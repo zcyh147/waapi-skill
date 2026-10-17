@@ -15,6 +15,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
+from .authoring_layout import LAYOUT_READ_URIS
+from .authoring_layout_business import LAYOUT_MUTATION_URIS
 from .authoring_ui_commands_manifest import (
     AUTHORING_UI_COMMAND_FUNCTION_URIS,
     AUTHORING_UI_COMMAND_TOPIC_URIS,
@@ -48,7 +50,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "8d25abc4519331083d9db8b0dd8783fde9f5521128c9ace9b6c12df6e29491b2"
+    "6a0876dc04c2fe129f220bf62928af6e2bd193d3a36d5c64a21047550ac5a3b2"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -119,35 +121,35 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         ),
         "2024.1": MappingProxyType(
             {
-                "functions": 161,
+                "functions": 175,
                 "topics": 34,
-                "public_functions": 161,
+                "public_functions": 175,
                 "public_topics": 34,
-                "public_total": 195,
+                "public_total": 209,
             }
         ),
         "2025.1": MappingProxyType(
             {
-                "functions": 168,
+                "functions": 183,
                 "topics": 35,
-                "public_functions": 168,
+                "public_functions": 183,
                 "public_topics": 35,
-                "public_total": 203,
+                "public_total": 218,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 849
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 849
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 203
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 878
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 878
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 218
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
             "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
-            "2024.1": "507ac5837fed7c1fd92f203c35e0eb638ca0f7b02236b35e3145fa890f7cb6a8",
-            "2025.1": "0b38412a85ac82e7005e1f6729b3abdbdd908946038e520fdee2ceadba7715ae",
+            "2024.1": "511f3a688e788441cf0c099af783ee131396e731a15215c26706b3988a0e61b5",
+            "2025.1": "4210b5c01ffbe0e48b7d0ff79386f3a65692f0b6f3c33495817cbcc1e194d8ba",
         }
     )
 )
@@ -181,16 +183,23 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "project-default-work-units",
         ),
         "ak.wwise.core.object.get": ("query-object", "buses"),
+        "ak.wwise.core.mediaPool.getFields": ("metadata media-pool-fields",),
         "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation",),
         "ak.wwise.core.object.getPropertyAndReferenceNames": (
             "metadata discover",
+            "metadata list",
+            "metadata detail",
         ),
         "ak.wwise.core.object.getPropertyInfo": (
             "metadata discover",
+            "metadata list",
+            "metadata detail",
         ),
         "ak.wwise.core.object.getTypes": (
             "metadata types",
             "metadata discover",
+            "metadata list",
+            "metadata detail",
         ),
         "ak.wwise.core.object.isPropertyEnabled": ("metadata property-state",),
         "ak.wwise.core.profiler.getGameObjects": (
@@ -226,7 +235,6 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
     {
         "ak.soundengine.getState",
         "ak.soundengine.getSwitch",
-        "ak.wwise.core.mediaPool.getFields",
         "ak.wwise.core.object.diff",
         "ak.wwise.core.object.isLinked",
         "ak.wwise.core.ping",
@@ -240,7 +248,8 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.wwise.waapi.getTopics",
     }
 ) | (
-    core_business_read_operations()
+    LAYOUT_READ_URIS
+    | core_business_read_operations()
     | media_build_business_operations()
     | runtime_inspection_business_read_operations()
 )
@@ -343,6 +352,7 @@ MANAGED_SESSION_PREFIXES = (
 
 LIFECYCLE_COMPANIONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
+        'ak.wwise.ui.layout.setLayout': ('ak.wwise.ui.layout.removeLayout',),
         "ak.soundengine.loadBank": ("ak.soundengine.unloadBank",),
         "ak.soundengine.registerGameObj": ("ak.soundengine.unregisterGameObj",),
         "ak.wwise.core.profiler.registerMeter": ("ak.wwise.core.profiler.unregisterMeter",),
@@ -678,7 +688,9 @@ class ExecutionContractRegistry:
                 program_case="fixed-command-dispatch",
             )
         if uri in BOUNDED_DIRECT_CALL_URIS:
-            if uri == "ak.wwise.waapi.getSchema":
+            if uri in LAYOUT_READ_URIS:
+                gateway_commands = ("request-schema", "layout-read")
+            elif uri == "ak.wwise.waapi.getSchema":
                 gateway_commands = ("request-schema", "waapi-schema")
             elif uri in (
                 core_business_operations()
@@ -697,12 +709,12 @@ class ExecutionContractRegistry:
                 gateway_commands=gateway_commands,
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
-                verification_strategy="result_schema",
+                verification_strategy=("bounded_native_observation" if uri in LAYOUT_READ_URIS else "result_schema"),
                 accepted_authorization_modes=(),
                 program_case="call-result-schema",
             )
 
-        effect = classify_function_effect(uri)
+        effect = "project_mutation" if uri in LAYOUT_MUTATION_URIS else classify_function_effect(uri)
         route = _transaction_route(uri, effect)
         project_guard_mode = PROJECT_TRANSITION_GUARD_MODES.get(
             uri,
@@ -736,6 +748,7 @@ class ExecutionContractRegistry:
             verification_strategy=(
                 "result_schema_and_project_transition"
                 if project_guard_mode != PROJECT_GUARD_INVARIANT
+                else "authoring_layout_state" if uri in LAYOUT_MUTATION_URIS
                 else "result_schema"
             ),
             accepted_authorization_modes=(

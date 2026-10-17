@@ -528,6 +528,7 @@ def generic_public_call_request(
 
 
 def generic_isolated_call_request(io_root: Path) -> dict[str, Any]:
+    io_root.mkdir(parents=True, exist_ok=True)
     return {
         "contract": OPERATION_REQUEST_CONTRACT,
         "version": "2023.1",
@@ -1627,7 +1628,10 @@ def test_compact_operations_reconstructs_detailed_directory_without_loss(
     defaults = compact["request_schema_route_defaults"]
     reconstructed = {}
     for row in compact["request_schema_routes"]:
-        full = {**defaults, **row}
+        namespaces = compact.get('request_schema_route_defaults_by_namespace', {})
+        matching = [prefix for prefix in namespaces if row['api'].startswith(prefix)]
+        namespace_defaults = namespaces[max(matching, key=len)] if matching else {}
+        full = {**defaults, **namespace_defaults, **row}
         full.setdefault("next_command", [
             part.replace("<api>", row["api"])
             for part in compact["request_schema_command_template"]
@@ -6604,14 +6608,17 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
         client=verify_client,
         version="2023.1",
     )
-    assert verify_exit == 0, verify_payload
-    assert verify_payload["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert verify_exit != 0, verify_payload
+    assert verify_payload["state"] == TransactionState.VERIFICATION_FAILED.value
     assert verify_payload["verified"] is False
-    assert verify_payload["result_schema_checked"] is True
-    assert verify_payload["verification_strength"] == "complete_reflected_schema"
-    assert verify_payload["agent_result"]["result"] == {}
-    assert verify_payload["agent_result"]["verified"] is False
-    assert verify_payload["agent_result"]["request"] == request
+    assert verify_payload["result_schema_checked"] is False
+    assert verify_payload["verification_strength"] == "partial_tone_artifact"
+    # A successful empty WAAPI reply cannot establish the missing artifact.
+    assert not (io_root / "tone.wav").exists()
+    events = TransactionStore(state_dir).read_events(transaction['transaction_id'])
+    completed = next(event for event in events if event['event_type'] == 'execution_completed')
+    assert completed['details']['dispatch_result']['result'] == {}
+    assert stored.artifact['request'] == request
 
 
 @pytest.mark.parametrize(

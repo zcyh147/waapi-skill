@@ -28,6 +28,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from wwise_waapi.recovery import PREWRITE_GUARD_REJECTION, recovery_receipt
+from wwise_waapi.native_catalog import (NATIVE_CATALOG_ROOT, NATIVE_HOSTS, load_native_catalog, native_capability)  # noqa: E402
 from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CapabilityCatalog,
     CapabilityNotFoundError,
@@ -40,6 +41,15 @@ from wwise_waapi.authoring_ui_commands_manifest import (  # noqa: E402  # pyrigh
 from wwise_waapi.authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS  # noqa: E402
 from wwise_waapi.authoring_core_manifest import COMMON_URIS as AUTHORING_CORE_URIS  # noqa: E402
 from wwise_waapi.authoring_core_manifest import requires_core_supplement  # noqa: E402
+from wwise_waapi.authoring_layout import (  # noqa: E402
+    LAYOUT_READS, LAYOUT_READ_URIS, LAYOUT_VERSIONS, MAX_LAYOUT_RESULT_BYTES,
+    layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
+)
+from wwise_waapi.layout_blueprint import validate_blueprint  # noqa: E402
+from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
+from wwise_waapi.authoring_layout_business import (  # noqa: E402
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor, validate_layout_call,
+)
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -48,6 +58,7 @@ from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[repor
     SemanticPreview,
     SemanticValidationError,
 )
+from wwise_waapi.wal_read_continuation import wal_read_contract  # noqa: E402
 from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DebugLuaContractError,
     MAX_WAL_TREE_NODES,
@@ -91,6 +102,7 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
 from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     HostPathError,
     host_path_comparison_key,
+    parse_absolute_host_path,
     localize_waapi_host_path,
 )
 from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -105,9 +117,16 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
+    MAX_QUERY_RETURN_SCOPE_BYTES,
     advanced_query_schema,
     build_advanced_object_get_query,
     build_object_get_query,
+    query_return_scope_options,
+)
+from wwise_waapi.object_query_outputs import (  # noqa: E402
+    QUERY_BUSINESS_OUTPUTS,
+    available_query_outputs,
+    query_output_detail,
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
@@ -243,6 +262,7 @@ from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[repo
 )
 from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_CONTRACT,
+    MAX_OPERATION_DRAFT_EVIDENCE_BYTES,
     OperationDraftBindingDrift,
     OperationDraftCheckRequired,
     OperationDraftNotAvailable,
@@ -284,6 +304,7 @@ from wwise_waapi.host_ui_debug_business_cli import (  # noqa: E402  # pyright: i
 )
 from wwise_waapi.host_ui_debug_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     materialize_waapi_schema_read_args,
+    MAX_HOST_PLAN_BYTES, MAX_COLLECTION_ITEMS, MAX_TEXT_BYTES, MAX_PATH_BYTES,
 )
 from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     core_business_catalog_rows,
@@ -582,7 +603,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
+AUTHORING_HOST_REQUIRED_URIS = LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -688,6 +709,12 @@ TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
 # canonical digest that binds the projection to the journal evidence.
 # Projection is intentionally delayed until transport cleanup succeeds.
 TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
+# Closed layout constructors retain their exact sealed request in agent_result.
+# Their exceptional capacity is bounded by the existing Draft seal ceiling plus
+# the ordinary terminal framing allowance, always below the global result cap.
+LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES = (
+    MAX_OPERATION_DRAFT_EVIDENCE_BYTES + TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+)
 TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
 TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES = 12 * 1024
 TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT = (
@@ -745,31 +772,6 @@ QUERY_BUSINESS_VIEWS: Mapping[str, tuple[str, ...]] = {
 }
 SOUNDBANK_GENERATED_TOPIC_URI = "ak.wwise.core.soundbank.generated"
 SOUNDBANK_TOPIC_IDENTITY_FIELDS = ("id", "name", "type", "path")
-QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
-    "notes": ("notes", "notes"),
-    "volume-db": ("@Volume", "volume_db"),
-    "pitch-cents": ("@Pitch", "pitch_cents"),
-    "output-bus": ("OutputBus", "output_bus"),
-    "source-language": ("audioSource:language", "source_language"),
-    "parent": ("parent", "parent"),
-    "owner": ("owner", "owner"),
-    "included": ("isIncluded", "included"),
-    "playable": ("isPlayable", "playable"),
-    "explicitly-muted": ("isExplicitMute", "explicitly_muted"),
-    "explicitly-soloed": ("isExplicitSolo", "explicitly_soloed"),
-    "child-count": ("childrenCount", "child_count"),
-    "plugin-name": ("pluginName", "plugin_name"),
-    "category": ("category", "category"),
-    "file-path": ("filePath", "file_path"),
-    "original-file-path": ("originalFilePath", "original_file_path"),
-    "active-source": ("activeSource", "active_source"),
-    "override-output": ("OverrideOutput", "override_output"),
-    "action-type": ("ActionType", "action_type"),
-    "target": ("Target", "target"),
-    "work-unit": ("workunit", "work_unit"),
-    "source-duration": ("audioSource:playbackDuration", "source_duration"),
-    "max-radius": ("audioSource:maxRadiusAttenuation", "max_radius"),
-}
 MAX_QUERY_BUSINESS_OUTPUTS = 32
 MAX_QUERY_CUSTOM_OUTPUTS = 16
 MAX_QUERY_CUSTOM_FIELD_CHARS = 128
@@ -1592,6 +1594,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     request_schema.add_argument("api")
 
+    layout_read = subparsers.add_parser(
+        "layout-read", help="Inspect layouts and views through a bounded Authoring read",
+    )
+    layout_read.add_argument("subject", choices=tuple(LAYOUT_READS))
+    layout_read.add_argument("--layout-name")
+    layout_read.add_argument("--element-handle")
+    layout_read.add_argument("--view-handle")
+    layout_inspect = subparsers.add_parser("layout-inspect", help="Discover session-bound layout, element and view identities")
+    layout_inspect.add_argument("--layout-name", required=True)
+
     waapi_schema = subparsers.add_parser(
         "waapi-schema",
         help="Read one exact WAAPI schema through a bounded business route",
@@ -1826,10 +1838,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="max_nodes",
         metavar=f"1..{MAX_WAL_TREE_NODES}",
         help=(
-            "Maximum WAL nodes returned after the complete bounded call; "
+            "Maximum node summaries or lossless document fragments per page; "
             f"defaults to 128 and is capped at {MAX_WAL_TREE_NODES}"
         ),
     )
+    debug_wal_tree.add_argument('--wal-page', help='Copy the Gateway-owned exact-observation continuation')
     debug_validate_call = subparsers.add_parser(
         "debug-validate-call",
         help=(
@@ -1874,7 +1887,14 @@ def build_parser() -> argparse.ArgumentParser:
         take=None,
         all_results=False,
     )
+    query_object.add_argument("--result-query", help="Copy the Gateway-issued bounded query read handle")
+    query_object.add_argument("--result-page", help="Copy the exact-result projection continuation")
     query_source.add_argument("--exact-id", dest="object_id")
+    query_source.add_argument("--type-selection", dest="query_type_selection",
+        help="Copy a Gateway-disclosed exact live type selection; native queryability is not implied")
+    query_source.add_argument("--short-id", type=int, help="Read candidates for one unsigned 32-bit Short ID; never a mutation identity")
+    from wwise_waapi.short_id_query_sources import SHORT_ID_KIND_CODES
+    query_object.add_argument("--short-id-kind", choices=tuple(SHORT_ID_KIND_CODES), help="Business kind required by the native typed Short ID selector")
     query_source.add_argument(
         "--kind",
         choices=QUERY_BUSINESS_KINDS,
@@ -1920,6 +1940,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument("--max-results", type=int)
+    query_object.add_argument("--platform", dest="query_platform", action="append", help="Read values for one exact platform name or GUID")
+    query_object.add_argument("--language", dest="query_language", action="append", help="Read values for one exact language name or GUID")
     query_object.add_argument(
         "--include",
         action="append",
@@ -2002,6 +2024,7 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
+            "media-pool-fields",
             "list",
             "detail",
             "discover",
@@ -2010,6 +2033,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     metadata_scope = metadata.add_mutually_exclusive_group()
+    metadata_scope.add_argument("--type-selection", dest="metadata_type_selection",
+                               help="Copy a disclosed live type selection for class metadata")
     metadata_scope.add_argument(
         "--path-segment",
         action="append",
@@ -2054,6 +2079,9 @@ def build_parser() -> argparse.ArgumentParser:
     metadata.add_argument("--page")
     metadata.add_argument("--page-size", type=int, default=20)
     metadata.add_argument("--selection")
+    metadata.add_argument("--detail-page", help="Copy the exact continuation from a metadata detail page")
+    metadata.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
+    metadata.add_argument("--detail-item", type=int)
     metadata.add_argument("--platform")
     metadata.add_argument(
         "--curve-role",
@@ -2182,7 +2210,9 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     capabilities.add_argument("--all-versions", action="store_true")
-    capabilities.add_argument(
+    capability_source = capabilities.add_mutually_exclusive_group()
+    capability_source.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect complete attested native reflection independently of executable profiles")
+    capability_source.add_argument(
         "--profile",
         choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
         default=CONSOLE_EXECUTION_PROFILE,
@@ -2192,6 +2222,7 @@ def build_parser() -> argparse.ArgumentParser:
             "selection never overrides live host detection"
         ),
     )
+    capabilities.add_argument("--offset", type=int, default=0, help="First matching row for complete offline pagination")
     capabilities.add_argument("--category")
     capabilities.add_argument("--item-type", choices=("function", "topic"))
     capabilities.add_argument("--family")
@@ -2219,8 +2250,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one URI, its schema, stable route, safety gate, request template when reviewed, and evidence boundary offline",
     )
     describe.add_argument("api")
+    description_source = describe.add_mutually_exclusive_group()
+    description_source.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect host-specific native schema truth without enabling execution")
     describe.add_argument("--all-versions", action="store_true")
-    describe.add_argument(
+    description_source.add_argument(
         "--profile",
         choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
         default=CONSOLE_EXECUTION_PROFILE,
@@ -2261,6 +2294,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_schema.add_argument("--all-versions", action="store_true")
+    query_schema.add_argument("--output", choices=tuple(QUERY_BUSINESS_OUTPUTS), help="Describe one closed business output, its native result shape and version availability")
     query_schema.add_argument(
         "--advanced",
         action="store_true",
@@ -2603,6 +2637,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
     add_cli_console_plan_arguments(draft_declare_cli_console_plan)
+    draft_layout_plan = subparsers.add_parser("draft-declare-layout-plan", help="Declare one closed Authoring layout outcome")
+    _add_business_draft_binding_arguments(draft_layout_plan)
+    draft_layout_plan.add_argument("--layout-handle", required=True)
+    draft_layout_plan.add_argument("--new-layout-name")
+    draft_layout_plan.add_argument("--view-handle")
+    draft_layout_plan.add_argument("--position-x", type=int)
+    draft_layout_plan.add_argument("--position-y", type=int)
+    draft_layout_plan.add_argument("--blueprint")
+    draft_layout_plan.add_argument('--splitter-handle')
+    draft_layout_plan.add_argument('--pixel-delta', type=int)
+    draft_layout_plan.add_argument('--target-element-handle')
+    draft_layout_plan.add_argument('--dock-side', choices=('left', 'right', 'top', 'bottom'))
+    draft_layout_plan.add_argument('--view-type')
+    draft_layout_plan.add_argument('--initial-x', type=int)
+    draft_layout_plan.add_argument('--initial-y', type=int)
     draft_declare_host_plan = subparsers.add_parser(
         "draft-declare-host-plan",
         help=(
@@ -3080,6 +3129,9 @@ def build_parser() -> argparse.ArgumentParser:
     field_mode.add_argument("--selection")
     draft_discover_fields.add_argument("--page")
     draft_discover_fields.add_argument("--page-size", type=int, default=20)
+    draft_discover_fields.add_argument("--detail-page")
+    draft_discover_fields.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
+    draft_discover_fields.add_argument("--detail-item", type=int)
     field_mode.add_argument(
         "--meaning",
         action="append",
@@ -3399,7 +3451,8 @@ def _execute_gateway_unconstrained(
     client_factory: ClientFactory | None = None,
     stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    args = build_parser().parse_args(argv)
+    original_argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(original_argv)
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
@@ -3466,6 +3519,23 @@ def _execute_gateway_unconstrained(
                 "stream-topic requires a live record sink; use the gateway CLI "
                 "entry point so every streamed record remains observable."
             )
+        if args.command == "query-object":
+            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore
+            if args.result_query is not None or args.result_page is not None:
+                if args.result_query is None or args.result_page is None:
+                    raise GatewayInputError("Query projection requires both returned --result-query and --result-page")
+                expected = build_parser().parse_args(["query-object", "--result-query", args.result_query, "--result-page", args.result_page])
+                expected.state_dir = args.state_dir
+                if vars(expected) != vars(args):
+                    raise GatewayInputError("A query result continuation accepts only its returned handle/page and existing state directory")
+                record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                handle, page = args.result_query, args.result_page
+                original_argv = record["plan"]["argv"]
+                args = build_parser().parse_args(original_argv)
+                if args.command != "query-object":
+                    raise GatewayInputError("Stored read is not an object query")
+                args.result_query, args.result_page, args.result_record = handle, page, record
+            args.original_query_argv = original_argv
         require_persisted_connection_binding(args, env=source_env)
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
@@ -3496,6 +3566,24 @@ def _execute_gateway_unconstrained(
             preflight_stable_read_input(args, env=source_env)
         if args.command == "typed-call":
             preflight_typed_request_input(args, env=source_env)
+        if args.command in {"layout-read", "layout-inspect"}:
+            try:
+                if args.command == "layout-inspect":
+                    layout_read_arguments("contents", args.layout_name)
+                elif args.subject in {"rectangle", "frontend"}:
+                    expected = args.element_handle if args.subject == "rectangle" else args.view_handle
+                    other = args.view_handle if args.subject == "rectangle" else args.element_handle
+                    if not isinstance(expected, str) or not re.fullmatch(r"lh1-[0-9a-f]{32}", expected) or other is not None or args.layout_name is not None:
+                        raise ValueError("Scoped layout read requires only its Gateway-issued identity handle")
+                else:
+                    if args.element_handle is not None or args.view_handle is not None:
+                        raise ValueError("This layout read does not accept an identity handle")
+                    layout_read_arguments(args.subject, args.layout_name)
+            except ValueError as exc:
+                raise GatewayInputError(str(exc)) from exc
+            configured_version = load_gateway_config(source_env).config.wwise_version
+            if configured_version is not None and configured_version not in LAYOUT_VERSIONS:
+                raise GatewayInputError("Layout reads require Wwise 2024.1 or 2025.1 Authoring; absent from the exact older native catalogs")
         if args.command == "core-call":
             preflight_core_business_input(args, env=source_env)
         if args.command in {"draft-apply", "draft-check", "preview-from-draft"}:
@@ -4582,7 +4670,7 @@ def transaction_capability(version: str, api: str) -> CapabilityRecord:
     """Resolve offline construction/guard facts, not permission to dispatch."""
     catalog = CapabilityCatalog()
     return (catalog.authoring_ui_describe(version, api)
-            if requires_core_supplement(version, api) else catalog.describe(version, api))
+            if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS else catalog.describe(version, api))
 
 
 def authoring_host_required_payload(
@@ -4600,7 +4688,7 @@ def authoring_host_required_payload(
         "command": command,
         "error_code": "AUTHORING_HOST_REQUIRED",
         "message": (
-            "This Wwise UI-command capability requires Wwise Authoring; "
+            "This Wwise Authoring capability requires Wwise Authoring; "
             "WwiseConsole cannot expose or execute it."
         ),
         "details": {
@@ -4734,7 +4822,7 @@ def live_authoring_transaction_boundary(
         if operation == "waapi.call" and isinstance(arguments, Mapping)
         else None
     )
-    if native_api in {"ak.wwise.ui.project.close", "ak.wwise.ui.project.create", "ak.wwise.ui.project.open"} or (
+    if native_api in LAYOUT_MUTATION_URIS or native_api in {"ak.wwise.ui.project.close", "ak.wwise.ui.project.create", "ak.wwise.ui.project.open"} or (
         isinstance(native_api, str)
         and requires_core_supplement(version_key_from_get_info(live_info), native_api)
     ):
@@ -4903,6 +4991,8 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
+    if args.api in LAYOUT_READ_URIS:
+        raise GatewayInputError("Layout reads use the closed layout-read continuation")
     if core_business_route_available(args.api, versions[0]):
         raise GatewayInputError(
             f"{args.api} uses request-schema and its closed Core business continuation"
@@ -5083,12 +5173,23 @@ def preflight_core_business_input(
         return
     if args.api in media_build_business_operations():
         try:
+            restored_plan = None
+            args.media_query_record = None
+            if args.api == MEDIA_POOL_GET_URI and args.media_query is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, MediaPoolQueryStore
+                store = MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env))
+                record = store.resolve(args.media_query)
+                if record["context"].get("configuration") != selected_connection_binding(env):
+                    raise MediaPoolContinuationError("Media Pool query configuration changed; start the search again")
+                args.media_query_record = record
+                restored_plan = record["plan"]
             media_input = media_build_input_from_namespace(
                 args,
                 operation=args.api,
                 version=versions[0],
+                restored_media_pool_plan=restored_plan,
             )
-        except MediaBuildBusinessCliError as exc:
+        except (MediaBuildBusinessCliError, ValueError, OSError) as exc:
             raise GatewayInputError(str(exc)) from exc
         args.media_build_request = media_input.materialized_request
         args.media_build_plan = media_input.deferred_media_pool_plan
@@ -5265,6 +5366,8 @@ def preflight_typed_zero_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-zero-call requires one configured Wwise version")
+    if args.api in LAYOUT_READ_URIS:
+        raise GatewayInputError("Layout reads use the closed layout-read continuation")
     contract = request_contract(versions[0], args.api)
     dedicated_zero = {
         "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
@@ -5342,6 +5445,25 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
     """Reject closed query input errors before opening a WAAPI transport."""
 
     relationships = tuple(getattr(args, "relationships", ()) or ())
+    args.object_ids = None
+    if args.short_id_kind is not None and args.short_id is None:
+        raise GatewayInputError("--short-id-kind requires the --short-id source")
+    if args.short_id is not None:
+        if not 0 <= args.short_id <= 4294967295 or args.max_results is None:
+            raise GatewayInputError("query-object --short-id requires uint32 0..4294967295 and explicit --max-results 1..1000")
+        from wwise_waapi.short_id_query_sources import short_id_selector
+        (short_id_version,) = resolve_catalog_versions(args, env=env)
+        try:
+            args.short_id_selector = short_id_selector(short_id_version, number=args.short_id, kind=args.short_id_kind)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+        validate_resolved_semantic_payload(OBJECT_GET_URI,
+            {"from": {"id": [args.short_id_selector]}, "transform": [{"range": [0, 65]}]},
+            {"return": list(SELECTED_REQUIRED_RETURN_FIELDS)}, version=short_id_version)
+        # Validate all requested business semantics before transport. Live
+        # resolution replaces this compiler-only placeholder with proven GUIDs.
+        args.object_ids = ("{00000000-0000-0000-0000-000000000000}",)
     business_view = getattr(args, "business_view", None)
     if business_view is not None:
         if not (
@@ -5384,7 +5506,17 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "--max-results or pass exactly 100."
             )
         args.max_results = 100
-    _compile_query_business_projection(args)
+    for key in ("platform", "language"):
+        selected = getattr(args, f"query_{key}", None) or []
+        if len(selected) > 1:
+            raise GatewayInputError(f"query-object --{key} accepts one exact selection")
+        setattr(args, f"query_{key}", selected[0] if selected else None)
+    try:
+        query_return_scope_options(platform=args.query_platform, language=args.query_language)
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    (projection_version,) = resolve_catalog_versions(args, env=env)
+    _compile_query_business_projection(args, version=projection_version)
     args.where = []
     args.select = [
         QUERY_BUSINESS_RELATIONSHIPS[value]
@@ -5407,6 +5539,9 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         args.object_type = kind_predicates[0][3]
         args.where.extend(kind_predicates[1:])
     custom_kind_meaning = getattr(args, "custom_kind_meaning", None)
+    type_selection = getattr(args, "query_type_selection", None)
+    if type_selection is not None and (not isinstance(type_selection, str) or len(type_selection) > 256):
+        raise GatewayInputError("--type-selection requires one bounded Gateway-disclosed type selection")
     if custom_kind_meaning is not None and (
         not isinstance(custom_kind_meaning, str)
         or not custom_kind_meaning
@@ -5457,13 +5592,15 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "max_results": args.max_results,
             },
             version=advanced_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
     if args.query_custom_field_meanings:
-        exact_object_scope = args.path is not None or args.object_id is not None
+        exact_object_scope = args.path is not None or args.object_id is not None or args.short_id is not None
         type_scope = (
-            args.object_type is not None or custom_kind_meaning is not None
+            args.object_type is not None or custom_kind_meaning is not None or type_selection is not None
         )
         if args.select:
             raise GatewayInputError(
@@ -5490,6 +5627,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=MAX_QUERY_TAKE,
             return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5500,14 +5639,16 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             args.object_type is not None,
             args.search is not None,
             args.query is not None,
+            args.short_id is not None,
             custom_kind_meaning is not None,
+            type_selection is not None,
         )
     ):
         raise GatewayInputError(
             "query-object requires one business source or --advanced-waql"
         )
 
-    if custom_kind_meaning is None:
+    if custom_kind_meaning is None and type_selection is None:
         where = typed_query_predicates(args)
         return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
@@ -5515,6 +5656,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         build_object_get_query(
             path=args.path,
             object_id=args.object_id,
+            object_ids=args.object_ids,
             type=args.object_type,
             search=args.search,
             query=args.query,
@@ -5523,11 +5665,13 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=args.take,
             return_fields=return_fields,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
     _require_explicit_query_bound(args)
 
 
-def _compile_query_business_projection(args: argparse.Namespace) -> None:
+def _compile_query_business_projection(args: argparse.Namespace, *, version: str) -> None:
     """Compile stable business output names into exact object.get accessors."""
 
     requested = list(getattr(args, "business_outputs", ()) or ())
@@ -5555,6 +5699,9 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
 
     bindings: list[tuple[str, str, str]] = []
     for name in requested:
+        if name not in available_query_outputs(version):
+            supported = query_output_detail(version, name)["supported_versions"]
+            raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}")
         native, output = QUERY_BUSINESS_OUTPUTS[name]
         bindings.append(("business", native, output))
 
@@ -5615,6 +5762,7 @@ def validate_original_file_reference_match_input(
             args.object_id is not None,
             args.object_type is not None,
             getattr(args, "custom_kind_meaning", None) is not None,
+            getattr(args, "query_type_selection", None) is not None,
             args.search is not None,
             args.query is not None,
         )
@@ -5709,6 +5857,7 @@ def preflight_metadata_input(
     semantic_kind = getattr(args, "metadata_semantic_kind", None)
     custom_kind_meaning = getattr(args, "metadata_custom_kind_meaning", None)
     exact_id = getattr(args, "metadata_exact_id", None)
+    type_selection = getattr(args, "metadata_type_selection", None)
     meanings = list(getattr(args, "metadata_meanings", None) or ())
     if path_segments:
         args.object = _business_object_path_from_segments(path_segments)
@@ -5738,17 +5887,36 @@ def preflight_metadata_input(
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
     args.detail = False
 
-    if args.operation == "types":
+    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation not in {"detail", "media-pool-fields", "types"}:
+        raise GatewayInputError("metadata --detail-page requires detail --selection")
+    if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
+        raise GatewayInputError("metadata --detail-item requires a nonnegative typed choices/dependencies item index")
+
+    if args.operation in {"types", "media-pool-fields"}:
+        if args.operation == "types" and args.selection is not None and meanings:
+            raise GatewayInputError("metadata types --selection cannot also filter the inventory with --meaning")
+        if args.operation == "media-pool-fields" and resolve_catalog_versions(args, env=env) != ("2025.1",):
+            raise GatewayInputError("Media Pool field discovery requires the Wwise 2025.1 contract")
         if (
             path_segments
             or semantic_kind is not None
             or custom_kind_meaning is not None
             or exact_id is not None
-            or meanings
+            or type_selection is not None
             or args.platform
             or args.curve_role
         ):
-            raise GatewayInputError("metadata types accepts no business input")
+            raise GatewayInputError(f"metadata {args.operation} accepts no business input")
+        if (not 1 <= args.page_size <= 64
+                or args.selection is not None and args.page is not None
+                or args.detail_page is not None and args.selection is None
+                or args.detail_view != "raw" or args.detail_item is not None):
+            raise GatewayInputError(f"metadata {args.operation} requires --page-size 1..64 and compatible paging/selection inputs")
+        if len(meanings) > MAX_METADATA_DISCOVERY_QUERIES or any(
+            not meaning.strip() or meaning != meaning.strip()
+            or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS for meaning in meanings
+        ) or sum(map(len, meanings)) > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
+            raise GatewayInputError(f"metadata {args.operation} --meaning must contain bounded, trimmed lexical filters")
         return
 
     if args.operation in {"discover", "property-state"}:
@@ -5794,7 +5962,7 @@ def preflight_metadata_input(
     if args.operation in {"discover", "list", "detail"}:
         if sum(
             value is not None
-            for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id)
+            for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id, type_selection)
         ) != 1:
             raise GatewayInputError(
                 "metadata discover requires exactly one --path-segment, --kind, "
@@ -5804,6 +5972,8 @@ def preflight_metadata_input(
             raise GatewayInputError(
                 "metadata discover does not accept --platform or --curve-role"
             )
+        if type_selection is not None and args.operation not in {"list", "detail"}:
+            raise GatewayInputError("metadata --type-selection requires list or detail")
         return
 
     if args.operation == "property-state":
@@ -5985,6 +6155,12 @@ def preflight_debug_read_input(
                 "debug-wal-tree --max-nodes must be between 1 and "
                 f"{MAX_WAL_TREE_NODES}"
             )
+        if args.wal_page is not None:
+            from wwise_waapi.wal_read_continuation import parse_wal_page, WalContinuationError
+            try:
+                parse_wal_page(args.wal_page)
+            except WalContinuationError as exc:
+                raise GatewayInputError(str(exc)) from exc
         return
     if args.command != "debug-validate-call":
         raise GatewayInputError(f"unsupported debug-read command: {args.command}")
@@ -6072,6 +6248,11 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"{args.command} --event-count must be between 1 and "
                 f"{MAX_WAIT_EVENT_COUNT}"
             )
+    elif args.command == 'draft-declare-layout-plan' and args.blueprint is not None:
+        try:
+            validate_blueprint(parse_json_object(args.blueprint, '--blueprint', max_document_bytes=256 * 1024))
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     elif args.command == "draft-apply":
         # The authorized Draft binding decides the operation-local typed
         # Composer grammar. Dispatch performs that state-bound decision before
@@ -6824,6 +7005,8 @@ def operation_composer_input_contract(
 def operation_draft_schema_digest(operation: str, version: str) -> str:
     """Bind named-operation and exact-URI Drafts to their owning schema."""
 
+    if operation in LAYOUT_MUTATION_URIS:
+        return canonical_sha256(layout_business_contract_data(operation, version))
     if operation.startswith("ak."):
         return request_contract(version, operation).schema_digest
     if operation in DRAFT_TYPED_OPERATIONS:
@@ -6890,6 +7073,7 @@ def public_typed_contract(version: str, api: str) -> Any:
 
 def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
     """Describe one deep fixed route without exposing its native request schema."""
+    from wwise_waapi.media_pool_field_discovery import media_pool_field_discovery_contract
 
     def command_requires_business_values(command: str) -> bool:
         return (
@@ -6901,7 +7085,7 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
             "profiler-voice-contributions",
             "debug-validate-call",
             }
-            and command != "metadata types"
+            and command not in {"metadata types", "metadata media-pool-fields"}
         )
 
     commands = [
@@ -6970,6 +7154,11 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         "input_shape": "fixed_business_command",
         "native_request_fields_disclosed": False,
         "commands": commands,
+        **({"business_contract": media_pool_field_discovery_contract()}
+           if capability.uri == "ak.wwise.core.mediaPool.getFields" else {}),
+        **({'business_contract': wal_read_contract(
+            native_limit=int(capability.execution_contract['result_limit_bytes']), maximum=MAX_WAL_TREE_NODES)}
+           if capability.uri == 'ak.wwise.debug.getWalTree' else {}),
         "continuation": (
             commands[0]
             if len(commands) == 1
@@ -6985,7 +7174,9 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     """Expose one reviewed Core declaration without reflected typed fields."""
 
     contract = (
-        host_ui_debug_business_contract_data(api, version)
+        layout_business_contract_data(api, version)
+        if api in LAYOUT_MUTATION_URIS
+        else host_ui_debug_business_contract_data(api, version)
         if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS
         else cli_console_business_contract_data(api, version)
         if api in CLI_CONSOLE_BUSINESS_OPERATIONS
@@ -7034,6 +7225,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 
 
 def core_business_route_available(api: str, version: str) -> bool:
+    if api in LAYOUT_MUTATION_URIS:
+        return version in layout_mutation_versions(api)
     if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS:
         return version in host_ui_debug_business_versions(api)
     if api in CLI_CONSOLE_BUSINESS_OPERATIONS:
@@ -8309,9 +8502,16 @@ def query_business_schema_payload(
     version: str,
     *,
     advanced: bool,
+    output: str | None = None,
 ) -> dict[str, Any]:
     """Describe the one deep direct-read continuation for an object query."""
 
+    if output is not None:
+        return {
+            "contract": BUSINESS_QUERY_SCHEMA_CONTRACT,
+            "ok": True, "status": "ok", "command": "query-schema", "version": version,
+            "business_output": query_output_detail(version, output),
+        }
     if advanced:
         advanced_schema = advanced_query_schema(version=version)
         waql_schema = advanced_schema["properties"]["waql"]
@@ -8325,7 +8525,10 @@ def query_business_schema_payload(
             "query_contract": ADVANCED_QUERY_CONTRACT,
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
-            "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+            "return_scope": _query_return_scope_contract(),
+            "result_presence": _query_result_presence_contract(),
+            "business_outputs": list(available_query_outputs(version)),
+            "output_detail": "query-schema --output <business-output>",
             "custom_outputs": {
                 "available": False,
                 "reason": "advanced WAQL has no Gateway-provable live metadata scope",
@@ -8364,7 +8567,10 @@ def query_business_schema_payload(
         "query_contract": BUSINESS_QUERY_CONTRACT,
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
-        "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+        "return_scope": _query_return_scope_contract(),
+        "result_presence": _query_result_presence_contract(),
+        "business_outputs": list(available_query_outputs(version)),
+        "output_detail": "query-schema --output <business-output>",
         "custom_outputs": {
             "field_meaning": "--include-field <user-facing property/reference meaning>",
             "authority": "live WAAPI metadata bound by the Gateway before object.get",
@@ -8373,8 +8579,10 @@ def query_business_schema_payload(
         "sources": {
             "object_path": "--path-segment <one literal name> (repeat)",
             "exact_object_id": "--exact-id <canonical GUID>",
+            "short_id_candidates": "--short-id <uint32> --short-id-kind <business-kind> --max-results <1..1000>",
             "common_kind": "--kind <closed business kind>",
             "custom_kind": "--custom-kind <user-facing type meaning>",
+            "selected_native_kind": "--type-selection <Gateway-issued live type selection>",
             "search": "--search-text <literal text>",
             "query_id": "--query-id <canonical GUID>",
             "query_path": "--query-path-segment <one literal name> (repeat)",
@@ -8386,6 +8594,17 @@ def query_business_schema_payload(
             "sound-voice": "only Sound objects whose source language is not SFX",
         },
         "source_rules": {
+            "selected_native_kind": {"discovery": "metadata types; copy the disclosed selection, including when a native name is too large to inline",
+                "binding": "exact current native name, inventory, endpoint, build, session and 900-second expiry",
+                "native_queryability": "getTypes membership does not prove WAQL type support; native errors are retained without alias inference or retry",
+                "class_id_and_category": "optional catalog facts are not WAQL type names", "mutation_authority": False},
+            "short_id": {"lookup": "native from.id structured Short ID and Gateway-derived type code, at most 65 candidate identities; 65 stops at an explicit 64-source resource boundary",
+                         "kind_choices": ["event", "switch-group", "state-group", "effect", "soundbank", "bus", "aux-bus", "game-parameter", "trigger", "audio-device"],
+                         "mapped_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+                         "2021.1": "native shape exists; business-kind codes remain unresolved pending matching proof, not a native absence",
+                         "combined_semantics": "Gateway resolves canonical GUID candidates before applying all requested predicates, relationships, outputs, platform and language",
+                         "custom_fields": "requires exactly one resolved GUID; nonunique source requires selecting an exact GUID first",
+                         "mutation_authority": False, "later_change": "select and verify canonical GUID through the exact-ID route"},
             "exactly_one_source": True,
             "common_kind_is_a_source": (
                 "--kind is valid only when no path, id, search, or Query Editor "
@@ -8672,6 +8891,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 )
             except CapabilityNotFoundError:
                 capability = None
+        if args.api in LAYOUT_READ_URIS:
+            if args.command != "request-schema":
+                raise GatewayInputError("Layout reads use request-schema and its closed layout-read continuation")
+            try:
+                return layout_read_contract(versions[0], args.api)
+            except ValueError as exc:
+                raise GatewayInputError(str(exc)) from exc
         if (
             args.command == "request-schema"
             and capability is not None
@@ -9347,6 +9573,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "draft-start requires an explicit or configured Wwise version."
             )
+        if args.operation in LAYOUT_READ_URIS:
+            raise GatewayInputError("Layout reads use request-schema and its closed layout-read continuation")
         if args.operation in (
             media_build_business_operations()
             | runtime_inspection_business_read_operations()
@@ -9492,12 +9720,50 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             reset=bool(args.reset),
         )
 
+    if args.command == "capabilities" and args.native_host:
+        versions = resolve_catalog_versions(args, env=env)
+        if args.limit < 0 or args.offset < 0:
+            raise GatewayInputError("--limit and --offset must be zero or greater")
+        selected = []
+        summaries = {}
+        for version in versions:
+            native = load_native_catalog(version, args.native_host, root=NATIVE_CATALOG_ROOT)
+            summaries[version] = {"functions": len(native["functions"]), "topics": len(native["topics"]), "schema_count": len(native["schemas"]), "evidence_kind": "reflection_only", "build": native["provenance"]["build"], "content_sha256": native["content_sha256"]}
+            execution_profile = AUTHORING_UI_EXECUTION_PROFILE if args.native_host == "wwise-authoring" else CONSOLE_EXECUTION_PROFILE
+            execution_records = {entry.uri: entry for entry in CapabilityCatalog().entries_for_profile(version, profile=execution_profile)}
+            for uri in sorted(native["schemas"]):
+                row = native_capability(native, uri, compact=not args.detail, execution_records=execution_records)
+                if args.item_type and row["item_type"] != args.item_type:
+                    continue
+                if args.query and args.query.casefold() not in uri.casefold():
+                    continue
+                if args.category and row.get("category") != args.category:
+                    continue
+                if args.family and row["interface"].get("semantic_family") != args.family:
+                    continue
+                if args.route and row["interface"].get("preferred_route") != args.route:
+                    continue
+                selected.append(row)
+        visible = [] if args.summary_only else selected[args.offset:args.offset + args.limit] if args.limit else selected[args.offset:]
+        more = not args.summary_only and args.offset + len(visible) < len(selected)
+        continuation = None
+        if more:
+            next_argv = ([] if args.all_versions else ["--version", versions[0]]) + ["capabilities", "--native-host", args.native_host, "--limit", str(args.limit), "--offset", str(args.offset + len(visible))]
+            if args.all_versions:
+                next_argv.append("--all-versions")
+            for flag, value in (("--item-type", args.item_type), ("--query", args.query), ("--category", args.category), ("--family", args.family), ("--route", args.route)):
+                if value:
+                    next_argv.extend([flag, value])
+            if args.detail:
+                next_argv.append("--detail")
+            continuation = {"gateway_argv": next_argv}
+        return {"contract": GATEWAY_RESULT_CONTRACT, "ok": True, "status": "ok", "command": "capabilities", "offline": True, "native_host": args.native_host, "versions": list(versions), "summary": summaries, "match_count": len(selected), "returned_count": len(visible), "truncated": more, "capabilities": visible, "continuation": continuation}
     if args.command == "capabilities":
         catalog = CapabilityCatalog()
         versions = resolve_catalog_versions(args, env=env)
         profile = args.profile
-        if args.limit < 0:
-            raise GatewayInputError("--limit must be zero or greater")
+        if args.limit < 0 or args.offset < 0:
+            raise GatewayInputError("--limit and --offset must be zero or greater")
         selected = []
         for version in versions:
             selected.extend(
@@ -9512,7 +9778,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 )
             )
         total_matches = len(selected)
-        visible = selected[: args.limit] if args.limit else selected
+        visible = selected[args.offset:args.offset + args.limit] if args.limit else selected[args.offset:]
         payload: dict[str, Any] = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -9535,7 +9801,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "match_count": total_matches,
             "returned_count": 0 if args.summary_only else len(visible),
-            "truncated": (not args.summary_only) and len(visible) < total_matches,
+            "truncated": (not args.summary_only) and args.offset + len(visible) < total_matches,
         }
         if not args.summary_only:
             payload["capabilities"] = [
@@ -9543,6 +9809,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 for entry in visible
             ]
         return payload
+    if args.command == "describe" and args.native_host:
+        versions = resolve_catalog_versions(args, env=env)
+        availability = {}
+        for version in versions:
+            native = load_native_catalog(version, args.native_host, root=NATIVE_CATALOG_ROOT)
+            present = args.api in native["functions"] or args.api in native["topics"]
+            availability[version] = {"available": present, **({"capability": native_capability(native, args.api, full_schema=args.full_schema)} if present else {"status": "absent_from_attested_native_inventory", "fallback_allowed": False})}
+        return {"contract": GATEWAY_RESULT_CONTRACT, "ok": True, "status": "ok", "command": "describe", "offline": True, "native_host": args.native_host, "versions": list(versions), "api": args.api, "availability": availability}
     if args.command == "describe":
         catalog = CapabilityCatalog()
         versions = resolve_catalog_versions(args, env=env)
@@ -9666,7 +9940,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if len(versions) == 1:
             return {
                 **query_business_schema_payload(
-                    versions[0], advanced=args.advanced
+                    versions[0], advanced=args.advanced, output=args.output
                 ),
                 "offline": True,
                 "versions": list(versions),
@@ -9688,6 +9962,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 version: query_business_schema_payload(
                     version,
                     advanced=args.advanced,
+                    output=args.output,
                 )
                 for version in versions
             },
@@ -9744,6 +10019,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             operations.append(projection)
         request_schema_routes = list(
             (
+                *layout_catalog_rows(),
+                *layout_business_catalog_rows(),
                 *cli_console_business_catalog_rows(),
                 *host_ui_debug_business_catalog_rows(),
                 *core_business_catalog_rows(),
@@ -9925,12 +10202,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "supported_versions": list(versions),
                 "host_surface": "wwise-console",
             }
+            namespace_defaults = {"ak.wwise.ui.layout.": {"host_surface": "wwise-authoring",
+                "supported_versions": list(LAYOUT_VERSIONS)}, "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
+                "ak.soundengine.": {"intent": "perform one closed SoundEngine runtime business operation"},
+                "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view"}}
+            def defaults_for_route(api: str) -> dict[str, Any]:
+                matching = [prefix for prefix in namespace_defaults if api.startswith(prefix)]
+                return {**route_defaults, **(namespace_defaults[max(matching, key=len)] if matching else {})}
             payload["request_schema_routes"] = [
                 {
                     key: value
                     for key, value in row.items()
                     if not (
-                        (key in route_defaults and value == route_defaults[key])
+                        (key in defaults_for_route(row["api"]) and value == defaults_for_route(row["api"])[key])
                         or (
                             key == "next_command"
                             and value == ["request-schema", row["api"]]
@@ -9943,10 +10227,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "operation-schema", "<name>",
             ]
             payload["request_schema_route_defaults"] = route_defaults
+            payload["request_schema_route_defaults_by_namespace"] = namespace_defaults
             payload["directory_reading"] = (
-                "Request rows inherit omitted supported_versions and host_surface "
-                "from request_schema_route_defaults; explicit row fields override. "
-                "For schema discovery only, use a row's next_command if present; "
+                "Rows inherit request_schema_route_defaults, then the longest matching API prefix in "
+                "request_schema_route_defaults_by_namespace; explicit row fields override. "
+                "For schema discovery, use row next_command when present; "
                 "otherwise instantiate the static schema-command templates: "
                 "operation_schema_command_template replaces only <name> with the "
                 "selected name; request_schema_command_template replaces only <api> "
@@ -11303,6 +11588,8 @@ def dispatch_soundengine_business_read(
         except RuntimeGameObjectHandleError as exc:
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "handle_kind": "game_object", "handle": handle,
+                    "required_identity": "live scoped runtime game object", "operation_dispatched": False},
                 error_code=exc.error_code,
             ) from exc
         native_args["gameObject"] = game_object_record.game_object_id
@@ -11419,6 +11706,7 @@ def dispatch_core_business_read(
     if args.api in media_build_business_operations():
         return dispatch_media_build_business_read(
             args,
+            env=env,
             connection=connection,
             detected_version=detected_version,
             live_info=live_info,
@@ -11482,18 +11770,22 @@ def dispatch_core_business_read(
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     by_id: dict[str, Mapping[str, Any]] = {}
-    for row in rows:
+    for row_index, row in enumerate(rows):
         try:
             identity = normalize_live_object_identity(row)
         except ValueError as exc:
             raise GatewayResultShapeError(
                 "Core business identity row is malformed.",
+                details={"api": args.api, "reason": "malformed_identity", "row_index": row_index,
+                    "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             ) from exc
         key = identity.object_id
         if key in by_id:
             raise GatewayResultShapeError(
                 "Core business identity read returned a duplicate object.",
+                details={"api": args.api, "reason": "duplicate_identity", "row_index": row_index,
+                    "object_id": key, "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             )
         by_id[key] = {
@@ -11506,6 +11798,8 @@ def dispatch_core_business_read(
     if set(by_id) != {value.upper() for value in requested.values()}:
         raise GatewayResultShapeError(
             "Core business identity read did not match the requested objects.",
+            details={"api": args.api, "reason": "identity_set_mismatch", "requested_ids": list(requested.values()),
+                "actual_ids": sorted(by_id), "operation_dispatched": False},
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     authority = "da1-" + canonical_sha256(
@@ -11701,6 +11995,9 @@ def dispatch_runtime_inspection_business_read(
         except RuntimeInspectionBusinessError as exc:  # pragma: no cover - store invariant
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "transport_handle": transport_record.handle,
+                    "binding_stage": "materialize_stored_transport_binding", "cause_type": type(exc).__name__,
+                    "operation_dispatched": False},
                 error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
             ) from exc
     else:
@@ -11854,6 +12151,7 @@ def dispatch_runtime_inspection_business_read(
 def dispatch_media_build_business_read(
     args: argparse.Namespace,
     *,
+    env: Mapping[str, str],
     connection: GatewayConnection,
     detected_version: str,
     live_info: Mapping[str, Any],
@@ -11861,6 +12159,20 @@ def dispatch_media_build_business_read(
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Revalidate and execute one closed media/build business read."""
+
+    def native_failure_evidence(native_call: Mapping[str, Any], *, maximum_inline_bytes: int | None = None) -> dict[str, Any]:
+        observation = native_call.get("result")
+        inline_limit = maximum_inline_bytes or (6 * 1024 if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else 64 * 1024)
+        evidence: dict[str, Any] = {"call": dispatch_call_summary(native_call)}
+        if probe_gateway_json_document_size(observation, inline_limit) == "ok":
+            evidence["native_observation"] = observation
+        else:
+            evidence["native_observation_boundary"] = {
+                "complete": False, "inline_limit_bytes": inline_limit,
+                "native_result_sha256": canonical_sha256(observation),
+                "evidence_path": native_call.get("evidence_path"),
+            }
+        return evidence
 
     project, project_call = current_project(
         dispatcher,
@@ -11874,6 +12186,8 @@ def dispatch_media_build_business_read(
         version=detected_version,
     )
     field_discovery_call = None
+    media_page = None
+    media_context_available = False
     if args.api == MEDIA_POOL_GET_URI:
         field_api = "ak.wwise.core.mediaPool.getFields"
         field_capability = live_capability(
@@ -11924,9 +12238,46 @@ def dispatch_media_build_business_read(
                 available_media_fields=available_fields,
             )
         except MediaBuildBusinessError as exc:
+            details = None
+            if exc.field_choices is not None:
+                choices = [name for name in exc.field_choices if len(name) <= 256][:20]
+                details = {"field_choices": choices, "field_choices_complete": len(choices) == len(exc.field_choices),
+                           "next_command": transaction_next_command("metadata", ["metadata", "media-pool-fields"])}
+            if details is not None:
+                raise BusinessFieldInputError(str(exc), details=details, error_code=exc.code) from exc
             raise GatewayInputError(str(exc)) from exc
+        from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, prepare_media_pool_page
+        media_context_available = (_canonical_guid(live_info.get("sessionId")) and isinstance(live_info.get("processId"), int)
+                                   and not isinstance(live_info.get("processId"), bool) and live_info["processId"] > 0)
+        media_context = {
+            "configuration": selected_connection_binding(env),
+            "modification_policy": load_gateway_config(env).config.project_modification_policy,
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")},
+        }
+        try:
+            if args.media_query_record is not None:
+                state_dir = resolve_transaction_state_directory(args, env=env)
+                require_runtime_directory_outside_project(state_dir, project=project)
+                if args.media_query_record["context"] != media_context:
+                    raise MediaPoolContinuationError("Stored Media Pool query belongs to a different live context; start the search again")
+            media_page = prepare_media_pool_page(request, token=args.media_page, context=media_context)
+        except MediaPoolContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
+    peak_page = None
+    if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
+        from wwise_waapi.peak_read_continuation import PeakContinuationError, prepare_peak_page
+        peak_context = {"configuration": selected_connection_binding(env),
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")}}
+        try:
+            peak_page = prepare_peak_page(request, token=args.peak_page, context=peak_context)
+        except PeakContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     if args.api == MEDIA_POOL_GET_URI:
         required_type = None
         identity_rows = None
@@ -11994,15 +12345,14 @@ def dispatch_media_build_business_read(
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
     )
-    result_validation = (
-        validate_semantic_result(
-            request["api"],
-            result.get("result"),
-            version=detected_version,
+    try:
+        result_validation = (
+            validate_semantic_result(request["api"], result.get("result"), version=detected_version)
+            if result.get("ok") else None
         )
-        if result.get("ok")
-        else None
-    )
+    except SemanticValidationError as exc:
+        raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result),
+            error_code="MEDIA_BUILD_RESULT_INVALID") from exc
     normalized = None
     result_identity_rows: list[Mapping[str, Any]] = []
     if result.get("ok"):
@@ -12064,13 +12414,61 @@ def dispatch_media_build_business_read(
         except MediaBuildBusinessError as exc:
             raise GatewayResultShapeError(
                 str(exc),
-                details={"media_build_error_code": exc.code},
+                details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
+        if peak_page is not None:
+            from wwise_waapi.peak_read_continuation import finish_peak_page, peak_page_argv
+            context_available = (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
+                and live_info["processId"] > 0)
+            try:
+                normalized = finish_peak_page(peak_page, raw=result["result"], normalized=normalized,
+                    context_available=bool(context_available),
+                    next_command=lambda token: transaction_next_command("core-call", peak_page_argv(request, token)))
+            except PeakContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result,
+                    maximum_inline_bytes=4096 if exc.code == "PEAK_PROJECTION_LIMIT_EXCEEDED" else None), error_code=exc.code) from exc
+        if args.api == MEDIA_POOL_GET_URI:
+            from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
+            try:
+                normalized, next_page, next_maximum = finish_media_pool_page(media_page, rows=result["result"]["return"],
+                    request=request, normalized=normalized, context_available=media_context_available)
+            except MediaPoolContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result), error_code=exc.code) from exc
+            if next_page is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                handle = args.media_query
+                state_dir = None
+                if handle is not None:
+                    state_dir = resolve_transaction_state_directory(args, env=env)
+                next_command = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
+                if handle is None and probe_gateway_json_document_size(next_command, 64 * 1024) != "ok":
+                    try:
+                        state_dir = resolve_transaction_state_directory(args, env=env)
+                        require_runtime_directory_outside_project(state_dir, project=project)
+                        handle = MediaPoolQueryStore(state_dir).issue(plan=args.media_build_plan, context=media_context, issued=media_page.issued)
+                    except (MediaPoolContinuationError, GatewayInputError, OSError) as exc:
+                        normalized["page"]["query_state_unavailable"] = str(exc)[:512]
+                if handle is not None:
+                    next_command = transaction_next_command("core-call", ["core-call", MEDIA_POOL_GET_URI,
+                        "--max-results", str(next_maximum), "--media-query", handle, "--media-page", next_page], state_dir=state_dir)
+                if probe_gateway_json_document_size(next_command, 64 * 1024) == "ok":
+                    normalized["next_command"] = next_command
+                else:
+                    normalized["page"].update({
+                        "continuation_unavailable_reason": "continuation_command_limit_exceeded",
+                        "continuation_command_limit_bytes": 64 * 1024,
+                    })
+            elif args.media_query is not None and normalized.get("complete") is True:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                try:
+                    MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env)).retire(args.media_query)
+                except (MediaPoolContinuationError, OSError) as exc:
+                    normalized["page"]["query_state_cleanup"] = {"complete": False, "message": str(exc)[:512]}
     incomplete_media_pool = (
         args.api == MEDIA_POOL_GET_URI
         and isinstance(normalized, Mapping)
-        and normalized.get("complete") is False
+        and normalized.get("incomplete_reason") == "candidate_limit_reached_before_exact_case_post_filter"
     )
     effective_ok = bool(result.get("ok")) and not incomplete_media_pool
     return {
@@ -12078,6 +12476,11 @@ def dispatch_media_build_business_read(
         "status": (
             "incomplete_boundary"
             if incomplete_media_pool
+            else "partial"
+            if isinstance(normalized, Mapping) and (
+                normalized.get("projection_complete") is False
+                or args.api == MEDIA_POOL_GET_URI and normalized.get("complete") is False
+            )
             else "ok"
             if result.get("ok")
             else "error"
@@ -12122,6 +12525,19 @@ def dispatch_media_build_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
+        **({key: value for key, value in native_failure_evidence(result).items() if key != "call"}
+           if incomplete_media_pool else {}),
+        **({"read_page": normalized["page"]} if incomplete_media_pool else {}),
+        **({"next_command": normalized["next_command"]}
+           if incomplete_media_pool and "next_command" in normalized else {}),
+        **({"read_resource_boundary": {
+                "requested_pairs_per_channel": request["business_request"]["peak_pair_count"],
+                "requested_channel_mode": request["business_request"]["channel_mode"],
+                "combined_native_result_limit_bytes": int(capability.execution_contract["result_limit_bytes"]),
+                "native_capability_or_completion_proven": False,
+                "next_step": "Review the disclosed schema and choose an explicit smaller read; original resolution, region and channel mode are preserved and never silently changed",
+            }, "next_command": transaction_next_command("request-schema", ["request-schema", args.api])}
+           if peak_page is not None and result.get("error_code") == "RESULT_TOO_LARGE" else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 
@@ -12911,6 +13327,8 @@ def _source_control_roots_from_project(
     if not isinstance(directories, Mapping):
         raise GatewayResultShapeError(
             "Live project information lacks source-control directory roots.",
+            details={"reason": "directory_map_missing", "required_fields": ["directories.root", "directories.originals"],
+                "actual_directories_type": type(directories).__name__, "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     project_root = directories.get("root")
@@ -12921,6 +13339,9 @@ def _source_control_roots_from_project(
     ):
         raise GatewayResultShapeError(
             "Live project information contains invalid source-control roots.",
+            details={"reason": "directory_roots_invalid", "required_fields": ["directories.root", "directories.originals"],
+                "invalid_fields": ["directories." + key for key, value in (("root", project_root), ("originals", originals_root))
+                    if not isinstance(value, str) or not value], "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     return {
@@ -13022,6 +13443,149 @@ def dispatch_business_source_control_plan(
     return payload
 
 
+def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str, str],
+    connection: GatewayConnection, detected_version: str, live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher, common: Mapping[str, Any]) -> dict[str, Any]:
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(args.draft_id, task_authority=args.task_authority)
+    if pending.operation not in LAYOUT_MUTATION_URIS:
+        raise GatewayInputError('This Draft does not expose a layout business plan')
+    boundary = live_authoring_api_boundary(pending.operation, command=args.command, live_info=live_info, common=common)
+    if boundary is not None:
+        return boundary
+    binding = _open_business_binding(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    adapter = business_adapter(binding.record.operation)
+    context = layout_identity_context(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    identity = resolve_layout_identity(args.layout_handle, role='layout', context=context, args=args,
+        env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+    plan = {'layout_handle': args.layout_handle}
+    if pending.operation == LAYOUT_SET_URI:
+        plan['new_layout_name'] = args.new_layout_name
+    elif args.new_layout_name is not None:
+        raise GatewayInputError('--new-layout-name belongs only to temporary layout registration')
+    blueprint = None
+    if args.blueprint is not None:
+        if pending.operation != LAYOUT_SET_URI:
+            raise GatewayInputError('Nested blueprint belongs only to temporary layout registration')
+        blueprint = validate_blueprint(parse_json_object(args.blueprint, '--blueprint', max_document_bytes=256 * 1024))
+        plan['blueprint'] = blueprint
+    view_request = None
+    if pending.operation == LAYOUT_GET_OR_CREATE_URI:
+        view_request = {'view_type': args.view_type}
+        for field in ('initial_x', 'initial_y'):
+            if getattr(args, field) is not None:
+                view_request[field] = getattr(args, field)
+        plan.update(view_request)
+    elif args.view_type is not None or args.initial_x is not None or args.initial_y is not None:
+        raise GatewayInputError('View type and initial coordinates belong only to get-or-create-view')
+    view_identity = None
+    if pending.operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
+        view_identity = resolve_layout_identity(args.view_handle, role='view', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        if view_identity['layout_name'] != identity['layout_name']:
+            raise GatewayInputError('View and layout handles must identify the same layout')
+        plan['view_handle'] = args.view_handle
+    elif args.view_handle is not None:
+        raise GatewayInputError('--view-handle belongs only to a scoped view mutation')
+    position_request = None
+    if pending.operation == LAYOUT_UNDOCK_URI:
+        position_request = {field: getattr(args, field) for field in ('position_x', 'position_y') if getattr(args, field) is not None}
+        plan.update(position_request)
+    elif args.position_x is not None or args.position_y is not None:
+        raise GatewayInputError('Floating positions belong only to the undock-view plan')
+    target_identity = None
+    dock_request = None
+    if pending.operation == LAYOUT_DOCK_URI:
+        target_identity = resolve_layout_identity(args.target_element_handle, role='element', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        dock_request = {'dock_side': args.dock_side}
+        plan.update(target_element_handle=args.target_element_handle, **dock_request)
+    elif args.target_element_handle is not None or args.dock_side is not None:
+        raise GatewayInputError('Target element and docking side belong only to dock-view')
+    splitter_identity = None
+    splitter_request = None
+    if pending.operation == LAYOUT_SPLITTER_URI:
+        splitter_identity = resolve_layout_identity(args.splitter_handle, role='element', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        splitter_request = {'pixel_delta': args.pixel_delta}
+        plan.update(splitter_handle=args.splitter_handle, **splitter_request)
+    elif args.splitter_handle is not None or args.pixel_delta is not None:
+        raise GatewayInputError('Splitter identity and pixel displacement belong only to move-splitter')
+    settings = {'authoring_layout_plan': plan,
+                'authoring_layout_binding': layout_binding_descriptor(identity,
+                    registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None,
+                    view_request=view_request, view_identity=view_identity, position_request=position_request,
+                    target_identity=target_identity, dock_request=dock_request,
+                    splitter_identity=splitter_identity, splitter_request=splitter_request, blueprint=blueprint)}
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(settings)
+        materialized = adapter.materialize(candidate)
+        layout_blueprint_terminal_budget(materialized)
+        return candidate
+    record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(binding.record.operation, detected_version),
+        composer_digest=operation_composer_digest(binding.record.operation, detected_version),
+        context=binding.context, update=update, event_type='settings.revised')
+    return operation_draft_payload(args.command, record, offline=False, state_dir=args.state_dir,
+        task_authority=args.task_authority)
+
+
+def read_layout_observation(subject: str, native_args: Mapping[str, Any], *,
+    dispatcher: WwiseDispatcher, connection: GatewayConnection, version: str) -> Any:
+    result = dispatch(dispatcher, LAYOUT_READS[subject], connection=connection, version=version,
+        args=native_args, options={}, operation_timeout=10, result_limit_bytes=MAX_LAYOUT_RESULT_BYTES)
+    if not result.get('ok'):
+        raise GatewayResultShapeError('Bounded layout identity observation failed',
+            error_code='LAYOUT_IDENTITY_READ_FAILED', details={'call': dispatch_call_summary(result)})
+    raw = result.get('result')
+    try:
+        validate_layout_read_result(subject, raw)
+    except ValueError as exc:
+        raise GatewayResultShapeError(str(exc), error_code='INVALID_LAYOUT_READ_RESULT',
+            details={'native_observation': raw, 'business_arrangement_verified': False}) from exc
+    return raw
+
+
+def layout_identity_context(args: argparse.Namespace, *, env: Mapping[str, str],
+    connection: GatewayConnection, detected_version: str, live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher) -> dict[str, Any]:
+    project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+    try:
+        from wwise_waapi.authoring_layout import PINNED_SHA256
+        identity = MetadataSessionIdentity.from_live_context(endpoint=connection.url,
+            live_info=live_info, project=project, resource_digest=PINNED_SHA256[detected_version])
+    except ValueError as exc:
+        raise GatewayInputError('Layout identities require exact live session/process/build/project facts: ' + str(exc)) from exc
+    return {'session': identity.as_dict(), 'configuration': selected_connection_binding(env),
+            'project_path': project['path']}
+
+
+def resolve_layout_identity(handle: str, *, role: str, context: Mapping[str, Any],
+    args: argparse.Namespace, env: Mapping[str, str], connection: GatewayConnection,
+    version: str, dispatcher: WwiseDispatcher) -> dict[str, Any]:
+    try:
+        record = LayoutHandleStore(resolve_transaction_state_directory(args, env=env)).resolve(
+            handle, context=context, role=role)
+        subject = 'instances' if role == 'view' else 'contents'
+        raw = read_layout_observation(subject, {'name': record['layout_name']}, dispatcher=dispatcher,
+            connection=connection, version=version)
+        if role == 'layout':
+            found = raw == record['observation']
+        else:
+            elements, views = layout_identity_rows(raw if role == 'element' else {},
+                raw if role == 'view' else {'viewInstances': []})
+            found = any(row['native_id'] == record['native_id'] and row['observation'] == record['observation']
+                for row in (views if role == 'view' else elements))
+        if not found:
+            raise LayoutHandleError('Layout identity is stale or changed; inspect the layout again')
+        return record
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -13039,6 +13603,88 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "draft-declare-layout-plan":
+        return dispatch_business_layout_plan(args, env=env, connection=connection,
+            detected_version=detected_version, live_info=live_info, dispatcher=dispatcher, common=common)
+    if args.command == "layout-inspect":
+        boundary = live_authoring_api_boundary(LAYOUT_READS['contents'], command=args.command, live_info=live_info, common=common)
+        if boundary is not None:
+            return boundary
+        if detected_version not in LAYOUT_VERSIONS:
+            return unreflected_interface_payload(LAYOUT_READS['contents'], detected_version, command=args.command, common=common)
+        context = layout_identity_context(args, env=env, connection=connection,
+            detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+        layout = read_layout_observation('contents', {'name': args.layout_name}, dispatcher=dispatcher,
+            connection=connection, version=detected_version)
+        instances = read_layout_observation('instances', {'name': args.layout_name}, dispatcher=dispatcher,
+            connection=connection, version=detected_version)
+        workspace = layout.get('Layout')
+        if not isinstance(workspace, Mapping) or not isinstance(workspace.get('Name'), str):
+            raise GatewayInputError('Layout contents are unavailable; no identity handles issued')
+        # The lookup name selects getLayout; serialized Layout.Name is a separate
+        # workspace name (the matching SDK documents divergent values). Retain
+        # that exact observed document in the capability, without equating names.
+        try:
+            elements, views = layout_identity_rows(layout, instances)
+            store = LayoutHandleStore(resolve_transaction_state_directory(args, env=env))
+            layout_handle = store.issue(context=context, layout_name=args.layout_name, role='layout',
+                native_id=args.layout_name, observation=layout)
+            def issue(rows: list[dict[str, Any]], role: str) -> list[dict[str, Any]]:
+                return [{'handle': store.issue(context=context, layout_name=args.layout_name, role=role,
+                    native_id=row['native_id'], observation=row['observation']), 'kind': row['kind'],
+                    **({'location': row['location'], 'name': row['observation'].get('Name')} if role == 'element'
+                       else {'display_name': row['observation'].get('viewDisplayName'),
+                             'docked': row['observation'].get('viewIsDocked')})}
+                    for row in rows]
+            element_handles, view_handles = issue(elements, 'element'), issue(views, 'view')
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        projection = {'layout_name': args.layout_name, 'workspace_name': workspace['Name'],
+                      'layout_handle': layout_handle,
+                      'elements': element_handles, 'views': view_handles}
+        return {**common, 'ok': True, 'status': 'ok', 'complete': True, 'truncated': False,
+                **projection, 'identity_lifetime_seconds': 900, 'agent_result': projection}
+    if args.command == "layout-read":
+        api = LAYOUT_READS[args.subject]
+        boundary = live_authoring_api_boundary(
+            api, command=args.command, live_info=live_info, common=common,
+        )
+        if boundary is not None:
+            return boundary
+        if detected_version not in LAYOUT_VERSIONS:
+            return unreflected_interface_payload(api, detected_version, command=args.command, common=common)
+        capability = live_capability(detected_version, api, live_info=live_info)
+        if capability.execution_contract.get("route") != "bounded_call" or args.command not in capability.gateway_commands:
+            raise GatewayInputError("Layout read is not bound to its packaged closed route")
+        native_id = None
+        if args.subject in {'rectangle', 'frontend'}:
+            context = layout_identity_context(args, env=env, connection=connection,
+                detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+            role = 'element' if args.subject == 'rectangle' else 'view'
+            handle = args.element_handle if role == 'element' else args.view_handle
+            record = resolve_layout_identity(handle, role=role, context=context, args=args, env=env,
+                connection=connection, version=detected_version, dispatcher=dispatcher)
+            native_id = record['native_id']
+        native_args = layout_read_arguments(args.subject, args.layout_name, native_id)
+        result = dispatch(
+            dispatcher, api, connection=connection, version=detected_version,
+            args=native_args, options={}, operation_timeout=10,
+            result_limit_bytes=MAX_LAYOUT_RESULT_BYTES,
+        )
+        if not result.get("ok"):
+            return {**common, "ok": False, "status": "error", "api_attempted": api,
+                    "call": dispatch_call_summary(result)}
+        raw = result.get("result")
+        try:
+            observation = validate_layout_read_result(args.subject, raw)
+        except ValueError as exc:
+            raise GatewayResultShapeError(str(exc), error_code="INVALID_LAYOUT_READ_RESULT",
+                details={"api": api, "call": dispatch_call_summary(result),
+                         "native_observation": raw, "business_arrangement_verified": False}) from exc
+        return {**common, "ok": True, "status": "ok", "api_attempted": api,
+                "complete": True, "truncated": False, "result": raw,
+                "observation": observation, "call": dispatch_call_summary(result),
+                "agent_result": raw}
     if args.command == "core-call":
         return dispatch_core_business_read(
             args,
@@ -13303,6 +13949,7 @@ def dispatch_command(
             **common,
             "api_attempted": api,
             "schema_target": args.target_uri,
+            "reflection_context": status_wwise_summary(live_info),
             "semantic_preview": {
                 "uri": api,
                 "business_request": {
@@ -13688,6 +14335,7 @@ def dispatch_command(
                 "result": result_validation.as_dict() if result_validation else None,
             },
             "inventory": inventory,
+            **({"reflection_context": status_wwise_summary(live_info)} if inventory is not None else {}),
             "agent_result": (
                 inventory
                 if inventory is not None
@@ -13790,6 +14438,13 @@ def dispatch_command(
             raise GatewayInputError(
                 f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
             )
+        from wwise_waapi.wal_read_continuation import prepare_wal_page, finish_wal_page, WalContinuationError
+        wal_context = {'configuration': selected_connection_binding(env), 'endpoint': common['endpoint'],
+            'live': dict(live_info)}
+        try:
+            wal_page = prepare_wal_page(token=args.wal_page, maximum=args.max_nodes, context=wal_context)
+        except WalContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': False}, error_code=exc.code) from exc
         request_validation = validate_semantic_payload(
             api,
             {},
@@ -13851,6 +14506,11 @@ def dispatch_command(
                 result.get("result"),
                 take=args.max_nodes,
             )
+            projection = finish_wal_page(wal_page, raw=result['result'], normalized=projection,
+                next_command=lambda token: transaction_next_command('debug-wal-tree',
+                    ['debug-wal-tree', '--max-nodes', str(args.max_nodes), '--wal-page', token]))
+        except WalContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': True}, error_code=exc.code) from exc
         except DebugLuaContractError as exc:
             raise GatewayResultShapeError(
                 str(exc),
@@ -14045,6 +14705,13 @@ def dispatch_command(
             "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "query-object":
+        if getattr(args, "result_record", None) is not None:
+            context = _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info)
+            if context != args.result_record["context"]:
+                raise GatewayResultShapeError("Query configuration, project or host session changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
             envelope = advanced_preview.envelope
@@ -14077,7 +14744,7 @@ def dispatch_command(
                 if result.get("ok")
                 else None
             )
-            return {
+            query_payload = {
                 "ok": bool(result.get("ok")),
                 "status": "ok" if result.get("ok") else "error",
                 **common,
@@ -14094,6 +14761,7 @@ def dispatch_command(
                     len(rows) == maximum_rows if result.get("ok") else None
                 ),
                 "objects": business_rows if result.get("ok") else None,
+                **_query_incomplete_identity_observation(result, business_rows),
                 **(
                     {"mutation_selection": mutation_selection}
                     if mutation_selection is not None
@@ -14101,6 +14769,9 @@ def dispatch_command(
                 ),
                 "agent_result": business_rows if result.get("ok") else None,
             }
+            return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+                env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
+                common=common, live_info=live_info)
         if original_file_reference_match_requested(args):
             return dispatch_original_file_reference_match(
                 args,
@@ -14109,13 +14780,42 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        source_resolution = None
+        if args.short_id is not None:
+            source_call = dispatch(dispatcher, OBJECT_GET_URI, connection=connection, version=detected_version,
+                args={"from": {"id": [args.short_id_selector]}, "transform": [{"range": [0, 65]}]},
+                options={"return": list(SELECTED_REQUIRED_RETURN_FIELDS)}, exact_object_lookup=False)
+            if not source_call.get("ok"):
+                return {"ok": False, "status": "error", **common, "call": dispatch_call_summary(source_call), "agent_result": None}
+            source_rows = strict_object_get_rows(source_call, command="query-object --short-id", maximum_rows=65)
+            ids = [row["id"].upper() for row in source_rows]
+            if len(set(ids)) != len(ids):
+                raise GatewayResultShapeError("Short ID source returned duplicate canonical GUIDs",
+                    details={"native_observation": source_call["result"], "call": dispatch_call_summary(source_call)})
+            source_resolution = {"source": "short-id", "short_id": args.short_id, "business_kind": args.short_id_kind, "candidate_count": len(ids),
+                "complete": len(ids) < 65, "mutation_authority": False, "call": dispatch_call_summary(source_call)}
+            if len(ids) >= 65 or (len(ids) > 1 and args.query_custom_field_meanings):
+                return {"ok": True, "status": "needs_clarification", **common, "source_resolution": source_resolution,
+                    "agent_result": {"candidates": source_rows[:64], "complete": len(ids) < 65, "mutation_authority": False,
+                        "reason": "short_id_source_limit_reached" if len(ids) >= 65 else "custom_fields_require_one_exact_guid",
+                        "repair": "Select a canonical candidate GUID and use query-object --exact-id with the requested read options."}}
+            if not ids:
+                return {"ok": True, "status": "ok", **common, "source_resolution": source_resolution,
+                        "query_bound": _query_bound_summary(args), "count": 0, "objects": [], "agent_result": []}
+            args.object_ids = tuple(ids) if len(ids) > 1 else None
+            args.object_id = ids[0] if len(ids) == 1 else None
         custom_kind_clarification = _bind_custom_kind_from_live_types(
             args,
             connection=connection,
             detected_version=detected_version,
             dispatcher=dispatcher,
+            context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
         )
         if custom_kind_clarification is not None:
+            if args.result_page is not None:
+                raise GatewayResultShapeError("The original query type selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -14130,6 +14830,10 @@ def dispatch_command(
             dispatcher=dispatcher,
         )
         if custom_field_clarification is not None:
+            if args.result_page is not None:
+                raise GatewayResultShapeError("The original query field selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -14143,6 +14847,7 @@ def dispatch_command(
         preview = build_object_get_query(
             path=args.path,
             object_id=args.object_id,
+            object_ids=args.object_ids,
             type=args.object_type,
             search=args.search,
             query=args.query,
@@ -14151,6 +14856,8 @@ def dispatch_command(
             take=args.take,
             return_fields=return_fields,
             version=detected_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         _require_explicit_query_bound(args)
         envelope = preview.envelope
@@ -14173,7 +14880,11 @@ def dispatch_command(
             else []
         )
         if result.get("ok"):
-            validate_exact_query_identity(args, rows)
+            if args.short_id is not None and not args.select and any(row["id"].upper() not in ids for row in rows):
+                raise GatewayResultShapeError("Short ID final read returned a GUID outside the resolved source",
+                    details={"native_observation": result["result"], "source_resolution": source_resolution,
+                             "call": dispatch_call_summary(result)}, error_code="SHORT_ID_CANDIDATE_DRIFT")
+            validate_exact_query_identity(args, rows, native_result=result)
             validate_query_business_view_result(args, rows)
         business_rows = (
             _project_query_business_rows(args, rows) if result.get("ok") else []
@@ -14188,15 +14899,17 @@ def dispatch_command(
             if result.get("ok")
             else None
         )
-        return {
+        query_payload = {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
+            **({"source_resolution": source_resolution} if source_resolution is not None else {}),
             "semantic_preview": preview.as_dict(),
             "query_bound": _query_bound_summary(args),
             "call": dispatch_call_summary(result),
             "count": len(rows) if result.get("ok") else None,
             "objects": business_rows if result.get("ok") else None,
+            **_query_incomplete_identity_observation(result, business_rows),
             **({"continuations": continuations} if continuations else {}),
             **(
                 {"mutation_selection": mutation_selection}
@@ -14205,13 +14918,92 @@ def dispatch_command(
             ),
             "agent_result": business_rows if result.get("ok") else None,
         }
+        return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+            env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
+            common=common, live_info=live_info)
     if args.command == "metadata":
+        if args.operation == "media-pool-fields":
+            from wwise_waapi.media_pool_field_discovery import browse_media_pool_fields
+            from wwise_waapi.metadata_discovery import MetadataDiscoveryError
+            api = "ak.wwise.core.mediaPool.getFields"
+            capability = live_capability(detected_version, api, live_info=live_info)
+            result = dispatch(dispatcher, api, connection=connection, version=detected_version, args={}, options={},
+                result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+                operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+            base = {**common, "operation": args.operation, "metadata_authority": "live-waapi", "call": dispatch_call_summary(result)}
+            if not result.get("ok"):
+                return {"ok": False, "status": "error", **base, "agent_result": None}
+            filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
+            page_size, fragment_size = args.page_size, 2048
+            while True:
+                try:
+                    validate_semantic_result(api, result["result"], version=detected_version)
+                    fields = browse_media_pool_fields(result["result"], context={"configuration": selected_connection_binding(env),
+                        "endpoint": common["endpoint"], "version": detected_version, "live_info": live_info},
+                        meanings=args.queries or (), page=args.page, page_size=page_size,
+                        selection=args.selection, detail_page=args.detail_page, fragment_size=fragment_size)
+                    if fields.get("next_page"):
+                        fields["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                            "--page-size", str(args.page_size), "--page", fields["next_page"]])
+                    for field in fields.get("fields", []):
+                        if field.get("detail_required"):
+                            field["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                                "--selection", field["selection"]])
+                    if fields.get("next_detail_page"):
+                        fields["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                            "--selection", args.selection, "--detail-page", fields["next_detail_page"]])
+                    if probe_gateway_json_document_size({**base, "agent_result": fields}, 28 * 1024) == "ok":
+                        break
+                    if args.selection is not None and fragment_size > 1:
+                        fragment_size //= 2
+                    elif args.selection is None and page_size > 1:
+                        page_size -= 1
+                    else:
+                        raise MetadataDiscoveryError("DISCOVERY_RESULT_LIMIT_EXCEEDED", "The complete Media Pool field page and continuation exceed the bounded output")
+                except (SemanticValidationError, MetadataDiscoveryError) as exc:
+                    evidence = {"call": dispatch_call_summary(result)}
+                    if probe_gateway_json_document_size(result["result"], 64 * 1024) == "ok":
+                        evidence["native_observation"] = result["result"]
+                    else:
+                        evidence["native_observation_boundary"] = {"complete": False, "inline_limit_bytes": 64 * 1024,
+                            "evidence_path": result.get("evidence_path")}
+                    raise GatewayResultShapeError(str(exc), details=evidence,
+                        error_code=getattr(exc, "error_code", "MEDIA_POOL_FIELDS_INVALID")) from exc
+            return {"ok": True, "status": "partial" if fields.get("projection_complete") is False else "ok", **base, "agent_result": fields}
+        if args.operation == "types":
+            from wwise_waapi.metadata_discovery import browse_metadata_types
+            metadata_calls: list[dict[str, Any]] = []
+            filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
+            def decorate_types(page):
+                if page.get("next_page"):
+                    page["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", page["next_page"]])
+                for row in page["types"]:
+                    if row.get("details_complete") is False:
+                        row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", "20"])
+                        row["detail_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", row["selection"]])
+                        if isinstance(row.get("classId"), int):
+                            row["fields_command"] = transaction_next_command("metadata", ["metadata", "list", "--type-selection", row["selection"]])
+            result = browse_metadata_types(
+                read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
+                meanings=args.queries or (), page=args.page, page_size=args.page_size,
+                selection=args.selection, detail_page=args.detail_page, decorate=decorate_types,
+            )
+            if args.selection is not None:
+                from wwise_waapi.metadata_detail import fit_detail_continuations
+                def decorate_type_detail(page):
+                    if page.get("next_detail_page"):
+                        page["next_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", args.selection, "--detail-page", page["next_detail_page"]])
+                result = fit_detail_continuations(result, decorate_type_detail)
+            return {"ok": True, "status": "ok", **common, "operation": args.operation,
+                    "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls), "agent_result": result}
         if args.operation in {"discover", "property-state", "list", "detail"}:
             custom_kind_clarification = _bind_custom_kind_from_live_types(
                 args,
                 connection=connection,
                 detected_version=detected_version,
                 dispatcher=dispatcher,
+                context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
             )
             if custom_kind_clarification is not None:
                 return {
@@ -14261,12 +15053,46 @@ def dispatch_command(
             )
             if args.operation in {"list", "detail"}:
                 from wwise_waapi.metadata_discovery import browse_metadata
+                if args.metadata_type_selection is not None:
+                    from wwise_waapi.metadata_discovery import resolve_metadata_type_selection
+                    args.class_id = resolve_metadata_type_selection(
+                        read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                        context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
+                        selection=args.metadata_type_selection)
                 result = browse_metadata(
                     read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
                     context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
                     object_type=args.object_type, class_id=args.class_id, object=args.object,
                     page_size=args.page_size, page=args.page, selection=args.selection,
+                    complete_detail=True, detail_page=args.detail_page, detail_view=args.detail_view, detail_item=args.detail_item,
                 )
+                scope_argv = []
+                if args.metadata_type_selection is not None:
+                    scope_argv.extend(["--type-selection", args.metadata_type_selection])
+                for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
+                    if value is not None:
+                        scope_argv.extend([flag, value])
+                for segment in args.metadata_path_segments or []:
+                    scope_argv.extend(["--path-segment", segment])
+                if result.get("next_page"):
+                    result["next_command"] = transaction_next_command("metadata", ["metadata", "list", *scope_argv, "--page-size", str(args.page_size), "--page", result["next_page"]])
+                def continue_detail(target, view, item=None):
+                    extra = ["--detail-item", str(item)] if item is not None else []
+                    if target.get("next_detail_page"):
+                        target["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", args.selection, "--detail-view", view, *extra, "--detail-page", target["next_detail_page"]])
+                    if target.get("detail_required"):
+                        target["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", args.selection, "--detail-view", target["detail_view"], "--detail-item", str(target["detail_item"])])
+                    for row in target.get("items", []):
+                        if isinstance(row, Mapping) and row.get("detail_required"):
+                            continue_detail(row, row["detail_view"], row["detail_item"])
+                def decorate_detail(page):
+                    continue_detail(page, args.detail_view, args.detail_item)
+                    for key in ("choices", "dependency_page"):
+                        continue_detail(page["field"][key], page["field"][key]["detail_view"])
+                if "field" in result:
+                    from wwise_waapi.metadata_detail import fit_detail_continuations
+                    result = fit_detail_continuations(result, decorate_detail)
+
                 return {"ok": True, "status": "ok", **common, "operation": args.operation,
                         "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls),
                         "agent_result": result}
@@ -14291,7 +15117,25 @@ def dispatch_command(
                     "metadata_authority": "live-waapi",
                     **metadata_call_evidence_projection(metadata_calls),
                 }
-                payload["agent_result"] = discovery.as_dict(detail=False)
+                projected = discovery.as_dict(detail=False)
+                detail_candidates = [row for row in projected["candidates"] if row.get("metadata_details_complete") is False]
+                if detail_candidates:
+                    from wwise_waapi.metadata_discovery import browse_metadata
+                    selections = browse_metadata(
+                        read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version),
+                        context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
+                        object_type=args.object_type, class_id=args.class_id, object=args.object,
+                        select_fields=[row["name"] for row in detail_candidates],
+                    )
+                    scope_argv = []
+                    for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
+                        if value is not None:
+                            scope_argv.extend([flag, value])
+                    for segment in args.metadata_path_segments or []:
+                        scope_argv.extend(["--path-segment", segment])
+                    for candidate, selected in zip(detail_candidates, selections["fields"], strict=True):
+                        candidate["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", selected["selection"], "--detail-view", "choices" if candidate["metadata"].get("restriction", {}).get("type") == "enum" else "dependencies"])
+                payload["agent_result"] = projected
                 return payload
             candidates = tuple(discovery.candidates)
             if len(candidates) != 1:
@@ -16716,10 +17560,9 @@ def dispatch_business_host_ui_debug_plan(
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings({"host_ui_debug_plan": plan})
-        parse_operation_request(
-            adapter.materialize(candidate),
-            expected_version=detected_version,
-        )
+        materialized = parse_operation_request(
+            adapter.materialize(candidate), expected_version=detected_version).as_dict()
+        transaction_verify_terminal_budget(materialized)
         return candidate
 
     record = binding.store.apply_business_update(
@@ -17160,12 +18003,15 @@ def _runtime_transport_context_from_live(
         if not isinstance(host, str) or isinstance(port, bool) or not isinstance(port, int):
             raise GatewayResultShapeError(
                 "Live endpoint identity is unavailable for transport handle binding.",
+                details={"required_fields": ["endpoint.url", "endpoint.host", "endpoint.port"],
+                    "binding": "runtime_transport_context"},
                 error_code="INVALID_STATUS_RESULT",
             )
         endpoint_url = f"ws://{host}:{port}/waapi"
     if not isinstance(display_name, str) or not display_name:
         raise GatewayResultShapeError(
             "Live Wwise build identity is unavailable for transport handle binding.",
+            details={"required_field": "version.displayName", "binding": "runtime_transport_context"},
             error_code="INVALID_STATUS_RESULT",
         )
     return RuntimeTransportContext(
@@ -17886,6 +18732,8 @@ def dispatch_business_field_discovery(
     """Bind bounded live candidates without accepting a model-authored token."""
 
     meanings = tuple(args.meanings or ())
+    if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
+        raise GatewayInputError("--detail-item requires a nonnegative typed choices/dependencies item index")
     if not (args.list_fields or args.selection) and (
         not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
         or any(
@@ -17979,6 +18827,9 @@ def dispatch_business_field_discovery(
     )
     if args.page and not args.list_fields:
         raise GatewayInputError("--page requires --list")
+    if (args.detail_page or args.detail_view != "raw" or args.detail_item is not None) and not args.selection:
+        raise GatewayInputError("--detail-page requires --selection")
+    detail_projection = None
     if args.list_fields or args.selection:
         from wwise_waapi.metadata_discovery import browse_metadata
         browsed = browse_metadata(
@@ -17986,20 +18837,56 @@ def dispatch_business_field_discovery(
             context={"draft": args.draft_id, "context": session.context.as_binding_dict(),
                      "endpoint": dict(common["endpoint"]), "live_info": dict(live_info)},
             **discovery_scope, page_size=args.page_size, page=args.page, selection=args.selection,
+            complete_detail=True, project_detail=False,
         )
-        if args.list_fields:
+        if args.selection:
+            from wwise_waapi.metadata_discovery import MetadataDiscoveryError, MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, _require_result_size
+            try:
+                _require_result_size(browsed, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
+            except MetadataDiscoveryError:
+                from wwise_waapi.metadata_detail import detail_page
+                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view, item_index=args.detail_item)
+            if (args.detail_page or args.detail_view != "raw") and detail_projection is None:
+                from wwise_waapi.metadata_detail import detail_page
+                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view, item_index=args.detail_item)
+        def detail_continuation(result, revision, view=None, item=None):
+            if result.get("next_detail_page"):
+                scope_flag, scope_handle = (("--object-handle", args.object_handle) if args.object_handle else ("--type-handle", args.type_handle) if args.type_handle else ("--semantic-kind", args.semantic_kind))
+                continuation = ["draft-discover-fields", args.draft_id, "--task-authority", args.task_authority, "--expected-revision", str(revision), scope_flag, scope_handle, "--selection", args.selection, "--detail-view", view or args.detail_view, "--detail-page", result["next_detail_page"]]
+                if item is not None or (view is None and args.detail_item is not None):
+                    continuation.extend(["--detail-item", str(item if item is not None else args.detail_item)])
+                if args.platform:
+                    continuation.extend(["--platform", args.platform])
+                result["next_command"] = transaction_next_command("draft-discover-fields", continuation, state_dir=args.state_dir)
+            if result.get("detail_required"):
+                scope_flag, scope_handle = (("--object-handle", args.object_handle) if args.object_handle else ("--type-handle", args.type_handle) if args.type_handle else ("--semantic-kind", args.semantic_kind))
+                continuation = ["draft-discover-fields", args.draft_id, "--task-authority", args.task_authority, "--expected-revision", str(revision), scope_flag, scope_handle, "--selection", args.selection, "--detail-view", result["detail_view"], "--detail-item", str(result["detail_item"])]
+                if args.platform:
+                    continuation.extend(["--platform", args.platform])
+                result["next_command"] = transaction_next_command("draft-discover-fields", continuation, state_dir=args.state_dir)
+            for item_row in result.get("items", []):
+                if isinstance(item_row, Mapping) and item_row.get("detail_required"):
+                    detail_continuation(item_row, revision, item_row["detail_view"], item_row["detail_item"])
+            if "field" in result:
+                for key in ("choices", "dependency_page"):
+                    detail_continuation(result["field"][key], revision, result["field"][key]["detail_view"])
+        if args.list_fields or args.detail_page or args.detail_view != "raw":
             payload = operation_draft_payload(args.command, binding.record, offline=False,
                 state_dir=args.state_dir, task_authority=args.task_authority)
             payload.update({"endpoint": dict(common["endpoint"]), "detected_version": detected_version,
-                            "agent_result": browsed})
+                            "agent_result": detail_projection if not args.list_fields else browsed})
+            if not args.list_fields:
+                from wwise_waapi.metadata_detail import fit_detail_continuations
+                payload["agent_result"] = fit_detail_continuations(payload["agent_result"], lambda page: detail_continuation(page, binding.record.revision))
             return payload
-        meanings = (browsed["metadata"]["name"],)
+        meanings = (browsed["selected_field_token"],)
         read_call = binding.read_call
     discovery = discover_metadata(
         read_call=read_call,
         queries=meanings,
         **discovery_scope,
         limit=MAX_METADATA_DISCOVERY_LIMIT,
+        exact_field=meanings[0] if args.selection else None,
     )
     eligible: list[Mapping[str, Any]] = []
     incompatible: list[dict[str, Any]] = []
@@ -18057,9 +18944,13 @@ def dispatch_business_field_discovery(
         if accepted:
             eligible.append(candidate)
         else:
+            unavailable_type = "type" not in metadata and kind != "reference"
             incompatible.append({
                 "field": candidate.get("name"),
-                "reason": ("RTPC requires a numeric property with live RTPC support"
+                **({"error_code": "FIELD_TYPE_UNAVAILABLE", "unavailable_facts": ["type"]}
+                   if unavailable_type else {}),
+                "reason": ("Native metadata omits the type needed to certify a typed field value"
+                           if unavailable_type else "RTPC requires a numeric property with live RTPC support"
                            if binding.record.operation == "object.setRTPC"
                            else "Live field kind/type/support is incompatible with this operation"),
                 "operation": binding.record.operation,
@@ -18090,7 +18981,11 @@ def dispatch_business_field_discovery(
                 "candidate_count_scope": "returned_compatible_live_fields",
                 "rejected_candidates": incompatible[:8],
                 "fallback_detail_scan": dict(discovery.fallback_detail_scan),
-                "recovery": "Refine the missing discovery meaning for this bound object; no declaration was changed.",
+                "recovery": (
+                    "Inspect the exact field metadata or select a field with a certified type; no declaration was changed."
+                    if any(row.get("error_code") == "FIELD_TYPE_UNAVAILABLE" for row in incompatible)
+                    else "Refine the missing discovery meaning for this bound object; no declaration was changed."
+                ),
             },
         )
     narrowed: list[Mapping[str, Any]] = []
@@ -18196,6 +19091,34 @@ def dispatch_business_field_discovery(
             and display["name"].strip()
             else bound.token
         )
+        restrictions = dict(bound.restrictions)
+        value_input = field_value_input(session, bound, choice_limit=20 if detail_projection is not None else None)
+        label_detail = "metadata_detail.field.choices" if detail_projection is not None else "metadata.restriction.values"
+        if "enum_labels" in restrictions:
+            restrictions["enum_labels"] = [dict(row) for row in restrictions["enum_labels"]]
+            for row in restrictions["enum_labels"]:
+                if len(row["label"].encode("utf-8")) > 512:
+                    row["label"] = row["label"].encode("utf-8")[:512].decode("utf-8", errors="ignore")
+                    row["label_complete"] = False
+                    row["label_detail"] = label_detail
+        for choice in value_input.get("choices", []):
+            if any(len(label.encode("utf-8")) > 512 for label in choice["labels"]):
+                choice["labels"] = [label.encode("utf-8")[:512].decode("utf-8", errors="ignore") for label in choice["labels"]]
+                choice["labels_complete"] = False
+                choice["label_detail"] = label_detail
+        if detail_projection is not None:
+            if len(label.encode("utf-8")) > 1024:
+                label = bound.token
+            for key in ("enum_choices", "enum_labels"):
+                if isinstance(restrictions.get(key), list) and len(restrictions[key]) > 20:
+                    restrictions[key] = restrictions[key][:20]
+                    restrictions["enum_complete"] = False
+                    restrictions["enum_detail"] = "metadata_detail.field.choices"
+            if isinstance(value_input.get("choices"), list) and len(value_input["choices"]) > 20:
+                value_input["total_choice_count"] = len(value_input["choices"])
+                value_input["choices"] = value_input["choices"][:20]
+                value_input["choices_complete"] = False
+                value_input["choice_continuation"] = "metadata_detail.field.choices.next_command"
         field_candidates.append(
             {
                 "handle": bound.handle,
@@ -18203,10 +19126,10 @@ def dispatch_business_field_discovery(
                 "field_kind": bound.field_kind,
                 "value_type": bound.value_type,
                 "platform": bound.platform,
-                "restrictions": dict(bound.restrictions),
-                "metadata": dict(browsed["metadata"] if args.selection else metadata),
+                "restrictions": restrictions,
+                "metadata": (dict(browsed["metadata"] if args.selection else metadata) if detail_projection is None else {"name": bound.token, "type": metadata["type"], "detail_projection": "metadata_detail", "complete": False}),
                 "unit": metadata_unit(metadata),
-                "value_input": field_value_input(session, bound),
+                "value_input": value_input,
                 "matched_meanings": list(candidate.get("matched_queries", [])),
             }
         )
@@ -18270,6 +19193,9 @@ def dispatch_business_field_discovery(
         payload["candidate_projection"] = (
             "meaning_results[].candidates_without_duplicate_top_level_rows"
         )
+    if detail_projection is not None:
+        from wwise_waapi.metadata_detail import fit_detail_continuations
+        payload["metadata_detail"] = fit_detail_continuations(detail_projection, lambda page: detail_continuation(page, record.revision))
     return payload
 
 
@@ -18495,6 +19421,9 @@ def dispatch_business_type_discovery(
     except (TypeError, ValueError) as exc:
         raise GatewayResultShapeError(
             "Live object type discovery returned an invalid catalog.",
+            details={"api": CACHE_GET_TYPES_URI, "requested_role": str(args.role),
+                "required_result": "return array of native type metadata", "cause_type": type(exc).__name__,
+                "selection_advanced": False},
             error_code="INVALID_METADATA_RESULT",
         ) from exc
     role = str(args.role)
@@ -18898,6 +19827,7 @@ def create_transaction_preview(
         request_payload,
         expected_version=detected_version,
     ).as_dict()
+    transaction_verify_terminal_budget(canonical_request)
     project_guard_mode, target_project_path = transaction_project_guard_spec(
         canonical_request,
         version=detected_version,
@@ -19531,6 +20461,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         request_payload = require_mapping(artifact.get("request"), "transaction request")
+        transaction_verify_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -20377,6 +21308,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 f"current state is {record.state.value!r}."
             )
         request_payload = require_mapping(artifact.get("request"), "transaction request")
+        transaction_verify_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -20607,6 +21539,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "Transport verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 transport_context = _runtime_transport_context_from_live(
@@ -20698,6 +21636,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 execution_payload = execution_result.get("result")
@@ -20760,6 +21704,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -20811,6 +21761,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -20855,6 +21811,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21811,6 +22773,7 @@ def _require_explicit_query_bound(args: argparse.Namespace) -> None:
     broad_source = (
         args.object_type is not None
         or getattr(args, "custom_kind_meaning", None) is not None
+        or getattr(args, "query_type_selection", None) is not None
         or args.search is not None
         or args.query is not None
     )
@@ -21863,6 +22826,8 @@ def dispatch_original_file_reference_match(
         take=MAX_QUERY_TAKE,
         return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
         version=detected_version,
+        platform=args.query_platform,
+        language=args.query_language,
     )
     envelope = preview.envelope
     result = dispatch(
@@ -22138,6 +23103,8 @@ def _query_result_maximum(args: argparse.Namespace) -> int | None:
 def validate_exact_query_identity(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
+    *,
+    native_result: Mapping[str, Any] | None = None,
 ) -> None:
     """Reject a successful exact lookup whose returned identity drifted."""
 
@@ -22177,6 +23144,7 @@ def validate_exact_query_identity(
                 "identity_field": identity_field,
                 "expected": args.path if args.path is not None else args.object_id,
                 "mismatches": mismatches,
+                **({"call": dispatch_call_summary(native_result), "native_observation": native_result["result"]} if native_result is not None else {}),
             },
         )
 
@@ -22223,6 +23191,37 @@ def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     return {"mode": "exact-object"}
 
 
+def _query_return_scope_argv(args: argparse.Namespace) -> list[str]:
+    return [token for key in ("platform", "language")
+            if getattr(args, f"query_{key}", None) is not None
+            for token in (f"--{key}", getattr(args, f"query_{key}"))]
+
+
+def _query_return_scope_contract() -> dict[str, Any]:
+    return {
+        "platform": {"cli": "--platform <exact name or GUID>", "omitted": "current Wwise platform"},
+        "language": {"cli": "--language <exact name or GUID>", "omitted": "native Wwise language default; Gateway supplies no language"},
+        "max_utf8_bytes": MAX_QUERY_RETURN_SCOPE_BYTES,
+        "literal_identity": True,
+        "native_options_authored_by": "Gateway",
+    }
+
+
+def _query_result_presence_contract() -> dict[str, Any]:
+    return {
+        "absent_fields": "unavailable_fields; omitted values are never replaced with null",
+        "explicit_null": "preserved",
+        "missing_identity": "identity_completeness.complete=false; native_observation retained, optionally as lossless page entries; no mutation authority",
+        "delivery": {"canonical_result": "agent_result is exact and terminal; large compact replies omit its duplicate objects with objects_source=agent_result",
+            "large_observation": "status partial; agent_result contains exact small identity headers, explicit omitted fields, and lossless JSON entries; copy next_command until projection_complete",
+            "completion": "projection_complete certifies delivery of that observation only, never query exhaustion or mutation selection",
+            "continuation": "short Gateway-issued --result-query and --result-page; 900 seconds; repeat identical bounded read and verify complete result, resolved fields, configuration, project and host session",
+            "detail": "--detail preserves diagnostics; oversized semantic_preview is retained in page entries",
+            "entries_encoding": "json-pointer-entries normally; json-document-fragments for oversized native keys/pointers. Concatenate document fragments by character offset to recover the exact observation, never mutation authority",
+            "page_stdout_utf8_bytes": 32768},
+    }
+
+
 def _project_query_business_rows(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
@@ -22232,11 +23231,17 @@ def _project_query_business_rows(
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     projected: list[dict[str, Any]] = []
     for row in rows:
-        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS}
+        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS if field in row}
+        missing_identity = [field for field in SELECTED_REQUIRED_RETURN_FIELDS if field not in row]
+        unavailable = list(missing_identity)
         properties: dict[str, Any] = {}
         references: dict[str, Any] = {}
         for kind, native, output in bindings:
-            value = row.get(native)
+            if native not in row:
+                group = {"property": "properties", "reference": "references"}.get(kind)
+                unavailable.append(f"{group}.{output}" if group else output)
+                continue
+            value = row[native]
             if kind == "property":
                 properties[output] = value
             elif kind == "reference":
@@ -22247,8 +23252,26 @@ def _project_query_business_rows(
             item["properties"] = properties
         if references:
             item["references"] = references
+        if unavailable:
+            item["unavailable_fields"] = unavailable
+        if missing_identity:
+            item["identity_completeness"] = {
+                "complete": False,
+                "unavailable_fields": missing_identity,
+                "mutation_authority": False,
+            }
         projected.append(item)
     return projected
+
+
+def _query_incomplete_identity_observation(
+    result: Mapping[str, Any], rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Retain the bounded native reply when identity facts cannot be certified."""
+
+    if any("identity_completeness" in row for row in rows):
+        return {"native_observation": result["result"]}
+    return {}
 
 
 def _query_mutation_selection(
@@ -22257,7 +23280,8 @@ def _query_mutation_selection(
 ) -> dict[str, Any] | None:
     """Expose conditional exact-ID readbacks for a later selected mutation subset."""
 
-    if not 2 <= len(rows) <= MAX_QUERY_MUTATION_SELECTION_CANDIDATES:
+    minimum = 1 if getattr(args, "short_id", None) is not None else 2
+    if not minimum <= len(rows) <= MAX_QUERY_MUTATION_SELECTION_CANDIDATES:
         return None
     relationships = tuple(getattr(args, "relationships", ()) or ())
     if (
@@ -22295,6 +23319,7 @@ def _query_mutation_selection(
                         GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         object_id,
                     ]
@@ -22358,6 +23383,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             source_id,
                             "--include",
@@ -22377,6 +23403,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             bus_id,
                             "--include",
@@ -22397,6 +23424,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             event_id,
                             "--relationship",
@@ -22422,6 +23450,7 @@ def _query_business_continuations(
                     "query-object",
                     [
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         target_id,
                         "--view",
@@ -22439,9 +23468,17 @@ def _bind_custom_kind_from_live_types(
     connection: GatewayConnection,
     detected_version: str,
     dispatcher: WwiseDispatcher,
+    context: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     """Resolve one user-facing custom kind against the live type inventory."""
 
+    selection = getattr(args, "query_type_selection", None)
+    if selection is not None:
+        from wwise_waapi.metadata_discovery import resolve_metadata_type_name_selection
+        args.object_type = resolve_metadata_type_name_selection(
+            read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version),
+            context=context, selection=selection)
+        return None
     meaning = getattr(args, "custom_kind_meaning", None) or getattr(
         args,
         "metadata_custom_kind_meaning",
@@ -22454,24 +23491,24 @@ def _bind_custom_kind_from_live_types(
         connection=connection,
         version=detected_version,
     )
-    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}))
+    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}), require_identity=False)
 
     def lexical(value: str) -> str:
         return "".join(character.casefold() for character in value if character.isalnum())
 
     needle = lexical(meaning)
-    exact = [record for record in records if lexical(record.name) == needle]
+    exact = [record for record in records if isinstance(record.name, str) and lexical(record.name) == needle]
     matches = exact or [
         record
         for record in records
-        if needle and (needle in lexical(record.name) or lexical(record.name) in needle)
+        if needle and isinstance(record.name, str) and (needle in lexical(record.name) or lexical(record.name) in needle)
     ]
     if len(matches) != 1:
         return {
             "metadata_authority": "live-waapi",
             "meaning": meaning,
             "candidate_count": len(matches),
-            "candidates": [record.as_dict() for record in matches[:8]],
+            "candidates": [dict(record.raw) for record in matches[:8]],
             "repair": "refine --custom-kind until one live Wwise type matches",
         }
     args.object_type = matches[0].name
@@ -22494,12 +23531,14 @@ def _bind_query_custom_fields_from_live_metadata(
     meanings = tuple(getattr(args, "query_custom_field_meanings", ()) or ())
     if not meanings:
         return None
+    selected_observations = []
+    read = transaction_read_call(dispatcher, connection=connection, version=detected_version)
+    def selection_read(uri, native_args, options):
+        observed = read(uri, native_args, options)
+        selected_observations.append({"api": uri, "args": native_args, "result": observed})
+        return observed
     discovery = discover_metadata(
-        read_call=transaction_read_call(
-            dispatcher,
-            connection=connection,
-            version=detected_version,
-        ),
+        read_call=selection_read,
         queries=meanings,
         object_type=args.object_type,
         object=args.path if args.path is not None else args.object_id,
@@ -22560,9 +23599,89 @@ def _bind_query_custom_fields_from_live_metadata(
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
         )
+    args.query_field_selection = selected_observations
     args.query_output_bindings = tuple(bindings)
     args.query_return_fields = (*SELECTED_REQUIRED_RETURN_FIELDS, *native_fields)
     return None
+
+
+def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info):
+    project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
+        connection=connection, version=detected_version,
+        **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
+           if detected_version == "2021.1" else {}))
+    if not project_call.get("ok"):
+        raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
+            details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    if detected_version == "2021.1":
+        project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
+            maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
+            error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    else:
+        project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    project = require_project_identity(project, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
+    return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+        "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
+        "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
+
+
+def _finish_object_query_result(args, payload, *, native, envelope, env, connection,
+                                detected_version, dispatcher, common, live_info):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
+    if not payload.get("ok"):
+        return payload
+    if args.result_page is None and len(canonical_json_bytes(
+            project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
+        return payload
+    try:
+        context = (args.result_record["context"] if getattr(args, "result_record", None) is not None else
+            _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info))
+        binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
+            "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
+            "output_bindings": getattr(args, "query_output_bindings", ()),
+            "field_selection": getattr(args, "query_field_selection", None)},
+            "native_result_sha256": canonical_sha256(native["result"]),
+            "projection_sha256": canonical_sha256({key: payload[key] for key in ("objects", "native_observation") if key in payload})}
+        offset = parse_offset(args.result_page, binding)
+        store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=env))
+        record = getattr(args, "result_record", None)
+        if record is None:
+            import time
+            issued = int(time.time())
+            handle = store.issue(plan={"argv": args.original_query_argv}, context=context, issued=issued)
+            expires = issued + 900
+        else:
+            handle, expires = args.result_query, record["expires_at"]
+        prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
+        detail_fragment_required = args.detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
+        page_payload = {**payload, "detail_fragment_required": detail_fragment_required}
+        page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
+            next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
+                "--result-query", handle, "--result-page", token]))
+        if not (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int and live_info["processId"] > 0):
+            page.pop("next_command", None)
+            if not page["projection_complete"]:
+                page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
+        result = {key: value for key, value in payload.items() if key not in
+            {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
+        if detail_fragment_required:
+            result.pop("semantic_preview", None)
+        result.update(status="ok" if page["projection_complete"] else "partial",
+            projection_complete=page["projection_complete"],
+            projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
+                "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
+                "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
+            objects_source="agent_result.objects", agent_result=page)
+        if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) != "ok":
+            raise QueryResultProjectionLimitError("The query page with diagnostics exceeds its bounded output; refine the original read")
+        return result
+    except QueryResultPageError as exc:
+        raise GatewayResultShapeError(str(exc),
+            details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
+            error_code=exc.code) from exc
 
 
 def project_successful_query_object_payload(
@@ -22577,7 +23696,7 @@ def project_successful_query_object_payload(
     projected because their complete evidence is required for a truthful stop.
     """
 
-    if detail or payload.get("ok") is not True:
+    if detail or payload.get("ok") is not True or "native_observation" in payload:
         return dict(payload)
     compact_keys = (
         "contract",
@@ -22590,13 +23709,22 @@ def project_successful_query_object_payload(
         "query_layer",
         "query_contract",
         "query_bound",
+        "source_resolution",
         "count",
         "limit_reached",
+        "projection_complete",
+        "projection_boundary",
+        "objects_source",
         "objects",
         "continuations",
         "mutation_selection",
     )
     projected = {key: payload[key] for key in compact_keys if key in payload}
+    if "objects" in projected and payload.get("objects") is payload.get("agent_result"):
+        from wwise_waapi.canonical import canonical_json_bytes
+        if len(canonical_json_bytes(payload["agent_result"])) > 16 * 1024:
+            projected.pop("objects")
+            projected["objects_source"] = "agent_result"
     if "agent_result" in payload:
         # Preserve the exact object and keep it insertion-order last.  The outer
         # session-context attachment repeats the same terminal-order guarantee.
@@ -23152,6 +24280,90 @@ def validate_successful_transaction_verify_projection(
     return verification, agent_result, cleanup
 
 
+def layout_blueprint_terminal_budget(request: Any) -> int:
+    """Admit only an exact closed constructor, with prewrite rendered-request fit."""
+    ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    if (not isinstance(request, Mapping)
+            or set(request) != {'contract', 'version', 'operation', 'arguments'}
+            or request.get('contract') != 'waapi-skill.operation-request/v1'
+            or request.get('operation') != 'waapi.call'
+            or request.get('version') not in LAYOUT_VERSIONS):
+        return ordinary
+    arguments = request.get('arguments')
+    if (not isinstance(arguments, Mapping)
+            or set(arguments) != {'api', 'args', 'options', 'layout_binding'}
+            or arguments.get('api') != LAYOUT_SET_URI
+            or not isinstance(arguments.get('layout_binding'), Mapping)
+            or 'layout_blueprint' not in arguments['layout_binding']):
+        return ordinary
+    try:
+        validate_layout_call(request['version'], LAYOUT_SET_URI,
+            arguments['args'], arguments['options'], arguments['layout_binding'])
+    except (ValueError, TypeError, KeyError):
+        return ordinary
+    # Size in its terminal nesting, using the actual pretty UTF-8 stdout encoder;
+    # quotes, backslashes, multibyte text and indentation all count. The remaining
+    # fixed allowance carries result framing, bounded cleanup and digests.
+    observed = gateway_json_document_size({'agent_result': {'request': request}},
+        stop_after_bytes=MAX_OPERATION_DRAFT_EVIDENCE_BYTES)
+    if observed > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+        raise GatewayInputError('Layout constructor request exceeds its bounded terminal UTF-8 capacity')
+    return (ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES
+        else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES)
+
+
+def transaction_verify_terminal_budget(request: Any) -> int:
+    """Select bounded exceptional capacity only for reviewed closed constructors."""
+    ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    layout_budget = layout_blueprint_terminal_budget(request)
+    if layout_budget != ordinary:
+        return layout_budget
+    if (not isinstance(request, Mapping)
+            or set(request) != {'contract', 'version', 'operation', 'arguments'}
+            or request.get('contract') != 'waapi-skill.operation-request/v1'
+            or request.get('operation') != 'waapi.call'
+            or request.get('version') not in {'2023.1', '2024.1', '2025.1'}):
+        return ordinary
+    arguments = request.get('arguments')
+    if (not isinstance(arguments, Mapping)
+            or set(arguments) != {'api', 'args', 'options', 'io_root'}
+            or arguments.get('api') != 'ak.wwise.debug.generateToneWAV'
+            or arguments.get('options') != {} or not isinstance(arguments.get('args'), Mapping)):
+        return ordinary
+    native = arguments['args']
+    try:
+        parse_operation_request(request, expected_version=request['version'])
+        validate_semantic_payload(arguments['api'], native, {}, version=request['version'])
+        path = native['path']
+        markers = native.get('markers', [])
+        layout = native.get('channelConfig', '1.0')
+        channels = ((int(layout.split()[1][0]) + 1) ** 2 if layout.startswith('Ambisonics ')
+            else sum(int(part) for part in layout.split('.')))
+        mask = native.get('waveformChannelMask')
+        if (not path.casefold().endswith('.wav')
+                or host_path_comparison_key(str(parse_absolute_host_path(path).pure_path.parent)) != host_path_comparison_key(arguments['io_root'])
+                or mask is not None and (isinstance(mask, bool) or not isinstance(mask, int) or not 0 <= mask < 1 << channels)
+                or layout.startswith('Ambisonics ') and native.get('waveform', 'silence') != 'silence'):
+            return ordinary
+        if (len(canonical_json_bytes(native)) > MAX_HOST_PLAN_BYTES
+                or not isinstance(path, str) or len(path.encode('utf-8')) > MAX_PATH_BYTES
+                or not isinstance(markers, list) or len(markers) > MAX_COLLECTION_ITEMS
+                or any('label' in row and (not isinstance(row['label'], str)
+                    or '\x00' in row['label'] or len(row['label'].encode('utf-8')) > MAX_TEXT_BYTES) for row in markers)):
+            return ordinary
+    except (ValueError, TypeError, KeyError):
+        return ordinary
+    # Host plans are shallow and sealed under 128 KiB. Retaining their exact
+    # request uses the existing 256 KiB rendered-request/Draft ceiling plus
+    # ordinary terminal framing. No input count/label bound is reduced.
+    rendered_limit = min(MAX_OPERATION_DRAFT_EVIDENCE_BYTES, 2 * MAX_HOST_PLAN_BYTES)
+    observed = gateway_json_document_size({'agent_result': {'request': request}},
+        stop_after_bytes=rendered_limit)
+    if observed > rendered_limit:
+        raise GatewayInputError('Tone request exceeds its bounded rendered terminal UTF-8 capacity')
+    return ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES
+
+
 def project_successful_transaction_verify_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -23168,16 +24380,16 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
+    stdout_budget = transaction_verify_terminal_budget(agent_result.get("request"))
     projected = dict(payload)
     projected.pop("agent_result", None)
     projection = {
         "contract": TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT,
         "detail_level": "full-verification-evidence",
         "fixed_projection_limit_bytes": (
-            TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
-            - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
+            stdout_budget - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
         ),
-        "stdout_budget_bytes": TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES,
+        "stdout_budget_bytes": stdout_budget,
         "session_context_reserve_bytes": (
             TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
         ),
@@ -25707,6 +26919,21 @@ def _business_next_action_binding(
                 "native_request_input": "forbidden",
             },
         }
+    if adapter.family == "authoring-layout-business":
+        declaration = business_contract['declaration']
+        shared = {'contract': 'waapi-skill.business-draft-next-action/v1',
+            'responsibility_split': business_contract['responsibility_split'],
+            'business_contract': business_contract, 'forbidden_inputs': forbidden_inputs,
+            'shell_tool_timeout_ms': GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            'then_read_next_response': True, 'precompute_or_increment_revision': False}
+        if session is not None and adapter.is_complete(session):
+            return {**shared, 'required_next_phase': 'check_complete_layout_plan',
+                'check': {**operation_draft_prefix_copy_binding(check), 'append': []}}
+        return {**shared, 'required_next_phase': 'declare_complete_layout_plan',
+            'declaration': {**operation_draft_prefix_copy_binding([*base, 'draft-declare-layout-plan', *binding],
+                append_action='copy_verbatim_then_append_disclosed_layout_fields'),
+                'required_fields': declaration['required_fields'], 'optional_fields': declaration['optional_fields'],
+                'input_forms': declaration['input_forms'], 'submit_once': True, 'native_request_input': 'forbidden'}}
     if adapter.family == "host-ui-debug-business":
         declaration = business_contract["declaration"]
         shared = {
@@ -27585,7 +28812,8 @@ def operation_draft_payload(
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
 
     read_only_draft = (
-        record.operation.startswith("ak.")
+        record.operation not in LAYOUT_MUTATION_URIS
+        and record.operation.startswith("ak.")
         and public_typed_contract(record.version, record.operation).effect == "read"
     )
 
@@ -29376,6 +30604,8 @@ def transaction_read_call(
             # dispatcher gate must be bypassed internally without broadening
             # the public direct-call surface.
             allow_destructive=True,
+            operation_timeout=10 if uri in LAYOUT_READ_URIS else None,
+            result_limit_bytes=MAX_LAYOUT_RESULT_BYTES if uri in LAYOUT_READ_URIS else MAX_GATEWAY_RESULT_JSON_BYTES,
         )
         if result.get("ok") is not True:
             raise OperationContractError(

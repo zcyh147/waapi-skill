@@ -39,7 +39,10 @@ def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path
         assert code == 0, schema
         assert schema["version"] == version
     assert ("ak.wwise.ui.getSelectedFiles" in rows) is (version == "2025.1")
-    assert not any(uri.startswith(("ak.wwise.ui.layout.", "ak.wwise.ui.model.")) for uri in rows)
+    assert {uri for uri in rows if uri.startswith("ak.wwise.ui.layout.")} == {
+        "ak.wwise.ui.layout." + suffix for suffix in ("getLayoutNames", "getCurrentLayoutName", "getLayout", "getViewInstances", "getViewTypes", "getElementRectangle", "getViewHandle", "switchLayout", "setLayout", "removeLayout", "getOrCreateView", "undockView", "dockView", "moveSplitter", *(("closeView",) if version == "2025.1" else ()))
+    }
+    assert not any(uri.startswith("ak.wwise.ui.model.") for uri in rows)
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
@@ -67,7 +70,7 @@ def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp
 
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))
 @pytest.mark.parametrize("suffix", (
-    "layout.getLayoutNames", "layout.setLayout", "layout.resetLayouts",
+    "layout.resetLayouts",
     "model.createHandle", "model.registerWafm", "window.create",
     "signal.emit", "cli.executeLuaScript", "cli.launch",
 ))

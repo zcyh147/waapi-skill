@@ -11,6 +11,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.metadata_discovery import metadata_typed_value_type
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
+from tests.support.metadata_result_case_bank import metadata_result_cases
 
 
 SCRIPT_PATH = (
@@ -210,6 +211,170 @@ def _metadata_responses(
         GET_NAMES_URI: {"return": list(names)},
         GET_PROPERTY_INFO_URI: property_info,
     }
+
+
+@pytest.mark.parametrize("version,case_name,native", [
+    (version, name, native) for version in SUPPORTED_WWISE_VERSION_KEYS
+    for name, native in metadata_result_cases(version).items()],
+    ids=[version + "-" + name for version in SUPPORTED_WWISE_VERSION_KEYS
+         for name in metadata_result_cases(version)])
+def test_public_metadata_result_bank_preserves_each_selected_native_fact(tmp_path: Path, version: str, case_name: str, native: dict, request) -> None:
+    import os
+    observed_capture = {}
+    context_path = os.environ.get("WAAPI_METADATA_RESULT_BRANCH_CAPTURE_CONTEXT")
+    if context_path:
+        from tests.support.metadata_read_branch_evidence import load_metadata_capture, finish_metadata_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_metadata_capture(Path(context_path), request.node.nodeid, version, case_name)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_metadata_capture(capture, reports, observed_capture))
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.maintenance.branch_coverage_audit import digest
+    from wwise_waapi.native_catalog import load_native_catalog
+    catalog = load_native_catalog(version, "wwise-console")
+    schema = catalog["schemas"][GET_PROPERTY_INFO_URI]["resultSchema"]
+    completion.validate_native_alternative(SCRIPT_PATH.parents[3], {
+        "route": version + "|wwise-console|" + catalog["provenance"]["build"] + "|function|" + GET_PROPERTY_INFO_URI,
+        "pointer": "/resultSchema", "shape_sha256": digest(schema)}, native)
+    responses = _metadata_responses(tmp_path, version=version, names=("Volume", "Unrelated"))
+    def property_info(args, options):
+        assert args == {"object": OBJECT_GUID, "property": "Volume"} and options == {}
+        return native
+    responses[GET_PROPERTY_INFO_URI] = property_info
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--exact-id", OBJECT_GUID],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    selected = next(row for row in listed["agent_result"]["fields"] if row["name"] == "Volume")
+    argv = ["metadata", "detail", "--exact-id", OBJECT_GUID, "--selection", selected["selection"]]
+    code, detail = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    observed = detail["agent_result"]["metadata"]
+    assert {key: observed[key] for key in native} == native
+    assert set(observed) == set(native) | {"unit", "availability"}
+    unit = native.get("ui", {}).get("dataMeaning")
+    assert observed["unit"] == {"status": "unknown" if unit in {None, "None"} else "known",
+                                "value": None if unit in {None, "None"} else unit}
+    assert observed["availability"] == {key: "known" if key in native else "unknown"
+        for key in ("type", "default", "restriction", "dependencies", "supports", "ui")}
+    assert detail["agent_result"]["complete"] is True
+    assert len(json.dumps(detail, ensure_ascii=False, indent=2).encode()) < 64 * 1024
+    assert [args for uri, args, _ in client.calls if uri == GET_PROPERTY_INFO_URI] == [
+        {"object": OBJECT_GUID, "property": "Volume"}]
+    from tests.support.media_pool_branch_evidence import public_read_observation
+    native_call = next(call for call in client.calls if call[0] == GET_PROPERTY_INFO_URI)
+    observed_capture.update(public_read_observation(gateway_argv=argv, exit_code=code, payload=detail,
+        uri=native_call[0], args=native_call[1], options=native_call[2], result=native))
+    # A surviving unrelated field must never replace this exact lost selection.
+    client.responses[GET_NAMES_URI] = {"return": ["Unrelated"]}
+    rejected_code, rejected = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert rejected_code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
+    dispatch_count = sum(uri == GET_PROPERTY_INFO_URI for uri, _, _ in client.calls)
+    assert dispatch_count == 1
+    observed_capture.update(native_metadata_dispatch_count=dispatch_count,
+        rejected_read={"argv": argv, "exit_code": rejected_code, "payload": rejected})
+
+
+def _metadata_command_platform(monkeypatch, platform: str) -> None:
+    if platform == "windows":
+        import types
+        original = waapi_gateway.transaction_next_command
+        def windows_command(*args, **kwargs):
+            actual = waapi_gateway.os
+            waapi_gateway.os = types.SimpleNamespace(**{**vars(actual), "name": "nt"})
+            try:
+                return original(*args, **kwargs)
+            finally:
+                waapi_gateway.os = actual
+        monkeypatch.setattr(waapi_gateway, "transaction_next_command", windows_command)
+
+
+def _assert_metadata_command(command, platform: str) -> None:
+    if platform == "windows":
+        from wwise_waapi.platform_commands import decode_windows_powershell_argv
+        argv = decode_windows_powershell_argv(command["shell_command"])
+        assert argv[argv.index("gateway.py") + 1:] == tuple(command["gateway_argv"])
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("platform", ["posix", "windows"])
+def test_native_long_field_name_uses_scoped_selection_and_lossless_detail(tmp_path: Path, version: str, platform: str, monkeypatch) -> None:
+    _metadata_command_platform(monkeypatch, platform)
+    name = "声" * 12000
+    client = FakeClient(_metadata_responses(tmp_path, version=version, names=(name,)))
+    env = _gateway_env(tmp_path, version=version)
+    def run(argv):
+        code, payload = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _url: client)
+        assert code == 0, payload
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) < 64 * 1024
+        return payload["agent_result"]
+    listed = run(["metadata", "list", "--exact-id", OBJECT_GUID])
+    row = listed["fields"][0]
+    assert row["name_complete"] is False
+    assert row["name_characters"] == 12000
+    assert name not in row.values()
+    page = run(["metadata", "detail", "--exact-id", OBJECT_GUID, "--selection", row["selection"]])
+    fragments = []
+    while True:
+        assert page["field"]["type"] == "Real32"
+        assert page["field"]["name_complete"] is False
+        fragments.extend(entry["value"] for entry in page["entries"] if entry["pointer"] == "/name")
+        if page["complete"]:
+            break
+        command = page["next_command"]
+        _assert_metadata_command(command, platform)
+        assert name not in command["gateway_argv"]
+        page = run(command["gateway_argv"])
+    assert "".join(fragments) == name
+    assert all(args["property"] == name for uri, args, _ in client.calls if uri == GET_PROPERTY_INFO_URI)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("platform", ["posix", "windows"])
+@pytest.mark.parametrize("class_id_available", [True, False])
+def test_oversized_native_type_row_can_be_read_and_selected_as_class_scope(tmp_path: Path, version: str, platform: str, class_id_available: bool, monkeypatch) -> None:
+    _metadata_command_platform(monkeypatch, platform)
+    name = "类型" * 6000
+    native = {"name": name, "type": "WObject", "classId": SOUND_CLASS_ID}
+    if not class_id_available:
+        native.pop("classId")
+    responses = _metadata_responses(tmp_path, version=version)
+    responses[GET_TYPES_URI] = {"return": [native]}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    def run(argv):
+        code, payload = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _url: client)
+        assert code == 0, payload
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) < 64 * 1024
+        return payload["agent_result"]
+    row = run(["metadata", "types"])["types"][0]
+    assert row["name_complete"] is False
+    assert row["type"] == "WObject"
+    _assert_metadata_command(row["detail_command"], platform)
+    if class_id_available:
+        assert row["classId"] == SOUND_CLASS_ID
+        _assert_metadata_command(row["fields_command"], platform)
+    page = run(row["detail_command"]["gateway_argv"])
+    fragments = []
+    while True:
+        fragments.extend(entry["value"] for entry in page["entries"] if entry["pointer"] == "/name")
+        if page["complete"]:
+            break
+        _assert_metadata_command(page["next_command"], platform)
+        page = run(page["next_command"]["gateway_argv"])
+    assert "".join(fragments) == name
+    if not class_id_available:
+        assert "fields_command" not in row and "classId" not in row
+        code, rejected = waapi_gateway.execute_gateway(["metadata", "list", "--type-selection", row["selection"]], env=env, client_factory=lambda _url: client)
+        assert code == 2 and rejected["error_code"] == "METADATA_CLASS_ID_UNAVAILABLE", rejected
+        assert not any(uri == GET_NAMES_URI for uri, _, _ in client.calls)
+        return
+    fields = run(row["fields_command"]["gateway_argv"])
+    assert fields["fields"][0]["name"] == "Volume"
+    assert [args for uri, args, _ in client.calls if uri == GET_NAMES_URI] == [{"classId": SOUND_CLASS_ID}]
+    client.responses[GET_TYPES_URI] = {"return": [{**native, "classId": SOUND_CLASS_ID + 1}]}
+    code, rejected = waapi_gateway.execute_gateway(row["fields_command"]["gateway_argv"], env=env, client_factory=lambda _url: client)
+    assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
 
 
 def test_metadata_discover_exposes_business_scope_and_meaning_not_native_tokens() -> None:
@@ -789,7 +954,7 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
     assert payload["agent_result"]["candidates"][0]["metadata"][
         "typed_value_type"
     ] == "number"
-    assert "supports" not in payload["agent_result"]["candidates"][0]["metadata"]
+    assert payload["agent_result"]["candidates"][0]["metadata"]["supports"]["rtpc"] == "Exclusive"
     assert "match_evidence" not in payload["agent_result"]["candidates"][0]
 
     call_uris = [call[0] for call in client.calls]
@@ -1349,3 +1514,321 @@ def test_exact_metadata_meaning_ignores_bulky_near_matches(tmp_path: Path, versi
     )
     assert code == 0, payload
     assert [row["name"] for row in payload["agent_result"]["candidates"]] == ["Volume"]
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_metadata_detail_preserves_native_presence_and_extended_fields(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    native = {"name": "Volume", "type": "Real32", "default": None,
+              "supports": {"rtpc": "Additive"}, "ui": {"dataMeaning": "Decibels"},
+              "extension": {"applicable": False, "values": []}}
+    responses[GET_PROPERTY_INFO_URI] = native
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, listed = waapi_gateway.execute_gateway(
+        ["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, detailed = waapi_gateway.execute_gateway(
+        ["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"]],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, detailed
+    metadata = detailed["agent_result"]["metadata"]
+    assert metadata["default"] is None
+    assert "restriction" not in metadata
+    assert metadata["extension"] == {"applicable": False, "values": []}
+    assert metadata["unit"] == {"status": "known", "value": "Decibels"}
+    assert detailed["agent_result"]["complete"] is True
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_metadata_detail_counts_unknown_native_extension_in_read_budget(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "extension": "x" * (512 * 1024)}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, detail = waapi_gateway.execute_gateway(["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"]],
+        env=env, client_factory=lambda _: client)
+    assert code == 2, detail
+    assert detail["error_code"] == "LIVE_METADATA_LIMIT_EXCEEDED"
+    assert detail["details"]["limit_bytes"] == 512 * 1024
+    assert "x" * 1024 not in json.dumps(detail)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_optional_metadata_identity_facts_remain_absent_in_reads(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version, names=("Volume",))
+    responses[GET_PROPERTY_INFO_URI] = {"default": None, "supports": {"rtpc": "None"}}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    def run(argv):
+        return waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    code, listed = run(["metadata", "list", "--exact-id", OBJECT_GUID])
+    assert code == 0, listed
+    code, detail = run(["metadata", "detail", "--exact-id", OBJECT_GUID, "--selection", listed["agent_result"]["fields"][0]["selection"]])
+    assert code == 0, detail
+    observed = detail["agent_result"]["metadata"]
+    assert "name" not in observed and "type" not in observed
+    assert observed["default"] is None
+    assert observed["availability"]["type"] == "unknown"
+    code, discovered = run(["metadata", "discover", "--exact-id", OBJECT_GUID, "--meaning", "Volume"])
+    assert code == 0, discovered
+    candidate = discovered["agent_result"]["candidates"][0]
+    assert candidate["name"] == "Volume" and candidate["kind"] == "unknown"
+    assert "name" not in candidate["metadata"] and "type" not in candidate["metadata"]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_type_inventory_retains_schema_optional_missing_facts(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    rows = [{"name": "Sound", "classId": 65552}, {"name": "Unidentified"}, {"type": "WObject"}, {}]
+    responses[GET_TYPES_URI] = {"return": rows}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, observed = waapi_gateway.execute_gateway(["metadata", "types"], env=env, client_factory=lambda _: client)
+    assert code == 0, observed
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in observed["agent_result"]["types"]] == rows
+    code, filtered = waapi_gateway.execute_gateway(["metadata", "types", "--meaning", "WObject"], env=env, client_factory=lambda _: client)
+    assert code == 0, filtered
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in filtered["agent_result"]["types"]] == [{"type": "WObject"}]
+    code, scoped = waapi_gateway.execute_gateway(["metadata", "list", "--custom-kind", "Sound"], env=env, client_factory=lambda _: client)
+    assert code == 0, scoped
+    assert (GET_NAMES_URI, {"classId": 65552}, {}) in client.calls
+
+
+def test_metadata_large_detail_continuation_is_complete_and_snapshot_bound(tmp_path: Path) -> None:
+    responses = _metadata_responses(tmp_path)
+    text = "声\\\"" * 16000
+    native = {"name": "Volume", "type": "Real32", "display": {"description": text},
+              "restriction": {"type": "enum", "values": [{"value": i, "displayName": str(i)} for i in range(100)]},
+              "default": 0, "supports": {"rtpc": "Additive"}, "ui": {"dataMeaning": "Decibels"},
+              "dependencies": [{"name": "Mode", "value": "Mode == 1"}]}
+    responses[GET_PROPERTY_INFO_URI] = native
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    def run(argv):
+        return waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    code, listed = run(["metadata", "list", "--kind", "all-sounds"])
+    assert code == 0, listed
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    argv = ["metadata", "detail", "--kind", "all-sounds", "--selection", selection]
+    code, detailed = run(argv)
+    assert code == 0, detailed
+    pages = [detailed["agent_result"]]
+    assert pages[0]["complete"] is False
+    summary = pages[0]["field"]
+    assert summary["name"] == "Volume" and summary["type"] == "Real32"
+    assert summary["default"] == 0 and summary["supports"] == {"rtpc": "Additive"}
+    assert summary["unit"] == {"status": "known", "value": "Decibels"}
+    assert summary["dependencies"] == [{"name": "Mode", "value": "Mode == 1"}]
+    assert summary["choices"]["items"] == native["restriction"]["values"][:20]
+    choice_pages = [summary["choices"]]
+    while not choice_pages[-1]["complete"]:
+        code, choices = run(choice_pages[-1]["next_command"]["gateway_argv"])
+        assert code == 0, choices
+        choice_pages.append(choices["agent_result"]["field"]["choices"])
+    assert [row for page in choice_pages for row in page["items"]] == native["restriction"]["values"]
+    assert pages[0]["next_command"]["copy_instruction"]["action"] == "execute_verbatim_as_one_shell_tool_call"
+    continuation = pages[0]["next_command"]["gateway_argv"]
+    while not pages[-1]["complete"]:
+        code, detailed = run(pages[-1]["next_command"]["gateway_argv"])
+        assert code == 0, detailed
+        pages.append(detailed["agent_result"])
+        assert len(pages) < 100
+    entries = [entry for page in pages for entry in page["entries"]]
+    assert "".join(row["value"] for row in entries if row["pointer"] == "/display/description") == text
+    assert [row["value"] for row in entries if row["pointer"].startswith("/restriction/values/") and row["pointer"].endswith("/value")] == list(range(100))
+    assert all(page["field"]["name"] == "Volume" for page in pages)
+    assert all(len(json.dumps(page, ensure_ascii=False, indent=2).encode()) <= 28 * 1024 for page in pages)
+    native["default"] = 10
+    code, rejected = run(continuation)
+    assert code == 2 and rejected["error_code"] == "METADATA_DETAIL_CHANGED", rejected
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_metadata_types_pages_preserve_native_rows_and_bind_filter(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    rows = [{"classId": i + 1, "name": f"Sound{i:03}", "type": "WObject", "extension": {"nullable": None, "enabled": False}} for i in range(75)]
+    responses[GET_TYPES_URI] = {"return": rows}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    def run(argv):
+        return waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    code, first = run(["metadata", "types", "--page-size", "17"])
+    assert code == 0, first
+    pages = [first["agent_result"]]
+    stale_argv = pages[0]["next_command"]["gateway_argv"]
+    while not pages[-1]["complete"]:
+        code, response = run(pages[-1]["next_command"]["gateway_argv"])
+        assert code == 0, response
+        pages.append(response["agent_result"])
+    assert [{key: value for key, value in row.items() if key != "selection"} for page in pages for row in page["types"]] == rows
+    assert [len(page["types"]) for page in pages] == [17, 17, 17, 17, 7]
+    code, filtered = run(["metadata", "types", "--meaning", "Sound074"])
+    assert code == 0, filtered
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in filtered["agent_result"]["types"]] == [rows[-1]]
+    code, rejected = run([*stale_argv, "--meaning", "Sound074"])
+    assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
+    rows[0]["name"] = "Changed"
+    code, rejected = run(stale_argv)
+    assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
+    assert all(uri in {GET_INFO_URI, GET_TYPES_URI} for uri, _, _ in client.calls)
+
+
+def test_metadata_type_empty_inventory_is_a_complete_empty_page(tmp_path: Path) -> None:
+    responses = _metadata_responses(tmp_path)
+    responses[GET_TYPES_URI] = {"return": []}
+    code, payload = waapi_gateway.execute_gateway(["metadata", "types"], env=_gateway_env(tmp_path), client_factory=lambda _: FakeClient(responses))
+    assert code == 0, payload
+    assert payload["agent_result"]["types"] == []
+    assert payload["agent_result"]["complete"] is True
+    assert payload["agent_result"]["total_count"] == 0
+
+
+@pytest.mark.parametrize("uri", [GET_NAMES_URI, GET_PROPERTY_INFO_URI])
+def test_metadata_catalog_discloses_exact_list_and_detail_routes(uri: str) -> None:
+    code, payload = waapi_gateway.execute_gateway(["--version", "2025.1", "describe", uri], env={})
+    assert code == 0, payload
+    text = json.dumps(payload)
+    assert "metadata list" in text and "metadata detail" in text
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_metadata_discovery_discloses_support_units_conditions_and_native_presence(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "supports": {"rtpc": "Additive", "unlink": True},
+                                        "ui": {"dataMeaning": "Decibels"}, "dependencies": []}
+    code, payload = waapi_gateway.execute_gateway(["metadata", "discover", "--kind", "all-sounds", "--meaning", "Volume"],
+                                                  env=_gateway_env(tmp_path, version=version), client_factory=lambda _: FakeClient(responses))
+    assert code == 0, payload
+    metadata = payload["agent_result"]["candidates"][0]["metadata"]
+    assert "default" not in metadata and "restriction" not in metadata
+    assert metadata["supports"] == {"rtpc": "Additive", "unlink": True}
+    assert metadata["ui"] == {"dataMeaning": "Decibels"}
+    assert metadata["unit"] == {"status": "known", "value": "Decibels"}
+    assert metadata["dependencies"] == []
+    assert metadata["availability"]["default"] == "unknown"
+
+
+@pytest.mark.parametrize(("key", "value"), [("supports", []), ("ui", "Decibels"), ("restriction", 1), ("display", False), ("ui", None)])
+def test_metadata_detail_rejects_malformed_optional_objects(tmp_path: Path, key: str, value: Any) -> None:
+    responses = _metadata_responses(tmp_path)
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", key: value}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, rejected = waapi_gateway.execute_gateway(["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"]], env=env, client_factory=lambda _: client)
+    assert code == 2 and rejected["error_code"] == "INVALID_LIVE_METADATA", rejected
+    assert key in json.dumps(rejected)
+
+
+def test_metadata_detail_windows_envelopes_fit_the_public_page_bound(tmp_path: Path, monkeypatch) -> None:
+    import types
+    original = waapi_gateway.transaction_next_command
+    def windows_continuation(*args, **kwargs):
+        actual_os = waapi_gateway.os
+        waapi_gateway.os = types.SimpleNamespace(**{**vars(actual_os), "name": "nt"})
+        try:
+            return original(*args, **kwargs)
+        finally:
+            waapi_gateway.os = actual_os
+    monkeypatch.setattr(waapi_gateway, "transaction_next_command", windows_continuation)
+    responses = _metadata_responses(tmp_path)
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "display": {"description": "声" * 20000},
+                                        "restriction": {"type": "enum", "values": [{"value": i, "displayName": str(i)} for i in range(100)]}}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, detail = waapi_gateway.execute_gateway(["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"]], env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    result = detail["agent_result"]
+    assert result["next_command"]["shell_family"] == "windows-powershell-encoded"
+    assert len(json.dumps(result, ensure_ascii=False, indent=2).encode()) <= 28 * 1024
+
+
+def test_metadata_field_list_continuation_is_executable_and_scope_complete(tmp_path: Path) -> None:
+    client = FakeClient(_metadata_responses(tmp_path, names=("Volume", "Pitch")))
+    env = _gateway_env(tmp_path)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds", "--page-size", "1"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    next_command = listed["agent_result"]["next_command"]
+    assert next_command["copy_instruction"]["action"] == "execute_verbatim_as_one_shell_tool_call"
+    code, second = waapi_gateway.execute_gateway(next_command["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, second
+    assert [row["name"] for row in listed["agent_result"]["fields"] + second["agent_result"]["fields"]] == ["Pitch", "Volume"]
+    assert second["agent_result"]["complete"] is True
+
+
+def test_large_enum_lexical_discovery_reaches_exact_typed_detail(tmp_path: Path) -> None:
+    responses = _metadata_responses(tmp_path, names=("Mode", "ModeNearby"))
+    native = {"name": "Mode", "type": "int32", "restriction": {"type": "enum", "values": [
+        {"value": index, "displayName": f"Mode {index}"} for index in range(1000)]}}
+    responses[GET_PROPERTY_INFO_URI] = native
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    code, discovered = waapi_gateway.execute_gateway(["metadata", "discover", "--kind", "all-sounds", "--meaning", "Mode"], env=env, client_factory=lambda _: client)
+    assert code == 0, discovered
+    candidate = discovered["agent_result"]["candidates"][0]
+    assert candidate["name"] == "Mode"
+    assert candidate["metadata"]["restriction"] == {"type": "enum", "value_count": 1000}
+    assert candidate["metadata_details_complete"] is False
+    assert len(json.dumps(discovered, ensure_ascii=False, indent=2).encode()) < 32 * 1024
+    code, detail = waapi_gateway.execute_gateway(candidate["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    assert detail["agent_result"]["field"]["name"] == "Mode"
+    assert detail["agent_result"]["field"]["choices"]["items"] == native["restriction"]["values"][:20]
+
+
+def test_large_dependency_discovery_reaches_complete_typed_detail(tmp_path: Path) -> None:
+    responses = _metadata_responses(tmp_path, version="2025.1")
+    dependencies = [{"type": "isMasterBus", "action": "Show", "context": "Self", "value": False} for _ in range(1000)]
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "dependencies": dependencies}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version="2025.1")
+    code, discovered = waapi_gateway.execute_gateway(["metadata", "discover", "--kind", "all-sounds", "--meaning", "Volume"], env=env, client_factory=lambda _: client)
+    assert code == 0, discovered
+    candidate = discovered["agent_result"]["candidates"][0]
+    assert candidate["metadata"]["dependency_count"] == 1000
+    assert "dependencies" not in candidate["metadata"]
+    pages = []
+    command = candidate["next_command"]
+    while command:
+        code, detail = waapi_gateway.execute_gateway(command["gateway_argv"], env=env, client_factory=lambda _: client)
+        assert code == 0, detail
+        page = detail["agent_result"]
+        pages.extend(page["items"])
+        command = page.get("next_command")
+    assert pages == dependencies
+
+
+@pytest.mark.parametrize("view", ["choices", "dependencies"])
+def test_single_large_typed_metadata_item_has_lossless_item_continuation(tmp_path: Path, view: str) -> None:
+    responses = _metadata_responses(tmp_path)
+    text = "声" * 12000
+    row = {"value": 1, "displayName": text} if view == "choices" else {"type": "property", "action": "Show", "context": "Self", "property": "Mode", "extension": text}
+    native = {"name": "Volume", "type": "Real32"}
+    native.update({"restriction": {"type": "enum", "values": [row]}} if view == "choices" else {"dependencies": [row]})
+    responses[GET_PROPERTY_INFO_URI] = native
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, detail = waapi_gateway.execute_gateway(["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"], "--detail-view", view], env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    page = detail["agent_result"]
+    assert page["field"]["name"] == "Volume"
+    assert len(page["items"]) == 1
+    item = page["items"][0]
+    assert item["detail_required"] is True
+    fragments = []
+    command = item["next_command"]
+    while command:
+        code, detail = waapi_gateway.execute_gateway(command["gateway_argv"], env=env, client_factory=lambda _: client)
+        assert code == 0, detail
+        value = detail["agent_result"]
+        assert len(json.dumps(value, ensure_ascii=False, indent=2).encode()) <= 28 * 1024
+        fragments.extend(entry["value"] for entry in value["entries"] if entry["pointer"] == ("/displayName" if view == "choices" else "/extension"))
+        command = value.get("next_command")
+    assert "".join(fragments) == text

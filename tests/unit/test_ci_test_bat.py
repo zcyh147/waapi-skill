@@ -352,13 +352,31 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 205
+    assert len(nodes) == 241
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
-    assert nodes[-1] == "tests/unit/test_policy_recovery_gateway.py"
+    assert nodes[-1] == "tests/unit/test_branch_evidence_readers.py"
     assert {
         "tests/unit/test_gateway_connection_binding.py",
         "tests/unit/test_metadata_selection_gateway.py",
+        "tests/unit/test_query_type_selection.py",
+        "tests/unit/test_condition_reference_hierarchy_gateway.py",
         "tests/unit/test_conditional_reference_gateway.py",
+        "tests/unit/test_condition_native_evidence.py",
+        "tests/unit/test_condition_native_finalization.py",
+        "tests/unit/test_peak_branch_evidence.py",
+        "tests/unit/test_authoring_batch_owner.py",
+        "tests/unit/test_authoring_launch_lifecycle.py",
+        "tests/unit/test_authoring_batch_adapter.py",
+        "tests/unit/test_authoring_layout_native_fixture.py",
+        "tests/unit/test_authoring_layout_splitter_gateway.py",
+        "tests/unit/test_authoring_layout_blueprint_gateway.py",
+        "tests/unit/test_condition_scalar_batch_evidence.py",
+        "tests/unit/test_condition_scalar_program.py",
+        "tests/unit/test_condition_scalar_requirements.py",
+        "tests/unit/test_condition_source_chain_gateway.py",
+        "tests/unit/test_scalar_program_admission.py",
+        "tests/unit/test_object_query_result_pages.py",
+        "tests/unit/test_gateway_error_context.py",
         "tests/unit/test_gameparameter_class_fields_gateway.py",
         "tests/unit/test_gameparameter_route_disclosure.py",
         "tests/unit/test_plugin_shareset_gateway.py",

@@ -337,8 +337,8 @@ def _channel_indexes(
     field: str,
     raw: object,
 ) -> list[int]:
-    if not isinstance(raw, list) or not raw or len(raw) > 64:
-        raise _invalid(session, field, "provide one or more channel indexes")
+    if not isinstance(raw, list) or len(raw) > 64:
+        raise _invalid(session, field, "provide an explicit empty set or up to 64 channel indexes")
     values: list[int] = []
     for value in raw:
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 63:

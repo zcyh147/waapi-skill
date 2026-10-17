@@ -31,8 +31,10 @@ from wwise_waapi.schema_inventory import (  # noqa: E402
 
 REPORT_CONTRACT = "waapi-skill.full-surface-release-report/v1"
 from wwise_waapi.authoring_core_manifest import COMMON_URIS  # noqa: E402
+from wwise_waapi.authoring_layout import LAYOUT_READ_URIS  # noqa: E402
+from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS  # noqa: E402
 
-REVIEWED_AUTHORING_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | COMMON_URIS | {"ak.wwise.ui.getSelectedFiles"}
+REVIEWED_AUTHORING_URIS = LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | COMMON_URIS | {"ak.wwise.ui.getSelectedFiles"}
 REPORT_RELATIVE_PATH = Path("docs/full-surface-release-report.json")
 MANIFEST_RELATIVE_PATH = Path("skills/waapi-skill/resources/manifest")
 
@@ -477,6 +479,29 @@ def _continuation_error(
                         return "inline operation continuation is not typed-operation"
                 else:
                     return "dedicated operation retained a non-typed input mode"
+        elif construction_shape == 'closed_business':
+            if not gateway.core_business_route_available(uri, version) or commands != ['request-schema']:
+                return 'closed business declaration has no exact reviewed public route'
+            payload = gateway.layout_business_contract_data(uri, version)
+            if (payload.get('operation') != uri or payload.get('version') != version
+                    or payload.get('input_mode') != 'business_declaration'
+                    or payload.get('legacy_native_request_public') is not False
+                    or payload.get('legacy_typed_call_public') is not False
+                    or payload.get('safety', {}).get('immutable_preview') is not True
+                    or payload.get('safety', {}).get('single_execute') is not True):
+                return 'closed business route differs from its immutable business contract'
+            gateway.build_parser().parse_args(payload['start']['gateway_argv'])
+        elif construction_shape == "closed_read":
+            if uri not in LAYOUT_READ_URIS or commands != ["request-schema", "layout-read"]:
+                return "closed read has no exact reviewed public route"
+            payload = gateway.layout_read_contract(version, uri)
+            argv = payload.get("continuation", {}).get("gateway_argv")
+            if (payload.get("api") != uri or payload.get("version") != version
+                    or payload.get("input_mode") != "bounded_business_read"
+                    or payload.get("safety", {}).get("native_request_input") != "forbidden"
+                    or not isinstance(argv, list) or len(argv) != 2 or argv[0] != "layout-read"):
+                return "closed read continuation differs from its business contract"
+            gateway.build_parser().parse_args(argv)
         elif "request-schema" in commands:
             contract = gateway.public_typed_contract(version, uri)
             payload = contract.as_gateway_payload()

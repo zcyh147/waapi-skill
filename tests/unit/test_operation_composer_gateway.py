@@ -33,6 +33,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,
+    operation_request_machine_contract,
 )
 from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
     expand_gateway_field_table,
@@ -330,9 +331,37 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Reviewed delta: explicit owner/ShareSet placement and Boolean reference
-    # dependency closure. Existing operation/version inventory remains unchanged.
+    # Reviewed hierarchy delta: only the five setReference contracts change
+    # their activation guidance. Restoring that exact prior wording reproduces
+    # the previous aggregate seal, preserving every other field and pair.
     assert canonical_sha256(non_object_set_digests) == (
+        "aa408e7b856275f9c1a6f0304997c8945d2602eb9c8d10871c5ca74f0399f577"
+    )
+    previous = dict(non_object_set_digests)
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.setReference", version)
+        assert contract["constraints"][2:4] == [
+            "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
+            "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
+        ]
+        contract["constraints"][2:4] = [
+            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
+        ]
+        previous[f"object.setReference@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
+        "e2ff2fedc414e846f092b06d03ad807952461373873ef1ed2c9d2b4ee42970de"
+    )
+    # Retain the earlier layout-proof review and its original aggregate seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("layout_binding")
+        contract["argument_contract"]["optional"].remove("layout_binding")
+        assert contract["argument_contract"]["properties"].pop("layout_binding") == {
+            "type": "object",
+            "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
+        }
+        previous[f"waapi.call@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
         "4f05743e90078e3d3ca52dc525b000b2fe46bbd4376ba9a701f1fddde5ca246f"
     )
     assert {

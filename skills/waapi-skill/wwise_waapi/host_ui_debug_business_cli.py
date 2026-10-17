@@ -44,6 +44,9 @@ def add_host_ui_debug_plan_arguments(parser: argparse.ArgumentParser) -> None:
         metavar=("BUSINESS_FIELD", "ENABLE_OR_DISABLE"),
     )
     parser.add_argument(
+        "--empty", action="append", default=[], metavar="BUSINESS_COLLECTION",
+    )
+    parser.add_argument(
         "--marker",
         action="append",
         nargs="+",
@@ -64,6 +67,8 @@ def host_ui_debug_plan_from_namespace(
 
     def field_type(name: str) -> str:
         try:
+            if name not in contract["declaration"]["public_fields"]:
+                raise KeyError(name)
             return str(field_types[name])
         except KeyError as exc:
             raise HostUiDebugBusinessCliError(
@@ -74,6 +79,15 @@ def host_ui_debug_plan_from_namespace(
         if name in result:
             raise HostUiDebugBusinessCliError(f"{name} was supplied twice")
         result[name] = value
+
+    empty_fields: set[str] = set()
+    for name in args.empty:
+        if field_type(name) not in {"channel_index_list", "tone_marker_list"}:
+            raise HostUiDebugBusinessCliError(
+                f"{name} does not disclose an explicit empty collection choice"
+            )
+        put(name, [])
+        empty_fields.add(name)
 
     scalar_types = {
         "exact_waapi_uri",
@@ -118,6 +132,8 @@ def host_ui_debug_plan_from_namespace(
                 )
         put(name, value)
     for name, raw in args.item:
+        if name in empty_fields:
+            raise HostUiDebugBusinessCliError(f"{name} uses conflicting empty and populated forms")
         value_type = field_type(name)
         if value_type not in {"language_name_list", "channel_index_list"}:
             raise HostUiDebugBusinessCliError(

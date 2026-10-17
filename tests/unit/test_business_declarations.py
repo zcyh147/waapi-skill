@@ -1341,3 +1341,22 @@ def test_live_property_enum_restrictions_fail_closed(
             token="LoopMode",
         )
     assert captured.value.repair["error_code"] == "INVALID_METADATA"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize("type_facts,expected_code", [({}, "FIELD_TYPE_UNAVAILABLE"), ({"type": None}, "METADATA_READBACK_INVALID"), ({"type": True}, "METADATA_READBACK_INVALID")])
+def test_exact_live_token_binding_distinguishes_optional_type_absence_from_malformed_present_type(version, type_facts, expected_code):
+    registry = BusinessHandleRegistry(_context(wwise_version=version, wwise_build=f"{version}.fixture"))
+    calls = []
+    def read(uri, args, options):
+        calls.append((uri, dict(args), dict(options)))
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {"name": "Volume", **type_facts}
+        raise AssertionError(uri)
+    with pytest.raises(BusinessDeclarationError) as error:
+        bind_live_field(registry, read_call=read, scope_kind="object", scope_value=OBJECT_ID, token="Volume")
+    assert error.value.error_code == expected_code
+    assert calls[-1][1] == {"object": OBJECT_ID, "property": "Volume"}
+    assert registry.as_dict()["fields"] == []

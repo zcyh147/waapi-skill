@@ -14,7 +14,7 @@ import json
 import os
 import shutil
 import stat
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -28,6 +28,7 @@ from tests.destructive.support.sandbox_fixture import (
     hash_project,
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
+    require_authoring_launch_proof,
     shutdown_sandboxed_wwise,
 )
 from tests.semantic.support.codex_campaign import (
@@ -38,6 +39,7 @@ from tests.semantic.support.codex_filesystem_security import (
     path_is_link_or_reparse,
 )
 from wwise_waapi.headless import HeadlessLifecycle
+from wwise_waapi.native_catalog import load_native_catalog
 
 
 SCENARIO_LIFECYCLE_CONTRACT = "waapi-skill.codex-semantic-scenario-lifecycle/v3"
@@ -134,6 +136,7 @@ class ScenarioLifecycleResult:
     source_mtime_after_ns: int | None
     errors: tuple[str, ...]
     quarantine_path: str | None
+    cleanup_deferred: bool = False
 
     @property
     def blocked(self) -> bool:
@@ -141,7 +144,9 @@ class ScenarioLifecycleResult:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "contract": SCENARIO_LIFECYCLE_CONTRACT,
+            "contract": ("waapi-skill.codex-semantic-scenario-prepared-cleanup/v1"
+                         if self.cleanup_deferred else SCENARIO_LIFECYCLE_CONTRACT),
+            **({"cleanup_deferred": True} if self.cleanup_deferred else {}),
             "scenario_id": self.scenario_id,
             "version": self.version,
             "requested_status": self.requested_status,
@@ -199,6 +204,7 @@ class ScenarioLifecycle:
         prelaunch_hook: PrelaunchHook | None = None,
         launch_environment_overrides: Mapping[str, str] | None = None,
         owned_wine_prefix: Path | None = None,
+        host_kind: str = 'wwise-console',
         lock_root: Path = GLOBAL_LIVE_LIFECYCLE_LOCK_ROOT,
     ) -> None:
         if not scenario_id or not scenario_id.strip():
@@ -210,10 +216,25 @@ class ScenarioLifecycle:
         self.scenario_root = Path(scenario_root).expanduser().resolve(strict=False)
         self.live_environment = {str(key): str(value) for key, value in live_environment.items()}
         self.prelaunch_hook = prelaunch_hook
+        if host_kind not in {'wwise-console', 'wwise-authoring'}:
+            raise ValueError('unsupported scenario host kind')
+        self.host_kind = host_kind
+        self.authoring_build = None
         self.launch_environment_overrides = _validate_launch_environment_overrides(
             launch_environment_overrides or {},
             scenario_root=self.scenario_root,
         )
+        if host_kind == 'wwise-authoring':
+            if version not in {'2024.1', '2025.1'}:
+                raise ValueError('owned Authoring lifecycle requires the pinned 2024.1/2025.1 catalog')
+            home = self.launch_environment_overrides.get('HOME')
+            if home is None:
+                raise ValueError('owned Authoring lifecycle requires a private HOME')
+            default_prefix = Path(home) / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+            if owned_wine_prefix is not None and Path(owned_wine_prefix) != default_prefix:
+                raise ValueError('owned Authoring lifecycle requires the default private HOME bottle')
+            owned_wine_prefix = default_prefix
+            self.authoring_build = load_native_catalog(version, 'wwise-authoring')['provenance']['build']
         self.owned_wine_prefix = _validate_owned_wine_prefix(
             owned_wine_prefix,
             overrides=self.launch_environment_overrides,
@@ -223,6 +244,7 @@ class ScenarioLifecycle:
         self.runtime: ScenarioRuntime | None = None
         self._lock_acquired = False
         self._finished = False
+        self._prepared_cleanup: ScenarioLifecycleResult | None = None
         self._launch_environment_symlink_baseline: (
             dict[str, tuple[tuple[str, str], ...]] | None
         ) = None
@@ -292,9 +314,12 @@ class ScenarioLifecycle:
                     env,
                     wine_prefix_path=self.owned_wine_prefix,
                     case_owned_root=owned_root,
+                    **({'host_kind': self.host_kind} if self.host_kind == 'wwise-authoring' else {}),
                 )
             stage = "wwise-launch-identity"
-            if lifecycle.port is None or str(sandbox.sandbox_project) not in lifecycle.command:
+            if self.host_kind == 'wwise-authoring':
+                require_authoring_launch_proof(lifecycle, project=sandbox.sandbox_project, build=self.authoring_build)
+            elif lifecycle.port is None or str(sandbox.sandbox_project) not in lifecycle.command:
                 raise ScenarioLifecycleError(
                     "Wwise launch did not prove the private project path and dynamic WAAPI port"
                 )
@@ -355,6 +380,12 @@ class ScenarioLifecycle:
                         if self.owned_wine_prefix is not None
                         else None
                     ),
+                    **({
+                        'host_kind': self.host_kind, 'authoring_build': self.authoring_build,
+                        'get_info': dict(lifecycle.ready_result),
+                        'launch_project_attestation': dict(lifecycle.launch_project_attestation),
+                        'launch_preparation': list(lifecycle.launch_preparation),
+                    } if self.host_kind == 'wwise-authoring' else {}),
                 },
             )
             return self.runtime
@@ -512,6 +543,7 @@ class ScenarioLifecycle:
         *,
         reason: str = "",
         post_shutdown_hook: PostShutdownHook | None = None,
+        defer_success_cleanup: bool = False,
     ) -> ScenarioLifecycleResult:
         if status not in SCENARIO_STATUSES:
             raise ValueError(f"unsupported scenario status: {status}")
@@ -570,9 +602,12 @@ class ScenarioLifecycle:
             )
             for row in errors
         ) else status
+        prepared_success = defer_success_cleanup and final_status == "PASS" and not errors
+        if prepared_success:
+            final_status = "PREPARED"
         retained = final_status != "PASS"
         quarantine_path: str | None = None
-        if retained and shutdown_proved and post_shutdown_proved:
+        if retained and not prepared_success and shutdown_proved and post_shutdown_proved:
             try:
                 self._archive_launch_environment_roots(
                     evidence_root=runtime.evidence_root,
@@ -609,13 +644,13 @@ class ScenarioLifecycle:
                 except BaseException as quarantine_exc:  # noqa: BLE001
                     errors.append(_format_error("quarantine-seal", quarantine_exc))
 
-        try:
-            self.lock.__exit__(None, None, None)
-            self._lock_acquired = False
-        except BaseException as exc:  # noqa: BLE001 - lock release is systemic
-            errors.append(_format_error("sandbox-lock-release", exc))
-            final_status = "BLOCKED"
-            retained = True
+        if not (prepared_success and final_status == "PREPARED" and not errors):
+            try:
+                self._release_lock_best_effort()
+            except BaseException as exc:  # noqa: BLE001 - lock release is systemic
+                errors.append(_format_error("sandbox-lock-release", exc))
+                final_status = "BLOCKED"
+                retained = True
 
         result = ScenarioLifecycleResult(
             scenario_id=self.scenario_id,
@@ -629,10 +664,70 @@ class ScenarioLifecycle:
             source_mtime_after_ns=source_mtime_after_ns,
             errors=tuple(errors),
             quarantine_path=quarantine_path,
+            cleanup_deferred=prepared_success and final_status == "PREPARED" and not errors,
         )
-        _write_json(runtime.evidence_root / "lifecycle.json", result.as_dict())
+        if result.cleanup_deferred:
+            self._prepared_cleanup = result
+            self._prepared_cleanup_paths = tuple(str(path.resolve(strict=True)) for path in (
+                runtime.sandbox.source_project, runtime.sandbox.source_root, runtime.owned_root,
+                runtime.sandbox.sandbox_path, runtime.sandbox.sandbox_project))
         self._finished = True
+        try:
+            _write_json(runtime.evidence_root / "lifecycle.json", result.as_dict())
+        except BaseException:
+            self.cancel_prepared_cleanup()
+            raise
         return result
+
+    def cancel_prepared_cleanup(self) -> None:
+        """Permanently revoke deferred cleanup and release its retained lock."""
+        self._prepared_cleanup = None
+        self._release_lock_best_effort()
+
+    def release_prepared_cleanup(
+        self, *, post_teardown_check: PostShutdownHook,
+        publication_hook: Callable[[ScenarioLifecycleResult], None] | None = None,
+    ) -> ScenarioLifecycleResult:
+        """Revalidate, clean and publish under the original global owner lock."""
+        prepared, runtime = self._prepared_cleanup, self.runtime
+        if (prepared is None or runtime is None or not self._finished or not self._lock_acquired
+                or not prepared.cleanup_deferred or prepared.final_status != 'PREPARED' or prepared.errors):
+            raise ScenarioLifecycleError('no eligible prepared success cleanup exists')
+        # Consume before any check/deletion: uncertain cleanup is never retried.
+        self._prepared_cleanup = None
+        phase = 'post-teardown'
+        try:
+            paths = tuple(str(path.resolve(strict=True)) for path in (
+                runtime.sandbox.source_project, runtime.sandbox.source_root, runtime.owned_root,
+                runtime.sandbox.sandbox_path, runtime.sandbox.sandbox_project))
+            if paths != self._prepared_cleanup_paths:
+                raise ScenarioLifecycleError('post-teardown owned resource paths changed')
+            if json.loads((runtime.evidence_root / 'lifecycle.json').read_text(encoding='utf-8')) != prepared.as_dict():
+                raise ScenarioLifecycleError('post-teardown prepared receipt changed')
+            fresh_hash = hash_project(runtime.sandbox.source_root, preferred_strategy='full')
+            fresh_mtime = runtime.sandbox.source_project.stat().st_mtime_ns
+            if fresh_hash != prepared.source_hash_after or fresh_mtime != prepared.source_mtime_after_ns:
+                raise ScenarioLifecycleError('post-teardown immutable source hash or mtime changed')
+            if post_teardown_check(runtime) is not None:
+                raise ScenarioLifecycleError('post-teardown resource check did not complete')
+            phase = 'release'
+            cleanup_sandbox(runtime.sandbox, keep=False, failed=False)
+            if runtime.owned_root.exists():
+                shutil.rmtree(runtime.owned_root, ignore_errors=False)
+            if runtime.owned_root.exists() or runtime.sandbox.sandbox_path.exists():
+                raise ScenarioLifecycleError('post-teardown owned resources remain after release')
+            result = replace(prepared, final_status='PASS', sandbox_retained=False,
+                             quarantine_path=None, cleanup_deferred=False)
+            _write_json(runtime.evidence_root / 'lifecycle-final.json', result.as_dict())
+            if publication_hook is not None:
+                publication_hook(result)
+            return result
+        except BaseException as exc:
+            _write_json(runtime.evidence_root / 'lifecycle-release-error.json', {
+                'status': 'BLOCKED', 'phase': phase, 'error': _format_error('post-teardown', exc)})
+            raise ScenarioLifecycleError(_format_error('post-teardown', exc)) from exc
+        finally:
+            self._release_lock_best_effort()
 
     def _archive_launch_environment_roots(
         self,

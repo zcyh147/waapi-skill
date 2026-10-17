@@ -43,7 +43,7 @@ def schema_branches(schema, pointer=""):
     for keyword in ("patternProperties", "definitions", "localDefinitions"):
         for name, child in sorted(schema.get(keyword, {}).items()):
             yield from schema_branches(child, pointer + "/" + keyword + "/" + escape(name))
-    for keyword in ("oneOf", "anyOf", "allOf", "items"):
+    for keyword in ("oneOf", "OneOf", "anyOf", "allOf", "items"):
         children = schema.get(keyword)
         if isinstance(children, list):
             for index, child in enumerate(children):
@@ -57,20 +57,68 @@ def schema_branches(schema, pointer=""):
     if isinstance(schema.get("type"), list):
         for index, value in enumerate(schema["type"]):
             yield {"pointer": pointer + f"/type/{index}", "kind": "type_variant", "value": value}
+    if "default" in schema:
+        yield {"pointer": pointer + "/@default", "kind": "default", "value": schema["default"]}
+    types = schema.get("type", [])
+    types = types if isinstance(types, list) else [types]
+    if "boolean" in types:
+        for value in (False, True):
+            if "enum" not in schema or value in schema["enum"]:
+                yield {"pointer": pointer + "/@boolean/" + str(value).lower(), "kind": "boolean_value", "value": value}
+    if "object" in types and not schema.get("required") and schema.get("minProperties", 0) == 0:
+        yield {"pointer": pointer + "/@empty/object", "kind": "empty_object", "value": {}}
+    for keyword in ("minimum", "maximum", "minItems", "maxItems", "minLength", "maxLength", "pattern", "uniqueItems", "minProperties", "maxProperties", "multipleOf"):
+        if keyword in schema:
+            yield {"pointer": pointer + "/" + keyword, "kind": "constraint", "value": schema[keyword]}
+    if "array" in types:
+        for cardinality, count in (("empty", 0), ("single", 1), ("multiple", max(2, schema.get("minItems", 0)))):
+            if schema.get("minItems", 0) <= count <= schema.get("maxItems", float("inf")):
+                yield {"pointer": pointer + "/@cardinality/" + cardinality,
+                       "kind": "collection_cardinality", "value": cardinality}
+    if "null" in types:
+        yield {"pointer": pointer + "/@nullable", "kind": "nullable", "value": None}
+    if "string" in types and schema.get("minLength", 0) == 0:
+        import re
+        if ("enum" not in schema or "" in schema["enum"]) and re.search(schema.get("pattern", ""), ""):
+            yield {"pointer": pointer + "/@empty/string", "kind": "empty_string", "value": ""}
+    if "OneOf" in schema:
+        yield {"pointer": pointer + "/@OneOf", "kind": "native_keyword_semantics", "value": "OneOf"}
     known = {"properties", "patternProperties", "definitions", "localDefinitions",
-             "oneOf", "anyOf", "allOf", "items", "additionalProperties", "enum",
-             "type", "required", "examples", "descriptions", "synopsis", "optionalPositional"}
+             "oneOf", "OneOf", "anyOf", "allOf", "items", "additionalProperties", "enum",
+             "type", "required", "default", "examples", "descriptions", "synopsis", "optionalPositional"}
     for keyword, value in sorted(schema.items()):
         if keyword not in known and isinstance(value, (dict, list)):
             yield {"pointer": pointer + "/" + escape(keyword),
                    "kind": "unreviewed_keyword", "value": value}
+            children = value if isinstance(value, list) else [value]
+            for index, child in enumerate(children):
+                child_path = pointer + "/" + escape(keyword) + ("/" + str(index) if isinstance(value, list) else "")
+                for nested in schema_branches(child, child_path):
+                    if nested['pointer'] != pointer + "/" + escape(keyword):
+                        yield nested
     for keyword in ("$ref", "#ref"):
         if keyword in schema:
             yield {"pointer": pointer + "/" + keyword, "kind": "reference", "value": schema[keyword]}
 
 
 def load(path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    document = json.loads(path.read_text(encoding="utf-8"))
+    descriptor = document.get("native_coverage", {}).get("obligations_artifact") if isinstance(document, dict) else None
+    if descriptor is not None:
+        import gzip
+        name = descriptor["path"]
+        if Path(name).name != name:
+            raise ValueError("native obligation artifact must be an adjacent file")
+        raw = (path.parent / name).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != descriptor["sha256"]:
+            raise ValueError("native obligation artifact digest mismatch")
+        packed = json.loads(gzip.decompress(raw))
+        rows = unpack_native_rows(packed)
+        if len(rows) != descriptor["rows"] or digest(rows) != descriptor["rows_sha256"]:
+            raise ValueError("native obligation row seal mismatch")
+        document["native_coverage"].pop("obligations_artifact")
+        document["native_coverage"]["obligations"] = rows
+    return document
 
 
 def route_key(version, kind, uri):
@@ -102,13 +150,16 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
             for row in load(path)[key]:
                 routes[route_key(version, kind, row["uri"])] = kind
         for filename in ("schemas.json", "authoring-ui-commands-supplement.json",
-                         "authoring-ui-topics-supplement.json", "authoring-core-supplement.json"):
+                         "authoring-ui-topics-supplement.json", "authoring-core-supplement.json",
+                         "authoring-layout-read-supplement.json", "authoring-layout-mutation-supplement.json"):
             path = folder / filename
             if not path.exists():
                 continue
             data = load(path)
             source = repository_source_identity(path, root)
             sources[source] = digest(data)
+            if filename == "authoring-layout-read-supplement.json":
+                definitions.append((version, source, "waapi_ui_definitions.json", data["definitions"]))
             if filename == "authoring-ui-commands-supplement.json":
                 for kind, key in (("function", "functions"), ("topic", "topics")):
                     for row in data[key]:
@@ -173,6 +224,10 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
     enrich_inventory(inventory, root, public, schemas,
                      native_policy if native_policy is not None else load(root / "skills/waapi-skill/resources/native_surface_policy.json"),
                      digest=digest)
+    from tests.maintenance.branch_audit_completion import native_coverage
+    inventory["native_coverage"] = native_coverage(root, inventory, digest=digest, schema_branches=schema_branches, load=load)
+    from tests.maintenance.branch_audit_completion import evaluate_coverage
+    inventory["native_coverage"] = evaluate_coverage(root, inventory, {"contract": "waapi-skill.branch-bindings/v1", "bindings": {}}, digest=digest)
     return inventory
 
 
@@ -185,9 +240,9 @@ def branch_record(version, source, subject, route, row):
     return record
 
 
-def check_inventory(inventory, root=ROOT):
+def check_inventory(inventory, root=ROOT, *, expected=None):
     """Return structural drift separately from unresolved business coverage."""
-    expected = build_inventory(root)
+    expected = build_inventory(root) if expected is None else expected
     errors = []
     for key, label in (("sources", "source inventory"), ("routes", "route ledger"),
                        ("branches", "branch ledger"), ("business_branches", "business ledger"),
@@ -199,7 +254,8 @@ def check_inventory(inventory, root=ROOT):
                        ("current_business_branches", "current business reconciliation"),
                        ("policy_rule_index", "policy rule index"),
                        ("family_findings", "family findings"),
-                       ("schema_occurrences", "schema occurrences")):
+                       ("schema_occurrences", "schema occurrences"),
+                       ("native_coverage", "native coverage")):
         if inventory.get(key) != expected[key]:
             errors.append(label + " differs")
     return errors
@@ -215,23 +271,116 @@ def render_inventory(inventory):
     ) + "\n}\n"
 
 
-def main():
+
+def pack_native_rows(rows):
+    """Storage deduplication only: no branch/evidence equivalence is inferred."""
+    routes, shapes, contexts, records = [], [], [], []
+    route_index, shape_index, context_index = {}, {}, {}
+    shared_fields = ('owner_issue', 'parent_issue', 'blocks_issue', 'state', 'reasons',
+                     'requirements', 'evidence_results', 'source_evidence_kind', 'dependencies')
+    for original in rows:
+        row = dict(original)
+        context = {key: row.pop(key) for key in shared_fields if key in row}
+        key = digest(context)
+        if key not in context_index:
+            context_index[key] = len(contexts)
+            contexts.append(context)
+        row['context'] = context_index[key]
+        shape = row.pop('shape_sha256')
+        if shape not in shape_index:
+            shape_index[shape] = len(shapes)
+            shapes.append(shape)
+        row['shape'] = shape_index[shape]
+        route = row['route']
+        if route is not None:
+            if row['id'] != route + '|' + row['pointer']:
+                raise ValueError('noncanonical native branch identity')
+            row.pop('id')
+            if route not in route_index:
+                route_index[route] = len(routes)
+                routes.append(route)
+            row['route'] = route_index[route]
+        records.append(row)
+    return {'contract': 'waapi-skill.branch-row-storage/v1', 'routes': routes,
+            'shapes': shapes, 'contexts': contexts, 'rows': records}
+
+
+def unpack_native_rows(packed):
+    if packed.get('contract') != 'waapi-skill.branch-row-storage/v1':
+        raise ValueError('unsupported native obligation storage')
+    rows = []
+    for encoded in packed['rows']:
+        row = dict(encoded)
+        row.update(packed['contexts'][row.pop('context')])
+        row['shape_sha256'] = packed['shapes'][row.pop('shape')]
+        if row['route'] is not None:
+            row['route'] = packed['routes'][row['route']]
+            row['id'] = row['route'] + '|' + row['pointer']
+        rows.append(row)
+    return rows
+
+
+def write_inventory(path, inventory):
+    rows = inventory['native_coverage']['obligations']
+    if len(rows) <= 1000:
+        path.write_text(render_inventory(inventory), encoding='utf-8')
+        return
+    import gzip
+    import io
+    packed = json.dumps(pack_native_rows(rows), ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    buffer = io.BytesIO()
+    with gzip.GzipFile(filename='', mode='wb', fileobj=buffer, mtime=0) as stream:
+        stream.write(packed)
+    compressed = buffer.getvalue()
+    artifact = path.with_name(path.stem + '.native-obligations.json.gz')
+    artifact.write_bytes(compressed)
+    native = {key: value for key, value in inventory['native_coverage'].items() if key != 'obligations'}
+    native['obligations_artifact'] = {'path': artifact.name, 'sha256': hashlib.sha256(compressed).hexdigest(),
+        'rows_sha256': digest(rows), 'rows': len(rows), 'compact_bytes': len(packed), 'compressed_bytes': len(compressed)}
+    path.write_text(render_inventory({**inventory, 'native_coverage': native}), encoding='utf-8')
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "docs/branch-coverage-inventory.json")
     parser.add_argument("--check", action="store_true", help="verify reproducibility, not coverage completion")
     parser.add_argument("--require-complete", action="store_true", help="fail on missing or unknown branches")
-    args = parser.parse_args()
-    inventory = build_inventory()
-    if args.check:
-        errors = check_inventory(load(args.output))
-        if errors:
-            print(json.dumps({"errors": errors}))
-            return 1
-    else:
-        args.output.write_text(render_inventory(inventory), encoding="utf-8")
-    print(json.dumps({"structural_check": "consistent", "business_coverage": "incomplete",
-                      "summary": inventory["summary"]}))
-    return 2 if args.require_complete else 0
+    parser.add_argument("--controlled-scope", type=Path, help="sealed test-only scope; never product completion credit")
+    parser.add_argument("--scope-sha256", help="independent byte seal of controlled scope")
+    parser.add_argument("--requirements", type=Path, help="reviewed exact branch evidence requirements")
+    parser.add_argument("--bindings", type=Path, help="exact branch implementation/evidence bindings")
+    args = parser.parse_args(argv)
+    try:
+        inventory = build_inventory()
+        scope = None
+        if args.controlled_scope is not None:
+            if hashlib.sha256(args.controlled_scope.read_bytes()).hexdigest() != args.scope_sha256:
+                raise ValueError("controlled scope seal mismatch")
+            scope = load(args.controlled_scope)
+        elif args.scope_sha256 is not None:
+            raise ValueError("scope seal requires explicit controlled scope")
+        bindings = load(args.bindings) if args.bindings else {"contract": "waapi-skill.branch-bindings/v1", "bindings": {}}
+        from tests.maintenance.branch_audit_completion import evaluate_coverage
+        if scope is not None or args.bindings is not None or args.requirements is not None:
+            inventory["native_coverage"] = evaluate_coverage(ROOT, inventory, bindings, digest=digest,
+                scope=scope, evidence_base=args.bindings.parent if args.bindings else ROOT,
+                requirements_document=load(args.requirements) if args.requirements else None)
+        if args.check:
+            previous = load(args.output)
+            errors = [("branch ledger" if key == "branches" else key) + " differs" for key in inventory if previous.get(key) != inventory[key]]
+            if errors:
+                print(json.dumps({"structural_check": "inconsistent", "errors": errors}))
+                return 1
+        else:
+            write_inventory(args.output, inventory)
+        coverage = inventory["native_coverage"]
+        complete = coverage["completion"]["complete"]
+        print(json.dumps({"structural_check": "consistent", "business_coverage": "complete" if complete else "incomplete",
+            "scope_kind": coverage["scope_kind"], "product_coverage": "not_evaluated" if scope else "complete" if complete else "incomplete",
+            "summary": inventory["summary"], "completion": coverage["completion"]}))
+        return 2 if args.require_complete and not complete else 0
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(json.dumps({"structural_check": "invalid", "errors": [str(exc)]}))
+        return 1
 
 
 if __name__ == "__main__":

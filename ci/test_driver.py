@@ -191,6 +191,45 @@ Examples:
 """
 
 
+def _owned_authoring_requested(pytest_args: Sequence[str]) -> bool:
+    return any(value == '--owned-authoring-batch-root' or value.startswith('--owned-authoring-batch-root=')
+               for value in pytest_args)
+
+
+_SCALAR_PROGRAM_ENV = ("WAAPI_SCALAR_PROGRAM_BATCH_ROOT", "WAAPI_SCALAR_PROGRAM_SELECTION")
+
+
+def _standalone_scalar_program_requested(arguments: Sequence[str], repo_root: Path) -> bool:
+    """Preserve evidence inputs only for the one explicit standalone pytest file."""
+    expected = (repo_root / "tests/unit/test_scalar_condition_product_gateway.py").resolve()
+    targets = []
+    index = 0
+    while index < len(arguments):
+        value = arguments[index]
+        if value in {"-k", "-m", "--basetemp", "--maxfail", "--tb", "--capture"}:
+            if index + 1 >= len(arguments):
+                return False
+            index += 2
+            continue
+        if value in {"-q", "--quiet", "-v", "--verbose", "-ra", "-rA", "-s", "-x", "--exitfirst",
+                     "--disable-warnings", "--collect-only"} or value.startswith(("--basetemp=", "--maxfail=", "--tb=", "--capture=")):
+            index += 1
+            continue
+        if value.startswith("-"):
+            return False
+        path, separator, node = value.partition("::")
+        selected = Path(path)
+        if not selected.is_absolute():
+            selected = repo_root / selected
+        if selected.resolve() != expected or (separator and node not in {
+                "test_product_self_scalar_source_conditions",
+                *("test_product_self_scalar_source_conditions[" + version + "]" for version in SUPPORTED_VERSIONS)}):
+            return False
+        targets.append(value)
+        index += 1
+    return len(targets) == 1
+
+
 def parse_request(arguments: Sequence[str]) -> TestRequest | None:
     version = ""
     mode = ""
@@ -247,6 +286,8 @@ def parse_request(arguments: Sequence[str]) -> TestRequest | None:
         raise TestDriverError("matrix/focused mode requires version 'all'")
     if mode in {"smoke", "live", "destructive"} and version == "none":
         raise TestDriverError(f"mode '{mode}' requires a real Wwise version or 'all'")
+    if _owned_authoring_requested(pytest_args) and (mode != 'destructive' or version not in {'2024.1', '2025.1'}):
+        raise TestDriverError('owned Authoring requires one exact 2024.1/2025.1 destructive lane')
     return TestRequest(version=version, mode=mode, pytest_args=pytest_args)
 
 
@@ -374,7 +415,7 @@ class TestDriver:
         if request.mode == "program":
             return self._run_program(request.pytest_args)
         if request.mode in {"nonlive", "default"}:
-            return self._run_nonlive(request.pytest_args)
+            return self._run_nonlive(request.pytest_args, allow_scalar_program=True)
         if request.mode == "all":
             result = self._run_nonlive(request.pytest_args)
             if result != 0:
@@ -413,6 +454,8 @@ class TestDriver:
                 "PYTHONUTF8": "1",
             }
         )
+        for name in _SCALAR_PROGRAM_ENV:
+            environment.pop(name, None)
         return environment
 
     def _print_context(
@@ -433,7 +476,7 @@ class TestDriver:
         print(f"pytest args:  {' '.join(pytest_args) if pytest_args else '<none>'}")
         print(flush=True)
 
-    def _run_nonlive(self, pytest_args: Sequence[str]) -> int:
+    def _run_nonlive(self, pytest_args: Sequence[str], *, allow_scalar_program: bool = False) -> int:
         started = time.perf_counter()
         try:
             validate_nonlive_readiness(self.repo_root, tuple(pytest_args))
@@ -443,6 +486,8 @@ class TestDriver:
             return 1
         report_readiness(started, reason="selected Non-live prerequisites ready")
         environment = self._nonlive_environment()
+        if allow_scalar_program and _standalone_scalar_program_requested(pytest_args, self.repo_root):
+            environment.update({name: self.environment[name] for name in _SCALAR_PROGRAM_ENV if name in self.environment})
         self._print_context(
             environment=environment,
             version="none",
@@ -512,6 +557,9 @@ class TestDriver:
     def _run_real(
         self, version: str, mode: str, pytest_args: Sequence[str]
     ) -> int:
+        owned_authoring = _owned_authoring_requested(pytest_args)
+        if owned_authoring and (mode != 'destructive' or version not in {'2024.1', '2025.1'} or self.windows):
+            raise TestDriverError('owned Authoring currently requires one exact Mac 2024.1/2025.1 destructive lane')
         defaults = default_live_paths(
             version,
             mode,
@@ -523,7 +571,7 @@ class TestDriver:
         elif mode == "live":
             child = ("-m", "pytest", *LIVE_TEST_NODES[version], *pytest_args)
         elif mode == "destructive":
-            child = ("-m", "pytest", *DESTRUCTIVE_TEST_NODES[version], *pytest_args)
+            child = ("-m", "pytest", *(() if owned_authoring else DESTRUCTIVE_TEST_NODES[version]), *pytest_args)
         else:
             raise TestDriverError(f"Unsupported real-test mode: {mode}")
         # The live helper treats this fixed prefix only as an argv schema and
@@ -554,7 +602,7 @@ class TestDriver:
             helper_argv,
             command_runner=self.command_runner,
             python_executable=self.python_executable,
-            environment=self.environment,
+            environment={**self.environment, **({'WWISE_AUTHORING_LIVE': '1'} if owned_authoring else {})},
         )
 
     def _run_matrix(self, pytest_args: Sequence[str]) -> int:

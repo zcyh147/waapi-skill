@@ -13,10 +13,27 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 
+def pytest_addoption(parser):
+    parser.getgroup('owned Authoring').addoption('--owned-authoring-batch-root', default=None,
+        help='Fresh absolute root for one explicitly selected owned Authoring batch')
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "live: tests that require Wwise and WAAPI access")
     config.addinivalue_line("markers", "destructive: tests that may mutate a fixture Wwise project")
     config.addinivalue_line("markers", "active_gate_policy: fake tests for active gate skip/fail semantics")
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_collection_finish(session):
+    outcome = yield
+    outcome.get_result()
+    if session.config.getoption('owned_authoring_batch_root', default=None) is None:
+        return
+    if session.testsfailed or session.shouldstop or session.shouldfail:
+        raise pytest.UsageError('Owned Authoring requires a complete successful collection before launch')
+    from tests.destructive.support.authoring_batch import configure_authoring_batch_owner
+    configure_authoring_batch_owner(session.config, session.items, repo_root=REPO_ROOT)
 
 
 def pytest_collection_modifyitems(items):
@@ -36,7 +53,7 @@ def pytest_collection_modifyitems(items):
             )
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_makereport(item, call):
     """Retain exact phase outcomes for real-evidence fixture finalizers."""
 
@@ -47,3 +64,5 @@ def pytest_runtest_makereport(item, call):
         reports = {}
         setattr(item, "_waapi_phase_reports", reports)
     reports[report.when] = report.outcome
+    from tests.support.exact_evidence_finalization import finalize_reported_node_evidence
+    finalize_reported_node_evidence(item, report)

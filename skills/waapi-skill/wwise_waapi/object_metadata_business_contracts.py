@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .business_declarations import SUPPORTED_WWISE_VERSIONS
+from .metadata_condition_contracts import existing_field_condition_contract
 
 
 OBJECT_METADATA_BUSINESS_CONTRACT = "waapi-skill.object-metadata-business/v1"
@@ -91,13 +92,8 @@ def object_metadata_business_contract_data(
             "result": "copy_one_gateway_returned_field_handle",
             "ambiguous_result": "choose_one_bounded_candidate_handle_or_refine_meaning",
         },
-        **({"activation_prerequisites": {
-            "read_and_guard": "live_same_object_Boolean_dependency_closure",
-            "when_unsatisfied": "separately_preview_each_required_object.setProperty_using_a_live_Field_Handle",
-            "then": "create_a_fresh_reference_Preview_after_verified_prerequisites",
-            "atomic_batch_alternative": "object.set" if version != "2021.1" else None,
-            "hidden_followup_writes": False,
-        }} if operation == "object.setReference" else {}),
+        **({"activation_prerequisites": existing_field_condition_contract(version)}
+           if operation in {"object.setProperty", "object.setReference"} else {}),
         "declaration": {
             "subcommand": "draft-declare-field-change",
             "required_fields": list(declaration["required_fields"]),

@@ -21,6 +21,7 @@ from .builders.metadata import (
     GET_TYPES_URI,
     IS_PROPERTY_ENABLED_URI,
     parse_get_property_info_result,
+    bind_get_property_info_result,
     parse_get_types_result,
     parse_is_property_enabled_result,
     parse_property_and_reference_names_result,
@@ -33,6 +34,8 @@ from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
     reference_type_token,
+    supports_property_prerequisite_workflow,
+    is_master_bus_visibility_dependency,
 )
 
 
@@ -77,7 +80,10 @@ MAX_BUSINESS_NAME_BYTES = 512
 MAX_BUSINESS_PATH_BYTES = 8 * 1024
 MAX_FIELD_TOKEN_BYTES = 256
 MAX_FIELD_STRING_BYTES = 16 * 1024
-MAX_FIELD_ENUM_CHOICES = 64
+MAX_FIELD_METADATA_STRING_BYTES = 512 * 1024
+# The live metadata reader already owns a 512 KiB input ceiling. A count
+# ceiling below that input's possible row count would hide legal live enums.
+MAX_FIELD_ENUM_CHOICES = 512 * 1024
 MAX_REFERENCE_TARGET_TYPES = 64
 COMMON_BUSINESS_FIELDS = (
     "delay_ms",
@@ -809,11 +815,13 @@ class BusinessHandleRegistry:
         platform: str | int | None = None,
         restrictions: Mapping[str, Any],
         metadata_digest: str,
+        trusted_native_token: bool = False,
     ) -> BoundFieldHandle:
         normalized_scope = _normalize_scope(scope_kind, scope_value)
-        if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+        if (not isinstance(token, str) or not token.strip()
+                or not trusted_native_token and not _FIELD_TOKEN.fullmatch(token)):
             raise ValueError("token must be an exact Wwise property/reference token")
-        if len(token.encode("utf-8")) > MAX_FIELD_TOKEN_BYTES:
+        if len(token.encode("utf-8")) > (MAX_FIELD_METADATA_STRING_BYTES if trusted_native_token else MAX_FIELD_TOKEN_BYTES):
             raise ValueError("token exceeds its fixed byte limit")
         if field_kind not in {"property", "reference"}:
             raise ValueError("field_kind must be property or reference")
@@ -1040,6 +1048,12 @@ class BusinessHandleRegistry:
                 )
 
 
+
+def _require_available_field_value_type(info, token):
+    if info.type is None and info.restriction.get("type") != "reference":
+        raise _error("FIELD_TYPE_UNAVAILABLE", field=token, unavailable_facts=["type"],
+                     action="inspect the exact field metadata or select a field with a certified value type")
+
 def bind_live_field(
     registry: BusinessHandleRegistry,
     *,
@@ -1051,7 +1065,7 @@ def bind_live_field(
 ) -> BoundFieldHandle:
     """Issue one Field Handle from exact, bounded live metadata evidence.
 
-    The Agent supplies the exact token selected from Gateway discovery.  This
+    The Gateway resolves the exact token from scoped live discovery. This
     function proves that token in the requested scope, binds the complete
     metadata digest, and performs the dynamic enabled check whenever a
     dependency-bearing object field is bound. An omitted business platform
@@ -1064,7 +1078,8 @@ def bind_live_field(
     if not callable(read_call):
         raise TypeError("read_call must be callable")
     normalized_scope = _normalize_scope(scope_kind, scope_value)
-    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+    if (not isinstance(token, str) or not token.strip()
+            or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise _error(
             "FIELD_TOKEN_INVALID",
             field="token",
@@ -1094,13 +1109,9 @@ def bind_live_field(
             action="choose one exact token returned for this live scope",
         )
     try:
-        info = parse_get_property_info_result(
-            read_call(
-                GET_PROPERTY_INFO_URI,
-                {**live_scope, "property": token},
-                {},
-            )
-        )
+        info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": token}, {})
+        info = (bind_get_property_info_result(info_result, field_token=token, available_names=exact_names)
+                if scope_kind == "object" else parse_get_property_info_result(info_result))
     except (TypeError, ValueError) as exc:
         raise _error(
             "METADATA_READBACK_INVALID",
@@ -1114,9 +1125,10 @@ def bind_live_field(
             candidates=(info.name,),
             action="refresh live Wwise metadata before continuing",
         )
+    _require_available_field_value_type(info, token)
     field_kind = (
         "reference"
-        if info.type.casefold() in {"reference", "objectreference"}
+        if (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or info.restriction.get("type") == "reference"
         else "property"
     )
@@ -1134,6 +1146,7 @@ def bind_live_field(
             info.restriction,
             field_kind=field_kind,
             value_type=value_type,
+            allow_target_classifiers=scope_kind == "object",
         )
     except MetadataRestrictionError as exc:
         raise _error(
@@ -1145,7 +1158,7 @@ def bind_live_field(
     enabled_dependency_fields = (
         dependency_fields if field_kind == "property" else ()
     )
-    if scope_kind == "object" and _is_positioning_override_terminal(info):
+    if scope_kind == "object" and _is_boolean_override_terminal(info):
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and scope_kind == "class":
@@ -1160,7 +1173,9 @@ def bind_live_field(
             new_object_workflow=_dependent_new_object_workflow(token),
             action="For a new object, complete and verify creation without this field, then configure the verified GUID through a separate property Preview; creation alone does not complete configuration",
         )
-    if enabled_dependency_fields:
+    structural_enabled_proof = scope_kind == "object" and any(
+        is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
+    if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
             _UNLINKED_PLATFORM_GUID if platform is None else platform
         )
@@ -1182,7 +1197,7 @@ def bind_live_field(
                 field=token,
                 action="refresh the live property-enabled state before continuing",
             ) from exc
-        if not enabled:
+        if not enabled and (structural_enabled_proof or not supports_property_prerequisite_workflow(info.dependencies)):
             raise _error(
                 "FIELD_DISABLED",
                 field=token,
@@ -1207,6 +1222,7 @@ def bind_live_field(
             platform=platform,
             restrictions=restrictions,
             metadata_digest=metadata_digest,
+            trusted_native_token=True,
         )
     except ValueError as exc:
         raise _error(
@@ -1258,13 +1274,10 @@ def revalidate_live_field(
                 rejected_handle=field.handle,
                 action="refresh live metadata and use the new field handle",
             )
-        info = parse_get_property_info_result(
-            read_call(
-                GET_PROPERTY_INFO_URI,
-                {**live_scope, "property": field.token},
-                {},
-            )
-        )
+        info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": field.token}, {})
+        info = (bind_get_property_info_result(info_result, field_token=field.token,
+                                             available_names=tuple(row.name for row in names))
+                if field.scope_kind == "object" else parse_get_property_info_result(info_result))
     except BusinessDeclarationError:
         raise
     except (TypeError, ValueError) as exc:
@@ -1280,11 +1293,12 @@ def revalidate_live_field(
             rejected_handle=field.handle,
             action="refresh live metadata and use the new field handle",
         )
+    _require_available_field_value_type(info, field.token)
     dependency_fields = _dependency_field_tokens(info.dependencies)
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
     )
-    if field.scope_kind == "object" and _is_positioning_override_terminal(info):
+    if field.scope_kind == "object" and _is_boolean_override_terminal(info):
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and field.scope_kind == "class":
@@ -1300,7 +1314,9 @@ def revalidate_live_field(
             new_object_workflow=_dependent_new_object_workflow(field.token),
             action="Use the verified created GUID to rediscover this field in object scope and configure it through a separate property Preview; never repeat completed creation",
         )
-    if enabled_dependency_fields:
+    structural_enabled_proof = field.scope_kind == "object" and any(
+        is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
+    if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
             _UNLINKED_PLATFORM_GUID
             if effective_platform is None
@@ -1324,7 +1340,7 @@ def revalidate_live_field(
                 field=field.token,
                 action="refresh the live property-enabled state before Preview",
             ) from exc
-        if not enabled:
+        if not enabled and (structural_enabled_proof or not supports_property_prerequisite_workflow(info.dependencies)):
             raise _error(
                 "FIELD_DISABLED",
                 field=field.token,
@@ -1700,6 +1716,7 @@ def _restrictions_from_live_metadata(
     *,
     field_kind: str,
     value_type: str,
+    allow_target_classifiers: bool = False,
 ) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     if restriction.get("type") == "range":
@@ -1727,19 +1744,25 @@ def _restrictions_from_live_metadata(
         if labels:
             normalized["enum_labels"] = labels
     if field_kind == "reference":
-        allowed = reference_allowed_types(restriction)
-        if allowed:
+        allowed = reference_allowed_types(restriction, allow_target_classifiers=allow_target_classifiers)
+        # A type-only handle must not discard a possible category alternative.
+        # The exact existing-object Preview owns classification and mixed-shape
+        # admission; the original metadata remains sealed in its digest.
+        has_categories = any(isinstance(row, Mapping) and "category" in row
+                             for row in restriction.get("restrictions") or [])
+        if allowed and not has_categories:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
 
 
-def _is_positioning_override_terminal(info):
+def _is_boolean_override_terminal(info):
     # The reflected self override describes the switch being edited. Wwise
     # reports it disabled while false, but setting this Boolean is precisely
     # how its separately previewed prerequisite is enabled.
-    marker = {"type": "override", "action": "Enable", "context": "Self", "property": "OverridePositioning"}
-    return (info.name == "OverridePositioning" and info.type.casefold() == "bool"
-            and bool(info.dependencies) and all(row == marker for row in info.dependencies))
+    from .metadata_restrictions import is_terminal_override_dependency
+    return bool(info.dependencies) and all(
+        is_terminal_override_dependency(info.name, info.type, row) for row in info.dependencies
+    )
 
 
 def _new_class_field_evidence(registry, info, live_scope, read_call):
@@ -1779,6 +1802,7 @@ def _dependency_field_tokens(
     values = {
         value
         for dependency in dependencies
+        if dependency.get("action") != "Show"
         for value in (dependency.get("property"), dependency.get("reference"))
         if isinstance(value, str) and value
     }
@@ -1946,7 +1970,8 @@ def _bound_field_from_dict(
     value_type = payload.get("value_type")
     platform = _normalize_field_platform(payload.get("platform"))
     metadata_digest = payload.get("metadata_digest")
-    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+    if (not isinstance(token, str) or not token.strip()
+            or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise ValueError("bound field token is invalid")
     if field_kind not in {"property", "reference"} or value_type not in {
         "number",
@@ -2119,7 +2144,7 @@ def _normalize_restrictions(
             if (
                 not isinstance(row, Mapping) or set(row) != {"label", "value"}
                 or not isinstance(row["label"], str) or not row["label"].strip()
-                or len(row["label"].encode("utf-8")) > MAX_BUSINESS_REPAIR_TEXT_BYTES
+                or len(row["label"].encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES
             ):
                 raise ValueError("enum labels require bounded nonempty labels and values")
             value = _normalized_enum_choices([row["value"]], value_type=value_type)[0]
@@ -2138,6 +2163,8 @@ def _normalize_restrictions(
         normalized["allowed_target_types"] = sorted(target_types)
     if field_kind == "property" and "allowed_target_types" in normalized:
         raise ValueError("property fields cannot bind reference target types")
+    if len(canonical_json_bytes(normalized)) > 2 * 1024 * 1024:
+        raise ValueError("live restrictions exceed the bounded field state size")
     return dict(sorted(normalized.items()))
 
 

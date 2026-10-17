@@ -38,6 +38,10 @@ class _LifecycleBinding:
 
 
 _OPENERS: Mapping[str, _LifecycleBinding] = {
+    'ak.wwise.ui.layout.setLayout': _LifecycleBinding(
+        'ak.wwise.ui.layout.removeLayout', 'request_argument', 'name', 'name',
+        warnings=('Temporary layout removal is a separate previewed, authorized and verified transaction.',),
+    ),
     "ak.soundengine.loadBank": _LifecycleBinding(
         "ak.soundengine.unloadBank",
         "request_argument",

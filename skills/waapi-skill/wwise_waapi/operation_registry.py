@@ -16,11 +16,16 @@ import json
 import math
 import os
 import re
+import time
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
+
+from .layout_blueprint import declared_layout_matches, declared_layout_mismatches
+from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -32,6 +37,8 @@ from .builders.metadata import (
     PropertyInfoMetadataRecord,
     parse_get_types_result,
     parse_get_property_info_result,
+    bind_get_property_info_result,
+    parse_property_and_reference_names_result,
 )
 from .builders.object_mutation import ObjectMutationBuilder
 from .builders.properties import PropertyReferenceBuilder
@@ -63,8 +70,12 @@ from .host_paths import (
 )
 from .io_policy import IOPolicyError, validate_isolated_io
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+from .condition_limits import MAX_CONDITION_CONTROLLERS, MAX_CONDITION_PATH_FIELDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
+    condition_values_equal,
+    is_terminal_override_dependency,
+    is_master_bus_visibility_dependency,
     reference_allowed_types,
     reference_type_token,
 )
@@ -164,6 +175,7 @@ from .operation_ui_commands import (
     validate_ui_command_runtime_preconditions,
     verify_ui_command_inventory_postcondition,
 )
+from .operation_tone import TONE_URI, prepare_tone_verification, validate_tone_binding, verify_tone_artifact
 from .operation_soundbank import (
     SoundBankContractError,
     build_external_sources_operation_plan,
@@ -262,7 +274,7 @@ REPLAY_GUARD_OPERATIONS = frozenset(
         "ui.captureScreen",
     }
 )
-PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
+PACKAGED_TRANSACTION_READBACK_URIS = (LAYOUT_READ_URIS - {'ak.wwise.ui.layout.getViewHandle'}) | frozenset(
     {
         OBJECT_GET_URI,
         OBJECT_GET_TYPES_URI,
@@ -1817,6 +1829,7 @@ ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, An
 
 MAX_OBJECT_SET_BATCH_CHECK_READS = 512
 MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS = 1024
+MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES = 32768
 
 # Positive contract for dedicated operations whose adapters bind paths on the
 # gateway machine. Generic ``waapi.call`` locality is derived separately from
@@ -1982,7 +1995,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection"),
+        ("args", "options", "io_root", "result_projection", "layout_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2017,6 +2030,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
                 "result_projection": {
                     "type": "object",
                     "description": (
@@ -2025,7 +2039,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -2472,7 +2486,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
             "a non-null target is live-resolved and checked against live reference type restrictions",
-            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
+            "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
+            "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
             "when a prior successful Gateway read returned an exact id for object or target, copy that id exactly; do not retype its path or name",
         ),
         selection_guidance=_selection_guidance(
@@ -4116,7 +4131,7 @@ def _public_call_arguments(
 
         registry = ExecutionContractRegistry()
         contract = (registry.authoring_ui_describe(version, api)
-                    if requires_core_supplement(version, api) else registry.describe(version, api))
+                    if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS else registry.describe(version, api))
     except ExecutionContractError as exc:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",
@@ -4172,7 +4187,15 @@ def _public_call_arguments(
             "Packaged waapi.call does not accept custom command-line hooks.",
             details={"api": api, "fields": list(supplied_forbidden)},
         )
-    validation = validate_semantic_payload(api, raw_args, raw_options, version=version)
+    if api in LAYOUT_MUTATION_URIS:
+        try:
+            validate_layout_call(version, api, raw_args, raw_options, arguments.get('layout_binding'))
+        except ValueError as exc:
+            raise OperationContractError('INVALID_LAYOUT_BUSINESS_BINDING', str(exc)) from exc
+    elif 'layout_binding' in arguments:
+        raise OperationContractError('INVALID_ARGUMENT', 'Layout binding is reserved for closed Authoring layout operations')
+    validation = validate_semantic_payload(api, raw_args, raw_options, version=version,
+        authoring_ui_profile=api in LAYOUT_MUTATION_URIS)
     result_projection = arguments.get("result_projection")
     if result_projection is not None:
         if api != "ak.wwise.core.sourceControl.getSourceFiles":
@@ -5462,6 +5485,9 @@ def _prepare_object_set(
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
     field_snapshots: list[dict[str, Any]] = []
+    condition_metadata_guards: list[dict[str, Any]] = []
+    related_conditions: list[dict[str, Any]] = []
+    reference_target_conditions: list[dict[str, Any]] = []
     children_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     list_subtree_snapshots: list[dict[str, Any]] = []
@@ -5657,6 +5683,7 @@ def _prepare_object_set(
             target_spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        reference_targets = []
         for descriptor in references:
             info = _read_property_info_cached(
                 read,
@@ -5664,7 +5691,8 @@ def _prepare_object_set(
                 object_id=target.object,
                 name=descriptor.name,
             )
-            _require_object_reference_metadata(info)
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            property_info_by_name[descriptor.name.casefold()] = info
             if platform is not None:
                 _require_platform_field_enabled(
                     read,
@@ -5672,29 +5700,52 @@ def _prepare_object_set(
                     field_name=descriptor.name,
                     platform=platform,
                 )
-            activation_properties = _apply_reference_activation_dependencies(
-                info,
-                read=read,
-                object_id=target.object,
-                property_specs=target_spec["properties"],
-                property_info_by_name=property_info_by_name,
-                derived_properties=derived_target_properties,
-                request_path=descriptor.request_path,
-                property_info_cache=property_info_cache,
-            )
             resolved = _resolve_identity(
                 descriptor.target.as_dict(),
                 role=descriptor.request_path,
                 read=read,
                 identity_cache=identity_cache,
             )
-            _require_reference_target_allowed(info, resolved)
+            reference_targets.append((info, resolved))
             roles[descriptor.request_path] = resolved
             trusted[f"@{descriptor.name}"] = resolved.object
             reference_spec = {"name": descriptor.name, "target_id": resolved.object}
-            if activation_properties:
-                reference_spec["activation_properties"] = list(activation_properties)
             target_spec["references"].append(reference_spec)
+        desired_references = {row["name"].casefold(): row["target_id"] for row in target_spec["references"]}
+        for info, resolved in reference_targets:
+            _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
+                platform=platform, desired_references=desired_references,
+                conditions=reference_target_conditions, property_info_cache=property_info_cache,
+                wwise_version=request.version)
+        reference_requirements: dict[str, Any] = {}
+        for descriptor in (*properties, *references):
+            activation_properties = _apply_reference_activation_dependencies(
+                property_info_by_name[descriptor.name.casefold()],
+                read=read, object_id=target.object,
+                property_specs=target_spec["properties"],
+                property_info_by_name=property_info_by_name,
+                derived_properties=derived_target_properties,
+                request_path=descriptor.request_path,
+                property_info_cache=property_info_cache,
+                _condition_sources=tuple(property_info_by_name.values()),
+                reference_requirements=reference_requirements,
+                desired_references=desired_references,
+                related_conditions=related_conditions,
+                platform=platform,
+            )
+            if activation_properties:
+                for row in target_spec["references"]:
+                    if row["name"] == descriptor.name:
+                        row["activation_properties"] = list(activation_properties)
+        for name, identity in reference_requirements.items():
+            if name.casefold() not in desired_references:
+                target_spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
+        if any(info.dependencies for info in property_info_by_name.values()):
+            condition_metadata_guards.append({
+                "object_id": target.object,
+                "platform": platform,
+                "fields": [info.as_dict() for info in property_info_by_name.values()],
+            })
         for property_name, value in derived_target_properties.items():
             trusted[f"@{property_name}"] = value
 
@@ -6113,10 +6164,23 @@ def _prepare_object_set(
             }
         )
         for property_spec in target_spec["properties"]:
-            if property_spec.get("derived") and _field_value(
-                snapshot_rows[0], property_spec["name"]
-            ) is property_spec["value"]:
+            if not property_spec.get("derived"):
+                continue
+            current_value = _field_value(snapshot_rows[0], property_spec["name"])
+            restriction = property_spec.get("condition_restriction")
+            if isinstance(restriction, Mapping):
+                from .metadata_restrictions import condition_matches
+                satisfied = _has_field(snapshot_rows[0], property_spec["name"]) and condition_matches(restriction, current_value)
+                if not satisfied and len(restriction.get("values", [])) != 1:
+                    raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "The final Preview state requires an explicit satisfying prerequisite choice.", details={
+                        "object_id": target.object, "property": property_spec["name"], "current_value": current_value,
+                        "restriction": restriction, "mutation_dispatched": False,
+                    })
+            else:
+                satisfied = _has_field(snapshot_rows[0], property_spec["name"]) and condition_values_equal(current_value, property_spec["value"])
+            if satisfied:
                 trusted.pop(f"@{property_spec['name']}", None)
+                property_spec["value"] = current_value
                 property_spec["already_satisfied"] = True
         target_spec["pre_state"] = snapshot_rows[0]
         target_spec["expected_parent_id"] = _parent_value(
@@ -6267,6 +6331,12 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
     }
+    if condition_metadata_guards:
+        state["condition_metadata_guards"] = condition_metadata_guards
+    if related_conditions:
+        state["related_conditions"] = related_conditions
+    if reference_target_conditions:
+        state["reference_target_conditions"] = reference_target_conditions
     if has_imports or requested_languages:
         state["import_guard"] = import_guard
     return preview, roles, state, verification, cleanup
@@ -7104,7 +7174,14 @@ def _read_property_info(
     else:  # pragma: no cover - internal invariant
         raise AssertionError("object_id or class_id is required")
     try:
-        info = parse_get_property_info_result(read(GET_PROPERTY_INFO_URI, args, {}))
+        result = read(GET_PROPERTY_INFO_URI, args, {})
+        if object_id is not None and isinstance(result, Mapping) and ("name" not in result or "type" not in result):
+            names = parse_property_and_reference_names_result(read(
+                GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": object_id}, {},
+            ))
+            info = bind_get_property_info_result(result, field_token=name, available_names=tuple(row.name for row in names))
+        else:
+            info = parse_get_property_info_result(result)
     except SemanticValidationError as exc:
         raise OperationContractError("INVALID_METADATA", str(exc), details=exc.as_dict()) from exc
     if info.name != name:
@@ -7113,6 +7190,8 @@ def _read_property_info(
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
+    if info.type is None and info.restriction.get("type") != "reference":
+        raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": name, "unavailable_facts": ["type"]})
     return info
 
 
@@ -7188,6 +7267,8 @@ def _require_platform_field_enabled(
 
 
 def _require_object_property_value(metadata: PropertyInfoMetadataRecord, value: Any) -> None:
+    if not isinstance(metadata.type, str):
+        raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": metadata.name})
     property_type = metadata.type.casefold()
     if property_type in {"real32", "real64", "float", "double"}:
         valid = _is_finite_waapi_number(value)
@@ -7240,9 +7321,9 @@ def _is_finite_waapi_number(value: Any) -> bool:
     return math.isfinite(converted)
 
 
-def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
+def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord, *, allow_hierarchy=False) -> None:
     restriction_type = metadata.restriction.get("type")
-    reference = metadata.type.casefold() in {"reference", "objectreference"} or restriction_type == "reference"
+    reference = restriction_type == "reference" or (isinstance(metadata.type, str) and metadata.type.casefold() in {"reference", "objectreference"})
     if not reference:
         raise OperationContractError(
             "INVALID_REFERENCE",
@@ -7250,7 +7331,7 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
             details={"reference": metadata.name, "metadata_type": metadata.type},
         )
     restrictions = metadata.restriction.get("restrictions")
-    if isinstance(restrictions, list) and any(
+    if not allow_hierarchy and isinstance(restrictions, list) and any(
         isinstance(row, Mapping) and row.get("childOfReference") is not None for row in restrictions
     ):
         raise OperationContractError(
@@ -7258,6 +7339,171 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
             "References constrained by another reference require a dedicated ordered operation.",
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         )
+
+
+def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, activation_path, platform=None):
+    """Bind the observed Switch association context to its exact native owner."""
+    from .metadata_restrictions import condition_matches
+    if object_id is None:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "AssocParent conditions require an existing context GUID.")
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
+                      {"return": ["id", "name", "type", "path", "owner"]}))
+    if (len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id)
+            or rows[0].get("type") != "ObjectSettingAssociation"):
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "AssocParent needs the observed native association context identity.")
+    source = rows[0]
+    owner_id = _reference_identity(source.get("owner"))
+    if not isinstance(owner_id, str) or _PLUGIN_GUID.fullmatch(owner_id) is None:
+        raise OperationContractError("INVALID_READBACK", "Association context must expose its canonical owner GUID.")
+    owner = _resolve_identity({"kind": "id", "value": owner_id}, role="association_owner", read=read)
+    if owner.row.get("type") != "SwitchContainer":
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Association owner must be the observed SwitchContainer context.")
+    info = _read_property_info(read, name=property_name, object_id=owner.object)
+    if info.name != property_name:
+        raise OperationContractError("INVALID_METADATA", "Association controller metadata names a different field.")
+    owner_specs: list[dict[str, Any]] = []
+    owner_metadata = {property_name.casefold(): info}
+    owner_references: dict[str, Any] = {}
+    try:
+        _apply_reference_activation_dependencies(
+            info, read=read, object_id=owner.object, property_specs=owner_specs,
+            property_info_by_name=owner_metadata, derived_properties={},
+            request_path="association_owner", related_conditions=requirements, platform=platform,
+            reference_requirements=owner_references,
+            _activation_path=tuple(f"{object_id}:{name}" for name in activation_path),
+        )
+    except OperationContractError as exc:
+        if exc.error_code != "REFERENCE_ACTIVATION_REQUIRED":
+            raise
+        raise OperationContractError(exc.error_code, str(exc), details={
+            **exc.details, "object_id": object_id, "owner_id": owner.object,
+        }) from exc
+    values = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
+        "return": ["id", property_name], **({"platform": platform} if platform is not None else {}),
+    }))
+    if len(values) != 1 or not _same_identity(values[0].get("id"), owner.object) or not _has_field(values[0], property_name):
+        raise OperationContractError("INVALID_READBACK", "Association controller must resolve on its exact owner.")
+    value = _field_value(values[0], property_name)
+    _require_object_property_value(info, value)
+    if not condition_matches(restriction, value):
+        choices = restriction.get("values", [])
+        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Separately preview the prerequisite on this exact association owner.", details={
+            "object_id": object_id, "owner_id": owner.object, "mutation_dispatched": False,
+            "prerequisite_changes": [{"operation": "object.setProperty", "object_id": owner.object,
+                "discovery_meaning": property_name, "selection": "live_discovered_Field_Handle",
+                "restriction": restriction, **({"required_value": choices[0]["value"]} if len(choices) == 1 else {})}],
+        })
+    # The owner is a separate authorization boundary. Reuse the condition
+    # planner to resolve its closure, then require every planned value to be
+    # already present; never add the owner to this mutation.
+    owner_values = [(property_name, value)]
+    for spec in owner_specs:
+        name = spec["name"]
+        rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
+            "return": ["id", name], **({"platform": platform} if platform is not None else {}),
+        }))
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), owner.object) or not _has_field(rows[0], name):
+            raise OperationContractError("INVALID_READBACK", "Related prerequisite must resolve on the exact owner.")
+        current = _field_value(rows[0], name)
+        _require_object_property_value(owner_metadata[name.casefold()], current)
+        if not condition_values_equal(current, spec["value"]):
+            raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Separately preview the prerequisite on this exact association owner.", details={
+                "object_id": object_id, "owner_id": owner.object, "mutation_dispatched": False,
+                "prerequisite_changes": [{"operation": "object.setProperty", "object_id": owner.object,
+                    "discovery_meaning": name, "selection": "live_discovered_Field_Handle", "required_value": spec["value"]}],
+            })
+        owner_values.append((name, current))
+    for name, current in owner_values:
+        _append_association_condition(requirements, source=source, owner=owner, property_name=name,
+                                      value=current, info=owner_metadata[name.casefold()], platform=platform)
+    for name, identity in owner_references.items():
+        _append_association_condition(requirements, source=source, owner=owner, property_name=name,
+                                      value=identity, info=owner_metadata[name.casefold()], platform=platform,
+                                      is_reference=True)
+
+
+def _append_association_condition(requirements, *, source, owner, property_name, value, info, platform, is_reference=False):
+    requirement = {"source_id": source["id"], "owner_id": owner.object, "property": property_name, "value": value,
+                   "source_identity": {key: source.get(key) for key in ("id", "name", "type", "path")},
+                   "owner_identity": {key: owner.row.get(key) for key in ("id", "name", "type", "path")},
+                   "metadata": info.as_dict()}
+    if is_reference:
+        requirement["is_reference"] = True
+    if platform is not None:
+        requirement["platform"] = platform
+    if requirement not in requirements:
+        requirements.append(requirement)
+    if len(requirements) > 16:
+        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
+
+
+def _condition_metadata_assertions(pre_state, *, read, after_write=False):
+    """Keep the exact selected condition metadata valid through verification."""
+    assertions = []
+    condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
+    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
+    if isinstance(condition_metadata, Mapping):
+        condition_metadata_groups.append(condition_metadata)
+    observed_fields = {}
+    def observed_field(object_id, name):
+        key = (object_id, name)
+        if key not in observed_fields:
+            observed_fields[key] = _read_property_info(read, object_id=object_id, name=name)
+        return observed_fields[key]
+    for condition_metadata in condition_metadata_groups:
+        for expected in condition_metadata["fields"]:
+            name = expected.get("field_binding", {}).get("token", expected["name"])
+            observed = observed_field(condition_metadata["object_id"], name).as_dict()
+            assertions.append({"name": f"condition metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, expected),
+                               "evidence": {"expected": expected, "actual": observed}})
+            if any(is_master_bus_visibility_dependency(item) and item["value"] is True
+                   for item in expected.get("dependencies", [])):
+                args = {"object": condition_metadata["object_id"], "property": name,
+                        "platform": condition_metadata.get("platform") or "{00000000-0000-0000-0000-000000000000}"}
+                result = read(OBJECT_IS_PROPERTY_ENABLED_URI, args, {})
+                assertions.append({"name": f"structurally visible field {name} remains enabled",
+                    "passed": isinstance(result, Mapping) and result.get("return") is True,
+                    "evidence": {"uri": OBJECT_IS_PROPERTY_ENABLED_URI, "args": args, "result": result}})
+        for selected in condition_metadata.get("native_fields", []):
+            name = selected["token"]
+            observed = dict(observed_field(condition_metadata["object_id"], name).raw)
+            assertions.append({"name": f"selected native metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, selected["metadata"]),
+                               "evidence": {"expected": selected["metadata"], "actual": observed}})
+    assertions.extend(_reference_target_condition_assertions(pre_state, read=read, after_write=after_write))
+    return assertions
+
+
+def _related_condition_assertions(requirements, *, read):
+    assertions = []
+    readbacks = []
+    for requirement in requirements:
+        source_id, owner_id, name = requirement["source_id"], requirement["owner_id"], requirement["property"]
+        args = {"from": {"id": [source_id, owner_id]}}
+        options = {"return": ["id", "name", "type", "path", "owner", name]}
+        if requirement.get("platform") is not None:
+            options["platform"] = requirement["platform"]
+        result = read(OBJECT_GET_URI, args, options)
+        readbacks.append({"uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+        rows = _rows(result)
+        source_rows = [row for row in rows if _same_identity(row.get("id"), source_id)]
+        owner_rows = [row for row in rows if _same_identity(row.get("id"), owner_id)]
+        exact = (len(rows) == 2 and len(source_rows) == 1 and len(owner_rows) == 1)
+        if exact:
+            source, owner = source_rows[0], owner_rows[0]
+            exact = (all(source.get(key) == value for key, value in requirement["source_identity"].items())
+                     and all(owner.get(key) == value for key, value in requirement["owner_identity"].items())
+                     and _same_identity(_reference_identity(source.get("owner")), owner_id)
+                     and _has_field(owner, name) and (
+                         _reference_requirement_matches(owner, name, requirement["value"])
+                         if requirement.get("is_reference") else
+                         condition_values_equal(_field_value(owner, name), requirement["value"])))
+        args = {"object": owner_id, "property": name}
+        metadata = _read_property_info(read, object_id=owner_id, name=name).as_dict()
+        assertions.append({"name": f"association owner condition {name} unchanged", "passed": exact and _native_snapshot_equal(metadata, requirement["metadata"]),
+                           "evidence": {"rows": rows, "metadata": metadata, "expected": requirement}})
+    return assertions, readbacks
 
 
 def _apply_reference_activation_dependencies(
@@ -7276,6 +7522,11 @@ def _apply_reference_activation_dependencies(
     ] | None = None,
     _activation_path: tuple[str, ...] = (),
     _activation_fields: set[str] | None = None,
+    _condition_sources: tuple[PropertyInfoMetadataRecord, ...] = (),
+    reference_requirements: dict[str, Any] | None = None,
+    desired_references: Mapping[str, Any] | None = None,
+    related_conditions: list[dict[str, Any]] | None = None,
+    platform: str | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded same-object Boolean activation requirements.
 
@@ -7288,24 +7539,96 @@ def _apply_reference_activation_dependencies(
     if (object_id is None) == (class_id is None):  # pragma: no cover - internal invariant.
         raise AssertionError("object_id or class_id must be supplied exclusively")
 
-    if len(_activation_path) >= 8:
-        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency depth exceeds 8.")
+    if len(_activation_path) >= MAX_CONDITION_PATH_FIELDS:
+        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Condition path exceeds the finite unique-field budget.",
+            details={"maximum_path_fields": MAX_CONDITION_PATH_FIELDS, "maximum_controller_fields": MAX_CONDITION_CONTROLLERS})
     path = (*_activation_path, metadata.name.casefold())
     all_fields = set() if _activation_fields is None else _activation_fields
     activation_names: list[str] = []
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
-        # Wwise marks the positioning override switch with its own override
-        # descriptor. It is the terminal switch, not another activation edge.
-        if (metadata.name == "OverridePositioning" and metadata.type.casefold() == "bool"
-                and dependency == {"type": "override", "action": "Enable",
-                                   "property": "OverridePositioning", "context": "Self"}):
+        if is_terminal_override_dependency(metadata.name, metadata.type, dependency):
             continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
-        if (dependency.get("value") is False
-                and dependency == {"type": "isMasterBus", "value": False,
-                                   "action": "Show", "context": "Self"}):
+        if is_master_bus_visibility_dependency(dependency):
+            if dependency["value"] is True:
+                if object_id is None:
+                    raise OperationContractError("FIELD_OBJECT_SCOPE_REQUIRED", "Master-bus visibility needs fresh enabled-state proof on the selected existing object.")
+                _require_platform_field_enabled(read, object_id=object_id, field_name=metadata.name,
+                    platform=platform or "{00000000-0000-0000-0000-000000000000}")
+            continue
+        if dependency.get("type") == "reference" and reference_requirements is not None:
+            expected_fields = {"type", "action", "context", "property", "conditions"}
+            conditions = dependency.get("conditions")
+            name = dependency.get("property")
+            if (set(dependency) != expected_fields or not isinstance(name, str)
+                    or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None
+                    or not all(isinstance(dependency.get(key), str) for key in ("action", "context"))):
+                raise OperationContractError("INVALID_METADATA", "Reference-presence dependency metadata is malformed.")
+            from .metadata_restrictions import reference_presence_condition, MetadataRestrictionError
+            try:
+                required_presence = reference_presence_condition(conditions)
+                if dependency["action"] == "Enable":
+                    accumulated = {
+                        reference_presence_condition(item.get("conditions"))
+                        for source in (metadata, *_condition_sources) for item in source.dependencies
+                        if item.get("type") == "reference" and item.get("action") == dependency["action"]
+                        and item.get("context") == dependency["context"]
+                        and isinstance(item.get("property"), str) and item["property"].casefold() == name.casefold()
+                    }
+                    if len(accumulated) != 1:
+                        raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference-presence conditions require incompatible states.")
+            except MetadataRestrictionError as exc:
+                raise OperationContractError("INVALID_METADATA", str(exc)) from exc
+            if dependency["action"] == "Show" and dependency["context"] in {"Self", "Parent", "AssocParent"}:
+                continue
+            if dependency["action"] != "Enable" or dependency["context"] != "Self":
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Reference-presence activation needs its exact object context.")
+            if name.casefold() in path:
+                raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.")
+            all_fields.add(name.casefold())
+            if len(all_fields) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
+            if object_id is None:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "A reference prerequisite needs an explicit target or a staged object-scoped Preview.")
+            reference_info = property_info_by_name.get(name.casefold())
+            if reference_info is None:
+                reference_info = _read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id) if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id)
+                property_info_by_name[name.casefold()] = reference_info
+            if reference_info.name != name:
+                raise OperationContractError("INVALID_METADATA", "Reference prerequisite metadata names a different field.")
+            _require_object_reference_metadata(reference_info)
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {
+                "return": ["id", name], **({"platform": platform} if platform is not None else {}),
+            }))
+            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], name):
+                raise OperationContractError("INVALID_READBACK", "Reference prerequisite must resolve on the exact object.")
+            value = _field_value(rows[0], name)
+            identity = None if _reference_value_is_null(value) else _reference_identity(value)
+            if not _reference_value_is_null(value) and (not isinstance(identity, str) or _PLUGIN_GUID.fullmatch(identity) is None):
+                raise OperationContractError("INVALID_READBACK", "Reference prerequisite must expose a canonical GUID or native null.")
+            if desired_references is not None and name.casefold() in desired_references:
+                identity = desired_references[name.casefold()]
+            if (identity is not None) != required_presence:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the required reference state before editing this field.", details={
+                    "object_id": object_id, "property": metadata.name, "mutation_dispatched": False,
+                    "prerequisite_changes": [{"operation": "object.setReference", "discovery_meaning": name,
+                        "selection": "live_discovered_Field_Handle", "required_presence": required_presence,
+                        "target_selection": "user_chosen_exact_object" if required_presence else "clear_reference"}],
+                })
+            reference_requirements[name] = identity
+            activation_names.extend(_apply_reference_activation_dependencies(
+                reference_info, read=read, object_id=object_id,
+                property_specs=property_specs, property_info_by_name=property_info_by_name,
+                derived_properties=derived_properties, request_path=request_path,
+                property_info_cache=property_info_cache, _activation_path=path,
+                _activation_fields=all_fields, _condition_sources=_condition_sources,
+                reference_requirements=reference_requirements,
+                desired_references=desired_references,
+                related_conditions=related_conditions,
+                platform=platform,
+            ))
             continue
         fields = set(dependency)
         expected_fields = (_REFERENCE_ACTIVATION_DEPENDENCY_FIELDS | {"conditions"}
@@ -7359,26 +7682,65 @@ def _apply_reference_activation_dependencies(
             )
         required_value = True
         if dependency_type == "property":
-            conditions = dependency.get("conditions")
-            if not (
-                isinstance(conditions, list) and len(conditions) == 1
-                and isinstance(conditions[0], Mapping)
-                and set(conditions[0]) == {"restriction"}
-                and isinstance(conditions[0]["restriction"], Mapping)
-                and set(conditions[0]["restriction"]) == {"type", "values"}
-                and conditions[0]["restriction"]["type"] == "enum"
-                and isinstance(conditions[0]["restriction"]["values"], list)
-                and len(conditions[0]["restriction"]["values"]) == 1
-                and isinstance(conditions[0]["restriction"]["values"][0], Mapping)
-                and set(conditions[0]["restriction"]["values"][0]) <= {"value", "displayName"}
-                and isinstance(conditions[0]["restriction"]["values"][0].get("value"), bool)
-            ):
-                raise OperationContractError(
-                    "CONSTRAINED_REFERENCE_BOUNDARY",
-                    "Reference activation requires one exact Boolean enum condition.",
-                    details={"reference": metadata.name, "property": property_name},
+            from .metadata_restrictions import condition_restriction, condition_matches, intersect_condition_restrictions, MetadataRestrictionError
+            try:
+                if action == "Show" and context in {"Self", "Parent", "AssocParent"}:
+                    condition_restriction(dependency.get("conditions"))
+                    continue
+                restriction = intersect_condition_restrictions([
+                    condition_restriction(item.get("conditions"))
+                    for source in (metadata, *_condition_sources)
+                    for item in source.dependencies
+                    if item.get("type") == "property"
+                    and item.get("action") == action and item.get("context") == context
+                    and isinstance(item.get("property"), str)
+                    and item["property"].casefold() == property_name.casefold()
+                ])
+            except MetadataRestrictionError as exc:
+                code = "REFERENCE_DEPENDENCY_CONFLICT" if exc.error_code == "CONDITION_CONFLICT" else "CONSTRAINED_REFERENCE_BOUNDARY"
+                raise OperationContractError(code, str(exc),
+                    details={"reference": metadata.name, "property": property_name}) from exc
+            if action == "Enable" and context == "AssocParent" and related_conditions is not None:
+                _prepare_association_parent_condition(
+                    object_id=object_id, property_name=property_name, restriction=restriction,
+                    read=read, requirements=related_conditions, activation_path=path,
+                    platform=platform,
                 )
-            required_value = conditions[0]["restriction"]["values"][0]["value"]
+                continue
+            supplied = next((spec for spec in property_specs
+                             if str(spec.get("name", "")).casefold() == property_name.casefold()), None)
+            if supplied is not None:
+                required_value = supplied["value"]
+                if not condition_matches(restriction, required_value):
+                    raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT",
+                        "An explicit property value conflicts with the activation condition.",
+                        details={"property": property_name, "value": required_value, "restriction": restriction})
+            else:
+                choices = restriction.get("values", [])
+                if object_id is not None:
+                    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
+                                      {"return": ["id", property_name], **({"platform": platform} if platform is not None else {})}))
+                    if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], property_name):
+                        raise OperationContractError("INVALID_READBACK", "Condition value must resolve on the exact object.")
+                    required_value = _field_value(rows[0], property_name)
+                    if not condition_matches(restriction, required_value) and len(choices) == 1:
+                        required_value = choices[0]["value"]
+                    elif not condition_matches(restriction, required_value):
+                        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+                            "Choose an explicit prerequisite value satisfying the live condition.",
+                            details={"property": property_name, "current_value": required_value,
+                                     "restriction": restriction, "mutation_dispatched": False,
+                                     "prerequisite_changes": [{
+                                         "operation": "object.setProperty", "discovery_meaning": property_name,
+                                         "object_id": object_id, "selection": "live_discovered_Field_Handle",
+                                         "restriction": restriction,
+                                     }]})
+                elif len(choices) == 1:
+                    required_value = choices[0]["value"]
+                else:
+                    raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+                        "A new object needs an explicit prerequisite value satisfying the live condition.",
+                        details={"property": property_name, "restriction": restriction, "mutation_dispatched": False})
         if not (
             dependency_type in {"override", "property"}
             and action == "Enable"
@@ -7386,7 +7748,7 @@ def _apply_reference_activation_dependencies(
         ):
             raise OperationContractError(
                 "CONSTRAINED_REFERENCE_BOUNDARY",
-                "Only same-object Enable dependencies with an override or exact Boolean condition are supported.",
+                "This context requires a supported same-object Enable scalar or override dependency.",
                 details={
                     "reference": metadata.name,
                     "request_path": request_path,
@@ -7404,11 +7766,11 @@ def _apply_reference_activation_dependencies(
         if property_key in path:
             raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.", details={"property": property_name})
         all_fields.add(property_key)
-        if len(all_fields) > 16:
-            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
+        if len(all_fields) > MAX_CONDITION_CONTROLLERS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
         if property_key in seen_dependencies:
             prior = next(spec for spec in property_specs if str(spec["name"]).casefold() == property_key)
-            if prior["value"] is not required_value:
+            if not condition_values_equal(prior["value"], required_value):
                 raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference activation conditions conflict.", details={"property": property_name})
             continue
         seen_dependencies.add(property_key)
@@ -7434,7 +7796,7 @@ def _apply_reference_activation_dependencies(
             property_info_by_name[property_key] = property_info
         if (
             property_info.name != property_name
-            or property_info.type.casefold() not in {"bool", "boolean"}
+            or (dependency_type == "override" and property_info.type.casefold() not in {"bool", "boolean"})
         ):
             raise OperationContractError(
                 "INVALID_METADATA",
@@ -7447,6 +7809,11 @@ def _apply_reference_activation_dependencies(
                     "metadata_type": property_info.type,
                 },
             )
+        if (dependency_type == "property" and supplied is None
+                and property_info.type.casefold().startswith(("int", "uint"))
+                and isinstance(required_value, float) and math.isfinite(required_value)
+                and required_value.is_integer()):
+            required_value = int(required_value)
         _require_object_property_value(property_info, required_value)
         activation_names.extend(_apply_reference_activation_dependencies(
             property_info, read=read, property_specs=property_specs,
@@ -7454,6 +7821,11 @@ def _apply_reference_activation_dependencies(
             derived_properties=derived_properties, request_path=request_path,
             object_id=object_id, class_id=class_id, property_info_cache=property_info_cache,
             _activation_path=path, _activation_fields=all_fields,
+            _condition_sources=_condition_sources,
+            reference_requirements=reference_requirements,
+            desired_references=desired_references,
+            related_conditions=related_conditions,
+            platform=platform,
         ))
 
         matching_specs = [
@@ -7470,7 +7842,7 @@ def _apply_reference_activation_dependencies(
             )
         if matching_specs:
             property_spec = matching_specs[0]
-            if property_spec.get("value") is not required_value:
+            if not condition_values_equal(property_spec.get("value"), required_value):
                 raise OperationContractError(
                     "REFERENCE_DEPENDENCY_CONFLICT",
                     "An explicit property value conflicts with the reference activation requirement.",
@@ -7488,6 +7860,8 @@ def _apply_reference_activation_dependencies(
                 "metadata_type": property_info.type,
                 "derived": True,
             }
+            if dependency_type == "property":
+                property_spec["condition_restriction"] = restriction
             property_specs.append(property_spec)
             derived_properties[property_info.name] = required_value
 
@@ -8486,6 +8860,83 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api == TONE_URI:
+            try:
+                verification = prepare_tone_verification(call_args, execution_contract['io_audit'], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in LAYOUT_MUTATION_URIS:
+            try:
+                validate_layout_live_binding(arguments['layout_binding'], read=read)
+            except ValueError as exc:
+                raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+            current = read('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            if not isinstance(current.get('name'), str):
+                raise OperationContractError('INVALID_READBACK', 'Current layout name was omitted; cannot prepare layout switching')
+            metadata['layout_original_current'] = dict(current)
+            verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
+                'expected_name': call_args.get('name', arguments['layout_binding']['layout_name'])}
+            if api == LAYOUT_SET_URI:
+                try:
+                    metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('LAYOUT_REGISTRATION_COLLISION', str(exc)) from exc
+                try:
+                    metadata['layout_blueprint_view_catalog'] = blueprint_view_catalog(arguments['layout_binding'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_BLUEPRINT_VIEW_TYPE', str(exc)) from exc
+                verification['expected_layout'] = dict(call_args['layout'])
+            elif api == LAYOUT_REMOVE_URI:
+                try:
+                    metadata['layout_factory_names'] = dict(require_temporary_layout(call_args['name'], read=read))
+                except ValueError as exc:
+                    raise OperationContractError('FACTORY_LAYOUT_REMOVAL_FORBIDDEN', str(exc)) from exc
+            elif api == LAYOUT_GET_OR_CREATE_URI:
+                binding = arguments['layout_binding']
+                try:
+                    if current['name'] != binding['layout_name']:
+                        raise ValueError('View creation requires its discovered layout to be current; switch and inspect again')
+                    observed = view_creation_observation(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', str(exc)) from exc
+                metadata['layout_view_prestate'] = observed
+                verification.update(expected_name=binding['layout_name'], view_type=call_args['name'],
+                    coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args},
+                    existing_view_ids=[row['viewID'] for row in observed['instances'] if row['viewName'] == call_args['name']])
+            elif api == LAYOUT_SPLITTER_URI:
+                binding = arguments['layout_binding']
+                try:
+                    if current['name'] != binding['layout_name']:
+                        raise ValueError('Splitter movement requires its discovered layout to be current')
+                    observed = splitter_state_observation(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_SPLITTER_SCOPE', str(exc)) from exc
+                metadata['layout_splitter_prestate'] = observed
+                verification.update(splitter_id=call_args['id'], axis=observed['axis'], parent_id=observed['parent_id'],
+                    rectangle_before=observed['rectangle'], pixel_delta=call_args['delta'],
+                    preserved_view_identities=layout_view_identities(observed['instances']))
+            elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
+                binding = arguments['layout_binding']
+                if current['name'] != binding['layout_name']:
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Changing a view requires its discovered layout to be current')
+                try:
+                    observed_view = validate_layout_view_binding(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+                verification.update(expected_name=binding['layout_name'], view_id=call_args['viewID'])
+                if api == LAYOUT_DOCK_URI:
+                    try:
+                        dock_state = dock_state_observation(binding, read=read)
+                    except ValueError as exc:
+                        raise OperationContractError('INVALID_LAYOUT_DOCK_TARGET', str(exc)) from exc
+                    metadata['layout_dock_prestate'] = dock_state
+                    verification.update(view_type=observed_view['viewName'], target_id=call_args['targetID'],
+                        target_kind=dock_state['target']['kind'], dock_side=call_args['side'],
+                        target_previous_ids=layout_subtree_ids(dock_state['target']['observation']),
+                        preserved_view_identities=layout_view_identities(dock_state['instances']))
+                if api == LAYOUT_UNDOCK_URI:
+                    verification.update(view_type=observed_view['viewName'],
+                        coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args})
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -8859,13 +9310,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if "platform" in arguments
             else None
         )
-        info_payload = read(
-            GET_PROPERTY_INFO_URI,
-            {"object": source.object, "property": field_value},
-            {},
-        )
-        info = parse_get_property_info_result(info_payload)
+        info = _read_property_info(read, object_id=source.object, name=field_value)
         metadata["field_info"] = info.as_dict()
+        # Every exact selected field stays bound through prewrite and verify,
+        # including dependency-free fields and cleared references. Raw facts
+        # distinguish native omission from explicit null/default containers.
+        metadata["condition_metadata"] = {
+            "object_id": source.object, "platform": platform,
+            "fields": [info.as_dict()],
+            "native_fields": [{"token": field_value, "metadata": dict(info.raw)}],
+        }
         if platform is not None and request.operation == "object.setProperty":
             _require_platform_field_enabled(
                 read,
@@ -8873,20 +9327,30 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 field_name=field_value,
                 platform=platform,
             )
-        activation_requirements: dict[str, bool] = {}
-        if request.operation == "object.setReference" and arguments["target"] is not None:
+        activation_requirements: dict[str, Any] = {}
+        activation_reference_requirements: dict[str, Any] = {}
+        related_conditions: list[dict[str, Any]] = []
+        activation_metadata: dict[str, PropertyInfoMetadataRecord] = {}
+        if request.operation == "object.setProperty" or arguments["target"] is not None:
             activation_specs: list[dict[str, Any]] = []
             _apply_reference_activation_dependencies(
                 info, read=read, object_id=source.object,
-                property_specs=activation_specs, property_info_by_name={},
+                property_specs=activation_specs, property_info_by_name=activation_metadata,
                 derived_properties={}, request_path="$.reference",
+                reference_requirements=activation_reference_requirements,
+                related_conditions=related_conditions,
+                platform=platform,
             )
             activation_requirements = {spec["name"]: spec["value"] for spec in activation_specs}
+            if related_conditions:
+                metadata["related_conditions"] = related_conditions
+            if info.dependencies:
+                metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
             {
-                "return": ["id", "path", field_value, *activation_requirements],
+                "return": ["id", "path", field_value, *activation_requirements, *activation_reference_requirements],
                 **({"platform": platform} if platform is not None else {}),
             },
         )
@@ -8904,7 +9368,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         missing_activators = [
             name for name, value in activation_requirements.items()
             if not _has_field(field_before_rows[0], name)
-            or _field_value(field_before_rows[0], name) is not value
+            or not condition_values_equal(_field_value(field_before_rows[0], name), value)
         ]
         if missing_activators:
             raise OperationContractError(
@@ -8930,6 +9394,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "platform": platform,
             "row": field_before_rows[0],
             **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+            **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
         }
         if request.operation == "object.setProperty":
             preview = PropertyReferenceBuilder(version=request.version).set_property(
@@ -8942,6 +9407,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             )
             verification = {
                 "kind": "same-guid-property",
+                **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+                **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_value": arguments["value"],
@@ -8959,7 +9426,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 _require_reference_clear_allowed(info)
             else:
                 roles["target"] = target
-                _require_reference_target_allowed(info, target)
+                reference_conditions = []
+                _require_reference_target_allowed(info, target, source_id=source.object, read=read,
+                    platform=platform, conditions=reference_conditions, wwise_version=request.version)
+                if reference_conditions:
+                    metadata["reference_target_conditions"] = reference_conditions
             preview = PropertyReferenceBuilder(version=request.version).set_reference(
                 object=source,
                 reference=field_value,
@@ -8970,6 +9441,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             verification = {
                 "kind": "same-guid-reference",
                 **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+                **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_target_id": (
@@ -9087,6 +9559,7 @@ def prepare_object_set_batch_check(
         if key != "objects"
     }
     issues: list[dict[str, Any]] = []
+    repair_bytes_remaining = MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES
     for row_index, row in enumerate(raw_objects):
         row_request = OperationRequest(
             contract=request.contract,
@@ -9097,13 +9570,27 @@ def prepare_object_set_batch_check(
         try:
             prepare_operation(row_request, read_call=cached_read)
         except OperationContractError as exc:
-            issues.append(
-                {
-                    "row_index": row_index,
-                    "error_code": exc.error_code,
-                    "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
-                }
-            )
+            issue = {
+                "row_index": row_index,
+                "error_code": exc.error_code,
+                "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
+            }
+            if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
+                # Preserve the exact owner and staged repair at this public
+                # batch-check boundary, under one aggregate output budget.
+                repair_size = len(canonical_json_bytes(exc.details))
+                if repair_size <= repair_bytes_remaining:
+                    issue["details"] = exc.details
+                    repair_bytes_remaining -= repair_size
+                else:
+                    issue["details"] = {
+                        "mutation_dispatched": False,
+                        "repair_details": "exceeds_batch_check_budget_use_separate_exact_field_preview",
+                        "limit_bytes": MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES,
+                        **{key: exc.details[key] for key in ("object_id", "owner_id")
+                           if isinstance(exc.details.get(key), str) and _PLUGIN_GUID.fullmatch(exc.details[key])},
+                    }
+            issues.append(issue)
     if issues:
         raise OperationContractError(
             "OPERATION_DRAFT_CHECK_FAILED",
@@ -10867,7 +11354,7 @@ def _materialize_audio_import_dynamic_rows(
 
 def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
     return (
-        info.type.casefold() in {"reference", "objectreference"}
+        (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or info.restriction.get("type") == "reference"
     )
 
@@ -13190,6 +13677,49 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == TONE_URI:
+            plan = prepared.get('verification_plan', {})
+            try:
+                validate_tone_binding(plan, call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in LAYOUT_MUTATION_URIS:
+            def layout_guard_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({'uri': uri, 'args': dict(args), 'options': dict(options), 'result': dict(result)})
+                return result
+            try:
+                validate_layout_live_binding(arguments['layout_binding'], read=layout_guard_read)
+                current = layout_guard_read('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                pre_state = prepared.get('pre_state')
+                if not isinstance(pre_state, Mapping) or current != pre_state.get('layout_original_current'):
+                    raise ValueError('Current layout changed since preview; inspect and preview again')
+                if api == LAYOUT_SET_URI:
+                    absence = require_layout_absence(call_args['name'], read=read_call)
+                    readbacks.append(absence)
+                    if blueprint_view_catalog(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_blueprint_view_catalog'):
+                        raise ValueError('Nested blueprint live view catalog changed after preview')
+                elif api == LAYOUT_REMOVE_URI:
+                    require_temporary_layout(call_args['name'], read=layout_guard_read)
+                elif api == LAYOUT_GET_OR_CREATE_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for view creation is no longer current')
+                    if view_creation_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_view_prestate'):
+                        raise ValueError('View catalog or instances changed after preview; inspect and preview again')
+                elif api == LAYOUT_SPLITTER_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for splitter movement is no longer current')
+                    if splitter_state_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_splitter_prestate'):
+                        raise ValueError('Splitter identity, axis or rectangle changed after preview')
+                elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for the view mutation is no longer current')
+                    validate_layout_view_binding(arguments['layout_binding'], read=layout_guard_read)
+                    if api == LAYOUT_DOCK_URI and dock_state_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_dock_prestate'):
+                        raise ValueError('Dock target, view or rectangles changed after preview')
+            except ValueError as exc:
+                raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
         actual = {
             "uri": dispatch_payload.get("uri"),
@@ -13286,7 +13816,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")
@@ -13552,6 +14082,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             )
 
     pre_state = prepared.get("pre_state")
+    related = pre_state.get("related_conditions", []) if isinstance(pre_state, Mapping) else []
+    related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
+    assertions.extend(related_assertions)
+    readbacks.extend(related_reads)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
     source = roles.get("object") if isinstance(roles, Mapping) else None
     if isinstance(field_before, Mapping) and isinstance(source, Mapping):
@@ -13560,7 +14095,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if isinstance(field_name, str) and object_id is not None:
             args = {"from": {"id": [object_id]}}
             activation_requirements = field_before.get("activation_requirements", {})
-            options = {"return": ["id", "path", field_name, *activation_requirements]}
+            activation_reference_requirements = field_before.get("activation_reference_requirements", {})
+            options = {"return": ["id", "path", field_name, *activation_requirements, *activation_reference_requirements]}
             platform = field_before.get("platform")
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
@@ -13588,9 +14124,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 assertions.append({
                     "name": f"reference activation {name} unchanged",
                     "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
-                              and _has_field(rows[0], name) and actual is expected,
+                              and _has_field(rows[0], name) and condition_values_equal(actual, expected),
                     "evidence": {"expected": expected, "actual": actual},
                 })
+            for name, expected in activation_reference_requirements.items():
+                assertions.append({"name": f"reference prerequisite {name} unchanged",
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
+                              and _reference_requirement_matches(rows[0], name, expected),
+                    "evidence": {"expected": expected, "rows": rows}})
 
     copy_move_collision_guard = (
         pre_state.get("copy_move_collision_guard")
@@ -13923,7 +14464,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             assertions.append(
                 {
                     "name": f"object graph field snapshot {index} unchanged",
-                    "passed": actual == expected,
+                    "passed": _native_snapshot_equal(actual, expected),
                     "evidence": {"expected": expected, "actual": actual},
                 }
             )
@@ -15118,6 +15659,13 @@ def verify_prepared_operation(
     def check(name: str, passed: bool, evidence: Any) -> None:
         assertions.append({"name": name, "passed": bool(passed), "evidence": evidence})
 
+    pre_state = prepared.get("pre_state")
+    related = pre_state.get("related_conditions", []) if isinstance(pre_state, Mapping) else []
+    related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
+    assertions.extend(related_assertions)
+    readbacks.extend(related_reads)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True))
+
     def check_result_schema(uri: str, version: str) -> None:
         try:
             validation = validate_semantic_result(
@@ -15392,6 +15940,22 @@ def verify_prepared_operation(
                 else "complete_reflected_schema"
             )
         )
+    elif kind == 'tone-wav-artifact':
+        check_result_schema(TONE_URI, plan['version'])
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'partial_tone_artifact'
+        try:
+            observed = verify_tone_artifact(plan)
+        except SoundBankContractError as exc:
+            check('Requested Tone WAV artifact exists and matches its observable postconditions', False,
+                {'code': exc.error_code, 'message': str(exc), **exc.details})
+        else:
+            business_state_verified = not observed['unresolved']
+            success_status = 'verified' if business_state_verified else 'result_schema_checked'
+            verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
+            readbacks.append(observed)
+            check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False
@@ -15422,6 +15986,186 @@ def verify_prepared_operation(
                 True,
                 validation.as_dict(),
             )
+    elif kind == "authoring-layout-state":
+        uri, version = plan.get('uri'), plan.get('version')
+        if uri not in LAYOUT_MUTATION_URIS or not isinstance(version, str):
+            raise OperationContractError('INVALID_PREVIEW', 'Layout verifier lacks its exact versioned operation')
+        try:
+            validation = validate_semantic_result(uri, execution_result.get('result'), version=version, authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Layout mutation returned its exact result contract', False, exc.as_dict())
+        else:
+            check('Layout mutation returned its exact result contract', True, validation.as_dict())
+        if uri == LAYOUT_SET_URI:
+            registered = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+            validate_layout_read_result('contents', registered)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': registered})
+            expected_layout = plan.get('expected_layout')
+            check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
+                and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
+                {'expected_name': expected_layout.get('Layout', {}).get('Name') if isinstance(expected_layout, Mapping) else None,
+                 'actual_name': registered.get('Layout', {}).get('Name')})
+            if isinstance(expected_layout, Mapping) and 'StackPanel' in expected_layout.get('Layout', {}):
+                check('Registered layout retains every declared nested field and child order',
+                    declared_layout_matches(expected_layout, registered),
+                    {'mismatches': declared_layout_mismatches(expected_layout, registered),
+                     'expected_layout_sha256': canonical_sha256(expected_layout),
+                     'observed_layout_sha256': canonical_sha256(registered),
+                     'comparison': 'all declared fields and exact child order; native default fields may be additional'})
+        elif uri == LAYOUT_REMOVE_URI:
+            try:
+                absent = require_layout_absence(plan['expected_name'], read=read_call)
+            except ValueError as exc:
+                check('Temporary layout is absent after unregister', False, {'reason': str(exc)})
+            else:
+                readbacks.append(absent)
+                check('Temporary layout is absent after unregister', True, absent)
+        elif uri == LAYOUT_SPLITTER_URI:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            scoped = current.get('name') == plan['expected_name']
+            check('Splitter movement remains in the reviewed current layout', scoped, current)
+            if scoped:
+                instances_raw = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': instances_raw})
+                view_identities = layout_view_identities(canonical_view_instances(instances_raw))
+                check('Splitter movement preserves every existing view identity and type',
+                    view_identities == plan['preserved_view_identities'],
+                    {'before': plan['preserved_view_identities'], 'after': view_identities})
+                layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
+                try:
+                    observed = splitter_element_context(layout, plan['splitter_id'])
+                    same_axis = observed['axis'] == plan['axis'] and observed['parent_id'] == plan['parent_id']
+                    check('The exact splitter retains its reviewed parent and axis', same_axis, observed)
+                    raw = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['splitter_id']}, {})
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['splitter_id']}, 'options': {}, 'result': raw})
+                    rectangle = require_layout_rectangle(raw)
+                    before = require_layout_rectangle(plan['rectangle_before'])
+                    movement_edges = ('left', 'right') if plan['axis'] == 'x' else ('top', 'bottom')
+                    expected = {edge: value + (plan['pixel_delta'] if edge in movement_edges else 0)
+                                for edge, value in before.items()}
+                    check('Splitter moves by the exact signed pixel displacement without resizing or perpendicular drift',
+                        same_axis and rectangle == expected,
+                        {'axis': plan['axis'], 'pixel_delta': plan['pixel_delta'], 'before': before,
+                         'expected': expected, 'actual': rectangle, 'automatic_replay': False})
+                except ValueError as exc:
+                    check('Exact splitter displacement is independently observed', False, {'reason': str(exc)})
+        elif uri == LAYOUT_DOCK_URI:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.extend([
+                {'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current},
+                {'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed}])
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            scoped = current.get('name') == plan['expected_name']
+            docked = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is True
+            check('Docked view remains in the reviewed current layout', scoped, current)
+            view_identities = layout_view_identities(instances)
+            check('Docking preserves every existing view identity and type',
+                view_identities == plan['preserved_view_identities'],
+                {'before': plan['preserved_view_identities'], 'after': view_identities})
+            check('The exact discovered view is independently observed docked', docked, {'view_id': plan['view_id'], 'actual': matches})
+            if scoped and docked:
+                layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
+                try:
+                    target = layout_element_observation(layout, plan['target_id'])
+                    if target['kind'] != plan['target_kind']:
+                        raise ValueError('The exact dock target changed its kind')
+                    topology = docking_topology_proof(layout, view_id=plan['view_id'], target_id=plan['target_id'],
+                        side=plan['dock_side'], previous_target_ids=plan['target_previous_ids'])
+                    rectangles = {}
+                    for role, identity in (('view', plan['view_id']), ('target', plan['target_id']), ('peer', topology['peer_id'])):
+                        raw = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': identity}, {})
+                        readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': identity}, 'options': {}, 'result': raw})
+                        rectangles[role] = require_layout_rectangle(raw)
+                    side_matches = docking_side_matches(rectangles['view'], rectangles['peer'], plan['dock_side'])
+                    if topology['relationship'] == 'container_boundary':
+                        view_rect, target_rect = rectangles['view'], rectangles['target']
+                        side_matches = side_matches and (target_rect['left'] <= view_rect['left'] < view_rect['right'] <= target_rect['right']
+                            and target_rect['top'] <= view_rect['top'] < view_rect['bottom'] <= target_rect['bottom'])
+                    check('Docking matches the exact requested target and side', side_matches,
+                        {'target_id': plan['target_id'], 'side': plan['dock_side'], 'rectangles': rectangles, 'topology': topology,
+                         'unresolved_boundary': None if side_matches else 'requested side not proven; overlapping container topology requires native characterization'})
+                except ValueError as exc:
+                    check('Docking matches the exact requested target and side', False, {'reason': str(exc)})
+        elif uri == LAYOUT_UNDOCK_URI:
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            floating = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is False
+            check('The discovered view is independently observed floating', floating, {'view_id': plan['view_id'], 'actual': matches})
+            if floating and plan.get('coordinates'):
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                in_scope = current.get('name') == plan['expected_name']
+                check('Floating placement remains in the reviewed current layout', in_scope, current)
+                if in_scope:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['view_id']}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['view_id']}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('Floating view ' + edge + ' matches its declared position', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge)})
+        elif uri == LAYOUT_CLOSE_URI:
+            observed, pending = {}, True
+            for poll in range(16):
+                observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                instances = canonical_view_instances(observed)
+                pending = any(_same_identity(row['viewID'], plan['view_id']) for row in instances)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'poll': poll + 1,
+                    'result_sha256': canonical_sha256(observed), 'view_present': pending})
+                if not pending:
+                    break
+                if poll < 15:
+                    time.sleep(0.2)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']},
+                'options': {}, 'result': observed})
+            check('Closed view disappears from independently read layout instances', not pending,
+                {'view_id': plan['view_id'], 'pending_async_close': pending, 'polls': poll + 1})
+        elif uri == LAYOUT_GET_OR_CREATE_URI:
+            result = execution_result.get('result')
+            view_id = result.get('id') if isinstance(result, Mapping) else None
+            valid_id = isinstance(view_id, str) and _PLUGIN_GUID.fullmatch(view_id) is not None
+            check('View result includes its exact native GUID', valid_id, {'id': view_id})
+            if valid_id:
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                current_scope_matches = current.get('name') == plan['expected_name']
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                check('Created or reused view remains in the reviewed current layout', current_scope_matches,
+                    {'expected': plan['expected_name'], 'actual': current.get('name')})
+                observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                instances = canonical_view_instances(observed)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+                matches = [row for row in instances if _same_identity(row['viewID'], view_id)]
+                check('Returned view exists with the requested live type', len(matches) == 1 and matches[0]['viewName'] == plan['view_type'],
+                    {'expected_type': plan['view_type'], 'id': view_id, 'actual': matches})
+                existing = plan.get('existing_view_ids', [])
+                if existing:
+                    check('Existing view is reused', any(_same_identity(item, view_id) for item in existing),
+                        {'existing_ids': existing, 'returned_id': view_id})
+                elif plan.get('coordinates') and current_scope_matches:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': view_id}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': view_id}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('New view initial ' + edge + ' matches its declared coordinate', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge), 'rectangle': rectangle})
+        else:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
+                {'expected': plan.get('expected_name'), 'actual': current.get('name')})
     elif kind == "project-setting-state":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -16439,7 +17183,8 @@ def verify_prepared_operation(
                 expected = field_spec.get("value")
                 check(
                     f"{request_path}.{field_name} matches typed metadata",
-                    _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
+                    (_has_field(row, str(field_name)) and condition_values_equal(actual, expected))
+                    if field_spec.get("derived") else _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
             for field_spec in spec.get("references", []):
@@ -16449,7 +17194,7 @@ def verify_prepared_operation(
                 actual = _reference_identity(_field_value(row, str(field_name)))
                 check(
                     f"{request_path}.{field_name} reference matches",
-                    _same_identity(actual, field_spec.get("target_id")),
+                    _reference_requirement_matches(row, str(field_name), field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
             import_spec = spec.get("import")
@@ -17367,9 +18112,11 @@ def verify_prepared_operation(
     elif kind == "same-guid-property":
         field_name = str(plan.get("field"))
         platform = plan.get("platform")
+        activation_requirements = plan.get("activation_requirements", {})
+        activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name),
+            fields=("id", "path", field_name, *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("property target resolves exactly once", len(rows) == 1, rows)
@@ -17383,13 +18130,22 @@ def verify_prepared_operation(
                 and _typed_value_equal(actual, expected, str(plan.get("metadata_type", ""))),
                 {"actual": actual, "expected": expected, "metadata_type": plan.get("metadata_type")},
             )
+            for name, expected_value in activation_requirements.items():
+                check(f"property activation {name} remains satisfied",
+                      _has_field(rows[0], name) and condition_values_equal(_field_value(rows[0], name), expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
+            for name, expected_value in activation_reference_requirements.items():
+                check(f"reference prerequisite {name} remains satisfied",
+                      _reference_requirement_matches(rows[0], name, expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
         platform = plan.get("platform")
         activation_requirements = plan.get("activation_requirements", {})
+        activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name, *activation_requirements),
+            fields=("id", "path", field_name, *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
@@ -17425,7 +18181,11 @@ def verify_prepared_operation(
         if len(rows) == 1:
             for name, expected_value in activation_requirements.items():
                 check(f"reference activation {name} remains satisfied",
-                      _has_field(rows[0], name) and _field_value(rows[0], name) is expected_value,
+                      _has_field(rows[0], name) and condition_values_equal(_field_value(rows[0], name), expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
+            for name, expected_value in activation_reference_requirements.items():
+                check(f"reference prerequisite {name} remains satisfied",
+                      _reference_requirement_matches(rows[0], name, expected_value),
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "ui-capture-screen-result":
         success_status = "result_schema_checked"
@@ -19081,7 +19841,7 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
-    return _verification(
+    outcome = _verification(
         operation,
         assertions,
         readbacks,
@@ -19089,6 +19849,16 @@ def verify_prepared_operation(
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
     )
+
+    if kind == 'tone-wav-artifact':
+        message = ('The requested Tone WAV artifact failed independent verification.'
+            if outcome.status == 'verification_failed' else
+            'The requested observable Tone WAV artifact state passed independent verification.'
+            if outcome.business_state_verified else
+            'Applicable Tone WAV artifact checks passed; requested postconditions remain explicitly unresolved.')
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    return outcome
 
 
 def _soundbank_input_file_proofs(
@@ -20885,27 +21655,34 @@ def _import_file_path_key(value: Any) -> HostPathKey | None:
 def _require_reference_target_allowed(
     metadata: PropertyInfoMetadataRecord,
     target: ResolvedObject,
+    *, source_id=None, read=None, platform=None, conditions=None,
+    desired_references=None, property_info_cache=None, _restriction_path=(),
+    _restriction_context=None,
+    wwise_version=None,
 ) -> None:
     try:
-        allowed_types = set(reference_allowed_types(metadata.restriction))
+        allowed_types = set(reference_allowed_types(metadata.restriction,
+            allow_target_classifiers=read is not None and conditions is not None))
     except MetadataRestrictionError as exc:
         raise OperationContractError(
             exc.error_code,
             str(exc),
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         ) from exc
-    if not allowed_types:
-        return
     target_type = target.row.get("type")
-    if not isinstance(target_type, str) or not target_type:
+    restrictions = metadata.restriction.get("restrictions") or []
+    category_rows = [row for row in restrictions if isinstance(row, Mapping) and "category" in row]
+    ambiguous_categories = len(category_rows) > 1 or bool(category_rows) and any(
+        isinstance(row, Mapping) and "type" in row for row in restrictions)
+    if allowed_types and not ambiguous_categories and (not isinstance(target_type, str) or not target_type):
         raise OperationContractError(
             "INVALID_READBACK",
             "Reference target readback must expose a type when live restrictions are present.",
             details={"reference": metadata.name, "target": target.as_dict()},
         )
-    target_token = reference_type_token(target_type)
+    target_token = reference_type_token(target_type) if isinstance(target_type, str) else None
     allowed_tokens = {reference_type_token(value) for value in allowed_types}
-    if target_token not in allowed_tokens:
+    if allowed_types and not ambiguous_categories and target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
             "Reference target type is not allowed by live getPropertyInfo restrictions.",
@@ -20915,6 +21692,239 @@ def _require_reference_target_allowed(
                 "allowed_types": sorted(allowed_types),
             },
         )
+    requires_shared = False
+    for row in metadata.restriction.get("restrictions", []):
+        if not isinstance(row, Mapping):
+            continue  # String flags and malformed entries are handled by reference_allowed_types.
+        if "type" in row:
+            if set(row) - {"type", "sharedOnlyTypes"}:
+                raise OperationContractError("INVALID_METADATA", "Reference type restriction has unknown fields.")
+            types = row["type"]
+            if not isinstance(types, list) or not all(isinstance(value, str) and value for value in types):
+                raise OperationContractError("INVALID_METADATA", "Reference type restriction must be a string array.")
+            shared = row.get("sharedOnlyTypes", [])
+            if (not isinstance(shared, list) or not all(isinstance(value, str) and value for value in shared)
+                    or {reference_type_token(value) for value in shared} - {reference_type_token(value) for value in types}):
+                raise OperationContractError("INVALID_METADATA", "Shared-only reference types must be a subset of the allowed type array.")
+            if target_token in {reference_type_token(value) for value in shared}:
+                requires_shared = True
+        elif "category" in row:
+            if set(row) != {"category"} or not isinstance(row["category"], list) or not all(isinstance(value, str) for value in row["category"]):
+                raise OperationContractError("INVALID_METADATA", "Reference category restriction must be an exact string array.")
+        elif set(row) != {"childOfReference"}:
+            raise OperationContractError("INVALID_METADATA", "Reference restriction has an unknown object shape.")
+    type_rows = [row for row in restrictions if isinstance(row, Mapping) and "type" in row]
+    classifier_fields = (["type"] if ambiguous_categories and type_rows else []) + (
+        ["category"] if category_rows else []) + (["isPlayable"] if "playable" in restrictions else [])
+    if classifier_fields:
+        if read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Target classifiers require an exact existing scoped Preview.")
+        facts = _read_reference_target_classifiers(target.object, classifier_fields, read=read, platform=platform)
+        if "isPlayable" in facts and facts["isPlayable"] is not True:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        if ambiguous_categories:
+            if "type" in facts and not _native_snapshot_equal(facts["type"], target_type):
+                raise OperationContractError("INVALID_READBACK", "Selected target type changed between exact identity and classifier observations.")
+            # Every disclosed row is independently satisfied. This sufficient
+            # proof does not assign AND/OR semantics to partial native matches.
+            all_satisfied = all(facts["category"] in row["category"] for row in category_rows) and all(
+                reference_type_token(facts["type"]) in {reference_type_token(value) for value in row["type"]}
+                for row in type_rows)
+            if not all_satisfied:
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "Partially satisfied combined type/category rows require separately established native admission semantics.",
+                    details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        elif category_rows and facts["category"] not in category_rows[0]["category"]:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        classifier_condition = {"kind": "target_classifier", "target_id": target.object,
+            "reference": metadata.name, "classifiers": facts, "platform": platform}
+        if classifier_condition not in conditions:
+            conditions.append(classifier_condition)
+    if requires_shared:
+        if read is None or conditions is None or wwise_version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only classification requires its pinned existing-object scope.")
+        facts = _read_shared_reference_target(target.object, read=read, platform=platform, version=wwise_version)
+        condition = {"kind": "shared_target", "target_id": target.object, "reference": metadata.name,
+            "classification": facts, "version": wwise_version, "platform": platform}
+        if condition not in conditions:
+            conditions.append(condition)
+    parent_fields = []
+    for row in metadata.restriction.get("restrictions", []):
+        if not isinstance(row, Mapping) or "childOfReference" not in row:
+            continue
+        name = row["childOfReference"]
+        if set(row) != {"childOfReference"} or not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+            raise OperationContractError("INVALID_METADATA", "Reference parent restriction must name one exact reference field.")
+        if name not in parent_fields:
+            parent_fields.append(name)
+    if not parent_fields:
+        return
+    if source_id is None or read is None or conditions is None:
+        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+            "Reference hierarchy constraints need an exact existing object and a separately scoped field Preview.",
+            details={"reference": metadata.name, "parent_references": parent_fields, "mutation_dispatched": False})
+    if _restriction_context is None:
+        _restriction_context = {"fields": set(), "values": {}, "identities": {}, "validated": set()}
+    if property_info_cache is None:
+        property_info_cache = {}
+    validation_key = (metadata.name.casefold(), _identity_key(target.object))
+    if validation_key in _restriction_context["validated"]:
+        return
+    path = (*_restriction_path, metadata.name.casefold())
+    for name in parent_fields:
+        if name.casefold() in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference hierarchy constraints contain a cycle.")
+        _restriction_context["fields"].add(name.casefold())
+        if len(_restriction_context["fields"]) > MAX_CONDITION_CONTROLLERS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference hierarchy exceeds the finite controller budget.")
+        info = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=source_id)
+                if property_info_cache is not None else _read_property_info(read, name=name, object_id=source_id))
+        _require_object_reference_metadata(info, allow_hierarchy=True)
+        if info.name != name:
+            raise OperationContractError("INVALID_METADATA", "Reference parent metadata names a different field.")
+        if name.casefold() not in _restriction_context["values"]:
+            _restriction_context["values"][name.casefold()] = _rows(read(OBJECT_GET_URI, {"from": {"id": [source_id]}}, {
+                "return": ["id", name], **({"platform": platform} if platform is not None else {})}))
+        rows = _restriction_context["values"][name.casefold()]
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), source_id) or not _has_field(rows[0], name):
+            raise OperationContractError("INVALID_READBACK", "Reference parent field must resolve on the exact source object.")
+        current = _field_value(rows[0], name)
+        before = None if _reference_value_is_null(current) else _reference_identity(current)
+        expected = desired_references.get(name.casefold(), before) if desired_references is not None else before
+        if expected is None:
+            raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the controlling reference first.", details={
+                "object_id": source_id, "reference": metadata.name, "mutation_dispatched": False,
+                "prerequisite_changes": [{"operation": "object.setReference", "object_id": source_id,
+                    "discovery_meaning": name, "selection": "live_discovered_Field_Handle", "required_presence": True,
+                    "target_selection": "user_chosen_exact_object", **({"platform": platform} if platform is not None else {})}]})
+        if (not isinstance(expected, str) or _PLUGIN_GUID.fullmatch(expected) is None
+                or (before is not None and (not isinstance(before, str) or _PLUGIN_GUID.fullmatch(before) is None))):
+            raise OperationContractError("INVALID_READBACK", "Reference parent must expose a canonical GUID or native null.")
+        actual_parent = _reference_identity(target.row.get("parent"))
+        if not isinstance(actual_parent, str) or _PLUGIN_GUID.fullmatch(actual_parent) is None:
+            raise OperationContractError("INVALID_READBACK", "Chosen reference target must expose its exact parent GUID.")
+        if not _same_identity(actual_parent, expected):
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Chosen reference target is not a child of the controlling reference.", details={
+                "reference": metadata.name, "target_id": target.object, "parent_reference": name,
+                "required_parent_id": expected, "actual_parent_id": actual_parent})
+        parent = _resolve_identity({"kind": "id", "value": expected}, role="reference_parent", read=read,
+            identity_cache=_restriction_context["identities"])
+        _require_reference_target_allowed(info, parent, source_id=source_id, read=read, platform=platform,
+            conditions=conditions, desired_references=desired_references, property_info_cache=property_info_cache,
+            _restriction_path=path, _restriction_context=_restriction_context, wwise_version=wwise_version)
+        condition = {"source_id": source_id, "target_id": target.object, "reference": metadata.name,
+            "parent_reference": name, "before_parent_id": before, "parent_id": expected,
+            "controller_metadata": info.as_dict(), "controller_native_metadata": dict(info.raw), "platform": platform}
+        if condition not in conditions:
+            conditions.append(condition)
+    _restriction_context["validated"].add(validation_key)
+
+
+def _read_shared_reference_target(target_id, *, read, platform, version, require_match=True):
+    """Prove SDK ShareSet relations without interpreting an omitted owner field."""
+    from .builders.query import WaqlQueryBuilder, STRUCTURED_QUERY_CONTRACT
+    options = {"return": ["id", "parent"]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Shared-only target must resolve exactly the chosen GUID.")
+    parent = rows[0].get("parent")
+    if "parent" not in rows[0] or isinstance(parent, Mapping) and "id" not in parent:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a fresh canonical parent relationship.")
+    if parent is None:
+        parent_id = None
+    else:
+        parent_id = _reference_identity(parent)
+        if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
+            raise OperationContractError("INVALID_READBACK", "Shared-only target parent must expose a canonical GUID.")
+        if _reference_value_is_null(parent_id):
+            parent_id = None
+    if parent_id is None and require_match:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a non-null parent relationship.")
+    preview = WaqlQueryBuilder(version=version).build({
+        "contract": STRUCTURED_QUERY_CONTRACT,
+        "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},
+        "transforms": [
+            {"kind": "where", "predicate": {"kind": "compare", "path": ["owner"], "operator": "=", "value": None}},
+            {"kind": "take", "value": 1}],
+        "return": ["id"],
+    })
+    query_options = dict(preview.envelope.options)
+    if platform is not None:
+        query_options["platform"] = platform
+    query = {"version": version, "args": dict(preview.envelope.args), "options": query_options}
+    matches = _rows(read(OBJECT_GET_URI, query["args"], query_options))
+    if not matches and require_match:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target does not satisfy the native owner-null ShareSet predicate.")
+    if matches and (len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id)):
+        raise OperationContractError("INVALID_READBACK", "Owner-null predicate must return exactly the selected target GUID.")
+    return {"parent_id": parent_id, "owner_absent": bool(matches), "native_query": query}
+
+
+def _read_reference_target_classifiers(target_id, fields, *, read, platform):
+    options = {"return": ["id", *fields]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Native target classifier must resolve exactly the selected GUID.")
+    facts = {}
+    for field in fields:
+        if field not in rows[0]:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Native target classifier is unavailable for this exact object.",
+                details={"target_id": target_id, "classifier": field})
+        value = rows[0][field]
+        if not (isinstance(value, str) and value if field in {"category", "type"} else isinstance(value, bool)):
+            raise OperationContractError("INVALID_READBACK", "Native target classifier has an invalid value.",
+                details={"target_id": target_id, "classifier": field})
+        facts[field] = value
+    return facts
+
+
+def _reference_target_condition_assertions(pre_state, *, read, after_write):
+    conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
+    assertions = []
+    for condition in conditions:
+        if condition.get("kind") == "shared_target":
+            facts = _read_shared_reference_target(condition["target_id"], read=read,
+                platform=condition.get("platform"), version=condition["version"], require_match=False)
+            assertions.append({"name": f"reference {condition['reference']} retains native ShareSet classification",
+                "passed": _native_snapshot_equal(facts, condition["classification"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classification"], "actual": facts}})
+            continue
+        if condition.get("kind") == "target_classifier":
+            facts = _read_reference_target_classifiers(condition["target_id"], condition["classifiers"],
+                read=read, platform=condition.get("platform"))
+            assertions.append({"name": f"reference {condition['reference']} retains native target classification",
+                "passed": _native_snapshot_equal(facts, condition["classifiers"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classifiers"], "actual": facts}})
+            continue
+        source, target, name = condition["source_id"], condition["target_id"], condition["parent_reference"]
+        options = {"return": ["id", "parent", name]}
+        if condition.get("platform") is not None:
+            options["platform"] = condition["platform"]
+        identities = [source] if _same_identity(source, target) else [source, target]
+        rows = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, options))
+        owners = [row for row in rows if _same_identity(row.get("id"), source)]
+        targets = [row for row in rows if _same_identity(row.get("id"), target)]
+        expected = condition["parent_id"] if after_write else condition["before_parent_id"]
+        actual = None
+        valid = len(rows) == len(identities) and len(owners) == len(targets) == 1 and _has_field(owners[0], name)
+        if valid:
+            value = _field_value(owners[0], name)
+            actual = None if _reference_value_is_null(value) else _reference_identity(value)
+            valid = ((actual is None and expected is None) or _same_identity(actual, expected)) and _same_identity(
+                _reference_identity(targets[0].get("parent")), condition["parent_id"])
+        info = _read_property_info(read, object_id=source, name=name)
+        valid = valid and _native_snapshot_equal(info.as_dict(), condition["controller_metadata"]) and _native_snapshot_equal(
+            dict(info.raw), condition["controller_native_metadata"])
+        assertions.append({"name": f"reference {condition['reference']} retains exact {name} parent scope", "passed": valid,
+            "evidence": {"expected_source_reference": expected, "actual_source_reference": actual,
+                "required_parent_id": condition["parent_id"], "rows": rows}})
+    return assertions
 
 
 def _require_reference_clear_allowed(
@@ -20948,6 +21958,10 @@ def _require_reference_clear_allowed(
             if item == "playable":
                 # A target classifier is unnecessary when no target remains.
                 continue
+            if item == "mustChildOf":
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "The native mustChildOf flag has no proven clear-operation semantics.",
+                    details={"reference": metadata.name, "restriction": dict(metadata.restriction)})
             raise OperationContractError(
                 "INVALID_METADATA",
                 "Reference restriction metadata contains an unknown string flag.",
@@ -21307,6 +22321,29 @@ def _reference_value_is_null(value: Any) -> bool:
         and identity.casefold()
         == "{00000000-0000-0000-0000-000000000000}"
     )
+
+
+def _reference_requirement_matches(row: Mapping[str, Any], name: str, expected: Any) -> bool:
+    if not _has_field(row, name):
+        return False
+    value = _field_value(row, name)
+    if expected is None:
+        return _reference_value_is_null(value)
+    actual = _reference_identity(value)
+    return isinstance(actual, str) and _PLUGIN_GUID.fullmatch(actual) is not None and _same_identity(actual, expected)
+
+
+def _native_snapshot_equal(actual: Any, expected: Any) -> bool:
+    """Keep native snapshot values exact while distinguishing Boolean scalars."""
+    if isinstance(actual, Mapping) and isinstance(expected, Mapping):
+        return actual.keys() == expected.keys() and all(
+            _native_snapshot_equal(actual[key], expected[key]) for key in actual
+        )
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _native_snapshot_equal(left, right) for left, right in zip(actual, expected)
+        )
+    return condition_values_equal(actual, expected)
 
 
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:

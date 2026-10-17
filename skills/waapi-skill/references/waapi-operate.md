@@ -46,7 +46,7 @@ Follow the sole `input_mode`, including Draft steps. Gateway owns native paths/t
 
 For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`; Gateway owns native construction. Configure defaults only when requested.
 
-Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. For dynamic fields, the returned `draft-discover-fields` scope also accepts `--list` (and returned `--page`) or `--selection` from that Draft/scope list; exact selection reads details and binds a Field Handle. `--meaning` remains an auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
+Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. Returned `draft-discover-fields` accepts `--list`/returned `--page`, or a same-Draft/scope `--selection` to read metadata and bind a Field Handle. Large fields expose `metadata_detail` pages and typed enum choices through `next_command`, preserving the resulting Draft revision. `--meaning` is auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
@@ -147,13 +147,11 @@ Unless a trusted caller supplied an override, omit `--state-dir`; the Gateway ow
 - `ask_before_changes`: present expected result/risk, say unchanged, and ask.
 - `allow_changes`: after Preview, announce the concrete impending change and continue.
 
-Preview's `policy_authorized` is separate durable authorization; no extra approval is needed.
-
-Prose covers objects, changes, results, risks and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands.
+`policy_authorized` is separate durable authorization; no extra approval.
 
 ## Continue only from Gateway-owned commands
 
-For every later phase, execute only the field named by `next_command.copy_instruction.source_field`, copying the complete string verbatim once. Windows normally selects `model_command`; encoded `shell_command` is audit/fallback unless explicitly selected. Do not render diagnostic `full_argv`. Truncated/incomplete instructions stop without inferred fallback.
+Later phases execute only the field named by `next_command.copy_instruction.source_field`, copying the complete string verbatim once. Windows normally selects `model_command`; encoded `shell_command` is audit/fallback unless explicitly selected. Do not render diagnostic `full_argv`. Truncated/incomplete instructions stop without inferred fallback.
 
 - a status/check request stops after `transaction-show`;
 - a clear confirmation follows returned confirm, execute, verify;
@@ -163,7 +161,7 @@ For every later phase, execute only the field named by `next_command.copy_instru
 
 `execution_in_progress`: no state change. Report busy; retry only in a later turn.
 
-The confirmation token binds the exact stored Preview. Never reconstruct/substitute it or run `confirm --help`. For ordered multi-transaction work, after the prior item reaches terminal verification, a successful `verify` immediately starts the next already-requested transaction in the same turn and stops only when its executable Preview is visible. Never infer, add, combine, reorder, or turn later items design-only.
+Confirmation binds the stored Preview; never reconstruct its token or run `confirm --help`. For ordered multi-transaction work, after the prior item reaches terminal verification, a successful `verify` immediately starts the next already-requested transaction in the same turn and stops only when its executable Preview is visible. Never infer, add, combine, reorder, or turn later items design-only.
 
 ## Terminal states
 
@@ -175,6 +173,8 @@ The confirmation token binds the exact stored Preview. Never reconstruct/substit
 - `indeterminate`: retain the unknown outcome. Follow the recovery receipt for independent read-only diagnosis within the existing task; never verify or replay the original write. Diagnosis does not grant new mutation authority.
 
 `ak.wwise.cli.migrate` ends at complete `execute`; run no later Agent tools/reads. Only the caller-owned harness outside the Skill sequence may reopen/prove it. Managed openers may leave cleanup uncertain; never synthesize code. Work Unit reversal and same-connection Undo stay explicit.
+
+Prose covers objects, changes, results, risks and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands.
 
 For an exact machine-readable answer, serialize the successful Gateway `agent_result` verbatim. Never fabricate a success projection from failed/deferred/indeterminate evidence.
 

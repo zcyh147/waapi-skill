@@ -27,6 +27,7 @@ from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyrig
 SUPPORTED_SELECTS = ("descendants", "ancestors", "referencesTo", "children", "parent")
 SUPPORTED_OPERATORS = ("=", "!=", "<", "<=", ">", ">=", ":")
 MAX_QUERY_TAKE = 1000
+MAX_QUERY_RETURN_SCOPE_BYTES = 512
 MUTATING_WORDS = ("set", "delete", "create", "import", "move", "rename")
 LEGACY_QUERY_KEYS = ("from", "transform")
 BUILTIN_ACCESSORS = {
@@ -119,6 +120,7 @@ def build_object_get_query(
     *,
     path: str | None = None,
     object_id: str | None = None,
+    object_ids: Sequence[str] | None = None,
     type: str | None = None,
     search: str | None = None,
     query: str | None = None,
@@ -126,6 +128,8 @@ def build_object_get_query(
     select: str | Sequence[str] | None = None,
     take: int | None = None,
     return_fields: Sequence[str] | None = None,
+    platform: str | None = None,
+    language: str | None = None,
     source_note_checker: Any | None = None,
     schema_validator: SemanticSchemaValidator | None = None,
     version: str = DEFAULT_WWISE_VERSION,
@@ -149,7 +153,15 @@ def build_object_get_query(
             details=source_note.as_dict(),
         )
 
-    source = _source_clause(path=path, object_id=object_id, type=type, search=search, query=query)
+    if object_ids is not None:
+        if (not 1 <= len(object_ids) <= MAX_STRUCTURED_SOURCE_ITEMS
+                or len(set(object_ids)) != len(object_ids)
+                or any(value is not None for value in (path, object_id, type, search, query))):
+            raise SemanticValidationError(SemanticErrorCode.AMBIGUOUS_OBJECT_IDENTITY,
+                "Resolved read candidates require 1..64 distinct canonical GUIDs and no other source.")
+        source = "from object " + ", ".join(_quote_literal(_object_guid_specifier(value)) for value in object_ids)
+    else:
+        source = _source_clause(path=path, object_id=object_id, type=type, search=search, query=query)
     clauses = [source]
     clauses.extend(_select_clauses(select))
     predicate_clause = _where_clause(where)
@@ -161,7 +173,7 @@ def build_object_get_query(
     waql = " ".join(part for part in clauses if part)
     _reject_mutating_waql(waql)
     args = {"waql": waql}
-    options = {"return": list(return_fields)}
+    options = {"return": list(return_fields), **query_return_scope_options(platform=platform, language=language)}
     validation = (schema_validator or SemanticSchemaValidator(version=version)).validate(OBJECT_GET_URI, args, options)
 
     envelope = SemanticEnvelope(
@@ -392,10 +404,13 @@ class AdvancedWaqlQueryBuilder:
         version: str = DEFAULT_WWISE_VERSION,
         source_note_checker: Any | None = None,
         schema_validator: SemanticSchemaValidator | None = None,
+        platform: str | None = None,
+        language: str | None = None,
     ) -> None:
         self.version = version
         self.source_note_checker = source_note_checker
         self.schema_validator = schema_validator
+        self.return_scope = query_return_scope_options(platform=platform, language=language)
 
     def build(self, request: Mapping[str, Any]) -> SemanticPreview:
         """Validate ``waapi-skill.advanced-object-query/v1`` and append its cap."""
@@ -444,7 +459,7 @@ class AdvancedWaqlQueryBuilder:
             )
 
         args = {"waql": bounded_waql}
-        options = {"return": list(return_expressions)}
+        options = {"return": list(return_expressions), **self.return_scope}
         validation = (
             self.schema_validator
             or SemanticSchemaValidator(version=self.version)
@@ -511,6 +526,8 @@ def build_advanced_object_get_query(
     version: str = DEFAULT_WWISE_VERSION,
     source_note_checker: Any | None = None,
     schema_validator: SemanticSchemaValidator | None = None,
+    platform: str | None = None,
+    language: str | None = None,
 ) -> SemanticPreview:
     """Build a dispatcher-ready, bounded native WAQL ``object.get`` preview."""
 
@@ -518,7 +535,23 @@ def build_advanced_object_get_query(
         version=version,
         source_note_checker=source_note_checker,
         schema_validator=schema_validator,
+        platform=platform,
+        language=language,
     ).build(request)
+
+
+def query_return_scope_options(*, platform: str | None = None, language: str | None = None) -> dict[str, str]:
+    """Compile two literal result-scope identities; never accept native options."""
+    result = {}
+    for key, value in (("platform", platform), ("language", language)):
+        if value is None:
+            continue
+        if (not isinstance(value, str) or not value or value != value.strip()
+                or len(value.encode("utf-8")) > MAX_QUERY_RETURN_SCOPE_BYTES
+                or any(ord(character) < 32 or ord(character) == 127 or character in {"\u2028", "\u2029"} for character in value)):
+            raise _structured_query_error(f"query {key} must be one trimmed literal name or GUID of at most {MAX_QUERY_RETURN_SCOPE_BYTES} UTF-8 bytes")
+        result[key] = value
+    return result
 
 
 def advanced_query_schema(

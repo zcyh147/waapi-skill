@@ -7084,12 +7084,20 @@ def _validate_heavy_v3_broker_records(
             else None
         )
         payload = record["payload"]
+        compact_policy_bound = (
+            expected_project_modification_policy is not None
+            and _validate_heavy_v3_compact_policy_binding(
+                payload, step=step, replay=replay, task_root=task_root,
+                skill_source=options.skill_source,
+                expected_policy=expected_project_modification_policy,
+            )
+        )
         _validate_heavy_v3_gateway_payload(
             payload,
             step=step,
             runner_exit_code=record.get("runner_exit_code"),
             expected_project_modification_policy=(
-                expected_project_modification_policy
+                None if compact_policy_bound else expected_project_modification_policy
             ),
         )
         if step.subcommand == "transaction-show":
@@ -7321,6 +7329,111 @@ def _validate_heavy_v3_broker_subscription_ack_record(
 
 def _canonical_sha256(value: Any) -> str:
     return hashlib.sha256(canonical_json_bytes(value)).hexdigest()
+
+
+def _validate_heavy_v3_compact_policy_binding(
+    payload: Mapping[str, Any], *, step: Any, replay: Any,
+    task_root: Path, skill_source: Path, expected_policy: str,
+) -> bool:
+    """Bind intentionally context-free public continuations to their own flow.
+
+    Gateway omits the already-issued introduction on successful Draft deltas
+    and transaction-show. The omission grants no policy or authority of its own.
+    Present contexts always go through the ordinary strict validator.
+    """
+    if "session_context" in payload:
+        return False
+    from tests.semantic.support.codex_draft_commands import DRAFT_GATEWAY_SUBCOMMANDS, DRAFT_START_SUBCOMMANDS
+    from wwise_waapi.config import load_effective_skill_config
+    from wwise_waapi.operation_drafts import load_operation_draft_archive_records, operation_draft_authority_digest
+    from wwise_waapi.transactions import load_transaction_archive_snapshot
+
+    draft_delta = step.subcommand in DRAFT_GATEWAY_SUBCOMMANDS - DRAFT_START_SUBCOMMANDS - {"preview-from-draft"}
+    transaction_review = step.subcommand == "transaction-show"
+    if not (draft_delta or transaction_review):
+        return False
+    if payload.get("ok") is not True or payload.get("command") != step.subcommand:
+        raise CampaignEvidenceError("context-free continuation is not an exact public success")
+    config_path = task_root / "broker" / "config" / "config.json"
+    try:
+        selected = load_effective_skill_config(skill_source, env={"WAAPI_SKILL_CONFIG_PATH": str(config_path)})
+        config = selected.config
+        if selected.source != "external" or config.project_modification_policy != expected_policy:
+            raise ValueError("saved task policy differs from the sealed policy")
+        connection = {"config_path": str(selected.external_path), "waapi_host": config.waapi_host,
+                      "waapi_port": config.waapi_port, "wwise_version": config.wwise_version}
+        state = task_root / "broker" / "state"
+        if draft_delta:
+            start = replay._draft_start_for_step(step)
+            source = replay._payloads_by_step.get(start.name)
+            if not isinstance(source, Mapping) or start.subcommand != "draft-start":
+                raise ValueError("compact Draft lacks its own validated start")
+            issued = source.get("draft")
+            if not isinstance(issued, Mapping):
+                raise ValueError("compact Draft lacks its issued binding")
+            draft_id = issued.get("draft_id")
+            authority = source.get("task_authority")
+            if not isinstance(draft_id, str) or not isinstance(authority, str):
+                raise ValueError("compact Draft lacks its issued authority")
+            durable = load_operation_draft_archive_records(state, (draft_id,))[draft_id]
+            binding = durable.connection_binding
+            response = payload.get("draft")
+            typed_read = payload.get("typed_request")
+            direct_read = (
+                step.subcommand == "draft-check" and response is None
+                and replay._operation_draft_step_is_read_only(step)
+                and isinstance(typed_read, Mapping)
+                and typed_read.get("contract") == "waapi-skill.typed-request/v1"
+                and typed_read.get("schema_digest") == issued.get("binding", {}).get("schema_digest")
+            )
+            if (not isinstance(binding, Mapping) or binding.get("configuration") != connection
+                    or durable.authority_digest != operation_draft_authority_digest(authority)
+                    or not (direct_read or (
+                        isinstance(response, Mapping)
+                        and response.get("contract") == "waapi-skill.operation-draft/v1"
+                        and response.get("draft_id") == draft_id and response.get("binding") == issued.get("binding")))):
+                raise ValueError("compact Draft does not preserve its own durable binding")
+            if step.subcommand == "draft-check" and not direct_read:
+                check = response.get("check")
+                revision = response.get("revision")
+                if (not isinstance(check, Mapping) or check.get("status") != "passed"
+                        or type(revision) is not int or check.get("source_revision") != revision - 1
+                        or not any(event.get("event_type") == "checked" and event.get("revision") == revision
+                                   for event in durable.audit)):
+                    raise ValueError("compact Draft check lacks its original checked transition")
+                if (isinstance(durable.check, Mapping)
+                        and durable.check.get("source_revision") == check.get("source_revision")
+                        and any(check.get(key) != durable.check.get(key)
+                                for key in ("checked_at", "source_revision", "request_digest"))):
+                    raise ValueError("compact Draft check differs from its durable check projection")
+        else:
+            transaction_id = payload.get("transaction_id")
+            if not isinstance(transaction_id, str):
+                raise ValueError("compact transaction review lacks its transaction")
+            transaction = load_transaction_archive_snapshot(state, transaction_id)
+            artifact = transaction.preview.artifact
+            sources = [candidate for candidate in replay._payloads_by_step.values()
+                       if candidate.get("command") == "preview-from-draft"
+                       and candidate.get("transaction_id") == transaction_id]
+            if len(sources) != 1:
+                raise ValueError("compact transaction review lacks its own validated Preview")
+            source = sources[0]
+            if (artifact.get("connection_configuration") != connection
+                    or payload.get("artifact_hash") != transaction.preview.artifact_hash
+                    or source.get("artifact_hash") != transaction.preview.artifact_hash
+                    or not isinstance(source.get("agent_result"), Mapping)
+                    or source["agent_result"].get("request") != artifact.get("request")):
+                raise ValueError("compact transaction review differs from its immutable Preview")
+        context = source.get("session_context")
+        if not isinstance(context, Mapping) or context.get("project_modification_policy") != config.project_modification_policy:
+            raise ValueError("compact continuation has no same-flow validated policy context")
+        endpoint = context.get("endpoint")
+        if (not isinstance(endpoint, Mapping) or endpoint.get("host") != config.waapi_host
+                or endpoint.get("port") != config.waapi_port or context.get("adapter_version") != config.wwise_version):
+            raise ValueError("compact continuation configuration differs from its own flow")
+    except Exception as exc:
+        raise CampaignEvidenceError(f"compact continuation policy binding is invalid: {exc}") from exc
+    return True
 
 
 def _validate_heavy_v3_gateway_payload(
