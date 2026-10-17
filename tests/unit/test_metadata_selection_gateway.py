@@ -124,13 +124,14 @@ class PropertyTask(FieldTask):
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-@pytest.mark.parametrize("operation,token", [
-    ("object.setProperty", "Volume"), ("object.setProperty", "NativeProperty" + "x" * 600),
-    ("object.setProperty", "声" * 300), ("object.setProperty", "NativeProperty" + "x" * 12000),
-    ("object.setReference", "OutputBus")],
-    ids=["ordinary", "long-ascii", "long-utf8", "paged-token", "reference-clear"])
+@pytest.mark.parametrize("operation,token,native_name_present", [
+    ("object.setProperty", "Volume", True), ("object.setProperty", "NativeProperty" + "x" * 600, True),
+    ("object.setProperty", "声" * 300, True), ("object.setProperty", "NativeProperty" + "x" * 12000, True),
+    ("object.setReference", "OutputBus", True),
+    ("object.setProperty", "Volume", False), ("object.setReference", "OutputBus", False)],
+    ids=["ordinary", "long-ascii", "long-utf8", "paged-token", "reference-clear", "property-name-absent", "reference-name-absent"])
 @pytest.mark.parametrize("drift", [None, "restriction", "type", "default-null", "unit", "postwrite-default"])
-def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: Path, version: str, operation: str, token: str, drift: str | None) -> None:
+def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: Path, version: str, operation: str, token: str, native_name_present: bool, drift: str | None) -> None:
     task = PropertyTask(tmp_path, version, operation)
     reference = operation == "object.setReference"
     before, after = ({"id": SECOND}, None) if reference else (0.0, -4)
@@ -139,6 +140,8 @@ def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: P
                                 "restriction": {"type": "range", "min": -96.3, "max": 12}}}
     if reference:
         task.metadata[token].update(type="Reference", restriction={"type": "reference", "restrictions": [{"type": ["Bus"]}]})
+    if not native_name_present:
+        task.metadata[token].pop("name")
     task.objects[FIRST].update({"name": "Alarm", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm", "@" + token: before})
     target = task.bind(FIRST)
     code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
@@ -146,6 +149,7 @@ def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: P
     code, detail = task.step("draft-discover-fields", "--object-handle", target,
                              "--selection", listed["agent_result"]["fields"][0]["selection"])
     assert code == 0, detail
+    assert ("name" in detail["field_candidates"][0]["metadata"]) is native_name_present
     code, declared = task.step("draft-declare-field-change", "--object-handle", target,
                               "--field-handle", detail["field_candidates"][0]["handle"],
                               *(["--clear-reference"] if reference else ["--business-value", "-4"]))
@@ -266,9 +270,12 @@ def test_selected_long_enum_label_can_be_inspected_and_declared(tmp_path: Path, 
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path: Path, version: str) -> None:
+@pytest.mark.parametrize("native_name_present", [True, False])
+def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path: Path, version: str, native_name_present: bool) -> None:
     task = FieldTask(tmp_path, version, "object.setProperty")
     task.metadata = {"Mode": {"name": "Mode", "default": 0}}
+    if not native_name_present:
+        task.metadata["Mode"].pop("name")
     target = task.bind(FIRST)
     code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
     assert code == 0, listed
@@ -282,13 +289,16 @@ def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path:
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_exact_draft_selection_reports_unavailable_scalar_type_without_claiming_bad_metadata(tmp_path, version):
+@pytest.mark.parametrize("native_name_present", [True, False])
+def test_exact_draft_selection_reports_unavailable_scalar_type_without_claiming_bad_metadata(tmp_path, version, native_name_present):
     task = FieldTask(tmp_path, version, "object.setProperty")
     target = task.bind(FIRST)
     code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
     assert code == 0, listed
     selection = listed["agent_result"]["fields"][0]["selection"]
     task.metadata["FadeTime"].pop("type")
+    if not native_name_present:
+        task.metadata["FadeTime"].pop("name")
     revision = task.revision
     code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
     assert code == 2, rejected
@@ -298,4 +308,39 @@ def test_exact_draft_selection_reports_unavailable_scalar_type_without_claiming_
     assert issue["unavailable_facts"] == ["type"]
     assert rejected["details"]["draft_changed"] is False
     assert task.revision == revision
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("operation", ["object.setProperty", "object.setReference"])
+@pytest.mark.parametrize("issue,error_code", [
+    ("null", "INVALID_LIVE_METADATA"), ("wrong-name", "LIVE_METADATA_NAME_MISMATCH"),
+    ("removed-from-inventory", "METADATA_SELECTION_SCOPE_CHANGED"),
+    ("removed-during-read", "METADATA_SELECTION_SCOPE_CHANGED")])
+def test_selected_field_never_replaces_missing_name_proof_with_null_or_unrelated_metadata(tmp_path, version, operation, issue, error_code):
+    class DropFieldAfterRead(PropertyTask):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri.endswith("getPropertyInfo"):
+                self.metadata.pop("Volume", None)
+            return result
+    task = (DropFieldAfterRead if issue == "removed-during-read" else PropertyTask)(tmp_path, version, operation)
+    task.metadata = {"Volume": {"name": "Volume", "type": "Real32"},
+                     "Unrelated": {"name": "Unrelated", "type": "Real32"}}
+    if operation == "object.setReference":
+        task.metadata["Volume"].update(type="Reference", restriction={"type": "reference", "restrictions": [{"type": ["Bus"]}]})
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    selection = next(row["selection"] for row in listed["agent_result"]["fields"] if row["name"] == "Volume")
+    revision, before = task.revision, len(task.calls)
+    if issue == "removed-from-inventory":
+        task.metadata.pop("Volume")
+    elif issue != "removed-during-read":
+        task.metadata["Volume"]["name"] = None if issue == "null" else "Unrelated"
+    code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 2 and rejected["error_code"] == error_code, rejected
+    assert task.revision == revision
+    reads = [args for uri, args, _ in task.calls[before:] if uri.endswith("getPropertyInfo")]
+    assert reads == ([] if issue == "removed-from-inventory" else [{"object": FIRST, "property": "Volume"}])
     assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)

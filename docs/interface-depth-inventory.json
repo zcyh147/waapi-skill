@@ -15235,271 +15235,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.query-object",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "short-id",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "short-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "short-id-kind",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "short-id-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "search-text",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "search-text"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "query-id",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "query-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "query-path-segment",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "query-path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "advanced-waql",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "advanced-waql"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "bounded_domain_expression"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "max-results",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "max-results"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "platform"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "language",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "language"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "include",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "include"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "include-field",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "include-field"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "predicate",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "predicate"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "match-original-file-path",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "match-original-file-path"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "relationship",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "relationship"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "view",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "view"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "detail",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "detail"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "07df023366dfc0bae9d7d063dc573b25f95ce3e1682f0dbb843855e56aff9521"
-    },
-    {
-      "model_values": [
-        {
           "channel": "request",
           "name": "actionType",
           "path": [
@@ -16868,6 +16603,59 @@
         }
       ],
       "sha256": "0b58305df0d035eabcf52c7e55827092c2b23222df541bb298416bff470346b4"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "business_declaration",
+          "name": "layout_handle",
+          "path": [
+            "business",
+            "layout_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "view_handle",
+          "path": [
+            "business",
+            "view_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "target_element_handle",
+          "path": [
+            "business",
+            "target_element_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "dock_side",
+          "path": [
+            "business",
+            "dock_side"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "0df7537fddd2fa8af68fcaa22c2651bb3ea732930f80a1f483deb21d489190db"
     },
     {
       "model_values": [
@@ -67615,6 +67403,47 @@
     {
       "model_values": [
         {
+          "channel": "business_declaration",
+          "name": "layout_handle",
+          "path": [
+            "business",
+            "layout_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "splitter_handle",
+          "path": [
+            "business",
+            "splitter_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "pixel_delta",
+          "path": [
+            "business",
+            "pixel_delta"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "731b3b732c732364e9d0df409e165b70f608d52cbaab542df97bcf9ab5be8d1c"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "exclusion",
           "path": [
@@ -78184,6 +78013,47 @@
         }
       ],
       "sha256": "82acbf1ecd23d1c76ab475e4cb249a83f8a67c7e3746b68d8f179f83687077c4"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "business_declaration",
+          "name": "layout_handle",
+          "path": [
+            "business",
+            "layout_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "new_layout_name",
+          "path": [
+            "business",
+            "new_layout_name"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "blueprint",
+          "path": [
+            "business",
+            "blueprint"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "846b52264b09c6bfefe8546c2fc6e078f10fec999cf79c19a2394652f4b2ba81"
     },
     {
       "model_values": [
@@ -118242,6 +118112,297 @@
     {
       "model_values": [
         {
+          "channel": "fixed.query-object",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "result-query",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "result-query"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "result-page",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "result-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "short-id",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "short-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "short-id-kind",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "short-id-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "search-text",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "search-text"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "query-id",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "query-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "query-path-segment",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "query-path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "advanced-waql",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "advanced-waql"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "bounded_domain_expression"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "max-results",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "max-results"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "platform"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "language",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "language"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-field",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-field"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "predicate",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "predicate"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "match-original-file-path",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "match-original-file-path"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "relationship",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "relationship"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "view",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "detail",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "detail"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "adfc01cf7682ff8de03650237b745596a57f1db1363ad2066a47f67f7f43d0ae"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "attenuationScalingFactor",
           "path": [
@@ -121950,35 +122111,6 @@
         }
       ],
       "sha256": "b0adc29a0a9921f10308098cb6bb61e8bb7a4af4c31c8bd4dda9d2b5b2aadeb7"
-    },
-    {
-      "model_values": [
-        {
-          "channel": "business_declaration",
-          "name": "layout_handle",
-          "path": [
-            "business",
-            "layout_handle"
-          ],
-          "required": true,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "channel": "business_declaration",
-          "name": "new_layout_name",
-          "path": [
-            "business",
-            "new_layout_name"
-          ],
-          "required": true,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "b21fd25ac6026fd9c0963d2e2f38383b4f774bb297202afd0bf54443663cae5a"
     },
     {
       "model_values": [
@@ -155804,9 +155936,9 @@
   "historical_baseline": {
     "construction_coverage_is_depth_evidence": false,
     "contract": "waapi-skill.typed-request-surface/v1",
-    "total_lanes": 874
+    "total_lanes": 878
   },
-  "inventory_sha256": "7da6e4ee9b2e149d45319b641d7df5768e8450b167a92edb17c1cec1c05275f0",
+  "inventory_sha256": "9071f0355b82516132a149d1d8f98b49cf165792483428e3c2f2921bb2e029be",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -157221,7 +157353,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "dbfeda29066c37573b73f77727ca22f0ec4ed3c43da8b7242da28b9d5cb4c4ef",
-      "field_contract_sha256": "07df023366dfc0bae9d7d063dc573b25f95ce3e1682f0dbb843855e56aff9521",
+      "field_contract_sha256": "adfc01cf7682ff8de03650237b745596a57f1db1363ad2066a47f67f7f43d0ae",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -161593,7 +161725,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "df0ea6e406d877a1e0fc0a35920b7b90f2cdd09142fff716af7e53ae69c55f52",
-      "field_contract_sha256": "07df023366dfc0bae9d7d063dc573b25f95ce3e1682f0dbb843855e56aff9521",
+      "field_contract_sha256": "adfc01cf7682ff8de03650237b745596a57f1db1363ad2066a47f67f7f43d0ae",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -166828,7 +166960,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "6a013055c2d2dfa80ea881ae9171fa2580a82d0a3b7186996a2dde43a722b812",
-      "field_contract_sha256": "07df023366dfc0bae9d7d063dc573b25f95ce3e1682f0dbb843855e56aff9521",
+      "field_contract_sha256": "adfc01cf7682ff8de03650237b745596a57f1db1363ad2066a47f67f7f43d0ae",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -173092,7 +173224,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "ed74be1d343f1b84c45c6066996954ad95bc8fdfaaea3d71f647a8c9cfc54211",
-      "field_contract_sha256": "07df023366dfc0bae9d7d063dc573b25f95ce3e1682f0dbb843855e56aff9521",
+      "field_contract_sha256": "adfc01cf7682ff8de03650237b745596a57f1db1363ad2066a47f67f7f43d0ae",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -176009,7 +176141,40 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_business",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "26ee1be1c4363d5f03cba481e719e07fd0b2b5b025ac5677372ef47dc4dd4603",
+      "field_contract_sha256": "0df7537fddd2fa8af68fcaa22c2651bb3ea732930f80a1f483deb21d489190db",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "3f8b83e28a1943a27487510cbb04f1df845d876ec4390ea994322d833e5772de",
+      "uri": "ak.wwise.ui.layout.dockView",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176043,7 +176208,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176077,7 +176242,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176111,7 +176276,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176145,7 +176310,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -176178,7 +176343,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176212,7 +176377,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176246,7 +176411,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -176280,7 +176445,40 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_business",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "ed6b7d37317f27ec0a0e0697c5fb842b5894697c666f417b06e10226548b0ad1",
+      "field_contract_sha256": "731b3b732c732364e9d0df409e165b70f608d52cbaab542df97bcf9ab5be8d1c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "6bde605bdb5c00386cfae03a1c482bf2e3f9b5d6c96040cec0639b1b271940b3",
+      "uri": "ak.wwise.ui.layout.moveSplitter",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -176313,7 +176511,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -176321,7 +176519,7 @@
       ],
       "disposition": "migration_required",
       "execution_policy_sha256": "94ba5d13c6331c039425a980a4424cfa8e6d6ded3983504c6445a2d25296f856",
-      "field_contract_sha256": "b21fd25ac6026fd9c0963d2e2f38383b4f774bb297202afd0bf54443663cae5a",
+      "field_contract_sha256": "846b52264b09c6bfefe8546c2fc6e078f10fec999cf79c19a2394652f4b2ba81",
       "host": "wwise-authoring",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -176346,7 +176544,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -176379,7 +176577,7 @@
       "version": "2024.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -180060,7 +180258,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "a6efce1e678b5b721a29b545d95ba3e3edb034283642600ceab67b3d9f5e64e7",
-      "field_contract_sha256": "07df023366dfc0bae9d7d063dc573b25f95ce3e1682f0dbb843855e56aff9521",
+      "field_contract_sha256": "adfc01cf7682ff8de03650237b745596a57f1db1363ad2066a47f67f7f43d0ae",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -183142,7 +183340,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -183175,7 +183373,40 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_business",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "8f2d6a9706f1ccdfce8665abf99b51532055860cfe4578845a60843b0751d6af",
+      "field_contract_sha256": "0df7537fddd2fa8af68fcaa22c2651bb3ea732930f80a1f483deb21d489190db",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "235b10653a6ded9e97b77cffb5f1ef8101b984f80647e926658535dfa203a40d",
+      "uri": "ak.wwise.ui.layout.dockView",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183209,7 +183440,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183243,7 +183474,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183277,7 +183508,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183311,7 +183542,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -183344,7 +183575,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183378,7 +183609,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183412,7 +183643,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_read",
       "continuation_commands": [
@@ -183446,7 +183677,40 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_business",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "b0df5ba59ed89703840589b86c6e751b4a78d43a134b79ae1109e7ac29ebd196",
+      "field_contract_sha256": "731b3b732c732364e9d0df409e165b70f608d52cbaab542df97bcf9ab5be8d1c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "6bde605bdb5c00386cfae03a1c482bf2e3f9b5d6c96040cec0639b1b271940b3",
+      "uri": "ak.wwise.ui.layout.moveSplitter",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -183479,7 +183743,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -183487,7 +183751,7 @@
       ],
       "disposition": "migration_required",
       "execution_policy_sha256": "2d7462c569f17fdcc2f1fc74ee80453c722f4b023526f2c081a8066bbd61b088",
-      "field_contract_sha256": "b21fd25ac6026fd9c0963d2e2f38383b4f774bb297202afd0bf54443663cae5a",
+      "field_contract_sha256": "846b52264b09c6bfefe8546c2fc6e078f10fec999cf79c19a2394652f4b2ba81",
       "host": "wwise-authoring",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -183512,7 +183776,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -183545,7 +183809,7 @@
       "version": "2025.1"
     },
     {
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
       "classification": "authoring-layout-partial",
       "construction_shape": "closed_business",
       "continuation_commands": [
@@ -189110,19 +189374,19 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "b3a27187d59ce2bd09ac99875b5bf539c9341faea3ed17b3dc36816a428c652d",
+    "gateway_parser_sha256": "00eb6373c2a043a7c2bc7e587cbbd12e16aabd0903704b231d051e43fe94a081",
     "operation_contract_sha256": "de138bb31b2c4ff5d79bbe706bc65b4dd6c544b920327bb7528b2fc62e042f08",
-    "public_continuation_sha256": "3d1b4f1bbf6a623638678e308be3ad4f417e537443cfa82fd2c1415405abb0ba",
-    "typed_request_surface_sha256": "341f0bc1f8ef9c56181985e4289cccfbdc5492c0f817de8da842331945677456"
+    "public_continuation_sha256": "ff994dd16e58f2c412a6014d9c2659d1ced776a30b436988745167322f8463e8",
+    "typed_request_surface_sha256": "5a60a7057fc4d526efd91b683018021ebe42840b3a37f99fbc7a059e76185259"
   },
   "summary": {
     "migration_ticket_families": 1,
     "native_dispositions": {
       "already_deep": 710,
-      "migration_required": 25,
+      "migration_required": 29,
       "prohibited_boundary": 139
     },
-    "native_lanes": 874,
+    "native_lanes": 878,
     "operation_dispositions": {
       "already_deep": 148,
       "prohibited_boundary": 5
@@ -189134,8 +189398,9 @@
     {
       "github_issue": 188,
       "id": "authoring-layout-partial",
-      "row_count": 25,
+      "row_count": 29,
       "rows": [
+        "2024.1|function|ak.wwise.ui.layout.dockView",
         "2024.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
         "2024.1|function|ak.wwise.ui.layout.getElementRectangle",
         "2024.1|function|ak.wwise.ui.layout.getLayout",
@@ -189144,11 +189409,13 @@
         "2024.1|function|ak.wwise.ui.layout.getViewHandle",
         "2024.1|function|ak.wwise.ui.layout.getViewInstances",
         "2024.1|function|ak.wwise.ui.layout.getViewTypes",
+        "2024.1|function|ak.wwise.ui.layout.moveSplitter",
         "2024.1|function|ak.wwise.ui.layout.removeLayout",
         "2024.1|function|ak.wwise.ui.layout.setLayout",
         "2024.1|function|ak.wwise.ui.layout.switchLayout",
         "2024.1|function|ak.wwise.ui.layout.undockView",
         "2025.1|function|ak.wwise.ui.layout.closeView",
+        "2025.1|function|ak.wwise.ui.layout.dockView",
         "2025.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
         "2025.1|function|ak.wwise.ui.layout.getElementRectangle",
         "2025.1|function|ak.wwise.ui.layout.getLayout",
@@ -189157,12 +189424,13 @@
         "2025.1|function|ak.wwise.ui.layout.getViewHandle",
         "2025.1|function|ak.wwise.ui.layout.getViewInstances",
         "2025.1|function|ak.wwise.ui.layout.getViewTypes",
+        "2025.1|function|ak.wwise.ui.layout.moveSplitter",
         "2025.1|function|ak.wwise.ui.layout.removeLayout",
         "2025.1|function|ak.wwise.ui.layout.setLayout",
         "2025.1|function|ak.wwise.ui.layout.switchLayout",
         "2025.1|function|ak.wwise.ui.layout.undockView"
       ],
-      "rows_sha256": "4c5da614772d3175743b3bbf32221910c785e46e36b1fee42b5bfb647f785233",
+      "rows_sha256": "9bfa4f48145a623a247b7341ab5175fea236f26aa9f729115afd50806e4e312f",
       "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence.",
       "title": "Complete ordinary Authoring layout business contracts and evidence"
     }

@@ -199,18 +199,32 @@ def test_platform_property_is_preflighted_dispatched_and_verified_with_same_plat
     field_read = next(call for call in reader.calls if call[2].get("return") == ["id", "path", "Volume"])
     assert field_read[2]["platform"] == "Mac"
 
+    verify_reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.get": [
+                {"return": [{"id": OBJECT_ID, "path": _object_row()["path"], "Volume": -6.0}]}
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "supports": {"randomizer": True, "rtpc": "Additive", "unlink": True},
+                }
+            ],
+        }
+    )
     verified = verify_prepared_operation(
         prepared,
         execution_result={"result": {}},
-        read_call=ScriptedReader(
-            {
-                "ak.wwise.core.object.get": [
-                    {"return": [{"id": OBJECT_ID, "path": _object_row()["path"], "Volume": -6.0}]}
-                ]
-            }
-        ),
+        read_call=verify_reader,
     )
     assert verified.ok
+    assert [call for call in verify_reader.calls if call[0] == "ak.wwise.core.object.getPropertyInfo"] == [
+        ("ak.wwise.core.object.getPropertyInfo", {"object": OBJECT_ID, "property": "Volume"}, {})
+    ]
+    assert [options for uri, _, options in verify_reader.calls if uri == "ak.wwise.core.object.get"] == [
+        {"return": ["id", "path", "Volume"], "platform": "Mac"}
+    ]
 
 
 def test_set_linked_uses_is_linked_for_prestate_and_postcondition() -> None:

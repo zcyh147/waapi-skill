@@ -4,7 +4,7 @@ This report is generated from the exact five-version public surface and the revi
 
 ## Exact coverage
 
-- Native function/Topic lanes: **874**
+- Native function/Topic lanes: **878**
 - Named-operation lanes: **153**
 - Migration families: **1**
 - Unowned migration rows: **0**
@@ -29,7 +29,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Family | Roll-up | Exact rows | Versions | Unique API/operation names | Row digest |
 | --- | ---: | ---: | --- | ---: | --- |
-| [`authoring-layout-partial`](https://github.com/zcyh147/waapi-skill/issues/188) | #188 | 25 | 2024.1, 2025.1 | 13 | `4c5da614772d3175743b3bbf32221910c785e46e36b1fee42b5bfb647f785233` |
+| [`authoring-layout-partial`](https://github.com/zcyh147/waapi-skill/issues/188) | #188 | 29 | 2024.1, 2025.1 | 15 | `9bfa4f48145a623a247b7341ab5175fea236f26aa9f729115afd50806e4e312f` |
 
 ## Completed migration family seals
 

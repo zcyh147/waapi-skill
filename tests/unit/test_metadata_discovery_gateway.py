@@ -11,6 +11,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.metadata_discovery import metadata_typed_value_type
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
+from tests.support.metadata_result_case_bank import metadata_result_cases
 
 
 SCRIPT_PATH = (
@@ -210,6 +211,68 @@ def _metadata_responses(
         GET_NAMES_URI: {"return": list(names)},
         GET_PROPERTY_INFO_URI: property_info,
     }
+
+
+@pytest.mark.parametrize("version,case_name,native", [
+    (version, name, native) for version in SUPPORTED_WWISE_VERSION_KEYS
+    for name, native in metadata_result_cases(version).items()],
+    ids=[version + "-" + name for version in SUPPORTED_WWISE_VERSION_KEYS
+         for name in metadata_result_cases(version)])
+def test_public_metadata_result_bank_preserves_each_selected_native_fact(tmp_path: Path, version: str, case_name: str, native: dict, request) -> None:
+    import os
+    observed_capture = {}
+    context_path = os.environ.get("WAAPI_METADATA_RESULT_BRANCH_CAPTURE_CONTEXT")
+    if context_path:
+        from tests.support.metadata_read_branch_evidence import load_metadata_capture, finish_metadata_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_metadata_capture(Path(context_path), request.node.nodeid, version, case_name)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_metadata_capture(capture, reports, observed_capture))
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.maintenance.branch_coverage_audit import digest
+    from wwise_waapi.native_catalog import load_native_catalog
+    catalog = load_native_catalog(version, "wwise-console")
+    schema = catalog["schemas"][GET_PROPERTY_INFO_URI]["resultSchema"]
+    completion.validate_native_alternative(SCRIPT_PATH.parents[3], {
+        "route": version + "|wwise-console|" + catalog["provenance"]["build"] + "|function|" + GET_PROPERTY_INFO_URI,
+        "pointer": "/resultSchema", "shape_sha256": digest(schema)}, native)
+    responses = _metadata_responses(tmp_path, version=version, names=("Volume", "Unrelated"))
+    def property_info(args, options):
+        assert args == {"object": OBJECT_GUID, "property": "Volume"} and options == {}
+        return native
+    responses[GET_PROPERTY_INFO_URI] = property_info
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--exact-id", OBJECT_GUID],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    selected = next(row for row in listed["agent_result"]["fields"] if row["name"] == "Volume")
+    argv = ["metadata", "detail", "--exact-id", OBJECT_GUID, "--selection", selected["selection"]]
+    code, detail = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    observed = detail["agent_result"]["metadata"]
+    assert {key: observed[key] for key in native} == native
+    assert set(observed) == set(native) | {"unit", "availability"}
+    unit = native.get("ui", {}).get("dataMeaning")
+    assert observed["unit"] == {"status": "unknown" if unit in {None, "None"} else "known",
+                                "value": None if unit in {None, "None"} else unit}
+    assert observed["availability"] == {key: "known" if key in native else "unknown"
+        for key in ("type", "default", "restriction", "dependencies", "supports", "ui")}
+    assert detail["agent_result"]["complete"] is True
+    assert len(json.dumps(detail, ensure_ascii=False, indent=2).encode()) < 64 * 1024
+    assert [args for uri, args, _ in client.calls if uri == GET_PROPERTY_INFO_URI] == [
+        {"object": OBJECT_GUID, "property": "Volume"}]
+    from tests.support.media_pool_branch_evidence import public_read_observation
+    native_call = next(call for call in client.calls if call[0] == GET_PROPERTY_INFO_URI)
+    observed_capture.update(public_read_observation(gateway_argv=argv, exit_code=code, payload=detail,
+        uri=native_call[0], args=native_call[1], options=native_call[2], result=native))
+    # A surviving unrelated field must never replace this exact lost selection.
+    client.responses[GET_NAMES_URI] = {"return": ["Unrelated"]}
+    rejected_code, rejected = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert rejected_code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
+    dispatch_count = sum(uri == GET_PROPERTY_INFO_URI for uri, _, _ in client.calls)
+    assert dispatch_count == 1
+    observed_capture.update(native_metadata_dispatch_count=dispatch_count,
+        rejected_read={"argv": argv, "exit_code": rejected_code, "payload": rejected})
 
 
 def _metadata_command_platform(monkeypatch, platform: str) -> None:

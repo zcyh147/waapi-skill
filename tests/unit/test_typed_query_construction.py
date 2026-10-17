@@ -454,7 +454,10 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
     assert code == 0, json.dumps(take, sort_keys=True)
     assert payload["input_shape"] == "business_declaration"
     assert payload["continuation"]["subcommand"] == "query-object"
-    assert "json" not in json.dumps(payload).casefold()
+    # Output may describe lossless JSON entries. The input continuation must
+    # still expose only the closed business flags, never caller-authored JSON.
+    assert "json" not in json.dumps(payload["continuation"]).casefold()
+    assert "lossless JSON entries" in payload["result_presence"]["delivery"]["large_observation"]
     if advanced:
         assert {
             key: value

@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "341f0bc1f8ef9c56181985e4289cccfbdc5492c0f817de8da842331945677456",
+  "inventory_sha256": "5a60a7057fc4d526efd91b683018021ebe42840b3a37f99fbc7a059e76185259",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -27949,6 +27949,160 @@
       "version": "2024.1"
     },
     {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
+            "dock_side": "enum:left,right,top,bottom",
+            "layout_handle": "scoped_layout_handle",
+            "target_element_handle": "scoped_element_handle",
+            "view_handle": "scoped_view_handle"
+          },
+          "input_forms": {
+            "dock_side": {
+              "gateway_flag": "--dock-side",
+              "shape": "scalar"
+            },
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "target_element_handle": {
+              "gateway_flag": "--target-element-handle",
+              "shape": "scalar"
+            },
+            "view_handle": {
+              "gateway_flag": "--view-handle",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [],
+          "public_fields": [
+            "layout_handle",
+            "view_handle",
+            "target_element_handle",
+            "dock_side"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "view_handle",
+            "target_element_handle",
+            "dock_side"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "native name from session-bound handle",
+          "native request envelope",
+          "current-layout verifier"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.dockView",
+        "responsibility_split": {
+          "agent": [
+            "choose a discovered view, target element and exact docking side"
+          ],
+          "gateway": [
+            "revalidate both identities in the current layout",
+            "dock or redock once without an extra undock write",
+            "verify the same view and exact target-relative side"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.dockView"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "kind": "authoring-layout-state",
+          "observation": "independent exact docked topology, order, orientation and target-relative rectangles",
+          "unresolved_native_effects": [
+            "owned native characterization of target-kind topology semantics",
+            "omitted or nonpositive target rectangles"
+          ]
+        },
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.dockView",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "26ee1be1c4363d5f03cba481e719e07fd0b2b5b025ac5677372ef47dc4dd4603",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 2,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "enum",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "3f8b83e28a1943a27487510cbb04f1df845d876ec4390ea994322d833e5772de",
+      "uri": "ak.wwise.ui.layout.dockView",
+      "version": "2024.1"
+    },
+    {
       "business_read_contract": {
         "api": "ak.wwise.ui.layout.getCurrentLayoutName",
         "business_fields": {},
@@ -28767,6 +28921,151 @@
         "contract": "waapi-skill.authoring-layout-business/v1",
         "declaration": {
           "field_types": {
+            "layout_handle": "scoped_layout_handle",
+            "pixel_delta": "integer",
+            "splitter_handle": "scoped_element_handle"
+          },
+          "input_forms": {
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "pixel_delta": {
+              "gateway_flag": "--pixel-delta",
+              "shape": "integer"
+            },
+            "splitter_handle": {
+              "gateway_flag": "--splitter-handle",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [],
+          "public_fields": [
+            "layout_handle",
+            "splitter_handle",
+            "pixel_delta"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "splitter_handle",
+            "pixel_delta"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "native name from session-bound handle",
+          "native request envelope",
+          "current-layout verifier",
+          "movement axis from the discovered parent stack orientation"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.moveSplitter",
+        "responsibility_split": {
+          "agent": [
+            "choose a discovered splitter and signed pixel displacement"
+          ],
+          "gateway": [
+            "revalidate the exact splitter in the current layout",
+            "derive the movement axis from its parent stack",
+            "freeze the exact rectangle",
+            "move once after authorization",
+            "verify the exact displacement, size and perpendicular coordinates"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.moveSplitter"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "clipped_or_incomplete_effect": "not_verified; never replay the movement",
+          "kind": "authoring-layout-state",
+          "observation": "independent exact splitter rectangle delta and parent axis"
+        },
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.moveSplitter",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "ed6b7d37317f27ec0a0e0697c5fb842b5894697c666f417b06e10226548b0ad1",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 0,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "6bde605bdb5c00386cfae03a1c482bf2e3f9b5d6c96040cec0639b1b271940b3",
+      "uri": "ak.wwise.ui.layout.moveSplitter",
+      "version": "2024.1"
+    },
+    {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
             "layout_handle": "scoped_layout_handle"
           },
           "input_forms": {
@@ -28892,13 +29191,152 @@
           "role_required": false,
           "roles": []
         },
+        "blueprint_schema": {
+          "additionalProperties": false,
+          "gateway_bounds": {
+            "draft_seal_frame_reserve_bytes": 32768,
+            "maximum_business_input_utf8_bytes": 114688,
+            "maximum_depth": 14,
+            "maximum_readback_utf8_bytes": 262144,
+            "maximum_rendered_terminal_request_utf8_bytes": 262144,
+            "maximum_serialized_layout_utf8_bytes": 114688,
+            "maximum_terminal_stdout_utf8_bytes": 286720,
+            "readback_frame_reserve_bytes": 147456,
+            "terminal_capacity_scope": "exact closed setLayout blueprint only; ordinary terminal budget remains 24 KiB"
+          },
+          "properties": {
+            "contract": {
+              "const": "waapi-skill.layout-blueprint/v1"
+            },
+            "nodes": {
+              "items": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "children": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                          "type": "string"
+                        },
+                        "maxItems": 128,
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "stack"
+                      },
+                      "label": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "orientation": {
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "label",
+                      "orientation",
+                      "children"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "view"
+                      },
+                      "selection_channel": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "view_type": {
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "view_type",
+                      "selection_channel"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "maxItems": 128,
+              "minItems": 1,
+              "type": "array"
+            },
+            "root": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+              "type": "string"
+            },
+            "workspace_name": {
+              "description": "Name inside the layout document; distinct from its temporary lookup name. Omission uses the lookup name.",
+              "maxLength": 4096,
+              "pattern": "^[^\\u0000]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "contract",
+            "root",
+            "nodes"
+          ],
+          "type": "object"
+        },
         "contract": "waapi-skill.authoring-layout-business/v1",
         "declaration": {
           "field_types": {
+            "blueprint": "closed_layout_blueprint",
             "layout_handle": "scoped_layout_handle",
             "new_layout_name": "new_temporary_layout_name"
           },
           "input_forms": {
+            "blueprint": {
+              "gateway_flag": "--blueprint",
+              "shape": "json"
+            },
             "layout_handle": {
               "gateway_flag": "--layout-handle",
               "shape": "scalar"
@@ -28908,10 +29346,13 @@
               "shape": "scalar"
             }
           },
-          "optional_fields": [],
+          "optional_fields": [
+            "blueprint"
+          ],
           "public_fields": [
             "layout_handle",
-            "new_layout_name"
+            "new_layout_name",
+            "blueprint"
           ],
           "required_fields": [
             "layout_handle",
@@ -28937,7 +29378,7 @@
           ],
           "gateway": [
             "prove exact target absence",
-            "construct empty layout declaration",
+            "compile the closed optional nested blueprint with frozen generated identities",
             "bind to the discovered Authoring session",
             "register once after authorization",
             "read back the registered layout"
@@ -38755,6 +39196,160 @@
       "version": "2025.1"
     },
     {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
+            "dock_side": "enum:left,right,top,bottom",
+            "layout_handle": "scoped_layout_handle",
+            "target_element_handle": "scoped_element_handle",
+            "view_handle": "scoped_view_handle"
+          },
+          "input_forms": {
+            "dock_side": {
+              "gateway_flag": "--dock-side",
+              "shape": "scalar"
+            },
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "target_element_handle": {
+              "gateway_flag": "--target-element-handle",
+              "shape": "scalar"
+            },
+            "view_handle": {
+              "gateway_flag": "--view-handle",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [],
+          "public_fields": [
+            "layout_handle",
+            "view_handle",
+            "target_element_handle",
+            "dock_side"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "view_handle",
+            "target_element_handle",
+            "dock_side"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "native name from session-bound handle",
+          "native request envelope",
+          "current-layout verifier"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.dockView",
+        "responsibility_split": {
+          "agent": [
+            "choose a discovered view, target element and exact docking side"
+          ],
+          "gateway": [
+            "revalidate both identities in the current layout",
+            "dock or redock once without an extra undock write",
+            "verify the same view and exact target-relative side"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.dockView"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "kind": "authoring-layout-state",
+          "observation": "independent exact docked topology, order, orientation and target-relative rectangles",
+          "unresolved_native_effects": [
+            "owned native characterization of target-kind topology semantics",
+            "omitted or nonpositive target rectangles"
+          ]
+        },
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.dockView",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "8f2d6a9706f1ccdfce8665abf99b51532055860cfe4578845a60843b0751d6af",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 2,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "enum",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "235b10653a6ded9e97b77cffb5f1ef8101b984f80647e926658535dfa203a40d",
+      "uri": "ak.wwise.ui.layout.dockView",
+      "version": "2025.1"
+    },
+    {
       "business_read_contract": {
         "api": "ak.wwise.ui.layout.getCurrentLayoutName",
         "business_fields": {},
@@ -39573,6 +40168,151 @@
         "contract": "waapi-skill.authoring-layout-business/v1",
         "declaration": {
           "field_types": {
+            "layout_handle": "scoped_layout_handle",
+            "pixel_delta": "integer",
+            "splitter_handle": "scoped_element_handle"
+          },
+          "input_forms": {
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "pixel_delta": {
+              "gateway_flag": "--pixel-delta",
+              "shape": "integer"
+            },
+            "splitter_handle": {
+              "gateway_flag": "--splitter-handle",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [],
+          "public_fields": [
+            "layout_handle",
+            "splitter_handle",
+            "pixel_delta"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "splitter_handle",
+            "pixel_delta"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "native name from session-bound handle",
+          "native request envelope",
+          "current-layout verifier",
+          "movement axis from the discovered parent stack orientation"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.moveSplitter",
+        "responsibility_split": {
+          "agent": [
+            "choose a discovered splitter and signed pixel displacement"
+          ],
+          "gateway": [
+            "revalidate the exact splitter in the current layout",
+            "derive the movement axis from its parent stack",
+            "freeze the exact rectangle",
+            "move once after authorization",
+            "verify the exact displacement, size and perpendicular coordinates"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.moveSplitter"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "clipped_or_incomplete_effect": "not_verified; never replay the movement",
+          "kind": "authoring-layout-state",
+          "observation": "independent exact splitter rectangle delta and parent axis"
+        },
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.moveSplitter",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "b0df5ba59ed89703840589b86c6e751b4a78d43a134b79ae1109e7ac29ebd196",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 0,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "6bde605bdb5c00386cfae03a1c482bf2e3f9b5d6c96040cec0639b1b271940b3",
+      "uri": "ak.wwise.ui.layout.moveSplitter",
+      "version": "2025.1"
+    },
+    {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
             "layout_handle": "scoped_layout_handle"
           },
           "input_forms": {
@@ -39698,13 +40438,152 @@
           "role_required": false,
           "roles": []
         },
+        "blueprint_schema": {
+          "additionalProperties": false,
+          "gateway_bounds": {
+            "draft_seal_frame_reserve_bytes": 32768,
+            "maximum_business_input_utf8_bytes": 114688,
+            "maximum_depth": 14,
+            "maximum_readback_utf8_bytes": 262144,
+            "maximum_rendered_terminal_request_utf8_bytes": 262144,
+            "maximum_serialized_layout_utf8_bytes": 114688,
+            "maximum_terminal_stdout_utf8_bytes": 286720,
+            "readback_frame_reserve_bytes": 147456,
+            "terminal_capacity_scope": "exact closed setLayout blueprint only; ordinary terminal budget remains 24 KiB"
+          },
+          "properties": {
+            "contract": {
+              "const": "waapi-skill.layout-blueprint/v1"
+            },
+            "nodes": {
+              "items": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "children": {
+                        "items": {
+                          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                          "type": "string"
+                        },
+                        "maxItems": 128,
+                        "type": "array",
+                        "uniqueItems": true
+                      },
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "stack"
+                      },
+                      "label": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "orientation": {
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "label",
+                      "orientation",
+                      "children"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "height": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "key": {
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "view"
+                      },
+                      "selection_channel": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "view_type": {
+                        "maxLength": 4096,
+                        "minLength": 1,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      },
+                      "width": {
+                        "maxLength": 4096,
+                        "pattern": "^[^\\u0000]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "kind",
+                      "view_type",
+                      "selection_channel"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "maxItems": 128,
+              "minItems": 1,
+              "type": "array"
+            },
+            "root": {
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$",
+              "type": "string"
+            },
+            "workspace_name": {
+              "description": "Name inside the layout document; distinct from its temporary lookup name. Omission uses the lookup name.",
+              "maxLength": 4096,
+              "pattern": "^[^\\u0000]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "contract",
+            "root",
+            "nodes"
+          ],
+          "type": "object"
+        },
         "contract": "waapi-skill.authoring-layout-business/v1",
         "declaration": {
           "field_types": {
+            "blueprint": "closed_layout_blueprint",
             "layout_handle": "scoped_layout_handle",
             "new_layout_name": "new_temporary_layout_name"
           },
           "input_forms": {
+            "blueprint": {
+              "gateway_flag": "--blueprint",
+              "shape": "json"
+            },
             "layout_handle": {
               "gateway_flag": "--layout-handle",
               "shape": "scalar"
@@ -39714,10 +40593,13 @@
               "shape": "scalar"
             }
           },
-          "optional_fields": [],
+          "optional_fields": [
+            "blueprint"
+          ],
           "public_fields": [
             "layout_handle",
-            "new_layout_name"
+            "new_layout_name",
+            "blueprint"
           ],
           "required_fields": [
             "layout_handle",
@@ -39743,7 +40625,7 @@
           ],
           "gateway": [
             "prove exact target absence",
-            "construct empty layout declaration",
+            "compile the closed optional nested blueprint with frozen generated identities",
             "bind to the discovered Authoring session",
             "register once after authorization",
             "read back the registered layout"
@@ -43268,10 +44150,10 @@
     }
   },
   "totals": {
-    "function_lanes": 714,
+    "function_lanes": 718,
     "topic_lanes": 160,
-    "total_lanes": 874,
-    "unique_function_uris": 181,
+    "total_lanes": 878,
+    "unique_function_uris": 183,
     "unique_topic_uris": 35
   },
   "unknown_schema_keywords": [],

@@ -45,9 +45,10 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
     LAYOUT_READS, LAYOUT_READ_URIS, LAYOUT_VERSIONS, MAX_LAYOUT_RESULT_BYTES,
     layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
 )
+from wwise_waapi.layout_blueprint import validate_blueprint  # noqa: E402
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor, validate_layout_call,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -259,6 +260,7 @@ from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[repo
 )
 from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_CONTRACT,
+    MAX_OPERATION_DRAFT_EVIDENCE_BYTES,
     OperationDraftBindingDrift,
     OperationDraftCheckRequired,
     OperationDraftNotAvailable,
@@ -704,6 +706,12 @@ TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
 # canonical digest that binds the projection to the journal evidence.
 # Projection is intentionally delayed until transport cleanup succeeds.
 TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
+# Closed layout constructors retain their exact sealed request in agent_result.
+# Their exceptional capacity is bounded by the existing Draft seal ceiling plus
+# the ordinary terminal framing allowance, always below the global result cap.
+LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES = (
+    MAX_OPERATION_DRAFT_EVIDENCE_BYTES + TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+)
 TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
 TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES = 12 * 1024
 TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT = (
@@ -1875,6 +1883,8 @@ def build_parser() -> argparse.ArgumentParser:
         take=None,
         all_results=False,
     )
+    query_object.add_argument("--result-query", help="Copy the Gateway-issued bounded query read handle")
+    query_object.add_argument("--result-page", help="Copy the exact-result projection continuation")
     query_source.add_argument("--exact-id", dest="object_id")
     query_source.add_argument("--short-id", type=int, help="Read candidates for one unsigned 32-bit Short ID; never a mutation identity")
     from wwise_waapi.short_id_query_sources import SHORT_ID_KIND_CODES
@@ -2628,6 +2638,11 @@ def build_parser() -> argparse.ArgumentParser:
     draft_layout_plan.add_argument("--view-handle")
     draft_layout_plan.add_argument("--position-x", type=int)
     draft_layout_plan.add_argument("--position-y", type=int)
+    draft_layout_plan.add_argument("--blueprint")
+    draft_layout_plan.add_argument('--splitter-handle')
+    draft_layout_plan.add_argument('--pixel-delta', type=int)
+    draft_layout_plan.add_argument('--target-element-handle')
+    draft_layout_plan.add_argument('--dock-side', choices=('left', 'right', 'top', 'bottom'))
     draft_layout_plan.add_argument('--view-type')
     draft_layout_plan.add_argument('--initial-x', type=int)
     draft_layout_plan.add_argument('--initial-y', type=int)
@@ -3430,7 +3445,8 @@ def _execute_gateway_unconstrained(
     client_factory: ClientFactory | None = None,
     stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    args = build_parser().parse_args(argv)
+    original_argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(original_argv)
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
@@ -3497,6 +3513,23 @@ def _execute_gateway_unconstrained(
                 "stream-topic requires a live record sink; use the gateway CLI "
                 "entry point so every streamed record remains observable."
             )
+        if args.command == "query-object":
+            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore
+            if args.result_query is not None or args.result_page is not None:
+                if args.result_query is None or args.result_page is None:
+                    raise GatewayInputError("Query projection requires both returned --result-query and --result-page")
+                expected = build_parser().parse_args(["query-object", "--result-query", args.result_query, "--result-page", args.result_page])
+                expected.state_dir = args.state_dir
+                if vars(expected) != vars(args):
+                    raise GatewayInputError("A query result continuation accepts only its returned handle/page and existing state directory")
+                record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                handle, page = args.result_query, args.result_page
+                original_argv = record["plan"]["argv"]
+                args = build_parser().parse_args(original_argv)
+                if args.command != "query-object":
+                    raise GatewayInputError("Stored read is not an object query")
+                args.result_query, args.result_page, args.result_record = handle, page, record
+            args.original_query_argv = original_argv
         require_persisted_connection_binding(args, env=source_env)
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
@@ -6198,6 +6231,11 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"{args.command} --event-count must be between 1 and "
                 f"{MAX_WAIT_EVENT_COUNT}"
             )
+    elif args.command == 'draft-declare-layout-plan' and args.blueprint is not None:
+        try:
+            validate_blueprint(parse_json_object(args.blueprint, '--blueprint', max_document_bytes=256 * 1024))
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     elif args.command == "draft-apply":
         # The authorized Draft binding decides the operation-local typed
         # Composer grammar. Dispatch performs that state-bound decision before
@@ -11525,6 +11563,8 @@ def dispatch_soundengine_business_read(
         except RuntimeGameObjectHandleError as exc:
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "handle_kind": "game_object", "handle": handle,
+                    "required_identity": "live scoped runtime game object", "operation_dispatched": False},
                 error_code=exc.error_code,
             ) from exc
         native_args["gameObject"] = game_object_record.game_object_id
@@ -11705,18 +11745,22 @@ def dispatch_core_business_read(
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     by_id: dict[str, Mapping[str, Any]] = {}
-    for row in rows:
+    for row_index, row in enumerate(rows):
         try:
             identity = normalize_live_object_identity(row)
         except ValueError as exc:
             raise GatewayResultShapeError(
                 "Core business identity row is malformed.",
+                details={"api": args.api, "reason": "malformed_identity", "row_index": row_index,
+                    "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             ) from exc
         key = identity.object_id
         if key in by_id:
             raise GatewayResultShapeError(
                 "Core business identity read returned a duplicate object.",
+                details={"api": args.api, "reason": "duplicate_identity", "row_index": row_index,
+                    "object_id": key, "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             )
         by_id[key] = {
@@ -11729,6 +11773,8 @@ def dispatch_core_business_read(
     if set(by_id) != {value.upper() for value in requested.values()}:
         raise GatewayResultShapeError(
             "Core business identity read did not match the requested objects.",
+            details={"api": args.api, "reason": "identity_set_mismatch", "requested_ids": list(requested.values()),
+                "actual_ids": sorted(by_id), "operation_dispatched": False},
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     authority = "da1-" + canonical_sha256(
@@ -11924,6 +11970,9 @@ def dispatch_runtime_inspection_business_read(
         except RuntimeInspectionBusinessError as exc:  # pragma: no cover - store invariant
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "transport_handle": transport_record.handle,
+                    "binding_stage": "materialize_stored_transport_binding", "cause_type": type(exc).__name__,
+                    "operation_dispatched": False},
                 error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
             ) from exc
     else:
@@ -13253,6 +13302,8 @@ def _source_control_roots_from_project(
     if not isinstance(directories, Mapping):
         raise GatewayResultShapeError(
             "Live project information lacks source-control directory roots.",
+            details={"reason": "directory_map_missing", "required_fields": ["directories.root", "directories.originals"],
+                "actual_directories_type": type(directories).__name__, "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     project_root = directories.get("root")
@@ -13263,6 +13314,9 @@ def _source_control_roots_from_project(
     ):
         raise GatewayResultShapeError(
             "Live project information contains invalid source-control roots.",
+            details={"reason": "directory_roots_invalid", "required_fields": ["directories.root", "directories.originals"],
+                "invalid_fields": ["directories." + key for key, value in (("root", project_root), ("originals", originals_root))
+                    if not isinstance(value, str) or not value], "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     return {
@@ -13386,6 +13440,12 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         plan['new_layout_name'] = args.new_layout_name
     elif args.new_layout_name is not None:
         raise GatewayInputError('--new-layout-name belongs only to temporary layout registration')
+    blueprint = None
+    if args.blueprint is not None:
+        if pending.operation != LAYOUT_SET_URI:
+            raise GatewayInputError('Nested blueprint belongs only to temporary layout registration')
+        blueprint = validate_blueprint(parse_json_object(args.blueprint, '--blueprint', max_document_bytes=256 * 1024))
+        plan['blueprint'] = blueprint
     view_request = None
     if pending.operation == LAYOUT_GET_OR_CREATE_URI:
         view_request = {'view_type': args.view_type}
@@ -13396,7 +13456,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
     elif args.view_type is not None or args.initial_x is not None or args.initial_y is not None:
         raise GatewayInputError('View type and initial coordinates belong only to get-or-create-view')
     view_identity = None
-    if pending.operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+    if pending.operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
         view_identity = resolve_layout_identity(args.view_handle, role='view', context=context, args=args,
             env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
         if view_identity['layout_name'] != identity['layout_name']:
@@ -13410,13 +13470,34 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         plan.update(position_request)
     elif args.position_x is not None or args.position_y is not None:
         raise GatewayInputError('Floating positions belong only to the undock-view plan')
+    target_identity = None
+    dock_request = None
+    if pending.operation == LAYOUT_DOCK_URI:
+        target_identity = resolve_layout_identity(args.target_element_handle, role='element', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        dock_request = {'dock_side': args.dock_side}
+        plan.update(target_element_handle=args.target_element_handle, **dock_request)
+    elif args.target_element_handle is not None or args.dock_side is not None:
+        raise GatewayInputError('Target element and docking side belong only to dock-view')
+    splitter_identity = None
+    splitter_request = None
+    if pending.operation == LAYOUT_SPLITTER_URI:
+        splitter_identity = resolve_layout_identity(args.splitter_handle, role='element', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        splitter_request = {'pixel_delta': args.pixel_delta}
+        plan.update(splitter_handle=args.splitter_handle, **splitter_request)
+    elif args.splitter_handle is not None or args.pixel_delta is not None:
+        raise GatewayInputError('Splitter identity and pixel displacement belong only to move-splitter')
     settings = {'authoring_layout_plan': plan,
                 'authoring_layout_binding': layout_binding_descriptor(identity,
                     registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None,
-                    view_request=view_request, view_identity=view_identity, position_request=position_request)}
+                    view_request=view_request, view_identity=view_identity, position_request=position_request,
+                    target_identity=target_identity, dock_request=dock_request,
+                    splitter_identity=splitter_identity, splitter_request=splitter_request, blueprint=blueprint)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
-        adapter.materialize(candidate)
+        materialized = adapter.materialize(candidate)
+        layout_blueprint_terminal_budget(materialized)
         return candidate
     record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
         expected_revision=args.expected_revision,
@@ -13512,8 +13593,12 @@ def dispatch_command(
             connection=connection, version=detected_version)
         instances = read_layout_observation('instances', {'name': args.layout_name}, dispatcher=dispatcher,
             connection=connection, version=detected_version)
-        if not isinstance(layout.get('Layout'), Mapping) or layout['Layout']['Name'] != args.layout_name:
-            raise GatewayInputError("Native layout name does not match the requested identity; no handles issued")
+        workspace = layout.get('Layout')
+        if not isinstance(workspace, Mapping) or not isinstance(workspace.get('Name'), str):
+            raise GatewayInputError('Layout contents are unavailable; no identity handles issued')
+        # The lookup name selects getLayout; serialized Layout.Name is a separate
+        # workspace name (the matching SDK documents divergent values). Retain
+        # that exact observed document in the capability, without equating names.
         try:
             elements, views = layout_identity_rows(layout, instances)
             store = LayoutHandleStore(resolve_transaction_state_directory(args, env=env))
@@ -13529,7 +13614,8 @@ def dispatch_command(
             element_handles, view_handles = issue(elements, 'element'), issue(views, 'view')
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
-        projection = {'layout_name': args.layout_name, 'layout_handle': layout_handle,
+        projection = {'layout_name': args.layout_name, 'workspace_name': workspace['Name'],
+                      'layout_handle': layout_handle,
                       'elements': element_handles, 'views': view_handles}
         return {**common, 'ok': True, 'status': 'ok', 'complete': True, 'truncated': False,
                 **projection, 'identity_lifetime_seconds': 900, 'agent_result': projection}
@@ -14582,6 +14668,13 @@ def dispatch_command(
             "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "query-object":
+        if getattr(args, "result_record", None) is not None:
+            context = _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info)
+            if context != args.result_record["context"]:
+                raise GatewayResultShapeError("Query configuration, project or host session changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
             envelope = advanced_preview.envelope
@@ -14614,7 +14707,7 @@ def dispatch_command(
                 if result.get("ok")
                 else None
             )
-            return {
+            query_payload = {
                 "ok": bool(result.get("ok")),
                 "status": "ok" if result.get("ok") else "error",
                 **common,
@@ -14639,6 +14732,9 @@ def dispatch_command(
                 ),
                 "agent_result": business_rows if result.get("ok") else None,
             }
+            return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+                env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
+                common=common, live_info=live_info)
         if original_file_reference_match_requested(args):
             return dispatch_original_file_reference_match(
                 args,
@@ -14678,6 +14774,10 @@ def dispatch_command(
             dispatcher=dispatcher,
         )
         if custom_kind_clarification is not None:
+            if args.result_page is not None:
+                raise GatewayResultShapeError("The original query type selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -14692,6 +14792,10 @@ def dispatch_command(
             dispatcher=dispatcher,
         )
         if custom_field_clarification is not None:
+            if args.result_page is not None:
+                raise GatewayResultShapeError("The original query field selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -14757,7 +14861,7 @@ def dispatch_command(
             if result.get("ok")
             else None
         )
-        return {
+        query_payload = {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
@@ -14776,6 +14880,9 @@ def dispatch_command(
             ),
             "agent_result": business_rows if result.get("ok") else None,
         }
+        return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+            env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
+            common=common, live_info=live_info)
     if args.command == "metadata":
         if args.operation == "media-pool-fields":
             from wwise_waapi.media_pool_field_discovery import browse_media_pool_fields
@@ -17857,12 +17964,15 @@ def _runtime_transport_context_from_live(
         if not isinstance(host, str) or isinstance(port, bool) or not isinstance(port, int):
             raise GatewayResultShapeError(
                 "Live endpoint identity is unavailable for transport handle binding.",
+                details={"required_fields": ["endpoint.url", "endpoint.host", "endpoint.port"],
+                    "binding": "runtime_transport_context"},
                 error_code="INVALID_STATUS_RESULT",
             )
         endpoint_url = f"ws://{host}:{port}/waapi"
     if not isinstance(display_name, str) or not display_name:
         raise GatewayResultShapeError(
             "Live Wwise build identity is unavailable for transport handle binding.",
+            details={"required_field": "version.displayName", "binding": "runtime_transport_context"},
             error_code="INVALID_STATUS_RESULT",
         )
     return RuntimeTransportContext(
@@ -18730,7 +18840,7 @@ def dispatch_business_field_discovery(
                 from wwise_waapi.metadata_detail import fit_detail_continuations
                 payload["agent_result"] = fit_detail_continuations(payload["agent_result"], lambda page: detail_continuation(page, binding.record.revision))
             return payload
-        meanings = (browsed["metadata"]["name"],)
+        meanings = (browsed["selected_field_token"],)
         read_call = binding.read_call
     discovery = discover_metadata(
         read_call=read_call,
@@ -19272,6 +19382,9 @@ def dispatch_business_type_discovery(
     except (TypeError, ValueError) as exc:
         raise GatewayResultShapeError(
             "Live object type discovery returned an invalid catalog.",
+            details={"api": CACHE_GET_TYPES_URI, "requested_role": str(args.role),
+                "required_result": "return array of native type metadata", "cause_type": type(exc).__name__,
+                "selection_advanced": False},
             error_code="INVALID_METADATA_RESULT",
         ) from exc
     role = str(args.role)
@@ -19675,6 +19788,7 @@ def create_transaction_preview(
         request_payload,
         expected_version=detected_version,
     ).as_dict()
+    layout_blueprint_terminal_budget(canonical_request)
     project_guard_mode, target_project_path = transaction_project_guard_spec(
         canonical_request,
         version=detected_version,
@@ -20308,6 +20422,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         request_payload = require_mapping(artifact.get("request"), "transaction request")
+        layout_blueprint_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -21154,6 +21269,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 f"current state is {record.state.value!r}."
             )
         request_payload = require_mapping(artifact.get("request"), "transaction request")
+        layout_blueprint_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -21384,6 +21500,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "Transport verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 transport_context = _runtime_transport_context_from_live(
@@ -21475,6 +21597,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 execution_payload = execution_result.get("result")
@@ -21537,6 +21665,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21588,6 +21722,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21632,6 +21772,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -23025,7 +23171,14 @@ def _query_result_presence_contract() -> dict[str, Any]:
     return {
         "absent_fields": "unavailable_fields; omitted values are never replaced with null",
         "explicit_null": "preserved",
-        "missing_identity": "identity_completeness.complete=false; native_observation retained; no mutation authority",
+        "missing_identity": "identity_completeness.complete=false; native_observation retained, optionally as lossless page entries; no mutation authority",
+        "delivery": {"canonical_result": "agent_result is exact and terminal; large compact replies omit its duplicate objects with objects_source=agent_result",
+            "large_observation": "status partial; agent_result contains exact small identity headers, explicit omitted fields, and lossless JSON entries; copy next_command until projection_complete",
+            "completion": "projection_complete certifies delivery of that observation only, never query exhaustion or mutation selection",
+            "continuation": "short Gateway-issued --result-query and --result-page; 900 seconds; repeat identical bounded read and verify complete result, resolved fields, configuration, project and host session",
+            "detail": "--detail preserves diagnostics; oversized semantic_preview is retained in page entries",
+            "entries_encoding": "json-pointer-entries normally; json-document-fragments for oversized native keys/pointers. Concatenate document fragments by character offset to recover the exact observation, never mutation authority",
+            "page_stdout_utf8_bytes": 32768},
     }
 
 
@@ -23330,12 +23483,14 @@ def _bind_query_custom_fields_from_live_metadata(
     meanings = tuple(getattr(args, "query_custom_field_meanings", ()) or ())
     if not meanings:
         return None
+    selected_observations = []
+    read = transaction_read_call(dispatcher, connection=connection, version=detected_version)
+    def selection_read(uri, native_args, options):
+        observed = read(uri, native_args, options)
+        selected_observations.append({"api": uri, "args": native_args, "result": observed})
+        return observed
     discovery = discover_metadata(
-        read_call=transaction_read_call(
-            dispatcher,
-            connection=connection,
-            version=detected_version,
-        ),
+        read_call=selection_read,
         queries=meanings,
         object_type=args.object_type,
         object=args.path if args.path is not None else args.object_id,
@@ -23396,9 +23551,89 @@ def _bind_query_custom_fields_from_live_metadata(
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
         )
+    args.query_field_selection = selected_observations
     args.query_output_bindings = tuple(bindings)
     args.query_return_fields = (*SELECTED_REQUIRED_RETURN_FIELDS, *native_fields)
     return None
+
+
+def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info):
+    project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
+        connection=connection, version=detected_version,
+        **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
+           if detected_version == "2021.1" else {}))
+    if not project_call.get("ok"):
+        raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
+            details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    if detected_version == "2021.1":
+        project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
+            maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
+            error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    else:
+        project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    project = require_project_identity(project, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
+    return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+        "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
+        "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
+
+
+def _finish_object_query_result(args, payload, *, native, envelope, env, connection,
+                                detected_version, dispatcher, common, live_info):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
+    if not payload.get("ok"):
+        return payload
+    if args.result_page is None and len(canonical_json_bytes(
+            project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
+        return payload
+    try:
+        context = (args.result_record["context"] if getattr(args, "result_record", None) is not None else
+            _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info))
+        binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
+            "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
+            "output_bindings": getattr(args, "query_output_bindings", ()),
+            "field_selection": getattr(args, "query_field_selection", None)},
+            "native_result_sha256": canonical_sha256(native["result"]),
+            "projection_sha256": canonical_sha256({key: payload[key] for key in ("objects", "native_observation") if key in payload})}
+        offset = parse_offset(args.result_page, binding)
+        store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=env))
+        record = getattr(args, "result_record", None)
+        if record is None:
+            import time
+            issued = int(time.time())
+            handle = store.issue(plan={"argv": args.original_query_argv}, context=context, issued=issued)
+            expires = issued + 900
+        else:
+            handle, expires = args.result_query, record["expires_at"]
+        prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
+        detail_fragment_required = args.detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
+        page_payload = {**payload, "detail_fragment_required": detail_fragment_required}
+        page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
+            next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
+                "--result-query", handle, "--result-page", token]))
+        if not (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int and live_info["processId"] > 0):
+            page.pop("next_command", None)
+            if not page["projection_complete"]:
+                page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
+        result = {key: value for key, value in payload.items() if key not in
+            {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
+        if detail_fragment_required:
+            result.pop("semantic_preview", None)
+        result.update(status="ok" if page["projection_complete"] else "partial",
+            projection_complete=page["projection_complete"],
+            projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
+                "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
+                "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
+            objects_source="agent_result.objects", agent_result=page)
+        if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) != "ok":
+            raise QueryResultProjectionLimitError("The query page with diagnostics exceeds its bounded output; refine the original read")
+        return result
+    except QueryResultPageError as exc:
+        raise GatewayResultShapeError(str(exc),
+            details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
+            error_code=exc.code) from exc
 
 
 def project_successful_query_object_payload(
@@ -23429,11 +23664,19 @@ def project_successful_query_object_payload(
         "source_resolution",
         "count",
         "limit_reached",
+        "projection_complete",
+        "projection_boundary",
+        "objects_source",
         "objects",
         "continuations",
         "mutation_selection",
     )
     projected = {key: payload[key] for key in compact_keys if key in payload}
+    if "objects" in projected and payload.get("objects") is payload.get("agent_result"):
+        from wwise_waapi.canonical import canonical_json_bytes
+        if len(canonical_json_bytes(payload["agent_result"])) > 16 * 1024:
+            projected.pop("objects")
+            projected["objects_source"] = "agent_result"
     if "agent_result" in payload:
         # Preserve the exact object and keep it insertion-order last.  The outer
         # session-context attachment repeats the same terminal-order guarantee.
@@ -23989,6 +24232,38 @@ def validate_successful_transaction_verify_projection(
     return verification, agent_result, cleanup
 
 
+def layout_blueprint_terminal_budget(request: Any) -> int:
+    """Admit only an exact closed constructor, with prewrite rendered-request fit."""
+    ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    if (not isinstance(request, Mapping)
+            or set(request) != {'contract', 'version', 'operation', 'arguments'}
+            or request.get('contract') != 'waapi-skill.operation-request/v1'
+            or request.get('operation') != 'waapi.call'
+            or request.get('version') not in LAYOUT_VERSIONS):
+        return ordinary
+    arguments = request.get('arguments')
+    if (not isinstance(arguments, Mapping)
+            or set(arguments) != {'api', 'args', 'options', 'layout_binding'}
+            or arguments.get('api') != LAYOUT_SET_URI
+            or not isinstance(arguments.get('layout_binding'), Mapping)
+            or 'layout_blueprint' not in arguments['layout_binding']):
+        return ordinary
+    try:
+        validate_layout_call(request['version'], LAYOUT_SET_URI,
+            arguments['args'], arguments['options'], arguments['layout_binding'])
+    except (ValueError, TypeError, KeyError):
+        return ordinary
+    # Size in its terminal nesting, using the actual pretty UTF-8 stdout encoder;
+    # quotes, backslashes, multibyte text and indentation all count. The remaining
+    # fixed allowance carries result framing, bounded cleanup and digests.
+    observed = gateway_json_document_size({'agent_result': {'request': request}},
+        stop_after_bytes=MAX_OPERATION_DRAFT_EVIDENCE_BYTES)
+    if observed > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+        raise GatewayInputError('Layout constructor request exceeds its bounded terminal UTF-8 capacity')
+    return (ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES
+        else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES)
+
+
 def project_successful_transaction_verify_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -24005,16 +24280,16 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
+    stdout_budget = layout_blueprint_terminal_budget(agent_result.get("request"))
     projected = dict(payload)
     projected.pop("agent_result", None)
     projection = {
         "contract": TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT,
         "detail_level": "full-verification-evidence",
         "fixed_projection_limit_bytes": (
-            TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
-            - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
+            stdout_budget - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
         ),
-        "stdout_budget_bytes": TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES,
+        "stdout_budget_bytes": stdout_budget,
         "session_context_reserve_bytes": (
             TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
         ),
