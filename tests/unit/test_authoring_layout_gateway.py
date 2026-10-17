@@ -353,3 +353,19 @@ def test_native_optional_outer_result_omission_is_preserved_without_invented_val
     assert result['result'] == result['agent_result'] == {}
     assert result['observation']['native_schema_status'] == 'optional_result_field_omitted'
     assert result['observation']['business_arrangement_verified'] is False
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_omitted_layout_contents_return_structured_unavailability_without_issuing_handles(tmp_path, version):
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    state_dir = tmp_path / 'state'
+    client = _identity_client(version=version)
+    client.responses[URI + 'getLayout'] = {}
+    client.responses[URI + 'getViewInstances'] = {'viewInstances': []}
+    code, result = gateway.execute_gateway(['--state-dir', str(state_dir), 'layout-inspect', '--layout-name', 'Designer'],
+        env=env, client_factory=lambda _: client)
+    assert code == 2 and result['ok'] is False, result
+    assert 'unavailable' in result['message'].lower(), result
+    assert 'no identity handles issued' in result['message'].lower(), result
+    assert not list(state_dir.glob('authoring-layout-handles-v1/*.json'))

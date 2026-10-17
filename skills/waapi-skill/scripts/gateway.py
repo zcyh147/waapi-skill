@@ -13557,6 +13557,9 @@ def dispatch_command(
             connection=connection, version=detected_version)
         instances = read_layout_observation('instances', {'name': args.layout_name}, dispatcher=dispatcher,
             connection=connection, version=detected_version)
+        workspace = layout.get('Layout')
+        if not isinstance(workspace, Mapping) or not isinstance(workspace.get('Name'), str):
+            raise GatewayInputError('Layout contents are unavailable; no identity handles issued')
         # The lookup name selects getLayout; serialized Layout.Name is a separate
         # workspace name (the matching SDK documents divergent values). Retain
         # that exact observed document in the capability, without equating names.
@@ -13575,7 +13578,7 @@ def dispatch_command(
             element_handles, view_handles = issue(elements, 'element'), issue(views, 'view')
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
-        projection = {'layout_name': args.layout_name, 'workspace_name': layout['Layout']['Name'],
+        projection = {'layout_name': args.layout_name, 'workspace_name': workspace['Name'],
                       'layout_handle': layout_handle,
                       'elements': element_handles, 'views': view_handles}
         return {**common, 'ok': True, 'status': 'ok', 'complete': True, 'truncated': False,

@@ -149,3 +149,8 @@ observed document/hash. Both version lanes fake-test create/verify/inspect and
 separate removal; stale document/lookup and cross-layout authority checks remain
 strict. Downstream larger-output Gateway/Broker/archive acceptance is an explicit
 already-dependent OPEN #194 condition; CLI byte fit grants no such acceptance.
+
+Omitted native Layout is separately unavailable for identity issuance: inspection
+requires an observed Layout object and string workspace Name before creating any
+handle. This guard does not equate lookup/workspace names. Public versioned
+negative controls prove a deliberate structured error and zero new handle files.

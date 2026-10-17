@@ -389,3 +389,13 @@ sharing a serialized workspace name, together with the complete scoped-read
 Gateway file, passed 71 tests. This is deterministic source proof, not native
 divergent-name write acceptance. Larger-output Broker/archive acceptance is
 tracked under the already-dependent OPEN #194; no Fresh run is authorized.
+
+Workspace successor `b5c555d9` passed 86 focused frozen tests. Parent review then
+found that the native contents contract legitimately permits omitted Layout:
+inspection issued a capability before failing with opaque KeyError text. That
+public RED remains retained. A separate availability/type guard now rejects
+omitted contents deliberately before any handle storage/issue, without restoring
+lookup/workspace equality. Both omitted-content version controls, all scoped-read
+tests, divergent create/reuse and stale/foreign authority controls passed 75
+tests. Earlier passing runs remain partial source evidence; no missing case or
+native acceptance was inferred from them.
