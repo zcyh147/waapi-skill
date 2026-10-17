@@ -46,8 +46,49 @@ choice preserves explicit zero/empty separately from omission and populated
 unknown/native fields, conflicting forms and duplicate empty choices fail before
 mutation. The three modification policies and one-execute binding remain intact.
 
-This checkpoint does not implement the tone artifact/effect verifier: the current
-Gateway still reports `result_schema_checked`, `verified=false`, even when the
+At the `4f366334` checkpoint the tone artifact/effect verifier was not implemented:
+the Gateway still reported `result_schema_checked`, `verified=false`, even when the
 fake native call creates no file. Simulated WAV observations grant no native or
 effect acceptance. The additive verifier criterion above remains implementation
 work here, alongside complete WAL delivery and the rest of this ticket.
+
+
+## Bounded implementation checkpoint: independent Tone WAV observations
+
+The successor to `4f366334` replaces the missing-file/schema-only boundary for
+known observable output states. The existing public schema, Draft, immutable
+Preview, policy/confirmation, one execution and verification path now freezes
+one isolated output path/root identity, existing-file proof or absence, exact
+arguments, explicit field set, packaged schema digest and source-described
+defaults. Output/root drift blocks before dispatch. Verification opens a regular
+non-link file through the existing artifact helper, rechecks confinement before
+reading, hashes bounded RIFF chunks and scans all audio samples through that
+same descriptor, then rechecks path/file/root stability.
+
+Recognized PCM16/IEEE float32, including their exact WAV extensible subtypes,
+receive format/rate/alignment/integral-frame checks. Standard extensible speaker
+positions are compared independently of the waveform channel-index mask.
+Silence and masked-off channels must contain digital zero throughout; float
+non-finite values fail. Explicit empty markers reject cue points and orphan
+labels. A valid unchanged overwrite can verify the requested observable state;
+`created=false` and `changed=false` remain separate truthful observations and
+do not claim that a rewrite was observed. Missing, malformed, wrong-format,
+wrong-duration, wrong-silence, changed-root and nonregular output controls fail.
+
+These are fake-tested implementation controls, not native Wwise effects.
+Active waveform/frequency/envelope checks, fractional rate/frame rounding,
+populated marker positions/encoding, anonymous/Ambisonic and unlabelled
+multichannel representations remain exact unfinished postconditions, reported
+as partial artifact observations with `verified=false`. RIFF variant and parser
+resource boundaries remain Gateway limitations, never native absence. The
+schema discloses the 512 MiB artifact, 4096 chunk, 128 cue and 128 KiB marker-list
+bounds. The independent source review used matching installed SDK headers for
+2023.1.19.8928, 2024.1.13.9056 and 2025.1.7.9143, without launching Wwise.
+
+A separate public reproduction retains the next runtime defect: four legal
+8192-byte marker labels execute once, then exact terminal result delivery returns
+`VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED`. No larger allowance or input shrink is
+part of this verifier checkpoint. Fixing accepted-request terminal capacity
+remains #193 implementation work; deterministic Broker/archive delivery remains
+#194 acceptance. Complete WAL delivery, the rest of #193 and remaining #188
+layout/state/native evidence obligations remain open.

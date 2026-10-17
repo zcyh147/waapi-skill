@@ -143,6 +143,18 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **({"tone_artifact_verification": {
+                "owned_output": "one exact regular file inside the existing isolated output directory",
+                "maximum_artifact_bytes": 536870912,
+                "maximum_riff_chunks": 4096,
+                "maximum_marker_count": 128,
+                "maximum_marker_list_bytes": 131072,
+                "sample_inspection": "all frames; bounded blocks; no raw audio in results",
+                "unchanged_valid_output": "observable requested state may verify; created/changed are reported separately",
+                "partial_postconditions": ["active waveform/frequency/envelope", "fractional rate/frame rounding",
+                    "populated marker positions/encoding", "anonymous/Ambisonic or unlabelled multichannel representation"],
+                "limits_are_gateway_resources_not_native_absence": True,
+            }} if operation == 'ak.wwise.debug.generateToneWAV' else {}),
             **(
                 {
                     "discard_unsaved_default": False,

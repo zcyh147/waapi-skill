@@ -425,3 +425,24 @@ the complete host-business file, existing isolated transaction verifier boundary
 exact adapter registration, operation catalog and reviewed schema seal. It grants
 closed-input construction/policy evidence only; tone artifact/effect and native
 verification remain pending implementation and acceptance under #193.
+
+
+## #193 bounded Tone artifact verifier checkpoint
+
+The successor to host-collection source `4f366334` adds exact-target prestate and
+prewrite guards plus independent bounded RIFF/PCM16/float32/header/frame/silent
+channel/empty-cue observations through the existing public transaction and
+artifact seams. Known incorrect or missing artifacts fail instead of receiving
+schema-only success. Valid unchanged output may verify its requested observable
+state, retaining separate `created`/`changed` facts. Synthetic full-chain tests
+establish implementation behavior only; no native, Fresh, family seal or whole
+#193 credit is asserted. Active signals, fractional rounding, populated marker
+semantics and anonymous/Ambisonic encodings remain explicitly incomplete.
+
+The public large-marker reproduction establishes a further #193 terminal
+capacity defect (`VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED` after one dispatch),
+without changing output allowances. Its implementation follows this coherent
+checkpoint; downstream Broker/archive delivery remains additionally owned by
+#194. Full #193/WAL and #188 state/native scope stay open. Original REDs and
+intermediate compatibility failures are retained in separate `/tmp/waapi-tone-*`
+roots and the worker handoff; no native process or launch was used.
