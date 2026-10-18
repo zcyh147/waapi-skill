@@ -1501,7 +1501,7 @@ def test_standalone_history_recovers_owned_rename_identity_and_hierarchy_path(tm
 def test_standalone_history_observes_all_recoverable_children_of_owned_compound_receipt(tmp_path, direction):
     client, state, _source, preview, shown, run = _owned_notes_history_case(tmp_path,
         direction=direction, source_operation="waapi.undoGroup")
-    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
     assert {row["field"] for row in binding["observations"]} == {"notes", "name"}
     assert "stack_head_observed" in json.dumps(shown)
     code, result = run("execute", preview["transaction_id"])
@@ -1534,7 +1534,7 @@ def test_standalone_history_incomplete_effect_readback_retains_raw_native_respon
 def test_standalone_history_compound_preserves_unchanged_child_observation_alongside_real_change(tmp_path):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
         source_operation="waapi.undoGroup", initial_notes="after")
-    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
     note = next(row for row in binding["observations"] if row["field"] == "notes")
     assert note["before"] == note["after"] == "after"
     code, result = run("execute", preview["transaction_id"])
@@ -1687,7 +1687,7 @@ def test_standalone_history_undo_then_explicit_redo_each_observes_its_expected_s
 def test_standalone_history_compound_ancestor_rename_keeps_descendant_observation_identity(tmp_path, direction):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
         source_operation="waapi.undoGroup", direction=direction, compound_ancestor=True)
-    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
     child = next(row for row in binding["observations"] if row["field"] == "notes")
     assert child["object_before"]["path"] == r"\Actor-Mixer Hierarchy\Default Work Unit\Destination\OldName"
     assert child["object_after"]["path"] == r"\Actor-Mixer Hierarchy\Default Work Unit\Renamed\OldName"
@@ -1851,7 +1851,7 @@ def test_standalone_history_property_retains_exact_scoped_binding_for_omitted_na
     assert code == 0 and verified["verified"] is True, verified
     code, shown = run("transaction-show", preview["transaction_id"])
     assert code == 0, shown
-    observation = shown["artifact"]["request"]["arguments"]["history_binding"]["observations"][0]
+    observation = shown["artifact"]["prepared_operation"]["pre_state"]["history_binding"]["observations"][0]
     assert observation["field_info"]["name"] is None
     assert observation["field_info"]["field_binding"] == {"token": "Volume", "source": "exact_scoped_getPropertyAndReferenceNames"}
     retained = next(event["details"]["verification"] for event in reversed(shown["events"]) if event["event_type"] == "verification_recorded")
@@ -1886,7 +1886,7 @@ def test_standalone_history_observes_verified_reference_receipt_in_exact_platfor
     assert client.source["@Attenuation"] == (client.history_before if direction == "undo" else client.history_after)["@Attenuation"]
     code, shown = run("transaction-show", preview["transaction_id"])
     assert code == 0, shown
-    binding = shown["artifact"]["request"]["arguments"]["history_binding"]
+    binding = shown["artifact"]["prepared_operation"]["pre_state"]["history_binding"]
     assert binding["source_receipt"]["transaction_id"] == source["transaction_id"]
     assert binding["observations"][0]["before"] == (client.parent["id"] if clear else None)
     assert binding["observations"][0]["after"] == (None if clear else client.parent["id"])
@@ -1899,7 +1899,7 @@ def test_standalone_history_observes_verified_reference_receipt_in_exact_platfor
 def test_standalone_history_reference_receipt_certifies_original_current_or_named_read_view(tmp_path, version, platform):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference",
         reference_platform=platform, version=version)
-    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
     assert binding["observations"][0]["platform"] == client.platform_rows[0]["id"]
     client.current_platform = client.platform_rows[1]["id"]
     if platform is not None:
@@ -1972,7 +1972,7 @@ def test_source_reference_original_read_platform_drift_stops_dispatch_or_verific
 def test_standalone_history_compound_reference_and_name_reuse_the_scoped_observer(tmp_path, direction):
     client, state, source, preview, _shown, run = _owned_notes_history_case(tmp_path,
         source_operation="waapi.undoGroup", compound_reference=True, direction=direction)
-    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
     assert {row["field"] for row in binding["observations"]} == {"Attenuation", "name"}
     code, compact = run("transaction-show", preview["transaction_id"], "--summary-only")
     assert code == 0, compact
@@ -1984,7 +1984,7 @@ def test_standalone_history_compound_reference_and_name_reuse_the_scoped_observe
     assert "latest_project_history" in json.dumps(compact)
     code, full = run("transaction-show", preview["transaction_id"])
     assert code == 0, full
-    full_binding = full["artifact"]["request"]["arguments"]["history_binding"]
+    full_binding = full["artifact"]["prepared_operation"]["pre_state"]["history_binding"]
     assert full_binding == binding
     assert full_binding["observations"][0]["field_info"]["restriction"]["type"] == "reference"
     code, source_full = run("transaction-show", source["transaction_id"])
@@ -2005,7 +2005,7 @@ def test_standalone_history_compound_reference_and_name_reuse_the_scoped_observe
 def test_standalone_history_scalar_receipt_reuses_original_read_platform_certification(tmp_path, platform):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
         source_operation="object.setProperty", property_platform=platform)
-    observation = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]["observations"][0]
+    observation = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]["observations"][0]
     assert observation["platform"] == "{55555555-5555-5555-5555-555555555555}"
     client.current_platform = client.platform_rows[1]["id"]
     code, executed = run("execute", preview["transaction_id"])
@@ -2032,7 +2032,7 @@ def test_standalone_history_reference_retains_omitted_metadata_name_and_type(tmp
     assert code == 0, executed
     code, verified = run("verify", preview["transaction_id"])
     assert code == 0 and verified["verified"] is True, verified
-    observation = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]["observations"][0]
+    observation = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]["observations"][0]
     assert observation["field_info"]["name"] is None and observation["field_info"]["type"] is None
     assert observation["field_info"]["field_binding"]["token"] == "Attenuation"
 
@@ -2276,7 +2276,7 @@ def test_created_reference_metadata_omission_is_bound_from_exact_source_names(tm
     tx = _created_leaf_history_preview(task, source)
     code, shown = task.run("transaction-show", tx)
     assert code == 0, shown
-    binding = shown["artifact"]["request"]["arguments"]["history_binding"]
+    binding = shown["artifact"]["prepared_operation"]["pre_state"]["history_binding"]
     field = next(item for item in binding["observations"] if item.get("kind") == "creation_field")
     assert field["field_info"]["name"] is None and field["field_info"]["type"] is None
     assert field["field_info"]["field_binding"]["token"] == "Attenuation"
@@ -2307,7 +2307,7 @@ def test_created_fields_review_is_compact_and_full_source_metadata_remains_avail
     assert all(item["metadata_bound"] is True and "field_info" not in item for item in fields)
     code, full = task.run("transaction-show", tx)
     assert code == 0, full
-    raw = full["artifact"]["request"]["arguments"]["history_binding"]["observations"]
+    raw = full["artifact"]["prepared_operation"]["pre_state"]["history_binding"]["observations"]
     assert all(item["field_info"]["type"] for item in raw if item.get("kind") == "creation_field")
     volume = next(item["field_info"] for item in raw if item.get("field") == "Volume")
     assert volume["default"] is None and "default" not in volume["raw"]
@@ -2561,7 +2561,7 @@ def test_created_fields_combined_receipt_review_keeps_complete_root_fields_and_e
     assert all(row['metadata_bound'] is True and 'field_info' not in row for row in presence['fields'])
     code, full = task.run('transaction-show', tx)
     assert code == 0, full
-    sealed = full['artifact']['request']['arguments']['history_binding']['observations']
+    sealed = full['artifact']['prepared_operation']['pre_state']['history_binding']['observations']
     field_rows = [row for row in sealed if row['kind'] == 'creation_field']
     assert len(field_rows) == 4 and all('raw' in row['field_info'] for row in field_rows)
     assert all(row['object_id'] == presence['object']['id'] for row in field_rows)
@@ -2581,7 +2581,7 @@ def test_created_fields_compact_review_cannot_weaken_immutable_field_proof(tmp_p
     tx = _created_leaf_history_preview(task, source)
     path = tmp_path / 'state' / 'transactions' / tx / 'preview.json'
     document = json.loads(path.read_text())
-    observations = document['artifact']['request']['arguments']['history_binding']['observations']
+    observations = document['artifact']['prepared_operation']['pre_state']['history_binding']['observations']
     field = next(item for item in observations if item['kind'] == 'creation_field')
     if corruption == 'missing': observations.remove(field)
     elif corruption == 'duplicate': observations.append(deepcopy(field))
@@ -2590,3 +2590,142 @@ def test_created_fields_compact_review_cannot_weaken_immutable_field_proof(tmp_p
     code, rejected = task.run('execute', tx)
     assert code == 2, rejected
     assert not any(call[0].startswith('ak.wwise.core.undo.') for call in task.calls)
+
+
+def _created_history_reference_draft(task, source):
+    code, started = task.run('draft-start', 'ak.wwise.core.undo.undo')
+    assert code == 0, started
+    draft, authority = started['draft']['draft_id'], started['task_authority']
+    code, declared = task.run('draft-declare-core-plan', draft, '--task-authority', authority,
+        '--expected-revision', str(started['draft']['revision']),
+        '--value', 'history_scope', 'latest_project_history', '--value', 'expectation_receipt', source)
+    assert code == 0, declared
+    return draft, authority, declared['draft']['revision']
+
+
+@pytest.mark.parametrize('corruption', ['binding-hash', 'source-artifact', 'source-tail', 'source-sequence', 'source-context', 'draft-context', 'journal', 'cross-store'])
+def test_history_draft_reference_cannot_recapture_or_cross_its_original_owner(tmp_path, corruption):
+    from copy import deepcopy
+    import shutil
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True, reference='existing')
+    draft, authority, revision = _created_history_reference_draft(task, source)
+    state = tmp_path / 'state'
+    path = state / 'operation-drafts-v1' / 'records' / (draft + '.json')
+    document = json.loads(path.read_text())
+    reference = document['composition']['business_session']['settings']['core_plan']['history_binding']
+    assert reference['contract'] == 'waapi-skill.history-draft-reference/v1'
+    assert 'observations' not in reference and 'state_dir' not in reference['source_receipt']
+    original = deepcopy(reference)
+    if corruption == 'cross-store':
+        other = tmp_path / 'other-state'
+        shutil.copytree(state, other)
+        # An otherwise valid copied source receipt must not become this Draft's owner.
+        code, rejected = waapi_gateway.execute_gateway(['--state-dir', str(other), 'draft-check', draft,
+            '--task-authority', authority, '--expected-revision', str(revision)], env=task.env,
+            client_factory=lambda _url: task)
+    else:
+        if corruption == 'binding-hash': reference['binding_sha256'] = '0' * 64
+        elif corruption == 'source-artifact': reference['source_receipt']['artifact_hash'] = '0' * 64
+        elif corruption == 'source-tail': reference['source_receipt']['last_event_hash'] = '0' * 64
+        elif corruption == 'source-sequence': reference['source_receipt']['event_sequence'] += 1
+        elif corruption == 'source-context': reference['source_context_fingerprint'] = '0' * 64
+        elif corruption == 'draft-context': reference['draft_context']['wwise_build'] = '2025.1.0.2'
+        elif corruption == 'journal':
+            events = state / 'transactions' / source / 'events.jsonl'
+            events.write_bytes(events.read_bytes() + b'{"event_type":"changed"}\n')
+        if corruption != 'journal':
+            document.pop('record_digest')
+            document['record_digest'] = canonical_sha256({'contract': 'waapi-skill.operation-draft-record-digest/v1', 'record': document})
+            path.write_bytes(canonical_json_bytes(document))
+        code, rejected = task.run('draft-check', draft, '--task-authority', authority, '--expected-revision', str(revision))
+    assert code == 2, rejected
+    assert not any(call[0].startswith('ak.wwise.core.undo.') for call in task.calls)
+    # No later lookup may silently substitute updated source or current context.
+    if corruption == 'cross-store':
+        assert json.loads(path.read_text())['composition']['business_session']['settings']['core_plan']['history_binding'] == original
+
+
+def test_history_request_reference_and_complete_proof_must_name_the_same_source(tmp_path):
+    """Two actual Gateway source receipts cannot be mixed under one new hash."""
+    from copy import deepcopy
+    client, state, _source, _preview, shown, run = _owned_notes_history_case(tmp_path)
+    code, full = run('transaction-show', _preview['transaction_id'])
+    assert code == 0, full
+    artifact = deepcopy(full['artifact'])
+    code, started = run('draft-start', 'object.setNotes')
+    assert code == 0, started
+    draft, authority = started['draft']['draft_id'], started['task_authority']
+    code, bound = run('draft-bind-object', draft, '--task-authority', authority,
+        '--expected-revision', str(started['draft']['revision']), '--object-id', client.source['id'])
+    assert code == 0, bound
+    code, declared = run('draft-declare-object-change', draft, '--task-authority', authority,
+        '--expected-revision', str(bound['draft']['revision']), '--notes', 'Second owned source')
+    assert code == 0, declared
+    phase = declared
+    for command in ('draft-check', 'preview-from-draft'):
+        code, phase = run(command, draft, '--task-authority', authority,
+            '--expected-revision', str(phase['draft']['revision']))
+        assert code == 0, phase
+    second_source = phase['transaction_id']
+    code, second_shown = run('transaction-show', second_source)
+    assert code == 0, second_shown
+    assert run('confirm', second_source, '--confirmation-token', second_shown['confirmation']['token'])[0] == 0
+    assert run('execute', second_source)[0] == 0
+    assert run('verify', second_source)[0] == 0
+    # Capture B's independently valid proof through the same public declaration.
+    from types import SimpleNamespace
+    draft, authority, revision = _created_history_reference_draft(SimpleNamespace(run=run), second_source)
+    for command in ('draft-check', 'preview-from-draft'):
+        code, phase = run(command, draft, '--task-authority', authority, '--expected-revision', str(revision))
+        assert code == 0, phase
+        if 'draft' in phase: revision = phase['draft']['revision']
+    code, second_history = run('transaction-show', phase['transaction_id'])
+    assert code == 0, second_history
+    proof = second_history['artifact']['prepared_operation']['pre_state']['history_binding']
+    assert proof['source_receipt']['transaction_id'] == second_source
+    artifact['prepared_operation']['pre_state']['history_binding'] = deepcopy(proof)
+    artifact['prepared_operation']['verification_plan']['history_binding'] = deepcopy(proof)
+    # Storage corruption setup: both source proofs were captured publicly. Even
+    # a fresh internally consistent storage hash cannot authorize their mixture.
+    store = TransactionStore(state)
+    store.create_preview('mixed-history-proof', artifact)
+    store.submit_for_confirmation('mixed-history-proof')
+    code, mixed = run('transaction-show', 'mixed-history-proof')
+    assert code == 0, mixed
+    assert run('confirm', 'mixed-history-proof', '--confirmation-token', mixed['confirmation']['token'])[0] == 0
+    code, rejected = run('execute', 'mixed-history-proof')
+    assert code == 2, rejected
+    assert 'History request reference differs from its complete sealed proof' in json.dumps(rejected)
+    assert not any(row[0].startswith('ak.wwise.core.undo.') for row in client.calls)
+
+
+@pytest.mark.parametrize('stage', ['preview', 'execute', 'verify'])
+def test_history_original_source_journal_is_revalidated_at_each_durable_phase(tmp_path, stage):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True)
+    draft, authority, revision = _created_history_reference_draft(task, source)
+    code, checked = task.run('draft-check', draft, '--task-authority', authority, '--expected-revision', str(revision))
+    assert code == 0, checked
+    def corrupt_source():
+        events = tmp_path / 'state' / 'transactions' / source / 'events.jsonl'
+        events.write_bytes(events.read_bytes() + b'{"event_type":"unsealed-later-source-event"}\n')
+    if stage == 'preview':
+        corrupt_source()
+        code, rejected = task.run('preview-from-draft', draft, '--task-authority', authority,
+            '--expected-revision', str(checked['draft']['revision']))
+    else:
+        code, preview = task.run(*checked['next_command']['gateway_argv'])
+        assert code == 0, preview
+        tx = preview['transaction_id']
+        code, shown = task.run('transaction-show', tx)
+        assert code == 0, shown
+        assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+        if stage == 'execute':
+            corrupt_source()
+            code, rejected = task.run('execute', tx)
+        else:
+            assert task.run('execute', tx)[0] == 0
+            corrupt_source()
+            code, rejected = task.run('verify', tx)
+    assert code == 2 and rejected.get('verified') is not True, rejected
+    assert len([call for call in task.calls if call[0].startswith('ak.wwise.core.undo.')]) == (1 if stage == 'verify' else 0)

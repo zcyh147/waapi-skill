@@ -57,7 +57,7 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
                 continue
             if is_master_bus_visibility_dependency(dependency) and dependency["value"] is False:
                 if not discovery and structural_bus_proof is None:
-                    raise NewObjectDefaultError("Non-master bus visibility requires a proved new Bus/AuxBus child below a Bus/AuxBus parent.")
+                    raise NewObjectDefaultError("Non-master visibility requires a proved non-Bus class or a Bus/AuxBus child below a Bus/AuxBus parent.")
                 structural_visibility.append({"field": name, "dependency": dict(dependency), "proof": structural_bus_proof})
                 continue
             kind, action, context = (dependency.get(key) for key in ("type", "action", "context"))
@@ -186,12 +186,19 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
 
 
 def planned_non_master_bus_proof(*, version, node, info, nodes, resolve_type, root_parent, read, root_collection="children"):
-    """Prove normal Bus/AuxBus child placement from pinned classes and this graph."""
+    """Prove non-Bus class identity, or normal Bus/AuxBus child placement."""
     from .documented_list_fields import load_catalog, scope_evidence
-    if node.collection != "children" or info.name not in {"Bus", "AuxBus"}:
-        return None
     catalog = load_catalog(version)
     classes = {row["name"]: row for row in catalog["classes"] if row["name"] in {"Bus", "AuxBus"}}
+    exact = [row for row in catalog["classes"] if row["name"] == info.name and row["class_id"] == info.class_id]
+    if (len(exact) == 1 and set(classes) == {"Bus", "AuxBus"} and info.name not in classes
+            and info.class_id not in {row["class_id"] for row in classes.values()}):
+        return {"kind": "non_bus_class", "version": version, "catalog_sha256": catalog["catalog_sha256"],
+            "request_path": node.request_path, "type": info.name, "class_id": info.class_id,
+            "bus_classes": {name: row["class_id"] for name, row in classes.items()},
+            "parent": {}}  # This proof has no parent premise; it is not a native parent observation.
+    if node.collection != "children" or info.name not in classes:
+        return None
     if info.name not in classes or info.class_id != classes[info.name]["class_id"]:
         return None
     if node.parent_request_path is not None:
@@ -227,6 +234,15 @@ def structural_bus_proof_current(proof, *, read, after_write=False):
     from .builders.metadata import GET_TYPES_URI, parse_get_types_result
     catalog = load_catalog(proof["version"])
     types = parse_get_types_result(read(GET_TYPES_URI, {}, {}))
+    if proof.get("kind") == "non_bus_class":
+        classes = {row["name"]: row["class_id"] for row in catalog["classes"] if row["name"] in {"Bus", "AuxBus"}}
+        return (catalog["catalog_sha256"] == proof["catalog_sha256"] and set(classes) == {"Bus", "AuxBus"}
+            and proof["bus_classes"] == classes and proof["type"] not in classes
+            and proof["class_id"] not in classes.values() and proof["parent"] == {}
+            and len([row for row in catalog["classes"]
+                if row["name"] == proof["type"] and row["class_id"] == proof["class_id"]]) == 1
+            and all([row.class_id for row in types if row.name.casefold() == name.casefold()] == [class_id]
+                for name, class_id in {proof["type"]: proof["class_id"], **classes}.items()))
     parent = proof["parent"]
     passed = catalog["catalog_sha256"] == proof["catalog_sha256"] and all(
         [row.class_id for row in types if row.name.casefold() == item["type"].casefold()] == [item["class_id"]]

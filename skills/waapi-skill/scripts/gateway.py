@@ -12946,6 +12946,11 @@ def dispatch_media_build_business_read(
     }
 
 
+def gateway_history_resolver(store: TransactionStore, project_guard: Mapping[str, Any]):
+    from wwise_waapi.edit_history_business import owned_history_resolver
+    return owned_history_resolver(store, project_guard)
+
+
 def dispatch_business_core_plan(
     args: argparse.Namespace,
     *,
@@ -13114,7 +13119,7 @@ def dispatch_business_core_plan(
 
     from wwise_waapi.edit_history_contracts import HISTORY_VERSIONS
     if binding.record.operation in HISTORY_VERSIONS:
-        from wwise_waapi.edit_history_business import capture_history_binding
+        from wwise_waapi.edit_history_business import capture_history_binding, history_draft_reference
         if set(plan) not in ({"history_scope"}, {"history_scope", "expectation_receipt"}) or plan["history_scope"] != "latest_project_history":
             raise GatewayInputError("History requires explicit latest_project_history scope and an optional owned expectation receipt")
         current_guard = build_project_guard(endpoint=common["endpoint"], version=detected_version,
@@ -13124,11 +13129,11 @@ def dispatch_business_core_plan(
                 plan.pop("expectation_receipt", None), current_guard=current_guard)
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
-        plan["history_binding"] = history
+        plan["history_binding"] = history_draft_reference(history, store=TransactionStore(binding.state_dir), context=session.context)
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings({"core_plan": plan})
-        adapter.materialize(candidate)
+        adapter.materialize(candidate, history_state_dir=binding.state_dir)
         return candidate
 
     record = binding.store.apply_business_update(
@@ -16924,6 +16929,7 @@ def dispatch_operation_draft_check(
         live_version=detected_version,
         read_call=read_call,
         project_guard=project_guard,
+        history_resolver=gateway_history_resolver(TransactionStore(state_dir), project_guard),
         skill_root=SKILL_ROOT,
         ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS,
     ).as_dict()
@@ -20742,6 +20748,7 @@ def create_transaction_preview(
         live_version=detected_version,
         read_call=read_call,
         project_guard=project_guard,
+        history_resolver=gateway_history_resolver(store, project_guard),
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
@@ -21344,7 +21351,8 @@ def _dispatch_transaction_command_with_execution_lease(
                 "verified": False,
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
-        role_validation = validate_prepared_roles(prepared, read_call=read_call)
+        role_validation = validate_prepared_roles(prepared, read_call=read_call,
+            history_resolver=gateway_history_resolver(store, artifact["project_guard"]))
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
                 transaction_id,
@@ -22510,6 +22518,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     prepared,
                     execution_result=execution_result,
                     read_call=read_call,
+                    history_resolver=gateway_history_resolver(store, artifact["project_guard"]),
                 )
             if project_guard_mode != PROJECT_GUARD_INVARIANT:
                 verification = strengthen_project_transition_verification(
@@ -31185,7 +31194,7 @@ def transaction_show_summary(
     # ceiling fails closed if the complete change list cannot fit.
     derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
     if isinstance(request, Mapping) and isinstance(request.get("arguments"), Mapping):
-        history_binding = request["arguments"].get("history_binding")
+        history_binding = prepared.get("pre_state", {}).get("history_binding")
         if isinstance(history_binding, Mapping):
             from wwise_waapi.edit_history_business import history_summary
             derived_notice["history_action"] = history_summary(history_binding)

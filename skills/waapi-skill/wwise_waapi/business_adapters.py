@@ -451,6 +451,7 @@ class BusinessAdapter:
         session: BusinessDeclarationSession,
         *,
         allow_cleaned_file_evidence: bool = False,
+        history_state_dir=None,
     ) -> Mapping[str, Any]:
         if allow_cleaned_file_evidence:
             if self._cleaned_file_evidence_materializer is None:
@@ -458,6 +459,9 @@ class BusinessAdapter:
                     f"{self.operation} does not accept cleaned file evidence"
                 )
             return self._cleaned_file_evidence_materializer(self.operation, session)
+        if self._materializer is _materialize_core_business:
+            from .core_business import materialize_core_business_request
+            return materialize_core_business_request(self.operation, session, history_state_dir=history_state_dir)
         return self._materializer(self.operation, session)
 
     def accepts_update_command(self, command: str) -> bool:

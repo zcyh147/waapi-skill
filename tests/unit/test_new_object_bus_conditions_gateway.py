@@ -131,3 +131,67 @@ def test_new_bus_reference_revalidates_existing_parent_and_source_and_effect(tmp
     code, rejected = task.run("execute", tx)
     assert code == 2 and rejected.get("executed") is not True, rejected
     assert not writes
+
+
+def _non_bus_reference_task(tmp_path, version='2025.1'):
+    from tests.unit.test_workflow_source_guard import _created_fields_history_runtime, _CREATED_HISTORY_NATIVE_2025_METADATA
+    _runtime, _commands, writes, task = _created_fields_history_runtime(tmp_path, None, version,
+        source_metadata=_CREATED_HISTORY_NATIVE_2025_METADATA)
+    task.objects[ROOT] = {'id': ROOT, 'name': 'Existing attenuation', 'type': 'Attenuation', 'classId': 655376,
+        'path': r'\Attenuations\Default Work Unit\Existing attenuation', 'notes': 'Keep target',
+        'parent': {'id': '{66666666-6666-6666-6666-666666666666}'}}
+    parent, target = task.bind(SECOND), task.bind(ROOT)
+    code, fields = task.step('draft-discover-fields', '--semantic-kind', 'sound-sfx', '--meaning', 'Attenuation')
+    assert code == 0, fields
+    reference = fields['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'source', '--parent-handle', parent,
+        '--kind', 'sound-sfx', '--name', 'Rain', '--field', 'loop', 'infinite', '--field-value', reference, target)
+    assert code == 0, declared
+    return task, writes
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_new_known_non_bus_class_keeps_same_call_reference_conditions(tmp_path, version):
+    #2025 raw condition grammar replay, version-pinned class proof only; no native applicability claim.
+    task, writes = _non_bus_reference_task(tmp_path, version)
+    tx, shown = task.preview()
+    spec, = shown['artifact']['prepared_operation']['verification_plan']['nodes']
+    evidence, = spec['new_object_default_evidence']
+    rule, = evidence['structural_visibility']
+    assert rule['field'] == 'Attenuation' and rule['proof']['kind'] == 'non_bus_class'
+    assert rule['proof']['class_id'] == 65552 and rule['proof']['parent'] == {}
+    assert rule['proof']['bus_classes'] == {'Bus': 1376272, 'AuxBus': 3997712}
+    assert evidence['derived_properties'] == {'OverridePositioning': True}
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1 and writes[0][1]['@OverridePositioning'] is True
+    assert writes[0][1]['@IsLoopingEnabled'] is True and writes[0][1]['@IsLoopingInfinite'] is True
+    assert task.objects[ROOT]['notes'] == 'Keep target'
+
+
+@pytest.mark.parametrize('fault', ['wrong-class', 'prewrite-class', 'effect-class', 'master-predicate'])
+def test_new_non_bus_visibility_never_accepts_unproved_class_or_wrong_created_class(tmp_path, fault):
+    task, writes = _non_bus_reference_task(tmp_path)
+    if fault in {'wrong-class', 'master-predicate'}:
+        if fault == 'wrong-class': next(row for row in task.types if row['name'] == 'Sound')['classId'] = 65553
+        else: task.metadata['Attenuation']['dependencies'][0]['value'] = True
+        code, rejected = task.step('draft-check')
+        assert code == 2 and rejected['error_code'] == ('FIELD_HANDLE_STALE' if fault == 'master-predicate' else 'NEW_OBJECT_DEPENDENCY_UNSUPPORTED'), rejected
+        assert writes == []
+        return
+    tx, shown = task.preview()
+    if fault == 'prewrite-class':
+        next(row for row in task.types if row['name'] == 'Sound')['classId'] = 65553
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and writes == [], rejected
+    else:
+        original = task.call
+        def wrong_effect(uri, args=None, options=None):
+            result = original(uri, args, options)
+            if uri.endswith('object.create'): task.objects[result['id']]['classId'] = 1376272
+            return result
+        task.call = wrong_effect
+        code, rejected = task.finish(tx, shown)
+        assert code == 2 and rejected.get('verified') is not True and len(writes) == 1, rejected

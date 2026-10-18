@@ -9,8 +9,8 @@ import math
 import re
 from typing import Any, Callable, Mapping
 
-from .business_declarations import normalize_live_object_identity
-from .canonical import canonical_json_bytes
+from .business_declarations import BusinessContext, normalize_live_object_identity
+from .canonical import canonical_json_bytes, canonical_sha256
 from .builders.metadata import bind_get_property_info_result, parse_property_and_reference_names_result
 from .metadata_discovery import metadata_typed_value_type
 from .object_lifecycle_graph import lifecycle_snapshot_equal
@@ -20,6 +20,7 @@ from .transaction_runtime import canonical_project_path
 from .edit_history_contracts import HISTORY_VERSIONS
 
 CONTRACT = "waapi-skill.owned-history-expectation/v1"
+REFERENCE_CONTRACT = "waapi-skill.history-draft-reference/v1"
 GET = "ak.wwise.core.object.get"
 NAMES = "ak.wwise.core.object.getPropertyAndReferenceNames"
 INFO = "ak.wwise.core.object.getPropertyInfo"
@@ -466,6 +467,103 @@ def validate_history_binding(uri: str, version: str, value: Any) -> dict[str, An
     if not 1 <= len(observations) <= MAX_OBSERVATIONS or not lifecycle_snapshot_equal(value["observations"], observations):
         raise ValueError("History expected states differ from their immutable owned receipt")
     return dict(value)
+
+
+def history_draft_reference(binding, *, store, context):
+    """Keep deep source metadata in its journal, not ordinary Draft JSON values."""
+    receipt = binding["source_receipt"]
+    if receipt is not None and receipt["state_dir"] != str(store.state_dir):
+        raise ValueError("History reference requires its current owned transaction store")
+    validate_history_binding(binding["uri"], binding["version"], binding)
+    return {"contract": REFERENCE_CONTRACT, "uri": binding["uri"],
+        "version": binding["version"], "scope": binding["scope"],
+        "source_context_fingerprint": binding["source_context_fingerprint"],
+        "source_receipt": None if receipt is None else {key: value for key, value in receipt.items() if key != "state_dir"},
+        "owner_state_sha256": canonical_sha256(str(store.state_dir)), "draft_context": context.as_binding_dict(),
+        "binding_sha256": canonical_sha256(binding)}
+
+
+def validate_history_reference(uri: str, version: str, reference: Any) -> dict[str, Any]:
+    """Validate the internal compact shape without opening any referenced path."""
+    keys = {"contract", "uri", "version", "scope", "source_context_fingerprint", "source_receipt",
+        "owner_state_sha256", "draft_context", "binding_sha256"}
+    if (uri not in HISTORY_VERSIONS or version not in HISTORY_VERSIONS[uri]
+            or not isinstance(reference, Mapping) or set(reference) != keys
+            or reference["contract"] != REFERENCE_CONTRACT or reference["uri"] != uri
+            or reference["version"] != version or reference["scope"] != "latest_project_history"):
+        raise ValueError("History requires its closed original-receipt reference")
+    for key in ("owner_state_sha256", "binding_sha256", "source_context_fingerprint"):
+        if not isinstance(reference[key], str) or not re.fullmatch(r"[0-9a-f]{64}", reference[key]):
+            raise ValueError("History reference digest is malformed")
+    context = BusinessContext.from_binding_dict(reference["draft_context"])
+    if context.wwise_version != version:
+        raise ValueError("History reference version differs from its Draft context")
+    receipt = reference["source_receipt"]
+    if receipt is not None:
+        if (not isinstance(receipt, Mapping) or set(receipt) != {"transaction_id", "artifact_hash", "event_sequence", "last_event_hash"}
+                or not isinstance(receipt["transaction_id"], str)
+                or type(receipt["event_sequence"]) is not int or receipt["event_sequence"] < 1
+                or any(not isinstance(receipt[key], str) or not re.fullmatch(r"[0-9a-f]{64}", receipt[key])
+                    for key in ("artifact_hash", "last_event_hash"))):
+            raise ValueError("History reference requires its exact original source receipt")
+    return dict(reference)
+
+
+def materialize_history_reference(uri, version, reference, *, store, context):
+    """Resolve only the supplied owner Store, retaining the originally selected tail."""
+    validate_history_reference(uri, version, reference)
+    if (store is None or reference["owner_state_sha256"] != canonical_sha256(str(store.state_dir))
+            or reference["draft_context"] != context.as_binding_dict()):
+        raise ValueError("History reference differs from its owned Draft store or context")
+    receipt = reference["source_receipt"]
+    observations = []
+    if receipt is not None:
+        snapshot = _verified_snapshot(store, receipt["transaction_id"])
+        if (snapshot.preview.artifact_hash != receipt["artifact_hash"]
+                or snapshot.record.event_sequence != receipt["event_sequence"]
+                or snapshot.record.last_event_hash != receipt["last_event_hash"]
+                or snapshot.preview.artifact.get("project_guard", {}).get("context_fingerprint") != reference["source_context_fingerprint"]):
+            raise ValueError("History reference source changed after selection")
+        observations = _snapshot_observations(snapshot)
+    binding = {"contract": CONTRACT, "uri": uri, "version": version, "scope": reference["scope"],
+        "source_context_fingerprint": reference["source_context_fingerprint"],
+        "source_receipt": None if receipt is None else {"state_dir": str(store.state_dir), **receipt},
+        "observations": observations}
+    if canonical_sha256(binding) != reference["binding_sha256"]:
+        raise ValueError("History reference full proof differs from its immutable selection")
+    return validate_history_binding(uri, version, binding)
+
+
+def owned_history_resolver(store: TransactionStore, project_guard: Mapping[str, Any]):
+    """Inject store authority from the owning Gateway, never from receipt input."""
+    def resolve(uri: str, version: str, reference: Mapping[str, Any]):
+        validate_history_reference(uri, version, reference)
+        context = BusinessContext.from_binding_dict(reference["draft_context"])
+        if (reference["source_context_fingerprint"] != project_guard.get("context_fingerprint")
+                or context.project_id != project_guard.get("project", {}).get("id")
+                or canonical_project_path(context.project_path) != canonical_project_path(project_guard.get("project", {}).get("path"))
+                or context.wwise_version != project_guard.get("version")
+                or context.wwise_build != project_guard.get("wwise", {}).get("version", {}).get("displayName")):
+            raise ValueError("History reference differs from its owning project/runtime context")
+        return materialize_history_reference(uri, version, reference, store=store, context=context)
+    return resolve
+
+
+def resolved_prepared_history(prepared: Mapping[str, Any], resolver):
+    """Bind the exact request reference to both complete sealed proof copies."""
+    request = prepared.get("request", {})
+    arguments = request.get("arguments", {})
+    reference = arguments.get("history_binding")
+    if isinstance(reference, Mapping) and reference.get("contract") == REFERENCE_CONTRACT:
+        if resolver is None:
+            raise ValueError("History reference requires its owning Gateway resolver")
+        binding = resolver(arguments.get("api"), request.get("version"), reference)
+    else:
+        binding = validate_history_binding(arguments.get("api"), request.get("version"), reference)
+    if (not lifecycle_snapshot_equal(binding, prepared.get("pre_state", {}).get("history_binding"))
+            or not lifecycle_snapshot_equal(binding, prepared.get("verification_plan", {}).get("history_binding"))):
+        raise ValueError("History request reference differs from its complete sealed proof")
+    return binding
 
 
 def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, read: Callable[..., Any]) -> dict[str, Any]:

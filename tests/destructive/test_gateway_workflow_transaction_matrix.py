@@ -6758,7 +6758,8 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
             return payload
     gateway = Gateway()
     projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
-    fields = ('IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'Attenuation')
+    required_fields = ('IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'Attenuation')
+    fields = required_fields
     def query(selector, *, sound=False):
         payload = gateway.gateway(['query-object', *selector, *projection, *(['--platform', platform] if sound else []),
             *(arg for field in (fields if sound else ()) for arg in ('--include-field', field))], live=True)
@@ -6773,7 +6774,7 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         return rows[0]
     def by_path(segments, *, sound=False):
         return query([arg for segment in segments for arg in ('--path-segment', segment)], sound=sound)
-    def complete(draft, label, *, setup=False, expected_root=None):
+    def complete(draft, label, *, setup=False, expected_root=None, expected_fields=None):
         phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
         receipt['setup' if setup else 'effects'].append(phase)
         phase_category = {'category': 'created-fields-history-' + label, 'status': 'FAIL',
@@ -6786,9 +6787,9 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         shown = gateway.gateway(['transaction-show', identity], live=False)
         phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'])
         if expected_root is not None:
-            binding = shown['artifact']['request']['arguments']['history_binding']
+            binding = shown['artifact']['prepared_operation']['pre_state']['history_binding']
             observed_fields = [row for row in binding['observations'] if row.get('kind') == 'creation_field']
-            assert len(observed_fields) == 4 and {row['field'] for row in observed_fields} == set(fields), binding
+            assert len(observed_fields) == len(expected_fields) and {row['field'] for row in observed_fields} == set(expected_fields), binding
             assert {row['object_id'] for row in observed_fields} == {expected_root}, binding
             assert all(isinstance(row['field_info'].get('raw'), Mapping) for row in observed_fields), binding
             root, = [row for row in binding['observations'] if row['kind'] == 'creation_presence']
@@ -6848,7 +6849,16 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
                 '--field-value', handles['Attenuation'], target_handle if case == 'existing' else 'null'], live=False)
             phase, phase_category = complete(draft, case + '-source')
             source_id, created_id = phase['transaction_id'], _created_object_id(phase['execute'])
+            node, = phase['immutable_preview']['prepared_operation']['pre_state']['object_create_nodes']
+            materialized_properties = {row['name']: row['value'] for row in node['properties']}
+            materialized_references = {row['name']: row['target_id'] for row in node['references']}
+            fields = (*materialized_properties, *materialized_references)
+            assert len(set(fields)) == len(fields) and set(required_fields) <= set(fields), node
             original = exact(created_id, sound=True)
+            for token, expected in materialized_properties.items():
+                actual = original.get('properties', {}).get(token)
+                assert (type(actual) is bool and actual is expected) if type(expected) is bool else (
+                    type(actual) in (int, float) and actual == expected), (token, expected, original)
             props = original.get('properties', {})
             assert original['type'] == 'Sound' and original['name'] == source_name, original
             assert original['path'] == '\\' + '\\'.join(source_segments), original
@@ -6868,12 +6878,12 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
                 and uuid.UUID(reference_id) == uuid.UUID(target_id)), original
             assert exact(target_id) == target and exact(parent['id']) == parent, 'Source changed its target or parent'
             admit(phase, phase_category, original)
-            phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id)
+            phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id, expected_fields=fields)
             absence = {'id': query(['--exact-id', created_id]), 'path': by_path(source_segments), 'target': exact(target_id)}
             assert absence['id'] == absence['path'] == [] and absence['target'] == target, absence
             admit(phase, phase_category, absence)
             if runtime.version != '2022.1':
-                phase, phase_category = complete(history(source_id, 'redo'), case + '-redo', expected_root=created_id)
+                phase, phase_category = complete(history(source_id, 'redo'), case + '-redo', expected_root=created_id, expected_fields=fields)
                 restored = exact(created_id, sound=True)
                 assert json.dumps(restored, sort_keys=True) == json.dumps(original, sort_keys=True), (original, restored)
                 assert by_path(source_segments, sound=True) == [restored] and exact(target_id) == target, restored

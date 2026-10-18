@@ -3245,7 +3245,7 @@ def test_voice_creation_collector_rejects_corruption_after_gateway_verified(tmp_
     assert len(writes) == expected and [row[0] for row in commands].count('execute') == expected
 
 
-def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fault=None, null_value=None):
+def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fault=None, null_value=None, source_metadata=None):
     """Public Gateway with native-shaped create/history state, never manufactured receipts."""
     from copy import deepcopy
     import uuid
@@ -3263,6 +3263,10 @@ def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fau
         'Volume': {'name': 'Volume', 'type': 'Real32', 'restriction': {'type': 'range', 'min': -96, 'max': 6}},
         'Attenuation': {'name': 'Attenuation', 'type': '', 'restriction': {
             'type': 'reference', 'restrictions': [{'type': ['Attenuation']}]}}}
+    if source_metadata is not None:
+        task.metadata.update(deepcopy(source_metadata))
+        task.types.extend([{'name': 'Bus', 'classId': 1376272, 'type': 'WObject'},
+            {'name': 'AuxBus', 'classId': 3997712, 'type': 'WObject'}])
     platform = '{77777777-7777-7777-7777-777777777777}'
     original, commands, writes = task.call, [], []
     history = {}
@@ -3278,6 +3282,8 @@ def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fau
                 'classId': next(item['classId'] for item in task.types if item['name'] == args['type']),
                 'path': task.objects[args['parent']]['path'] + '\\' + args['name'],
                 'parent': {'id': args['parent']}, 'notes': args.get('notes', '')}
+            if args['type'] == 'Sound' and source_metadata is not None:
+                row.update({'@' + key: deepcopy(info['default']) for key, info in source_metadata.items() if 'default' in info})
             row.update({key: deepcopy(value) for key, value in args.items() if key.startswith('@')})
             if '@Attenuation' in row and row['@Attenuation'] is None:
                 row['@Attenuation'] = deepcopy(null_value)
@@ -3354,7 +3360,7 @@ def test_created_fields_history_collector_executes_public_source_and_history_eff
     assert len(set(roots)) == 2
     for row in receipt['effects']:
         if row['phase'].endswith(('-undo', '-redo')):
-            binding = row['immutable_preview']['request']['arguments']['history_binding']
+            binding = row['immutable_preview']['prepared_operation']['pre_state']['history_binding']
             root = roots[int(row['phase'].startswith('null-'))]
             assert {item['object_id'] for item in binding['observations'] if item['kind'] == 'creation_field'} == {root}
     assert sum(command[0] == 'execute' for command in commands) == len(writes)
@@ -3416,6 +3422,187 @@ def test_created_fields_history_collector_rejects_unbound_live_context_or_path(t
         assert receipt['effects'][-1]['verify']['verified'] is True
     else:
         assert writes == []
+
+
+# Exact raw six-field metadata from retained807 native2025.1 draft discovery.
+# Source/provenance: /tmp/full-coverage-180-new-object-non-master-condition-plan.md.
+_CREATED_HISTORY_NATIVE_2025_METADATA = {'Volume': {'audioEngineId': 0,
+            'default': 0.0,
+            'dependencies': [],
+            'display': {'group': 'Voice', 'index': 1520, 'name': 'Voice Volume'},
+            'name': 'Volume',
+            'restriction': {'max': 200.0, 'min': -200.0, 'type': 'range'},
+            'supports': {'randomizer': True, 'rtpc': 'Additive', 'unlink': True},
+            'type': 'Real64',
+            'ui': {'autoUpdate': False,
+                   'dataMeaning': 'Decibels',
+                   'displayAs': {'bitfield': False, 'lrMix': False, 'musicNote': False, 'percentage': False},
+                   'value': {'decimals': 1,
+                             'fine': 0.1,
+                             'infinity': 0,
+                             'max': 12.0,
+                             'min': -96.0,
+                             'step': 1.0}}},
+ 'Attenuation': {'audioEngineId': 4294967295,
+                 'default': None,
+                 'dependencies': [{'action': 'Show',
+                                   'context': 'Self',
+                                   'type': 'isMasterBus',
+                                   'value': False},
+                                  {'action': 'Enable',
+                                   'conditions': [{'restriction': {'type': 'enum',
+                                                                   'values': [{'displayName': 'True',
+                                                                               'value': True}]}}],
+                                   'context': 'Self',
+                                   'property': 'ListenerRelativeRouting',
+                                   'type': 'property'},
+                                  {'action': 'Enable',
+                                   'conditions': [{'restriction': {'type': 'enum',
+                                                                   'values': [{'displayName': 'True',
+                                                                               'value': True}]}}],
+                                   'context': 'Self',
+                                   'property': 'ListenerRelativeRouting',
+                                   'type': 'property'},
+                                  {'action': 'Enable',
+                                   'context': 'Self',
+                                   'property': 'OverridePositioning',
+                                   'type': 'override'}],
+                 'display': {'group': 'Listener Relative Routing/Attenuation',
+                             'index': 1641,
+                             'name': 'Attenuation'},
+                 'name': 'Attenuation',
+                 'restriction': {'restrictions': [{'sharedOnlyTypes': [], 'type': ['Attenuation']}],
+                                 'type': 'reference'},
+                 'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': True},
+                 'type': '',
+                 'ui': {'autoUpdate': False,
+                        'dataMeaning': 'None',
+                        'displayAs': {'bitfield': False,
+                                      'lrMix': False,
+                                      'musicNote': False,
+                                      'percentage': False},
+                        'value': {'decimals': 0,
+                                  'fine': 0.0,
+                                  'infinity': 0,
+                                  'max': 0.0,
+                                  'min': 0.0,
+                                  'step': 0.0}}},
+ 'ListenerRelativeRouting': {'audioEngineId': 4294967295,
+                             'default': True,
+                             'dependencies': [{'action': 'Enable',
+                                               'context': 'Self',
+                                               'property': 'OverridePositioning',
+                                               'type': 'override'}],
+                             'display': {'group': 'Listener Relative Routing',
+                                         'index': 1636,
+                                         'name': 'Listener Relative Routing'},
+                             'name': 'ListenerRelativeRouting',
+                             'restriction': {},
+                             'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': False},
+                             'type': 'bool',
+                             'ui': {'autoUpdate': False,
+                                    'dataMeaning': 'None',
+                                    'displayAs': {'bitfield': False,
+                                                  'lrMix': False,
+                                                  'musicNote': False,
+                                                  'percentage': False},
+                                    'value': {'decimals': 0,
+                                              'fine': 0.0,
+                                              'infinity': 0,
+                                              'max': 0.0,
+                                              'min': 0.0,
+                                              'step': 0.0}}},
+ 'OverridePositioning': {'audioEngineId': 4294967295,
+                         'default': False,
+                         'dependencies': [{'action': 'Enable',
+                                           'context': 'Self',
+                                           'property': 'OverridePositioning',
+                                           'type': 'override'}],
+                         'display': {'group': '', 'index': 1633, 'name': 'Override Positioning'},
+                         'name': 'OverridePositioning',
+                         'restriction': {},
+                         'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': False},
+                         'type': 'bool',
+                         'ui': {'autoUpdate': False,
+                                'dataMeaning': 'None',
+                                'displayAs': {'bitfield': False,
+                                              'lrMix': False,
+                                              'musicNote': False,
+                                              'percentage': False},
+                                'value': {'decimals': 0,
+                                          'fine': 0.0,
+                                          'infinity': 0,
+                                          'max': 0.0,
+                                          'min': 0.0,
+                                          'step': 0.0}}},
+ 'IsLoopingEnabled': {'audioEngineId': 4294967295,
+                      'default': False,
+                      'dependencies': [],
+                      'display': {'group': 'Loop', 'index': 1568, 'name': 'Loop'},
+                      'name': 'IsLoopingEnabled',
+                      'restriction': {},
+                      'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': False},
+                      'type': 'bool',
+                      'ui': {'autoUpdate': False,
+                             'dataMeaning': 'None',
+                             'displayAs': {'bitfield': False,
+                                           'lrMix': False,
+                                           'musicNote': False,
+                                           'percentage': False},
+                             'value': {'decimals': 0,
+                                       'fine': 0.0,
+                                       'infinity': 0,
+                                       'max': 0.0,
+                                       'min': 0.0,
+                                       'step': 0.0}}},
+ 'IsLoopingInfinite': {'audioEngineId': 4294967295,
+                       'default': True,
+                       'dependencies': [{'action': 'Enable',
+                                         'conditions': [{'restriction': {'type': 'enum',
+                                                                         'values': [{'displayName': 'True',
+                                                                                     'value': True}]}}],
+                                         'context': 'Self',
+                                         'property': 'IsLoopingEnabled',
+                                         'type': 'property'}],
+                       'display': {'group': 'Loop', 'index': 1569, 'name': 'Loop Infinite'},
+                       'name': 'IsLoopingInfinite',
+                       'restriction': {},
+                       'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': False},
+                       'type': 'bool',
+                       'ui': {'autoUpdate': False,
+                              'dataMeaning': 'None',
+                              'displayAs': {'bitfield': False,
+                                            'lrMix': False,
+                                            'musicNote': False,
+                                            'percentage': False},
+                              'value': {'decimals': 0,
+                                        'fine': 0.0,
+                                        'infinity': 0,
+                                        'max': 0.0,
+                                        'min': 0.0,
+                                        'step': 0.0}}}}
+
+
+def test_created_fields_history_collector_preserves_actual_same_call_reference_conditions(tmp_path, workflow):
+    runtime, _commands, _writes, _task = _created_fields_history_runtime(tmp_path, workflow,
+        source_metadata=_CREATED_HISTORY_NATIVE_2025_METADATA)
+    category = workflow._collect_created_leaf_fields_history_acceptance(runtime, name="WAAPI_HISTORY_TEST")
+    assert category["status"] == "PASS"
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    for phase in receipt['effects']:
+        if phase['phase'].endswith('-source'):
+            assert phase['independent_effect']['properties']['OverridePositioning'] is True
+            continue
+        artifact = phase['immutable_preview']
+        reference = artifact['request']['arguments']['history_binding']
+        assert reference['contract'] == 'waapi-skill.history-draft-reference/v1' and 'observations' not in reference
+        binding = artifact['prepared_operation']['pre_state']['history_binding']
+        fields = [row for row in binding['observations'] if row['kind'] == 'creation_field']
+        assert {row['field'] for row in fields} == {'IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'OverridePositioning', 'Attenuation'}
+        assert all(row['field_info']['raw'] == _CREATED_HISTORY_NATIVE_2025_METADATA[row['field']] for row in fields)
+        assert phase['verify']['agent_result']['request'] == artifact['request']
+        assert list(phase['verify'])[-1] == 'agent_result'
+        assert len(json.dumps(phase['verify'], ensure_ascii=False, indent=2).encode('utf-8')) <= 24 * 1024
 
 
 def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared', version='2025.1'):
