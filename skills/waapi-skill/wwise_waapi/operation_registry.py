@@ -5860,6 +5860,7 @@ def _prepare_object_set(
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
     field_snapshots: list[dict[str, Any]] = []
+    existing_field_history: list[dict[str, Any]] = []
     condition_metadata_guards: list[dict[str, Any]] = []
     related_conditions: list[dict[str, Any]] = []
     reference_target_conditions: list[dict[str, Any]] = []
@@ -6792,6 +6793,9 @@ def _prepare_object_set(
                             spec["preexisting_children"] = _read_direct_children(collisions[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
                             children_snapshots.append({"object_id": collisions[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": spec["preexisting_children"]})
 
+        from .existing_field_observations import capture_before
+        existing_field_history.append(capture_before(target_spec, property_info_by_name,
+            version=request.version, catalog=type_catalog, read=read))
         snapshot_fields = _dedupe_fields(
             [
                 *IDENTITY_RETURN_FIELDS,
@@ -7035,6 +7039,7 @@ def _prepare_object_set(
     state: dict[str, Any] = {
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
+        "existing_field_observations": existing_field_history,
         "effect_render_chains": effect_render_chains,
         "graph_rtpc_guards": [spec for spec in node_specs if spec.get("rtpc_binding")],
     }
@@ -10540,6 +10545,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
 
         if arguments.get("history_binding") is not None:
             from .edit_history_business import observe_history_state, history_summary, REFERENCE_CONTRACT
+            observed = None
             try:
                 history = arguments["history_binding"]
                 if history.get("contract") == REFERENCE_CONTRACT:
@@ -10551,7 +10557,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                     if not observed["matches"]:
                         raise ValueError("Current scoped state differs from the owned history expectation")
             except ValueError as exc:
-                raise OperationContractError("HISTORY_EXPECTATION_CHANGED", str(exc)) from exc
+                raise OperationContractError("HISTORY_EXPECTATION_CHANGED", str(exc), details={
+                    "readbacks": getattr(exc, "readbacks", []),
+                    **({"history_observation": observed} if observed is not None else {}),
+                }) from exc
             metadata["history_binding"] = dict(history)
             metadata["history_expectation"] = history_summary(history)
             preview = SemanticPreview(envelope=SemanticEnvelope(uri=api, args=call_args, options=call_options,
@@ -22578,6 +22587,10 @@ def verify_prepared_operation(
         from .creation_observations import capture_created_field_metadata
         for spec, object_id in created_history_metadata:
             readbacks.extend(capture_created_field_metadata(spec, object_id, read=read_call))
+    if kind == "object-set-batch" and all(item.get("passed") is True for item in assertions):
+        from .existing_field_observations import capture_after
+        for proof in (pre_state or {}).get("existing_field_observations", []):
+            readbacks.append(capture_after(proof, read=read_call))
     outcome = _verification(
         operation,
         assertions,

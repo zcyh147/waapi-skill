@@ -621,7 +621,7 @@ def test_exact_existing_slot_render_uses_same_chain_preview_and_readback(tmp_pat
         code, rejected = task.run('draft-declare-core-plan', history['draft_id'],
             '--task-authority', started['task_authority'], '--expected-revision', str(history['revision']),
             '--value', 'history_scope', 'latest_project_history', '--value', 'expectation_receipt', tx)
-        assert code == 2 and 'Render chain' in json.dumps(rejected), rejected
+        assert code == 2 and 'original chain read view is not certified' in json.dumps(rejected), rejected
         assert not any(uri.endswith('undo.undo') for uri, _, _ in task.calls)
 
 
