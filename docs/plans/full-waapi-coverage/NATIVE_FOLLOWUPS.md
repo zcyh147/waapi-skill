@@ -325,3 +325,13 @@ Source hashes/mtime/tree and 1,881 tracked files stayed unchanged; the sandbox
 was deleted and processes ended. The original is in the query worktree's
 `render-suffix-98c1f74f-2025-r1`. Other modern versions and legacy scalar layout
 still need their own evidence before this behavior is generalized.
+
+Matching modern diagnostics at `a4936b07` subsequently observed the same
+true,true → false,false transition on 2023.1 and 2024.1 (13.11s and 8.23s,
+113 public calls each). Each preserved all other disclosed state and metadata,
+source hashes/mtime/tree and 1,881 tracked files, removed its sandbox and left
+no owned process. Their original `render-suffix-a4936b07-{2023,2024}-r1`
+records remain diagnostic-only; they justify implementing the modern suffix
+rule, not claiming its successor is already accepted. Legacy 2021/2022 remains
+separate. Root's ignored `render-suffix-modern-observation-summary.json` hashes
+the three original observations without replacing them.

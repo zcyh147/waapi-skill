@@ -21,6 +21,12 @@ and blocked for business acceptance. Source hash/mtime/tree and 1,881 tracked
 files were unchanged; sandbox deletion and process cleanup passed. Other
 versions and the successor suffix planner are not certified by this result.
 
+Separate matching diagnostics at `a4936b07` passed on 2023.1 (13.11s) and
+2024.1 (8.23s), observing the same clearing transition with complete scoped
+preservation. Source hash/mtime/tree and 1,881 tracked-file checks, sandbox
+deletion and process cleanup passed. These remain diagnostic observations,
+not legacy or successor-planner acceptance.
+
 ## 2026-10-18 full-coverage R31 native component
 
 At fixed `5e22e208`, the existing anonymous EffectSlot construction case passed
