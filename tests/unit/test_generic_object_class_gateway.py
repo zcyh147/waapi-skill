@@ -228,3 +228,14 @@ def test_object_set_import_reads_actual_source_and_requested_sound_classes(tmp_p
     assert code == (0 if fault == 'valid' else 2), json.dumps(result)
     assert (result.get('verified') is True) is (fault == 'valid')
     assert calls.count('ak.wwise.core.object.set') == 1
+
+
+def test_existing_ordinary_root_type_and_live_class_must_agree_at_preview(tmp_path):
+    task = class_task(tmp_path, operation='object.set')
+    task.objects[FIRST]['type'] = 'Sound'  # Still has independently supplied ActorMixer class 1.
+    owner = task.bind(FIRST)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'owner',
+        '--object-handle', owner, '--field', 'notes', 'Reviewed')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and not any(uri.endswith('object.set') for uri, _, _ in task.calls), rejected
