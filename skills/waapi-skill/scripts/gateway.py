@@ -775,7 +775,16 @@ QUERY_BUSINESS_RELATIONSHIPS: Mapping[str, str] = {
     "children": "children",
     "event-actions": "children",
     "parent": "parent",
+    "active-source": "activeSource",
 }
+
+
+def _available_query_relationships(version: str) -> dict[str, str]:
+    # Only the pinned 2021 WAQL object-expression mapping is established here.
+    return {name: token for name, token in QUERY_BUSINESS_RELATIONSHIPS.items()
+            if name != "active-source" or version == "2021.1"}
+
+
 QUERY_BUSINESS_VIEWS: Mapping[str, tuple[str, ...]] = {
     "sound-routing-diagnostics": (
         "override-output",
@@ -5599,6 +5608,15 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "bound; do not combine it with relationship, include, predicate, "
                 "custom-field, or max-results options."
             )
+    if "active-source" in relationships:
+        (relationship_version,) = resolve_catalog_versions(args, env=env)
+        if relationship_version != "2021.1":
+            raise GatewayInputError("--relationship active-source is established for Wwise 2021.1; later versions retain --include active-source")
+        if relationships != ("active-source",) or not (args.path_segments or args.object_id):
+            raise GatewayInputError("--relationship active-source requires one exact Sound GUID or path and no other relationship")
+        if args.max_results not in {None, 1}:
+            raise GatewayInputError("--relationship active-source owns the fixed one-source bound; omit --max-results or pass exactly 1")
+        args.max_results = 1
     if "event-actions" in relationships:
         if relationships != ("event-actions",):
             raise GatewayInputError(
@@ -5812,9 +5830,12 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
     bindings: list[tuple[str, str, str]] = []
     for name in requested:
         if name not in available_query_outputs(version):
-            supported = query_output_detail(version, name)["supported_versions"]
-            raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}")
-        native, output = QUERY_BUSINESS_OUTPUTS[name]
+            detail = query_output_detail(version, name)
+            supported = detail["supported_versions"]
+            alternative = detail.get("alternative", {}).get("gateway_option")
+            raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}"
+                                    + (f"; use {alternative} to read the selected source identity" if alternative else ""))
+        native, output = available_query_outputs(version)[name]
         bindings.append(("business", native, output))
 
     def bounded_custom_meaning(value: Any) -> str:
@@ -8790,7 +8811,7 @@ def query_business_schema_payload(
                 "choices": list(QUERY_BUSINESS_KINDS),
             }
         },
-        "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
+        "relationships": list(_available_query_relationships(version)),
         "views": {
             "sound-routing-diagnostics": {
                 "source": (
@@ -8815,6 +8836,11 @@ def query_business_schema_payload(
             }
         },
         "relationship_presets": {
+            **({"active-source": {"source": "one exact Sound path or GUID", "native_relationship": "activeSource",
+                                   "fixed_max_results": 1, "language": "explicit selection or current native language",
+                                   "result": "selected source identity; read exact GUID for file/language proof",
+                                   "authority": "pinned 2021.1 SDK waql_reference.html OBJECT_EXPRESSION activeSource"}}
+               if version == "2021.1" else {}),
             "event-actions": {
                 "source": "one exact Event path or GUID",
                 "native_relationship": "children",

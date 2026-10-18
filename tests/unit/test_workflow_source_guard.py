@@ -3883,10 +3883,17 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
             expression = args['waql']
             if version == '2021.1':
                 assert not {'activeSource', 'originalFilePath'} & set(options['return']), options
-            match = re.fullmatch(r'from object "([^"]+)"(?: take 1)?', expression)
+            match = re.fullmatch(r'from object "([^"]+)"( select activeSource)?(?: take 1)?', expression)
             assert match, expression
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             rows = [row for row in task.objects.values() if match[1] in (row['id'], row['path'])]
+            if match[2]:
+                assert version == '2021.1' and options['language'] == 'SFX'
+                rows = [task.objects[row['activeSource']['id']] for row in rows if 'activeSource' in row]
+                if fault == 'selected-source-guid' and len(writes) == 2:
+                    rows = [{**row, 'id': other} for row in rows]
+                if fault == 'ambiguous-source' and len(writes) == 2:
+                    rows = rows + [{**row, 'id': other} for row in rows]
             return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
                 if key in row or '@' + key in row} for row in rows]}
         if uri.endswith('audio.importTabDelimited'):
@@ -3940,9 +3947,16 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
         commands.append(list(command))
         code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
             env=runtime.env, client_factory=lambda _: task)
-        if command[0] == 'verify' and payload.get('verified') is True and len(writes) == 2 and fault == 'independent-source-parent':
+        if command[0] == 'verify' and payload.get('verified') is True and len(writes) == 2:
             source = next(row for row in task.objects.values() if row['type'] == 'AudioFileSource')
-            source['parent'] = {'id': EFFECT_PARENT}
+            if fault == 'independent-source-parent':
+                source['parent'] = {'id': EFFECT_PARENT}
+            if fault == 'source-media-mismatch':
+                Path(source['originalFilePath']).write_bytes(b'changed after verified import')
+        if (command[0] == 'query-object' and '--relationship' in command and code == 0
+                and fault == 'partial-source' and len(writes) == 2):
+            payload['projection_complete'] = False
+            payload['status'] = 'partial'
         return code, payload
     runtime.raw_gateway = raw
     return runtime, commands, writes
@@ -4002,6 +4016,11 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
     if version == '2021.1':
         assert receipt['source_class_discovery'] == {'name': 'AudioSource', 'class_id': 16}
         assert all(row['independent_source']['type'] == 'AudioFileSource' and row['independent_source']['class_id'] == 16 for row in effects[:2])
+        relation_calls = [call for call in receipt['calls'] if '--relationship' in call['argv']]
+        assert relation_calls and all('--language' in call['argv'] and 'SFX' in call['argv'] for call in relation_calls)
+        for row in effects[:2]:
+            assert row['source_selection']['selected']['id'] == row['independent_source']['id']
+            assert row['source_selection']['sound_file']['original_file_path'] == row['independent_source']['original_file_path']
         assert category['read_view_scope'] == 'current_default_view_only_unobserved_platform_identity'
         assert all(row['read_view']['status'] == 'unobserved' for row in effects)
     else:
@@ -4053,3 +4072,19 @@ def test_legacy_import_render_collector_rejects_live_source_move_after_gateway_v
     assert record['categories'][0]['status'] == 'FAIL' and record['invocation']['outcome'] == 'FAIL'
     assert len(record['transactions']) == 2 and all(row['state'] == 'verified' for row in record['transactions'])
     assert record['categories'][0]['observation_sha256'] == hashlib.sha256(Path(category['observation_path']).read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize('fault', ['selected-source-guid', 'independent-source-parent', 'partial-source',
+    'ambiguous-source', 'source-media-mismatch'])
+def test_legacy_2021_source_oracle_stops_after_verified_import_on_mismatched_selection(tmp_path, workflow, fault):
+    runtime, commands, writes = _legacy_import_render_runtime(tmp_path, workflow, '2021.1', fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_legacy_import_render_acceptance(runtime, prefix='WAAPI_LEGACY_SOURCE_NEGATIVE')
+    receipt = json.loads(Path(runtime.category_results[-1]['observation_path']).read_text())
+    assert receipt['failure'] and receipt['business_effect_verified'] is False
+    phase = receipt['transactions'][-1]
+    assert phase['phase'] == 'existing_media_render' and phase['verify']['payload']['verified'] is True
+    assert phase['effect_verified'] is False
+    assert len(writes) == 2
+    assert [command[0] for command in commands].count('execute') == 3  # imports2 + save prerequisite1
+    assert [command[0] for command in commands].count('verify') == 3

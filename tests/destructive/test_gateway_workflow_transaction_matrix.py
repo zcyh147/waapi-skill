@@ -7199,6 +7199,26 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
                 if i < 2: assert guid(value) == targets[i]['id'], row
                 else: assert value is None or isinstance(value, Mapping) and uuid.UUID(value['id']).int == 0, row
             return row
+        def selected_source(owner):
+            if runtime.version == '2021.1':
+                selected = one(['--exact-id', owner['id'], '--relationship', 'active-source', '--language', 'SFX'])
+                source_id = selected['id']
+            else:
+                selected = one(['--exact-id', owner['id'], '--include', 'active-source'])
+                source_id = guid(selected.get('active_source'))
+            source = one(['--exact-id', source_id, '--include', 'original-file-path', '--include', 'source-language',
+                *(['--language', 'SFX'] if runtime.version == '2021.1' else [])])
+            assert source['type'] == 'AudioFileSource' and source['class_id'] == classes['AudioFileSource'] and guid(source.get('parent')) == owner['id'], source
+            assert isinstance(source.get('source_language'), Mapping) and source['source_language'].get('name') == 'SFX', source
+            selection = {'selected': selected}
+            if runtime.version == '2021.1':
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes'):
+                    assert (key in selected) == (key in source) and selected.get(key) == source.get(key), (selected, source)
+                sound_file = one(['--exact-id', owner['id'], '--include', 'original-file-path', '--language', 'SFX'])
+                assert sound_file['id'] == owner['id'] and sound_file['type'] == 'Sound', sound_file
+                assert isinstance(source.get('original_file_path'), str) and source['original_file_path'] == sound_file.get('original_file_path'), (sound_file, source)
+                selection['sound_file'] = sound_file
+            return source, selection
         existing_name = prefix + '_Existing'
         completed_media = []
         for index, phase_name in enumerate(('setup_existing_sound_no_credit', 'existing_media_render', 'new_media_refs_render', 'immutable_tsv_structure_render')):
@@ -7249,12 +7269,10 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
             if existing: assert owner['id'] == existing_owner['id'], owner
             if not setup and not existing: assert owner['id'] != existing_owner['id'], owner
             if index in (1, 2):
-                active = one(['--exact-id', owner['id'], '--include', 'active-source'])
-                source_id = guid(active.get('active_source'))
-                source = one(['--exact-id', source_id, '--include', 'original-file-path', '--include', 'source-language'])
+                source, selection = selected_source(owner)
+                source_id = source['id']
                 phase['independent_source'] = source
-                assert source['type'] == 'AudioFileSource' and source['class_id'] == classes['AudioFileSource'] and guid(source.get('parent')) == owner['id'], source
-                assert isinstance(source.get('source_language'), Mapping) and source['source_language'].get('name') == 'SFX', source
+                phase['source_selection'] = selection
                 source_result = _imported_object(phase['execute']['payload'], '\\' + '\\'.join((*segments, name, audio.stem)))
                 assert source_result['id'] == source_id and guid(source_result.get('parent')) == owner['id'], source_result
                 copied_path = Path(localize_waapi_host_path(_required_string(source, 'original_file_path')))
@@ -7270,10 +7288,9 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
             for previous in completed_media:
                 previous_owner = owner_at(previous['owner']['name'], rendered=True)
                 assert previous_owner == previous['owner'], (previous, previous_owner)
-                active = one(['--exact-id', previous_owner['id'], '--include', 'active-source'])
-                assert guid(active.get('active_source')) == previous['source']['id'], active
-                prior_source = one(['--exact-id', previous['source']['id'], '--include', 'original-file-path', '--include', 'source-language'])
+                prior_source, prior_selection = selected_source(previous_owner)
                 assert prior_source == previous['source'], (previous, prior_source)
+                assert prior_selection == previous['selection'], (previous, prior_selection)
                 prior_path = Path(localize_waapi_host_path(_required_string(prior_source, 'original_file_path')))
                 assert not path_is_link_or_reparse(prior_path), prior_path
                 assert prior_path.resolve(strict=True) == Path(previous['media']['copied']), prior_source
@@ -7282,7 +7299,7 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
                 input_path = Path(previous['media']['input'])
                 assert input_path.stat().st_size == previous['media']['input_size'] and hashlib.sha256(input_path.read_bytes()).hexdigest() == previous['media']['input_sha256'], previous
                 phase['preserved_media'].append(previous)
-            if index in (1, 2): completed_media.append({'owner': owner, 'source': source, 'media': phase['media']})
+            if index in (1, 2): completed_media.append({'owner': owner, 'source': source, 'selection': selection, 'media': phase['media']})
             phase['preserved'] = preserved()
             phase['effect_verified'] = not setup
         receipt['business_effect_verified'] = True; category['status'] = 'PASS'

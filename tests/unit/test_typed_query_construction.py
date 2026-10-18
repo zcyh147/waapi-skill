@@ -1393,3 +1393,16 @@ def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_p
             env=env, client_factory=lambda _: client)
         assert code != 0 and "--relationship active-source" in error["message"]
         assert len(client.calls) == before
+        code, detail = gateway.execute_gateway(["query-schema", "--output", "original-file-path"], env=env)
+        assert code == 0 and detail["business_output"]["native_definition"]["pointer"].endswith("/originalWavFilePath")
+        for suffix in (["--max-results", "2"], ["--relationship", "parent"]):
+            code, error = gateway.execute_gateway(["query-object", "--exact-id", sound,
+                "--relationship", "active-source", *suffix], env=env, client_factory=lambda _: client)
+            assert code != 0 and len(client.calls) == before
+    else:
+        code, schema = gateway.execute_gateway(["query-schema"], env=env)
+        assert code == 0 and "active-source" not in schema["relationships"]
+        before = len(client.calls)
+        code, error = gateway.execute_gateway(["query-object", "--exact-id", sound,
+            "--relationship", "active-source"], env=env, client_factory=lambda _: client)
+        assert code != 0 and len(client.calls) == before
