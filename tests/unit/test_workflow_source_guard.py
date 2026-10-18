@@ -3154,6 +3154,11 @@ def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared')
             assert len(slots) == 2 and args == {'object': slots[0]['id'], 'property': 'Render', 'value': False}, args
             assert [row['@Render'] for row in slots] == [True, True], slots
             if outcome == 'native-error': raise RuntimeError('Original native suffix rejection; never replay')
+            if outcome == 'native-rejected':
+                class NativeSuffixRejection(RuntimeError):
+                    uri = 'ak.wwise.invalid_arguments'
+                    kwargs = {'details': {'procedureUri': 'ak.wwise.core.object.setProperty'}}
+                raise NativeSuffixRejection('Original native suffix rejection; never replay')
             slots[0]['@Render'] = False
             if outcome in {'cleared', 'missing-render', 'bypass-change', 'owner-change', 'reference-change', 'read-error'}:
                 slots[1]['@Render'] = False
@@ -3213,12 +3218,15 @@ def test_render_suffix_diagnostic_cannot_classify_incomplete_or_unrequested_chan
     assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
 
 
-def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry(tmp_path, workflow):
-    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome='native-error')
+@pytest.mark.parametrize('outcome,classification,complete,status', [
+    ('native-error', 'indeterminate', False, 'FAIL'), ('native-rejected', 'native_rejected', True, 'blocked')])
+def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry(tmp_path, workflow, outcome, classification, complete, status):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=outcome)
     category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
     receipt = json.loads(Path(category['observation_path']).read_text())
-    assert category['classification'] == 'native_rejected' and receipt['diagnostic_complete'] is True
-    assert category['status'] == 'blocked' and receipt['business_effect_verified'] is False
+    assert category['classification'] == classification and receipt['diagnostic_complete'] is complete
+    assert category['status'] == status and receipt['business_effect_verified'] is False
+    assert receipt['transactions'][-1]['original_durable_state'] == 'indeterminate'
     assert 'Original native suffix rejection' in json.dumps(receipt['transactions'][-1]['execute'])
     assert len(writes) == 5 and commands[-1][0] == 'execute'
     assert [command[0] for command in commands].count('verify') == 4

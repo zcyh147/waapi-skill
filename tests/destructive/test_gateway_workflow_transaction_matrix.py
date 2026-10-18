@@ -6400,8 +6400,17 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
         if code != 0 or executed.get('ok') is not True:
             phase['native_outcome'] = 'rejected' if executed.get('state') == 'execution_failed' else 'indeterminate'
-            receipt['classification'] = 'native_rejected' if phase['native_outcome'] == 'rejected' else 'indeterminate'
-            receipt['diagnostic_complete'] = phase['native_outcome'] == 'rejected'
+            phase['original_durable_state'] = executed.get('state')
+            native = executed.get('dispatch_result', {})
+            explicit_rejection = (isinstance(native, Mapping) and native.get('api') == 'ak.wwise.core.object.setProperty'
+                and native.get('version') == runtime.version and native.get('ok') is False
+                and native.get('waapi_error_uri') == 'ak.wwise.invalid_arguments')
+            # An explicit native error response is an observed fact even though
+            # e2 conservatively journals a failed named write as indeterminate.
+            # Neither classification establishes a no-mutation/effect outcome.
+            phase['native_response_class'] = 'explicit_invalid_arguments' if explicit_rejection else 'unresolved_failure'
+            receipt['classification'] = 'native_rejected' if explicit_rejection else 'indeterminate'
+            receipt['diagnostic_complete'] = explicit_rejection
             category.update(status='blocked' if receipt['diagnostic_complete'] else 'FAIL',
                 classification=receipt['classification'], diagnostic_complete=receipt['diagnostic_complete'],
                 reason='Original execution failure retained; no verify, read-after or retry; no business credit')
