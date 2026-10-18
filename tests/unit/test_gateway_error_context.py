@@ -168,3 +168,32 @@ def test_project_loss_during_verification_preserves_already_executed_state_witho
     code, result = sound.gateway.execute_gateway(['--state-dir', str(state), 'verify', tx], env=env, client_factory=lambda _: client)
     assert code == 0 and result['state'] in {'verified', 'result_schema_checked'}, result
     assert client.soundengine_calls == ['ak.soundengine.registerGameObj']
+
+
+def test_field_discovery_error_keeps_complete_keys_after_large_rejected_candidates(tmp_path):
+    from tests.unit.test_field_interface_closure_gateway import CreateTask, FIRST
+    task = CreateTask(tmp_path, '2025.1')
+    task.bind(FIRST)
+    task.types = [{'name': 'AuxBus', 'classId': 3997712, 'type': 'WObject'}]
+    kind = task.discover_kind('AuxBus')
+    # The real failing neighbours; all eight are class-scope conditional fields.
+    task.metadata = {f'UserAuxSend{band}{index}': {
+        'name': f'UserAuxSend{band}{index}', 'type': 'int16',
+        'display': {'name': f'User-Defined Auxiliary {band} {index}'},
+        'restriction': {'type': 'range', 'min': 0, 'max': 100},
+        'dependencies': [{'action': 'Show', 'context': 'Self', 'type': 'isMasterBus', 'value': False},
+            {'action': 'Enable', 'context': 'Self',
+            'property': 'OverrideUserAuxSends', 'type': 'override'}],
+    } for band in ('HPF', 'LPF') for index in range(4)}
+    revision = task.revision
+    code, result = task.step('draft-discover-fields', '--type-handle', kind,
+        '--meaning', 'User-Defined Auxiliary Send 0')
+    assert code == 2 and result['message'] == 'Selected live fields could not be bound', json.dumps({'result': result, 'calls': task.calls})
+    assert result['details']['draft_changed'] is False
+    rejected = result['details']['rejected_candidates']
+    assert len(rejected) == 8
+    assert all(set(row) == {'error_code', 'field_kind', 'field', 'reason', 'details'} for row in rejected)
+    assert all(row['details']['draft_changed'] is False for row in rejected)
+    assert task.revision == revision
+    assert not any(uri.endswith(('create', 'set', 'setProperty', 'setReference')) for uri, _, _ in task.calls)
+    assert len(json.dumps(result, ensure_ascii=False).encode('utf-8')) < 32 * 1024

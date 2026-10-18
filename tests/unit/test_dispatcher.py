@@ -655,6 +655,68 @@ def test_exception_metadata_string_and_node_budgets_are_explicitly_bounded() -> 
     assert len(json.dumps(result).encode("utf-8")) < 32 * 1024
 
 
+
+def _dispatch_metadata_error(metadata: Any) -> dict[str, Any]:
+    class MetadataError(Exception):
+        uri = "ak.wwise.no_project_loaded"
+        kwargs = metadata
+    result = WwiseDispatcher(client=FakeWaapiClient(error=MetadataError("exact native message")),
+        manifest_store=manifest_store()).dispatch("ak.wwise.core.getInfo")
+    assert result["error_code"] == "MetadataError" and result["message"] == "exact native message"
+    assert result["waapi_error_uri"] == "ak.wwise.no_project_loaded"
+    assert len(json.dumps(result, ensure_ascii=False).encode("utf-8")) < 32 * 1024
+    return result["waapi_error_details"]
+
+
+def test_exception_metadata_reserves_complete_utf8_and_empty_keys_before_large_values():
+    details = _dispatch_metadata_error({"payload": "🎵" * 10000,
+        "similar-prefix-one": 1, "similar-prefix-two": 2, "原生字段": True, "": False, "draft_changed": False})
+    assert set(details) == {"payload", "similar-prefix-one", "similar-prefix-two", "原生字段", "", "draft_changed"}
+    assert details["similar-prefix-one"] == 1 and details["similar-prefix-two"] == 2
+    assert details["原生字段"] is True and details[""] is False and details["draft_changed"] is False
+    assert details["payload"] and set(details["payload"]) == {"🎵"}
+    assert sum(len(key.encode("utf-8")) for key in details) + len(details["payload"].encode("utf-8")) <= dispatcher_module.MAX_EXCEPTION_METADATA_STRING_BYTES
+
+
+@pytest.mark.parametrize("metadata,expected,reason", [
+    ({"a" * 8191: 1, "a" * 8192: 2, "abc": 3, "": False}, {"a" * 8191: 1, "": False}, "key_budget_or_invalid"),
+    ({"\ud800": 1, "\ufffd": 2}, {"\ufffd": 2}, "key_budget_or_invalid"),
+    ({"1": "first", 1: "second"}, {"1": "first"}, "key_collision"),
+    ({"_metadata_truncated": "original", "x" * 8193: 1}, {"_metadata_truncated": "original"}, "key_budget_or_invalid"),
+])
+def test_exception_metadata_omits_whole_invalid_or_colliding_keys_with_explicit_marker(metadata, expected, reason):
+    details = _dispatch_metadata_error(metadata)
+    for key, value in expected.items():
+        assert details[key] == value
+    markers = {key: value for key, value in details.items() if key not in expected}
+    assert len(markers) == 1 and next(iter(markers)).startswith("_metadata_truncated")
+    assert next(iter(markers.values())) == reason
+
+
+def test_exception_metadata_infinite_duplicate_empty_keys_consume_node_budget():
+    class InfiniteMapping(dict):
+        count = 0
+        def items(self):
+            while True:
+                self.count += 1
+                assert self.count <= dispatcher_module.MAX_EXCEPTION_METADATA_NODES
+                yield "", False
+    metadata = InfiniteMapping()
+    details = _dispatch_metadata_error(metadata)
+    assert details[""] is False
+    assert details["_metadata_truncated"] == "key_collision,node_budget"
+    assert metadata.count <= dispatcher_module.MAX_EXCEPTION_METADATA_NODES
+
+
+def test_exception_metadata_hostile_mapping_keeps_partial_fields_and_unavailable_marker():
+    class PartialMapping(dict):
+        def items(self):
+            yield "_metadata_unavailable", "original"
+            raise RuntimeError("hostile iterator")
+    details = _dispatch_metadata_error(PartialMapping())
+    assert details == {"_metadata_unavailable": "original", "_metadata_unavailable_": "items"}
+
+
 def test_huge_live_success_is_replaced_by_bounded_error_without_returning_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

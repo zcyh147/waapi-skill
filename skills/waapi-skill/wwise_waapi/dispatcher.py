@@ -745,6 +745,11 @@ def _truncate_utf8(value: str, byte_budget: int) -> str:
     return "".join(parts)
 
 
+@dataclass(slots=True, frozen=True)
+class _ExceptionMetadataString:
+    value: str
+
+
 @dataclass(slots=True)
 class _ExceptionMetadataSanitizer:
     """Budgeted copier for optional third-party exception metadata."""
@@ -753,10 +758,11 @@ class _ExceptionMetadataSanitizer:
     string_bytes_remaining: int = MAX_EXCEPTION_METADATA_STRING_BYTES
     active_ids: set[int] = field(default_factory=set)
 
-    def sanitize(self, value: Any, *, depth: int = 0) -> Any:
-        if self.nodes_remaining <= 0:
-            return {"truncated": "node_budget"}
-        self.nodes_remaining -= 1
+    def sanitize(self, value: Any, *, depth: int = 0, reserved: bool = False) -> Any:
+        if not reserved:
+            if self.nodes_remaining <= 0:
+                return {"truncated": "node_budget"}
+            self.nodes_remaining -= 1
         if depth > MAX_EXCEPTION_METADATA_DEPTH:
             return {"truncated": "depth_budget"}
         if value is None or isinstance(value, (bool, int)):
@@ -764,7 +770,8 @@ class _ExceptionMetadataSanitizer:
         if isinstance(value, float):
             return value if math.isfinite(value) else {"type": "float", "reason": "non_finite"}
         if isinstance(value, str):
-            return self._copy_string(value)
+            # Defer value copies until all bounded keys have reserved their bytes.
+            return _ExceptionMetadataString(value)
         if isinstance(value, Mapping):
             return self._sanitize_mapping(value, depth)
         if isinstance(value, (list, tuple)):
@@ -776,29 +783,53 @@ class _ExceptionMetadataSanitizer:
         self.string_bytes_remaining -= len(copied.encode("utf-8"))
         return copied
 
+    @staticmethod
+    def _mark(result: dict[str, Any], key: str, reason: str) -> None:
+        # Never overwrite a real field, including an existing diagnostic-like key.
+        while key in result:
+            key += "_"
+        result[key] = reason
+
     def _sanitize_mapping(self, value: Mapping[Any, Any], depth: int) -> dict[str, Any]:
         identity = id(value)
         if identity in self.active_ids:
             return {"truncated": "circular_reference"}
         self.active_ids.add(identity)
         result: dict[str, Any] = {}
+        entries: list[tuple[str, Any]] = []
+        keys: set[str] = set()
+        omitted: set[str] = set()
+        unavailable = False
         try:
             try:
                 iterator = iter(value.items())
             except BaseException:  # noqa: BLE001 - hostile Mapping implementation
                 return {"type": _safe_type_name(value), "unavailable": "items"}
-            while self.nodes_remaining > 0:
+            # Fixed before iteration: even an infinite stream of duplicate/empty keys is bounded.
+            for _ in range(self.nodes_remaining):
                 try:
                     key, item = next(iterator)
                 except StopIteration:
                     break
                 except BaseException:  # noqa: BLE001 - partial safe metadata is sufficient
-                    result["_metadata_unavailable"] = "items"
+                    unavailable = True
                     break
                 safe_key = self._safe_key(key)
-                result[safe_key] = self.sanitize(item, depth=depth + 1)
+                if safe_key is None or safe_key in keys:
+                    omitted.add("key_budget_or_invalid" if safe_key is None else "key_collision")
+                    self.nodes_remaining -= 1
+                    continue
+                self.nodes_remaining -= 1
+                keys.add(safe_key)
+                entries.append((safe_key, item))
             else:
-                result["_metadata_truncated"] = "node_budget"
+                omitted.add("node_budget")
+            for key, item in entries:
+                result[key] = self.sanitize(item, depth=depth + 1, reserved=True)
+            if unavailable:
+                self._mark(result, "_metadata_unavailable", "items")
+            if omitted:
+                self._mark(result, "_metadata_truncated", ",".join(sorted(omitted)))
             return result
         finally:
             self.active_ids.remove(identity)
@@ -819,26 +850,45 @@ class _ExceptionMetadataSanitizer:
         finally:
             self.active_ids.remove(identity)
 
-    def _safe_key(self, key: Any) -> str:
+    def _safe_key(self, key: Any) -> str | None:
         if isinstance(key, str):
-            return self._copy_string(key)
-        if key is None:
-            return "null"
-        if key is True:
-            return "true"
-        if key is False:
-            return "false"
-        if isinstance(key, int):
-            return int.__repr__(key)
-        if isinstance(key, float) and math.isfinite(key):
-            return float.__repr__(key)
-        return f"<key-type:{_safe_type_name(key)}>"
+            safe_key = key
+        elif key is None:
+            safe_key = "null"
+        elif key is True:
+            safe_key = "true"
+        elif key is False:
+            safe_key = "false"
+        elif isinstance(key, int):
+            if int.bit_length(key) > self.string_bytes_remaining * 4:
+                return None
+            safe_key = int.__repr__(key)
+        elif isinstance(key, float) and math.isfinite(key):
+            safe_key = float.__repr__(key)
+        else:
+            safe_key = f"<key-type:{_safe_type_name(key)}>"
+        # A key is an identity: copying only a prefix would fabricate or collide with another key.
+        safe_key = _bounded_public_string(safe_key, None, self.string_bytes_remaining)
+        if safe_key is not None:
+            self.string_bytes_remaining -= len(safe_key.encode("utf-8"))
+        return safe_key
+
+    def copy_values(self, value: Any) -> Any:
+        """Finish only the fresh, bounded tree; no second untrusted Mapping traversal."""
+        if isinstance(value, _ExceptionMetadataString):
+            return self._copy_string(value.value)
+        if isinstance(value, dict):
+            return {key: self.copy_values(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.copy_values(item) for item in value]
+        return value
 
 
 def _json_safe_exception_value(value: Any) -> Any:
     """Copy third-party error metadata into a deterministic JSON-safe shape."""
 
-    return _ExceptionMetadataSanitizer().sanitize(value)
+    sanitizer = _ExceptionMetadataSanitizer()
+    return sanitizer.copy_values(sanitizer.sanitize(value))
 
 
 def _probe_json_document_size(value: Any, limit_bytes: int) -> _JsonSizeProbe:
