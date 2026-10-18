@@ -502,3 +502,35 @@ The reserved maximum fmt size is Gateway resource policy, not observed writer
 behavior. UTF-8 maximum-plan LIST framing already fits its bound; no unsupported
 encoding inference or new native credit follows. Full #193/WAL and #188 remain
 open, and original REDs stay retained in distinct `/tmp/waapi-tone-*` roots.
+
+
+## Incremental product capture inputs
+
+The first reviewed requirement is the exact 2025.1 Console
+`ak.wwise.cli.moveMediaIdsToSingleFile|/resultSchema` row in
+`docs/branch-coverage-requirements.json`. It requires both public program proof
+and independent native file effects. It grants no completion credit by itself;
+other rows and alternatives remain open. Freeze this policy and the relevant
+source before capture.
+
+Use the existing `tests/support/media_id_branch_evidence.py` producer:
+`prepare_media_id_capture` selects the existing exact public test, and its
+pytest finalizer emits original `bindings.json`, `requirements.json` and
+`program.json`. Keep these in a fresh ignored capture directory. Their actual
+Gateway argv include that run's state directory and transaction identity; do not
+replace these with portable placeholders or commit machine-local paths.
+
+Evaluate the complete product ledger using the maintainer CLI with explicit
+`--bindings <capture>/2025.1/bindings.json`,
+`--requirements docs/branch-coverage-requirements.json`,
+`--output <capture>/product-ledger.json` and `--require-complete`. Repeat the
+identical command with `--check` for reproducibility. This overlay keeps every
+product obligation; it is not a controlled-scope acceptance. Exit 2 is expected
+while required evidence or other branches remain incomplete. The default
+unbound inventory remains an inventory, not the evidence-bearing overlay.
+
+Retain the exact command and input hashes alongside the overlay so a reviewer
+can reproduce the evaluated result. Missing or stale artifacts stay missing;
+only the existing strict readers may grant evidence credit. Attach native
+evidence only after an independently reviewed matching run. Whole-file source
+equivalence and literal argv equality remain unchanged.
