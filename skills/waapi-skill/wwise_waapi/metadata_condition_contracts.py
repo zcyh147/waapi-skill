@@ -37,9 +37,12 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                     "mixed_type_category_rows": "explicit_boundary_pending_native_combination_semantics",
                     "shared_only_types": {
                         "supported": version in {"2022.1", "2023.1", "2024.1", "2025.1"},
-                        "facts": "Gateway_owned_exact_GUID_owner_null_predicate_and_canonical_parent",
-                        "omitted_owner_fact": "insufficient_without_predicate_membership",
-                        "revalidate_and_verify": ["versioned_query_meaning", "owner_null_membership", "exact_parent_GUID"],
+                        "facts": ("Gateway_owned_exact_GUID_self_and_owner_projection_and_canonical_parent" if version == "2022.1"
+                            else "Gateway_owned_exact_GUID_owner_null_predicate_and_canonical_parent"),
+                        "omitted_owner_fact": ("insufficient_without_exact_source_owner_projection" if version == "2022.1"
+                            else "insufficient_without_predicate_membership"),
+                        "revalidate_and_verify": (["versioned_query_meaning", "exact_source_presence", "owner_projection_absence", "exact_parent_GUID"]
+                            if version == "2022.1" else ["versioned_query_meaning", "owner_null_membership", "exact_parent_GUID"]),
                     },
                     "must_child_of": "explicit_boundary_pending_proven_relationship_semantics",
                 },

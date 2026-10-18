@@ -24426,7 +24426,13 @@ def _require_reference_target_allowed(
 
 
 def _read_shared_reference_target(target_id, *, read, platform, version, require_match=True):
-    """Prove SDK ShareSet relations without interpreting an omitted owner field."""
+    """Prove SDK ShareSet relations without interpreting an omitted owner field.
+
+    The pinned 2022 SDK documents select-this/owner object projection. Its
+    owner=null comparison returned no match for an independently created Game
+    Parameter, so use the relationship projection in that version only. Keeping
+    this in the projection proves the exact source still exists in that read.
+    """
     from .builders.query import WaqlQueryBuilder, STRUCTURED_QUERY_CONTRACT
     options = {"return": ["id", "parent"]}
     if platform is not None:
@@ -24450,16 +24456,34 @@ def _read_shared_reference_target(target_id, *, read, platform, version, require
     preview = WaqlQueryBuilder(version=version).build({
         "contract": STRUCTURED_QUERY_CONTRACT,
         "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},
-        "transforms": [
+        "transforms": ([
+            {"kind": "select", "expressions": [["this"], ["owner"]]},
+            {"kind": "take", "value": 3}] if version == "2022.1" else [
             {"kind": "where", "predicate": {"kind": "compare", "path": ["owner"], "operator": "=", "value": None}},
-            {"kind": "take", "value": 1}],
+            {"kind": "take", "value": 1}]),
         "return": ["id"],
     })
     query_options = dict(preview.envelope.options)
     if platform is not None:
         query_options["platform"] = platform
     query = {"version": version, "args": dict(preview.envelope.args), "options": query_options}
-    matches = _rows(read(OBJECT_GET_URI, query["args"], query_options))
+    result = read(OBJECT_GET_URI, query["args"], query_options)
+    if version == "2022.1":
+        if not isinstance(result, Mapping) or set(result) != {"return"}:
+            raise OperationContractError("INVALID_READBACK", "Owner projection needs a complete native object.get envelope.")
+        rows = _rows(result)
+        ids = [row.get("id") for row in rows]
+        if (not 1 <= len(ids) <= 2
+                or any(not _valid_object_id(value) or _reference_value_is_null(value) for value in ids)
+                or len({_identity_key(value) for value in ids}) != len(ids)
+                or sum(_same_identity(value, target_id) for value in ids) != 1):
+            raise OperationContractError("INVALID_READBACK", "Owner projection must contain the exact source once and at most one distinct owner.")
+        owner_absent = len(ids) == 1
+        if not owner_absent and require_match:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target has a native projected owner and is not a ShareSet.")
+        return {"parent_id": parent_id, "owner_absent": owner_absent, "native_query": query,
+            "native_result": dict(result)}
+    matches = _rows(result)
     if not matches and require_match:
         raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target does not satisfy the native owner-null ShareSet predicate.")
     if matches and (len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id)):

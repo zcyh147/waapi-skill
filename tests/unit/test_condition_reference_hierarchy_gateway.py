@@ -658,16 +658,24 @@ class SharedReferenceTask(AttenuationTask):
     def __init__(self, path, version, *, shared=True, operation='object.setReference'):
         super().__init__(path, version, operation=operation)
         self.shared = shared
+        self.shared_version = version
         self.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
         self.objects[SECOND]['parent'] = {'id': GROUP}
         self.metadata['Attenuation']['restriction']['restrictions'] = [
             {'type': ['Attenuation'], 'sharedOnlyTypes': ['Attenuation']}]
 
     def call(self, uri, args=None, options=None):
-        expected = f'from object "{SECOND}" where owner = null take 1'
-        if uri.endswith('object.get') and args.get('waql') == expected:
+        null_predicate = f'from object "{SECOND}" where owner = null take 1'
+        projection = f'from object "{SECOND}" select this, owner take 3'
+        if uri.endswith('object.get') and args.get('waql') in {null_predicate, projection}:
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert options['return'] == ['id']
+            if self.shared_version == '2022.1':
+                # SDK object-expression model; the old null comparator can
+                # return empty even for independent targets in actual2022.
+                return {'return': ([{'id': SECOND}] if self.shared else [{'id': GROUP}, {'id': SECOND}])
+                    if args['waql'] == projection else []}
+            assert args['waql'] == null_predicate
             return {'return': [{'id': SECOND}] if self.shared else []}
         return super().call(uri, args, options)
 
@@ -790,18 +798,22 @@ def test_shared_only_predicate_keeps_the_selected_platform_and_read_meaning(tmp_
     _, _, verified, _ = finish(task)
     assert verified['verified'] is True
     reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')
-             and ('parent' in options.get('return', []) or 'owner = null' in args.get('waql', ''))]
+             and ('parent' in options.get('return', []) or 'owner = null' in args.get('waql', '')
+                  or 'select this, owner' in args.get('waql', ''))]
     classification_reads = [(args, options) for args, options in reads
                             if options.get('return') in (['id', 'parent'], ['id'])]
     assert classification_reads and all(options['platform'] == platform for _, options in classification_reads)
     predicates = [args['waql'] for args, options in classification_reads if 'waql' in args]
-    assert predicates and set(predicates) == {f'from object "{SECOND}" where owner = null take 1'}
+    expected = (f'from object "{SECOND}" select this, owner take 3' if version == '2022.1'
+        else f'from object "{SECOND}" where owner = null take 1')
+    assert predicates and set(predicates) == {expected}
 
 
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 @pytest.mark.parametrize('phase', ['before', 'after'])
-def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_same_id(tmp_path, monkeypatch, phase):
+def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_same_id(tmp_path, monkeypatch, phase, version):
     from wwise_waapi.builders.query import WaqlQueryBuilder
-    task = SharedReferenceTask(tmp_path, '2025.1')
+    task = SharedReferenceTask(tmp_path, version)
     task.declare()
     code, checked = task.step('draft-check')
     assert code == 0, checked
@@ -816,10 +828,11 @@ def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_sam
     normal_call = task.call
     def changed_build(self, request):
         result = normal_build(self, request)
-        result.envelope.args['waql'] = result.envelope.args['waql'].replace('owner = null', 'owner != null')
+        result.envelope.args['waql'] = (result.envelope.args['waql'].replace('select this, owner', 'select this')
+            if version == '2022.1' else result.envelope.args['waql'].replace('owner = null', 'owner != null'))
         return result
     def call(uri, args=None, options=None):
-        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner != null take 1'):
+        if uri.endswith('object.get') and args.get('waql', '').endswith(('where owner != null take 1', 'select this take 3')):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             return {'return': [{'id': SECOND}]}
         return normal_call(uri, args, options)
@@ -926,6 +939,14 @@ def test_observed_false_shared_target_postcondition_is_terminal_without_second_w
     assert code == 2 and verified['state'] == 'verification_failed', verified
     assert verified['verification']['status'] == 'verification_failed'
     assert verified['automatic_retry'] is False
+    if version == '2022.1':
+        proof = next(row['evidence'] for row in verified['verification']['assertions']
+            if row['name'] == 'reference Attenuation retains native ShareSet classification')
+        assert proof['expected']['native_result'] == {'return': [{'id': SECOND}]}
+        assert proof['expected']['native_query']['args'] == {
+            'waql': f'from object "{SECOND}" select this, owner take 3'}
+        if observation == 'owner-present':
+            assert proof['actual']['native_result'] == {'return': [{'id': GROUP}, {'id': SECOND}]}
     store = TransactionStore(task.path / 'state')
     assert store.load(tx).state is TransactionState.VERIFICATION_FAILED
     events = store.read_events(tx)
@@ -1030,6 +1051,52 @@ def test_scalar_null_guid_parent_postread_is_malformed_not_a_proven_missing_pare
     assert code == 2 and verified['state'] == 'executed_unverified', verified
     assert verified['status'] == 'verification_deferred'
     assert TransactionStore(task.path / 'state').load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('response', [
+    {}, {'return': []}, {'return': [{'id': GROUP}]},
+    {'return': [{'id': SECOND}, {'id': SECOND}]},
+    {'return': [{'id': SECOND}, {'id': GROUP}, {'id': OTHER}]},
+    {'return': [{'id': SECOND}, {'id': NULL_GUID}]},
+    {'return': [{'id': SECOND}, {}]},
+    {'return': [{'id': SECOND}], 'truncated': True},
+    {'return': [{'id': SECOND}], 'complete': False},
+    {'return': [{'id': SECOND}], 'error': {'uri': 'fixture.unavailable'}},
+])
+def test_2022_shared_target_projection_rejects_incomplete_or_wrong_membership(tmp_path, response):
+    task = SharedReferenceTask(tmp_path, '2022.1')
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql', '').endswith('select this, owner take 3'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return deepcopy(response)
+        return normal_call(uri, args, options)
+    task.call = call
+    task.declare()
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'INVALID_READBACK', rejected
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('failure', ['transport', 'incomplete'])
+def test_2022_unavailable_owner_projection_never_retries_an_executed_write(tmp_path, failure):
+    task = SharedReferenceTask(tmp_path, '2022.1')
+    tx = _execute_target_assignment(task)
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql', '').endswith('select this, owner take 3'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if failure == 'transport':
+                raise RuntimeError('controlled owner projection unavailable')
+            return {'return': [{'id': SECOND}], 'complete': False}
+        return normal_call(uri, args, options)
+    task.call = call
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['automatic_retry'] is False
     code, repeated = task.run('execute', tx)
     assert code == 2, repeated
     assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
