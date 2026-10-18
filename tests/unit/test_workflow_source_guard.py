@@ -1171,6 +1171,22 @@ def test_workflow_failure_captures_owned_process_before_cleanup_with_bounded_tai
     assert records[-1]['invocation']['outcome'] == 'FAIL'
 
 
+def test_workflow_diagnostic_capture_error_preserves_original_failure_and_cleanup(tmp_path, workflow, monkeypatch, capsys):
+    fixture, events, records = _fixture_run(tmp_path, workflow, monkeypatch)
+    next(fixture)
+    def failed_capture(*args, **kwargs):
+        events.append('capture-error')
+        raise OSError('Diagnostic disk error')
+    monkeypatch.setattr(workflow, '_capture_workflow_pre_teardown_process', failed_capture)
+    original = RuntimeError('Original failure must survive diagnostic capture error')
+    with pytest.raises(RuntimeError) as caught:
+        fixture.throw(original)
+    assert caught.value is original
+    assert events.index('capture-error') < events.index('shutdown') < events.index('release')
+    assert records[-1]['invocation']['outcome'] == 'FAIL'
+    assert 'Diagnostic disk error' in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("tamper", (False, True))
 def test_source_full_guard_runs_after_shutdown_and_before_final_pass(tmp_path, workflow, monkeypatch, tamper):
     fixture, events, records = _fixture_run(

@@ -947,6 +947,48 @@ def _restart_workflow_host_after_transport_loss(
     runtime.lifecycle = replacement
 
 
+def _capture_workflow_pre_teardown_process(lifecycle: HeadlessLifecycle, state_dir: Path, *, version: str, candidate: str) -> None:
+    """Snapshot only the owned launch handle before cleanup can change its state."""
+    record = {"contract": "waapi-skill.workflow-pre-teardown-process/v1", "phase": "before_owned_shutdown",
+        "captured_at_unix_ns": time.time_ns(), "candidate": candidate, "version": version,
+        "owned_launch_pid": None, "observed_exit_code": None, "process_state": "unobserved",
+        "capture_errors": []}
+    def error(stage, exc):
+        record["capture_errors"].append({"stage": stage, "type": type(exc).__name__,
+            "message": str(exc).encode("utf-8", errors="replace")[:512].decode("utf-8", errors="ignore")})
+    try:
+        process = lifecycle.process
+        if process is None:
+            record["process_state"] = "not-started"
+        else:
+            pid = process.pid
+            if type(pid) is not int or pid <= 0:
+                raise ValueError("Owned launch PID must be a positive integer")
+            record["owned_launch_pid"] = pid
+            code = process.poll()  # No probe, process inventory, wait, signal or retry.
+            if code is not None and type(code) is not int:
+                raise ValueError("Owned poll result must be an exit integer or None")
+            record.update(observed_exit_code=code, process_state="running" if code is None else "exited")
+    except Exception as exc:
+        error("owned_process_poll", exc)
+    for stream in ("stdout", "stderr"):
+        try:
+            tail = lifecycle.output.tail(stream, max_lines=20)
+            if not isinstance(tail, str):
+                raise ValueError("Owned process output tail must be text")
+            encoded = tail.encode("utf-8", errors="replace")
+            record[stream + "_tail"] = encoded[-4096:].decode("utf-8", errors="ignore")
+            record[stream + "_truncated"] = len(encoded) > 4096
+        except Exception as exc:
+            error(stream + "_tail", exc)
+    record["capture_status"] = "partial" if record["capture_errors"] else "complete"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    output = state_dir / "workflow-pre-teardown-process.json"
+    temporary = output.with_suffix(".tmp")
+    temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(output)
+
+
 @pytest.fixture(scope="module")
 def workflow_sandbox_runtime(
     request: pytest.FixtureRequest,
@@ -1072,6 +1114,14 @@ def workflow_sandbox_runtime(
         active_error = sys.exc_info()[1]
         active_lifecycle = runtime.lifecycle if runtime is not None else lifecycle
         if active_lifecycle is not None and sandbox is not None:
+            try:
+                _capture_workflow_pre_teardown_process(active_lifecycle, state_dir, version=version, candidate=candidate)
+            except BaseException as exc:  # diagnostics must not replace the verdict or skip cleanup
+                try:
+                    message = str(exc).encode("utf-8", errors="replace")[:512].decode("utf-8", errors="ignore")
+                    print(f"pre-teardown process diagnostic capture failed: {type(exc).__name__}: {message}", file=sys.stderr)
+                except BaseException:
+                    pass
             try:
                 shutdown_sandboxed_wwise(active_lifecycle, sandbox)
             except BaseException as exc:  # noqa: BLE001 - every teardown guard must still run
