@@ -86,10 +86,10 @@ class OwnedMacAuthoringContext:
         if len(roundtrip.splitlines()) != 1 or _real(Path(roundtrip), directory=False) != self.project:
             raise AuthoringLaunchError('Owned Authoring project path roundtrip differs from the sandbox')
         resolution = self._require_bottle_resolution()
-        # A private stub's Updater resolves this same logical name against the
-        # matching managed support. Absolute paths cannot identify that bottle.
-        command = [str(self.cx / 'bin/wine'), '--bottle', resolution['name'],
-            '--enable-alt-loader', 'macdrv', '--wait-children',
+        # Retained owned 2024/2025 readiness proves this direct-Wine strategy.
+        # Native-app macdrv/wait-child options belong to its enclosing app strategy.
+        # The validated environment retains the logical private/managed bottle.
+        command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
             f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe', native]
         return command, {'method': 'owned_winepath_roundtrip', 'project': str(self.project), 'native_project': native,
                          'roundtrip_project': str(self.project), 'build': self.build, 'bottle_resolution': resolution}

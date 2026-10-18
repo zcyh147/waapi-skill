@@ -762,9 +762,8 @@ def require_authoring_launch_proof(
             or proof.get('project') != str(project) or proof.get('roundtrip_project') != str(project)
             or proof.get('build') != build or not isinstance(proof.get('native_project'), str)
             or not proof['native_project'] or lifecycle.host != '127.0.0.1' or lifecycle.port != 8080
-            or len(command) != 8 or Path(command[0]).name != 'wine'
-            or list(command[1:]) != ['--bottle', 'Wwise2019x64', '--enable-alt-loader', 'macdrv',
-                '--wait-children', expected_executable, proof['native_project']]):
+            or len(command) != 5 or Path(command[0]).name != 'wine'
+            or list(command[1:]) != ['start.exe', '/wait', expected_executable, proof['native_project']]):
         raise SandboxFixtureError('Authoring launch did not prove the private project path and fixed command')
     environment = getattr(lifecycle, 'launch_env', None)
     resolution = proof.get('bottle_resolution')
