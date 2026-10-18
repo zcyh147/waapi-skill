@@ -12994,6 +12994,8 @@ def _normalize_existing_sfx_imports(
         if len(matching) != 1 or (source_id is not None and not _same_identity(matching[0].get("id"), source_id)):
             raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "Existing SFX media must resolve to its one exact active AudioFileSource.")
         source = matching[0]
+        if not _object_class_matches(source.get("classId"), target.get("audio_source_class_id")):
+            raise OperationContractError("INVALID_READBACK", "Existing SFX source class differs from its sealed live semantic class.")
         source_id = source["id"]
         language = source.get("audioSource:language")
         if not isinstance(language, Mapping) or language.get("name") != "SFX":
@@ -13974,6 +13976,10 @@ def _prepare_closed_import_plan(
                                  "candidate_count": len(matching_sources)},
                     )
                 localized_active_source = matching_sources[0]["id"] if matching_sources else None
+                if any(_object_type_token(source.get("type")) == "audiofilesource"
+                        and not _object_class_matches(source.get("classId"), target.get("audio_source_class_id"))
+                        for source in snapshot["rows"]):
+                    raise OperationContractError("INVALID_READBACK", "Existing localized source class differs from live semantic metadata.")
                 target["localized_source_snapshot"] = snapshot
                 target["localized_audio_file_source_id"] = localized_active_source
                 # Console 2021/2022 reuse the language source through the typed

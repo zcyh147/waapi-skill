@@ -148,13 +148,30 @@ def import_task(path, *, version='2022.1'):
     task.types.append({'name': 'AudioSource' if version == '2021.1' else 'AudioFileSource',
         'classId': 16, 'type': 'WObject'})
     task.require_class_projection = True
+    if version == '2021.1':
+        import xml.etree.ElementTree as ET
+        from tests.unit.test_operation_registry_import_verifier import WWISE_2021_PROJECT
+        tree = ET.parse(WWISE_2021_PROJECT)
+        project = tree.find('./ProjectInfo/Project')
+        project.set('Name', 'Fixture'); project.set('ID', '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}')
+        tree.write(task.project_file, encoding='utf-8', xml_declaration=True)
+        (task.project_file.parent / 'Originals').mkdir()
     original = task.call
     def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql') in {'from type Project take 1', 'from type Project take 2'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'Fixture',
+                'type': 'Project', 'path': '\\', 'filePath': str(task.project_file), 'workunitIsDirty': False}]}
+        if uri.endswith('getProjectInfo') and version == '2021.1':
+            from tests.unit.test_object_native_surface import _project_info
+            return {**_project_info(task.project_file.parent, language='SFX'), **original(uri, args, options)}
         result = original(uri, args, options)
         if uri.endswith('audio.import'):
             for row in task.objects.values():
                 if row['type'] == 'AudioFileSource':
                     row['classId'] = 16
+                if version == '2021.1' and 'originalFilePath' in row:
+                    row['originalWavFilePath'] = row['sound:originalWavFilePath'] = row['originalFilePath']
         return result
     task.call = call
     return task, writes
@@ -188,3 +205,25 @@ def test_import_independent_target_and_source_reads_require_live_classes(tmp_pat
     assert code == (0 if fault is None else 2), json.dumps(result)
     assert (result.get('verified') is True) is (fault is None)
     assert len(writes) == 1
+
+
+def test_2021_import_uses_pinned_live_audio_source_class_without_changing_actual_type(tmp_path):
+    task, writes = import_task(tmp_path, version='2021.1')
+    declare_import(task, tmp_path)
+    tx, shown = task.preview()
+    execute(task, tx, shown)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['verified'] is True, json.dumps(result)
+    assert next(row for row in task.types if row['name'] == 'AudioSource')['classId'] == 16
+    assert any(row['type'] == 'AudioFileSource' and row['classId'] == 16 for row in task.objects.values())
+    assert len(writes) == 1
+
+
+@pytest.mark.parametrize('fault', ['valid', 'wrong-source-class', 'wrong-target-class'])
+def test_object_set_import_reads_actual_source_and_requested_sound_classes(tmp_path, fault):
+    from tests.unit.test_object_graph_business_gateway import _public_inline_wav_preview, INLINE_PCM_PADDED
+    code, result, calls = _public_inline_wav_preview(tmp_path, '2025.1',
+        'Inline.wav|' + INLINE_PCM_PADDED, nested=False, verification_case=fault)
+    assert code == (0 if fault == 'valid' else 2), json.dumps(result)
+    assert (result.get('verified') is True) is (fault == 'valid')
+    assert calls.count('ak.wwise.core.object.set') == 1
