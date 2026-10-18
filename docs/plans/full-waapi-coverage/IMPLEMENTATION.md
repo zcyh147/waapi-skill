@@ -18,6 +18,25 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Integration `3f7205e1` extends creation history to complete ordinary nested
+  hierarchies: each actual node, class, parent, notes, fields and membership is
+  checked, including references between newly created nodes. Root review found
+  and fixed a same-basename root/descendant ambiguity using the sealed parent's
+  exact path. Focused version and corruption controls retain separate original
+  results; the conflict-free integration needed no repeated component groups.
+  Four serial inventory commands passed with unchanged native obligations.
+  Graph/List replacement, ancestor-rename algebra and native history acceptance
+  remain required work.
+- On `ae95b5cc`, the 2024 diagnostic completed in **44.34s** with clean source
+  and process evidence. Independent image review confirms that Inspect loaded
+  Minigun in an ObjectTab and displayed Materials=Concrete. Filtered RTPC values
+  remain unobserved; no media operation or preservation acceptance is claimed.
+- On `205097b6`, the 2025 Console diagnostic collected four original Tone WAVs
+  in **10.74s**, preserving all transaction/file/source/cleanup evidence. All
+  four verification transactions failed on the native zero-valid-bits header
+  variant. That concrete parser repair and active signal verification remain
+  #193 work; successful collection is not successful effect verification.
+
 - Integration `dacfa842` rejects the observed 2022 TSV `IsVoice` assignment
   before Preview, naming the row and field and explaining Sound SFX/Voice type
   construction. Caller files and ordinary constructors remain unchanged.

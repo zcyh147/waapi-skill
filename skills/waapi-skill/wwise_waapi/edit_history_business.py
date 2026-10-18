@@ -346,64 +346,116 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
         raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":
         return _receipt_observations(prepared)
-    # This first presence observer has one ordinary new child, never an
-    # inferred graph/List/merge/replace restoration image.
-    nodes = plan.get("nodes")
-    if (prepared.get("operation") != "object.create" or not isinstance(nodes, list) or len(nodes) != 1
-        or plan.get("on_name_conflict") != "fail" or plan.get("list") is not None
-        or plan.get("preexisting_root_rows") != [] or plan.get("replaced_subtree_rows") != []):
-        raise ValueError("Creation history currently requires one new fail-mode child; graph/List/merge/replace remain implementation obligations")
-    node = nodes[0]
-    if (not isinstance(node, Mapping) or node.get("request_path") != "$" or node.get("parent_request_path") is not None
-        or node.get("collection") != "children" or node.get("existing_target") is not False
-        or node.get("preexisting_id") is not None or node.get("requested_language") is not None):
-        raise ValueError("Creation history lacks a supported ordinary leaf observation")
-    from .creation_observations import verified_created_root_identity, ordinary_creation_fields
-    materialized_fields = ordinary_creation_fields(node)
-    if materialized_fields is None:
-        raise ValueError("Creation history field union requires its own complete observation")
-    if len(materialized_fields) + 1 > MAX_OBSERVATIONS or len({item["name"] for item in materialized_fields}) != len(materialized_fields):
-        raise ValueError("Creation history fields exceed their combined bound or contain duplicate tokens")
-    view = prepared.get("pre_state", {}).get("field_read_platform", {})
-    platform = None
-    if materialized_fields:
-        if view.get("status") != "certified" or not _GUID.fullmatch(str(view.get("platform_id"))):
-            raise ValueError("Creation receipt original read platform is not certified")
-        platform = view["platform_id"]
+    if prepared.get("operation") != "object.create":
+        raise ValueError("Creation history requires its actual object.create source")
+    from .creation_observations import ordinary_creation_graph, ordinary_creation_fields, verified_created_root_identity
     from .operation_object import flatten_create_result
-    identity = verified_created_root_identity(verification)
-    if identity is None:
-        raise ValueError("Creation history requires the actual successful result and one verified root witness")
-    returned = flatten_create_result(execution.get("result"), max_nodes=1)
-    if (len(returned) != 1 or returned[0].object.upper() != identity["id"] or returned[0].name != identity["name"]
-        or identity["name"] != node.get("requested_name") or identity["type"] != node.get("canonical_type")):
-        raise ValueError("Creation history root witness differs from its actual native result or declaration")
-    paths = prepared.get("pre_state", {}).get("object_graph_guard", {}).get("path_snapshots", [])
-    if len(paths) != 1 or paths[0].get("path") != identity["path"] or paths[0].get("rows") != []:
-        raise ValueError("Creation history requires the exact sealed path absence before creation")
+    from .operation_registry import _object_type_matches
+    nodes, expected_paths = ordinary_creation_graph(plan, prepared.get("pre_state", {}),
+        parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"), max_observations=MAX_OBSERVATIONS)
+    returned = flatten_create_result(execution.get("result"))
+    if [row.request_path for row in returned] != [node["request_path"] for node in nodes]:
+        raise ValueError("Creation history requires every actual returned graph node exactly once")
+    ids = {row.request_path: row.object.upper() for row in returned}
+    if len(set(ids.values())) != len(nodes):
+        raise ValueError("Creation history actual graph contains duplicate GUIDs")
+    graph = len(nodes) > 1
+    witnesses = [row for row in verification.get("assertions", []) if row.get("kind") == "verified_created_node_identity"]
+    if graph and (len(witnesses) != len(nodes) or any(row.get("passed") is not True
+            or not isinstance(row.get("evidence"), Mapping) for row in witnesses)):
+        raise ValueError("Creation graph requires a complete independently verified node roster")
+    observations = []
+    for node, result in zip(nodes, returned, strict=True):
+        materialized_fields = ordinary_creation_fields(node)
+        view = prepared.get("pre_state", {}).get("field_read_platform", {})
+        platform = None
+        if materialized_fields:
+            if view.get("status") != "certified" or not _GUID.fullmatch(str(view.get("platform_id"))):
+                raise ValueError("Creation receipt original read platform is not certified")
+            platform = view["platform_id"]
+        # Every graph node uses the producer's frozen field view, even a
+        # zero-field container whose required exact read shares that view.
+        if graph and view.get("status") == "certified":
+            platform = view["platform_id"]
+        parent_id = str(plan["parent_id"]).upper() if node['parent_request_path'] is None else ids[node['parent_request_path']]
+        if graph:
+            matches = [row["evidence"] for row in witnesses if row.get("evidence", {}).get("request_path") == node["request_path"]]
+            if (len(matches) != 1 or type(matches[0].get("class_id")) is not int
+                    or matches[0]["class_id"] != node.get("class_id")
+                    or not isinstance(matches[0].get("parent_id"), str) or matches[0]["parent_id"].upper() != parent_id):
+                raise ValueError("Creation graph node witness differs from its exact class or parent association")
+            identity = _identity(matches[0]["object"])
+        else:
+            identity = verified_created_root_identity(verification)
+        if (identity is None or identity["id"] != ids[node["request_path"]] or identity["name"] != result.name
+                or identity["name"] != node.get("requested_name") or identity["path"] != expected_paths[node["request_path"]]
+                or not _object_type_matches(identity["type"], node, actual_class_id=node.get("class_id"))):
+            raise ValueError("Creation history node differs from its actual result and independently observed declaration")
+        observations.extend(_created_node_observations(node, identity, parent_id, platform,
+            materialized_fields, prepared, verification, ids if graph else {}, ids["$"]))
+    if graph:
+        retained = [row for row in verification.get("readbacks", []) if row.get("role") == "created-graph-history-membership"]
+        expected_args = {"from": {"id": [ids["$"]]}, "transform": [{"select": ["descendants"]}]}
+        if (len(retained) != 1 or retained[0].get("uri") != GET or retained[0].get("args") != expected_args
+                or "error" in retained[0] or not _created_membership_matches(retained[0].get("result"), observations)):
+            raise ValueError("Creation graph requires its complete independently observed source membership")
+    return observations
+
+
+def _created_membership_matches(result, observations):
+    nodes = [row for row in observations if row.get("kind") == "creation_presence" and row["request_path"] != "$"]
+    rows = result.get("return") if isinstance(result, Mapping) and set(result) == {"return"} else None
+    if not isinstance(rows, list) or len(rows) != len(nodes) or any(not isinstance(row, Mapping) for row in rows):
+        return False
+    found = {}
+    for row in rows:
+        identity = _identity(row)
+        if identity['id'] in found:
+            return False
+        found[identity['id']] = row
+    return all(expected["object"]["id"] in found
+        and _identity(found[expected["object"]["id"]]) == expected["object"]
+        and type(found[expected["object"]["id"]].get("classId")) is int
+        and found[expected["object"]["id"]]["classId"] == expected["class_id"]
+        and 'parent' in found[expected["object"]["id"]]
+        and _reference_value(found[expected["object"]["id"]]["parent"]) == expected["parent_id"]
+        for expected in nodes)
+
+
+def _created_node_observations(node, identity, parent_id, platform, materialized_fields, prepared, verification, graph_ids, graph_root_id):
     fields = [*IDENTITY, "parent", "notes"]
     reads = [row for row in verification.get("readbacks", []) if isinstance(row, Mapping)
         and row.get("uri") == GET and row.get("args") == {"from": {"id": [identity["id"]]}}
         and isinstance(row.get("options"), Mapping) and set(row["options"].get("return", [])) >= set(fields)
         and not set(row["options"]) - {"return", "platform"}
-        and row["options"].get("platform") == platform and "error" not in row]
+        and row["options"].get("platform") == platform and "error" not in row
+        and (not graph_ids or row.get("role") == "created-node-history-source" and row.get("request_path") == node["request_path"])]
     if len(reads) != 1:
         raise ValueError("Creation history requires one independent complete root readback")
-    rows = reads[0].get("result", {}).get("return")
+    result = reads[0].get("result")
+    if graph_ids and (not isinstance(result, Mapping) or set(result) != {"return"}):
+        raise ValueError("Creation graph requires a complete exact-selector source read")
+    rows = result.get("return") if isinstance(result, Mapping) else None
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping):
         raise ValueError("Creation history source root readback is incomplete")
     row = rows[0]
     if (_identity(row) != identity or not isinstance(row.get("notes"), str)
-        or _reference_value(row.get("parent")) != str(plan.get("parent_id")).upper()
+        or _reference_value(row.get("parent")) != parent_id
         or "parent" not in row or (node.get("notes_supplied") is True and row["notes"] != node.get("requested_notes"))):
         raise ValueError("Creation history source identity, parent or actual notes are incomplete")
-    observation = {"kind": "creation_presence", "object": identity, "parent_id": str(plan["parent_id"]).upper(),
+    observation = {"kind": "creation_presence", "object": identity, "parent_id": parent_id,
         "notes": row["notes"], "before": False, "after": True}
+    if graph_ids:
+        observation.update(graph_root_id=graph_root_id, request_path=node["request_path"],
+            parent_request_path=node["parent_request_path"], class_id=row.get("classId"))
+        if type(row.get("classId")) is not int or row["classId"] != node.get("class_id"):
+            raise ValueError("Creation graph requires each independently observed exact class ID")
     if materialized_fields:
         if type(row.get("classId")) is not int or row["classId"] != node.get("class_id"):
             raise ValueError("Creation history requires the exact independently observed class ID")
         retained = [item for item in verification.get("readbacks", [])
-            if item.get("role") == "created-root-history-field-metadata"]
+            if item.get("role") == "created-root-history-field-metadata"
+            and (not graph_ids or item.get("request_path") == node["request_path"])]
         names_rows = [item for item in retained if item.get("uri") == NAMES and item.get("args") == {"object": identity["id"]}]
         if len(names_rows) != 1 or "result" not in names_rows[0]:
             raise ValueError("Creation history requires complete source object-scoped field names")
@@ -432,9 +484,9 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
                         or info.supports.get("reference") is True):
                     raise ValueError("Creation history source metadata does not certify a Reference")
                 actual = _reference_value(actual)
-                if actual != _reference_value(field["target_id"]):
+                if actual != _reference_value((graph_ids[field["target_request_path"]] if "target_request_path" in field else field["target_id"])):
                     raise ValueError("Creation history source reference differs from its verified outcome")
-                if actual is not None:
+                if actual is not None and "target_request_path" not in field:
                     targets = [_identity(role["row"]) for role in prepared.get("resolved_roles", {}).values()
                         if isinstance(role, Mapping) and str(role.get("object")).upper() == actual]
                     if not targets or any(target != targets[0] for target in targets):
@@ -442,7 +494,8 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
                     target_identity = targets[0]
             captured.append({"field": token, "field_kind": field["kind"], "value": actual,
                 "metadata_type": info.type, "field_info": info.as_dict(include_raw=True),
-                **({"reference_target": target_identity} if target_identity is not None else {})})
+                **({"reference_target": target_identity} if target_identity is not None else {}),
+                **({"internal_reference_target_id": actual} if "target_request_path" in field else {})})
         observation.update(platform=platform, class_id=row["classId"])
         return [observation, *({"kind": "creation_field", "object_id": identity["id"], "before": False, "after": True,
             **item} for item in captured)]
@@ -472,7 +525,7 @@ def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable
                 raise ValueError("Created-object history field metadata changed")
     for selector in ({"id": [identity["id"]]}, {"path": [identity["path"]]}):
         result = read(GET, {"from": selector}, {"return": [*IDENTITY, "parent", "notes",
-            *(["classId", *(item["field"] for item in fields)] if fields else [])],
+            *(["classId", *(item["field"] for item in fields)] if fields else ["classId"] if "graph_root_id" in expected else [])],
             **({"platform": expected["platform"]} if fields else {})})
         if not isinstance(result, Mapping) or set(result) != {"return"} or not isinstance(result["return"], list):
             raise ValueError("History presence read requires a complete exact-selector result")
@@ -486,6 +539,8 @@ def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable
                 raise ValueError("History presence read lacks parent or notes projection")
             matches = (actual == identity and _reference_value(row["parent"]) == expected["parent_id"]
                 and row["notes"] == expected["notes"])
+            if "graph_root_id" in expected:
+                matches = matches and type(row.get("classId")) is int and row["classId"] == expected["class_id"]
             if fields:
                 from .operation_registry import _has_field, _field_value
                 matches = matches and type(row.get("classId")) is int and row["classId"] == expected["class_id"]
@@ -682,6 +737,14 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
     try:
         groups = {}
         metadata_cache = {}
+        graph_roots = {row["graph_root_id"] for row in observations if row.get("kind") == "creation_presence" and "graph_root_id" in row}
+        for root in sorted(graph_roots):
+            graph_nodes = [row for row in observations if row.get("kind") == "creation_presence" and row.get("graph_root_id") == root]
+            if graph_nodes[0][side]:
+                result = retained_read(GET, {"from": {"id": [root]}, "transform": [{"select": ["descendants"]}]},
+                    {"return": [*IDENTITY, "parent", "classId"]})
+                checks.append({"field": "created_graph_membership", "object_id": root,
+                    "passed": _created_membership_matches(result, graph_nodes)})
         for expected in observations:
             if expected.get("kind") == "existing_render_chain":
                 from .render_history_observations import observe_chain

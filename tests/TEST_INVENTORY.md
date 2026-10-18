@@ -5,6 +5,40 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-19 ordinary hierarchy history and native diagnostic evidence
+
+Integration `3f7205e1` preserves accepted graph `4469adba`, frontend `ae95b5cc`
+and Tone collector `205097b6` source files without merge edits. Four serial
+inventory generation/check commands passed once. The only semantic contract
+change is five-version undoGroup hierarchy scope and its still-open ancestor
+rename dependency. Native obligation identities, requirements and evidence are
+unchanged. No aggregate pytest rerun or broad gate was added for this merge.
+
+Graph evidence remains staged: `4926f900` passed **7 tests in 8.83s** covering
+five-version internal-reference source/history behavior and two compound graph
+flows; `70023040` passed **4 tests in 4.03s** for the later aggregate Render bound.
+Root's same-basename case exposed a real rejection; `4469adba` then passed that
+case and its existing reference control (**2 passed in 2.99s**). These establish
+program behavior, not native graph-history acceptance or whole-ticket closure.
+
+The owned 2024 Authoring diagnostic on `ae95b5cc` passed **1 test in 44.34s**;
+source hash/mtime and 1,886 tracked files were unchanged, its sandbox was deleted
+and owned processes ended. Root's independent archived-image review confirms
+Minigun session loading in an ObjectTab, selected GUID and Materials=Concrete.
+Filtered RTPC/other saved values remain unverified. The category intentionally
+stays diagnostic/blocked. Earlier `493b0d35` cleanup BLOCKED, `c8238eba` two-view
+FAIL (**48.44s**) and `57ab9859` missing-view FAIL (**37.46s**) remain original
+results; absence of a separately named view did not prove failed activation.
+
+The owned 2025.1.7.9143 Console characterization on `205097b6` passed **1 test
+in 10.74s**, retaining four original mono sine WAVs (int16/float32, 0/-6 dB),
+39 public calls, independent transactions and complete raw evidence. Source
+hash/mtime/tree and 1,886 tracked files were unchanged; cleanup completed.
+All four transaction verifications remain **verification_failed** because the
+Tone parser rejected the actual zero-valid-bits extensible headers. Collection
+success grants no waveform/level acceptance; the diagnostic category is blocked.
+No Fresh or Windows acceptance is added. Full gates and final review remain open.
+
 ## 2026-10-19 TSV admission and Soundcaster diagnostic follow-up
 
 Integration `dacfa842` preserves component evidence without redundant reruns.

@@ -5254,10 +5254,14 @@ def _prepare_object_create(
             "irreversible_preexisting_changes": conflict == "merge",
         }
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs, "effect_render_chains": effect_render_chains}
-    from .creation_observations import ordinary_creation_fields
-    fields = ordinary_creation_fields(node_specs[0]) if len(node_specs) == 1 else None
-    if (fields and conflict == "fail" and list_name is None and node_specs[0].get("collection") == "children"
-            and not node_specs[0].get("requested_language") and not node_specs[0].get("import_requested")):
+    from .creation_observations import ordinary_creation_fields, ordinary_creation_graph
+    try:
+        ordinary_creation_graph(verification, state, parent=parent.row)
+    except ValueError:
+        history_fields = []
+    else:
+        history_fields = [field for node in node_specs for field in (ordinary_creation_fields(node) or [])]
+    if history_fields:
         from .edit_history_business import capture_field_read_platform
         state["field_read_platform"] = capture_field_read_platform(request.version, platform, read=read)
     condition_guards = [spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec]
@@ -10391,22 +10395,15 @@ def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
 
 
 def _require_compound_ordinary_creation(prepared: PreparedOperation) -> None:
-    plan = prepared.verification_plan
-    nodes = plan.get("nodes")
-    from .creation_observations import ordinary_creation_fields
-    if (prepared.request.operation != "object.create" or not isinstance(nodes, list) or len(nodes) != 1
-            or plan.get("on_name_conflict") != "fail" or plan.get("list") is not None
-            or plan.get("preexisting_root_rows") != [] or plan.get("replaced_subtree_rows") != []):
-        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED",
-            "Compound creation currently requires one ordinary new fail-mode leaf; graph/List/merge/replace remain implementation obligations.")
-    node = nodes[0]
-    if (node.get("request_path") != "$" or node.get("parent_request_path") is not None
-            or node.get("collection") != "children" or node.get("existing_target") is not False
-            or node.get("preexisting_id") is not None or node.get("requested_language") is not None
-            or node.get("children_request_paths") or node.get("list_request_paths")
-            or ordinary_creation_fields(node) is None):
-        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED",
-            "Compound creation needs its complete ordinary leaf observation; richer source unions remain implementation obligations.")
+    from .creation_observations import ordinary_creation_graph
+    from .edit_history_business import MAX_OBSERVATIONS
+    try:
+        if prepared.request.operation != "object.create":
+            raise ValueError("Creation history requires object.create")
+        ordinary_creation_graph(prepared.verification_plan, prepared.pre_state,
+            parent=prepared.resolved_roles.get("parent", {}).get("row"), max_observations=MAX_OBSERVATIONS)
+    except ValueError as exc:
+        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
 
 
 def _compound_platform_guid(value: Any) -> bool:
@@ -10486,10 +10483,10 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     scopes = []
     if kind == "object-create-graph":
         _require_compound_ordinary_creation(prepared)
-        paths = state.get("object_graph_guard", {}).get("path_snapshots", [])
-        if len(paths) != 1 or not isinstance(paths[0].get("path"), str):
-            raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", "Compound creation needs its exact sealed absent path.")
-        return [{"object_id": "path:" + paths[0]["path"].casefold(), "field": "presence", "kind": "all", "platform": None}]
+        from .creation_observations import ordinary_creation_graph
+        _, paths = ordinary_creation_graph(plan, state, parent=prepared.resolved_roles.get("parent", {}).get("row"))
+        return [{"object_id": "path:" + path.casefold(), "field": "presence", "kind": "all", "platform": None}
+            for path in paths.values()]
     elif kind == "object-set-batch":
         nodes = plan.get("nodes", [])
         if (prepared.request.operation != "object.set" or not nodes
@@ -10612,6 +10609,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                     "request_validation_strength": "dedicated_operation_preparation",
                 }
             )
+        from .creation_observations import require_compound_creation_scope
+        require_compound_creation_scope(prepared_children)
         execution_plan = {
             **execution_plan,
             "calls": prepared_children,
@@ -19498,6 +19497,15 @@ def verify_prepared_operation(
         if not isinstance(raw_specs, list) or not all(isinstance(row, Mapping) for row in raw_specs):
             raise OperationContractError("INVALID_PREVIEW", "Object graph verification nodes are malformed.")
         specs = [dict(row) for row in raw_specs]
+        history_graph = False
+        if kind == "object-create-graph" and len(specs) > 1:
+            from .creation_observations import ordinary_creation_graph
+            try:
+                ordinary_creation_graph(plan, pre_state or {}, parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"))
+            except ValueError:
+                pass  # Richer unions retain their existing source verifier.
+            else:
+                history_graph = True
         renamed_owner_rows = {}
         def read_renamed_owner(object_id):
             if object_id not in renamed_owner_rows:
@@ -19661,7 +19669,7 @@ def verify_prepared_operation(
             fields = _object_spec_return_fields(spec)
             platform = spec.get("platform")
             history_view = (pre_state or {}).get("field_read_platform", {})
-            history_fields = (kind == "object-create-graph" and len(specs) == 1
+            history_fields = (kind == "object-create-graph"
                 and history_view.get("status") == "certified")
             if history_fields:
                 fields = _dedupe_fields([*fields, "classId"])
@@ -19691,6 +19699,8 @@ def verify_prepared_operation(
                 continue
             row = rows[0]
             observed_row_by_path[request_path] = row
+            if history_graph:
+                readbacks[-1] = {**readbacks[-1], "role": "created-node-history-source", "request_path": request_path}
             check(
                 f"{request_path} readback GUID matches the result",
                 _same_identity(row.get("id"), object_id),
@@ -19801,6 +19811,19 @@ def verify_prepared_operation(
                 )
                 assertions.append({"name": "created root identity is independently verified",
                     "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
+                if identity_ok and history_fields and len(specs) == 1:
+                    created_history_metadata.append((spec, object_id))
+            if history_graph and not spec.get("preexisting_id"):
+                identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                identity_ok = (result_node is not None and _same_identity(row.get("id"), object_id)
+                    and type(row.get("classId")) is int and row["classId"] == spec.get("class_id")
+                    and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")) and name_ok
+                    and _same_identity(_reference_identity(row.get("parent")), expected_parent_id)
+                    and isinstance(row.get("notes"), str))
+                assertions.append({"name": "created hierarchy node is independently verified",
+                    "kind": "verified_created_node_identity", "passed": bool(identity_ok),
+                    "evidence": {"request_path": request_path, "object": identity,
+                        "class_id": row.get("classId"), "parent_id": expected_parent_id}})
                 if identity_ok and history_fields:
                     created_history_metadata.append((spec, object_id))
             if spec.get("notes_supplied") is True:
@@ -22829,6 +22852,15 @@ def verify_prepared_operation(
         from .creation_observations import capture_created_field_metadata
         for spec, object_id in created_history_metadata:
             readbacks.extend(capture_created_field_metadata(spec, object_id, read=read_call))
+    if kind == "object-create-graph" and history_graph and all(item.get("passed") is True for item in assertions):
+        record = {"role": "created-graph-history-membership", "uri": OBJECT_GET_URI,
+            "args": {"from": {"id": [resolved_id_by_path.get("$")]}, "transform": [{"select": ["descendants"]}]},
+            "options": {"return": [*IDENTITY_RETURN_FIELDS, "classId"]}}
+        try:
+            record["result"] = read_call(record["uri"], record["args"], record["options"])
+        except OperationContractError as exc:
+            record["error"] = exc.as_dict()
+        readbacks.append(record)
     if kind == "object-set-batch" and all(item.get("passed") is True for item in assertions):
         from .existing_field_observations import capture_after
         for proof in (pre_state or {}).get("existing_field_observations", []):

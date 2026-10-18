@@ -12,11 +12,137 @@ def ordinary_creation_fields(node: Mapping[str, Any]) -> list[dict[str, Any]] | 
     for kind, key in (("scalar", "properties"), ("reference", "references")):
         for item in node.get(key, []):
             if (not isinstance(item, Mapping) or not isinstance(item.get("name"), str)
-                    or (kind == "reference" and ("target_id" not in item
+                    or (kind == "reference" and "target_request_path" not in item and ("target_id" not in item
                         or (item["target_id"] is not None and not isinstance(item["target_id"], str))))):
                 return None
             fields.append({"kind": kind, **dict(item)})
     return fields
+
+
+def ordinary_creation_graph(plan, state, *, parent, max_observations=128):
+    """Validate the complete ordinary new hierarchy, never a supported subset."""
+    nodes = plan.get('nodes')
+    if (not isinstance(nodes, list) or not nodes or not all(isinstance(node, Mapping) for node in nodes)
+            or plan.get('on_name_conflict') != 'fail'
+            or plan.get('list') is not None or plan.get('preexisting_root_rows') != []
+            or plan.get('replaced_subtree_rows') != []):
+        raise ValueError('Creation history needs a complete ordinary new fail-mode hierarchy; List/merge/replace/restoration remain implementation obligations')
+    paths, field_count = {}, 0
+    for node in nodes:
+        path = node.get('request_path')
+        fields = ordinary_creation_fields(node)
+        if (not isinstance(path, str) or path in paths or fields is None
+                or type(node.get('class_id')) is not int or node['class_id'] <= 0
+                or node.get('collection') != 'children' or node.get('existing_target') is not False
+                or node.get('preexisting_id') is not None or node.get('requested_language') is not None
+                or node.get('list_request_paths') or node.get('import_requested') or 'import' in node
+                or 'graph_plugin_native' in node or any('curve' in field or 'array' in field for field in fields)
+                or len({field['name'] for field in fields}) != len(fields)):
+            raise ValueError('Creation history requires every declared node and field to have an ordinary hierarchy observation')
+        paths[path] = node
+        field_count += len(fields)
+    if len(nodes) + field_count > max_observations:
+        raise ValueError('Creation history complete graph exceeds its combined observation bound')
+    if nodes[0].get('request_path') != '$' or nodes[0].get('parent_request_path') is not None:
+        raise ValueError('Creation history requires one exact declared root')
+    for node in nodes:
+        path = node['request_path']
+        if path != '$' and node.get('parent_request_path') not in paths:
+            raise ValueError('Creation history node lacks its declared parent')
+        current, seen = path, set()
+        while current != '$':
+            if current in seen or current not in paths:
+                raise ValueError('Creation history graph is not a connected hierarchy')
+            seen.add(current)
+            current = paths[current].get('parent_request_path')
+        children = [child['request_path'] for child in nodes if child.get('parent_request_path') == path]
+        if 'children_request_paths' in node and node['children_request_paths'] != children:
+            raise ValueError('Creation history declared child roster is incomplete')
+        for field in ordinary_creation_fields(node):
+            if 'target_request_path' in field and field['target_request_path'] not in paths:
+                raise ValueError('Creation history reference lacks its declared graph target')
+    parent_identity = normalize_live_object_identity(parent)
+    if parent_identity.object_id.upper() != str(plan.get('parent_id')).upper():
+        raise ValueError('Creation history requires its exact sealed parent identity')
+    root_path = parent_identity.path.rstrip('\\') + '\\' + nodes[0]['requested_name']
+    roots = [row for row in state.get('object_graph_guard', {}).get('path_snapshots', [])
+             if row.get('path') == root_path]
+    if not roots or any(row.get('rows') != [] for row in roots):
+        raise ValueError('Creation history requires one sealed absent root path')
+    expected_paths = {'$': root_path}
+    pending = dict(paths)
+    while pending:
+        ready = [path for path, node in pending.items() if path == '$' or node['parent_request_path'] in expected_paths]
+        if not ready:
+            raise ValueError('Creation history graph has no connected traversal')
+        for path in ready:
+            node = pending.pop(path)
+            if path != '$':
+                expected_paths[path] = expected_paths[node['parent_request_path']] + '\\' + node['requested_name']
+    if len({path.casefold() for path in expected_paths.values()}) != len(nodes):
+        raise ValueError('Creation history graph has duplicate native hierarchy paths')
+    return nodes, expected_paths
+
+
+def require_compound_creation_scope(calls):
+    """Fail before a graph write when its complete history algebra is unproved."""
+    from .operation_registry import OperationContractError
+    from .edit_history_business import MAX_OBSERVATIONS
+    prepared = [row.get('prepared_operation', {}) for row in calls]
+    if not any(child.get('verification_plan', {}).get('kind') == 'object-create-graph' for child in prepared):
+        return
+    graphs, renames, known_count = [], [], 0
+    for index, child in enumerate(prepared):
+        plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
+        kind = plan.get('kind')
+        chains = state.get('effect_render_chains', [])
+        covered = {}
+        for chain in chains:
+            # Arity only. Actual source observations are still required before
+            # any receipt can certify the fields or the preservation image.
+            known_count += 1 + sum(len(snapshot.get('after_changes', {})) for snapshot in chain.get('snapshots', []))
+            for item in chain.get('metadata', []):
+                key = (str(item['scope'].get('object_id')).upper(), chain.get('platform'))
+                covered.setdefault(key, set()).add(item['field'])
+        if kind == 'object-create-graph':
+            nodes, paths = ordinary_creation_graph(plan, state,
+                parent=child.get('resolved_roles', {}).get('parent', {}).get('row'), max_observations=MAX_OBSERVATIONS)
+            graphs.append((index, paths))
+            known_count += len(nodes) + sum(len(ordinary_creation_fields(node)) for node in nodes)
+        elif kind == 'same-guid-renamed':
+            renames.append((index, plan['old_path']))
+            known_count += 1
+        elif kind in {'same-guid-notes', 'same-guid-property', 'same-guid-reference'} and not state.get('effect_render_chains'):
+            known_count += 1
+        elif kind == 'object-set-batch':
+            for node in plan.get('nodes', []):
+                if node.get('requested_name') != node.get('original_name'):
+                    paths = {role['row']['path'] for role in child.get('resolved_roles', {}).values()
+                        if str(role.get('object')).upper() == str(node.get('target_id')).upper()}
+                    if len(paths) != 1:
+                        raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
+                            'Compound graph ancestry needs the exact renamed object path.')
+                    renames.append((index, next(iter(paths))))
+                proofs = [proof for proof in state.get('existing_field_observations', [])
+                    if proof.get('request_path') == node.get('request_path')]
+                view = proofs[0].get('field_read_platform', {}).get('platform_id') if len(proofs) == 1 else None
+                excluded = covered.get((str(node.get('target_id')).upper(), view), set())
+                fields = ({'name'} if node.get('requested_name') != node.get('original_name') else set())
+                fields.update({'notes'} if node.get('notes_supplied') else ())
+                fields.update(item['name'] for key in ('properties', 'references') for item in node.get(key, []))
+                known_count += len(fields - excluded)
+    if not graphs:
+        return
+    if known_count > MAX_OBSERVATIONS:
+        raise OperationContractError('UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED',
+            'Compound created graph and known companion outcomes exceed the complete history observation bound.')
+    for graph_index, paths in graphs:
+        for rename_index, old_path in renames:
+            if rename_index != graph_index and any(path.casefold().startswith(old_path.casefold().rstrip('\\') + '\\') for path in paths.values()):
+                raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
+                    'Compound creation with an ancestor rename requires the next graph path-dependency algebra; this is an implementation gap, not native absence.',
+                    details={'creation_index': graph_index, 'rename_index': rename_index,
+                        'implementation_obligation': 'created_graph_ancestor_rename_path_algebra'})
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:
@@ -29,7 +155,8 @@ def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, r
     requests = [("ak.wwise.core.object.getPropertyAndReferenceNames", {"object": object_id}),
         *(("ak.wwise.core.object.getPropertyInfo", {"object": object_id, "property": item["name"]}) for item in fields)]
     for uri, args in requests:
-        record = {"role": "created-root-history-field-metadata", "uri": uri, "args": args, "options": {}}
+        record = {"role": "created-root-history-field-metadata", "request_path": node["request_path"],
+            "uri": uri, "args": args, "options": {}}
         records.append(record)
         try:
             record["result"] = read(uri, args, {})

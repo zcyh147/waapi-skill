@@ -2116,6 +2116,13 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD, ROOT
     task = OwnedGraphTask(tmp_path, version, "object.create")
+    original_create = task._create
+    def create_with_actual_class(node, parent, **kwargs):
+        result = original_create(node, parent, **kwargs)
+        row = task.objects[result['id']]
+        row['classId'] = next(info['classId'] for info in task.types if info['name'] == row['type'])
+        return result
+    task._create = create_with_actual_class
     if compound:
         _start_parent_owned_graph_child(task, "object.create")
     if created_fields or reference:
@@ -2181,6 +2188,7 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
         "--kind", "sound-sfx", "--name", "Rain",
         *([] if notes is None else ["--field", "notes", notes]), *values)
     assert code == 0, declared
+    task.created_parent_handle = parent
     if declaration_only:
         return task, None, None
     if compound:
@@ -3759,6 +3767,11 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
     elif companion == "object.set":
         assert task.step("draft-declare-existing", "--declaration-id", "companion", "--object-handle", owner,
             "--field", "notes", "Compound companion notes")[0] == 0
+    elif companion == "object.setName":
+        assert task.step("draft-declare-object-change", "--new-name", "Renamed parent")[0] == 0
+    elif companion == "object.create":
+        assert task.step("draft-declare-new", "--declaration-id", "companion", "--parent-handle", owner,
+            "--kind", "sound-sfx", "--name", "History root")[0] == 0
     else:
         assert task.step("draft-declare-object-change", "--notes", "Compound companion notes")[0] == 0
     assert task.step("draft-check")[0] == 0
@@ -3957,7 +3970,7 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert ("object.set" in choices) is (version != "2021.1")
     assert "object.createPlugin" not in choices and "object.setRTPC" not in choices
     scope = declaration["child_observation_scope"]
-    assert "fail_mode_leaf" in scope["object.create"]
+    assert "new_fail_mode_hierarchy" in scope["object.create"]
     assert "actual_parent_execution_phase" in scope["history_receipt"]
     assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
     assert declaration["native_request_input"] == "forbidden"
@@ -4014,3 +4027,347 @@ def test_compound_history_display_names_do_not_define_child_ownership(tmp_path):
     code, verified = run("verify", preview["transaction_id"])
     assert code == 0 and verified["verified"] is True, verified
     assert (client.source["name"], client.source["notes"]) == (client.history_before["name"], client.history_before["notes"])
+
+
+def _created_graph_history_case(tmp_path, *, version='2025.1', compound=False, prepared_only=False, long_notes=False):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST
+    task, _, _ = _created_leaf_history_case(tmp_path, version=version, nested=True,
+        created_fields=True, reference='null', declaration_only=True, compound=compound,
+        notes=('Nested graph note.\n' * 600) if long_notes else 'Created notes')
+    code, inner = task.step('draft-declare-new', '--declaration-id', 'inner',
+        '--parent-handle', task.created_parent_handle, '--kind', 'actor-mixer', '--name', 'Inner')
+    assert code == 0, inner
+    code, wind = task.step('draft-declare-new', '--declaration-id', 'wind',
+        '--parent-handle', inner['draft']['declared_object']['result_handle'],
+        '--kind', 'sound-sfx', '--name', 'Wind', '--field', 'notes', 'Nested wind')
+    assert code == 0, wind
+    ids = {name: '{' + str(index) * 8 + '-' + str(index) * 4 + '-' + str(index) * 4 + '-' + str(index) * 4 + '-' + str(index) * 12 + '}'
+        for index, name in enumerate(('Container', 'Rain', 'Inner', 'Wind'), 6)}
+    def create(node, parent, **_kwargs):
+        identity = ids[node['name']]
+        actual_type = 'PropertyContainer' if version == '2025.1' and node['type'] == 'ActorMixer' else node['type']
+        task.objects[identity] = {'id': identity, 'name': node['name'], 'type': actual_type,
+            'classId': next(row['classId'] for row in task.types if row['name'] == actual_type),
+            'path': task.objects[parent]['path'] + '\\' + node['name'], 'parent': {'id': parent},
+            'notes': node.get('notes', 'Native default ' + node['name']),
+            **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
+        children = [create(child, identity) for child in node.get('children', [])]
+        return {'id': identity, 'name': node['name'], **({'children': children} if children else {})}
+    task._create = create
+    original = task.call
+    def actual_classes(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.create'):
+            for identity in ids.values():
+                row = task.objects[identity]
+                row['classId'] = next(item['classId'] for item in task.types if item['name'] == row['type'])
+        return result
+    task.call = actual_classes
+    before = deepcopy(task.objects)
+    if compound:
+        assert task.step('draft-check')[0] == 0
+        if prepared_only:
+            return task, None, before, None
+        source, before, after = _compound_from_graph_task(task, notes_id=FIRST)
+        return task, source, before, after
+    source, shown = task.preview()
+    if prepared_only:
+        return task, source, before, shown
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    after = deepcopy(task.objects)
+    source_call = task.call
+    def history(uri, args=None, options=None):
+        if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects = deepcopy(before if uri.endswith('.undo') else after)
+            return {}
+        return source_call(uri, args, options)
+    task.call = history
+    return task, source, before, after
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('compound', [False, True])
+def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_path, version, compound):
+    task, source, before, after = _created_graph_history_case(tmp_path, version=version, compound=compound)
+    for direction in (('undo',) if version == '2022.1' else ('undo', 'redo')):
+        tx = _created_leaf_history_preview(task, source, direction)
+        code, full = task.run('transaction-show', tx)
+        assert code == 0, full
+        observations = full['artifact']['prepared_operation']['pre_state']['history_binding']['observations']
+        nodes = [row for row in observations if row.get('kind') == 'creation_presence']
+        assert {row['object']['name'] for row in nodes} == {'Container', 'Rain', 'Inner', 'Wind'}
+        assert all(type(row.get('class_id')) is int for row in nodes)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == (before if direction == 'undo' else after)
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
+
+
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination'):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
+    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for cid, name in
+        ((1638416, 'WorkUnit'), (1376272, 'Bus'), (3997712, 'AuxBus'))]
+    task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
+        'path': r'\Master-Mixer Hierarchy\Default Work Unit', 'parent': None, 'notes': 'Keep buses'}}
+    task.metadata = {'UserAuxSend0': {'name': 'UserAuxSend0', 'type': 'Reference',
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['AuxBus']}]}}}
+    ids = {'Routing': '{66666666-6666-6666-6666-666666666666}',
+        'Destination': '{77777777-7777-7777-7777-777777777777}', 'Sender': '{88888888-8888-8888-8888-888888888888}'}
+    platform = '{44444444-4444-4444-4444-444444444444}'
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('getProjectInfo'):
+            return {**original(uri, args, options), 'currentPlatformId': platform, 'platforms': [{'id': platform, 'name': 'Windows'}]}
+        if uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            base = task.objects[SECOND]['path'] + r'\Routing'
+            for key, name, cid, parent in (('Routing', 'Routing', 1376272, SECOND), ('Destination', target_name, 3997712, ids['Routing']), ('Sender', 'Sender', 3997712, ids['Routing'])):
+                task.objects[ids[key]] = {'id': ids[key], 'name': name, 'classId': cid,
+                    'type': 'Bus' if key == 'Routing' else 'AuxBus', 'parent': {'id': parent}, 'notes': '',
+                    'path': base + ('' if key == 'Routing' else '\\' + name)}
+            native_target = args['children'][1]['@UserAuxSend0']
+            actual_targets = [row['id'] for row in task.objects.values() if row['path'] == native_target]
+            assert len(actual_targets) == 1, native_target
+            task.objects[ids['Sender']]['@UserAuxSend0'] = {'id': actual_targets[0]}
+            return {'id': ids['Routing'], 'name': 'Routing', 'children': [
+                {'id': ids['Destination'], 'name': target_name}, {'id': ids['Sender'], 'name': 'Sender'}]}
+        if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects = deepcopy(before if uri.endswith('.undo') else after)
+            return {}
+        return original(uri, args, options)
+    task.call = call
+    parent = task.bind(SECOND)
+    kinds = {}
+    for name in ('Bus', 'AuxBus'):
+        code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', name)
+        assert code == 0, found
+        kinds[name] = found['type_candidates'][0]['handle']
+    code, found = task.step('draft-discover-fields', '--type-handle', kinds['AuxBus'], '--meaning', 'UserAuxSend0')
+    assert code == 0, found
+    field = found['meaning_results'][0]['candidates'][0]['handle']
+    code, root = task.step('draft-declare-new', '--declaration-id', 'root', '--parent-handle', parent, '--kind', kinds['Bus'], '--name', 'Routing')
+    assert code == 0, root
+    root = root['draft']['declared_object']['result_handle']
+    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', target_name)
+    assert code == 0, target
+    code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Sender',
+        '--field-value', field, target['draft']['declared_object']['result_handle'])
+    assert code == 0, sender
+    before = deepcopy(task.objects)
+    source, shown = task.preview()
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    after = deepcopy(task.objects)
+    if version == '2021.1':
+        assert task.run('draft-start', 'ak.wwise.core.undo.undo')[0] == 2
+        return
+    for direction in (('undo',) if version == '2022.1' else ('undo', 'redo')):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == (before if direction == 'undo' else after)
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_created_graph_history_restores_internal_reference_without_preserving_absent_target(tmp_path, version):
+    _exercise_created_graph_internal_reference_history(tmp_path, version)
+
+
+def test_created_graph_internal_reference_target_may_share_root_basename(tmp_path):
+    _exercise_created_graph_internal_reference_history(tmp_path, '2025.1', target_name='Routing')
+
+
+@pytest.mark.parametrize('compound', [False, True])
+def test_2021_created_graph_source_and_compound_admission_do_not_invent_history_uri(tmp_path, compound):
+    task, source, before, after = _created_graph_history_case(tmp_path, version='2021.1', compound=compound)
+    assert len(after) - len(before) == 4
+    code, rejected = task.run('draft-start', 'ak.wwise.core.undo.undo')
+    assert code == 2 and '2021.1' in json.dumps(rejected), rejected
+    assert not any(row[0] == 'ak.wwise.core.undo.undo' for row in task.calls)
+
+
+@pytest.mark.parametrize('damage', ['surviving-child', 'new-guid', 'empty-container-class', 'parent', 'nested-field', 'extra-descendant'])
+def test_created_graph_history_false_native_success_cannot_certify_partial_graph(tmp_path, damage):
+    from copy import deepcopy
+    task, source, before, after = _created_graph_history_case(tmp_path)
+    undo = _created_leaf_history_preview(task, source)
+    assert task.run('execute', undo)[0] == 0
+    if damage == 'surviving-child':
+        child = next(row for row in after.values() if row['name'] == 'Wind')
+        task.objects[child['id']] = deepcopy(child)
+        target = undo
+    else:
+        assert task.run('verify', undo)[0] == 0
+        target = _created_leaf_history_preview(task, source, 'redo')
+        assert task.run('execute', target)[0] == 0
+        if damage == 'new-guid':
+            row = next(row for row in task.objects.values() if row['name'] == 'Wind')
+            del task.objects[row['id']]
+            row['id'] = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+            task.objects[row['id']] = row
+        elif damage == 'empty-container-class':
+            next(row for row in task.objects.values() if row['name'] == 'Inner')['classId'] = 999
+        elif damage == 'parent':
+            next(row for row in task.objects.values() if row['name'] == 'Wind')['parent'] = {'id': next(row['id'] for row in task.objects.values() if row['name'] == 'Container')}
+        elif damage == 'nested-field':
+            next(row for row in task.objects.values() if row['name'] == 'Rain')['@Volume'] = True
+        else:
+            parent = next(row for row in task.objects.values() if row['name'] == 'Container')
+            extra = {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'Extra', 'type': 'Sound', 'classId': 2,
+                'parent': {'id': parent['id']}, 'notes': '', 'path': parent['path'] + r'\Extra'}
+            task.objects[extra['id']] = extra
+    code, failed = task.run('verify', target)
+    assert code == 2 and failed.get('verified') is False, failed
+    count = len([row for row in task.calls if row[0] in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}])
+    assert count == (1 if damage == 'surviving-child' else 2)
+
+
+def _rewrite_created_graph_verification(task, source, mutate):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    code, shown = task.run('transaction-show', source)
+    assert code == 0, shown
+    events = shown['events']
+    verification = next(row['details']['verification'] for row in events if row['event_type'] == 'verification_recorded')
+    mutate(verification)
+    previous = ''
+    for event in events:
+        event['previous_event_hash'] = previous
+        event.pop('event_hash')
+        event['event_hash'] = previous = canonical_sha256(event)
+    directory = task.path / 'state' / 'transactions' / source
+    (directory / 'events.jsonl').write_bytes(b''.join(canonical_json_bytes(event) + b'\n' for event in events))
+    state_path = directory / 'state.json'
+    record = json.loads(state_path.read_text())
+    record['last_event_hash'] = previous
+    state_path.write_bytes(canonical_json_bytes(record))
+
+
+def _reject_created_graph_receipt(task, source):
+    code, phase = task.run('draft-start', 'ak.wwise.core.undo.undo')
+    assert code == 0, phase
+    code, rejected = task.run('draft-declare-core-plan', phase['draft']['draft_id'], '--task-authority', phase['task_authority'],
+        '--expected-revision', str(phase['draft']['revision']), '--value', 'history_scope', 'latest_project_history',
+        '--value', 'expectation_receipt', source)
+    assert code == 2, rejected
+    assert not any(row[0] == 'ak.wwise.core.undo.undo' for row in task.calls)
+    return rejected
+
+
+@pytest.mark.parametrize('fault', ['missing-node', 'metadata-node', 'boolean-class', 'extra-membership'])
+def test_created_graph_receipt_rejects_incomplete_or_misassociated_actual_producer_proof(tmp_path, fault):
+    from copy import deepcopy
+    task, source, _, _ = _created_graph_history_case(tmp_path)
+    def damage(verification):
+        nodes = [row for row in verification['assertions'] if row.get('kind') == 'verified_created_node_identity']
+        if fault == 'missing-node':
+            verification['assertions'].remove(nodes[-1])
+        elif fault == 'boolean-class':
+            nodes[0]['evidence']['class_id'] = True
+        elif fault == 'metadata-node':
+            row = next(row for row in verification['readbacks'] if row.get('role') == 'created-root-history-field-metadata')
+            row['request_path'] = '$.children[99]'
+        else:
+            membership = next(row for row in verification['readbacks'] if row.get('role') == 'created-graph-history-membership')
+            extra = deepcopy(membership['result']['return'][0])
+            extra.update(id='{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', name='Unreported', path=extra['path'] + r'\Unreported')
+            membership['result']['return'].append(extra)
+    _rewrite_created_graph_verification(task, source, damage)
+    _reject_created_graph_receipt(task, source)
+
+
+@pytest.mark.parametrize('boundary', ['ancestor-rename', 'combined-observations'])
+def test_compound_created_graph_unproven_path_dependency_and_complete_bound_stop_before_write(tmp_path, monkeypatch, boundary):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND
+    from wwise_waapi import edit_history_business
+    task, _, _, _ = _created_graph_history_case(tmp_path, compound=True, prepared_only=True)
+    if boundary == 'combined-observations':
+        monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 8)
+    _compound_from_graph_task(task, notes_id=SECOND if boundary == 'ancestor-rename' else FIRST,
+        companion='object.setName' if boundary == 'ancestor-rename' else 'object.setNotes',
+        expected_error='UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN' if boundary == 'ancestor-rename' else 'UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED')
+    assert not any(row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.undo.beginGroup'} for row in task.calls)
+
+
+@pytest.mark.parametrize('drift', ['nested-notes', 'raw-metadata'])
+def test_created_graph_history_revalidates_complete_scope_before_native_action(tmp_path, drift):
+    task, source, _, _ = _created_graph_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    if drift == 'nested-notes':
+        next(row for row in task.objects.values() if row['name'] == 'Wind')['notes'] = 'Later edit'
+    else:
+        task.metadata['Volume']['nativeExtension'] = None
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert not any(row[0] == 'ak.wwise.core.undo.undo' for row in task.calls)
+
+
+def test_created_graph_optional_object_metadata_failure_keeps_source_but_blocks_stronger_receipt(tmp_path):
+    task, source, _, shown = _created_graph_history_case(tmp_path, prepared_only=True)
+    original = task.call
+    def metadata_failure(uri, args=None, options=None):
+        if uri.endswith('getPropertyInfo') and args.get('object') in task.objects and task.objects[args['object']]['name'] == 'Rain':
+            raise RuntimeError('Graph optional exact-object metadata unavailable')
+        return original(uri, args, options)
+    task.call = metadata_failure
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    rejected = _reject_created_graph_receipt(task, source)
+    assert 'metadata' in json.dumps(rejected).lower()
+
+
+def test_created_graph_history_review_pages_reconstruct_complete_original_graph(tmp_path):
+    task, source, before, _ = _created_graph_history_case(tmp_path, long_notes=True)
+    tx = _created_leaf_history_preview(task, source)
+    code, compact = task.run('transaction-show', tx, '--summary-only')
+    assert code == 0, compact
+    detail = compact['preview_summary']['history_action']['detail']
+    binding, pages = _collect_history_pages(task.run, detail, task)
+    code, full = task.run('transaction-show', tx)
+    assert code == 0, full
+    assert binding == full['artifact']['prepared_operation']['pre_state']['history_binding']
+    assert {row['object']['name'] for row in binding['observations'] if row['kind'] == 'creation_presence'} == {'Container', 'Rain', 'Inner', 'Wind'}
+    assert pages[-1]['complete'] is True
+    assert task.run('execute', tx)[0] == 0
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects == before
+
+
+def test_created_graph_history_full_proof_keeps_existing_byte_ceiling(tmp_path, monkeypatch):
+    from wwise_waapi import edit_history_business
+    task, source, _, _ = _created_graph_history_case(tmp_path)
+    monkeypatch.setattr(edit_history_business, 'MAX_BINDING_BYTES', 1024)
+    rejected = _reject_created_graph_receipt(task, source)
+    assert 'bounded proof size' in rejected['message']
+
+
+def test_compound_created_graph_cannot_borrow_another_child_observation_tag(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256
+    task, source, _, _ = _created_graph_history_case(tmp_path, compound=True)
+    def wrong_child(verification):
+        association = next(row['evidence'] for row in verification['assertions'] if row.get('kind') == 'compound_child_observation')
+        bounds = association['readbacks']
+        rows = verification['readbacks'][bounds['start']:bounds['start'] + bounds['count']]
+        next(row for row in rows if row.get('role') == 'created-node-history-source')['compound_child_index'] = 1
+        bounds['sha256'] = canonical_sha256(rows)
+    _rewrite_created_graph_verification(task, source, wrong_child)
+    rejected = _reject_created_graph_receipt(task, source)
+    assert 'typed child index' in rejected['message']
+
+
+def test_compound_created_graph_complete_bound_includes_existing_render_observations(tmp_path, monkeypatch):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    from wwise_waapi import edit_history_business
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 3)
+    _compound_from_graph_task(task, notes_id=SECOND, companion='object.create',
+        expected_error='UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED')
+    assert not any(row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.undo.beginGroup'} for row in task.calls)
