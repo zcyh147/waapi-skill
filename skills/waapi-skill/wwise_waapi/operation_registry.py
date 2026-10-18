@@ -6366,6 +6366,9 @@ def _prepare_object_set(
                 owner_id=target.object,
                 list_name=descriptor.name,
             )
+            if (any(member.anonymous for member in descriptor.objects)
+                    and len(descriptor.objects) + (len(before_rows) if row_list_mode == "append" else 0) > OBJECT_LIST_MAX_SUBTREE_NODES):
+                raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Anonymous construction exceeds the Gateway complete ordered membership bound before dispatch")
             list_snapshot = {
                 "object_id": target.object,
                 "list": descriptor.name,
@@ -6376,13 +6379,8 @@ def _prepare_object_set(
             list_snapshots.append(list_snapshot)
             target_list_snapshots.append(list_snapshot)
             if any(member.anonymous for member in descriptor.objects):
-                for member in before_rows:
-                    fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId", "@Effect", "@Bypass", "@Render"]
-                    rows = _read_object_id_rows(member["id"], fields=fields, read=read, platform=platform)
-                    if len(rows) != 1 or not _same_identity(rows[0].get("id"), member["id"]):
-                        raise OperationContractError("INVALID_READBACK", "Anonymous append preservation needs one exact existing member")
-                    field_snapshots.append({"object_id": member["id"], "fields": fields, "platform": platform,
-                        "rows": rows, "preserve_after_write": row_list_mode == "append"})
+                field_snapshots.extend(_capture_anonymous_member_state(before_rows, read=read, platform=platform,
+                    preserve=row_list_mode == "append"))
             if row_list_mode == "replaceAll":
                 replacement_subtrees = _capture_object_list_replace_subtrees(
                     before_rows,
@@ -6639,6 +6637,9 @@ def _prepare_object_set(
                         _read_object_list(owner_id, descriptor.name, fields=OBJECT_LIST_SNAPSHOT_FIELDS, read=read,
                                           platform=owner_spec.get("platform")), owner_id=owner_id, list_name=descriptor.name,
                     )
+                if (any(member.anonymous for member in descriptor.objects)
+                        and len(descriptor.objects) + (len(before_rows) if row_list_mode == "append" else 0) > OBJECT_LIST_MAX_SUBTREE_NODES):
+                    raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Anonymous construction exceeds the Gateway complete ordered membership bound before dispatch")
                 snapshot = {"object_id": owner_id, "list": descriptor.name, "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
                             "platform": owner_spec.get("platform"), "rows": before_rows}
                 owner_spec.setdefault("list_snapshots", []).append(snapshot)
@@ -6646,13 +6647,8 @@ def _prepare_object_set(
                 if owner_id is not None:
                     list_snapshots.append(snapshot)
                     if any(member.anonymous for member in descriptor.objects):
-                        for member in before_rows:
-                            fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId", "@Effect", "@Bypass", "@Render"]
-                            rows = _read_object_id_rows(member["id"], fields=fields, read=read, platform=owner_spec.get("platform"))
-                            if len(rows) != 1 or not _same_identity(rows[0].get("id"), member["id"]):
-                                raise OperationContractError("INVALID_READBACK", "Anonymous append preservation needs one exact existing member")
-                            field_snapshots.append({"object_id": member["id"], "fields": fields, "platform": owner_spec.get("platform"),
-                                "rows": rows, "preserve_after_write": row_list_mode == "append"})
+                        field_snapshots.extend(_capture_anonymous_member_state(before_rows, read=read,
+                            platform=owner_spec.get("platform"), preserve=row_list_mode == "append"))
                     if row_list_mode == "replaceAll":
                         removed = _capture_object_list_replace_subtrees(before_rows, read=read)
                         for subtree in removed:
@@ -6763,6 +6759,11 @@ def _prepare_object_set(
         if set(trusted) != {"object"}:
             dispatch_objects.append(trusted)
 
+    unique_snapshots = []
+    for snapshot in field_snapshots:
+        if snapshot not in unique_snapshots:
+            unique_snapshots.append(snapshot)
+    field_snapshots = unique_snapshots
     for spec in node_specs:
         for snapshot in spec.pop("anonymous_target_snapshots", []):
             matching = [row for row in field_snapshots if row.get("object_id") == snapshot["object_id"] and row.get("fields") == snapshot["fields"]]
@@ -7748,6 +7749,72 @@ def _resolve_merge_node_target(
         resolution="live-exact-merge-collision", row=row)
 
 
+def _capture_anonymous_member_state(members, *, read, platform, preserve):
+    snapshots, targets = [], set()
+    for member in members:
+        fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId", "@Effect", "@Bypass", "@Render"]
+        rows = _read_object_id_rows(member["id"], fields=fields, read=read, platform=platform)
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), member["id"]):
+            raise OperationContractError("INVALID_READBACK", "Anonymous preservation needs one exact existing member")
+        snapshots.append({"object_id": member["id"], "fields": fields, "platform": platform,
+            "rows": rows, "preserve_after_write": preserve, "reference_fields": ["Effect"]})
+        if not preserve or not _has_field(rows[0], "Effect"):
+            continue
+        value = _field_value(rows[0], "Effect")
+        if _reference_value_is_null(value):
+            continue
+        target_id = _reference_identity(value)
+        if not _valid_object_id(target_id):
+            raise OperationContractError("INVALID_READBACK", "Preserved Effect reference needs its exact GUID or explicit native null")
+        if _identity_key(target_id) in targets:
+            continue
+        targets.add(_identity_key(target_id))
+        fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+        actual = _read_object_id_rows(target_id, fields=fields, read=read, platform=platform)
+        if len(actual) != 1 or not _same_identity(actual[0].get("id"), target_id):
+            raise OperationContractError("INVALID_READBACK", "Preserved Effect target must independently resolve once")
+        snapshots.append({"object_id": target_id, "fields": fields, "platform": platform, "rows": actual, "preserve_after_write": True})
+    return snapshots
+
+
+def _observe_independent_effect_ancestry(effect, *, catalog, read, platform):
+    """Bind an existing ShareSet, rather than reuse a creation destination rule.
+
+    All pinned SampleProject Effects/Factory Effects Work Units contain Effect
+    children below Folder nodes. Exact fresh parent GUIDs/classes prove this
+    hierarchy; an opaque owner-local Effect is not made independent by its path.
+    """
+    if len([row for row in catalog if row.class_id == effect.get("classId") and row.type == "Effect"]) != 1:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "Selected Effect needs one fresh exact plugin class")
+    fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+    rows, seen, current = [], set(), effect
+    for depth in range(DEFAULT_MAX_DEPTH + 1):
+        identity = current.get("id")
+        if not _valid_object_id(identity) or _identity_key(identity) in seen:
+            raise OperationContractError("INVALID_READBACK", "Independent ShareSet ancestry needs unique exact GUIDs")
+        seen.add(_identity_key(identity))
+        rows.append(current)
+        if "owner" in current and not _reference_value_is_null(current["owner"]):
+            if depth == 0 and _valid_object_id(_reference_identity(current["owner"])):
+                raise OperationContractError("LOCAL_EFFECT_REUSE_UNRESOLVED", "Existing owner-local Effect reuse is not proved by ShareSet construction authority; its actual owner cannot be silently replaced")
+            raise OperationContractError("INVALID_READBACK", "Independent ShareSet ancestry has non-null or malformed ownership")
+        if depth:
+            matches = [row for row in catalog if row.class_id == current.get("classId") and row.name in {"WorkUnit", "Folder"}]
+            if len(matches) != 1:
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestors require their fresh WorkUnit or Folder classes")
+            path = current.get("path")
+            if not isinstance(path, str) or not path.startswith("\\Effects\\"):
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestry must remain in the actual Effects hierarchy")
+            if matches[0].name == "WorkUnit":
+                return rows
+        parent_id = _reference_identity(current.get("parent"))
+        parent = _read_object_id_rows(parent_id, fields=fields, read=read, platform=platform) if _valid_object_id(parent_id) else []
+        if len(parent) != 1 or not _same_identity(parent[0].get("id"), parent_id):
+            raise OperationContractError("INVALID_READBACK", "ShareSet parent must resolve once by its actual GUID")
+        current = parent[0]
+    raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestry exceeds the graph depth bound")
+
+
 def _resolve_graph_node_type(node, *, catalog, version):
     if node.plugin is None:
         return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
@@ -7969,20 +8036,11 @@ def _prepare_object_node_specs(
                     if len(rows) != 1 or not _same_identity(rows[0].get("id"), resolved.object):
                         raise OperationContractError("INVALID_READBACK", "A selected Effect needs its actual identity/class/ownership")
                     actual = rows[0]
-                    if _reference_identity(actual.get("owner")) is not None:
-                        raise OperationContractError("LOCAL_EFFECT_REUSE_UNRESOLVED", "Existing owner-local Effect reuse is not proved by ShareSet construction authority; its actual owner cannot be silently replaced")
-                    parent_id = _reference_identity(actual.get("parent"))
-                    parents = _read_object_id_rows(parent_id, fields=fields, read=read, platform=platform) if _valid_object_id(parent_id) else []
-                    plugin_types = [row for row in type_catalog if row.class_id == actual.get("classId") and row.type == "Effect"]
-                    if (len(plugin_types) != 1 or len(parents) != 1 or not _same_identity(parents[0].get("id"), parent_id)
-                            or len([row for row in type_catalog if row.name == "WorkUnit" and row.class_id == parents[0].get("classId")]) != 1):
-                        raise OperationContractError("INVALID_REFERENCE_TARGET", "Independent Effect requires its exact fresh plugin class and actual ShareSet Work Unit")
-                    descriptor_proof = normalize_plugin_creation({"kind": "effect", "placement": "shareset", "class_id": actual["classId"], "name": actual["name"]})
-                    validate_plugin_target(descriptor_proof, target_type=parents[0].get("type"), target_path=parents[0].get("path"))
+                    observed = _observe_independent_effect_ancestry(actual, catalog=type_catalog, read=read, platform=platform)
                     resolved = ResolvedObject(identity=resolved.identity, object=resolved.object, resolution=resolved.resolution, row=actual)
                     spec.setdefault("anonymous_target_snapshots", []).extend([
                         {"object_id": row["id"], "fields": fields, "rows": [row], "platform": platform, "preserve_after_write": True}
-                        for row in [actual, parents[0]]])
+                        for row in observed])
                 targets.append(resolved)
                 roles[role] = resolved
                 identities.append(resolved.object)
@@ -20249,21 +20307,32 @@ def verify_prepared_operation(
                 continue
             from .object_graph_paths import expected_snapshot
             expected = expected_snapshot(snapshot["rows"][0], edits=specs, read_row=read_renamed_owner)
+            selected_references = {}
+            observed_fields = {field.lstrip("@") for field in snapshot["fields"]}
+            for name in snapshot.get("reference_fields", []):
+                if _has_field(expected, name):
+                    value = _field_value(expected, name)
+                    selected_references[name] = None if _reference_value_is_null(value) else _reference_identity(value)
             for node in specs:
                 if not _same_identity(node.get("target_id", node.get("preexisting_id")), snapshot["object_id"]):
                     continue
                 for prop in node.get("properties", []):
-                    expected["@" + prop["name"]] = prop["value"]
+                    if prop["name"] in observed_fields:
+                        expected["@" + prop["name"]] = prop["value"]
                 for reference in node.get("references", []):
-                    value = resolved_id_by_path.get(reference.get("target_request_path"), reference.get("target_id"))
-                    key = "@" + reference["name"]
-                    if isinstance(expected.get(key), Mapping) and _valid_object_id(value):
-                        expected[key] = {**expected[key], "id": value}
-                    else:
-                        expected[key] = value
+                    if reference.get("condition_guard") or reference["name"] not in observed_fields:
+                        continue
+                    selected_references[reference["name"]] = resolved_id_by_path.get(reference.get("target_request_path"), reference.get("target_id"))
             actual = read_object(object_id=snapshot["object_id"], fields=snapshot["fields"], platform=snapshot.get("platform"))
-            check("unrequested existing anonymous member state remains unchanged", actual == [expected],
-                {"expected": expected, "actual": actual})
+            # A deliberately retargeted reference uses the ordinary canonical
+            # identity/null primitive, never old target display labels with a
+            # new id spliced into them. All unselected fields remain exact.
+            expected_unselected = {key: value for key, value in expected.items() if key.lstrip("@") not in selected_references}
+            actual_unselected = [{key: value for key, value in row.items() if key.lstrip("@") not in selected_references} for row in actual]
+            passed = (_native_snapshot_equal(actual_unselected, [expected_unselected]) and len(actual) == 1
+                and all(_reference_requirement_matches(actual[0], name, value) for name, value in selected_references.items()))
+            check("unrequested existing anonymous member state remains unchanged", passed,
+                {"expected": expected, "selected_reference_intent": selected_references, "actual": actual})
         rtpc_guards = [spec for spec in specs if spec.get("rtpc_binding")]
         rtpc_snapshots, rtpc_verified = {}, set()
         for spec in rtpc_guards:

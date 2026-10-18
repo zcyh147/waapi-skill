@@ -28631,6 +28631,18 @@ def _business_next_action_binding(
                 },
                 "declare_new": {
                     **operation_draft_prefix_copy_binding(declare_new_prefix),
+                    "anonymous_list_member": {
+                        **operation_draft_prefix_copy_binding(declare_new_prefix),
+                        "append": ["--declaration-id", "<task-local-id>", "--parent-handle", "<bound-or-planned-owner-handle>",
+                            "--kind", "<selected-EffectSlot-Type-Handle>", "--field", "object_list", "<selected-Effects-List-Field-Handle>",
+                            "[--field-value <selected-class-Field-Handle> <business-value>]..."],
+                        "native_name": "Gateway_owned_empty_string",
+                        "semantics": business_contract["declaration"]["anonymous_list_member"],
+                        "local_plugin": {"parent": "new_slot_result_handle", "kind": "selected_effect_Type_Handle",
+                            "name": "user_requested_plugin_name", "plugin_placement": "owner"},
+                        "new_shareset": {"parent": "bound_Effects_WorkUnit_Handle", "kind": "selected_effect_Type_Handle",
+                            "name": "user_requested_ShareSet_name", "plugin_placement": "shareset"},
+                    },
                     "append": [
                         "--declaration-id",
                         "<task-local-id>",
