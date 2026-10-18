@@ -4306,7 +4306,7 @@ def test_stationary_tone_diagnostic_stops_on_wrong_host_or_generation_failure_wi
     if expected_writes:
         assert receipt['phases'][0]['execution_attempted'] is True
         final = json.loads(Path(receipt['phases'][0]['transaction']['path']).read_text())
-        assert final['state'] == ('execution_indeterminate' if fault == 'native-error' else 'executed_unverified')
+        assert final['state'] == ('indeterminate' if fault == 'native-error' else 'executed_unverified')
 
 
 def test_stationary_tone_diagnostic_retains_unrecognized_output_and_failed_verification_without_effect_credit(tmp_path, workflow):
