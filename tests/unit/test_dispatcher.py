@@ -143,6 +143,19 @@ def test_dispatch_function_validates_manifest_and_calls_injected_client() -> Non
     assert client.calls == [("ak.wwise.core.getInfo", {"platform": "Mac"}, {"return": ["displayName"]})]
 
 
+@pytest.mark.parametrize("payload", [{}, [], False, 0, "", {"reference": None}],
+    ids=["empty-object", "empty-array", "false", "zero", "empty-string", "nested-null"])
+def test_missing_response_check_preserves_every_non_none_client_payload(payload) -> None:
+    client = FakeWaapiClient(result=payload)
+    dispatcher = WwiseDispatcher(client=client, manifest_store=manifest_store())
+
+    result = dispatcher.dispatch("ak.wwise.core.getInfo")
+
+    assert result["ok"] is True and result["result"] == payload
+    assert result["error_code"] is None
+    assert len(client.calls) == 1
+
+
 def test_dispatch_function_passes_options_as_keyword_argument() -> None:
     client = KeywordOnlyOptionsClient()
     dispatcher = WwiseDispatcher(client=client, manifest_store=manifest_store())

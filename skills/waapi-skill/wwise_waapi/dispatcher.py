@@ -323,6 +323,18 @@ class WwiseDispatcher:
             return self._exception_result(request, exc, item_type=entry.item_type, error_code="TIMEOUT")
         except Exception as exc:  # noqa: BLE001 - preserve client error type in machine field
             return self._exception_result(request, exc, item_type=entry.item_type)
+        if payload is None:
+            # WaapiClient uses None for a failed/unblocked request, whereas an
+            # acknowledged empty WAMP result is {}. The write may have reached
+            # Wwise: missing acknowledgement is not a native rejection.
+            result = self._error_result(
+                request.api, request.version, "WAAPI_RESPONSE_MISSING",
+                "The WAAPI client returned no acknowledgement; effects are unknown",
+                item_type=entry.item_type, category=entry.category, risk_level=entry.risk_level,
+                details={"response_received": False, "effects_unknown": True},
+            )
+            result["failure_origin"] = "missing_response"
+            return result
         return self._success_result(request, entry, payload)
 
     def _dispatch_topic(self, request: DispatcherRequest, entry: ManifestApiEntry) -> dict[str, Any]:
