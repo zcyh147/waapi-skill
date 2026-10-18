@@ -293,7 +293,7 @@ def _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch):
     client.views['Designer'] = [{'viewName': 'DisclosedSoundcasterView',
         'viewID': '{22222222-2222-2222-2222-222222222222}',
         'viewDisplayName': 'Soundcaster', 'viewIsDocked': False}]
-    client.responses.update({'ak.wwise.ui.commands.getCommands': {'commands': ['ShowSoundcaster']},
+    client.responses.update({'ak.wwise.ui.commands.getCommands': {'commands': ['Inspect']},
         'ak.wwise.ui.commands.execute': {},
         'ak.wwise.ui.captureScreen': {'contentType': 'image/png', 'contentBase64': base64.b64encode(png).decode()}})
     def factory(*, skill_source, runtime, version, receipts):
@@ -324,8 +324,9 @@ def test_soundcaster_images_are_archived_without_business_preservation_credit(ow
     assert report['complete'] is True
     assert report['runtime_session_values_observed'] is False and report['business_preservation_verified'] is False
     assert report['coverage_credit'] == 'none; diagnostic observation only'
+    assert report['activation_request'] == 'Inspect one exact Minigun object; Soundcaster session loading is unproven'
     assert report['source']['binding_counts'] == {'RTPC': 72, 'State': 16, 'Switch': 12}
-    assert [row['name'] for row in report['sessions']] == ['Minigun', 'Music']
+    assert [row['name'] for row in report['sessions']] == ['Minigun']
     for row in report['sessions']:
         assert (report_path.parent / row['image']['path']).read_bytes() == png
         assert row['command']['state'] == row['capture']['state'] == 'result_schema_checked'
@@ -336,19 +337,17 @@ def test_soundcaster_images_are_archived_without_business_preservation_credit(ow
         assert row['view_locator']['session_id'] == row['id']
     writes = [(uri, args) for uri, args, _ in client.calls if uri in
         {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
-    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster', 'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']}),
-        ('ak.wwise.ui.captureScreen', {'viewName': 'DisclosedSoundcasterView'}),
-        ('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster', 'objects': ['{F4B8069C-3C15-4157-B570-8A41AB2463C2}']}),
+    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'Inspect', 'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']}),
         ('ak.wwise.ui.captureScreen', {'viewName': 'DisclosedSoundcasterView'})]
     receipts = batch.receipts[nodeid]
     captures = [row for row in receipts if row['argv'][0] == 'execute'
         and row['payload']['stdout_projection']['full_dispatch_result_in_stdout'] is False]
-    assert len(captures) == 2
+    assert len(captures) == 1
     image_txs = {row['capture']['transaction_id'] for row in report['sessions']}
     reads = [row for row in receipts if row['argv'][0] == 'transaction-show'
              and row['argv'][1] in image_txs and row['payload']['state'] == 'result_schema_checked']
-    assert len(reads) == 2 and {row['argv'][1] for row in reads} == image_txs
-    assert len({row['payload']['transaction_id'] for row in receipts if row['argv'][0] == 'preview-from-draft'}) == 4
+    assert len(reads) == 1 and {row['argv'][1] for row in reads} == image_txs
+    assert len({row['payload']['transaction_id'] for row in receipts if row['argv'][0] == 'preview-from-draft'}) == 2
     assert all(row['payload']['verification']['business_state_verified'] is False
                for row in receipts if row['argv'][0] == 'verify')
     target = tmp_path / 'image-category.jsonl'
@@ -380,11 +379,11 @@ def test_soundcaster_images_are_archived_without_business_preservation_credit(ow
         and row['business_preservation_verified'] is False for row in categories)
 
 
-def test_soundcaster_wrong_second_identity_stops_before_all_ui_writes(owned_authoring, tmp_path, monkeypatch):
+def test_soundcaster_wrong_selected_identity_stops_before_all_ui_writes(owned_authoring, tmp_path, monkeypatch):
     from pathlib import Path
     native, batch, call, client, _, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
-    music = '{F4B8069C-3C15-4157-B570-8A41AB2463C2}'
-    client.rows[music]['name'] = 'Different session'
+    selected = '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'
+    client.rows[selected]['name'] = 'Different session'
     with pytest.raises(AssertionError, match='identity/class changed'):
         native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
     destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
@@ -394,7 +393,7 @@ def test_soundcaster_wrong_second_identity_stops_before_all_ui_writes(owned_auth
     assert not list(destination.glob('*.png'))
     assert not any(uri.startswith('ak.wwise.ui.commands.') or uri == 'ak.wwise.ui.captureScreen'
                    for uri, _, _ in client.calls)
-    assert [row['argv'][0] for row in batch.receipts[nodeid]][2:] == ['query-object', 'query-object']
+    assert [row['argv'][0] for row in batch.receipts[nodeid]][2:] == ['query-object']
     target = tmp_path / 'failed-image-category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
     item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'failed'})
@@ -423,6 +422,6 @@ def test_soundcaster_missing_unique_view_retains_observation_without_image(owned
     assert not list(destination.glob('*.png'))
     writes = [(uri, args) for uri, args, _ in client.calls if uri in
         {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
-    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster',
+    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'Inspect',
         'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']})]
     assert len([row for row in batch.receipts[nodeid] if row['argv'][0] == 'preview-from-draft']) == 1

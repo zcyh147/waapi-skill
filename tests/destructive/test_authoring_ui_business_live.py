@@ -371,7 +371,7 @@ def _soundcaster_source_witness(batch, destination):
 
 
 def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_layout_node):
-    """One image per exact session; only independent image review can observe values."""
+    """Inspect one exact Minigun object; session activation requires image review."""
     batch, call = owned_authoring_layout_node
     assert batch.runtime.version == '2024.1' and batch.info['version']['build'] == 9056
     runtime = batch.node_runtimes[SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE]
@@ -384,8 +384,10 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
         'coverage_credit': 'none; diagnostic observation only', 'visual_review': 'unobserved; independent review required',
         'media_operation_executed': False, 'host': batch.info, 'candidate': batch.candidate,
         'source_context': batch.source_context, 'sessions': [], 'requests': [], 'errors': [],
+        'activation_request': 'Inspect one exact Minigun object; Soundcaster session loading is unproven',
+        'remaining_preservation_scope': 'Music and the complete original 100 saved bindings remain unresolved',
         'limits': {'public_calls': 48, 'reply_bytes': 1024 * 1024, 'total_reply_bytes': 4 * 1024 * 1024,
-            'image_base64_chars': 1024 * 1024, 'image_count': 2}}
+            'image_base64_chars': 1024 * 1024, 'image_count': 1}}
     path.write_text(json.dumps(report) + '\n', encoding='utf-8')
     total, executed = 0, {}
     def bounded_call(argv):
@@ -410,14 +412,15 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
             'state': verified['state'], 'business_state_verified': False}
     try:
         report['source'] = _soundcaster_source_witness(batch, destination)
-        # Preflight both identities before any UI command or image dispatch.
-        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS[1:]:
+        # This controlled activation experiment selects only Minigun. Keep all
+        # original saved expectations, but verify the selected identity before UI writes.
+        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS[1:2]:
             rows = bounded_call(['query-object', '--exact-id', identity, '--include', 'class-id', '--max-results', '1'])['objects']
             assert (len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name
                 and rows[0]['type'] == 'SoundcasterSession' and rows[0]['class_id'] == 1703952), 'Exact source session identity/class changed'
             report['sessions'].append({'id': identity, 'name': name, 'identity': rows[0]})
         for session in report['sessions']:
-            session['command'] = effect('ui.commands.execute', ['--command-id', 'ShowSoundcaster', '--command-object', session['id']])
+            session['command'] = effect('ui.commands.execute', ['--command-id', 'Inspect', '--command-object', session['id']])
             layout = bounded_call(['layout-read', 'current'])['result'].get('name')
             assert isinstance(layout, str) and layout, 'No exact current layout for Soundcaster observation'
             types = bounded_call(['layout-read', 'types'])['result'].get('viewTypes', [])
