@@ -3713,7 +3713,8 @@ def test_compound_same_uri_children_keep_distinct_actual_observation_ranges(tmp_
         assert task.objects == expected
 
 
-@pytest.mark.parametrize("fault", ["missing", "prepared", "dispatch", "index", "boolean-index", "range", "phase-index", "weak-child"])
+@pytest.mark.parametrize("fault", ["missing", "prepared", "dispatch", "index", "boolean-index", "range", "phase-index", "weak-child",
+    "assertion-boolean-tag", "assertion-wrong-tag", "readback-boolean-tag", "readback-wrong-tag"])
 def test_compound_history_rejects_structurally_valid_but_misassociated_child_events(tmp_path, fault):
     from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
     client, state, source, _, _, run = _owned_notes_history_case(tmp_path,
@@ -3733,6 +3734,13 @@ def test_compound_history_rejects_structurally_valid_but_misassociated_child_eve
     elif fault == "boolean-index": proof["index"] = False
     elif fault == "weak-child": proof["verification"]["business_state_verified"] = False
     elif fault == "range": proof["readbacks"] = associations[1]["evidence"]["readbacks"]
+    elif fault.endswith("-tag"):
+        section = "assertions" if fault.startswith("assertion-") else "readbacks"
+        bounds = associations[1]["evidence"][section]
+        rows = verification[section][bounds["start"]:bounds["start"] + bounds["count"]]
+        assert rows
+        rows[0]["compound_child_index"] = True if "boolean" in fault else 0
+        bounds["sha256"] = canonical_sha256(rows)
     else:
         execution = next(row["details"]["dispatch_result"] for row in events if row["event_type"] == "execution_completed")
         execution["result"]["phases"][1]["index"] = 1
@@ -3774,3 +3782,56 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert "actual_parent_execution_phase" in scope["history_receipt"]
     assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
     assert declaration["native_request_input"] == "forbidden"
+
+
+
+def test_compound_history_display_names_do_not_define_child_ownership(tmp_path):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    client, state, source, _, _, run = _owned_notes_history_case(tmp_path,
+        source_operation="waapi.undoGroup", source_prepared_only=True)
+    assert run("execute", source["transaction_id"])[0] == 0
+    assert run("verify", source["transaction_id"])[0] == 0
+    code, shown = run("transaction-show", source["transaction_id"])
+    assert code == 0, shown
+    events = shown["events"]
+    verification = next(row["details"]["verification"] for row in events if row["event_type"] == "verification_recorded")
+    associations = [row["evidence"] for row in verification["assertions"] if row.get("kind") == "compound_child_observation"]
+    for index, proof in enumerate(associations):
+        for section in ("assertions", "readbacks"):
+            bounds = proof[section]
+            rows = verification[section][bounds["start"]:bounds["start"] + bounds["count"]]
+            assert rows
+            assert all(type(row.get("compound_child_index")) is int and row["compound_child_index"] == index for row in rows)
+            if section == "assertions":
+                for row in rows:
+                    row["name"] = "Translated display text; no child ownership encoded here"
+                bounds["sha256"] = canonical_sha256(rows)
+    previous = ""
+    for event in events:
+        event["previous_event_hash"] = previous
+        event.pop("event_hash")
+        event["event_hash"] = previous = canonical_sha256(event)
+    directory = state / "transactions" / source["transaction_id"]
+    (directory / "events.jsonl").write_bytes(b"".join(canonical_json_bytes(event) + b"\n" for event in events))
+    record_path = directory / "state.json"
+    record = json.loads(record_path.read_text())
+    record["last_event_hash"] = previous
+    record_path.write_bytes(canonical_json_bytes(record))
+    code, phase = run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, phase
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    code, phase = run("draft-declare-core-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--value", "history_scope", "latest_project_history",
+        "--value", "expectation_receipt", source["transaction_id"])
+    assert code == 0, phase
+    code, phase = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, phase
+    code, preview = run("preview-from-draft", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, preview
+    code, full = run("transaction-show", preview["transaction_id"])
+    assert code == 0, full
+    assert run("confirm", preview["transaction_id"], "--confirmation-token", full["confirmation"]["token"])[0] == 0
+    assert run("execute", preview["transaction_id"])[0] == 0
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    assert (client.source["name"], client.source["notes"]) == (client.history_before["name"], client.history_before["notes"])

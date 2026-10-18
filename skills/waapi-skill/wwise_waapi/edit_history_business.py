@@ -276,10 +276,10 @@ def _compound_observations(prepared, execution, verification):
             if canonical_sha256(rows) != bounds.get("sha256"):
                 raise ValueError("Compound child observation range hash differs from its recorded proof")
             if name == "assertions" and (not rows or any(row.get("kind") == "compound_child_observation" for row in rows)
-                    or any(row.get("passed") is not True or not str(row.get("name", "")).startswith(f"Undo Group child[{index}] ") for row in rows)):
-                raise ValueError("Compound child assertion range belongs to another child")
-            if name == "readbacks" and any(row.get("compound_child_index") != index for row in rows):
-                raise ValueError("Compound child readback range belongs to another child")
+                    or any(row.get("passed") is not True for row in rows)):
+                raise ValueError("Compound child assertion range lacks its passed observations")
+            if any(type(row.get("compound_child_index")) is not int or row["compound_child_index"] != index for row in rows):
+                raise ValueError("Compound child observation range belongs to another typed child index")
             used.update(range(start, start + count))
             sections[name] = rows
         observations.extend(_source_observations(child, phase["dispatch_result"], {**header, **sections}))

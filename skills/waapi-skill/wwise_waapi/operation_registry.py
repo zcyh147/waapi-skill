@@ -18018,6 +18018,7 @@ def verify_prepared_operation(
                 assertions.extend(
                     {
                         **dict(assertion),
+                        "compound_child_index": index,
                         "name": (
                             f"Undo Group child[{index}] "
                             f"{assertion.get('name', 'postcondition')}"
