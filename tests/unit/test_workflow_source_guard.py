@@ -134,8 +134,9 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_
     return runtime, commands, writes, task
 
 
-def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workflow):
-    runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, '2021.1', root_sources=True)
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workflow, version):
+    runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
     category = workflow._collect_existing_bus_send_acceptance(runtime,
         root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
     receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
@@ -151,15 +152,64 @@ def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workf
         assert baseline[role]['path'] == parent['path'] + '\\' + baseline[role]['name']
     assert baseline['target']['type'] == 'AuxBus' and baseline['target']['class_id'] == 3997712
     assert baseline['target']['parent']['id'] == baseline['root']['id']
-    assert [uri.rsplit('.', 1)[1] for uri, _ in writes] == ['create'] * 3 + ['setReference', 'setProperty', 'create']
+    assert [uri.rsplit('.', 1)[1] for uri, _ in writes] == ['create'] * 3 + ['setReference', 'setProperty', 'create' if version == '2021.1' else 'set']
     assert [cmd[0] for cmd in commands].count('execute') == 6
     assert [cmd[0] for cmd in commands].count('verify') == 6
     assert 'OverrideUserAuxSends' not in json.dumps(writes)
-    assert receipt['transactions'][-1]['expected_existing_merge'] == baseline['batch_source']
-    assert writes[-1][1]['parent'] == parent['id']
-    assert writes[-1][1]['type'] == 'Bus'
+    assert [phase['phase'] for phase in receipt['transactions'][:3]] == [
+        'setup_no_coverage_credit', 'setup_source_no_coverage_credit', 'setup_batch_source_no_coverage_credit']
+    for phase in receipt['transactions'][3:]:
+        assert phase['effect_verified'] is True
+        assert phase['independent_placement_parent'] == parent
+        for role in ('source', 'batch_source'):
+            assert phase['independent_effect'][role]['parent']['id'] == parent['id']
+    if version == '2021.1':
+        assert receipt['transactions'][-1]['expected_existing_merge'] == baseline['batch_source']
+        assert writes[-1][1]['parent'] == parent['id']
+        assert writes[-1][1]['type'] == 'Bus'
+    else:
+        assert writes[-1][1]['objects'][0]['object'] == baseline['batch_source']['id']
     assert len(receipt['calls']) <= 192
     assert (runtime.state_dir / 'existing-bus-send-acceptance.json').stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize(('version', 'fault', 'write_count'), [
+    ('2021.1', 'class', 3),
+    ('2022.1', 'parent', 4),
+    ('2023.1', 'independent-guid', 4),
+    ('2021.1', 'merge-target-drift', 5),
+    ('2021.1', 'merge-wrong-guid', 6),
+    ('2023.1', 'native-error', 4),
+])
+def test_old_root_bus_send_acceptance_rejects_wrong_authority_or_effect(tmp_path, workflow, version, fault, write_count):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, version,
+        root_sources=True, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_existing_bus_send_acceptance(runtime,
+            root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False
+    assert len(writes) == write_count
+    assert [cmd[0] for cmd in commands].count('execute') == write_count
+    if fault == 'merge-target-drift':
+        assert receipt['transactions'][-1]['native_outcome'] == 'not_executed'
+        assert [cmd[0] for cmd in commands].count('confirm') == 5
+    if fault == 'native-error':
+        assert [cmd[0] for cmd in commands].count('verify') == 3
+        assert receipt['transactions'][-1]['native_outcome'] == 'indeterminate'
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_old_root_bus_witness_keeps_new_version_boundary_before_calls(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
+    with pytest.raises(AssertionError, match='2024–2025 retain'):
+        workflow._collect_existing_bus_send_acceptance(runtime,
+            root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    assert receipt['calls'] == [] and commands == [] and writes == []
+    assert receipt['business_effect_verified'] is False
+    assert runtime.category_results[-1]['status'] == 'FAIL'
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
