@@ -622,7 +622,13 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
                 "migration_save_has_no_observed_write" if entry.uri == "ak.wwise.cli.migrate"
                 else "central_media_id_mapping_representation"
             )
-            assert verification.readbacks[-1]["unresolved"] == [expected_boundary]
+            if entry.uri == "ak.wwise.cli.migrate":
+                effect = verification.readbacks[-1]
+            else:
+                effects = [row for row in verification.readbacks if row.get("kind") == "cli-media-id-artifacts"]
+                assert len(effects) == 1, verification.readbacks
+                effect = effects[0]
+            assert effect["unresolved"] == [expected_boundary]
     elif entry.uri in BUSINESS_STATE_VERIFIED_APIS:
         assert verification.status == "verified"
         assert verification.business_state_verified is True
