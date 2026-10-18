@@ -1303,6 +1303,8 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     ('2025.1', 'PluginMediaSource', 'plugin-conflicting-encodings'),
     ('2025.1', 'PluginMediaSource', 'plugin-value-list'),
     *[(version, 'AudioFileSource', 'serialization') for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[('2022.1', 'AudioFileSource', change) for change in
+      ['bus-empty-reference', 'bus-nonempty-reference', 'bus-attributed-reference', 'bus-text-reference', 'other-empty-reference']],
     *[('2025.1', 'AudioFileSource', 'serialization-' + fault) for fault in
       ['value', 'platform', 'dual', 'value-attribute', 'reference', 'reference-attribute']],
     *[('2025.1', 'AudioFileSource', change) for change in ['media-id', 'source-id', 'filename',
@@ -1373,6 +1375,9 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                         nested.set('Unestablished', 'x')
                     slot = tree.find('.//EffectSlot')
                     slot.remove(slot.find('ReferenceList'))
+                if change and (change.startswith('bus-') or change == 'other-empty-reference'):
+                    owner = tree.find('.//Bus' if change.startswith('bus-') else './/Sound')
+                    owner.remove(owner.find('ReferenceList'))
                 tree.write(self.unit)
                 tree = ET.parse(self.project_file)
                 if change != 'mode-unchanged':
@@ -1417,6 +1422,17 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
             ET.SubElement(references, 'Reference', Name='Effect')
         elif change == 'serialization-reference-attribute':
             references.set('Unestablished', 'x')
+    if change and (change.startswith('bus-') or change == 'other-empty-reference'):
+        owner = (ET.SubElement(ET.SubElement(tree.getroot(), 'Busses'), 'Bus',
+            Name='Ambience', ID='{2C5FE1AB-B90C-44C9-8760-CF255A4C9B62}')
+            if change.startswith('bus-') else tree.find('.//Sound'))
+        references = ET.SubElement(owner, 'ReferenceList')
+        if change == 'bus-nonempty-reference':
+            ET.SubElement(references, 'Reference', Name='OutputBus')
+        elif change == 'bus-attributed-reference':
+            references.set('Unestablished', 'x')
+        elif change == 'bus-text-reference':
+            references.text = 'unestablished'
     if change == 'unrelated-same-name-property':
         ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='MediaIDsInSingleFile', Type='bool', Value='False')
     ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
@@ -1432,7 +1448,7 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization'}:
+    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'bus-empty-reference'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         if change == 'serialization-value':

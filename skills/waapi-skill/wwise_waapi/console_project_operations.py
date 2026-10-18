@@ -676,11 +676,11 @@ def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_med
             or node.tag == 'Property' and node.get('Name') == 'MediaIDsInSingleFile'
                 and _path == ('WwiseDocument', 'ProjectInfo', 'Project', 'PropertyList')):
         return None
-    # Wwise serialization may omit an empty EffectSlot ReferenceList and turn
+    # Wwise serialization may omit an empty EffectSlot/Bus ReferenceList and turn
     # a scalar Property Value attribute into one unqualified ValueList/Value.
     # Compare the exact value, type and name; never collapse platform-specific,
     # dual-encoded, attributed, nested or nonempty reference representations.
-    if (node.tag == 'ReferenceList' and _path and _path[-1] == 'EffectSlot'
+    if (node.tag == 'ReferenceList' and _path and _path[-1] in {'EffectSlot', 'Bus'}
             and not node.attrib and not len(node) and not (node.text or '').strip()):
         return None
     if (node.tag == 'Property' and _path and _path[-1] == 'PropertyList'
