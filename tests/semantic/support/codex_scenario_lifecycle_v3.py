@@ -10,6 +10,7 @@ semantic failures.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -38,7 +39,7 @@ from tests.semantic.support.codex_campaign import (
 from tests.semantic.support.codex_filesystem_security import (
     path_is_link_or_reparse,
 )
-from wwise_waapi.headless import HeadlessLifecycle
+from wwise_waapi.headless import HeadlessLifecycle, HeadlessLifecycleError
 from wwise_waapi.native_catalog import load_native_catalog
 
 
@@ -489,6 +490,7 @@ class ScenarioLifecycle:
                         "failed_at": _utc_now(),
                         "stage": stage,
                         "primary_error": _format_error("start", primary_exc),
+                        "primary_error_diagnostics": _headless_failure_diagnostics(primary_exc),
                         "wwise_stop_status": wwise_stop_status,
                         "source_hash_before": (
                             asdict(source_hash_before) if source_hash_before else None
@@ -877,6 +879,49 @@ class ScenarioLifecycle:
 
 def _format_error(stage: str, exc: BaseException) -> str:
     return f"{stage}:{type(exc).__name__}:{exc}"
+
+
+_HEADLESS_DIAGNOSTIC_BYTES = 64 * 1024
+
+
+def _headless_failure_diagnostics(exc: BaseException) -> dict[str, Any] | None:
+    """Retain the owning error's JSON evidence without changing start verdicts."""
+    if not isinstance(exc, HeadlessLifecycleError):
+        return None
+    raw = exc.diagnostics
+    def encode(value: Any) -> bytes:
+        return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True,
+            separators=(",", ":")).encode("utf-8")
+    json_errors = (TypeError, ValueError, OverflowError, RecursionError, UnicodeError)
+    try:
+        if not isinstance(raw, dict):
+            raise TypeError("Lifecycle diagnostics must be a JSON object")
+        body = encode(raw)
+    except json_errors as error:
+        retention = {"retention": "invalid", "reason": "diagnostics_not_a_finite_JSON_object",
+            "error_type": type(error).__name__}
+    else:
+        if len(body) <= _HEADLESS_DIAGNOSTIC_BYTES:
+            return {"retention": "complete", "bytes": len(body), "limit_bytes": _HEADLESS_DIAGNOSTIC_BYTES,
+                "diagnostics": json.loads(body)}
+        retention = {"retention": "partial", "reason": "diagnostics_byte_limit_exceeded", "bytes": len(body),
+            "sha256": hashlib.sha256(body).hexdigest()}
+    # Preserve the bounded discriminating host/build facts even if an unrelated
+    # output tail is oversized/malformed. Never stringify arbitrary objects.
+    priority, omitted = {}, []
+    if isinstance(raw, dict):
+        for key in ("phase", "observed_host_info"):
+            if key not in raw:
+                continue
+            try:
+                body = encode(raw[key])
+                if len(body) > 4096:
+                    raise ValueError("Priority lifecycle diagnostic exceeds its byte bound")
+                priority[key] = json.loads(body)
+            except json_errors:
+                omitted.append(key)
+    return {**retention, "limit_bytes": _HEADLESS_DIAGNOSTIC_BYTES,
+        "diagnostics": priority, "omitted_priority_fields": omitted}
 
 
 def _capture_launch_environment_symlink_baseline(

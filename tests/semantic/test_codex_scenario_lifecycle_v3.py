@@ -880,3 +880,101 @@ def test_failed_authoring_preflight_needs_exact_no_start_proof(monkeypatch, tmp_
     assert evidence['wwise_stop_status'] == ('not-started' if with_phase_proof else 'unproven')
     assert caught.value.unsafe_to_continue is (not with_phase_proof)
     assert bool(evidence['launch_environment_archive_path']) is with_phase_proof
+
+
+@pytest.mark.parametrize('reply', ['console', 'wrong-build', 'malformed', 'probe-error'])
+def test_failed_authoring_readiness_retains_owning_diagnostics_in_start_proof(monkeypatch, tmp_path, reply):
+    from tests.unit.test_headless_lifecycle import FakeProcess
+    from wwise_waapi.headless import HeadlessLifecycle, HeadlessLifecycleError, LifecycleTimeouts
+    _install_fakes(monkeypatch, tmp_path, version='2024.1')
+    captured, calls = {}, []
+    info = {'isCommandLine': reply == 'console', 'version': {'year': 2024, 'major': 1, 'minor': 13,
+        'build': 9057 if reply == 'wrong-build' else 9056}}
+    class Client:
+        def call(self, uri):
+            calls.append(uri)
+            if reply == 'probe-error': raise RuntimeError('fixture exact getInfo failed')
+            return None if reply == 'malformed' else info
+        def disconnect(self): pass
+    def launch(sandbox, env, **kwargs):
+        lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+            launch_env={}, timeouts=LifecycleTimeouts(readiness=0.01, probe=0.1, probe_interval=0.001),
+            waapi_client_factory=lambda _url: Client())
+        lifecycle.process = FakeProcess()
+        try:
+            lifecycle.wait_ready()
+        except HeadlessLifecycleError as exc:
+            captured['error'] = exc
+            sandbox.metadata.process_cleanup_result = 'cleaned'
+            raise
+        pytest.fail('The existing readiness guard must reject the injected reply')
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, process: process.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    root = tmp_path / 'authoring-scenario'
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='authoring-readiness-evidence', version='2024.1',
+        scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, host_kind='wwise-authoring',
+        launch_environment_overrides={'HOME': str(root / 'owned/private-home')}, lock_root=tmp_path / 'lock')
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError) as caught:
+        owner.start()
+    proof = json.loads(caught.value.evidence_path.read_text())
+    retained = proof['primary_error_diagnostics']
+    assert retained['retention'] == 'complete'
+    assert retained['diagnostics'] == captured['error'].diagnostics
+    if reply == 'probe-error':
+        assert retained['diagnostics']['last_exception'] == {'type': 'RuntimeError', 'message': 'fixture exact getInfo failed'}
+    else:
+        assert calls == ['ak.wwise.core.getInfo']
+        observed = retained['diagnostics']['observed_host_info']
+        assert observed['result_type'] == ('NoneType' if reply == 'malformed' else 'dict')
+        assert observed['is_command_line'] == (None if reply == 'malformed' else reply == 'console')
+        assert observed['exact_build'] == (None if reply == 'malformed' else '2024.1.13.9057' if reply == 'wrong-build' else '2024.1.13.9056')
+    assert proof['primary_error'] == 'start:' + type(captured['error']).__name__ + ':' + str(captured['error'])
+    assert proof['wwise_stop_status'] == 'stopped-by-launch-helper' and proof['errors'] == []
+    assert proof['source_hash_before'] == proof['source_hash_after']
+    assert proof['source_mtime_before_ns'] == proof['source_mtime_after_ns']
+    assert caught.value.unsafe_to_continue is False and owner._lock_acquired is False
+
+
+@pytest.mark.parametrize('diagnostic_case', ['oversized', 'non-json', 'non-finite', 'foreign-error'])
+def test_start_failure_diagnostics_are_bounded_without_masking_primary_error(monkeypatch, tmp_path, diagnostic_case):
+    from wwise_waapi.headless import HeadlessLifecycleError
+    _install_fakes(monkeypatch, tmp_path)
+    priority = {'phase': 'authoring-readiness', 'observed_host_info': {
+        'result_type': 'NoneType', 'is_command_line': None, 'exact_build': None}}
+    diagnostics = {**priority, 'stdout_tail': '雨' * 100000}
+    if diagnostic_case == 'non-json':
+        diagnostics['stdout_tail'] = object()
+    elif diagnostic_case == 'non-finite':
+        diagnostics['stdout_tail'] = float('nan')
+    error = (RuntimeError('original owning launch failure') if diagnostic_case == 'foreign-error'
+        else HeadlessLifecycleError('original owning launch failure', diagnostics=diagnostics))
+    if diagnostic_case == 'foreign-error':
+        error.diagnostics = diagnostics
+    def launch(sandbox, env):
+        sandbox.metadata.process_cleanup_result = 'cleaned'
+        raise error
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    owner, _home = _private_home_controller(tmp_path)
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError) as caught:
+        owner.start()
+    proof = json.loads(caught.value.evidence_path.read_text())
+    retained = proof['primary_error_diagnostics']
+    if diagnostic_case == 'foreign-error':
+        assert retained is None
+    else:
+        assert retained['diagnostics'] == priority
+        assert retained['omitted_priority_fields'] == []
+        assert len(json.dumps(retained, ensure_ascii=False).encode('utf-8')) < 8192
+        if diagnostic_case == 'oversized':
+            assert retained['retention'] == 'partial'
+            assert retained['bytes'] > retained['limit_bytes'] == 65536
+            assert len(retained['sha256']) == 64
+        else:
+            assert retained['retention'] == 'invalid'
+            assert retained['reason'] == 'diagnostics_not_a_finite_JSON_object'
+    assert proof['primary_error'] == f'start:{type(error).__name__}:original owning launch failure'
+    assert proof['wwise_stop_status'] == 'stopped-by-launch-helper' and proof['errors'] == []
+    assert proof['source_hash_before'] == proof['source_hash_after']
+    assert proof['source_mtime_before_ns'] == proof['source_mtime_after_ns']
+    assert caught.value.unsafe_to_continue is False and owner._lock_acquired is False
