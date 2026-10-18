@@ -3883,13 +3883,18 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
             expression = args['waql']
             if version == '2021.1':
                 assert not {'activeSource', 'originalFilePath'} & set(options['return']), options
-            match = re.fullmatch(r'from object "([^"]+)"( select activeSource)?(?: take 1)?', expression)
+            if version == '2021.1':
+                assert 'select activeSource' not in expression, 'Actual 2021 Console rejects activeSource traversal too'
+            match = re.fullmatch(r'from object "([^"]+)"( select children)?(?: take (?:1|100))?', expression)
             assert match, expression
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             rows = [row for row in task.objects.values() if match[1] in (row['id'], row['path'])]
             if match[2]:
                 assert version == '2021.1' and options['language'] == 'SFX'
-                rows = [task.objects[row['activeSource']['id']] for row in rows if 'activeSource' in row]
+                owner_ids = {row['id'] for row in rows}
+                rows = [row for row in task.objects.values() if row.get('parent', {}).get('id') in owner_ids]
+                if fault == 'empty-source' and len(writes) == 2:
+                    rows = []
                 if fault == 'selected-source-guid' and len(writes) == 2:
                     rows = [{**row, 'id': other} for row in rows]
                 if fault == 'ambiguous-source' and len(writes) == 2:
