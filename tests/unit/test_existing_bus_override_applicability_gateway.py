@@ -128,7 +128,7 @@ def test_existing_bus_user_send_uses_actual_source_and_parent_without_override(t
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
 @pytest.mark.parametrize('valid_parent', [True, False])
-def test_class_scalar_discovery_does_not_authorize_unproved_mutation_placement(tmp_path, version, valid_parent):
+def test_class_scalar_discovery_rebinds_versioned_placement_before_mutation(tmp_path, version, valid_parent):
     operation = 'object.create' if version == '2021.1' else 'object.set'
     task, writes = existing_task(tmp_path, version=version, operation=operation, field='UserAuxSendVolume0')
     parent = task.bind(SECOND if valid_parent else CHILD)
@@ -141,7 +141,7 @@ def test_class_scalar_discovery_does_not_authorize_unproved_mutation_placement(t
     code, declared = task.step('draft-declare-new', '--declaration-id', 'new', '--parent-handle', parent,
         '--name', 'NewSender', '--kind', kind, '--field-value', field, '-9', '--field-value', reference, target)
     assert code == 0, declared
-    if not valid_parent:
+    if not valid_parent and version in {'2024.1', '2025.1'}:
         code, rejected = task.step('draft-check')
         assert code == 2, rejected
     else:
@@ -150,7 +150,17 @@ def test_class_scalar_discovery_does_not_authorize_unproved_mutation_placement(t
         node = next(row for row in nodes if row.get('requested_name') == 'NewSender')
         proof = node['new_object_default_evidence'][0]['override_applicability'][0]
         assert proof.get('purpose', 'mutation') == 'mutation'
-        assert proof['structural_proof']['parent']['object_id'] == SECOND
+        if valid_parent:
+            assert proof['structural_proof']['parent']['object_id'] == SECOND
+        else:
+            assert proof['structural_proof'] is None
+            # A class-only applicability fact must still be reacquired before
+            # execution; missing placement is not permission to reuse stale metadata.
+            task.metadata['UserAuxSendVolume0']['restriction']['max'] = 11
+            code, confirmed = task.run('confirm', _tx, '--confirmation-token', shown['confirmation']['token'])
+            assert code == 0, confirmed
+            code, rejected = task.run('execute', _tx)
+            assert code == 2 and rejected.get('executed') is not True, rejected
         assert node['new_object_default_evidence'][0]['derived_properties'] == {}
     assert not writes
 
@@ -423,3 +433,57 @@ def test_renamed_parent_reference_label_is_derived_from_admitted_exact_parent(tm
     assert code == (0 if fault is None else 2), verified
     assert (verified.get('verified') is True) == (fault is None), verified
     assert len(writes) == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+@pytest.mark.parametrize('field', ['UserAuxSend0', 'UserAuxSendVolume0'])
+def test_old_root_bus_without_master_visibility_condition_uses_exact_live_identity(tmp_path, version, field):
+    operation = 'object.setReference' if field == 'UserAuxSend0' else 'object.setProperty'
+    task, writes = existing_task(tmp_path, version=version, operation=operation,
+        field=field, source_kind='Bus')
+    task.objects[FIRST]['parent'] = {'id': CHILD}
+    task.objects[FIRST]['path'] = task.objects[CHILD]['path'] + '\\' + task.objects[FIRST]['name']
+    if field == 'UserAuxSendVolume0':
+        task.objects[FIRST]['@UserAuxSend0'] = {'id': ROOT}
+    before = deepcopy(task.objects)
+    declare_existing(task)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1 and 'OverrideUserAuxSends' not in json.dumps(writes)
+    assert task.objects[FIRST]['@' + field] == ({'id': ROOT} if field == 'UserAuxSend0' else -9)
+    assert task.objects[FIRST]['parent'] == before[FIRST]['parent']
+    assert task.objects[FIRST]['notes'] == before[FIRST]['notes']
+    assert all(task.objects[key] == before[key] for key in (SECOND, ROOT, CHILD))
+
+
+@pytest.mark.parametrize('phase', ['before-execute', 'after-write'])
+@pytest.mark.parametrize('fault', ['parent-class', 'parent-notes', 'metadata', 'source-path'])
+def test_old_root_bus_does_not_waive_live_drift_or_unrequested_changes(tmp_path, phase, fault):
+    task, writes = existing_task(tmp_path, version='2023.1', operation='object.setReference', source_kind='Bus')
+    task.objects[FIRST]['parent'] = {'id': CHILD}
+    task.objects[FIRST]['path'] = task.objects[CHILD]['path'] + '\\' + task.objects[FIRST]['name']
+    declare_existing(task)
+    tx, shown = task.preview()
+    def corrupt():
+        if fault == 'parent-class': task.objects[CHILD]['classId'] = 65552
+        if fault == 'parent-notes': task.objects[CHILD]['notes'] = 'Unexpected'
+        if fault == 'metadata': task.metadata['UserAuxSend0']['dependencies'][0]['context'] = 'Parent'
+        if fault == 'source-path': task.objects[FIRST]['path'] += r'\Unexpected'
+    if phase == 'before-execute':
+        corrupt()
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and rejected.get('executed') is not True, rejected
+        assert not writes
+    else:
+        original = task.call
+        def call(uri, args=None, options=None):
+            value = original(uri, args, options)
+            if uri.endswith('setReference'): corrupt()
+            return value
+        task.call = call
+        code, verified = task.finish(tx, shown)
+        assert code == 2 and verified.get('verified') is not True, verified
+        assert len(writes) == 1

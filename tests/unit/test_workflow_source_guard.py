@@ -20,7 +20,7 @@ def workflow(monkeypatch):
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
 
 
-def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None):
+def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_sources=False):
     """Actual Gateway parsing/dispatch; fake native state honors each exact request."""
     from copy import deepcopy
     import uuid
@@ -39,26 +39,39 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None):
     ids = {name: '{' + str(uuid.UUID(int=index)).upper() + '}' for index, name in enumerate(
         ('WAAPI_EXISTING_SEND_TEST', 'Destination', 'Sender', 'BatchSender'), 11)}
 
+    setup_count = 3 if root_sources else 1
+    source_names = {name: 'WAAPI_EXISTING_SEND_TEST_' + name if root_sources else name
+        for name in ('Sender', 'BatchSender')}
+    for name, actual_name in source_names.items():
+        ids[actual_name] = ids[name]
+
     def call(uri, args=None, options=None):
         if uri.endswith(('object.create', 'object.set', 'setReference', 'setProperty')):
             writes.append((uri, deepcopy(args)))
-            if len(writes) > 1 and fault == 'native-error':
+            if len(writes) > setup_count and fault == 'native-error':
                 raise RuntimeError('Existing-source write refused; never retry')
         if uri.endswith('object.create'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            if len(writes) == 4:
+            if len(writes) == setup_count + 3:
                 assert version == '2021.1', args
-                assert args == {'parent': ids['WAAPI_EXISTING_SEND_TEST'], 'type': 'AuxBus', 'name': 'BatchSender',
+                assert args == {'parent': CHILD if root_sources else ids['WAAPI_EXISTING_SEND_TEST'],
+                    'type': 'Bus' if root_sources else 'AuxBus', 'name': source_names['BatchSender'],
                     '@UserAuxSend0': ids['Destination'], '@UserAuxSendVolume0': -12,
                     'onNameConflict': 'merge', 'autoAddToSourceControl': False}, args
                 task.objects[ids['BatchSender']].update({'@UserAuxSend0': {'id': args['@UserAuxSend0']},
                     '@UserAuxSendVolume0': args['@UserAuxSendVolume0']})
-                return {'id': ids['Sender'] if fault == 'merge-wrong-guid' else ids['BatchSender'], 'name': 'BatchSender'}
-            assert args == {'parent': CHILD, 'type': 'Bus', 'name': 'WAAPI_EXISTING_SEND_TEST',
-                'notes': 'Keep routing', 'children': [
-                    {'type': 'AuxBus', 'name': name, 'notes': 'Keep ' + name}
-                    for name in ('Destination', 'Sender', 'BatchSender')],
-                'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
+                return {'id': ids['Sender'] if fault == 'merge-wrong-guid' else ids['BatchSender'],
+                    'name': source_names['BatchSender']}
+            if root_sources and len(writes) in {2, 3}:
+                name = source_names['Sender' if len(writes) == 2 else 'BatchSender']
+                assert args == {'parent': CHILD, 'type': 'Bus', 'name': name, 'notes': 'Keep ' + name,
+                    'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
+            else:
+                assert args == {'parent': CHILD, 'type': 'Bus', 'name': 'WAAPI_EXISTING_SEND_TEST',
+                    'notes': 'Keep routing', 'children': [
+                        {'type': 'AuxBus', 'name': name, 'notes': 'Keep ' + name}
+                        for name in (('Destination',) if root_sources else ('Destination', 'Sender', 'BatchSender'))],
+                    'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
             def create(node, owner):
                 identity = ids[node['name']]
                 task.objects[identity] = {'id': identity, 'name': node['name'], 'type': node['type'],
@@ -67,32 +80,35 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None):
                     'notes': node['notes'], '@UserAuxSend0': None, '@UserAuxSendVolume0': 0}
                 return {'id': identity, 'name': node['name'],
                     'children': [create(child, identity) for child in node.get('children', [])]}
-            return create(args, CHILD)
+            result = create(args, CHILD)
+            if root_sources and len(writes) == 3 and fault == 'class':
+                task.objects[ids['Sender']].update(type='AuxBus', classId=3997712)
+            return result
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             identity = args['waql'].split('"')[1]
             rows = [row for row in task.objects.values() if identity in {row['id'], row['path']}]
             projected = [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
                 if key in row or '@' + key in row} for row in rows]
-            if independent_read and len(writes) > 1 and fault == 'independent-guid':
+            if independent_read and len(writes) > setup_count and fault == 'independent-guid':
                 for row in projected:
                     if row.get('id') == ids['Sender'] and 'UserAuxSend0' in row:
                         row['UserAuxSend0'] = {'id': ids['WAAPI_EXISTING_SEND_TEST']}
-            if independent_read and len(writes) == 3 and fault == 'independent-value':
+            if independent_read and len(writes) == setup_count + 2 and fault == 'independent-value':
                 for row in projected:
                     if row.get('id') == ids['Sender'] and '@UserAuxSendVolume0' in row:
                         row['@UserAuxSendVolume0'] = -4
             return {'return': projected}
         result = original(uri, args, options)
-        if len(writes) > 1 and uri.endswith(('object.set', 'setReference', 'setProperty')):
+        if len(writes) > setup_count and uri.endswith(('object.set', 'setReference', 'setProperty')):
             source = task.objects[args['objects'][0]['object'] if 'objects' in args else args['object']]
             if fault == 'wrong-guid': source['@UserAuxSend0'] = {'id': ids['WAAPI_EXISTING_SEND_TEST']}
             if fault == 'wrong-value': source['@UserAuxSendVolume0'] = -1
             if fault == 'notes': source['notes'] = 'Not requested'
-            if fault == 'parent': source['parent'] = {'id': CHILD}
-            if fault == 'batch-wrong-guid' and len(writes) == 4:
+            if fault == 'parent': source['parent'] = {'id': ids['WAAPI_EXISTING_SEND_TEST'] if root_sources else CHILD}
+            if fault == 'batch-wrong-guid' and len(writes) == setup_count + 3:
                 source['@UserAuxSend0'] = {'id': ids['Sender']}
-            if fault == 'scalar-effect' and len(writes) == 3:
+            if fault == 'scalar-effect' and len(writes) == setup_count + 2:
                 source['@UserAuxSendVolume0'] = -4
         return result
 
@@ -103,19 +119,124 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None):
         nonlocal independent_read
         commands.append(list(command))
         independent_read = command[0] == 'query-object'
-        if fault == 'merge-target-drift' and command[:2] == ['draft-start', 'object.create'] and len(writes) == 3:
+        if fault == 'merge-target-drift' and command[:2] == ['draft-start', 'object.create'] and len(writes) == setup_count + 2:
             original_source = task.objects[ids['BatchSender']]
             replacement = deepcopy(original_source)
             replacement['id'] = '{99999999-9999-9999-9999-999999999999}'
             original_source['name'] = 'MovedBatchSender'
             original_source['path'] += 'Moved'
             task.objects[replacement['id']] = replacement
-        if fault == 'merge-state-drift' and command[:2] == ['draft-start', 'object.create'] and len(writes) == 3:
+        if fault == 'merge-state-drift' and command[:2] == ['draft-start', 'object.create'] and len(writes) == setup_count + 2:
             task.objects[ids['BatchSender']]['@UserAuxSend0'] = {'id': ids['Destination']}
         return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
             env=runtime.env, client_factory=lambda _url: task)
     runtime.raw_gateway = raw
     return runtime, commands, writes, task
+
+
+def test_existing_and_old_root_send_witnesses_retain_distinct_shared_state_receipts(tmp_path, workflow):
+    shared = tmp_path / 'shared-state'
+    (tmp_path / 'ordinary').mkdir()
+    (tmp_path / 'old-root').mkdir()
+    ordinary, _commands, _writes, _task = _existing_bus_send_runtime(tmp_path / 'ordinary', workflow, '2021.1')
+    old_root, _commands, _writes, _task = _existing_bus_send_runtime(tmp_path / 'old-root', workflow, '2021.1', root_sources=True)
+    ordinary.state_dir = old_root.state_dir = shared
+    first = workflow._collect_existing_bus_send_acceptance(ordinary, root_name='WAAPI_EXISTING_SEND_TEST')
+    first_path = Path(first['observation_path'])
+    first_bytes = first_path.read_bytes()
+    second = workflow._collect_existing_bus_send_acceptance(old_root,
+        root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    second_path = Path(second['observation_path'])
+    assert first['status'] == second['status'] == 'PASS'
+    assert first['category'] == 'existing-bus-user-send'
+    assert second['category'] == 'old-root-bus-user-send'
+    assert first_path == shared / 'existing-bus-send-acceptance.json'
+    assert second_path == shared / 'old-root-bus-send-acceptance.json'
+    assert first_path != second_path
+    assert first_path.read_bytes() == first_bytes
+    for path, placement, count in [(first_path, 'aux_bus_children', 4), (second_path, 'old_root_bus_sources', 6)]:
+        receipt = json.loads(path.read_text())
+        assert receipt['placement'] == placement
+        assert receipt['business_effect_verified'] is True
+        assert len(receipt['transactions']) == count
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workflow, version):
+    runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
+    category = workflow._collect_existing_bus_send_acceptance(runtime,
+        root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    receipt = json.loads((runtime.state_dir / 'old-root-bus-send-acceptance.json').read_text())
+    assert category['status'] == 'PASS'
+    assert receipt['setup_coverage_credit'] is False
+    assert receipt['business_effect_verified'] is True
+    baseline, parent = receipt['baseline'], receipt['placement_parent']
+    assert parent['type'] == 'WorkUnit' and parent['class_id'] == 1638416
+    assert len({row['id'] for row in baseline.values()}) == 4
+    for role in ('root', 'source', 'batch_source'):
+        assert baseline[role]['type'] == 'Bus' and baseline[role]['class_id'] == 1376272
+        assert baseline[role]['parent']['id'] == parent['id']
+        assert baseline[role]['path'] == parent['path'] + '\\' + baseline[role]['name']
+    assert baseline['target']['type'] == 'AuxBus' and baseline['target']['class_id'] == 3997712
+    assert baseline['target']['parent']['id'] == baseline['root']['id']
+    assert [uri.rsplit('.', 1)[1] for uri, _ in writes] == ['create'] * 3 + ['setReference', 'setProperty', 'create' if version == '2021.1' else 'set']
+    assert [cmd[0] for cmd in commands].count('execute') == 6
+    assert [cmd[0] for cmd in commands].count('verify') == 6
+    assert 'OverrideUserAuxSends' not in json.dumps(writes)
+    assert [phase['phase'] for phase in receipt['transactions'][:3]] == [
+        'setup_no_coverage_credit', 'setup_source_no_coverage_credit', 'setup_batch_source_no_coverage_credit']
+    for phase in receipt['transactions'][3:]:
+        assert phase['effect_verified'] is True
+        assert phase['independent_placement_parent'] == parent
+        for role in ('source', 'batch_source'):
+            assert phase['independent_effect'][role]['parent']['id'] == parent['id']
+    if version == '2021.1':
+        assert receipt['transactions'][-1]['expected_existing_merge'] == baseline['batch_source']
+        assert writes[-1][1]['parent'] == parent['id']
+        assert writes[-1][1]['type'] == 'Bus'
+    else:
+        assert writes[-1][1]['objects'][0]['object'] == baseline['batch_source']['id']
+    assert len(receipt['calls']) <= 192
+    assert (runtime.state_dir / 'old-root-bus-send-acceptance.json').stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize(('version', 'fault', 'write_count'), [
+    ('2021.1', 'class', 3),
+    ('2022.1', 'parent', 4),
+    ('2023.1', 'independent-guid', 4),
+    ('2021.1', 'merge-target-drift', 5),
+    ('2021.1', 'merge-wrong-guid', 6),
+    ('2023.1', 'native-error', 4),
+])
+def test_old_root_bus_send_acceptance_rejects_wrong_authority_or_effect(tmp_path, workflow, version, fault, write_count):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, version,
+        root_sources=True, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_existing_bus_send_acceptance(runtime,
+            root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    receipt = json.loads((runtime.state_dir / 'old-root-bus-send-acceptance.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False
+    assert len(writes) == write_count
+    assert [cmd[0] for cmd in commands].count('execute') == write_count
+    if fault == 'merge-target-drift':
+        assert receipt['transactions'][-1]['native_outcome'] == 'not_executed'
+        assert [cmd[0] for cmd in commands].count('confirm') == 5
+    if fault == 'native-error':
+        assert [cmd[0] for cmd in commands].count('verify') == 3
+        assert receipt['transactions'][-1]['native_outcome'] == 'indeterminate'
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_old_root_bus_witness_keeps_new_version_boundary_before_calls(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
+    with pytest.raises(AssertionError, match='2024–2025 retain'):
+        workflow._collect_existing_bus_send_acceptance(runtime,
+            root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    receipt = json.loads((runtime.state_dir / 'old-root-bus-send-acceptance.json').read_text())
+    assert receipt['calls'] == [] and commands == [] and writes == []
+    assert receipt['business_effect_verified'] is False
+    assert runtime.category_results[-1]['status'] == 'FAIL'
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])

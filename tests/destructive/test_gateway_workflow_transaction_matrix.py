@@ -4640,11 +4640,11 @@ def _collect_new_result_scalar_reference_acceptance(
 
 
 def _collect_existing_bus_send_acceptance(
-    runtime: _WorkflowSandboxRuntime, *, root_name: str,
+    runtime: _WorkflowSandboxRuntime, *, root_name: str, root_sources: bool = False,
 ) -> dict[str, Any]:
     """Existing-source writes in one owned lifecycle, with independent effect reads."""
-    output = runtime.state_dir / "existing-bus-send-acceptance.json"
-    category = {"category": "existing-bus-user-send", "status": "FAIL",
+    output = runtime.state_dir / ("old-root-bus-send-acceptance.json" if root_sources else "existing-bus-send-acceptance.json")
+    category = {"category": "old-root-bus-user-send" if root_sources else "existing-bus-user-send", "status": "FAIL",
         "verifier_strength": "gateway_verified_plus_independent_exact_identity_parent_reference_scalar_and_notes",
         "observation_path": str(output)}
     runtime.category_results.append(category)
@@ -4683,7 +4683,10 @@ def _collect_existing_bus_send_acceptance(
 
     gateway = ReceiptGateway()
     segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
-    names = {"root": root_name, "target": "Destination", "source": "Sender", "batch_source": "BatchSender"}
+    names = {"root": root_name, "target": "Destination",
+        "source": root_name + "_Sender" if root_sources else "Sender",
+        "batch_source": root_name + "_BatchSender" if root_sources else "BatchSender"}
+    receipt["placement"] = "old_root_bus_sources" if root_sources else "aux_bus_children"
 
     def exact(command):
         payload = gateway.gateway(command, live=True)
@@ -4697,8 +4700,11 @@ def _collect_existing_bus_send_acceptance(
         row = exact(["query-object", "--exact-id", identity, "--include", "class-id", "--include", "parent",
             "--include", "notes", *(["--include-field", "UserAuxSend0", "--include-field", "UserAuxSendVolume0"]
                 if role in {"source", "batch_source"} else [])])
-        assert type(row.get("class_id")) is int and row["class_id"] == (1376272 if role == "root" else 3997712), row
-        assert row["type"] == ("Bus" if role == "root" else "AuxBus"), row
+        kind, class_id = (("WorkUnit", 1638416) if role == "placement_parent" else
+            ("Bus", 1376272) if role == "root" or (root_sources and role in {"source", "batch_source"}) else
+            ("AuxBus", 3997712))
+        assert type(row.get("class_id")) is int and row["class_id"] == class_id, row
+        assert row["type"] == kind, row
         assert isinstance(row.get("notes"), str), row
         if role in {"source", "batch_source"}:
             assert "UserAuxSend0" in row.get("references", {}), row
@@ -4775,33 +4781,61 @@ def _collect_existing_bus_send_acceptance(
         return phase
 
     try:
+        assert not root_sources or runtime.version in {"2021.1", "2022.1", "2023.1"}, (
+            "Root-Bus witness is limited to the pinned 2021–2023 class-source scope; "
+            "2024–2025 retain their explicit non-master placement boundary.")
+        placement_parent = None
+        if root_sources:
+            found = exact(["query-object", *(arg for segment in segments for arg in ("--path-segment", segment))])
+            placement_parent = read(found["id"], "placement_parent")
+            assert all(found.get(key) == placement_parent.get(key) for key in ("id", "name", "type", "path")), (found, placement_parent)
+            assert placement_parent["name"] == segments[-1] and placement_parent["path"] == "\\" + "\\".join(segments), placement_parent
+            receipt["placement_parent"] = placement_parent
         setup = _start_business_draft(gateway, "object.create")
-        parent = _bind_business_object(gateway, setup, path_segments=segments)
+        parent = _bind_business_object(gateway, setup, **({"object_id": placement_parent["id"]}
+            if placement_parent is not None else {"path_segments": segments}))
         types = {name: _discover_business_type(gateway, setup, meaning=name, role="object", expected_label=name)
             for name in ("Bus", "AuxBus")}
         root = _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", "root",
             "--parent-handle", parent, "--name", root_name, "--kind", types["Bus"], "--field", "notes", "Keep routing"], live=False)
         root_handle = declared_business_object_handle(root, "root")
-        for role in ("target", "source", "batch_source"):
+        for role in (("target",) if root_sources else ("target", "source", "batch_source")):
             _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", role,
                 "--parent-handle", root_handle, "--name", names[role], "--kind", types["AuxBus"],
                 "--field", "notes", "Keep " + names[role]], live=False)
-        setup_phase = complete(setup, "setup_no_coverage_credit")
+        setup_phases = [complete(setup, "setup_no_coverage_credit")]
+        if root_sources:
+            # 2021 permits one create root. Keep the sibling root Busses in separate
+            # closed Previews; none of these setup effects grants user-send credit.
+            for role in ("source", "batch_source"):
+                setup = _start_business_draft(gateway, "object.create")
+                parent = _bind_business_object(gateway, setup, object_id=placement_parent["id"])
+                kind = _discover_business_type(gateway, setup, meaning="Bus", role="object", expected_label="Bus")
+                _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", role,
+                    "--parent-handle", parent, "--name", names[role], "--kind", kind,
+                    "--field", "notes", "Keep " + names[role]], live=False)
+                setup_phases.append(complete(setup, "setup_" + role + "_no_coverage_credit"))
         baseline = {}
         for role, name in names.items():
-            path = (*segments, root_name, *([] if role == "root" else [name]))
+            path = (*segments, name) if root_sources and role in {"source", "batch_source"} else (
+                *segments, root_name, *([] if role == "root" else [name]))
             found = exact(["query-object", *(arg for segment in path for arg in ("--path-segment", segment))])
             row = read(found["id"], role)
             assert all(found.get(key) == row.get(key) for key in ("id", "name", "type", "path")), (found, row)
+            assert row["name"] == name and row["path"] == "\\" + "\\".join(path), row
+            assert row["notes"] == ("Keep routing" if role == "root" else "Keep " + name), row
             baseline[role] = row
         assert len({row["id"] for row in baseline.values()}) == 4, baseline
-        for role in ("target", "source", "batch_source"):
+        for role in (("root", "source", "batch_source") if root_sources else ()):
+            assert baseline[role].get("parent", {}).get("id") == placement_parent["id"], baseline
+        for role in (("target",) if root_sources else ("target", "source", "batch_source")):
             assert baseline[role].get("parent", {}).get("id") == baseline["root"]["id"], baseline
             assert baseline[role]["path"] == baseline["root"]["path"] + "\\" + names[role], baseline
         for role in ("source", "batch_source"):
             assert reference_id(baseline[role]) is None, baseline[role]
         receipt["baseline"] = baseline
-        setup_phase["effect_verified"] = True
+        for phase in setup_phases:
+            phase["effect_verified"] = True
         expected = json.loads(json.dumps(baseline))
         phases = [("standalone_reference", "object.setReference", "source", {"UserAuxSend0": "target"}),
             ("standalone_scalar", "object.setProperty", "source", {"UserAuxSendVolume0": -9}),
@@ -4812,8 +4846,9 @@ def _collect_existing_bus_send_acceptance(
             owner = _bind_business_object(gateway, draft, object_id=baseline[role]["id"])
             kind = None
             if operation == "object.create":
-                kind = _discover_business_type(gateway, draft, meaning="AuxBus", role="object", expected_label="AuxBus")
-                parent = _bind_business_object(gateway, draft, object_id=baseline["root"]["id"])
+                kind = _discover_business_type(gateway, draft, meaning=baseline[role]["type"],
+                    role="object", expected_label=baseline[role]["type"])
+                parent = _bind_business_object(gateway, draft, object_id=baseline[role]["parent"]["id"])
                 _update_business_draft(gateway, draft, "draft-business-configure", ["--name-conflict", "merge"], live=False)
             fields = []
             for token, value in values.items():
@@ -4836,6 +4871,10 @@ def _collect_existing_bus_send_acceptance(
                     {"id": baseline["target"]["id"]} if token == "UserAuxSend0" else value)
             observed = {key: read(row["id"], key) for key, row in baseline.items()}
             phase["independent_effect"] = observed
+            if placement_parent is not None:
+                actual_parent = read(placement_parent["id"], "placement_parent")
+                phase["independent_placement_parent"] = actual_parent
+                assert actual_parent == placement_parent, (label, placement_parent, actual_parent)
             for key, row in observed.items():
                 for field in ("id", "name", "type", "path", "class_id", "parent", "notes"):
                     assert row.get(field) == expected[key].get(field), (label, key, field, expected[key], row)
@@ -4860,6 +4899,17 @@ def test_existing_bus_send_reference_scalar_acceptance(workflow_sandbox_runtime:
     """One lifecycle; each legal phase independently previewed and executed once."""
     category = _collect_existing_bus_send_acceptance(workflow_sandbox_runtime,
         root_name="WAAPI_EXISTING_SEND_" + uuid.uuid4().hex[:12])
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_old_root_bus_send_reference_scalar_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """2021–2023 root sources route to an AuxBus below a different root Bus."""
+    if workflow_sandbox_runtime.version not in {"2021.1", "2022.1", "2023.1"}:
+        pytest.skip("Old root-Bus witness only; 2024–2025 require their non-master placement proof")
+    category = _collect_existing_bus_send_acceptance(workflow_sandbox_runtime,
+        root_name="WAAPI_ROOT_SEND_" + uuid.uuid4().hex[:12], root_sources=True)
     assert category["status"] == "PASS", category
 
 

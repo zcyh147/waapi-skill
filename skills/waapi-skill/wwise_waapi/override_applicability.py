@@ -121,11 +121,15 @@ def prove_absent_override(*, version, class_id, info, dependency, read, structur
     expected_dependencies = source['group']['dependencies'] + source['group']['field_dependencies'][info.name]
     if sorted(info.dependencies, key=canonical_sha256) != sorted(expected_dependencies, key=canonical_sha256):
         raise ValueError('Selected field conditions differ from the source-proven user-send group')
-    if not discovery and (not isinstance(structural_proof, dict)
-            or structural_proof.get('kind') not in {None, 'existing-non-master-bus'}
+    requires_child = any(item.get('type') == 'isMasterBus' for item in source['group']['dependencies'])
+    allowed_kinds = {None, 'existing-non-master-bus'}
+    if not requires_child:
+        allowed_kinds.add('existing-bus-identity')
+    if not discovery and (requires_child or structural_proof is not None) and (not isinstance(structural_proof, dict)
+            or structural_proof.get('kind') not in allowed_kinds
             or structural_proof.get('version') != version
             or structural_proof.get('class_id') != class_id or structural_proof.get('type') != row['name']):
-        raise ValueError('Absent user-send override needs the exact non-master child placement proof')
+        raise ValueError('Absent user-send override needs its exact source-required placement proof')
     types = parse_get_types_result(read('ak.wwise.core.object.getTypes', {}, {}))
     if ([item.class_id for item in types if item.name == row['name']] != [class_id]
             or [item.name for item in types if item.class_id == class_id] != [row['name']]):
@@ -148,7 +152,14 @@ def proof_current(proof, *, read, after_write=False, edits=()):
     if proof.get('purpose', 'mutation') != 'mutation':
         return False
     structural = proof['structural_proof']
-    if structural.get('kind') == 'existing-non-master-bus':
+    if structural is None:
+        # Older source groups have no placement predicate. Re-prove the class
+        # fact; the ordinary operation guards still bind its target/parent.
+        info = parse_get_property_info_result(read('ak.wwise.core.object.getPropertyInfo',
+            {'classId': proof['class_id'], 'property': proof['field']}, {}))
+        return proof == prove_absent_override(version=proof['version'], class_id=proof['class_id'],
+            info=info, dependency=proof['dependency'], read=read)
+    if structural.get('kind') in {'existing-non-master-bus', 'existing-bus-identity'}:
         object_id = structural['source']['id']
         info = parse_get_property_info_result(read('ak.wwise.core.object.getPropertyInfo',
             {'object': object_id, 'property': proof['field']}, {}))
@@ -188,17 +199,20 @@ def prove_existing_absent_override(*, version, object_id, info, dependency, read
     if source.get('type') not in {'Bus', 'AuxBus'}:
         return None
     catalog, _nodes, _closures = load_source(version)
+    requires_child = any(item.get('type') == 'isMasterBus' for item in catalog['group']['dependencies'])
     classes = {row['name']: row['class_id'] for row in catalog['classes']}
     if type(source.get('classId')) is not int or source['classId'] != classes[source['type']]:
         raise ValueError('Existing bus source class contradicts its actual type')
     parent_id = source.get('parent', {}).get('id') if isinstance(source.get('parent'), dict) else None
     parent = _existing_row(read, parent_id)
-    if (parent.get('type') not in {'Bus', 'AuxBus'} or type(parent.get('classId')) is not int
-            or parent['classId'] != classes[parent['type']] or source['id'].casefold() == parent['id'].casefold()
+    if (type(parent.get('classId')) is not int or parent['classId'] <= 0
+            or (requires_child and (parent.get('type') not in {'Bus', 'AuxBus'}
+                or parent['classId'] != classes[parent['type']]))
+            or source['id'].casefold() == parent['id'].casefold()
             or any(not isinstance(row.get(key), str) or (not row[key] and key != 'notes')
                    for row in (source, parent) for key in ('name', 'path', 'notes'))
             or source['path'] != parent['path'] + '\\' + source['name']):
-        raise ValueError('Existing source needs its exact actual non-master Bus/AuxBus parent placement')
+        raise ValueError('Existing source needs its exact actual parent identity and source-required placement')
     types = parse_get_types_result(read('ak.wwise.core.object.getTypes', {}, {}))
     if ([row.class_id for row in types if row.name == parent['type']] != [parent['classId']]
             or [row.name for row in types if row.class_id == parent['classId']] != [parent['type']]):
@@ -207,7 +221,8 @@ def prove_existing_absent_override(*, version, object_id, info, dependency, read
         {'classId': source['classId'], 'property': info.name}, {}))
     if class_info.as_dict() != info.as_dict():
         raise ValueError('Object/class user-send metadata does not match')
-    structural = {'kind': 'existing-non-master-bus', 'version': version, 'class_id': source['classId'],
+    structural = {'kind': 'existing-non-master-bus' if requires_child else 'existing-bus-identity',
+        'version': version, 'class_id': source['classId'],
         'type': source['type'], 'source': source, 'parent': parent}
     proof = prove_absent_override(version=version, class_id=source['classId'], info=info,
         dependency=dependency, read=read, structural_proof=structural)
