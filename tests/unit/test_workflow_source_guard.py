@@ -71,24 +71,23 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
                     "dependencies": [{"action": "Show", "context": "Self", "type": "isMasterBus", "value": False},
                         {"action": "Enable", "context": "Self", "property": "OverrideUserAuxSends", "type": "override"}]}
             if native_conditions and args["property"] == "OverrideUserAuxSends":
-                # Controller metadata is fixture-only until the owned native read is available.
-                return {"name": "OverrideUserAuxSends", "type": "bool", "default": False,
-                    "dependencies": [{"type": "override", "action": "Enable", "context": "Self", "property": "OverrideUserAuxSends"}]}
+                raise RuntimeError("Literal native 553: controller property does not exist on AuxBus")
             assert args["property"] == "UserAuxSend0", args
             if native_conditions:
-                # Exact relevant class metadata observed on 2025.1.7.9143; older lanes test this grammar only.
+                # Literal relevant 2025 native shape; older program lanes use their XML group grammar, not claimed native observations.
                 return {"name": "UserAuxSend0", "type": "", "default": None,
+                    "supports": {"unlink": False, "randomizer": False, "rtpc": "None"},
                     "display": {"name": "User-Defined Auxiliary Send 0"},
                     "restriction": {"type": "reference", "restrictions": [{"type": ["Auxiliary Bus"], "sharedOnlyTypes": []}]},
-                    "dependencies": [{"type": "isMasterBus", "value": False, "action": "Show", "context": "Self"},
+                    "dependencies": ([{"type": "isMasterBus", "value": False, "action": "Show", "context": "Self"}]
+                        if version in {"2024.1", "2025.1"} else []) + [
                         {"type": "override", "action": "Enable", "context": "Self", "property": "OverrideUserAuxSends"}]}
             return {"name": "UserAuxSend0", "type": "Reference", "display": {"name": "User-Defined Auxiliary Send 0"},
                 "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
         if uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"}:
             writes.append((uri, deepcopy(args), deepcopy(options)))
             children = [{"type": "AuxBus", "name": "Destination"},
-                {"type": "AuxBus", "name": "Sender", "@UserAuxSend0": base + r"\Destination",
-                    **({"@OverrideUserAuxSends": True} if native_conditions else {})}]
+                {"type": "AuxBus", "name": "Sender", "@UserAuxSend0": base + r"\Destination"}]
             if operation == "object.create":
                 assert args == {"parent": parent, "type": "Bus", "name": "WAAPI_RESULT_REFERENCE_TEST",
                     "children": children, "onNameConflict": "fail", "autoAddToSourceControl": False}
@@ -105,7 +104,6 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
                     "path": base + "\\" + name, "parent": {"id": root}, "notes": ""}
             task.objects[source]["@UserAuxSend0"] = {"id": root if fault == "wrong-guid" else target}
             if native_conditions:
-                task.objects[source]["@OverrideUserAuxSends"] = fault != "wrong-controller-effect"
                 if fault == "wrong-parent-effect":
                     task.objects[source]["parent"] = {"id": parent}
             result = {"id": root, "name": "WAAPI_RESULT_REFERENCE_TEST", "children": [
@@ -156,9 +154,9 @@ def test_new_result_reference_exact_selection_and_native_condition_share_one_wri
     assert category["status"] == "PASS", category
     assert len(writes) == 1 and [command[0] for command in commands].count("execute") == 1
     assert {args["property"] for uri, args, _ in task.calls if uri.endswith("getPropertyInfo")} == {
-        "UserAuxSend0", "OverrideUserAuxSends"}
+        "UserAuxSend0"}
     sender = writes[0][1]["objects"][0]["children"][0]["children"][1]
-    assert sender["@OverrideUserAuxSends"] is True
+    assert "@OverrideUserAuxSends" not in sender
     assert sender["@UserAuxSend0"].endswith(r"\Destination")
 
 
@@ -232,16 +230,18 @@ def test_new_result_reference_acceptance_handles_native_non_master_bus_condition
     assert len(writes) == 1 and [command[0] for command in commands].count("execute") == 1
     tree = writes[0][1] if version == "2021.1" else writes[0][1]["objects"][0]["children"][0]
     sender = tree["children"][1]
-    assert sender["@OverrideUserAuxSends"] is True
+    assert "@OverrideUserAuxSends" not in sender
     assert sender["@UserAuxSend0"].endswith(r"\Destination")
 
 
-@pytest.mark.parametrize("fault", ("wrong-controller-effect", "wrong-guid", "wrong-source-class", "wrong-parent-class", "wrong-parent-effect"))
+@pytest.mark.parametrize("fault", ("controller-appears-after-write", "wrong-guid", "wrong-source-class", "wrong-parent-class", "wrong-parent-effect"))
 def test_new_result_native_condition_needs_controller_class_parent_and_reference_effect(tmp_path, workflow, fault):
     runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", native_conditions=True, fault=fault)
     original = task.call
     def effect(uri, args=None, options=None):
         result = original(uri, args, options)
+        if uri.endswith("getPropertyAndReferenceNames") and fault == "controller-appears-after-write" and writes:
+            result["return"].append("OverrideUserAuxSends")
         if uri.endswith("object.set"):
             rows = {row["name"]: row for row in task.objects.values()}
             if fault == "wrong-source-class":
@@ -257,7 +257,7 @@ def test_new_result_native_condition_needs_controller_class_parent_and_reference
     assert receipt["gateway_verification"]["payload"].get("verified") is not True, receipt
 
 
-@pytest.mark.parametrize("fault", ("value-true", "value-number", "action-enable", "context-parent", "extra-key", "controller-type"))
+@pytest.mark.parametrize("fault", ("value-true", "value-number", "action-enable", "context-parent", "extra-key", "controller-present"))
 def test_new_result_native_condition_rejects_unproved_or_malformed_grammar_without_write(tmp_path, workflow, fault):
     runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", native_conditions=True)
     original = task.call
@@ -270,8 +270,8 @@ def test_new_result_native_condition_rejects_unproved_or_malformed_grammar_witho
             if fault == "action-enable": dependency["action"] = "Enable"
             if fault == "context-parent": dependency["context"] = "Parent"
             if fault == "extra-key": dependency["property"] = "OverrideUserAuxSends"
-        if uri.endswith("getPropertyInfo") and args["property"] == "OverrideUserAuxSends" and fault == "controller-type":
-            result["type"] = "int16"
+        if uri.endswith("getPropertyAndReferenceNames") and fault == "controller-present":
+            result["return"].append("OverrideUserAuxSends")
         return result
     task.call = metadata
     with pytest.raises(AssertionError):
@@ -279,7 +279,7 @@ def test_new_result_native_condition_rejects_unproved_or_malformed_grammar_witho
     assert not writes and not any(command[0] == "execute" for command in commands)
 
 
-@pytest.mark.parametrize("fault", ("condition-drift", "controller-drift", "type-drift", "type-ambiguous"))
+@pytest.mark.parametrize("fault", ("condition-drift", "controller-appears", "type-drift", "type-ambiguous"))
 def test_new_result_native_condition_revalidates_metadata_and_types_before_only_write(tmp_path, workflow, fault):
     runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", native_conditions=True)
     raw, original = runtime.raw_gateway, task.call
@@ -288,7 +288,8 @@ def test_new_result_native_condition_revalidates_metadata_and_types_before_only_
         result = original(uri, args, options)
         if executing and uri.endswith("getPropertyInfo"):
             if args["property"] == "UserAuxSend0" and fault == "condition-drift": result["dependencies"][0]["value"] = True
-            if args["property"] == "OverrideUserAuxSends" and fault == "controller-drift": result["default"] = True
+        if executing and uri.endswith("getPropertyAndReferenceNames") and fault == "controller-appears":
+            result["return"].append("OverrideUserAuxSends")
         return result
     def drift(command):
         nonlocal executing

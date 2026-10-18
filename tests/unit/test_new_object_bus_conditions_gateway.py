@@ -18,7 +18,7 @@ def _bus_children_task(tmp_path, *, source_kind="AuxBus", parent_kind="Bus", exp
         FIRST: {"id": FIRST, "name": "Routing", "type": parent_kind, "classId": classes[parent_kind],
             "path": r"\Busses\Default Work Unit\Routing", "parent": {"id": SECOND}, "notes": "Keep existing bus"},
     }
-    # Exact observed 2025 reference dependency grammar; controller row remains fixture-only.
+    # Exact observed 2025 reference dependency grammar; no controller exists on this class.
     task.metadata = {
         "UserAuxSend0": {"name": "UserAuxSend0", "type": "", "default": None,
             "restriction": {"type": "reference", "restrictions": [{"type": ["Auxiliary Bus"], "sharedOnlyTypes": []}]},
@@ -27,6 +27,9 @@ def _bus_children_task(tmp_path, *, source_kind="AuxBus", parent_kind="Bus", exp
         "OverrideUserAuxSends": {"name": "OverrideUserAuxSends", "type": "bool", "default": False,
             "dependencies": [{"type": "override", "action": "Enable", "context": "Self", "property": "OverrideUserAuxSends"}]},
     }
+    if explicit is None:
+        del task.metadata["OverrideUserAuxSends"]
+    task.metadata["UserAuxSend0"]["supports"] = {"unlink": False, "rtpc": "None", "randomizer": False}
     parent = task.bind(FIRST)
     kinds = {}
     for name in ("Bus", "AuxBus"):
@@ -62,11 +65,11 @@ def _bus_children_task(tmp_path, *, source_kind="AuxBus", parent_kind="Bus", exp
             writes.append(deepcopy(args))
             assert args["objects"] == [{"object": FIRST, "children": [
                 {"type": "AuxBus", "name": "Destination"}, {"type": source_kind, "name": "Sender",
-                    "@UserAuxSend0": task.objects[FIRST]["path"] + r"\Destination", "@OverrideUserAuxSends": True}]}]
+                    "@UserAuxSend0": task.objects[FIRST]["path"] + r"\Destination"}]}]
             for identity, name, kind in ((ROOT, "Destination", "AuxBus"), (CHILD, "Sender", source_kind)):
                 task.objects[identity] = {"id": identity, "name": name, "type": kind, "classId": classes[kind],
                     "path": task.objects[FIRST]["path"] + "\\" + name, "parent": {"id": FIRST}, "notes": ""}
-            task.objects[CHILD].update({"@UserAuxSend0": {"id": ROOT}, "@OverrideUserAuxSends": True})
+            task.objects[CHILD].update({"@UserAuxSend0": {"id": ROOT}})
             if fault == "parent-class-effect": task.objects[FIRST]["classId"] = 65552
             return {"objects": [{"id": FIRST, "name": "Routing", "children": [
                 {"id": ROOT, "name": "Destination"}, {"id": CHILD, "name": "Sender"}]}]}
@@ -75,7 +78,7 @@ def _bus_children_task(tmp_path, *, source_kind="AuxBus", parent_kind="Bus", exp
     return task, writes
 
 
-@pytest.mark.parametrize("source_kind,parent_kind,explicit", [("AuxBus", "Bus", None), ("Bus", "AuxBus", None), ("Bus", "Bus", True), ("AuxBus", "AuxBus", True)])
+@pytest.mark.parametrize("source_kind,parent_kind,explicit", [("AuxBus", "Bus", None), ("Bus", "AuxBus", None), ("Bus", "Bus", None), ("AuxBus", "AuxBus", None)])
 def test_new_bus_reference_below_existing_bus_keeps_same_graph_and_controller_intent(tmp_path, source_kind, parent_kind, explicit):
     task, writes = _bus_children_task(tmp_path, source_kind=source_kind, parent_kind=parent_kind, explicit=explicit)
     tx, shown = task.preview()
@@ -83,7 +86,8 @@ def test_new_bus_reference_below_existing_bus_keeps_same_graph_and_controller_in
     source = next(node for node in nodes if node.get("requested_name") == "Sender")
     evidence = source["new_object_default_evidence"][0]
     assert evidence["structural_visibility"][0]["proof"]["parent"]["object_id"] == FIRST
-    assert evidence["requirements"][0]["source"] == ("explicit" if explicit else "derived")
+    assert evidence["requirements"] == [] and evidence["derived_properties"] == {}
+    assert evidence["override_applicability"][0]["kind"] == "not_applicable_on_class"
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, verified
     assert len(writes) == 1 and task.objects[FIRST]["notes"] == "Keep existing bus"
@@ -96,7 +100,7 @@ def test_new_bus_reference_rejects_conflict_or_unproved_existing_parent_before_w
     if fault == "wrong-parent-class": task.objects[FIRST]["classId"] = 65552
     code, rejected = task.step("draft-check")
     assert code == 2, rejected
-    assert rejected["error_code"] == ("NEW_OBJECT_DEPENDENCY_CONFLICT" if fault == "explicit-false" else "NEW_OBJECT_DEPENDENCY_UNSUPPORTED")
+    assert rejected["error_code"] == ("OVERRIDE_APPLICABILITY_INVALID" if fault == "explicit-false" else "NEW_OBJECT_DEPENDENCY_UNSUPPORTED")
     assert not writes
 
 

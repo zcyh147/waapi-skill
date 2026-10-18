@@ -42,6 +42,7 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
     visited, controllers, override_controllers = set(), set(), set()
     derived_properties = {}
     structural_visibility = []
+    override_applicability = []
 
     def visit(info, path):
         name = info.name
@@ -78,6 +79,18 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
                 continue
             if context != "Self":
                 raise NewObjectDefaultError("Related-object conditions require verified object-scoped configuration.")
+            if kind == "override" and structural_bus_proof is not None:
+                from .override_applicability import prove_absent_override
+                try:
+                    proof = prove_absent_override(version=structural_bus_proof["version"], class_id=scope.get("classId"),
+                        info=info, dependency=dependency, read=read_call, structural_proof=structural_bus_proof)
+                except (ValueError, OSError, KeyError, TypeError) as exc:
+                    raise NewObjectDefaultError(str(exc), error_code="OVERRIDE_APPLICABILITY_INVALID") from exc
+                if proof is not None:
+                    if controller in supplied:
+                        raise NewObjectDefaultError("An absent class controller cannot be supplied as a property.", error_code="NEW_OBJECT_DEPENDENCY_CONFLICT")
+                    override_applicability.append(proof)
+                    continue
             controllers.add(controller)
             if len(controllers) > MAX_CONDITION_CONTROLLERS:
                 raise NewObjectDefaultError("Class conditions exceed the bounded controller budget.", error_code="REFERENCE_DEPENDENCY_LIMIT")
@@ -168,7 +181,8 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
     return {"class_scope": dict(scope), "requirements": requirements, "derived_properties": derived_properties,
             "default_presence": {name: "default" in info.raw for name, info in metadata.items()},
             "metadata": {name: info.as_dict() for name, info in metadata.items()},
-            **({"structural_visibility": structural_visibility} if structural_visibility else {})}
+            **({"structural_visibility": structural_visibility} if structural_visibility else {}),
+            **({"override_applicability": override_applicability} if override_applicability else {})}
 
 
 def planned_non_master_bus_proof(*, version, node, info, nodes, resolve_type, root_parent, read, root_collection="children"):

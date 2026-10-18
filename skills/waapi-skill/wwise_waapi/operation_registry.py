@@ -7624,7 +7624,11 @@ def _prepare_object_node_specs(
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
                 structural_proof = None
-                if any(is_master_bus_visibility_dependency(item) and item["value"] is False
+                # The older user-send source group lacks the later Show rule;
+                # absent-override applicability still requires non-master placement.
+                if any((is_master_bus_visibility_dependency(item) and item["value"] is False)
+                       or (type_info.name in {"Bus", "AuxBus"} and item == {"type": "override", "action": "Enable",
+                           "context": "Self", "property": "OverrideUserAuxSends"})
                        for info in property_info_by_name.values() for item in info.dependencies):
                     structural_proof = planned_non_master_bus_proof(version=version, node=node, info=type_info,
                         nodes=nodes, resolve_type=lambda name: _resolve_object_type(name, catalog=type_catalog),
@@ -7658,8 +7662,9 @@ def _prepare_object_node_specs(
     structural_classes = {}
     for spec in specs:
         for evidence in spec.get("new_object_default_evidence", []):
-            for rule in evidence.get("structural_visibility", []):
-                proof = rule["proof"]
+            proofs = [rule["proof"] for rule in evidence.get("structural_visibility", [])]
+            proofs.extend(rule["structural_proof"] for rule in evidence.get("override_applicability", []))
+            for proof in proofs:
                 structural_classes[proof["request_path"]] = proof["class_id"]
                 if "request_path" in proof["parent"]:
                     structural_classes[proof["parent"]["request_path"]] = proof["parent"]["class_id"]
@@ -15611,6 +15616,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         for node in condition_nodes:
             for evidence in node.get("new_object_default_evidence", []):
                 scope = evidence["class_scope"]
+                for proof in evidence.get("override_applicability", []):
+                    from .override_applicability import proof_current
+                    assertions.append({"name": "new user-send override applicability proof unchanged",
+                        "passed": proof_current(proof, read=read_call), "evidence": proof})
                 for rule in evidence.get("structural_visibility", []):
                     from .new_object_defaults import structural_bus_proof_current
                     assertions.append({"name": "new non-master bus class/source/parent proof unchanged",
@@ -18640,6 +18649,10 @@ def verify_prepared_operation(
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
             for evidence in spec.get("new_object_default_evidence", []):
+                for proof in evidence.get("override_applicability", []):
+                    from .override_applicability import proof_current
+                    check(f"{request_path} user-send override applicability remains valid",
+                        proof_current(proof, read=read_call, after_write=True), proof)
                 for rule in evidence.get("structural_visibility", []):
                     from .new_object_defaults import structural_bus_proof_current
                     check(f"{request_path} non-master bus class/source/parent proof remains valid",
