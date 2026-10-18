@@ -717,6 +717,11 @@ def test_exception_metadata_hostile_mapping_keeps_partial_fields_and_unavailable
     assert details == {"_metadata_unavailable": "original", "_metadata_unavailable_": "items"}
 
 
+def test_exception_metadata_unformattable_integer_key_keeps_other_complete_fields():
+    details = _dispatch_metadata_error({10 ** 5000: True, "draft_changed": False})
+    assert details == {"draft_changed": False, "_metadata_truncated": "key_budget_or_invalid"}
+
+
 def test_huge_live_success_is_replaced_by_bounded_error_without_returning_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
