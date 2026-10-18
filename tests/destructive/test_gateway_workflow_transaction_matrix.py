@@ -4817,3 +4817,149 @@ def test_prospective_group_default_native_acceptance(
     """Create one container with explicit group/default in the existing sandbox."""
     category = _collect_prospective_group_default_native_acceptance(workflow_sandbox_runtime, family)
     assert category["status"] == "PASS", category
+
+
+def _collect_reference_enabled_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe one existing non-master AuxBus reference; never infer a new-object default."""
+    from wwise_waapi.documented_list_fields import load_catalog
+    output = runtime.state_dir / 'reference-enabled-metadata-observation.json'
+    evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_evidence = set(evidence_root.glob('*.json'))
+    category = {'category': 'reference-enabled-metadata-observation', 'status': 'FAIL',
+        'observation_path': str(output), 'verifier_strength': 'read_only_exact_existing_object_field_state'}
+    runtime.category_results.append(category)
+    observation = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [],
+        'endpoint': {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url},
+        'config_path': runtime.env['WAAPI_SKILL_CONFIG_PATH'],
+        'config_sha256': hashlib.sha256(Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']).read_bytes()).hexdigest(),
+        'native_evidence': [], 'mutation_authority': False, 'prospective_authority': False,
+        'business_effect_verified': False, 'outcome': 'incomplete'}
+
+    def retain():
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 2 * 1024 * 1024, 'Reference observer receipt bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp')
+        temporary.write_bytes(body)
+        temporary.replace(output)
+
+    def raw(command):
+        assert len(observation['calls']) < 64
+        row = {'argv': list(command)}
+        observation['calls'].append(row)
+        try:
+            code, payload = runtime.raw_gateway(command)
+            row.update(exit_code=code, payload=payload)
+            return code, payload
+        finally:
+            retain()
+
+    def read(command):
+        code, payload = raw(command)
+        assert code == 0 and payload.get('ok') is True, payload
+        return payload
+
+    def exact(identity):
+        result = read(['query-object', '--exact-id', identity, '--include', 'class-id', '--include', 'parent'])
+        assert result.get('count') == 1 and len(result.get('objects', [])) == 1, result
+        row = result['objects'][0]
+        assert row['id'].upper() == identity.upper(), row
+        return row
+
+    def field_inventory(scope):
+        rows, page, pages = [], None, set()
+        for _ in range(4):
+            result = read(['metadata', 'list', *scope, '--page-size', '64', *(['--page', page] if page else [])])['agent_result']
+            rows.extend(result['fields'])
+            if result.get('complete') is True:
+                return rows
+            page = _required_string(result, 'next_page')
+            assert page not in pages
+            pages.add(page)
+        raise AssertionError('Exact field inventory not complete within four disclosed pages; no absence claim')
+
+    try:
+        types = read(['metadata', 'types', '--meaning', 'Bus', '--meaning', 'Platform', '--page-size', '64'])['agent_result']
+        assert types.get('complete') is True, 'Filtered type inventory incomplete'
+        aux_rows = [row for row in types['types'] if row.get('name') == 'AuxBus']
+        platform_rows = [row for row in types['types'] if row.get('name') == 'Platform']
+        assert len(aux_rows) == len(platform_rows) == 1
+        source = load_catalog(runtime.version)
+        classes = {row['name']: row for row in source['classes'] if row['name'] in {'AuxBus', 'Bus'}}
+        aux = aux_rows[0]
+        assert type(aux.get('classId')) is int and aux['classId'] == classes['AuxBus']['class_id']
+        observation['source_class'] = {'catalog_sha256': source['catalog_sha256'],
+            'class': {key: classes['AuxBus'][key] for key in ('name', 'class_id', 'source_member', 'source_sha256')}}
+        candidates = read(['query-object', '--type-selection', aux['selection'], '--max-results', '20',
+            '--include', 'class-id', '--include', 'parent'])
+        chosen = None
+        for candidate in candidates.get('objects') or []:
+            if candidate.get('type') != 'AuxBus' or candidate.get('class_id') != aux['classId']:
+                continue
+            parent_id = (candidate.get('parent') or {}).get('id')
+            if not isinstance(parent_id, str):
+                continue
+            parent = exact(parent_id)
+            if parent.get('type') in classes and parent.get('class_id') == classes[parent['type']]['class_id']:
+                chosen = exact(candidate['id'])
+                assert all(chosen.get(key) == candidate.get(key) for key in ('id', 'name', 'type', 'path', 'class_id', 'parent')), (chosen, candidate)
+                observation['parent'] = parent
+                break
+        if chosen is None:
+            category.update(status='blocked', reason='No source/class/parent-proven non-master AuxBus in first 20 candidates')
+            return category
+        observation['object'] = chosen
+        platforms = read(['query-object', '--type-selection', platform_rows[0]['selection'], '--max-results', '20'])
+        assert platforms.get('objects'), 'No explicit project platform available'
+        platform = platforms['objects'][0]
+        assert platform['type'] == 'Platform' and platform.get('name')
+        platform_exact = read(['query-object', '--exact-id', platform['id']])
+        assert platform_exact.get('count') == 1 and platform_exact['objects'] == [platform], platform_exact
+        observation['platform'] = platform
+        object_scope = ['--exact-id', chosen['id']]
+        class_scope = ['--type-selection', aux['selection']]
+        object_names, class_names = field_inventory(object_scope), field_inventory(class_scope)
+        observation['controller_name_absence'] = {
+            'object': not any(row['name'] == 'OverrideUserAuxSends' for row in object_names),
+            'class': not any(row['name'] == 'OverrideUserAuxSends' for row in class_names),
+            'object_complete_names': [row['name'] for row in object_names], 'class_complete_names': [row['name'] for row in class_names]}
+        selections = []
+        for label, scope, names in [('object', object_scope, object_names), ('class', class_scope, class_names)]:
+            selected, = [row for row in names if row['name'] == 'UserAuxSend0']
+            detail = read(['metadata', 'detail', *scope, '--selection', selected['selection']])['agent_result']
+            observation[label + '_field'] = detail
+            assert detail.get('metadata', {}).get('name') == 'UserAuxSend0', detail
+            selections.append(selected['selection'])
+        code, result = raw(['metadata', 'property-state', *object_scope, '--selection', selections[0], '--platform', platform['id']])
+        observation['enabled_response'] = {'exit_code': code, 'payload': result}
+        if code != 0 or result.get('ok') is not True:
+            observation['outcome'] = 'native_or_observation_failure'
+            return category
+        state = result['agent_result']
+        assert state['field'] == 'UserAuxSend0' and state['kind'] == 'reference' and type(state['enabled']) is bool, state
+        assert state['mutation_authority'] is False
+        observation.update(outcome='observed_existing_reference_state', observed_enabled=state['enabled'])
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        observation['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        paths = sorted(set(evidence_root.glob('*.json')) - prior_evidence)
+        assert len(paths) <= 512
+        total = 0
+        for path in paths:
+            body = path.read_bytes()
+            total += len(body)
+            assert total <= 32 * 1024 * 1024
+            observation['native_evidence'].append({'path': str(path), 'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
+        retain()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_reference_enabled_native_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_reference_enabled_metadata_probe(workflow_sandbox_runtime)
+    if category['status'] == 'blocked':
+        pytest.skip(f'Existing reference observation blocked; receipt retained: {category}')
+    assert category['status'] == 'PASS', category

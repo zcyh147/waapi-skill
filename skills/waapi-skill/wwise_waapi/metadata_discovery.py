@@ -1285,7 +1285,7 @@ def _metadata_kind(info: PropertyInfoMetadataRecord) -> str:
         or str(info.restriction.get("type", "")).casefold() == "reference"
     ):
         return "reference"
-    return "property" if info.type is not None else "unknown"
+    return "property" if info.type else "unknown"
 
 
 def _validate_queries(queries: Sequence[str]) -> tuple[str, ...]:
@@ -1620,7 +1620,7 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
         if not all(name in names for name in select_fields):
             raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "A discovered field left the live scope; discover again.")
         return {"fields": [{"name": name, "selection": locator("mf1", names.index(name))} for name in select_fields]}
-    token = selection or page
+    token = selection if selection is not None else page
     if token is not None:
         try:
             kind, stamp, position, digest = token.split(".")
@@ -1647,6 +1647,7 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                 # selected in the freshly read, scope-bound name inventory;
                 # it is not a synthesized native getPropertyInfo.name.
                 payload["selected_field_token"] = name
+                payload["selected_field_kind"] = _metadata_kind(info)
                 return payload
             if complete_detail:
                 from .metadata_detail import detail_page as project_detail_page

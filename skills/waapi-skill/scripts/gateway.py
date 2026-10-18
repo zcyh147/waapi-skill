@@ -2113,7 +2113,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     metadata.add_argument("--page")
     metadata.add_argument("--page-size", type=int, default=20)
-    metadata.add_argument("--selection")
+    metadata.add_argument("--selection", help="Copy an exact listed locator; field detail/property-state or type selection")
     metadata.add_argument("--detail-page", help="Copy the exact continuation from a metadata detail page")
     metadata.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
     metadata.add_argument("--detail-item", type=int)
@@ -6023,7 +6023,8 @@ def preflight_metadata_input(
             raise GatewayInputError(f"metadata {args.operation} --meaning must contain bounded, trimmed lexical filters")
         return
 
-    if args.operation in {"discover", "property-state"}:
+    selected_property_state = args.operation == "property-state" and args.selection is not None
+    if args.operation in {"discover", "property-state"} and not selected_property_state:
         if not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES:
             raise GatewayInputError(
                 f"metadata {args.operation} requires 1.."
@@ -6060,8 +6061,8 @@ def preflight_metadata_input(
             raise GatewayInputError("metadata --page-size must be 1..64")
         if (args.operation == "detail") != (args.selection is not None) or (args.selection and args.page):
             raise GatewayInputError("metadata detail requires --selection; metadata list accepts --page")
-    elif args.page or args.selection or args.page_size != 20:
-        raise GatewayInputError("metadata pagination/selection requires list or detail")
+    elif args.page or (args.selection and not selected_property_state) or args.page_size != 20:
+        raise GatewayInputError("metadata pagination requires list/detail; exact field selection also permits property-state")
 
     if args.operation in {"discover", "list", "detail"}:
         if sum(
@@ -6085,14 +6086,15 @@ def preflight_metadata_input(
             (path_segments is None) == (exact_id is None)
             or semantic_kind is not None
             or custom_kind_meaning is not None
+            or type_selection is not None
         ):
             raise GatewayInputError(
                 "metadata property-state requires one object --path-segment or "
                 "--exact-id scope"
             )
-        if len(meanings) != 1:
+        if not ((args.selection is not None and not meanings) or (args.selection is None and len(meanings) == 1)):
             raise GatewayInputError(
-                "metadata property-state requires exactly one --meaning"
+                "metadata property-state requires exactly one --meaning or copied --selection"
             )
         args.platform = validate_metadata_platform_name(args.platform)
         if args.curve_role is not None:
@@ -7231,6 +7233,20 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri == "ak.wwise.core.object.isPropertyEnabled":
+        commands[0].update({
+            "required_inputs": ["object", "field_choice", "platform"],
+            "input_forms": {
+                "object": {"exactly_one_of": ["--exact-id <canonical-object-guid>", "--path-segment <literal-hierarchy-name> (repeat)"]},
+                "field_choice": {"exactly_one_of": ["--meaning <one-property-meaning>", "--selection <opaque-field-selection>"],
+                    "selection_source": "copy one field selection from metadata list/detail for the same object",
+                    "selected_kinds": ["property", "reference"], "class_scope": False,
+                    "validity": "same live scope/version/project/session/inventory; 900 seconds"},
+                "platform": {"arguments": ["--platform", "<exact-platform-name-or-guid>"], "required": True},
+            },
+            "observation_authority": "current object Boolean only; no prospective default or mutation authority",
+            "native_refusal": "preserve exact bounded native error; no inferred Boolean or retry",
+        })
     if capability.uri == "ak.wwise.core.object.getAttenuationCurve":
         # This existing fixed read requires business values. Disclose the
         # complete CLI input forms without exposing native curveType tokens.
@@ -15601,18 +15617,28 @@ def dispatch_command(
                 return {"ok": True, "status": "ok", **common, "operation": args.operation,
                         "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls),
                         "agent_result": result}
-            discovery = discover_metadata(
-                read_call=read_call,
-                queries=tuple(args.queries),
-                object_type=args.object_type,
-                class_id=args.class_id,
-                object=args.object,
-                limit=(
-                    DEFAULT_METADATA_DISCOVERY_LIMIT
-                    if args.limit is None
-                    else args.limit
-                ),
-            )
+            selected_state = None
+            if args.operation == "property-state" and args.selection is not None:
+                from wwise_waapi.metadata_discovery import browse_metadata
+                selected_state = browse_metadata(
+                    read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                    context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
+                    object=args.object, selection=args.selection, complete_detail=True, project_detail=False,
+                )
+                discovery = None
+            else:
+                discovery = discover_metadata(
+                    read_call=read_call,
+                    queries=tuple(args.queries),
+                    object_type=args.object_type,
+                    class_id=args.class_id,
+                    object=args.object,
+                    limit=(
+                        DEFAULT_METADATA_DISCOVERY_LIMIT
+                        if args.limit is None
+                        else args.limit
+                    ),
+                )
             if args.operation == "discover":
                 payload = {
                     "ok": True,
@@ -15642,7 +15668,8 @@ def dispatch_command(
                         candidate["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", selected["selection"], "--detail-view", "choices" if candidate["metadata"].get("restriction", {}).get("type") == "enum" else "dependencies"])
                 payload["agent_result"] = projected
                 return payload
-            candidates = tuple(discovery.candidates)
+            candidates = (({"name": selected_state["selected_field_token"], "kind": selected_state["selected_field_kind"]},)
+                          if selected_state is not None else tuple(discovery.candidates))
             if len(candidates) != 1:
                 return {
                     "ok": True,
@@ -15680,7 +15707,10 @@ def dispatch_command(
                     details={"operation": args.operation},
                     error_code="INVALID_METADATA_RESULT",
                 )
-            if field_kind != "property":
+            if field_kind not in ({"property", "reference"} if selected_state is not None else {"property"}):
+                if selected_state is not None:
+                    raise GatewayResultShapeError("Selected metadata does not certify a property or reference.",
+                        details={"selection": args.selection, "kind": field_kind}, error_code="INVALID_METADATA_RESULT")
                 return {
                     "ok": True,
                     "status": "needs_clarification",
@@ -15717,11 +15747,16 @@ def dispatch_command(
                 args=envelope.args,
                 options=envelope.options,
             )
-            normalized = (
-                parse_is_property_enabled_result(result.get("result")).as_dict()
-                if result.get("ok")
-                else None
-            )
+            try:
+                normalized = (
+                    parse_is_property_enabled_result(result.get("result")).as_dict()
+                    if result.get("ok") else None
+                )
+            except SemanticValidationError as exc:
+                if selected_state is None:
+                    raise
+                raise GatewayResultShapeError(str(exc), error_code="INVALID_METADATA_RESULT",
+                    details={"call": dispatch_call_summary(result), "native_result": result.get("result")}) from exc
             return {
                 "ok": bool(result.get("ok")),
                 "status": "ok" if result.get("ok") else "error",
@@ -15733,7 +15768,10 @@ def dispatch_command(
                 "call": dispatch_call_summary(result),
                 "agent_result": (
                     {
-                        "meaning": args.queries[0],
+                        **({"selection": args.selection, "scope": selected_state["scope"],
+                            "field": field_name, "kind": field_kind, "mutation_authority": False,
+                            "authority": "current_object_enabled_state_only; no prospective/default/write authority"}
+                           if selected_state is not None else {"meaning": args.queries[0]}),
                         "platform": args.platform,
                         "enabled": normalized["enabled"],
                     }
