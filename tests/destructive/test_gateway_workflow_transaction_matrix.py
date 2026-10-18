@@ -6163,3 +6163,287 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
         pytest.skip('2021 RTPC construction remains separate; no modern object.set is fabricated')
     category = _collect_rtpc_graph_acceptance(workflow_sandbox_runtime, name='WAAPI_RTPC_' + uuid.uuid4().hex[:12])
     assert category['status'] == 'PASS', category
+
+
+def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    """Three modern new-List effects inside the existing owned workflow lifecycle."""
+    output = runtime.state_dir / 'anonymous-effect-slot-construction-acceptance.json'
+    category = {'category': 'anonymous-effect-slot-construction', 'status': 'FAIL',
+        'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_membership_exact_guid_class_owner_reference_fields_and_preservation',
+        'observation_path': str(output)}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'setup_coverage_credit': False, 'business_effect_verified': False,
+        'scope': 'new_anonymous_EffectSlot_construction_not_existing_member_name_merge',
+        'lifecycle_acceptance': 'existing host-category-evidence/v3 finalizer owns source/cleanup acceptance'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024, 'Anonymous EffectSlot receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 256, 'Anonymous EffectSlot public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}, payload
+                assert payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = ReceiptGateway()
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def query(argv, *, count=None):
+        result = gateway.gateway(['query-object', *argv, *projection], live=True)
+        rows = result.get('objects')
+        assert isinstance(rows, list) and len(rows) <= 8, result
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        assert result.get('count') == len(rows) and len({row['id'] for row in rows}) == len(rows), result
+        if count is not None: assert len(rows) == count, result
+        for row in rows:
+            assert uuid.UUID(row['id']).int != 0 and isinstance(row.get('path'), str), row
+        return rows
+    def exact(identity, fields=()):
+        row = query(['--exact-id', identity, *(arg for name in fields for arg in ('--include-field', name))], count=1)[0]
+        assert row['id'] == identity and type(row.get('class_id')) is int, row
+        return row
+    def at(segments):
+        return query([*(arg for segment in segments for arg in ('--path-segment', segment))], count=1)[0]
+    def members(owner):
+        return query(['--advanced-waql', f'from object "{owner}" select @Effects', '--max-results', '8'])
+    def children(owner):
+        return query(['--advanced-waql', f'from object "{owner}" select children', '--max-results', '8'])
+    def guid(value, *, nullable=False):
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        if nullable and (identity is None or (isinstance(identity, str) and uuid.UUID(identity).int == 0)):
+            return None
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, value
+        return identity
+    def gain_fields(identity):
+        names, page = [], None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page is not None else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field['name']
+                assert isinstance(name, str) and name not in names, result
+                names.append(name)
+            if result['complete'] is True:
+                assert len(names) == result['total_count'] and len(names) <= 8, result
+                return names
+            next_page = _required_string(result, 'next_page')
+            assert next_page != page, result
+            page = next_page
+        raise AssertionError('Gain metadata exceeds four pages')
+    def gain(identity, *, parent=None, owner=None):
+        names = gain_fields(identity)
+        row = exact(identity, names)
+        assert row['type'] == 'Effect' and row['class_id'] == classes['Wwise Gain'], row
+        if parent is not None:
+            assert guid(row.get('parent')) == parent, row
+            if 'owner' in row: assert guid(row['owner'], nullable=True) is None, row
+            else: assert 'owner' in row.get('unavailable_fields', []), row
+        else:
+            assert guid(row.get('owner')) == owner, row
+            assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
+        return row
+    def selected_fields(draft, kind):
+        listed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--list'], live=True)['agent_result']
+        selected = {}
+        for name in ('Effect', 'Bypass', 'Render'):
+            rows = [row for row in listed['fields'] if row.get('name') == name]
+            assert len(rows) == 1, (name, listed)
+            result = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--type-handle', kind, '--selection', rows[0]['selection']], live=True)
+            selected[name] = discovered_business_field_handle(result, name)
+        return selected
+    def list_field(draft, owner, *, planned=False):
+        scope = ['--type-handle' if planned else '--object-handle', owner]
+        listed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            [*scope, '--field-source', 'documented-lists', '--list'], live=True)['agent_result']
+        matches = [row for row in listed['items'] if row['name'] == 'Effects']
+        assert len(matches) == 1, listed
+        result = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            [*scope, '--field-source', 'documented-lists', '--selection', matches[0]['selection']], live=True)
+        return result['meaning_results'][0]['candidates'][0]['handle']
+    def declare_slots(draft, owner, effects, kind, fields, targets):
+        handles = []
+        for index, target in enumerate(targets):
+            values = ['--field-value', fields['Bypass'], 'false' if index == 0 else 'true',
+                '--field-value', fields['Render'], 'true' if index == 0 else 'false']
+            if target is not None: values += ['--field-value', fields['Effect'], target]
+            declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', f'slot{index}',
+                '--parent-handle', owner, '--kind', kind, '--field', 'object_list', effects, *values], live=False)
+            handles.append(_required_string(declared['draft']['declared_object'], 'result_handle'))
+        return handles
+    def complete(draft, label, *, setup=False):
+        phase = {'phase': label, 'setup_no_credit': setup, 'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+        return phase
+    def slot_snapshot(owner, expected_targets, *, old=()):
+        sound = exact(owner)
+        assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'], sound
+        listed = members(owner)
+        assert len(listed) == len(old) + len(expected_targets), listed
+        assert [row['id'] for row in listed[:len(old)]] == list(old), listed
+        fresh = listed[len(old):]
+        assert not set(row['id'] for row in fresh).intersection(old), listed
+        slots = []
+        for index, candidate in enumerate(fresh):
+            row = exact(candidate['id'], ('Effect', 'Bypass', 'Render'))
+            assert row['name'] == '' and row['type'] == 'EffectSlot' and row['class_id'] == classes['EffectSlot'], row
+            assert guid(row.get('owner')) == owner, row
+            assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
+            assert guid(row.get('references', {}).get('Effect')) == expected_targets[index], row
+            assert row.get('properties', {}).get('Bypass') is (index != 0), row
+            assert row.get('properties', {}).get('Render') is (index == 0), row
+            slots.append(row)
+        return {'owner': sound, 'slots': slots, 'ordered_ids': [row['id'] for row in listed]}
+    def preserved(*, new_child=None):
+        actual = {'folder': exact(folder['id']), 'targets': [gain(row['id'], parent=folder['id']) for row in targets],
+            'owner': exact(sound['id']), 'parents': {key: exact(row['id']) for key, row in parents.items()}}
+        assert actual == preserved_before, (preserved_before, actual)
+        actual_children = children(folder['id'])
+        by_id = {row['id']: row for row in actual_children}
+        assert all(by_id.get(row['id']) == row for row in before_children), (before_children, actual_children)
+        assert set(by_id) - {row['id'] for row in before_children} == ({new_child} if new_child else set()), actual_children
+        return {**actual, 'children': actual_children}
+    try:
+        assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Anonymous modern List witness gives no2021/22 credit'
+        gateway.gateway(['query-schema', '--advanced'], live=False)
+        result = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'Folder', '--meaning', 'WorkUnit',
+            '--meaning', 'EffectSlot', '--meaning', 'Wwise Gain', '--page-size', '64'], live=True)['agent_result']
+        assert result.get('complete') is True, result
+        classes = {}
+        for name in ('Sound', 'Folder', 'WorkUnit', 'EffectSlot', 'Wwise Gain'):
+            matches = [row for row in result['types'] if row.get('name') == name]
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, (name, result)
+            classes[name] = matches[0]['classId']
+        receipt['live_classes'] = classes
+        sound_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        effect_segments = ('Effects', 'Default Work Unit')
+        parents = {'effects': at(effect_segments), 'sound': at(sound_segments)}
+        assert all(row['type'] == 'WorkUnit' and row['class_id'] == classes['WorkUnit'] for row in parents.values()), parents
+        # Already-supported multi-root graph; Folder and Sound are independent
+        # setup only, and each actual identity/class/parent is reread below.
+        draft = _start_business_draft(gateway, 'object.set')
+        for label, segments, name, kind_name in [('folder', effect_segments, prefix + '_Folder', 'Folder'),
+                ('sound', sound_segments, prefix + '_Sound', 'Sound')]:
+            parent = _bind_business_object(gateway, draft, path_segments=segments)
+            kind = _discover_business_type(gateway, draft, meaning=kind_name, role='object', expected_label=kind_name)
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', label, '--parent-handle', parent,
+                '--name', name, '--kind', kind, '--field', 'notes', 'Keep ' + label], live=False)
+        complete(draft, 'setup_folder_and_sound_no_credit', setup=True)
+        folder = at((*effect_segments, prefix + '_Folder')); sound = at((*sound_segments, prefix + '_Sound'))
+        folder = exact(folder['id']); sound = exact(sound['id'])
+        assert folder['type'] == 'Folder' and folder['class_id'] == classes['Folder'] and guid(folder.get('parent')) == parents['effects']['id'], folder
+        assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'] and guid(sound.get('parent')) == parents['sound']['id'], sound
+        assert members(sound['id']) == []
+        targets = []
+        for index in range(2):
+            draft = _start_business_draft(gateway, 'object.createPlugin')
+            parent = _bind_business_object(gateway, draft, object_id=folder['id'])
+            plugin = _discover_business_type(gateway, draft, meaning='Wwise Gain', role='effect', expected_label='Wwise Gain')
+            _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'gain', '--object-handle', parent,
+                '--field', 'plugin_role', 'effect', '--field', 'plugin_placement', 'shareset', '--field', 'plugin_name', prefix + f'_Gain{index}',
+                '--field', 'plugin_type_handle', plugin, '--field', 'notes', 'Keep target' + str(index)], live=False)
+            complete(draft, f'setup_shareset_{index}_no_credit', setup=True)
+            target = at((*effect_segments, prefix + '_Folder', prefix + f'_Gain{index}'))
+            targets.append(gain(target['id'], parent=folder['id']))
+        preserved_before = {'folder': folder, 'targets': targets, 'owner': sound, 'parents': parents}
+        before_children = children(folder['id'])
+        assert {row['id'] for row in before_children} == {row['id'] for row in targets}, before_children
+        receipt['baseline'] = {**preserved_before, 'children': before_children}
+        previous = []
+        for mode, target_order in [('append', targets), ('replace-all', list(reversed(targets)))]:
+            draft = _start_business_draft(gateway, 'object.set')
+            owner = _bind_business_object(gateway, draft, object_id=sound['id'])
+            kind = _discover_business_type(gateway, draft, meaning='EffectSlot', role='object', expected_label='EffectSlot')
+            fields = selected_fields(draft, kind); effects = list_field(draft, owner)
+            handles = [_bind_business_object(gateway, draft, object_id=row['id']) for row in target_order]
+            declare_slots(draft, owner, effects, kind, fields, handles)
+            if mode == 'replace-all': _update_business_draft(gateway, draft, 'draft-business-configure', ['--list-behavior', mode], live=False)
+            phase = complete(draft, 'append_existing_sharesets' if mode == 'append' else 'replace_all_population')
+            observed = slot_snapshot(sound['id'], [row['id'] for row in target_order])
+            assert observed['owner'] == sound, (sound, observed)
+            assert not set(observed['ordered_ids']).intersection(previous), observed
+            for removed in previous: assert query(['--exact-id', removed], count=0) == []
+            phase['independent_effect'] = {'members': observed, 'preserved': preserved()}
+            phase['effect_verified'] = True
+            previous = observed['ordered_ids']
+            last_snapshot = observed
+        draft = _start_business_draft(gateway, 'object.set')
+        folder_handle = _bind_business_object(gateway, draft, object_id=folder['id'])
+        plugin = _discover_business_type(gateway, draft, meaning='Wwise Gain', role='effect', expected_label='Wwise Gain')
+        declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'new-share', '--parent-handle', folder_handle,
+            '--name', prefix + '_NewShare', '--kind', plugin, '--field', 'plugin_placement', 'shareset', '--field', 'notes', 'Keep new ShareSet'], live=False)
+        shared = _required_string(declared['draft']['declared_object'], 'result_handle')
+        parent = _bind_business_object(gateway, draft, path_segments=sound_segments)
+        sound_kind = _discover_business_type(gateway, draft, meaning='Sound', role='object', expected_label='Sound')
+        declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'new-sound', '--parent-handle', parent,
+            '--name', prefix + '_PlannedSound', '--kind', sound_kind, '--field', 'notes', 'Keep planned Sound'], live=False)
+        planned_owner = _required_string(declared['draft']['declared_object'], 'result_handle')
+        kind = _discover_business_type(gateway, draft, meaning='EffectSlot', role='object', expected_label='EffectSlot')
+        handles = declare_slots(draft, planned_owner, list_field(draft, sound_kind, planned=True), kind,
+            selected_fields(draft, kind), [shared, None])
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'local', '--parent-handle', handles[1],
+            '--name', prefix + '_LocalGain', '--kind', plugin, '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep local Effect'], live=False)
+        phase = complete(draft, 'planned_owner_shareset_and_inline_effect')
+        planned = at((*sound_segments, prefix + '_PlannedSound'))
+        new_share = gain(at((*effect_segments, prefix + '_Folder', prefix + '_NewShare'))['id'], parent=folder['id'])
+        listed = members(planned['id']); assert len(listed) == 2, listed
+        # Slot GUIDs come only from ordered membership; the owning relationship
+        # independently identifies the inline Effect, never matching postvalues.
+        local_slot = exact(listed[1]['id'], ('Effect',))
+        local = gain(guid(local_slot.get('references', {}).get('Effect')), owner=local_slot['id'])
+        observed = slot_snapshot(planned['id'], [new_share['id'], local['id']])
+        assert observed['owner']['name'] == prefix + '_PlannedSound' and observed['owner']['notes'] == 'Keep planned Sound', observed
+        assert guid(observed['owner'].get('parent')) == parents['sound']['id'], observed
+        assert new_share['notes'] == 'Keep new ShareSet' and local['notes'] == 'Keep local Effect', (new_share, local)
+        assert len({row['id'] for row in [planned, new_share, local, *observed['slots']]}) == 5, observed
+        retained = slot_snapshot(sound['id'], [row['id'] for row in reversed(targets)])
+        assert retained == last_snapshot, (last_snapshot, retained)
+        phase['independent_effect'] = {'members': observed, 'new_share': new_share, 'local_effect': local,
+            'preserved': preserved(new_child=new_share['id']), 'retained_previous_owner': retained}
+        phase['effect_verified'] = True
+        receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
+        pytest.skip('Modern anonymous Effects List constructor witness excludes legacy EffectN lanes')
+    category = _collect_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime,
+        prefix='WAAPI_ANON_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category

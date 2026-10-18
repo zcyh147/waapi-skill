@@ -5,7 +5,7 @@ import json
 import pytest
 
 from tests.unit.test_list_merge_existing_conditions_gateway import list_task, select_field, EFFECT, EFFECT_PARENT
-from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND, ROOT, CHILD
 
 EFFECT_B = '{77777777-7777-7777-7777-777777777777}'
 SLOT_A = '{88888888-8888-8888-8888-888888888888}'
@@ -26,7 +26,7 @@ def anonymous_task(tmp_path, version='2025.1'):
     return task
 
 
-def declare_slots(task, *, owner=None, owner_kind=None, targets=None):
+def declare_slots(task, *, owner=None, owner_kind=None, targets=None, renders=("false", "false"), bypasses=("true", "false")):
     owner = task.bind(FIRST) if owner is None else owner
     scope = ["--object-handle", owner] if owner_kind is None else ["--type-handle", owner_kind]
     code, listed = task.step('draft-discover-fields', *scope,
@@ -42,12 +42,12 @@ def declare_slots(task, *, owner=None, owner_kind=None, targets=None):
     kind = found['type_candidates'][0]['handle']
     fields = {name: select_field(task, kind=kind, token=name) for name in ['Effect', 'Bypass', 'Render']}
     targets = [EFFECT, EFFECT_B] if targets is None else targets
-    for name, target, bypass, render in [('first', targets[0], 'true', 'false'), ('second', targets[1], 'false', 'true')]:
+    for name, target, bypass, render in [('first', targets[0], bypasses[0], renders[0]), ('second', targets[1], bypasses[1], renders[1])]:
         handle = target if target.startswith('bnh1-') else task.bind(target)
         code, declared = task.step('draft-declare-new', '--declaration-id', name, '--parent-handle', owner,
             '--kind', kind, '--field', 'object_list', effects,
-            '--field-value', fields['Effect'], handle, '--field-value', fields['Bypass'], bypass,
-            '--field-value', fields['Render'], render)
+            '--field-value', fields['Effect'], handle, *(['--field-value', fields['Bypass'], bypass] if bypass is not None else []),
+            *(['--field-value', fields['Render'], render] if render is not None else []))
         assert code == 0, declared
     return owner
 
@@ -55,11 +55,14 @@ def declare_slots(task, *, owner=None, owner_kind=None, targets=None):
 @pytest.mark.parametrize('version,mode,fault', [
     ('2023.1', 'append', None), ('2024.1', 'replace-all', None),
     ('2025.1', 'append', None), ('2025.1', 'replace-all', None),
+    ('2025.1', 'replace-all', 'nonlexicographic-guids'),
     *[('2025.1', 'append', fault) for fault in ['old-bypass', 'order', 'class', 'owner',
         'duplicate-return', 'old-return', 'spare-notes', 'target-notes', 'value']],
     *[('2025.1', 'replace-all', fault) for fault in ['order', 'old-return', 'retained-old-member']],
 ])
 def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_path, version, mode, fault):
+    new_a, new_b = (SLOT_B, SLOT_A) if fault == 'nonlexicographic-guids' else (SLOT_A, SLOT_B)
+    expect_failure = fault is not None and fault != 'nonlexicographic-guids'
     task = anonymous_task(tmp_path, version)
     before = deepcopy(task.objects)
     declare_slots(task)
@@ -72,10 +75,10 @@ def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_
             writes.append(deepcopy(args))
             assert args['objects'] == [{'object': FIRST, '@Effects': [
                 {'type': 'EffectSlot', 'name': '', '@Bypass': True, '@Render': False, '@Effect': EFFECT},
-                {'type': 'EffectSlot', 'name': '', '@Bypass': False, '@Render': True, '@Effect': EFFECT_B}]}], args
+                {'type': 'EffectSlot', 'name': '', '@Bypass': False, '@Render': False, '@Effect': EFFECT_B}]}], args
             for identity, effect, bypass, render, path in [
-                (SLOT_A, EFFECT, True, False, r'\Opaque new slot A'),
-                (SLOT_B, EFFECT_B, False, True, r'\Opaque new slot B')]:
+                (new_a, EFFECT, True, False, r'\Opaque new slot A'),
+                (new_b, EFFECT_B, False, False, r'\Opaque new slot B')]:
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject',
                     'classId': 5505040, 'owner': {'id': FIRST}, 'path': path, 'notes': '',
                     '@Effect': {'id': effect}, '@Bypass': bypass, '@Render': render}
@@ -87,12 +90,12 @@ def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_
                 else:
                     del task.objects[ROOT]
                 del task.objects[CHILD]
-            task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
+            task.objects[FIRST]['@Effects'] += [{'id': new_a}, {'id': new_b}]
             if fault == 'order':
-                task.objects[FIRST]['@Effects'][-2:] = [{'id': SLOT_B}, {'id': SLOT_A}]
-            if fault == 'class': task.objects[SLOT_A]['classId'] = 5570560
-            if fault == 'owner': task.objects[SLOT_A]['owner'] = {'id': EFFECT_PARENT}
-            if fault == 'value': task.objects[SLOT_A]['@Bypass'] = False
+                task.objects[FIRST]['@Effects'][-2:] = [{'id': new_b}, {'id': new_a}]
+            if fault == 'class': task.objects[new_a]['classId'] = 5570560
+            if fault == 'owner': task.objects[new_a]['owner'] = {'id': EFFECT_PARENT}
+            if fault == 'value': task.objects[new_a]['@Bypass'] = False
             if fault == 'spare-notes': task.objects[CHILD]['notes'] = 'Reset'
             if fault == 'target-notes': task.objects[EFFECT_B]['notes'] = 'Reset'
             if fault == 'old-bypass':
@@ -100,18 +103,18 @@ def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_
             # Returned associations are explicitly reversed. Their order cannot
             # identify declarations; independent owner Effects order can.
             return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [
-                {'id': SLOT_A if fault == 'duplicate-return' else ROOT if fault == 'old-return' else SLOT_B, 'name': ''},
-                {'id': SLOT_A, 'name': ''}]}]}
+                {'id': new_a if fault == 'duplicate-return' else ROOT if fault == 'old-return' else new_b, 'name': ''},
+                {'id': new_a, 'name': ''}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
-    assert code == (2 if fault else 0), json.dumps(verified)
-    assert (verified.get('verified') is True) == (fault is None), verified
+    assert code == (2 if expect_failure else 0), json.dumps(verified)
+    assert (verified.get('verified') is True) == (not expect_failure), verified
     assert len(writes) == 1
-    if fault:
+    if expect_failure:
         return
-    expected = [SLOT_A, SLOT_B] if mode == 'replace-all' else [ROOT, CHILD, SLOT_A, SLOT_B]
+    expected = [new_a, new_b] if mode == 'replace-all' else [ROOT, CHILD, new_a, new_b]
     assert [row['id'] for row in task.objects[FIRST]['@Effects']] == expected
     preserved = [EFFECT, EFFECT_B, EFFECT_PARENT] + ([ROOT, CHILD] if mode == 'append' else [])
     assert all(task.objects[identity] == before[identity] for identity in preserved)
@@ -199,7 +202,7 @@ def test_anonymous_slot_references_same_graph_new_independent_shareset(tmp_path,
             task.objects[new_effect] = {'id': new_effect, 'name': 'New ShareSet', 'type': 'Effect',
                 'classId': 8454147, 'path': new_path,
                 'parent': {'id': parent_id}, 'notes': ''}
-            for identity, effect, bypass, render in [(SLOT_A, new_effect, True, False), (SLOT_B, EFFECT_B, False, True)]:
+            for identity, effect, bypass, render in [(SLOT_A, new_effect, True, False), (SLOT_B, EFFECT_B, False, False)]:
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject',
                     'classId': 5505040, 'path': r'\Opaque ' + identity, 'owner': {'id': FIRST}, 'notes': '',
                     '@Effect': {'id': EFFECT if fault == 'wrong-reference' else effect}, '@Bypass': bypass, '@Render': render}
@@ -514,3 +517,361 @@ def test_anonymous_nondefault_conflict_policy_is_explicitly_pending_before_dispa
     code, checked = task.step('draft-check')
     assert code == 2 and 'ANONYMOUS_LIST_CONFLICT_UNRESOLVED' in json.dumps(checked), checked
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+
+
+def test_explicit_render_false_before_later_true_is_rejected_before_any_write(tmp_path):
+    task = anonymous_task(tmp_path)
+    # Literal nativee2 request: first(Bypasstrue,Renderfalse), then
+    # second(Bypassfalse,Rendertrue). Native silently forces first Rendertrue.
+    declare_slots(task, renders=("false", "true"))
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'EFFECT_RENDER_CHAIN_CONFLICT', checked
+    assert not any(uri.endswith(('object.set', 'setProperty', 'object.create')) for uri, _, _ in task.calls)
+
+
+def test_omitted_new_predecessor_render_is_derived_in_preview(tmp_path):
+    task = anonymous_task(tmp_path)
+    declare_slots(task, renders=(None, 'true'))
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    _, shown = task.preview()
+    prepared = shown['artifact']['prepared_operation']
+    slots = prepared['dispatch']['args']['objects'][0]['@Effects']
+    assert slots[0]['@Render'] is True
+    assert slots[0]['@Bypass'] is True  # Bypass precedence never rewrites stored intent.
+    chain = prepared['pre_state']['effect_render_chains'][0]
+    assert chain['derived'][0]['after'] is True
+    assert 'Bypass takes precedence' in chain['bypass_policy']
+
+
+@pytest.mark.parametrize('version,fault', [('2025.1', fault) for fault in [None, 'ignored-derived', 'metadata-drift', 'member-drift']] + [('2023.1', None), ('2024.1', None)])
+def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path, version, fault):
+    task = anonymous_task(tmp_path, version)
+    declare_slots(task, renders=(None, 'true'))
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            slots = args['objects'][0]['@Effects']
+            assert slots[0]['@Render'] is True and slots[1]['@Render'] is True
+            for identity, source in zip([SLOT_A, SLOT_B], slots):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject',
+                    'classId': 5505040, 'owner': {'id': FIRST}, 'path': r'\Opaque ' + identity,
+                    'notes': '', '@Effect': {'id': source['@Effect']}, '@Bypass': source['@Bypass'], '@Render': source['@Render']}
+            for identity in [ROOT, CHILD]:
+                task.objects[identity]['@Render'] = fault != 'ignored-derived'
+            task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_A, 'name': ''}, {'id': SLOT_B, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert [row['key'] for row in chain['derived']] == [ROOT, CHILD, '$.objects[0].lists[0].objects[0]']
+    if fault in {'metadata-drift', 'member-drift'}:
+        if fault == 'metadata-drift': task.metadata['Render']['default'] = True
+        else: task.objects[FIRST]['@Effects'].reverse()
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, failed = task.run('execute', tx)
+        assert code == 2 and writes == [], failed
+    else:
+        code, verified = task.finish(tx, shown)
+        assert (code == 0 and verified.get('verified') is True) == (fault is None), verified
+        assert len(writes) == 1
+        assert task.objects[SLOT_A]['@Bypass'] is True and task.objects[SLOT_B]['@Bypass'] is False
+
+
+@pytest.mark.parametrize('operation', ['object.setProperty', 'object.set'])
+def test_exact_existing_slot_render_uses_same_chain_preview_and_readback(tmp_path, operation):
+    task, _ = list_task(tmp_path, operation=operation)
+    prior = task.call
+    def enabled(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return prior(uri, args, options)
+    task.call = enabled
+    target = task.bind(CHILD)
+    render = select_field(task, owner=target, token='Render')
+    if operation == 'object.setProperty':
+        code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+            '--field-handle', render, '--business-value', 'true')
+    else:
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'slot', '--object-handle', target,
+            '--field-value', render, 'true')
+    assert code == 0, declared
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith(('object.set', 'object.setProperty')):
+            writes.append(deepcopy(args))
+            task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+            return {'objects': [{'id': CHILD, 'name': 'Spare'}]} if operation == 'object.set' else {}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert chain['derived'] == [{'key': ROOT, 'before': False, 'after': True}]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
+    if operation == 'object.setProperty':
+        code, started = task.run('draft-start', 'ak.wwise.core.undo.undo')
+        assert code == 0, started
+        history = started['draft']
+        code, rejected = task.run('draft-declare-core-plan', history['draft_id'],
+            '--task-authority', started['task_authority'], '--expected-revision', str(history['revision']),
+            '--value', 'history_scope', 'latest_project_history', '--value', 'expectation_receipt', tx)
+        assert code == 2 and 'Render chain' in json.dumps(rejected), rejected
+        assert not any(uri.endswith('undo.undo') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version,operation', [('2021.1', 'object.setProperty'), ('2022.1', 'object.setProperty'), ('2022.1', 'object.set')])
+def test_legacy_render_chain_uses_same_prefix_plan_without_changing_bypass(tmp_path, version, operation):
+    task, _ = list_task(tmp_path, version=version, operation=operation)
+    del task.objects[ROOT], task.objects[CHILD], task.objects[FIRST]['@Effects']
+    task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    task.metadata = {}
+    reference_dependency = lambda i: {'type': 'reference', 'action': 'Enable', 'context': 'Self',
+        'property': 'Effect' + str(i), 'conditions': [{'referenceIsSet': True}]}
+    for i in range(4):
+        task.objects[FIRST].update({f'@Effect{i}': {'id': EFFECT}, f'@RenderEffect{i}': False, f'@BypassEffect{i}': i == 0})
+        task.metadata[f'Effect{i}'] = {'name': f'Effect{i}', 'type': '', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
+        for prefix in ('Bypass', 'Render'):
+            task.metadata[f'{prefix}Effect{i}'] = {'name': f'{prefix}Effect{i}', 'type': 'bool', 'default': False,
+                'dependencies': [reference_dependency(i)]}
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith(('object.set', 'object.setProperty')):
+            writes.append(deepcopy(args))
+            if operation == 'object.set':
+                assert args['objects'] == [{'object': FIRST, '@RenderEffect1': True, '@RenderEffect0': True}]
+            else:
+                assert args == {'object': FIRST, 'property': 'RenderEffect1', 'value': True}
+            task.objects[FIRST]['@RenderEffect0'] = task.objects[FIRST]['@RenderEffect1'] = True
+            return {'objects': [{'id': FIRST, 'name': 'Sender'}]} if operation == 'object.set' else {}
+        return original(uri, args, options)
+    task.call = call
+    target = task.bind(FIRST)
+    render = select_field(task, owner=target, token='RenderEffect1')
+    if operation == 'object.set':
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'sound', '--object-handle', target,
+            '--field-value', render, 'true')
+    else:
+        code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+            '--field-handle', render, '--business-value', 'true')
+    assert code == 0, declared
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert chain['derived'] == [{'key': 'RenderEffect0', 'before': False, 'after': True}]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[FIRST] == {**before[FIRST], '@RenderEffect0': True, '@RenderEffect1': True}
+    assert len(writes) == 1
+
+
+def test_render_replace_all_keeps_new_metadata_after_deleting_old_slots(tmp_path):
+    task = anonymous_task(tmp_path)
+    declare_slots(task, renders=('true', 'false'))
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('getPropertyInfo') and args.get('object') in (ROOT, CHILD):
+            assert args['object'] in task.objects, 'deleted old slot metadata must not be queried after replaceAll'
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            slots = args['objects'][0]['@Effects']
+            assert args['listMode'] == 'replaceAll'
+            for identity in (ROOT, CHILD): del task.objects[identity]
+            task.objects[FIRST]['@Effects'] = [{'id': SLOT_A}, {'id': SLOT_B}]
+            for identity, node in zip((SLOT_A, SLOT_B), slots):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject', 'classId': 5505040,
+                    'owner': {'id': FIRST}, 'path': r'\Opaque ' + identity, 'notes': '', '@Effect': {'id': node['@Effect']},
+                    '@Bypass': node['@Bypass'], '@Render': node['@Render']}
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    assert any(field['scope'].get('object_id') == ROOT for field in shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]['metadata'])
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1 and ROOT not in task.objects and CHILD not in task.objects
+
+
+def test_separate_existing_rows_cannot_hide_explicit_render_contradiction(tmp_path):
+    task, _ = list_task(tmp_path, operation='object.set')
+    prior = task.call
+    def enabled(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return prior(uri, args, options)
+    task.call = enabled
+    for declaration, identity, value in [('earlier', ROOT, 'false'), ('later', CHILD, 'true')]:
+        target = task.bind(identity)
+        render = select_field(task, owner=target, token='Render')
+        code, declared = task.step('draft-declare-existing', '--declaration-id', declaration,
+            '--object-handle', target, '--field-value', render, value)
+        assert code == 0, declared
+    code, failed = task.step('draft-check')
+    assert code == 2 and failed['error_code'] == 'EFFECT_RENDER_CHAIN_CONFLICT', failed
+    assert not any(uri.endswith(('object.set', 'object.setProperty')) for uri, _, _ in task.calls)
+
+
+def test_legacy_render_clear_before_true_successor_still_requires_own_observation(tmp_path):
+    task, _ = list_task(tmp_path, version='2022.1', operation='object.setProperty')
+    del task.objects[ROOT], task.objects[CHILD], task.objects[FIRST]['@Effects']
+    task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    task.metadata = {}
+    for i in range(4):
+        task.objects[FIRST].update({f'@Effect{i}': {'id': EFFECT}, f'@RenderEffect{i}': i < 2, f'@BypassEffect{i}': False})
+        task.metadata[f'Effect{i}'] = {'name': f'Effect{i}', 'type': '', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
+        for prefix in ('Bypass', 'Render'):
+            task.metadata[f'{prefix}Effect{i}'] = {'name': f'{prefix}Effect{i}', 'type': 'bool', 'default': False,
+                'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self',
+                    'property': 'Effect' + str(i), 'conditions': [{'referenceIsSet': True}]}]}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return original(uri, args, options)
+    task.call = call
+    target = task.bind(FIRST)
+    render = select_field(task, owner=target, token='RenderEffect0')
+    code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+        '--field-handle', render, '--business-value', 'false')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_SUFFIX_OBSERVATION_REQUIRED', rejected
+    assert rejected['details']['mutation_dispatched'] is False
+    assert not any(uri.endswith('object.setProperty') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('wrong_default', [False, True])
+def test_omitted_bypass_default_is_independently_verified_without_native_rewrite(tmp_path, wrong_default):
+    task = anonymous_task(tmp_path)
+    declare_slots(task, renders=('true', 'false'), bypasses=(None, None))
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            slots = args['objects'][0]['@Effects']
+            assert all('@Bypass' not in node for node in slots), args
+            for identity in (ROOT, CHILD): del task.objects[identity]
+            task.objects[FIRST]['@Effects'] = [{'id': SLOT_A}, {'id': SLOT_B}]
+            for identity, node in zip((SLOT_A, SLOT_B), slots):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject', 'classId': 5505040,
+                    'owner': {'id': FIRST}, 'path': r'\Opaque ' + identity, 'notes': '', '@Effect': {'id': node['@Effect']},
+                    '@Bypass': wrong_default, '@Render': node['@Render']}
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_A, 'name': ''}, {'id': SLOT_B, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    specs = shown['artifact']['prepared_operation']['verification_plan']['nodes']
+    default = next(prop for node in specs for prop in node['properties'] if prop['name'] == 'Bypass')
+    assert default['observed_class_default'] is True and default['value'] is False
+    code, verified = task.finish(tx, shown)
+    assert (code == 0 and verified.get('verified') is True) == (not wrong_default), verified
+
+
+def test_legacy_import_owner_render_fields_are_explicit_unfinished_chain_boundary(tmp_path):
+    import wave
+    task, _ = list_task(tmp_path, version='2022.1', operation='audio.import')
+    task.metadata['IsVoice'] = {'name': 'IsVoice', 'type': 'bool', 'default': False}
+    task.metadata['RenderEffect0'] = {'name': 'RenderEffect0', 'type': 'bool', 'default': False,
+        'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': 'Effect0',
+            'conditions': [{'referenceIsSet': True}]}]}
+    task.metadata['Effect0'] = {'name': 'Effect0', 'type': '', 'default': None,
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
+    task.objects[FIRST].update({'@IsVoice': False, '@RenderEffect0': False, '@Effect0': {'id': EFFECT}})
+    prior = task.call
+    def enabled(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return prior(uri, args, options)
+    task.call = enabled
+    target = task.bind(FIRST)
+    code, found = task.step('draft-discover-fields', '--object-handle', target, '--meaning', 'RenderEffect0')
+    assert code == 0, found
+    field = found['meaning_results'][0]['candidates'][0]['handle']
+    media = tmp_path / 'render-input.wav'
+    with wave.open(str(media), 'wb') as output:
+        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000); output.writeframes(b'\0\0' * 8)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'sound', '--object-handle', target, '--field', 'media_file', str(media), '--field-value', field, 'true')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_IMPORT_CHAIN_PENDING', rejected
+    assert rejected['details']['mutation_dispatched'] is False
+    assert 'audio.importTabDelimited' in rejected['details']['remaining_obligation']
+    assert not any(uri.endswith('audio.import') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version,operation,fault', [
+    pytest.param(version, operation, None, id=version + '-' + operation)
+    for version in ['2023.1', '2024.1', '2025.1'] for operation in ['object.setProperty', 'object.set']
+] + [
+    pytest.param('2025.1', 'object.setProperty', 'ignored-suffix', id='ignored-suffix'),
+    pytest.param('2025.1', 'object.set', 'metadata-drift', id='metadata-drift'),
+])
+def test_render_clear_previews_and_verifies_observed_suffix_without_changing_bypass(tmp_path, version, operation, fault):
+    task, _ = list_task(tmp_path, version=version, operation=operation)
+    task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith(('object.set', 'object.setProperty')):
+            writes.append(deepcopy(args))
+            if operation == 'object.setProperty':
+                assert args == {'object': ROOT, 'property': 'Render', 'value': False}
+            else:
+                assert args['objects'] == [{'object': ROOT, '@Render': False}]
+            task.objects[ROOT]['@Render'] = False
+            task.objects[CHILD]['@Render'] = fault == 'ignored-suffix'
+            return {'objects': [{'id': ROOT, 'name': task.objects[ROOT]['name']}]} if operation == 'object.set' else {}
+        return original(uri, args, options)
+    task.call = call
+    before = deepcopy(task.objects)
+    target = task.bind(ROOT)
+    render = select_field(task, owner=target, token='Render')
+    if operation == 'object.setProperty':
+        code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+            '--field-handle', render, '--business-value', 'false')
+    else:
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'slot', '--object-handle', target,
+            '--field-value', render, 'false')
+    assert code == 0, declared
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert chain['derived'] == [{'key': CHILD, 'before': True, 'after': False}]
+    assert chain['suffix_rule']['rule'] == 'clearing a Render flag clears all subsequent stored Render flags'
+    assert chain['suffix_rule']['version'] == version
+    if operation == 'object.set':
+        code, schema = task.run('operation-schema', operation)
+        assert code == 0 and 'derive_visible_false_for_retained_successors' in json.dumps(schema), schema
+    if fault == 'metadata-drift':
+        task.metadata['Render']['default'] = True
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and not writes, rejected
+        assert task.objects == before
+        return
+    code, verified = task.finish(tx, shown)
+    if fault:
+        assert code == 2 and verified.get('verified') is not True, verified
+        assert len(writes) == (0 if fault == 'metadata-drift' else 1)
+        return
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects == {**before, ROOT: {**before[ROOT], '@Render': False}, CHILD: {**before[CHILD], '@Render': False}}
+    assert len(writes) == 1

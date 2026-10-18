@@ -706,3 +706,49 @@ def test_new_rtpc_shared_control_input_cannot_verify_after_source_or_target_drif
     code, verified = task.run('verify', tx)
     assert code == 2 and verified['verified'] is False and len(writes) == 1, json.dumps(verified)
     assert task.run('execute', tx)[0] == 2 and len(writes) == 1
+
+
+def test_rtpc_replacement_preserves_accessor_order_instead_of_sorting_guids(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    seed_pair(task)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    # The native collector selects the documented List source before declaring
+    # RTPC pairs; that source guard is what activates ordered List verification.
+    code, listed = task.step('draft-discover-fields', '--object-handle', owner,
+        '--field-source', 'documented-lists', '--list')
+    assert code == 0, listed
+    selected, = [row for row in listed['agent_result']['items'] if row['name'] == 'RTPC']
+    code, disclosed = task.step('draft-discover-fields', '--object-handle', owner,
+        '--field-source', 'documented-lists', '--selection', selected['selection'])
+    assert code == 0, disclosed
+    for token in ('Volume', 'Pitch'):
+        declare_rtpc(task, owner, control, token, token.lower())
+    original, writes = task.call, []
+    first, second = '{88888888-8888-8888-8888-888888888888}', RTPC_B
+    curve_second = '{99999999-9999-9999-9999-999999999999}'
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            assert args['listMode'] == 'replaceAll'
+            nodes = args['objects'][0]['@RTPC']
+            assert [row['@PropertyName'] for row in nodes] == ['Volume', 'Pitch']
+            assert all('object' not in row for row in nodes)
+            del task.objects[CHILD]; del task.objects[CURVE_A]
+            task.objects[FIRST]['@RTPC'] = []
+            for node, identity, curve in zip(nodes, (first, second), (CURVE_B, curve_second), strict=True):
+                seed_pair(task, identity=identity, property_name=node['@PropertyName'], curve=curve)
+                task.objects[identity]['@Curve']['points'] = deepcopy(node['@Curve']['points'])
+            # Actual966 raw readback preserves request order. Fresh GUIDs need
+            # not increase lexically; a snapshot's identity sort is not list order.
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@RTPC': [
+                {'id': first, 'name': ''}, {'id': second, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1 and CHILD not in task.objects and CURVE_A not in task.objects
+    assert [row['id'] for row in task.objects[FIRST]['@RTPC']] == [first, second]
+    assert task.objects[second]['@PropertyName'] == 'Pitch' and task.objects[first]['@PropertyName'] == 'Volume'
