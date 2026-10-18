@@ -77,7 +77,16 @@ def capture_field_read_platform(version: str, selector: str | None, *, read: Cal
     proof = {"contract": "waapi-skill.field-read-platform/v1", "version": version, "selector": selector}
     if version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
         return {**proof, "status": "unobserved", "reason": "no_pinned_current_platform_observer_in_this_lane"}
-    context = read("ak.wwise.core.getProjectInfo", {}, {})
+    from .operation_registry import OperationContractError
+    try:
+        context = read("ak.wwise.core.getProjectInfo", {}, {})
+    except OperationContractError as exc:
+        if exc.error_code not in {"READBACK_FAILED", "INVALID_READBACK"}:
+            raise
+        # This optional observer must not impose a new prerequisite on an
+        # otherwise usable source write. Preserve its owned bounded failure;
+        # only an uncertified history expectation becomes unavailable.
+        return {**proof, "status": "unobserved", "reason": "project_platform_read_failed", "error": exc.as_dict()}
     rows = context.get("platforms") if isinstance(context, Mapping) else None
     if not isinstance(rows, list) or not 1 <= len(rows) <= 32:
         return {**proof, "status": "unobserved", "reason": "complete_bounded_project_platform_inventory_not_exposed"}
@@ -120,6 +129,8 @@ def observe_field_read_platform(pre_state: Mapping[str, Any], *, read: Callable[
 
 def _receipt_platform(plan: Mapping[str, Any], state: Mapping[str, Any]) -> str:
     platform = plan.get("platform")
+    if platform == "{00000000-0000-0000-0000-000000000000}":
+        raise ValueError("Receipt null GUID is an unlink instruction, not a certified read platform; its original view remains unobserved")
     if isinstance(platform, str) and _GUID.fullmatch(platform):
         return platform
     proof = state.get("field_read_platform")

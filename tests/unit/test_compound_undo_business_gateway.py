@@ -1217,7 +1217,7 @@ def test_compound_current_platform_membership_drift_blocks_before_begin_group(tm
     assert not any(row[0].endswith("setProperty") for row in client.calls)
 
 
-def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}"):
+def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}", source_platform_observer_error=False):
     from tests.unit.test_remaining_core_business_gateway import _env
     from tests.unit.test_object_graph_business_gateway import _info
     reference_case = source_operation == "object.setReference" or compound_reference
@@ -1241,6 +1241,12 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                 self.history_parent_after = dict(self.parent)
                 return {}
             if uri == "ak.wwise.core.getProjectInfo" and (reference_case or source_operation == "object.setProperty"):
+                if hasattr(self, "project_info_successes_before_fault"):
+                    if self.project_info_successes_before_fault == 0:
+                        del self.project_info_successes_before_fault
+                        self.calls.append((uri, args, options))
+                        raise ValueError("fixture optional platform inventory read failed")
+                    self.project_info_successes_before_fault -= 1
                 result = super().call(uri, args, options)
                 return {**result, "platforms": self.platform_rows, "currentPlatformId": self.current_platform} if platform_inventory else result
             if uri == "ak.wwise.core.object.get" and reference_case:
@@ -1248,7 +1254,8 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                 platform = (options or {}).get("platform") or self.current_platform
                 if platform == "Windows":
                     platform = self.platform_rows[0]["id"]
-                if platform != self.platform_rows[0]["id"]:
+                # A successful null-GUID projection cannot certify a real platform identity.
+                if platform not in {self.platform_rows[0]["id"], "{00000000-0000-0000-0000-000000000000}"}:
                     for row in result["return"]:
                         if row["id"] == self.source["id"]:
                             row["@Attenuation"] = self.other_reference
@@ -1314,8 +1321,15 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
     def run(*argv):
         return waapi_gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _url: client)
     def check_preview(draft, authority, revision, *, confirm=True):
+        if source_platform_observer_error and not getattr(client, "platform_fault_scheduled", False):
+            client.project_info_successes_before_fault = 1
         code, checked = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(revision))
         assert code == 0, json.dumps(checked)
+        if source_platform_observer_error and not getattr(client, "platform_fault_scheduled", False):
+            # The mandatory project guard succeeds; only the following optional
+            # source observation read fails once. Later project guards remain usable.
+            client.project_info_successes_before_fault = 1
+            client.platform_fault_scheduled = True
         code, preview = run("preview-from-draft", draft, "--task-authority", authority,
             "--expected-revision", str(checked["draft"]["revision"]), "--apply")
         assert code == 0, json.dumps(preview)
@@ -2042,3 +2056,53 @@ def test_history_reference_wrong_original_view_cannot_pass_from_another_current_
     code, verified = run("verify", preview["transaction_id"])
     assert code == 2 and verified.get("verified") is not True, verified
     assert client.source["@Attenuation"] == {"id": client.parent["id"]}
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("clear", [False, True])
+def test_history_reference_unlink_platform_is_not_a_certified_read_view(tmp_path, version, clear):
+    null_platform = "{00000000-0000-0000-0000-000000000000}"
+    client, _state, source, rejected, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="object.setReference", reference_platform=null_platform,
+        version=version, reference_clear=clear, declaration_error=True)
+    assert "null GUID is an unlink instruction, not a certified read platform" in rejected["message"]
+    code, full = run("transaction-show", source["transaction_id"])
+    assert code == 0, full
+    assert full["state"] == "verified"
+    native = full["artifact"]["prepared_operation"]["dispatch"]["args"]
+    assert native["platform"] == null_platform
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.object.setReference"]) == 1
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("source_operation", ["object.setReference", "object.setProperty"])
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_optional_history_platform_read_error_does_not_block_ordinary_source_write(tmp_path, source_operation, platform):
+    client, _state, source, rejected, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation=source_operation, reference_platform=platform, property_platform=platform,
+        source_platform_observer_error=True, declaration_error=True)
+    assert "original current/named read platform is not certified" in rejected["message"]
+    code, full = run("transaction-show", source["transaction_id"])
+    assert code == 0 and full["state"] == "verified", full
+    proof = full["artifact"]["prepared_operation"]["pre_state"]["field_read_platform"]
+    assert proof["status"] == "unobserved" and proof["reason"] == "project_platform_read_failed"
+    assert proof["error"]["error_code"] == "READBACK_FAILED"
+    assert "fixture optional platform inventory read failed" in json.dumps(proof)
+    assert proof["error"]["details"]["call"]["api"] == "ak.wwise.core.getProjectInfo"
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core." + source_operation]) == 1
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failure(tmp_path):
+    client, _state, source, _preview, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="object.setReference", reference_platform=None, source_prepared_only=True)
+    original = client.call
+    def failed_project(uri, args=None, options=None):
+        if uri == "ak.wwise.core.getProjectInfo":
+            raise ValueError("fixture required current-project read failed")
+        return original(uri, args, options)
+    client.call = failed_project
+    code, rejected = run("execute", source["transaction_id"])
+    assert code == 2 and rejected.get("executed") is not True, rejected
+    assert "getProjectInfo" in rejected["message"]
+    assert not any(row[0] == "ak.wwise.core.object.setReference" for row in client.calls)
