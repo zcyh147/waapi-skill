@@ -5,7 +5,7 @@ import json
 import pytest
 
 from tests.unit.test_list_merge_existing_conditions_gateway import list_task, select_field, EFFECT, EFFECT_PARENT
-from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND, ROOT, CHILD
 
 EFFECT_B = '{77777777-7777-7777-7777-777777777777}'
 SLOT_A = '{88888888-8888-8888-8888-888888888888}'
@@ -544,9 +544,9 @@ def test_omitted_new_predecessor_render_is_derived_in_preview(tmp_path):
     assert 'Bypass takes precedence' in chain['bypass_policy']
 
 
-@pytest.mark.parametrize('fault', [None, 'ignored-derived', 'metadata-drift', 'member-drift'])
-def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path, fault):
-    task = anonymous_task(tmp_path)
+@pytest.mark.parametrize('version,fault', [('2025.1', fault) for fault in [None, 'ignored-derived', 'metadata-drift', 'member-drift']] + [('2023.1', None), ('2024.1', None)])
+def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path, version, fault):
+    task = anonymous_task(tmp_path, version)
     declare_slots(task, renders=(None, 'true'))
     original, writes = task.call, []
     def call(uri, args=None, options=None):
