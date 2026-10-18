@@ -1634,3 +1634,38 @@ def test_tone_original_native_zero_valid_bits_outputs_parse_without_claiming_sig
     assert verified['verification_strength'] == 'partial_tone_artifact'
     assert verified['verification']['business_state_verified'] is False
     assert 'active waveform' in str(verified['verification']['readbacks'][0]['unresolved'])
+
+
+@pytest.mark.parametrize('defect', ['contradictory-valid-bits', 'excess-valid-bits', 'unknown-subtype',
+    'subtype-container-mismatch', 'extension-length', 'block-alignment'])
+def test_tone_zero_union_field_never_bypasses_contradictory_format_checks(tmp_path, defect):
+    import struct
+    fixture_root = Path(__file__).resolve().parents[1] / 'fixtures' / 'tone' / 'console-2025.1.7.9143'
+    raw = bytearray((fixture_root / 'int16-0db.wav').read_bytes())
+    if defect in {'contradictory-valid-bits', 'excess-valid-bits'}:
+        struct.pack_into('<H', raw, 38, 15 if defect == 'contradictory-valid-bits' else 17)
+    elif defect == 'unknown-subtype':
+        raw[44:60] = bytes(16)
+    elif defect == 'subtype-container-mismatch':
+        raw[44] = 3  # Explicit IEEE-float GUID with an unchanged16-bit container.
+    elif defect == 'extension-length':
+        struct.pack_into('<H', raw, 36, 21)
+    else:
+        struct.pack_into('<H', raw, 32, 3)
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'waveform': 'sine', 'channel_layout': '1.0', 'sample_rate_hz': '48000',
+            'attack_seconds': '0', 'sustain_seconds': '0.25', 'release_seconds': '0'})
+    client.artifact_bytes = bytes(raw)
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
+    failed = [row for row in verified['verification']['assertions'] if not row['passed']]
+    assert len(failed) == 1 and failed[0]['evidence']['code'] == 'INVALID_TONE_WAV'
+    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+def test_tone_older_pinned_routes_remain_unavailable_without_native_calls(tmp_path, version):
+    code, rejected = gateway.execute_gateway(['--version', version, 'request-schema',
+        'ak.wwise.debug.generateToneWAV'], env=_env(tmp_path, version),
+        client_factory=lambda _: pytest.fail('older route discovery must remain offline'))
+    assert code != 0 and rejected['ok'] is False, rejected
+    assert 'continuation' not in rejected

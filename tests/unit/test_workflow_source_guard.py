@@ -4177,11 +4177,11 @@ def test_soundcaster_dump_observation_uses_gateway_and_actual_category_writer(tm
     assert len(record['transactions']) == 1 and record['transactions'][0]['state'] == 'result_schema_checked'
 
 
-def _stationary_tone_runtime(tmp_path, workflow, *, fault=None):
+def _stationary_tone_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     import math
     import struct
     from tests.unit.test_host_ui_debug_business_adapter import _ToneFileClient, _env
-    client = _ToneFileClient(tmp_path, '2025.1', is_command_line=fault != 'authoring')
+    client = _ToneFileClient(tmp_path, version, is_command_line=fault != 'authoring')
     original = client.call
     writes, commands, native_files = [], [], {}
     def call(uri, args=None, options=None):
@@ -4206,15 +4206,16 @@ def _stationary_tone_runtime(tmp_path, workflow, *, fault=None):
             native_files[args['path']] = raw
         result = original(uri, args, options)
         if uri == 'ak.wwise.core.getInfo':
-            result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+            minor, build = {'2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}[version]
+            result['version'].update(minor=minor, build=build, displayName=f'v{version}.{minor}.{build}')
             if fault == 'wrong-build': result['version']['build'] = 9999
         return result
     client.call = call
-    env = {**_env(tmp_path, '2025.1'), 'WWISE_EVIDENCE_DIR': str(tmp_path / 'dispatcher-evidence'),
+    env = {**_env(tmp_path, version), 'WWISE_EVIDENCE_DIR': str(tmp_path / 'dispatcher-evidence'),
         'WWISE_CATEGORY_EVIDENCE_PATH': str(tmp_path / 'category.jsonl')}
     source = tmp_path / 'immutable-source'; source.mkdir()
     source_project = source / 'SampleProject.wproj'; source_project.write_text('immutable source fixture')
-    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+    runtime = SimpleNamespace(version=version, candidate='a' * 40, category_results=[],
         state_dir=tmp_path / 'state', env=env, port=31337,
         sandbox=SimpleNamespace(sandbox_project=client.project_file, sandbox_root=tmp_path / 'sandbox-output',
             source_project=source_project, source_root=source),
@@ -4354,3 +4355,16 @@ def test_soundcaster_dump_wrong_guid_cannot_certify_same_named_session_values(tm
     assert record['categories'][0]['status'] == 'blocked'
     assert record['categories'][0]['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
     assert len(record['transactions']) == 1 and record['transactions'][0]['state'] == 'result_schema_checked'
+
+
+@pytest.mark.parametrize('version,build', [('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056')])
+def test_stationary_tone_diagnostic_uses_matching_pinned_console_catalog_without_effect_credit(tmp_path, workflow, version, build):
+    runtime, commands, writes, _ = _stationary_tone_runtime(tmp_path, workflow, version=version)
+    category = workflow._collect_stationary_tone_characterization(runtime)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['version'] == version and receipt['native_catalog']['build'] == build
+    assert len(receipt['native_catalog']['content_sha256']) == 64
+    assert len(writes) == 4 and sum(argv[0] == 'execute' for argv in commands) == 4
+    assert len(set(receipt['lifecycle_final_reference']['transaction_ids'])) == 4
+    assert receipt['collection_complete'] is True and receipt['business_effect_verified'] is False
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True
