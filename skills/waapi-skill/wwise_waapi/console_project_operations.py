@@ -88,6 +88,7 @@ PROJECT_CREATE_URIS = frozenset({CONSOLE_CREATE_URI, AUTHORING_CREATE_URI})
 MAX_PROJECT_FILE_BYTES = 8 * 1024 * 1024
 MAX_PROJECT_XML_NODES = 32768
 MAX_PROJECT_XML_DEPTH = 64
+MAX_OBJECT_DUMP_JSON_DEPTH = 64
 MAX_PROJECT_DECLARATION_ROWS = 128
 MAX_MISSING_PROJECT_DIRECTORIES = 64
 
@@ -516,7 +517,6 @@ def inspect_cli_project_effect(effect):
             'source_file_versions': sorted({row['wwise_version'] for row in old_model['files'].values()}, key=str),
             'unresolved': unresolved}], 'checks': checks, 'unresolved': unresolved}
     if effect['uri'] == 'ak.wwise.cli.dumpObjects':
-        import json
         from .operation_soundbank import SoundBankContractError, capture_file_proof, prove_artifact_path
         _created_project_root_identity(effect)
         target = prove_artifact_path(effect['path'], io_root=effect['io_root'],
@@ -524,27 +524,7 @@ def inspect_cli_project_effect(effect):
         if not target['exists']:
             raise SoundBankContractError('MISSING_ARTIFACT', 'Requested object dump file is missing')
         raw, proof = _read_bounded_artifact(effect['path'], effect['io_root'])
-        try:
-            def pairs(rows):
-                result = {}
-                for key, value in rows:
-                    if key in result:
-                        raise ValueError('Object dump JSON contains duplicate keys')
-                    result[key] = value
-                return result
-            def nonfinite(value):
-                raise ValueError('Object dump JSON contains a nonfinite number')
-            value = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=pairs, parse_constant=nonfinite)
-            pending, count = [(value, 1)], 0
-            while pending:
-                item, depth = pending.pop()
-                count += 1
-                if count > MAX_PROJECT_XML_NODES or depth > MAX_PROJECT_XML_DEPTH:
-                    raise SoundBankContractError('LIMIT_EXCEEDED', 'Object dump exceeds its JSON node/depth observation budget')
-                if isinstance(item, (dict, list)):
-                    pending.extend((child, depth + 1) for child in (item.values() if isinstance(item, dict) else item))
-        except (UnicodeError, ValueError, RecursionError) as exc:
-            raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', 'Object dump is not one bounded valid UTF-8 JSON document') from exc
+        _, json_observation = inspect_object_dump_artifact(raw)
         input_root = effect['input_root_identity']['resolved_path']
         input_proof = capture_file_proof(effect['native_args']['project'], field='dump input project',
             max_bytes=MAX_PROJECT_FILE_BYTES, io_root=input_root)
@@ -552,7 +532,7 @@ def inspect_cli_project_effect(effect):
         if proof == effect['before']:
             unresolved.append('preexisting_dump_file_has_no_observed_new_write')
         return {'observations': [{'kind': 'cli-object-dump-artifact', 'file_proof': proof,
-            'json_valid': True, 'json_nodes': count, 'requested_content': effect['native_args'].get('content', 'name'),
+            'json_valid': True, **json_observation, 'requested_content': effect['native_args'].get('content', 'name'),
             'unresolved': unresolved}], 'checks': [
             {'name': 'Dump source project bytes and directory identity were preserved', 'passed':
                 _project_io_root_identity(input_root) == effect['input_root_identity']
@@ -654,6 +634,54 @@ def _read_bounded_artifact(path, root):
             or capture_file_proof(path, field='project model', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root) != proof):
         raise SoundBankContractError('FILE_CHANGED', 'Project model changed during its bounded observation')
     return raw, proof
+
+
+def inspect_object_dump_artifact(raw: bytes) -> tuple[Any, dict[str, int]]:
+    """Inspect external JSON under its byte/depth bounds, never a reply/XML node cap."""
+    import json
+    import math
+    from .operation_soundbank import SoundBankContractError
+    if len(raw) > MAX_PROJECT_FILE_BYTES:
+        raise SoundBankContractError('LIMIT_EXCEEDED', 'Object dump exceeds its artifact byte limit')
+
+    def pairs(rows):
+        result = {}
+        for key, value in rows:
+            if key in result:
+                raise ValueError('Object dump JSON contains duplicate keys')
+            result[key] = value
+        return result
+
+    def nonfinite(value):
+        raise ValueError('Object dump JSON contains a nonfinite number')
+
+    try:
+        value = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=pairs, parse_constant=nonfinite)
+    except RecursionError as exc:
+        raise SoundBankContractError('LIMIT_EXCEEDED', 'Object dump exceeds JSON decoder depth resources') from exc
+    except (UnicodeError, ValueError) as exc:
+        raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', 'Object dump is not one valid finite UTF-8 JSON document') from exc
+
+    # Parsing and traversal are linear in the already bounded artifact bytes.
+    # Iterator frames retain only the current ancestry, not every pending child.
+    stack, count, deepest = [(iter((value,)), 1)], 0, 0
+    while stack:
+        children, depth = stack[-1]
+        try:
+            item = next(children)
+        except StopIteration:
+            stack.pop()
+            continue
+        count += 1
+        deepest = max(deepest, depth)
+        if depth > MAX_OBJECT_DUMP_JSON_DEPTH:
+            raise SoundBankContractError('LIMIT_EXCEEDED', 'Object dump exceeds its JSON depth limit')
+        if isinstance(item, float) and not math.isfinite(item):
+            # JSONDecoder can turn a legal numeric token such as 1e999 into inf.
+            raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', 'Object dump contains a nonfinite numeric value')
+        if isinstance(item, (dict, list)):
+            stack.append((iter(item.values()) if isinstance(item, dict) else iter(item), depth + 1))
+    return value, {'json_nodes': count, 'json_depth': deepest}
 
 
 def _read_xml_artifact(path, root, *, require_wwise_document=True):

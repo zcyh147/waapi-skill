@@ -7338,6 +7338,7 @@ def test_legacy_import_render_acceptance(workflow_sandbox_runtime: _WorkflowSand
 def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
     """Observe one closed dump; token occurrences never certify session values."""
     from wwise_waapi.operation_soundbank import capture_file_proof
+    from wwise_waapi.console_project_operations import inspect_object_dump_artifact, MAX_OBJECT_DUMP_JSON_DEPTH
     assert runtime.version == '2024.1', 'This source-bound diagnostic is only for the retained 2024 fixture'
     sessions = [('MIDI', '{9C02096E-8E29-4029-9D49-778F85015C87}'),
         ('Minigun', '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'),
@@ -7359,8 +7360,9 @@ def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> d
         'business_preservation_verified': False, 'session_values_observed': False, 'semantic_absence_proven': False,
         'media_operation_executed': False, 'saved_model_preserved': None, 'model_images': {},
         'limits': {'public_calls': 12, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
-            'report_bytes': 128 * 1024, 'dump_bytes': 8 * 1024 * 1024, 'json_nodes': 32768,
-            'json_depth': 64, 'source_bindings': 128, 'session_occurrence_paths': 32}}
+            'report_bytes': 128 * 1024, 'dump_bytes': 8 * 1024 * 1024,
+            'json_work': 'linear_in_bounded_artifact_bytes',
+            'json_depth': MAX_OBJECT_DUMP_JSON_DEPTH, 'source_bindings': 128, 'session_occurrence_paths': 32}}
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(body) <= receipt['limits']['report_bytes'], 'Dump diagnostic report byte bound exceeded'
@@ -7510,15 +7512,7 @@ def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> d
             execute_state=transaction['execute']['state'], verify_state=transaction['verify']['state'],
             business_state_verified=transaction['verify']['verification']['business_state_verified'])
         raw = retain_dump()
-        def pairs(rows):
-            result = {}
-            for key, value in rows:
-                assert key not in result, 'Duplicate dump JSON key'
-                result[key] = value
-            return result
-        def nonfinite(value):
-            raise ValueError('Nonfinite dump JSON number: ' + value)
-        dumped = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=pairs, parse_constant=nonfinite)
+        dumped, json_observation = inspect_object_dump_artifact(raw)
         targets = {identity for _, identity in sessions}
         for row in receipt['source_sessions']:
             for field in ('rtpc', 'states', 'switches'):
@@ -7529,7 +7523,7 @@ def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> d
         occurrences = receipt['session_guid_occurrences'] = []
         receipt['occurrence_paths_complete'] = True
         session_ids = {identity for _, identity in sessions}
-        stack, nodes = [(dumped, [], 0)], 0
+        stack = [(iter(((None, dumped),)), [], False)]
         def observe(value, path, location):
             if type(value) is not str or len(value) not in (36, 38): return
             try: identity = guid(value)
@@ -7542,17 +7536,21 @@ def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> d
                         'interpretation': 'token_occurrence_only_not_session_or_value_binding'})
                 else: receipt['occurrence_paths_complete'] = False
         while stack:
-            item, path, depth = stack.pop(); nodes += 1
-            assert nodes <= 32768 and depth <= 64, 'Dump JSON node/depth observation bound exceeded'
+            children, parent_path, mapping = stack[-1]
+            try:
+                key, item = next(children)
+            except StopIteration:
+                stack.pop()
+                continue
+            path = parent_path if key is None else [*parent_path, key]
+            if mapping: observe(key, path, 'key')
             if isinstance(item, dict):
-                for key, value in reversed(list(item.items())):
-                    child_path = [*path, key]
-                    observe(key, child_path, 'key')
-                    stack.append((value, child_path, depth + 1))
+                stack.append((iter(item.items()), path, True))
             elif isinstance(item, list):
-                stack.extend((child, [*path, index], depth + 1) for index, child in reversed(list(enumerate(item))))
+                stack.append((enumerate(item), path, False))
             else: observe(item, path, 'value')
-        receipt['dump_json_nodes'] = nodes
+        receipt['dump_json_nodes'] = json_observation['json_nodes']
+        receipt['dump_json_depth'] = json_observation['json_depth']
         receipt['missing_session_guid_tokens'] = [identity for _, identity in sessions if not counts[identity]]
         after, _, _ = model('after')
         receipt['saved_model_preserved'] = (set(before.files) == set(after.files) and all(

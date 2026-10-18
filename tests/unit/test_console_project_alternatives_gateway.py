@@ -2472,3 +2472,59 @@ def test_media_single_none_failed_remainder_never_claims_complete_difference_acc
     exact, count, _, _ = collect_none_state_pages(task, command)
     assert count == 3 and exact == outcome
     assert exact['actual_additions_complete'] is False and exact['remaining_model_preserved'] is False
+
+
+def test_cli_dump_large_json_artifact_is_separate_from_public_reply_budget(tmp_path):
+    class LargeDump(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text(json.dumps([0] * 100000), encoding='utf-8')
+            return super().call(uri, args, options)
+    task = LargeDump(tmp_path, '2024.1', 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'large-objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output), '--value', 'content', 'property_sets',
+        '--toggle', 'include_session_objects', 'enable')
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    assert payload['verified'] is False and payload['verification']['business_state_verified'] is False
+    observations = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-object-dump-artifact']
+    assert len(observations) == 1 and observations[0]['json_nodes'] == 100001
+    assert task.output.stat().st_size == 300000 > 256 * 1024
+    assert len(json.dumps(payload).encode('utf-8')) < 16384
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+    code, schema = task.run('--version', '2024.1', 'request-schema', task.operation)
+    assert code == 0, schema
+    limits = schema['business_adapter']['effect_verification']['limits']
+    assert limits == {'file_bytes': 8 * 1024 * 1024, 'json_work': 'linear_in_bounded_artifact_bytes', 'json_depth': 64}
+
+
+@pytest.mark.parametrize(('raw', 'expected_code'), [
+    (b'{', 'INVALID_PROJECT_ARTIFACT'),
+    (b'{"same":1,"same":2}', 'INVALID_PROJECT_ARTIFACT'),
+    (b'[1e999]', 'INVALID_PROJECT_ARTIFACT'),
+    (b'[NaN]', 'INVALID_PROJECT_ARTIFACT'),
+    (b'\xff', 'INVALID_PROJECT_ARTIFACT'),
+    (b'[' * 64 + b'0' + b']' * 64, 'LIMIT_EXCEEDED'),
+    (b'[' * 1100 + b'0' + b']' * 1100, 'LIMIT_EXCEEDED'),
+    (b' ' * (8 * 1024 * 1024 + 1), 'LIMIT_EXCEEDED'),
+], ids=['malformed', 'duplicate', 'overflow', 'nonfinite', 'utf8', 'depth', 'decoder-depth', 'bytes'])
+def test_cli_dump_artifact_errors_preserve_malformed_and_resource_distinction(tmp_path, raw, expected_code):
+    class InvalidDump(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_bytes(raw)
+            return super().call(uri, args, options)
+    task = InvalidDump(tmp_path, '2024.1', 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'invalid-objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output), '--value', 'content', 'property_sets')
+    code, payload = task.run('verify', tx)
+    assert code != 0, payload
+    if expected_code == 'LIMIT_EXCEEDED':
+        assert payload['state'] == 'executed_unverified' and payload['error_code'] == expected_code, payload
+    else:
+        assert payload['state'] == 'verification_failed', payload
+        failures = [row for row in payload['verification']['assertions'] if row['passed'] is False]
+        assert len(failures) == 1 and failures[0]['evidence']['code'] == expected_code, payload
+    code, repeated = task.run('execute', tx)
+    assert code != 0 and repeated.get('automatic_retry') is not True, repeated
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1

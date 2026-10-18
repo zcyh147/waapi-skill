@@ -8,6 +8,7 @@ from typing import Any
 from .console_project_operations import (
     CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_DEPTH, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
     MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
+    MAX_OBJECT_DUMP_JSON_DEPTH,
 )
 
 
@@ -744,8 +745,8 @@ def cli_console_business_contract_data(
             'output_artifact': 'stable_confined_bounded_UTF8_JSON',
             'native_object_model_content_and_session_representation': 'unresolved_no_business_acceptance',
             'source_project': 'bytes_and_directory_identity_preserved',
-            'limits': {'file_bytes': MAX_PROJECT_FILE_BYTES, 'json_nodes': MAX_PROJECT_XML_NODES,
-                'json_depth': MAX_PROJECT_XML_DEPTH},
+            'limits': {'file_bytes': MAX_PROJECT_FILE_BYTES, 'json_work': 'linear_in_bounded_artifact_bytes',
+                'json_depth': MAX_OBJECT_DUMP_JSON_DEPTH},
         }} if operation == 'ak.wwise.cli.dumpObjects' else {}),
         **({'effect_verification': {
             'saved_project': 'target_Wwise_version_and_preserved_project_identity_platforms_languages',
