@@ -6165,16 +6165,21 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
     assert category['status'] == 'PASS', category
 
 
-def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        render_suffix_diagnostic: bool = False) -> dict[str, Any]:
     """Three modern new-List effects inside the existing owned workflow lifecycle."""
-    output = runtime.state_dir / 'anonymous-effect-slot-construction-acceptance.json'
-    category = {'category': 'anonymous-effect-slot-construction', 'status': 'FAIL',
+    output = runtime.state_dir / ('effect-render-suffix-observation.json' if render_suffix_diagnostic else 'anonymous-effect-slot-construction-acceptance.json')
+    category = {'category': 'effect-render-suffix-observation' if render_suffix_diagnostic else 'anonymous-effect-slot-construction', 'status': 'FAIL',
         'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_membership_exact_guid_class_owner_reference_fields_and_preservation',
         'observation_path': str(output)}
+    if render_suffix_diagnostic:
+        category.update(diagnostic_only=True, business_effect_verified=False,
+            verifier_strength='diagnostic_stored_Render_suffix_and_complete_preservation_observation_no_business_credit')
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'setup_coverage_credit': False, 'business_effect_verified': False,
-        'scope': 'new_anonymous_EffectSlot_construction_not_existing_member_name_merge',
+        'diagnostic_complete': False, 'classification': 'not_observed',
+        'scope': 'stored_Render_suffix_observation_not_business_acceptance' if render_suffix_diagnostic else 'new_anonymous_EffectSlot_construction_not_existing_member_name_merge',
         'lifecycle_acceptance': 'existing host-category-evidence/v3 finalizer owns source/cleanup acceptance'}
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
@@ -6279,8 +6284,8 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
     def declare_slots(draft, owner, effects, kind, fields, targets):
         handles = []
         for index, target in enumerate(targets):
-            values = ['--field-value', fields['Bypass'], 'true' if index == 0 else 'false',
-                '--field-value', fields['Render'], 'false' if index == 0 else 'true']
+            values = ['--field-value', fields['Bypass'], 'true' if index == 0 and not render_suffix_diagnostic else 'false',
+                '--field-value', fields['Render'], 'true' if render_suffix_diagnostic or index != 0 else 'false']
             if target is not None: values += ['--field-value', fields['Effect'], target]
             declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', f'slot{index}',
                 '--parent-handle', owner, '--kind', kind, '--field', 'object_list', effects, *values], live=False)
@@ -6304,7 +6309,7 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
         assert verified.get('verification', {}).get('business_state_verified') is True, verified
         return phase
-    def slot_snapshot(owner, expected_targets, *, old=()):
+    def slot_snapshot(owner, expected_targets, *, old=(), observing_suffix=False):
         sound = exact(owner)
         assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'], sound
         listed = members(owner)
@@ -6319,8 +6324,10 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             assert guid(row.get('owner')) == owner, row
             assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
             assert guid(row.get('references', {}).get('Effect')) == expected_targets[index], row
-            assert row.get('properties', {}).get('Bypass') is (index == 0), row
-            assert row.get('properties', {}).get('Render') is (index != 0), row
+            assert row.get('properties', {}).get('Bypass') is (index == 0 and not render_suffix_diagnostic), row
+            assert type(row.get('properties', {}).get('Render')) is bool, row
+            if not observing_suffix:
+                assert row['properties']['Render'] is (render_suffix_diagnostic or index != 0), row
             slots.append(row)
         return {'owner': sound, 'slots': slots, 'ordered_ids': [row['id'] for row in listed]}
     def preserved(*, new_child=None):
@@ -6332,8 +6339,99 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         assert all(by_id.get(row['id']) == row for row in before_children), (before_children, actual_children)
         assert set(by_id) - {row['id'] for row in before_children} == ({new_child} if new_child else set()), actual_children
         return {**actual, 'children': actual_children}
+    def suffix_metadata(identity):
+        names, selected, page = [], [], None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field.get('name')
+                assert isinstance(name, str) and name not in names, result
+                names.append(name)
+                if name in {'Effect', 'Bypass', 'Render'}: selected.append((name, field['selection']))
+            if result.get('complete') is True:
+                assert len(names) == result['total_count'] and len(names) <= 64, result
+                break
+            next_page = _required_string(result, 'next_page'); assert next_page != page, result
+            page = next_page
+        else: raise AssertionError('Suffix metadata exceeds four pages')
+        assert {name for name, _ in selected} == {'Effect', 'Bypass', 'Render'}, names
+        details = {}
+        for name, selection in selected:
+            result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+            assert result.get('complete') is True, result
+            facts = result.get('metadata', result.get('entries'))
+            assert isinstance(facts, (dict, list)), result
+            details[name] = facts
+        return details
+    def observe_suffix():
+        assert runtime.version == '2025.1', 'First suffix diagnostic is pinned2025 only'
+        target_ids = [row['id'] for row in targets]
+        before = slot_snapshot(sound['id'], target_ids)
+        receipt['suffix_before'] = before
+        metadata = {row['id']: suffix_metadata(row['id']) for row in before['slots']}
+        receipt['suffix_metadata_before'] = metadata
+        draft = _start_business_draft(gateway, 'object.setProperty')
+        first_id = before['ordered_ids'][0]
+        bound = _bind_business_object(gateway, draft, object_id=first_id)
+        listed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--object-handle', bound, '--list'], live=True)['agent_result']
+        selected = [row for row in listed['fields'] if row.get('name') == 'Render']
+        assert len(selected) == 1, listed
+        field = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--object-handle', bound, '--selection', selected[0]['selection']], live=True)
+        receipt['clear_selected_field'] = field
+        handle = discovered_business_field_handle(field, 'Render')
+        _update_business_draft(gateway, draft, 'draft-declare-field-change',
+            ['--object-handle', bound, '--field-handle', handle, '--business-value', 'false'], live=False)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase = {'phase': 'observe_clear_first_Render_once', 'diagnostic_only': True,
+            'transaction_id': identity, 'artifact_hash': preview['artifact_hash'],
+            'compiled_native_request': shown['artifact']['prepared_operation']['dispatch'],
+            'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        assert phase['compiled_native_request']['uri'] == 'ak.wwise.core.object.setProperty'
+        assert phase['compiled_native_request']['args'] == {'object': first_id, 'property': 'Render', 'value': False}
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        if code != 0 or executed.get('ok') is not True:
+            phase['native_outcome'] = 'rejected' if executed.get('state') == 'execution_failed' else 'indeterminate'
+            receipt['classification'] = 'native_rejected' if phase['native_outcome'] == 'rejected' else 'indeterminate'
+            receipt['diagnostic_complete'] = phase['native_outcome'] == 'rejected'
+            category.update(status='blocked' if receipt['diagnostic_complete'] else 'FAIL',
+                classification=receipt['classification'], diagnostic_complete=receipt['diagnostic_complete'],
+                reason='Original execution failure retained; no verify, read-after or retry; no business credit')
+            return category
+        assert executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('state') == 'verified' and verified.get('verified') is True, verified
+        # The e2 single-field verifier says nothing about the later flag. Its
+        # original result is retained, while this independent oracle checks it.
+        after = slot_snapshot(sound['id'], target_ids, observing_suffix=True)
+        receipt['suffix_after'] = after
+        assert after['ordered_ids'] == before['ordered_ids'] and after['owner'] == before['owner'], (before, after)
+        assert after['slots'][0]['properties']['Render'] is False, after
+        for old, actual in zip(before['slots'], after['slots'], strict=True):
+            expected = json.loads(json.dumps(old))
+            expected['properties']['Render'] = actual['properties']['Render']
+            assert actual == expected, (old, actual)  # only the two Render booleans may differ
+        actual_metadata = {row['id']: suffix_metadata(row['id']) for row in after['slots']}
+        receipt['suffix_metadata_after'] = actual_metadata
+        assert actual_metadata == metadata, (metadata, actual_metadata)
+        receipt['preserved_after'] = preserved()
+        receipt['classification'] = 'retained' if after['slots'][1]['properties']['Render'] else 'cleared'
+        receipt['diagnostic_complete'] = True
+        category.update(status='blocked', diagnostic_complete=True, classification=receipt['classification'],
+            reason='Complete stored suffix diagnostic only; test PASS grants no business/route/native-absence credit')
+        return category
     try:
         assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Anonymous modern List witness gives no2021/22 credit'
+        if render_suffix_diagnostic: assert runtime.version == '2025.1', 'Suffix diagnostic is pinned2025 only'
         gateway.gateway(['query-schema', '--advanced'], live=False)
         result = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'Folder', '--meaning', 'WorkUnit',
             '--meaning', 'EffectSlot', '--meaning', 'Wwise Gain', '--page-size', '64'], live=True)['agent_result']
@@ -6387,7 +6485,10 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             handles = [_bind_business_object(gateway, draft, object_id=row['id']) for row in target_order]
             declare_slots(draft, owner, effects, kind, fields, handles)
             if mode == 'replace-all': _update_business_draft(gateway, draft, 'draft-business-configure', ['--list-behavior', mode], live=False)
-            phase = complete(draft, 'append_existing_sharesets' if mode == 'append' else 'replace_all_population')
+            phase = complete(draft, 'setup_rendered_chain_no_credit' if render_suffix_diagnostic else 'append_existing_sharesets' if mode == 'append' else 'replace_all_population',
+                setup=render_suffix_diagnostic)
+            if render_suffix_diagnostic:
+                return observe_suffix()
             observed = slot_snapshot(sound['id'], [row['id'] for row in target_order])
             assert observed['owner'] == sound, (sound, observed)
             assert not set(observed['ordered_ids']).intersection(previous), observed
@@ -6447,3 +6548,19 @@ def test_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime:
     category = _collect_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime,
         prefix='WAAPI_ANON_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
+
+
+def _collect_effect_render_suffix_observation(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    return _collect_anonymous_effect_slot_construction_acceptance(runtime, prefix=prefix, render_suffix_diagnostic=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_effect_render_suffix_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Stored suffix observation begins with2025 only; no cross-version inference')
+    category = _collect_effect_render_suffix_observation(workflow_sandbox_runtime, prefix='WAAPI_SUFFIX_' + uuid.uuid4().hex[:10])
+    assert category.get('diagnostic_complete') is True, category
+    # A diagnosed native rejection remains a failed attempt with a retained
+    # sandbox under the existing finalizer, never a business acceptance PASS.
+    assert category.get('classification') in {'cleared', 'retained'}, category
