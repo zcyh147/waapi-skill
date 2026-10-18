@@ -6168,11 +6168,12 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
 def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
     """Ordinary created fields, then latest-project undo/redo with the owned receipt."""
     assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No pinned native history route in 2021.1'
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
     output = runtime.state_dir / 'created-fields-history-acceptance.json'
     category = {'category': 'created-fields-history-acceptance', 'status': 'FAIL',
         'observation_path': str(output), 'verifier_strength': 'owned_source_receipt_plus_independent_created_fields_absence_and_restoration'}
     runtime.category_results.append(category)
-    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'setup': [], 'effects': [],
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint, 'calls': [], 'setup': [], 'effects': [],
         'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False,
         'stack_head_observed': False, 'outside_scope_preservation_observed': False,
         'preserved_target_scope': 'exact_identity_class_parent_and_notes',
@@ -6199,6 +6200,9 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         def gateway(self, argv, *, live):
             code, payload = self.raw_gateway(argv)
             assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint, payload
+                assert payload.get('detected_version') == runtime.version, payload
             return payload
     gateway = Gateway()
     projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
@@ -6215,8 +6219,8 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         rows = query(['--exact-id', identity], sound=sound)
         assert len(rows) == 1 and rows[0]['id'] == identity and type(rows[0].get('class_id')) is int, rows
         return rows[0]
-    def by_path(path, *, sound=False):
-        return query([arg for segment in path.split('\\') if segment for arg in ('--path-segment', segment)], sound=sound)
+    def by_path(segments, *, sound=False):
+        return query([arg for segment in segments for arg in ('--path-segment', segment)], sound=sound)
     def complete(draft, label, *, setup=False, expected_root=None):
         phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
         receipt['setup' if setup else 'effects'].append(phase)
@@ -6260,8 +6264,8 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         platform = status.get('project', {}).get('currentPlatformId')
         assert isinstance(platform, str) and uuid.UUID(platform).int != 0, status
         receipt['host_and_project'] = status
-        actor = CONTAINERS_PARENT if runtime.version == '2025.1' else ACTOR_MIXER_PARENT
-        parent_rows = by_path(actor)
+        actor_segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == '2025.1' else ACTOR_MIXER_PARENT_SEGMENTS
+        parent_rows = by_path(actor_segments)
         assert len(parent_rows) == 1 and exact(parent_rows[0]['id']) == parent_rows[0], parent_rows
         parent = parent_rows[0]
         setup = _start_business_draft(gateway, 'object.create')
@@ -6275,6 +6279,8 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         assert target['type'] == 'Attenuation' and target['name'] == name + '_Target', target
         phase['independent_setup'] = target; setup_category['status'] = 'PASS'
         for case in ('existing', 'null'):
+            source_name = name + '_' + case
+            source_segments = (*actor_segments, source_name)
             draft = _start_business_draft(gateway, 'object.create')
             parent_handle = _bind_business_object(gateway, draft, object_id=parent['id'])
             target_handle = _bind_business_object(gateway, draft, object_id=target_id)
@@ -6285,14 +6291,15 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
                     ['--semantic-kind', 'sound-sfx', '--meaning', token], live=True)
                 handles[token] = discovered_business_field_handle(disclosed, token)
             _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'source', '--parent-handle', parent_handle,
-                '--kind', 'sound-sfx', '--name', name + '_' + case, '--field', 'notes', 'Created history ' + case,
+                '--kind', 'sound-sfx', '--name', source_name, '--field', 'notes', 'Created history ' + case,
                 '--field', 'loop', 'infinite', '--field-value', handles['Volume'], '-6.0',
                 '--field-value', handles['Attenuation'], target_handle if case == 'existing' else 'null'], live=False)
             phase, phase_category = complete(draft, case + '-source')
             source_id, created_id = phase['transaction_id'], _created_object_id(phase['execute'])
             original = exact(created_id, sound=True)
             props = original.get('properties', {})
-            assert original['type'] == 'Sound' and original['name'] == name + '_' + case, original
+            assert original['type'] == 'Sound' and original['name'] == source_name, original
+            assert original['path'] == '\\' + '\\'.join(source_segments), original
             assert original.get('notes') == 'Created history ' + case and original.get('parent', {}).get('id') == parent['id'], original
             assert original['class_id'] == phase['immutable_preview']['prepared_operation']['pre_state']['object_create_nodes'][0]['class_id'], original
             assert props.get('IsLoopingEnabled') is True and props.get('IsLoopingInfinite') is True, original
@@ -6310,14 +6317,14 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
             assert exact(target_id) == target and exact(parent['id']) == parent, 'Source changed its target or parent'
             admit(phase, phase_category, original)
             phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id)
-            absence = {'id': query(['--exact-id', created_id]), 'path': by_path(original['path']), 'target': exact(target_id)}
+            absence = {'id': query(['--exact-id', created_id]), 'path': by_path(source_segments), 'target': exact(target_id)}
             assert absence['id'] == absence['path'] == [] and absence['target'] == target, absence
             admit(phase, phase_category, absence)
             if runtime.version != '2022.1':
                 phase, phase_category = complete(history(source_id, 'redo'), case + '-redo', expected_root=created_id)
                 restored = exact(created_id, sound=True)
                 assert json.dumps(restored, sort_keys=True) == json.dumps(original, sort_keys=True), (original, restored)
-                assert by_path(original['path'], sound=True) == [restored] and exact(target_id) == target, restored
+                assert by_path(source_segments, sound=True) == [restored] and exact(target_id) == target, restored
                 assert exact(parent['id']) == parent, 'History changed its original parent'
                 admit(phase, phase_category, restored)
         receipt.update(complete=True, business_effect_verified=True)

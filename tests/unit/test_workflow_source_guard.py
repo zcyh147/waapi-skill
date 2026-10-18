@@ -2974,11 +2974,18 @@ def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fau
         return original(uri, args, options)
     task.call = call
     runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
-        candidate='fixture-candidate', category_results=[])
+        candidate='fixture-candidate', category_results=[], port=31337,
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
     def raw(command):
         commands.append(list(command))
         code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
             env=runtime.env, client_factory=lambda _url: task)
+        if command[0] == 'status' and code == 0:
+            if fault == 'endpoint-drift': payload['endpoint'] = {**payload['endpoint'], 'port': 31338}
+            elif fault == 'version-drift': payload['detected_version'] = '2024.1'
+        if fault == 'source-query-path' and command[0] == 'query-object' and '--exact-id' in command and history:
+            for row in payload.get('objects', []):
+                if row['id'] == history['id']: row['path'] = r'\Different\Returned\Path'
         if command[0] == 'verify' and code == 0 and history:
             last = writes[-1][0]
             if last.endswith('object.create') and fault == 'derived-after-verify':
@@ -3018,6 +3025,10 @@ def test_created_fields_history_collector_executes_public_source_and_history_eff
             root = roots[int(row['phase'].startswith('null-'))]
             assert {item['object_id'] for item in binding['observations'] if item['kind'] == 'creation_field'} == {root}
     assert sum(command[0] == 'execute' for command in commands) == len(writes)
+    parent = ('Containers' if version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+    path_queries = [tuple(command[index + 1] for index, token in enumerate(command) if token == '--path-segment')
+        for command in commands if command[0] == 'query-object' and '--path-segment' in command]
+    assert set(path_queries) == {parent, (*parent, 'WAAPI_HISTORY_TEST_existing'), (*parent, 'WAAPI_HISTORY_TEST_null')}
     if version == '2022.1': assert not any(uri.endswith('.redo') for uri, _args in writes)
 
 
@@ -3057,3 +3068,18 @@ def test_created_fields_history_collector_retains_native_explicit_null_represent
     source = next(row for row in receipt['effects'] if row['phase'] == 'null-source')
     assert source['independent_effect']['references']['Attenuation'] == null_value
     assert category['status'] == 'PASS' and receipt['complete'] is True
+
+
+@pytest.mark.parametrize('fault', ['endpoint-drift', 'version-drift', 'source-query-path'])
+def test_created_fields_history_collector_rejects_unbound_live_context_or_path(tmp_path, workflow, fault):
+    runtime, _commands, writes, _task = _created_fields_history_runtime(tmp_path, workflow, '2022.1', fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_created_leaf_fields_history_acceptance(runtime, name='WAAPI_HISTORY_TEST')
+    receipt = json.loads((runtime.state_dir / 'created-fields-history-acceptance.json').read_text())
+    assert receipt['complete'] is False and receipt['business_effect_verified'] is False
+    assert runtime.category_results[0]['status'] == 'FAIL'
+    if fault == 'source-query-path':
+        assert not any(uri.endswith('.undo') for uri, _args in writes)
+        assert receipt['effects'][-1]['verify']['verified'] is True
+    else:
+        assert writes == []
