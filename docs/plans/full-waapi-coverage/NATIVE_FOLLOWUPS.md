@@ -5,6 +5,31 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## Current Soundcaster activation and Tone artifacts
+
+`ae95b5cc` establishes actual Minigun session activation through Inspect on
+2024.1.13.9056. The preserved main image shows the Minigun ObjectTab/session
+selector, Play/Stop modules and Materials=Concrete. Before selection is empty;
+after selection matches the exact session GUID. The image SHA-256 is
+`0153f5ee195995e41c3058f5fb2c3b2749ba9cd4a7c2f4b91279b12e2cd3192f`.
+The passing diagnostic root is `soundcaster-inspect-ae95b5cc-2024-r1` in the
+short-id worktree coordination directory. Original report/image and independent
+`root-image-review.json` are archived outside the deleted passing sandbox.
+Matching Help documents Show All filtering; empty RTPC/State panels do not prove
+missing saved values. Full 100-binding preservation and media effects remain
+unverified. Earlier view-specific failures retain their original outcomes.
+
+`205097b6` collects four actual stationary Tone outputs on Console 2025.1.7.9143,
+using 440 Hz, 48 kHz, mono, 0/.25/0-second envelope and int16/float32 at 0/-6 dB.
+The native-conditions worktree root is `tone-stationary-205097b6-2025-r1`.
+Its receipt and exact WAV/public/native artifacts are under
+`pytest/gateway-workflows-2025-10/state/`; the final category row proves source
+hash/mtime/tree integrity and cleanup. All four verifications failed on the
+40-byte extensible header's raw valid-bits value zero, despite standard PCM/float
+subtypes and 16/32-bit containers. This is an observed Wwise writer variant,
+not a claim about a general Microsoft default. Parser repair, matching 2023/24
+observations and signal/gain/envelope verification remain same-parent work.
+
 ## Soundcaster image observation — #184
 
 The single owned 2024.1.13.9056 attempt on `493b0d35` completed 36 public
