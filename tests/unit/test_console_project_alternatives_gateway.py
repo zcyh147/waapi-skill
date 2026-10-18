@@ -5,6 +5,7 @@ project effects or permit any native process launch.
 """
 from copy import deepcopy
 import json
+import os
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -87,6 +88,123 @@ class NoProjectConsoleTask(FieldTask):
             self.opened = self.effect != 'stay-none'
             return {}
         return super().call(uri, args, options)
+
+
+class WineNoProjectConsoleTask(NoProjectConsoleTask):
+    """Native-shaped Wine process/paths; public plans still use owned POSIX files."""
+    def __init__(self, path, version, operation):
+        super().__init__(path, version, operation)
+        self.info_overrides.update(platform='x64', processPath=r'c:\Program Files\Audiokinetic\Wwise\WwiseConsole.exe')
+        if operation == CREATE:
+            self.created_file = path / 'Fresh' / 'Nested' / 'Created.wproj'
+            self.expected_args = {'path': r'Y:\Fresh\Nested\Created.wproj'}
+        else:
+            self.expected_args = {'path': r'Y:\Created\Created.wproj'}
+
+    def call(self, uri, args=None, options=None):
+        if uri == CREATE:
+            self.created_file.parent.mkdir(parents=True)
+        result = super().call(uri, args, options)
+        if self.opened:
+            if uri.endswith('getProjectInfo'):
+                result['path'] = self.expected_args['path']
+            elif uri.endswith('object.get') and args.get('waql') == 'from type Project take 2':
+                for row in result['return']:
+                    row['filePath'] = self.expected_args['path']
+        return result
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Injected POSIX Wine path context; no native Windows evidence')
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('operation', [CREATE, OPEN])
+@pytest.mark.parametrize('inside_home', [True, False])
+def test_console_load_from_none_translates_only_transient_wine_path_and_strongly_verifies(tmp_path, monkeypatch, version, operation, inside_home):
+    from types import SimpleNamespace
+    from wwise_waapi import platform_paths
+    home = tmp_path if inside_home else tmp_path / 'AccountHome'
+    home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths.pwd, 'getpwuid', lambda _uid: SimpleNamespace(pw_dir=str(home)))
+    task = WineNoProjectConsoleTask(tmp_path, version, operation)
+    if not inside_home:
+        task.expected_args = {'path': 'Z:\\' + '\\'.join(task.created_file.resolve().parts[1:])}
+    preview = _console_load_preview(task)
+    tx = _authorize_console_load(task, preview)
+    code, before = task.run('transaction-show', tx)
+    assert code == 0, before
+    sealed = before['artifact']['prepared_operation']['dispatch']
+    assert sealed == {'uri': operation, 'args': {'path': str(task.created_file)}, 'options': {}}
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    assert executed['wire_path_adaptation']['mapping']['anchor_source'] == 'transition_target'
+    assert executed['wire_path_adaptation']['mapping']['round_trip_verified'] is True
+    assert [args for uri, args, _ in task.calls if uri == operation] == [task.expected_args]
+    code, after = task.run('transaction-show', tx)
+    assert code == 0 and after['artifact']['prepared_operation']['dispatch'] == sealed, after
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert verified['verification']['business_state_verified'] is True
+    code, repeated = task.run('execute', tx)
+    assert code != 0, repeated
+    assert [uri for uri, _, _ in task.calls].count(operation) == 1
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Injected POSIX Wine context')
+@pytest.mark.parametrize('drift', ['remote', 'configuration', 'runtime', 'file'])
+def test_console_wine_none_load_retains_endpoint_runtime_and_file_guards(tmp_path, monkeypatch, drift):
+    from types import SimpleNamespace
+    from wwise_waapi import platform_paths
+    monkeypatch.setattr(platform_paths.pwd, 'getpwuid', lambda _uid: SimpleNamespace(pw_dir=str(tmp_path)))
+    task = WineNoProjectConsoleTask(tmp_path, '2023.1', OPEN)
+    if drift == 'remote':
+        code, configured = task.run('config-set', '--waapi-host', '192.0.2.10')
+        assert code == 0, configured
+        code, restarted = task.run('draft-start', OPEN)
+        assert code == 0, restarted
+        task.draft, task.authority, task.revision = restarted['draft']['draft_id'], restarted['task_authority'], restarted['draft']['revision']
+        code, declared = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file))
+        assert code == 0, declared
+        code, rejected = task.step('draft-check')
+        assert code != 0 and rejected['error_code'] == 'LOCAL_WAAPI_HOST_REQUIRED', rejected
+        assert not any(uri == OPEN for uri, _, _ in task.calls)
+        return
+    tx = _authorize_console_load(task, _console_load_preview(task))
+    if drift == 'configuration':
+        code, configured = task.run('config-set', '--waapi-port', '31338')
+        assert code == 0, configured
+    elif drift == 'runtime':
+        task.info_overrides['processPath'] = r'D:\Foreign\WwiseConsole.exe'
+    elif drift == 'file':
+        task.created_file.write_text(task.created_file.read_text() + '\n<!-- changed after preview -->')
+    code, rejected = task.run('execute', tx)
+    assert code != 0 and rejected.get('executed') is not True, rejected
+    assert not any(uri == OPEN for uri, _, _ in task.calls)
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Foreign native drive is not a local POSIX file')
+def test_console_none_wine_load_does_not_map_caller_foreign_drive(tmp_path):
+    task = WineNoProjectConsoleTask(tmp_path, '2023.1', OPEN)
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', r'W:\Foreign\Created.wproj')
+    if code == 0:
+        code, payload = task.step('draft-check')
+    assert code != 0, payload
+    assert not any(uri == OPEN for uri, _, _ in task.calls)
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='Injected POSIX Wine readback')
+def test_console_none_wine_load_refuses_foreign_drive_readback_without_replaying(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from wwise_waapi import platform_paths
+    monkeypatch.setattr(platform_paths.pwd, 'getpwuid', lambda _uid: SimpleNamespace(pw_dir=str(tmp_path)))
+    task = WineNoProjectConsoleTask(tmp_path, '2023.1', OPEN)
+    tx = _authorize_console_load(task, _console_load_preview(task))
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    task.expected_args = {'path': r'W:\Foreign\Created.wproj'}
+    code, rejected = task.run('verify', tx)
+    assert code != 0 and rejected.get('verified') is not True, rejected
+    code, repeated = task.run('execute', tx)
+    assert code != 0, repeated
+    assert [uri for uri, _, _ in task.calls].count(OPEN) == 1
 
 
 def test_console_project_create_from_exact_native_no_project_reaches_verified_once(tmp_path):

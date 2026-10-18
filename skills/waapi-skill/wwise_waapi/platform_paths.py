@@ -37,7 +37,11 @@ WINE_WIRE_PATH_WAAPI_URIS = frozenset(
         "ak.wwise.ui.model.registerWafm",
     }
 )
-_AUTHORING_PROJECT_TRANSITION_URIS = frozenset(
+_CONSOLE_PROJECT_TRANSITION_URIS = frozenset({
+    "ak.wwise.console.project.create", "ak.wwise.console.project.open",
+})
+_PROJECT_OPEN_URIS = frozenset({"ak.wwise.ui.project.open", "ak.wwise.console.project.open"})
+_PROJECT_TRANSITION_URIS = _CONSOLE_PROJECT_TRANSITION_URIS | frozenset(
     {
         "ak.wwise.ui.project.create",
         "ak.wwise.ui.project.open",
@@ -228,7 +232,8 @@ def adapt_cli_dispatch_paths(
             else None
         )
         if (
-            uri not in _AUTHORING_PROJECT_TRANSITION_URIS
+            uri not in _PROJECT_TRANSITION_URIS
+            or (uri in _CONSOLE_PROJECT_TRANSITION_URIS and live_project_guard.get("version") not in {"2023.1", "2024.1", "2025.1"})
             or project.get("state") != "none"
             or live_project_guard.get("project_guard_mode") != "transition_to_path"
             or not isinstance(target_path, str)
@@ -240,7 +245,7 @@ def adapt_cli_dispatch_paths(
         if not target_path.startswith("posix:/"):
             raise WwiseWirePathError(
                 "WIRE_PATH_CONTEXT_UNAVAILABLE",
-                "The Authoring project transition target is not a canonical local POSIX path.",
+                "The project transition target is not a canonical local POSIX path.",
                 details={"canonical_target_project_path": target_path},
             )
         target_host_path = target_path.removeprefix("posix:")
@@ -249,7 +254,7 @@ def adapt_cli_dispatch_paths(
         except HostPathError as exc:
             raise WwiseWirePathError(
                 "WIRE_PATH_CONTEXT_UNAVAILABLE",
-                "The Authoring project transition target is not one normalized non-traversing POSIX path.",
+                "The project transition target is not one normalized non-traversing POSIX path.",
                 details={"canonical_target_project_path": target_path},
             ) from exc
         if (
@@ -258,7 +263,7 @@ def adapt_cli_dispatch_paths(
         ):
             raise WwiseWirePathError(
                 "WIRE_PATH_CONTEXT_UNAVAILABLE",
-                "The Authoring project transition target changed under canonical path parsing.",
+                "The project transition target changed under canonical path parsing.",
                 details={"canonical_target_project_path": target_path},
             )
         anchor_host = Path(parsed_target.pure_path).resolve(strict=False)
@@ -279,7 +284,7 @@ def adapt_cli_dispatch_paths(
         ):
             raise WwiseWirePathError(
                 "WIRE_PATH_AUDIT_MISMATCH",
-                "The Authoring project transition target differs from its exact audited path.",
+                "The project transition target differs from its exact audited path.",
                 details={"canonical_target_project_path": target_path},
             )
         if (
@@ -287,16 +292,16 @@ def adapt_cli_dispatch_paths(
             or anchor_host.is_symlink()
             or anchor_host.suffix.casefold() != ".wproj"
             or (
-                uri == "ak.wwise.ui.project.open"
+                uri in _PROJECT_OPEN_URIS
                 and not anchor_host.is_file()
             )
         ):
             raise WwiseWirePathError(
                 "WIRE_PATH_ANCHOR_INVALID",
-                "The Authoring project transition target is not a valid local .wproj anchor.",
+                "The project transition target is not a valid local .wproj anchor.",
                 details={"target_project_path": str(anchor_host)},
             )
-        # Authoring create may create its target directory. Its immutable
+        # Project create may create its target directory. Its immutable
         # creation plan independently pins the existing ancestor/destination
         # absence and revalidates both before this transient wire adaptation.
         # The mapping still belongs to the existing account/root and the exact
@@ -318,7 +323,7 @@ def adapt_cli_dispatch_paths(
         ):
             raise WwiseWirePathError(
                 "WIRE_PATH_ROUND_TRIP_FAILED",
-                "The Authoring project transition target did not round-trip through its Wine mapping.",
+                "The project transition target did not round-trip through its Wine mapping.",
                 details={"drive": drive},
             )
         anchor_source = "transition_target"
