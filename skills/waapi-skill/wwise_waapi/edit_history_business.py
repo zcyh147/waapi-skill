@@ -111,14 +111,16 @@ def capture_field_read_platform(version: str, selector: str | None, *, read: Cal
 def observe_field_read_platform(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
     primary = _observe_field_read_platform_proof(pre_state, read=read)
     existing = pre_state.get("existing_field_observations")
-    if isinstance(existing, list):
-        outcomes = ([primary] if primary is not None else []) + [
-            outcome for proof in existing if proof.get("status") == "certified"
-            if (outcome := _observe_field_read_platform_proof(proof, read=read)) is not None]
-        if outcomes:
-            return {"matches": all(item["matches"] for item in outcomes), "views": [
-                {key: value for key, value in item.items() if key != "readbacks"} for item in outcomes],
-                "readbacks": [row for item in outcomes for row in item["readbacks"]]}
+    chains = pre_state.get("effect_render_chains")
+    groups = ([proof for proof in existing if proof.get("status") == "certified"] if isinstance(existing, list) else [])
+    groups.extend(chains if isinstance(chains, list) else [])
+    outcomes = ([primary] if primary is not None else []) + [
+        outcome for proof in groups
+        if (outcome := _observe_field_read_platform_proof(proof, read=read)) is not None]
+    if outcomes and (isinstance(existing, list) or groups):
+        return {"matches": all(item["matches"] for item in outcomes), "views": [
+            {key: value for key, value in item.items() if key != "readbacks"} for item in outcomes],
+            "readbacks": [row for item in outcomes for row in item["readbacks"]]}
     return primary
 
 
@@ -257,6 +259,16 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
     prepared = snapshot.preview.artifact["prepared_operation"]
     plan = prepared.get("verification_plan", {})
+    if (prepared.get("pre_state", {}).get("effect_render_chains")
+            and plan.get("kind") in {"same-guid-property", "object-set-batch"}):
+        from .render_history_observations import receipt_observations as render_observations
+        observations, covered = render_observations(snapshot)
+        if plan["kind"] == "object-set-batch":
+            from .existing_field_observations import receipt_observations
+            observations.extend(receipt_observations(snapshot, exclude_fields=covered))
+        elif plan["field"] not in covered.get((str(plan["object_id"]).upper(), _receipt_platform(plan, prepared["pre_state"])), set()):
+            raise ValueError("Render source selected field is missing from its complete chain observation")
+        return observations
     if plan.get("kind") == "object-set-batch":
         from .existing_field_observations import receipt_observations
         return receipt_observations(snapshot)
@@ -605,6 +617,10 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
         groups = {}
         metadata_cache = {}
         for expected in observations:
+            if expected.get("kind") == "existing_render_chain":
+                from .render_history_observations import observe_chain
+                checks.append(observe_chain(expected, side, read=retained_read))
+                continue
             if expected.get("kind") == "creation_presence":
                 fields = [item for item in observations if item.get("kind") == "creation_field"
                     and item["object_id"] == expected["object"]["id"]]
@@ -673,7 +689,10 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                     and type(row.get("classId")) is int and row["classId"] == expected["classId"]})
     except ValueError as exc:
         raise HistoryObservationError(str(exc), readbacks) from exc
-    return {"scope": "owned_receipt_observation_only", "stack_head_observed": False,
+    # Put actual failed reads before successful diagnostic bulk so bounded
+    # public error projection cannot spend its node budget before the cause.
+    failed = [row for row in readbacks if "error" in row]
+    return {**({"failed_reads": failed} if failed else {}), "scope": "owned_receipt_observation_only", "stack_head_observed": False,
         "outside_scope_preservation_observed": False, "matches": all(row["passed"] for row in checks),
         "checks": checks, "readbacks": readbacks}
 
@@ -682,8 +701,17 @@ def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
     receipt = binding["source_receipt"]
     observations = []
     existing_groups = {}
+    render_fields = {(str(field["scope"].get("object_id")).upper(), field["field"], row["platform"])
+        for row in binding["observations"] if row.get("kind") == "existing_render_chain"
+        for field in row["chain"]["metadata"]}
     for row in binding["observations"]:
+        if row.get("kind") == "existing_render_chain":
+            from .render_history_observations import summary
+            observations.append(summary(row))
+            continue
         if row.get("kind") == "existing_field":
+            if (row["object_before"]["id"], row["field"], row["platform"]) in render_fields:
+                continue  # Already disclosed exactly once in the complete chain view.
             common = {key: row[key] for key in ("object_before", "object_after", "class_id", "platform")}
             key = canonical_sha256(common)
             if key not in existing_groups:

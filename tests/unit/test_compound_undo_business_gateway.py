@@ -2490,6 +2490,297 @@ def test_optional_existing_history_unknown_union_remains_unobserved_without_read
     assert observed["reason"] == "field_union_requires_its_complete_history_observer"
 
 
+def _render_history_case(tmp_path, *, version="2025.1", operation="object.setProperty", clear=False,
+    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, platform_inventory=True, target_read_failure=None):
+    from copy import deepcopy
+    from tests.unit.test_list_merge_existing_conditions_gateway import list_task
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+
+    task, _ = list_task(tmp_path, version=version, operation=operation)
+    legacy = version in {"2021.1", "2022.1"}
+    if legacy:
+        del task.objects[ROOT], task.objects[CHILD], task.objects[FIRST]["@Effects"]
+        task.types = [row for row in task.types if row["name"] != "EffectSlot"]
+        task.metadata = {}
+        for i in range(4):
+            task.objects[FIRST].update({f"@Effect{i}": {"id": EFFECT}, f"@RenderEffect{i}": False, f"@BypassEffect{i}": i == 0})
+            task.metadata[f"Effect{i}"] = {"name": f"Effect{i}", "type": "", "default": None,
+                "restriction": {"type": "reference", "restrictions": [{"type": ["Effect"]}]}}
+            for prefix in ("Bypass", "Render"):
+                task.metadata[f"{prefix}Effect{i}"] = {"name": f"{prefix}Effect{i}", "type": "bool", "default": False,
+                    "dependencies": [{"type": "reference", "action": "Enable", "context": "Self", "property": f"Effect{i}",
+                        "conditions": [{"referenceIsSet": True}]}]}
+    else:
+        task.objects[ROOT]["@Bypass"] = True
+    if clear:
+        task.objects[ROOT]["@Render"] = task.objects[CHILD]["@Render"] = True
+    original = task.call
+    before, after, writes = deepcopy(task.objects), None, []
+    task.current_platform = "{44444444-4444-4444-4444-444444444444}"
+    task.history_effect = True
+    def call(uri, args=None, options=None):
+        nonlocal after
+        if uri.endswith("isPropertyEnabled"):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {"return": True}
+        if uri in {"ak.wwise.core.object.set", "ak.wwise.core.object.setProperty"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            writes.append((uri, deepcopy(args)))
+            if legacy:
+                task.objects[FIRST]["@RenderEffect0"] = task.objects[FIRST]["@RenderEffect1"] = True
+            else:
+                task.objects[ROOT]["@Render"] = task.objects[CHILD]["@Render"] = not clear
+            after = deepcopy(task.objects)
+            return {"objects": [{"id": node["object"], "name": task.objects[node["object"]]["name"]} for node in args["objects"]]} if operation == "object.set" else {}
+        if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if task.history_effect:
+                task.objects = deepcopy(before if uri.endswith(".undo") else after)
+            return {}
+        if (target_read_failure and uri.endswith("object.get") and args.get("from") == {"id": [EFFECT]}
+                and "notes" in options.get("return", []) and (target_read_failure == "before" or after is not None)):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            raise RuntimeError("Optional legacy Effect target read unavailable")
+        result = original(uri, args, options)
+        if uri.endswith("getProjectInfo") and platform_inventory:
+            result.update(currentPlatformId=task.current_platform, platforms=[
+                {"id": "{44444444-4444-4444-4444-444444444444}", "name": "Windows"},
+                {"id": "{55555555-5555-5555-5555-555555555555}", "name": "Mac"}])
+        return result
+    task.call = call
+    target = task.bind(FIRST if legacy else ROOT if clear else CHILD)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", target,
+        "--meaning", "RenderEffect1" if legacy else "Render", *(["--platform", platform] if platform is not None else []))
+    assert code == 0, discovered
+    render = (discovered["field_candidates"][0]["handle"] if "field_candidates" in discovered else
+        discovered["meaning_results"][0]["candidates"][0]["handle"])
+    if operation == "object.setProperty":
+        code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+            "--field-handle", render, "--business-value", "false" if clear else "true")
+    else:
+        code, declared = task.step("draft-declare-existing", "--declaration-id", "slot", "--object-handle", target,
+            "--field-value", render, "false" if clear else "true")
+    assert code == 0, declared
+    source, shown = task.preview()
+    task.source_preview = shown
+    if not prepared_only:
+        code, verified = task.finish(source, shown)
+        assert code == 0 and verified["verified"] is True, verified
+    return task, source, before, after, writes
+
+
+@pytest.mark.parametrize("version,operation,platform,clear", [
+    ("2023.1", "object.setProperty", "{44444444-4444-4444-4444-444444444444}", False),
+    ("2024.1", "object.setProperty", "Windows", False),
+    ("2025.1", "object.setProperty", None, False),
+    ("2023.1", "object.set", None, False),
+    ("2024.1", "object.set", "Windows", False),
+    ("2025.1", "object.set", "{44444444-4444-4444-4444-444444444444}", False),
+    ("2025.1", "object.setProperty", None, True),
+])
+def test_render_history_receipt_restores_complete_existing_chain_and_derived_field(tmp_path, version, operation, platform, clear):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, source, before, after, writes = _render_history_case(tmp_path, version=version, operation=operation,
+        platform=platform, clear=clear)
+    assert task.objects[ROOT]["@Render"] is (not clear) and task.objects[CHILD]["@Render"] is (not clear)
+    # History observes the original GUID view, independent of a later UI selection.
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    for direction, expected in (("undo", before), ("redo", after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        code, executed = task.run("execute", tx)
+        assert code == 0, json.dumps(executed)
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+        assert task.objects[FIRST]["@Effects"] == before[FIRST]["@Effects"]
+        assert task.objects[ROOT] == expected[ROOT] and task.objects[CHILD] == expected[CHILD]
+        assert task.objects[EFFECT] == before[EFFECT]
+    assert len(writes) == 1
+    native = writes[0][1]
+    assert (native if operation == "object.setProperty" else native["objects"][0]).get("platform") == platform
+
+
+@pytest.mark.parametrize("fault", ["order", "missing-member", "duplicate-member", "owner", "class", "effect", "bypass", "target", "raw-metadata"])
+def test_render_history_refuses_drift_of_complete_original_chain_before_dispatch(tmp_path, fault):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD, SECOND
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, source, _, _, _ = _render_history_case(tmp_path)
+    if fault == "order": task.objects[FIRST]["@Effects"].reverse()
+    elif fault == "missing-member": task.objects[FIRST]["@Effects"].pop()
+    elif fault == "duplicate-member": task.objects[FIRST]["@Effects"].append({"id": ROOT})
+    elif fault == "owner": task.objects[ROOT]["owner"] = {"id": SECOND}
+    elif fault == "class": task.objects[ROOT]["classId"] = 65552
+    elif fault == "effect": task.objects[ROOT]["@Effect"] = None
+    elif fault == "bypass": task.objects[ROOT]["@Bypass"] = False
+    elif fault == "target": task.objects[EFFECT]["notes"] = "Unrequested target drift"
+    else: task.metadata["Render"]["nativeExtension"] = None
+    draft, authority, revision = _created_history_reference_draft(task, source)
+    code, rejected = task.run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(revision))
+    assert code == 2 and rejected["error_code"] == "HISTORY_EXPECTATION_CHANGED", rejected
+    assert not any(uri.endswith("undo.undo") for uri, _, _ in task.calls)
+    assert "readbacks" in rejected["details"] or "history_observation" in rejected["details"]
+
+
+def test_render_history_retains_independent_readback_when_native_undo_omits_derived_change(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import ROOT, CHILD
+    task, source, before, _, _ = _render_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    assert task.run("execute", tx)[0] == 0
+    task.objects[ROOT]["@Render"] = True
+    assert task.objects[CHILD]["@Render"] == before[CHILD]["@Render"] is False
+    code, verified = task.run("verify", tx)
+    assert code == 2 and verified.get("verified") is not True, verified
+    assert "Render" in json.dumps(verified) and "readbacks" in json.dumps(verified)
+    assert task.run("execute", tx)[0] == 2
+    assert len([uri for uri, _, _ in task.calls if uri.endswith("undo.undo")]) == 1
+
+
+@pytest.mark.parametrize("operation", ["object.setProperty", "object.set"])
+def test_legacy_render_history_restores_all_owner_flags_and_effect_targets(tmp_path, operation):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, source, before, after, writes = _render_history_case(tmp_path, version="2022.1", operation=operation)
+    assert after[FIRST] == {**before[FIRST], "@RenderEffect0": True, "@RenderEffect1": True}
+    tx = _created_leaf_history_preview(task, source)
+    assert task.run("execute", tx)[0] == 0
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST] == before[FIRST] and task.objects[EFFECT] == before[EFFECT]
+    assert len(writes) == 1
+    code, redo = task.run("draft-start", "ak.wwise.core.undo.redo")
+    assert code == 2 and "2022.1" in json.dumps(redo), redo
+
+
+def test_legacy_render_source_2021_preserves_native_history_gate(tmp_path):
+    task, source, before, after, writes = _render_history_case(tmp_path, version="2021.1")
+    assert len(writes) == 1 and before != after
+    code, unavailable = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 2 and "2021.1" in json.dumps(unavailable), unavailable
+
+
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_render_source_original_platform_certificate_drift_blocks_write(tmp_path, platform):
+    task, source, before, _, writes = _render_history_case(tmp_path, operation="object.set", platform=platform, prepared_only=True)
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    if platform == "Windows":
+        original = task.call
+        def changed_names(uri, args=None, options=None):
+            result = original(uri, args, options)
+            if uri.endswith("getProjectInfo"):
+                result["platforms"][0]["name"] = "Old Windows"
+                result["platforms"][1]["name"] = "Windows"
+            return result
+        task.call = changed_names
+    assert task.run("confirm", source, "--confirmation-token", task.source_preview["confirmation"]["token"])[0] == 0
+    code, rejected = task.run("execute", source)
+    assert code == 2 and rejected.get("executed") is not True and not writes, rejected
+    assert task.objects == before
+
+
+def test_render_history_review_keeps_exact_fields_and_full_source_raw_proof(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import ROOT, CHILD
+    task, source, _, _, _ = _render_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    code, compact = task.run("transaction-show", tx, "--summary-only")
+    assert code == 0, compact
+    chain, = compact["preview_summary"]["history_action"]["expected_observations"]
+    assert [row["id"] for row in chain["members_in_original_order"]] == [ROOT, CHILD]
+    assert all(row["changes"]["Render"] == {"before": False, "after": True} for row in chain["members_in_original_order"])
+    assert [row["preserved"]["Bypass"] for row in chain["members_in_original_order"]] == [True, False]
+    assert chain["metadata_bound"] is True and chain["all_other_projected_state_preserved"] is True
+    code, full = task.run("transaction-show", tx)
+    assert code == 0, full
+    rows = full["artifact"]["prepared_operation"]["pre_state"]["history_binding"]["observations"]
+    field_rows = [row for row in rows if row["kind"] == "existing_field"]
+    assert {row["object_before"]["id"] for row in field_rows} == {ROOT, CHILD}
+    assert all("raw" in row["field_info"] for row in field_rows)
+    chain_row, = [row for row in rows if row["kind"] == "existing_render_chain"]
+    assert all("raw" in row for row in chain_row["after"]["metadata"])
+    assert task.run("execute", tx)[0] == 0
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert list(verified)[-1] == "agent_result" and verified["agent_result"]["result"] == {}
+
+
+@pytest.mark.parametrize("stage", ["execute", "verify"])
+def test_render_history_rechecks_unrequested_effect_target_at_durable_phases(tmp_path, stage):
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, source, _, _, _ = _render_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    if stage == "verify":
+        assert task.run("execute", tx)[0] == 0
+    task.objects[EFFECT]["notes"] = "Unrequested drift after Preview"
+    code, rejected = task.run(stage, tx)
+    assert code == 2 and rejected.get("verified") is not True, rejected
+    assert len([uri for uri, _, _ in task.calls if uri.endswith("undo.undo")]) == (stage == "verify")
+    assert "Unrequested drift after Preview" in json.dumps(rejected)
+
+
+def test_render_history_retains_actual_missing_readback_error_without_history_dispatch(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import ROOT
+    task, source, _, _, _ = _render_history_case(tmp_path)
+    draft, authority, revision = _created_history_reference_draft(task, source)
+    original = task.call
+    def unavailable(uri, args=None, options=None):
+        if uri.endswith("object.get") and args.get("from") == {"id": [ROOT]}:
+            task.calls.append((uri, args, options))
+            raise RuntimeError("Exact Render member read unavailable")
+        return original(uri, args, options)
+    task.call = unavailable
+    code, rejected = task.run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(revision))
+    assert code == 2 and "Exact Render member read unavailable" in json.dumps(rejected), rejected
+    assert "readbacks" in json.dumps(rejected) and not any(uri.endswith("undo.undo") for uri, _, _ in task.calls)
+
+
+def test_render_optional_uncertified_view_keeps_source_write_usable_without_strong_receipt(tmp_path):
+    task, source, _, _, writes = _render_history_case(tmp_path, operation="object.set", platform=None, platform_inventory=False)
+    assert len(writes) == 1
+    code, full = task.run("transaction-show", source)
+    assert code == 0 and full["state"] == "verified", full
+    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, started
+    code, rejected = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "original chain read view is not certified" in rejected["message"], rejected
+    assert not any(uri.endswith("undo.undo") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("stage", ["before", "after"])
+def test_legacy_render_optional_target_observation_failure_keeps_source_usable(tmp_path, stage):
+    task, source, _, _, writes = _render_history_case(tmp_path, version="2022.1", target_read_failure=stage)
+    assert len(writes) == 1
+    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, started
+    code, rejected = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "target" in rejected["message"].casefold(), rejected
+    code, full = task.run("transaction-show", source)
+    assert code == 0 and full["state"] == "verified", full
+    assert "Optional legacy Effect target read unavailable" in json.dumps(full)
+    assert not any(uri.endswith("undo.undo") for uri, _, _ in task.calls)
+
+
+
+
+def test_legacy_render_optional_target_witness_preserves_existing_aggregate_bound(tmp_path, monkeypatch):
+    from wwise_waapi import operation_registry
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    monkeypatch.setattr(operation_registry, "OBJECT_LIST_MAX_SUBTREE_NODES", 4)
+    task, source, _, _, writes = _render_history_case(tmp_path, version="2022.1")
+    assert len(writes) == 1
+    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, started
+    code, rejected = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "target observation is unavailable" in rejected["message"], rejected
+    assert not [uri for uri, args, options in task.calls if uri.endswith("object.get")
+        and args.get("from") == {"id": [EFFECT]} and "notes" in options.get("return", [])]
+
+
 def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_path):
     task, source, created = _created_leaf_history_case(tmp_path)
     tx = _created_leaf_history_preview(task, source)

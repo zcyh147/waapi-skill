@@ -149,7 +149,7 @@ def capture_after(proof, *, read):
         return {**record, "reason": "optional_source_postread_failed", "error": _read_error(exc)}
 
 
-def receipt_observations(snapshot):
+def receipt_observations(snapshot, *, exclude_fields=None):
     """Associate every ordinary existing-field outcome with actual source reads."""
     from .edit_history_business import _identity, _scalar_matches, _reference_value, NAMES, INFO, GET
     from .builders.metadata import bind_get_property_info_result, parse_property_and_reference_names_result
@@ -164,8 +164,6 @@ def receipt_observations(snapshot):
             or node.get("list_snapshots") for node in nodes)
             or plan.get("replaced_subtree_rows") or plan.get("replaced_list_subtree_rows")):
         raise ValueError("Graph/List/creation/restoration receipt observations remain implementation obligations")
-    if state.get("effect_render_chains"):
-        raise ValueError("Render history requires its complete ordered-chain observation")
     proofs = state.get("existing_field_observations", [])
     if len(proofs) != len(nodes) or len({proof.get("request_path") for proof in proofs}) != len(nodes):
         raise ValueError("Existing-field receipt lacks every original source observation")
@@ -174,14 +172,6 @@ def receipt_observations(snapshot):
     captured = [record for record in verification.get("readbacks", []) if record.get("role") == ROLE]
     observations = []
     for node in nodes:
-        proof, = [proof for proof in proofs if proof.get("request_path") == node["request_path"]]
-        matches = [record for record in captured if record.get("request_path") == node["request_path"]]
-        if (proof.get("status") != "certified" or len(matches) != 1 or matches[0].get("status") != "observed"
-                or matches[0].get("source_proof_sha256") != canonical_sha256(proof)
-                or proof.get("field_read_platform", {}).get("status") != "certified"):
-            raise ValueError("Existing-field receipt original view/before/verified-after observations are unavailable")
-        observed = matches[0]
-        fields = proof["fields"]
         declared = {item["name"]: ("scalar", item["value"]) for item in node.get("properties", [])}
         for item in node.get("references", []):
             if "target_id" not in item or isinstance(item["target_id"], list):
@@ -191,6 +181,19 @@ def receipt_observations(snapshot):
             declared["notes"] = ("text", node["requested_notes"])
         if node.get("requested_name") != node.get("original_name"):
             declared["name"] = ("identity", node["requested_name"])
+        proof, = [proof for proof in proofs if proof.get("request_path") == node["request_path"]]
+        view = proof.get("field_read_platform", {}).get("platform_id")
+        excluded = (exclude_fields or {}).get((node["target_id"].upper(), view), set())
+        declared = {name: value for name, value in declared.items() if name not in excluded}
+        if not declared:
+            continue
+        matches = [record for record in captured if record.get("request_path") == node["request_path"]]
+        if (proof.get("status") != "certified" or len(matches) != 1 or matches[0].get("status") != "observed"
+                or matches[0].get("source_proof_sha256") != canonical_sha256(proof)
+                or proof.get("field_read_platform", {}).get("status") != "certified"):
+            raise ValueError("Existing-field receipt original view/before/verified-after observations are unavailable")
+        observed = matches[0]
+        fields = [field for field in proof["fields"] if field["field"] not in excluded]
         if set(declared) != {field["field"] for field in fields} or len(fields) != len(declared):
             raise ValueError("Existing-field receipt does not cover every materialized source field exactly once")
         platform = proof["field_read_platform"]["platform_id"]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 from copy import deepcopy
+from .canonical import canonical_sha256
 
 
 # Exact installed English Help member evidence, extracted without starting Wwise.
@@ -106,11 +107,19 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
         if spec.get("collection") == "Effects" and spec.get("canonical_type") == "EffectSlot":
             groups.setdefault((spec.get("parent_request_path"), spec.get("platform")), []).append(spec)
     exact = {}
+    views = {}
+    def view_for(selector):
+        from .edit_history_business import capture_field_read_platform
+        if selector not in views:
+            views[selector] = capture_field_read_platform(version, selector, read=read)
+        proof = views[selector]
+        return proof, proof["platform_id"] if proof["status"] == "certified" else selector
     for spec in specs:
         if not spec.get("existing_target") or not any(prop["name"] == "Render" for prop in spec["properties"]):
             continue
         object_id = spec["target_id"]
-        rows = r._read_object_id_rows(object_id, fields=[*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId"], read=read, platform=spec.get("platform"))
+        _view, read_platform = view_for(spec.get("platform"))
+        rows = r._read_object_id_rows(object_id, fields=[*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId"], read=read, platform=read_platform)
         if len(rows) != 1 or not r._same_identity(rows[0].get("id"), object_id):
             raise r.OperationContractError("INVALID_READBACK", "Render field source must resolve exactly once")
         if rows[0].get("classId") != 5505040:
@@ -136,6 +145,7 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
     for parent_path, platform, members, exact_owner in combined.values():
         if not any(any(prop["name"] == "Render" for prop in spec["properties"]) for spec in members):
             continue
+        view, platform = view_for(platform)
         owner = by_path.get(parent_path)
         owner_id = exact_owner or (owner.get("target_id", owner.get("preexisting_id")) if owner else
                     root_parent.object if root_parent is not None and root_collection == "Effects" else None)
@@ -227,19 +237,25 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                 if not any(prop["name"] == name for prop in spec["properties"]):
                     spec["properties"].append({"name": name, "value": value, "metadata_type": "bool", "observed_class_default": True})
         chains.append({**planned, "authority": source_authority(version), "version": version, "platform": platform, "source": source,
-            "owner_id": owner_id, "mode": mode, "before_order": [row["id"] for row in before],
+            "field_read_platform": view, "owner_id": owner_id, "mode": mode, "before_order": [row["id"] for row in before],
             "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets})
     chains.extend(prepare_legacy(specs, native_nodes, version=version, read=read))
     return chains
 
 
-def prepare_legacy(specs, native_nodes, *, version, read):
+def prepare_legacy(specs, native_nodes, *, version, read, history_targets=True):
     from . import operation_registry as r
     from .documented_list_fields import load_catalog
     if version not in {"2021.1", "2022.1"}:
         return []
     catalog = load_catalog(version)
     chains = []
+    # Reserve the existing four-slot scope for every potential owner before any
+    # optional target read. An unavailable history witness never expands or
+    # rejects the source operation's existing aggregate bound.
+    target_budget = max(0, r.OBJECT_LIST_MAX_SUBTREE_NODES - 4 * sum(
+        any(prop["name"] in {f"RenderEffect{i}" for i in range(4)} for prop in spec["properties"])
+        for spec in specs))
     for spec in specs:
         intents = {prop["name"]: prop["value"] for prop in spec["properties"]}
         if not any(name in intents for name in (f"RenderEffect{i}" for i in range(4))):
@@ -247,7 +263,10 @@ def prepare_legacy(specs, native_nodes, *, version, read):
         identity = spec.get("target_id", spec.get("preexisting_id"))
         fields = [*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId", *[field for i in range(4)
             for field in (f"Effect{i}", f"BypassEffect{i}", f"RenderEffect{i}")]]
-        before = r._read_object_id_rows(identity, fields=fields, read=read, platform=spec.get("platform")) if identity else []
+        from .edit_history_business import capture_field_read_platform
+        view = capture_field_read_platform(version, spec.get("platform"), read=read)
+        platform = view["platform_id"] if view["status"] == "certified" else spec.get("platform")
+        before = r._read_object_id_rows(identity, fields=fields, read=read, platform=platform) if identity else []
         if identity and (len(before) != 1 or not r._same_identity(before[0].get("id"), identity)):
             raise r.OperationContractError("INVALID_READBACK", "Legacy Render chain needs one exact owner")
         if 4 * (len(chains) + 1) > r.OBJECT_LIST_MAX_SUBTREE_NODES:
@@ -262,7 +281,7 @@ def prepare_legacy(specs, native_nodes, *, version, read):
                       if row.class_id == class_id and row.name == source_class["name"]]
         if len(live_types) != 1:
             raise r.OperationContractError("EFFECT_RENDER_CHAIN_UNPROVED", "Legacy owner needs its fresh exact documented class")
-        metadata, entries = [], []
+        metadata, entries, targets = [], [], []
         references = {row["name"]: row for row in spec["references"]}
         scope = {"object_id": identity} if identity else {"class_id": class_id}
         for i in range(4):
@@ -280,6 +299,31 @@ def prepare_legacy(specs, native_nodes, *, version, read):
                     if type(value) is not bool:
                         raise r.OperationContractError("INVALID_READBACK", "Legacy Render needs observed Boolean state or a fresh actual default")
                     entries.append({"key": field, "render_before": value, "render_intent": intents.get(field)})
+        target_observation = {"status": "certified"}
+        try:
+            if identity and history_targets:
+                for i in range(4):
+                    value = r._field_value(before[0], f"Effect{i}")
+                    if r._reference_value_is_null(value):
+                        continue
+                    effect_id = r._reference_identity(value)
+                    if not r._valid_object_id(effect_id):
+                        raise r.OperationContractError("INVALID_READBACK", "Retained legacy Effect requires its exact GUID or explicit null")
+                    if not any(r._same_identity(item["before"]["id"], effect_id) for item in targets):
+                        if target_budget <= 0:
+                            raise r.OperationContractError("RESULT_TOO_LARGE", "Optional legacy history targets exceed the existing aggregate snapshot bound")
+                        target_budget -= 1
+                        target_fields = [*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+                        rows = r._read_object_id_rows(effect_id, fields=target_fields, read=read, platform=platform)
+                        if len(rows) != 1 or not r._same_identity(rows[0].get("id"), effect_id):
+                            raise r.OperationContractError("INVALID_READBACK", "Retained legacy Effect must independently resolve once")
+                        targets.append({"fields": target_fields, "before": rows[0]})
+        except r.OperationContractError as exc:
+            if exc.error_code not in {"READBACK_FAILED", "INVALID_READBACK", "RESULT_TOO_LARGE"}:
+                raise
+            # This additional witness is optional history evidence. The existing
+            # legacy source verifier still owns all actual owner-field effects.
+            target_observation = {"status": "unobserved", "error": exc.as_dict()}
         plan = plan_chain(entries, version=version)
         changes = {name: value for name, value in intents.items() if name in fields}
         for change in plan["derived"]:
@@ -295,9 +339,10 @@ def prepare_legacy(specs, native_nodes, *, version, read):
                 native_nodes[spec["request_path"]]["@" + field] = True
                 spec["properties"].append({"name": field, "value": True, "metadata_type": "bool", "derived": True,
                     "condition_source": "effect-render-prefix"})
-        chains.append({**plan, "authority": source_authority(version), "kind": "legacy-scalars", "version": version, "platform": spec.get("platform"),
+        chains.append({**plan, "authority": source_authority(version), "kind": "legacy-scalars", "version": version, "platform": platform, "field_read_platform": view,
             "source": {"catalog_sha256": catalog["catalog_sha256"], "class": source_class}, "owner_id": identity,
-            "mode": "existing", "metadata": metadata, "slot_type": live_types[0],
+            "mode": "existing", "metadata": metadata, "slot_type": live_types[0], "targets": targets,
+            **({"target_observation": target_observation} if history_targets else {}),
             "snapshots": [{"object_id": identity, "fields": fields, "before": before[0], "after_changes": changes}] if identity else []})
     return chains
 
@@ -323,33 +368,42 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
         return rows[0]
     for chain in chains:
         try:
+            observed = {"metadata": [], "snapshots": [], "targets": []}
             source = chain["source"]
             legacy = chain.get("kind") == "legacy-scalars"
             if legacy:
                 from .documented_list_fields import load_catalog
                 catalog = load_catalog(chain["version"])
                 source_match = catalog["catalog_sha256"] == source["catalog_sha256"] and source["class"] in catalog["classes"]
+                observed["source"] = {"catalog_sha256": catalog["catalog_sha256"], "class": source["class"]}
             else:
                 current = (resolve_live_list_evidence(chain["version"], chain["owner_id"], "Effects", read=read)
                 if chain["owner_id"] else resolve_class_list_evidence(chain["version"], source["scope"]["class_id"], "Effects"))
             # Owner names/paths can change only through the ordinary prepared
             # identity/path guards; the source class/declaration remains exact.
                 source_match = all(current[key] == source[key] for key in source if key != "scope") and current["scope"]["class_id"] == source["scope"]["class_id"]
-            passed = source_match and chain["authority"] == source_authority(chain["version"]) and [row.as_dict() for row in r._read_object_type_catalog(read)
-                if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]] == [chain["slot_type"]]
+                observed["source"] = current
+            types = [row.as_dict() for row in r._read_object_type_catalog(read)
+                if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]]
+            observed["slot_types"] = types
+            passed = source_match and chain["authority"] == source_authority(chain["version"]) and types == [chain["slot_type"]]
             if not legacy and chain["owner_id"] and (not after_write or chain["mode"] == "existing"):
                 rows = r._read_object_list(chain["owner_id"], "Effects", fields=r.OBJECT_LIST_SNAPSHOT_FIELDS,
                     read=read, platform=chain["platform"], version=chain["version"])
+                observed["order"] = [row["id"] for row in rows]
                 passed = passed and [row["id"] for row in rows] == chain["before_order"]
             for field in chain["metadata"]:
                 if (after_write and chain["mode"] == "replaceAll" and field["scope"].get("object_id") in chain["before_order"]):
                     continue  # sealed old GUIDs must be deleted by the replacement verifier
                 info = r._read_property_info(read, **field["scope"], name=field["field"])
+                observed["metadata"].append({"scope": field["scope"], "field": field["field"],
+                    "raw": dict(info.raw), "normalized": info.as_dict()})
                 passed = passed and r._native_snapshot_equal(dict(info.raw), field["raw"]) and r._native_snapshot_equal(info.as_dict(), field["normalized"])
             for snapshot in chain["snapshots"]:
                 if after_write and chain["mode"] == "replaceAll":
                     continue  # ordinary replacement verification proves deletion
                 actual = r._read_object_id_rows(snapshot["object_id"], fields=snapshot["fields"], read=read, platform=chain["platform"])
+                observed["snapshots"].append({"object_id": snapshot["object_id"], "rows": actual})
                 expected = deepcopy(snapshot["before"])
                 if after_write:
                     expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
@@ -377,18 +431,35 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                         passed = passed and r._has_field(row, name) and (
                             r._reference_requirement_matches(row, name, value) if name in construction["reference_fields"] else
                             r._typed_value_equal(r._field_value(row, name), value, construction["metadata_types"][name]))
+            optional_targets = legacy and "target_observation" in chain
+            if legacy:
+                observed["targets_complete"] = not optional_targets or chain["target_observation"]["status"] == "certified"
             for target in chain.get("targets", []):
-                actual = r._read_object_id_rows(target["before"]["id"], fields=target["fields"], read=read, platform=chain["platform"])
-                expected = target["before"]
-                if after_write:
-                    expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
-                passed = passed and r._native_snapshot_equal(actual, [expected])
+                try:
+                    actual = r._read_object_id_rows(target["before"]["id"], fields=target["fields"], read=read, platform=chain["platform"])
+                    observed["targets"].append({"object_id": target["before"]["id"], "rows": actual})
+                    expected = target["before"]
+                    if after_write:
+                        expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
+                    target_matches = r._native_snapshot_equal(actual, [expected])
+                    if optional_targets:
+                        observed["targets_complete"] = observed["targets_complete"] and target_matches
+                    else:
+                        passed = passed and target_matches
+                except r.OperationContractError as exc:
+                    if not optional_targets or exc.error_code not in {"READBACK_FAILED", "INVALID_READBACK", "RESULT_TOO_LARGE"}:
+                        raise
+                    observed["targets_complete"] = False
+                    observed["targets"].append({"object_id": target["before"]["id"], "error": exc.as_dict()})
             target_conditions = r._reference_target_condition_assertions(chain, read=read, after_write=after_write)
             passed = passed and all(item["passed"] for item in target_conditions)
-            evidence = {"source_matches": source_match, "chain": chain, "target_conditions": target_conditions}
+            evidence = {"source_matches": source_match, "chain": chain, "target_conditions": target_conditions,
+                "prepared_chain_sha256": canonical_sha256(chain), "after_write": after_write,
+                "observation": observed}
         except (r.OperationContractError, ValueError, KeyError, TypeError) as exc:
             passed, evidence = False, {"error": str(exc)}
-        assertions.append({"name": "Effect Render chain metadata and complete stored state match prepared intent", "passed": bool(passed), "evidence": evidence})
+        assertions.append({"name": "Effect Render chain metadata and complete stored state match prepared intent",
+            "kind": "effect_render_chain_observation", "passed": bool(passed), "evidence": evidence})
     return assertions
 
 
@@ -438,7 +509,7 @@ def prepare_import(targets, *, version, operation, import_operation, read):
         if identity:
             spec["target_id"] = identity
         specs.append(spec); native[path] = {}
-    chains = prepare_legacy(specs, native, version=version, read=read)
+    chains = prepare_legacy(specs, native, version=version, read=read, history_targets=False)
     if len(chains) != len(selected):
         raise r.OperationContractError("EFFECT_RENDER_CHAIN_UNPROVED", "Every legacy import owner requires its exact documented class chain")
     for target, spec, chain in zip(selected, specs, chains, strict=True):
