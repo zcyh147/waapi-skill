@@ -2111,7 +2111,8 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
 
 
 def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed",
-    created_fields=False, reference=None, observer="complete", prepared_only=False, platform=None):
+    created_fields=False, reference=None, observer="complete", prepared_only=False, platform=None,
+    source_class_metadata=None, sound_class_id=2, nested=False, declaration_only=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD, ROOT
     task = OwnedGraphTask(tmp_path, version, "object.create")
@@ -2135,7 +2136,14 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
             if uri.endswith("getProjectInfo") and observer != "no-platform":
                 result.update(currentPlatformId=task.current_platform, platforms=task.platform_rows)
             if uri.endswith("object.create"):
-                task.objects[result["id"]]["classId"] = 2
+                task.objects[result["id"]]["classId"] = sound_class_id
+                if source_class_metadata is not None:
+                    for row in task.objects.values():
+                        if row["type"] in {"Sound", "ActorMixer"}:
+                            row["classId"] = next(info["classId"] for info in task.types if info["name"] == row["type"])
+                        if row["type"] == "Sound":
+                            for name, info in source_class_metadata.items():
+                                if "default" in info: row.setdefault("@" + name, deepcopy(info["default"]))
             return result
         task.call = source_fields
     if reference:
@@ -2144,6 +2152,9 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
         task.types.append({"classId": 655376, "name": "Attenuation", "type": "WObject"})
         task.metadata["Attenuation"] = {"name": "Attenuation", "type": "Reference",
             "restriction": {"type": "reference", "restrictions": [{"type": ["Attenuation"]}]}}
+    if source_class_metadata is not None:
+        task.metadata.update(deepcopy(source_class_metadata))
+        next(row for row in task.types if row["name"] == "Sound")["classId"] = sound_class_id
     parent = task.bind(SECOND)
     if platform is not None:
         code, configured = task.step("draft-business-configure", "--platform", platform)
@@ -2159,10 +2170,17 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
         assert code == 0, fields
         values.extend(["--field-value", fields["meaning_results"][0]["candidates"][0]["handle"],
             "null" if reference == "null" else target])
+    if nested:
+        code, container = task.step("draft-declare-new", "--declaration-id", "container", "--parent-handle", parent,
+            "--kind", "actor-mixer", "--name", "Container", "--field", "notes", "Keep container")
+        assert code == 0, container
+        parent = container["draft"]["declared_object"]["result_handle"]
     code, declared = task.step("draft-declare-new", "--declaration-id", "leaf", "--parent-handle", parent,
         "--kind", "sound-sfx", "--name", "Rain",
         *([] if notes is None else ["--field", "notes", notes]), *values)
     assert code == 0, declared
+    if declaration_only:
+        return task, None, None
     source, shown = task.preview()
     if prepared_only:
         return task, source, shown
@@ -2769,3 +2787,166 @@ def test_history_original_source_journal_is_revalidated_at_each_durable_phase(tm
             code, rejected = task.run('verify', tx)
     assert code == 2 and rejected.get('verified') is not True, rejected
     assert len([call for call in task.calls if call[0].startswith('ak.wwise.core.undo.')]) == (1 if stage == 'verify' else 0)
+
+
+def _literal_2022_null_creation_metadata():
+    """Failed native2022 Sound condition/default grammar; display data omitted in fixture."""
+    override = {'type': 'override', 'action': 'Enable', 'context': 'Self', 'property': 'OverridePositioning'}
+    return {
+        'IsLoopingEnabled': {'name': 'IsLoopingEnabled', 'type': 'bool', 'default': False},
+        'IsLoopingInfinite': {'name': 'IsLoopingInfinite', 'type': 'bool', 'default': True,
+            'dependencies': [{'type': 'property', 'action': 'Enable', 'context': 'Self', 'property': 'IsLoopingEnabled',
+                'conditions': [{'restriction': {'type': 'enum', 'values': [{'displayName': 'True', 'value': True}]}}]}]},
+        'Volume': {'name': 'Volume', 'type': 'Real64', 'default': 0.0, 'restriction': {'type': 'range', 'min': -200.0, 'max': 200.0}},
+        'Attenuation': {'name': 'Attenuation', 'type': '', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Attenuation'], 'sharedOnlyTypes': []}]},
+            'supports': {'randomizer': False, 'rtpc': 'None', 'unlink': True},
+            'dependencies': [{'type': 'property', 'action': 'Enable', 'context': 'Self', 'property': 'ListenerRelativeRouting',
+                'conditions': [{'restriction': {'type': 'enum', 'values': [{'displayName': 'True', 'value': True}]}}]}, override]},
+        'ListenerRelativeRouting': {'name': 'ListenerRelativeRouting', 'type': 'bool', 'default': True, 'dependencies': [override]},
+        'OverridePositioning': {'name': 'OverridePositioning', 'type': 'bool', 'default': False, 'dependencies': [override]},
+    }
+
+
+def test_2022_new_sound_null_intent_uses_default_without_losing_source_or_history(tmp_path):
+    metadata = _literal_2022_null_creation_metadata()
+    task, source, shown = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        prepared_only=True, source_class_metadata=metadata, sound_class_id=65552)
+    artifact = shown['artifact']; native = artifact['prepared_operation']['dispatch']['args']
+    assert artifact['request']['arguments']['references'] == [{'name': 'Attenuation', 'target': None}]
+    assert '@Attenuation' not in native
+    assert native['@OverridePositioning'] is True and native['@IsLoopingEnabled'] is True and native['@IsLoopingInfinite'] is True
+    assert native['@Volume'] == -6 and native['onNameConflict'] == 'fail'
+    spec = artifact['prepared_operation']['pre_state']['object_create_nodes'][0]
+    assert spec['references'] == [{'name': 'Attenuation', 'target_id': None}]
+    assert spec['native_default_reference_omissions'] == ['Attenuation']
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    created = next(row for row in task.objects.values() if row['name'] == 'Rain')
+    assert '@Attenuation' in created and created['@Attenuation'] is None and created['@OverridePositioning'] is True
+    assert len([row for row in task.calls if row[0].endswith('object.create')]) == 1
+    tx = _created_leaf_history_preview(task, source)
+    code, history = task.run('transaction-show', tx)
+    assert code == 0, history
+    fields = history['artifact']['prepared_operation']['pre_state']['history_binding']['observations']
+    null_field = next(row for row in fields if row.get('kind') == 'creation_field' and row.get('field') == 'Attenuation')
+    assert null_field['value'] is None and null_field['field_info']['default'] is None
+    presence = next(row for row in fields if row['kind'] == 'creation_presence')
+    assert presence['platform'] == artifact['prepared_operation']['pre_state']['field_read_platform']['platform_id']
+
+
+def test_2022_new_nested_sound_null_uses_absent_root_hierarchy_and_actual_child(tmp_path):
+    task, source, shown = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        prepared_only=True, source_class_metadata=_literal_2022_null_creation_metadata(), sound_class_id=65552, nested=True)
+    prepared = shown['artifact']['prepared_operation']
+    assert prepared['dispatch']['args']['type'] == 'ActorMixer'
+    child = prepared['dispatch']['args']['children'][0]
+    assert child['type'] == 'Sound' and '@Attenuation' not in child and child['@OverridePositioning'] is True
+    assert shown['artifact']['request']['arguments']['children'][0]['references'] == [{'name': 'Attenuation', 'target': None}]
+    spec = next(row for row in prepared['pre_state']['object_create_nodes'] if row['canonical_type'] == 'Sound')
+    assert spec['native_default_reference_omissions'] == ['Attenuation']
+    assert prepared['pre_state']['object_graph_guard']['path_snapshots'][0]['rows'] == []
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    container = next(row for row in task.objects.values() if row['name'] == 'Container')
+    created = next(row for row in task.objects.values() if row['name'] == 'Rain')
+    assert created['parent']['id'] == container['id'] and created['@Attenuation'] is None
+    assert created['classId'] == 65552 and len([row for row in task.calls if row[0].endswith('object.create')]) == 1
+
+
+@pytest.mark.parametrize('default', ['missing', 'non-null'])
+def test_2022_new_sound_null_without_actual_null_class_default_cannot_dispatch(tmp_path, default):
+    metadata = _literal_2022_null_creation_metadata()
+    if default == 'missing': metadata['Attenuation'].pop('default')
+    else: metadata['Attenuation']['default'] = '{33333333-3333-3333-3333-333333333333}'
+    task, _, _ = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        declaration_only=True, source_class_metadata=metadata, sound_class_id=65552)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'NEW_OBJECT_NULL_DEFAULT_UNPROVEN', rejected
+    assert not any(row[0].endswith('object.create') for row in task.calls)
+
+
+@pytest.mark.parametrize('corruption', ['null-missing', 'inherited-reference', 'wrong-class', 'controller-false', 'post-metadata'])
+def test_2022_omitted_native_null_still_requires_actual_present_null(tmp_path, corruption):
+    task, source, shown = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        prepared_only=True, source_class_metadata=_literal_2022_null_creation_metadata(), sound_class_id=65552)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', source)
+    assert code == 0 and executed['state'] == 'executed_unverified', executed
+    created = next(row for row in task.objects.values() if row['name'] == 'Rain')
+    if corruption == 'null-missing': del created['@Attenuation']
+    elif corruption == 'inherited-reference': created['@Attenuation'] = {'id': '{33333333-3333-3333-3333-333333333333}'}
+    elif corruption == 'wrong-class': created['classId'] = 2
+    elif corruption == 'controller-false': created['@OverridePositioning'] = False
+    else: task.metadata['Attenuation']['default'] = '{33333333-3333-3333-3333-333333333333}'
+    code, rejected = task.run('verify', source)
+    assert code == 2 and rejected.get('verified') is not True, rejected
+    assert len([row for row in task.calls if row[0].endswith('object.create')]) == 1
+
+
+@pytest.mark.parametrize('fault', ['default-presence', 'default-target', 'controller', 'dependency', 'collision'])
+def test_2022_omission_default_conditions_and_absence_are_fresh_before_execute(tmp_path, fault):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task, source, shown = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        prepared_only=True, source_class_metadata=_literal_2022_null_creation_metadata(), sound_class_id=65552)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    if fault == 'default-presence': task.metadata['Attenuation'].pop('default')
+    elif fault == 'default-target': task.metadata['Attenuation']['default'] = '{33333333-3333-3333-3333-333333333333}'
+    elif fault == 'controller': task.metadata['ListenerRelativeRouting']['default'] = False
+    elif fault == 'dependency': task.metadata['Attenuation']['dependencies'][0]['context'] = 'Parent'
+    else:
+        row = deepcopy(task.objects[SECOND])
+        row.update(id='{99999999-9999-9999-9999-999999999999}', type='Sound', name='Rain', parent={'id': SECOND},
+            path=task.objects[SECOND]['path'] + '\\Rain', classId=65552)
+        task.objects[row['id']] = row
+    code, rejected = task.run('execute', source)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert not any(row[0].endswith('object.create') for row in task.calls)
+
+
+@pytest.mark.parametrize('version,sound_class_id,reference', [
+    ('2021.1', 65552, 'null'), ('2023.1', 65552, 'null'), ('2024.1', 65552, 'null'), ('2025.1', 65552, 'null'),
+    ('2022.1', 2, 'null'), ('2022.1', 65552, 'existing'),
+])
+def test_null_constructor_compatibility_does_not_change_other_lanes_or_existing_targets(tmp_path, version, sound_class_id, reference):
+    # One literal2022 condition fixture checks scope isolation, not metadata/native credit in other versions.
+    task, source, shown = _created_leaf_history_case(tmp_path, version=version, reference=reference, created_fields=True,
+        prepared_only=True, source_class_metadata=_literal_2022_null_creation_metadata(), sound_class_id=sound_class_id)
+    native = shown['artifact']['prepared_operation']['dispatch']['args']
+    assert '@Attenuation' in native and native['@Attenuation'] == (None if reference == 'null' else '{33333333-3333-3333-3333-333333333333}')
+    assert all('native_default_reference_omissions' not in row for row in shown['artifact']['prepared_operation']['pre_state']['object_create_nodes'])
+    assert not any(row[0].endswith('object.create') for row in task.calls)
+
+
+def test_2022_null_default_cannot_waive_incompatible_creation_controller(tmp_path):
+    metadata = _literal_2022_null_creation_metadata()
+    metadata['ListenerRelativeRouting']['default'] = False
+    task, _, _ = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        declaration_only=True, source_class_metadata=metadata, sound_class_id=65552)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'REFERENCE_ACTIVATION_REQUIRED', rejected
+    assert not any(row[0].endswith('object.create') for row in task.calls)
+
+
+@pytest.mark.parametrize('mode', ['merge', 'rename'])
+def test_2022_null_omission_never_changes_native_assignment_for_other_conflict_modes(tmp_path, mode):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    metadata = _literal_2022_null_creation_metadata()
+    task, _, _ = _created_leaf_history_case(tmp_path, version='2022.1', reference='null', created_fields=True,
+        declaration_only=True, source_class_metadata=metadata, sound_class_id=65552)
+    if mode == 'merge':
+        identity = '{99999999-9999-9999-9999-999999999999}'
+        task.objects[identity] = {'id': identity, 'name': 'Rain', 'type': 'Sound', 'classId': 65552,
+            'path': task.objects[SECOND]['path'] + '\\Rain', 'parent': {'id': SECOND}, 'notes': 'Keep existing',
+            **{'@' + name: deepcopy(info['default']) for name, info in metadata.items() if 'default' in info}}
+        task.objects[identity]['@Attenuation'] = {'id': '{33333333-3333-3333-3333-333333333333}'}
+    code, configured = task.step('draft-business-configure', '--name-conflict', mode)
+    assert code == 0, configured
+    source, shown = task.preview()
+    prepared = shown['artifact']['prepared_operation']; native = prepared['dispatch']['args']
+    assert native['onNameConflict'] == mode and '@Attenuation' in native and native['@Attenuation'] is None
+    assert all('native_default_reference_omissions' not in row for row in prepared['pre_state']['object_create_nodes'])
+    if mode == 'merge': assert prepared['pre_state']['object_create_nodes'][0]['preexisting_id'] == identity
+    assert not any(row[0].endswith('object.create') for row in task.calls)
