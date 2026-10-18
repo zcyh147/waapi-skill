@@ -2119,7 +2119,8 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
     source, shown = task.preview()
     code, verified = task.finish(source, shown)
     assert code == 0 and verified["verified"] is True, verified
-    created = deepcopy(task.objects[CHILD])
+    created = deepcopy(next(row for row in task.objects.values() if row["name"] == "Rain"))
+    created_id = created["id"]
     original = task.call
     task.history_effect = True
     def call(uri, args=None, options=None):
@@ -2127,9 +2128,9 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             if task.history_effect:
                 if uri.endswith(".undo"):
-                    task.objects.pop(CHILD, None)
+                    task.objects.pop(created_id, None)
                 else:
-                    task.objects[CHILD] = deepcopy(created)
+                    task.objects[created_id] = deepcopy(created)
             return {}
         return original(uri, args, options)
     task.call = call
