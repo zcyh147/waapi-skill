@@ -66,11 +66,10 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
                 slot, effect = ('{' + str(uuid.UUID(int=value)).upper() + '}' for value in (11 + index, 21 + index))
                 task.objects[slot] = {'id': slot, 'name': '', 'type': 'EffectSlot', 'classId': 5505040,
                     'path': '\\opaque-slot-' + str(index), 'owner': {'id': FIRST}, 'notes': '',
-                    '@Effect': {'id': effect}, '@Bypass': False, '@Render': False,
-                    **({'parent': {'id': FIRST}} if index == 0 else {})}
+                    '@Effect': {'id': effect}, '@Bypass': False, '@Render': False}
                 task.objects[effect] = {'id': effect, 'name': plugin['name'], 'type': 'Effect', 'classId': 9109507,
-                    'path': '\\opaque-local-effect-' + str(index), 'owner': {'id': FIRST}, 'parent': {'id': slot},
-                    'notes': plugin['notes'], '@Gain': 0}
+                    'path': '\\opaque-local-effect-' + str(index), 'owner': {'id': slot},
+                    'notes': plugin['notes'], '@FullBandGain': 0.0, '@LFEGain': 0.0}
                 task.objects[FIRST]['@Effects'].append({'id': slot})
                 return {'objects': [{'id': FIRST, 'name': task.objects[FIRST]['name'], '@Effects': [
                     {'id': slot, 'name': '', '@Effect': {'id': effect, 'name': plugin['name']}}]}]}
@@ -95,6 +94,9 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
             if fault == 'wrong-value': selected['@Bypass'] = not selected['@Bypass']
             if fault == 'spare-value': spare['@Render'] = True
             if fault == 'effect-notes': task.objects[selected['@Effect']['id']]['notes'] = 'Not requested'
+            if fault == 'effect-owner': task.objects[selected['@Effect']['id']]['owner'] = {'id': FIRST}
+            if fault == 'effect-parent': task.objects[selected['@Effect']['id']]['parent'] = {'id': selected['id']}
+            if fault == 'slot-parent-null': selected['parent'] = None
             if fault == 'rename-path' and len(writes) == 5: selected['path'] += 'Unexpected'
             return {'objects': result}
         if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
@@ -125,7 +127,7 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
                 if key in row or '@' + key in row} for row in rows]}
         if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and (args.get('classId') == 9109507 or task.objects.get(args.get('object'), {}).get('type') == 'Effect'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            return {'return': ['Gain']} if uri.endswith('getPropertyAndReferenceNames') else {'name': 'Gain', 'type': 'Real64', 'default': 0}
+            return {'return': ['FullBandGain', 'LFEGain']} if uri.endswith('getPropertyAndReferenceNames') else {'name': args['property'], 'type': 'Real64', 'default': 0.0}
         return original(uri, args, options)
     task.call = call
     runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
@@ -153,6 +155,11 @@ def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path
     assert len(writes) == 5 and [cmd[0] for cmd in commands].count('verify') == 5
     assert [row['name'] for row in receipt['baseline']['slots']] == ['', '']
     assert len({row['id'] for row in receipt['baseline']['slots']}) == 2
+    for slot, effect in zip(receipt['baseline']['slots'], receipt['baseline']['effects'], strict=True):
+        assert effect['owner']['id'] == slot['id']
+        assert 'parent' not in slot and 'parent' in slot['unavailable_fields']
+        assert 'parent' not in effect and 'parent' in effect['unavailable_fields']
+        assert effect['properties'] == {'FullBandGain': 0.0, 'LFEGain': 0.0}
     assert [phase['phase'] for phase in receipt['transactions'][-2:]] == ['exact_member_bypass', 'owner_rename_and_exact_member_bypass']
     assert receipt['transactions'][-1]['independent_effect']['owner']['name'] == 'WAAPI_SLOT_TEST_Renamed'
     assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
@@ -175,6 +182,22 @@ def test_existing_effect_slot_collector_rejects_unrequested_or_failed_effect(tmp
     assert [cmd[0] for cmd in commands].count('verify') == expected_verifies
     assert not any(phase['effect_verified'] for phase in receipt['transactions'][3:] if fault != 'rename-path')
     assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize('fault', ['effect-owner', 'effect-parent', 'slot-parent-null'])
+def test_existing_effect_slot_collector_preserves_native_immediate_owner_and_unavailable_parent(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, '2025.1', fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    receipt = json.loads(Path(runtime.category_results[-1]['observation_path']).read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['failure']['type'] == 'AssertionError'
+    assert len(writes) == 4 and [command[0] for command in commands].count('verify') == 4
+    assert receipt['transactions'][-1]['effect_verified'] is False
+    for slot, effect in zip(receipt['baseline']['slots'], receipt['baseline']['effects'], strict=True):
+        assert effect['owner']['id'] == slot['id']
+        assert 'parent' not in slot and 'parent' not in effect
+        assert 'parent' in slot['unavailable_fields'] and 'parent' in effect['unavailable_fields']
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1'])

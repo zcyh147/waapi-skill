@@ -10835,6 +10835,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if "platform" in arguments
             else None
         )
+        observation_platform = platform
+        if platform is None or not _compound_platform_guid(platform):
+            from .edit_history_business import capture_field_read_platform
+            metadata["field_read_platform"] = capture_field_read_platform(request.version, platform, read=read)
+            if metadata["field_read_platform"]["status"] == "certified":
+                observation_platform = metadata["field_read_platform"]["platform_id"]
         info = _read_property_info(read, object_id=source.object, name=field_value)
         metadata["field_info"] = info.as_dict()
         # Every exact selected field stays bound through prewrite and verify,
@@ -10879,7 +10885,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             {"from": {"id": [source.object]}},
             {
                 "return": ["id", "path", field_value, *activation_requirements, *activation_reference_requirements],
-                **({"platform": platform} if platform is not None else {}),
+                **({"platform": observation_platform} if observation_platform is not None else {}),
             },
         )
         field_before_rows = _rows(field_before_result)
@@ -10921,6 +10927,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "value": _field_value(field_before_rows[0], field_value),
             "platform": platform,
             "row": field_before_rows[0],
+            "observation_platform": observation_platform,
             **({"activation_requirements": activation_requirements} if activation_requirements else {}),
             **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
         }
@@ -10942,6 +10949,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 "expected_value": arguments["value"],
                 "metadata_type": info.type,
                 "platform": platform,
+                "observation_platform": observation_platform,
             }
         else:
             target_payload = arguments["target"]
@@ -10977,6 +10985,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 ),
                 "expected_clear": target is None,
                 "platform": platform,
+                "observation_platform": observation_platform,
             }
         cleanup = {"kind": "restore-pre-state", "snapshot": dict(source.row), "field_metadata": info.as_dict()}
     elif request.operation == "audio.import":
@@ -15755,6 +15764,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
+    from .edit_history_business import observe_field_read_platform
+    platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
+    if platform_observation is not None:
+        readbacks.extend(platform_observation["readbacks"])
+        assertions.append({"name": "source field original read-platform binding unchanged", "passed": platform_observation["matches"],
+            "evidence": {key: value for key, value in platform_observation.items() if key != "readbacks"}})
     curve_type_cache: dict[str, Any] = {}
     for expected in pre_state.get("inline_curve_guards", []) if isinstance(pre_state, Mapping) else []:
         def curve_read(uri, args, options):
@@ -15781,7 +15796,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             activation_requirements = field_before.get("activation_requirements", {})
             activation_reference_requirements = field_before.get("activation_reference_requirements", {})
             options = {"return": ["id", "path", field_name, *activation_requirements, *activation_reference_requirements]}
-            platform = field_before.get("platform")
+            platform = field_before.get("observation_platform", field_before.get("platform"))
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
                     raise OperationContractError(
@@ -17416,6 +17431,12 @@ def verify_prepared_operation(
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True))
+    from .edit_history_business import observe_field_read_platform
+    platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
+    if platform_observation is not None:
+        readbacks.extend(platform_observation["readbacks"])
+        check("source field original read-platform binding unchanged", platform_observation["matches"],
+            {key: value for key, value in platform_observation.items() if key != "readbacks"})
 
     def check_result_schema(uri: str, version: str) -> None:
         try:
@@ -20475,7 +20496,7 @@ def verify_prepared_operation(
             check("notes match exactly", rows[0].get("notes") == plan.get("expected_notes"), rows[0].get("notes"))
     elif kind == "same-guid-property":
         field_name = str(plan.get("field"))
-        platform = plan.get("platform")
+        platform = plan.get("observation_platform", plan.get("platform"))
         activation_requirements = plan.get("activation_requirements", {})
         activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
@@ -20504,7 +20525,7 @@ def verify_prepared_operation(
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
-        platform = plan.get("platform")
+        platform = plan.get("observation_platform", plan.get("platform"))
         activation_requirements = plan.get("activation_requirements", {})
         activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(

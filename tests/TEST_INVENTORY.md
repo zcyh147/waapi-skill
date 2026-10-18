@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R28 checkpoint
+
+Frozen `4fac9727` passed the central preflight **825 tests** (27.01s) and
+the separate affected cross-focus **8 tests** (4.26s). Both runs preserved all
+1,878 tracked files and left no owned processes. Program roster: 259 entries.
+This is not a replacement full Program or Non-live gate.
+
+The same candidate passed one native anonymous EffectSlot exact-ID edit case
+on each of macOS Wwise 2023.1, 2024.1 and 2025.1, sequentially: **1 passed**
+in 13.04s, 13.29s and 9.71s respectively. Each case independently checked two
+separate effects and preservation; source hashes/mtime/tree stayed unchanged,
+the sandbox was deleted and owned processes ended. The original `f4c245b6`
+2025 failure remains a failure: its collector assumed the wrong embedded
+Effect owner/parent relationship and stopped before the intended effects.
+These results do not establish new anonymous List construction, inline merge,
+RTPC graph effects, history effects, Windows or Fresh acceptance. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-eighth-integration-checkpoint).
+
 ## 2026-10-18 full-coverage R27 checkpoint
 
 Central `cb35b9d7` recorded **824 passed / 1 failed** (27.28s). The shared-schema

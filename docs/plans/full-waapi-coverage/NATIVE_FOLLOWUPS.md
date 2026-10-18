@@ -173,3 +173,27 @@ blocked. This settles existing identity/class/owner observation, not creation,
 ControlInput mutation applicability, owner-list token, arbitrary Curve-point
 construction, or native absence. No further launch is needed to rediscover
 these same facts.
+
+## Existing anonymous EffectSlot exact-member effects — #180
+
+Frozen `4fac9727` passed the existing exact-ID collector once on each macOS
+Console lane 2023.1, 2024.1 and 2025.1. Each lifecycle verifies two separately
+previewed effects: selected Bypass=true, then owner rename plus Bypass=false.
+Independent public reads check ordered membership, both slots and local Effects,
+class/owner/reference/scalar values, notes, paths and parent availability.
+Three setup transactions are excluded from effect coverage. Source full hashes,
+mtime/tree and all tracked files stayed unchanged; PASS sandboxes were deleted
+and no owned process remained. The three original roots and summary are
+`.waapi-skill-state/full-coverage/effect-slot-exact-4fac9727-{2023,2024,2025}-r1`
+and `effect-slot-exact-4fac9727-native-summary.json` in the root checkout.
+
+The earlier `f4c245b6` 2025 attempt remains FAIL/quarantined. Its collector had
+invented a local Effect hierarchy parent and direct Sound owner; the actual
+representation is immediate slot owner with parent unavailable. The corrected
+collector retains, rather than normalizes away, that observed absence.
+
+This closes these exact candidate/version native witnesses only. New anonymous
+List construction, empty-name conflict semantics, planned plugin targets and
+RTPC graph/Exclusive native effects still require implementation or evidence.
+Legacy 2021/2022 scalar EffectN contracts are distinct. No blanket owner rule,
+inline List merge, Windows, Fresh or whole-ticket completion follows.

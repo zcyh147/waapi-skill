@@ -1008,3 +1008,53 @@ for development tests, Skill-local Python for native/formal runtime, owned
 sequential Wwise sessions, and separately approved small Mac-only Fresh batches.
 Preserve ignored evidence before archiving any worktree. Final acceptance needs
 all branch obligations, combined gates, native proof and Standards/Spec review.
+
+## Twenty-eighth integration checkpoint
+
+R28 code `4fac9727` enforces the selected property's Exclusive RTPC limit in
+both standalone and graph requests, including planned owners and replace-all.
+Same-pair GUID updates remain supported; unrelated curves are preserved.
+Standalone requests now revalidate the selected support metadata before writing.
+
+Owned history expectations now observe verified reference assignments/clears,
+including supported compound changes. Source property/reference reads bind
+current/named selectors to the observed non-null platform GUID. Source execution
+and verification recheck that binding; later history observes the original GUID.
+A null GUID does not certify a read view. Known optional platform-observer
+failures retain bounded unobserved evidence without blocking otherwise usable
+source writes; mandatory context and previously certified binding checks still
+fail closed. Compact summaries omit duplicated metadata only; full source and
+history proofs remain in transaction-show. Other history observer kinds and
+version-matched native history effects remain unfinished.
+
+One central preflight passed 825 tests in 27.01s and a separate eight-case
+cross-focus passed in 4.26s. Both preserved all 1,878 tracked files and left no
+owned processes. Four serial inventory generation/check steps passed once.
+The Program roster is 259; public counts remain 897 version rows / 228 URIs /
+515 contracts / 32,978 branches. Native IDs, shapes, owners, requirements and
+policy bytes remain unchanged: 272,313 obligations, 116 approved exclusions,
+272,197 unresolved default rows. No existing receipt is silently rebound.
+
+The first actual 2025 EffectSlot witness on `f4c245b6` failed because its collector
+assumed a local Effect belonged directly to the Sound and had a hierarchy
+parent. Native observation instead showed Effect.owner=EffectSlot and
+EffectSlot.owner=Sound, with both parents unavailable. Three setup transactions
+had verified; the intended effects had not begun. The corrected collector keeps
+that exact owner chain and preserves parent absence rather than discarding the
+checks. Its original failure/quarantine and pure regression controls remain.
+
+On frozen `4fac9727`, the corrected case passed sequentially on macOS 2023.1,
+2024.1 and 2025.1 (one test each, 13.04s / 13.29s / 9.71s). Each lifecycle made
+118 public calls: three setup transactions receive no coverage credit; two
+separate effect transactions toggle a selected actual anonymous slot's Bypass,
+then rename its Sound and toggle Bypass back. Independent reads preserve other
+slots, Effect references, values, identities and ordered membership. Source
+hashes/mtime/tree and tracked files stayed unchanged; all three PASS sandboxes
+were removed and owned processes ended. This is exact-member acceptance, not
+new anonymous List construction, inline merge or whole-ticket completion.
+Original receipts and the candidate-bound summary are under the root ignored
+`full-coverage/effect-slot-exact-4fac9727-*` evidence paths.
+
+Anonymous slot/plugin graph construction, RTPC graph native effects, other
+condition/host branches, exact evidence completion and final broad gates remain
+same-parent work. No Fresh, Windows, final review or ticket closure is added.
