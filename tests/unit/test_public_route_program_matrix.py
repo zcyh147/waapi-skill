@@ -244,6 +244,30 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             assert not output.exists()
             output.write_text(project_xml, encoding="utf-8")
 
+    elif entry.uri == "ak.wwise.console.project.open":
+        # Open seals the actual saved input before dispatch. This Registry-only
+        # matrix does not observe a live transition and cannot grant effect credit.
+        io_root = (tmp_path / "console-open-input").resolve()
+        io_root.mkdir()
+        project = io_root / "ProgramProbe.wproj"
+        project.write_text('''<WwiseDocument Type="Project"><ProjectInfo>
+<Project Name="ProgramProbe" ID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}" />
+</ProjectInfo></WwiseDocument>''', encoding="utf-8")
+        args, options = {"path": str(project)}, {}
+        project_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(project_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        plan = prepared_before_dispatch.as_dict()["verification_plan"]
+        assert plan["project"] == {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "ProgramProbe"}
+        assert plan["path"] == str(project)
+        assert plan["file_proof"]["size"] == len(project.read_bytes())
+
     elif entry.uri in CLI_PROJECT_FILE_URIS:
         # These matrix rows deliberately supply only a successful process result,
         # with no filesystem effect. Freeze real isolated inputs so the current
@@ -567,6 +591,13 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert observed["default_language"] == "English(US)"
         assert observed["unresolved"] == []
         assert len(observed["file_proof"]["sha256"]) == 64
+    elif entry.uri == "ak.wwise.console.project.open":
+        assert verification.status == "result_schema_checked"
+        assert verification.business_state_verified is False
+        assert verification.verification_strength == "saved_project_input_identity"
+        assert verification.readbacks[0]["project"] == {
+            "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "ProgramProbe"}
+        assert verification.readbacks[0]["file_proof"] == prepared_payload["verification_plan"]["file_proof"]
     elif entry.uri in CLI_PROJECT_FILE_URIS:
         observed = verification.readbacks[0]
         # Process success remains a separate fact from the unchanged/missing
