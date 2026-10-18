@@ -18,6 +18,17 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Latest staging `5acc4054` passes the 2022 null-source diagnostic and original
+  complete created-field history case on real macOS Console. The 2021 legacy
+  import now passes the saved-project prerequisite and first Gateway-verified
+  media/Render write, but independent reading exposes an unsupported native
+  `activeSource` accessor that the public query still offers. Its versioned
+  mapping/oracle correction remains #181 work. Authoring automation-mode startup
+  reaches connection checking promptly; malformed `getInfo` evidence still
+  blocks exact host/build acceptance. See NATIVE_FOLLOWUPS.md for original
+  candidates, runs and scope. This staging work is not yet promoted to the
+  integration checkout; remaining ticket and final-gate status is unchanged.
+
 - Draft integration PR: [#196](https://github.com/zcyh147/waapi-skill/pull/196).
 - #175 is complete and closed. Integration candidate `faa704ff` passed the fixed
   five-version Program gate: **7014 passed, 3 native-Windows-only skips**, exit 0,

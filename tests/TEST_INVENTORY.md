@@ -5,6 +5,33 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 constructor repair and Authoring startup follow-ups
+
+Staging `5acc4054`, macOS Console 2022.1: the separate null-source diagnostic
+passed **1 test in 9.83s**, followed in a fresh root by the unchanged complete
+created-field history case, **1 passed in 7.95s**. Both source variants and
+their undo effects passed independent checks. The diagnostic itself remains
+diagnostic-only; it is not separate full-history coverage. Both runs preserved
+source hash/mtime/tree and 1,883 tracked files, deleted passing sandboxes and
+left no owned process. These are exact 2022 component results, not generic
+class, nested/platform, Fresh or whole-ticket acceptance.
+
+The matching 2021 legacy import collector on `5acc4054` recorded **1 failed in
+12.65s**. The saved-project prerequisite now succeeds; the first media/Render
+write passed Gateway verification. Independent reading then hit native rejection
+of the public `active-source` projection (`Unknown accessor activeSource`).
+Its sandbox is quarantined; source integrity and process cleanup passed. This
+requires a version-correct public mapping and oracle, not removal of the check.
+
+Two root `1d58f5fa` Authoring startup attempts ended before test collection with
+exit 3. The first had a user-observed/user-accepted EULA; the second used the
+user-requested child-only `AK_AUTOMATION_MODE=1`. Readiness reached a malformed
+client `getInfo` result after 58.93s / 3.85s, respectively. Neither passed the
+exact host/build guard. Source full hash/mtime and 1,883 tracked files remained
+unchanged and owned processes ended. These are diagnostic evidence, not passing
+tests. Exact roots and limitations are in
+[native follow-ups](../docs/plans/full-waapi-coverage/NATIVE_FOLLOWUPS.md).
+
 ## 2026-10-18 full-coverage R33 integration and history
 
 Integrated runtime `51906536` passed one central preflight: **825 passed**

@@ -7,6 +7,24 @@ and existing obligations remain in SPEC.md and LEDGER.md.
 
 ## Created-field history: current exact results — #192 / #178
 
+The reviewed 2022 constructor compatibility at staging `5acc4054` now passes
+both the separate null-source diagnostic (**9.83s**) and the original complete
+creation/history case (**7.95s**). The public request still asks for null
+Attenuation and all four scalar/controller fields. Only the redundant native
+null assignment is omitted after proving the new Sound's actual null class
+default and satisfied conditions. Independent reads confirm class 65552, parent,
+all requested fields and a present null reference; both existing-reference and
+null-reference creation/undo sequences pass. This proves the exercised 2022
+placement/platform, not every nested or inherited context.
+
+Original roots in the native-conditions worktree are
+`null-source-only-5acc4054-2022-r1` and `created-history-5acc4054-2022-r1`.
+Both preserved source full hash/mtime/tree and 1,883 tracked files, deleted the
+passing sandbox and left no owned process. Earlier failed transactions/dumps
+remain unchanged. The generic actual-class verifier gap for unmarked ordinary
+creation nodes remains separate required work; this targeted constructor now
+uses the existing strict class observer.
+
 Fixed `854d28aa0b570733280fd77729d108d8bcde3788` passed the existing
 `test_created_leaf_fields_history_receipt_native_acceptance` on macOS Console
 2023.1, 2024.1 and 2025.1 (16.31s, 10.00s and 19.71s). Both original cases
@@ -68,6 +86,44 @@ must retain the public null intent, all other fields and independent null-state
 verification; removing the case is not a repair.
 
 ## Legacy import Render: two effects verified, TSV still open — #180 / #182
+
+The 2021 collector at staging `5acc4054` saved the sandbox through normal public
+transactions before language-bound imports. Setup and the first media/Render
+transaction passed Gateway verification, but the independent check then failed:
+the public `active-source` projection compiled to `activeSource`, which the
+matching 2021 server rejected as an unknown accessor. The whole case is **FAIL
+(12.65s)**, not a completed import acceptance. This adds a versioned public query
+mapping/admission obligation under #181 and requires a supported independent
+Source-selection oracle; removing that assertion is not a repair.
+
+Root: `legacy-import-render-5acc4054-2021-r1` in the native-conditions worktree.
+Source hash/mtime/tree and 1,883 tracked files remained unchanged, owned processes
+ended, and the failed sandbox was quarantined. Three planned public saves are
+prerequisites without effect coverage credit; only the first was reached here.
+
+## Authoring startup: observed EULA and automation experiment — #184 / #188
+
+On root candidate `1d58f5fa`, the user observed and personally accepted the
+2024.1.13.9056 EULA in the fresh owned Authoring environment. The lifecycle then
+received a dictionary without the required `getInfo` version/host fields and
+rejected it. This is not proof that the actual launched build was wrong.
+
+At the user's request, a separate fresh run supplied only the child environment
+`AK_AUTOMATION_MODE=1`. Installed Wwise executable strings support this startup
+experiment; SDK documentation establishes that automation mode auto-accepts EULA,
+project-load and related dialogs. No user preference was copied or global setting
+changed. The new run reached the same malformed response after **3.85s**, versus
+**58.93s** in the manually observed run, without another manual click. It still
+failed the host/build guard and grants no Authoring business acceptance.
+
+Original roots are `authoring-metadata-1d58f5fa-user-observation-r1` and
+`authoring-metadata-1d58f5fa-automation-r1` under the root coordination directory.
+Both preserved source full hash/mtime and 1,883 tracked files and cleaned owned
+processes. Existing diagnostics retained only response types; a bounded snapshot
+of the already-returned client value is needed before another meaningful attempt.
+Do not weaken the host/build guard or infer raw transport data from this record.
+
+## Earlier legacy import evidence
 
 On macOS 2022.1, the first collector at `88673436` stopped before any write
 (6.32s): it incorrectly compared the display label `Effect 0` to the exact
