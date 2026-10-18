@@ -622,11 +622,12 @@ class HeadlessLifecycle:
                 time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
                 continue
             if self.host_kind == 'wwise-authoring':
-                if type(observed) is dict and not observed:
-                    # The client can return {} before any host identity exists.
-                    # Poll only this exact empty shape within the same deadline;
+                if observed is None or (type(observed) is dict and not observed):
+                    # The client documents None on failure and can return {};
+                    # neither result proves a host identity. Poll only these
+                    # absence shapes within the same deadline;
                     # nonempty malformed data and proved mismatches fail below.
-                    pending_host_info = {'result_type': 'dict', 'classification': 'identity_pending',
+                    pending_host_info = {'result_type': type(observed).__name__, 'classification': 'identity_pending',
                                          'client_result': _get_info_diagnostic(observed)}
                     last_error = None
                     time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
