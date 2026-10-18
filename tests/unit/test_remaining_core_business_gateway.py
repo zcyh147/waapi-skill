@@ -1365,6 +1365,7 @@ def _assert_no_provider_secret_artifacts(state, evidence, secret, *payloads):
 
 
 @pytest.mark.parametrize("native", [
+    pytest.param(lambda: None, id="missing-response"),
     RuntimeError('provider echoed fake-password-雪-"\\-needle'),
     {"log": [{"severity": "Message", "time": 0, "messageId": "id", "message": "fake-password-雪-\"\\-needle", "fake-password-雪-\"\\-needle": "echo"}]},
     {"log": [{"severity": "Message", "time": 0, "messageId": "id", "message": "x" * 12000}]},
@@ -1375,6 +1376,9 @@ def test_source_control_provider_native_exception_malformed_or_large_echo_is_pro
     code, result = run("execute", preview["transaction_id"])
     assert code != 0 and len(client.calls) == 1, result
     assert result["automatic_retry"] is False
+    if callable(native):
+        assert result["state"] == "indeterminate"
+        assert result["dispatch_result"]["error_code"] == "PROTECTED_PROVIDER_RESULT_INVALID"
     _assert_no_provider_secret_artifacts(state, evidence, secret, result)
     code, replay = run("execute", preview["transaction_id"])
     assert code != 0 and len(client.calls) == 1, replay

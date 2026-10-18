@@ -2220,11 +2220,51 @@ def _created_leaf_history_preview(task, source, direction="undo"):
     return tx
 
 
+def test_created_source_missing_acknowledgement_is_indeterminate_and_never_replayed(tmp_path):
+    task, source, shown = _created_leaf_history_case(tmp_path, version="2022.1",
+        created_fields=True, reference="null", prepared_only=True)
+    original = task.call
+
+    def lost_response(uri, args=None, options=None):
+        result = original(uri, args, options)
+        # A write may have reached Wwise before the client loses its response.
+        return None if uri == "ak.wwise.core.object.create" else result
+
+    task.call = lost_response
+    code, confirmed = task.run("confirm", source, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, failed = task.run("execute", source)
+    assert code == 2 and failed["state"] == "indeterminate", failed
+    assert failed["status"] == "indeterminate" and failed["automatic_retry"] is False
+    assert failed["dispatch_result"]["result"] is None
+    assert failed["dispatch_result"]["error_code"] == "WAAPI_RESPONSE_MISSING"
+    assert failed["dispatch_result"]["failure_origin"] == "missing_response"
+    assert failed["dispatch_result"]["details"]["effects_unknown"] is True
+    assert failed["recovery"]["stage"] == "unknown_write_outcome"
+    assert failed["recovery"]["project_write_outcome"] == "unknown"
+    assert failed["recovery"]["original_write_replay_allowed"] is False
+    assert "agent_result" not in failed and "verification" not in failed
+    code, full = task.run("transaction-show", source)
+    assert code == 0, full
+    events = full["events"]
+    assert [event["event_type"] for event in events][-2:] == ["execution_started", "execution_indeterminate"]
+    assert not any(event["event_type"] in {"execution_completed", "verification_recorded"} for event in events)
+    assert "Rain" in [row["name"] for row in task.objects.values()]
+    code, replay = task.run("execute", source)
+    assert code == 2 and replay.get("verified") is not True, replay
+    code, verify = task.run("verify", source)
+    assert code == 2 and verify.get("verified") is not True, verify
+    writes = [row for row in task.calls if row[0] == "ak.wwise.core.object.create"]
+    assert len(writes) == 1 and writes[0][1]["@Attenuation"] is None
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+
+
 def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_path):
     task, source, created = _created_leaf_history_case(tmp_path)
     tx = _created_leaf_history_preview(task, source)
     code, executed = task.run("execute", tx)
     assert code == 0, executed
+    assert executed["dispatch_result"]["result"] == {}
     code, verified = task.run("verify", tx)
     assert code == 0 and verified["verified"] is True, verified
     assert verified["verification_strength"] == "scoped_history_effect_readback"

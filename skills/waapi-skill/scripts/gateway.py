@@ -23069,13 +23069,13 @@ def dispatch_host_control_transaction(
         }
 
     dispatch_accepted = bool(result is not None and result.get("ok") is True)
-    normalized_exception = (
-        result is not None and result.get("failure_origin") == "exception"
+    ambiguous_dispatch_failure = (
+        result is not None and result.get("failure_origin") in {"exception", "missing_response"}
     )
     explicit_dispatch_failure = (
         result is not None
         and not dispatch_accepted
-        and not (expected_disconnect and normalized_exception)
+        and not (expected_disconnect and ambiguous_dispatch_failure)
     )
     if dispatch_accepted:
         delivery = "waapi_result_returned"
