@@ -684,14 +684,22 @@ def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_med
             and not node.attrib and not len(node) and not (node.text or '').strip()):
         return None
     if (node.tag == 'Property' and _path and _path[-1] == 'PropertyList'
-            and set(node.attrib) == {'Name', 'Type'} and len(node) == 1
+            and set(node.attrib) == {'Name', 'Type'} and 1 <= len(node) <= 2
             and not (node.text or '').strip()):
-        values = node[0]
-        if (values.tag == 'ValueList' and not values.attrib and len(values) == 1
-                and not (values.text or '').strip()):
-            value = values[0]
-            if value.tag == 'Value' and not value.attrib and not len(value):
-                return [node.tag, sorted([*node.attrib.items(), ('Value', value.text or '')]), '', []]
+        value_lists = [child for child in node if child.tag == 'ValueList']
+        retained = [child for child in node if child.tag != 'ValueList']
+        if len(value_lists) == 1 and all(child.tag == 'RTPCList' for child in retained):
+            values = value_lists[0]
+            if (not values.attrib and len(values) == 1 and not (values.text or '').strip()):
+                value = values[0]
+                if value.tag == 'Value' and not value.attrib and not len(value):
+                    # Scalar storage can change beside an RTPC binding. Preserve
+                    # that entire binding, including curve, IDs and point order.
+                    children = [_xml_value(child, excluded_platform=excluded_platform,
+                        exclude_media_storage=exclude_media_storage, _path=(*_path, node.tag))
+                        for child in retained]
+                    return [node.tag, sorted([*node.attrib.items(), ('Value', value.text or '')]), '',
+                        [child for child in children if child is not None]]
     excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
     return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
         (node.text if node.text and node.text.strip() else ''), [value for child in node

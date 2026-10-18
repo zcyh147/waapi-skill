@@ -1303,6 +1303,8 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     ('2025.1', 'PluginMediaSource', 'plugin-conflicting-encodings'),
     ('2025.1', 'PluginMediaSource', 'plugin-value-list'),
     *[(version, 'AudioFileSource', 'serialization') for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[('2021.1', 'AudioFileSource', change) for change in
+      ['serialization-rtpc', 'serialization-rtpc-change', 'serialization-rtpc-remove']],
     *[('2022.1', 'AudioFileSource', change) for change in
       ['bus-empty-reference', 'bus-nonempty-reference', 'bus-attributed-reference', 'bus-text-reference', 'other-empty-reference']],
     *[('2025.1', 'AudioFileSource', 'serialization-' + fault) for fault in
@@ -1367,6 +1369,10 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                     value = field.attrib.pop('Value')
                     nested = ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value')
                     nested.text = '42' if change == 'serialization-value' else value
+                    if change == 'serialization-rtpc-change':
+                        field.find('.//Point/YPos').text = '99'
+                    elif change == 'serialization-rtpc-remove':
+                        field.remove(field.find('RTPCList'))
                     if change == 'serialization-platform':
                         nested.set('Platform', 'Windows')
                     elif change == 'serialization-dual':
@@ -1417,6 +1423,11 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
         ET.SubElement(source, 'AudioFile' if source_kind == 'AudioFileSource' else 'MidiFile').text = 'Keep.wav'
     if change and change.startswith('serialization'):
         ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='PlainScalar', Type='Real32', Value='22.7')
+        if change.startswith('serialization-rtpc'):
+            scalar = tree.find('.//Sound/PropertyList/Property[@Name="PlainScalar"]')
+            scalar.append(ET.fromstring('''<RTPCList><RTPC Name="" ID="{A75FFD27-F761-4E29-9666-2E85075CB99D}" ShortID="539810034">
+<Curve Name="" ID="{B3F2A2A7-8634-4B8B-8203-B2F7BD38C9A8}"><PointList><Point><XPos>0</XPos><YPos>5</YPos><Flags>5</Flags></Point></PointList></Curve>
+</RTPC></RTPCList>'''))
         references = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'EffectSlot'), 'ReferenceList')
         if change == 'serialization-reference':
             ET.SubElement(references, 'Reference', Name='Effect')
@@ -1448,7 +1459,7 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'bus-empty-reference'}:
+    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'serialization-rtpc', 'bus-empty-reference'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         if change == 'serialization-value':
