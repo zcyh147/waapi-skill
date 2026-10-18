@@ -52,6 +52,17 @@ _SUPPORTED_VERSIONS = {
 }
 
 
+def _sound_semantics(operation):
+    return {
+        "sound_voice": {"native_class": "Sound", "initial_fields": {"IsVoice": True}, "empty_container": True},
+        "explicit_flag_conflict": "reject_before_dispatch",
+        "generic_Sound_Type_Handle": "explicit_class_fields_remain_available",
+        "verification": "actual_Boolean_IsVoice_and_bound_fields_identity_and_metadata",
+        "language_and_media": ("use_audio_import_for_localized_media" if operation == "object.create"
+            else "requested_media_language_independently_verified;explicit_language_without_media_pending_effect_evidence"),
+    }
+
+
 def object_graph_business_contract_data(
     operation: str,
     version: str,
@@ -222,6 +233,7 @@ def object_graph_business_contract_data(
             "operation": operation,
             "version": version,
             "input_mode": "business_declaration",
+            "sound_semantics": _sound_semantics(operation),
             "start": {
                 "subcommand": "draft-start",
                 "gateway_argv": ["draft-start", operation],
@@ -418,6 +430,7 @@ def object_graph_business_contract_data(
         "operation": operation,
         "version": version,
         "input_mode": "business_declaration",
+        "sound_semantics": _sound_semantics(operation),
         "start": {
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", operation],

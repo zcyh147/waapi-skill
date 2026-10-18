@@ -378,13 +378,6 @@ def _compile_set_new_node(
                 action="provide one exact non-SFX Project language for a Sound Voice",
             )
         node["language"] = language
-    elif declaration.target.kind == "sound-voice":
-        raise _repair(
-            session,
-            "OBJECT_SET_VOICE_LANGUAGE_REQUIRED",
-            field="language",
-            action="provide the exact Project language for the new Sound Voice",
-        )
     if "media_files" in extension_fields:
         node["import"] = _compile_object_set_import(
             session,
@@ -541,6 +534,23 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
         target = session.handles.resolve_object(handle)
         identities.append({"kind": "id", "value": target.object_id})
     return {"name": field.token, "target": identities if isinstance(value, list) else identities[0]}
+
+
+def _apply_sound_kind_fields(session, declaration, properties):
+    """Bind Voice meaning to its documented Sound scalar, not a wire alias."""
+    target = declaration.target
+    if not isinstance(target, NewDescendantTarget) or target.kind.startswith("bth1-"):
+        return
+    kind = resolve_semantic_kind(target.kind, version=session.context.wwise_version).name
+    if kind not in {"sound-sfx", "sound-voice"}:
+        return
+    voice = kind == "sound-voice"
+    explicit = [row for row in properties if row["name"].casefold() == "isvoice"]
+    if any(row["value"] is not voice for row in explicit):
+        raise _repair(session, "SOUND_KIND_FIELD_CONFLICT", field="field_values",
+            action="choose a Sound kind consistent with the explicitly selected IsVoice value")
+    if voice and not explicit:
+        properties.append({"name": "IsVoice", "value": True})
 
 
 def _compile_create_fields(
@@ -727,6 +737,7 @@ def _compile_create_fields(
         else:
             references.append(_compile_graph_field_reference(session, field, business_value,
                 allow_arrays=allow_reference_arrays, allow_inline_curve=allow_inline_curve))
+    _apply_sound_kind_fields(session, declaration, properties)
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -835,17 +846,6 @@ def _materialize_create(
                 "TARGET_FORM_INVALID",
                 field="target",
                 action="object.create accepts only named new-object declarations",
-            )
-        if row.target.kind == "sound-voice":
-            raise _repair(
-                session,
-                "OBJECT_CREATE_VOICE_UNAVAILABLE",
-                field="kind",
-                choices=["audio.import", "object.set"],
-                action=(
-                    "use audio.import for a media outcome or object.set with an "
-                    "exact Project language for a new Sound Voice"
-                ),
             )
         parent_handle = row.target.parent_handle
         if parent_handle in declarations:

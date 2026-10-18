@@ -690,7 +690,7 @@ def test_object_set_compiles_voice_language_platform_and_subordinate_media() -> 
                     "name": "Storm Warning",
                     "language": "English(US)",
                     "platform": "Windows",
-                    "properties": [{"name": "Volume", "value": -3.0}],
+                    "properties": [{"name": "Volume", "value": -3.0}, {"name": "IsVoice", "value": True}],
                     "import": {
                         "files": [
                             {
@@ -812,7 +812,7 @@ def test_object_set_rejects_empty_list_clear_without_replace_all() -> None:
     assert captured.value.error_code == "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE"
 
 
-def test_object_create_rejects_voice_outcome_that_native_route_cannot_express() -> None:
+def test_object_create_compiles_empty_voice_with_native_sound_flag() -> None:
     session, parent_handle = _session("2025.1")
     session = session.with_new_declaration(
         declaration_id="voice",
@@ -824,11 +824,12 @@ def test_object_create_rejects_voice_outcome_that_native_route_cannot_express() 
         fields={},
     )
 
-    with pytest.raises(BusinessDeclarationError) as captured:
-        business_adapter("object.create").materialize(session)
-
-    assert captured.value.error_code == "OBJECT_CREATE_VOICE_UNAVAILABLE"
-    assert captured.value.repair["choices"] == ["audio.import", "object.set"]
+    request = business_adapter("object.create").materialize(session)
+    assert request["arguments"] == {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "Sound", "name": "Storm Warning",
+        "properties": [{"name": "IsVoice", "value": True}],
+    }
 
 
 def test_create_plugin_rejects_type_handle_from_the_wrong_role() -> None:

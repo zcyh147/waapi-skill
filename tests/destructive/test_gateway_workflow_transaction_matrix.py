@@ -6447,3 +6447,151 @@ def test_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime:
     category = _collect_anonymous_effect_slot_construction_acceptance(workflow_sandbox_runtime,
         prefix='WAAPI_ANON_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
+
+
+def _collect_voice_creation_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    """Empty Voice identity effects in the existing owned host lifecycle."""
+    output = runtime.state_dir / 'voice-creation-acceptance.json'
+    category = {'category': 'sound-voice-creation', 'status': 'FAIL',
+        'verifier_strength': 'gateway_verified_plus_independent_exact_guid_class_parent_name_notes_volume_and_actual_boolean_voice',
+        'observation_path': str(output)}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
+        'business_effect_verified': False, 'scope': 'empty_Voice_containers_no_localized_media_or_Source_effect_claim',
+        'applicable_effects': ['ordinary_root_voice', 'ordinary_nested_voice',
+            *(['graph_empty_voice'] if runtime.version != '2021.1' else [])],
+        'lifecycle_acceptance': 'Requires final host-category-evidence/v3 source-integrity and cleanup acceptance'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 4 * 1024 * 1024, 'Voice receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 96, 'Voice public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}, payload
+                assert payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = ReceiptGateway()
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    def one(argv):
+        payload = gateway.gateway(['query-object', *argv, *projection], live=True)
+        rows = payload.get('objects')
+        assert payload.get('count') == 1 and isinstance(rows, list) and len(rows) == 1, payload
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        row = rows[0]
+        assert uuid.UUID(_required_string(row, 'id')).int != 0 and type(row.get('class_id')) is int, row
+        return row
+    def exact(identity, *, voice=False):
+        row = one(['--exact-id', identity, *(['--include-field', 'IsVoice', '--include-field', 'Volume'] if voice else [])])
+        assert row['id'] == identity, row
+        return row
+    def at(segments, *, voice=False):
+        found = one([*(arg for segment in segments for arg in ('--path-segment', segment))])
+        row = exact(found['id'], voice=voice)
+        assert all(row.get(key) == found.get(key) for key in ('id', 'name', 'type', 'path')), (found, row)
+        return row
+    def parent_id(row):
+        reference = row.get('parent')
+        assert isinstance(reference, Mapping) and uuid.UUID(_required_string(reference, 'id')).int != 0, row
+        return reference['id']
+    def complete(draft, phase):
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('state') == 'verified' and verified.get('verified') is True, verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+    try:
+        container_type = 'PropertyContainer' if runtime.version == '2025.1' else 'ActorMixer'
+        disclosed = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', container_type,
+            '--meaning', 'WorkUnit', '--page-size', '64'], live=True)['agent_result']
+        assert disclosed.get('complete') is True, disclosed
+        classes = {}
+        for name in ('Sound', container_type, 'WorkUnit'):
+            matches = [row for row in disclosed['types'] if row.get('name') == name and row.get('type') == 'WObject']
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, (name, disclosed)
+            classes[name] = matches[0]['classId']
+        assert classes['Sound'] == 65552, classes  # All five pinned Sound class pages.
+        receipt['live_classes'] = classes
+        segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        parent = at(segments)
+        assert parent['type'] == 'WorkUnit' and parent['class_id'] == classes['WorkUnit'], parent
+        receipt['parent_before'] = parent
+        observed_ids = set()
+        for index, label in enumerate(receipt['applicable_effects']):
+            nested = label == 'ordinary_nested_voice'
+            operation = 'object.set' if label == 'graph_empty_voice' else 'object.create'
+            name = 'NestedVoice' if nested else prefix + ('_GraphVoice' if operation == 'object.set' else '_RootVoice')
+            volume, notes = -6 - index, 'Keep ' + label
+            expected = {'name': name, 'volume': volume, 'notes': notes, 'parent_id': parent['id']}
+            phase = {'phase': label, 'operation': operation, 'expected': expected,
+                'native_outcome': 'not_executed', 'effect_verified': False}
+            receipt['transactions'].append(phase)
+            draft = _start_business_draft(gateway, operation)
+            handle = _bind_business_object(gateway, draft, object_id=parent['id'])
+            voice_segments = segments
+            if nested:
+                declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'container',
+                    '--parent-handle', handle, '--kind', 'actor-mixer', '--name', prefix + '_Container',
+                    '--field', 'notes', 'Keep Voice container'], live=False)
+                handle = declared_business_object_handle(declared, 'container')
+                voice_segments = (*segments, prefix + '_Container')
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'voice', '--parent-handle', handle,
+                '--kind', 'sound-voice', '--name', name, '--field', 'notes', notes, '--field', 'volume_db', str(volume)], live=False)
+            complete(draft, phase)
+            if nested:
+                container = at(voice_segments)
+                phase['independent_container'] = container
+                assert container['type'] == container_type and container['class_id'] == classes[container_type], container
+                assert parent_id(container) == parent['id'] and container['notes'] == 'Keep Voice container', container
+                assert container['id'] not in observed_ids and container['id'] != parent['id'], container
+                observed_ids.add(container['id']); expected['parent_id'] = container['id']
+            voice = at((*voice_segments, name), voice=True)
+            phase['independent_voice'] = voice
+            assert voice['type'] == 'Sound' and voice['class_id'] == classes['Sound'], voice
+            assert voice['id'] not in observed_ids and voice['id'] != parent['id'], voice
+            assert parent_id(voice) == expected['parent_id'] and voice['name'] == name and voice['notes'] == notes, voice
+            assert voice.get('properties', {}).get('IsVoice') is True, voice
+            actual_volume = voice.get('properties', {}).get('Volume')
+            assert type(actual_volume) in (int, float) and actual_volume == volume, voice
+            observed_ids.add(voice['id'])
+            assert exact(parent['id']) == parent, parent
+            phase['effect_verified'] = True
+        receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_voice_creation_acceptance(workflow_sandbox_runtime, prefix='WAAPI_VOICE_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category

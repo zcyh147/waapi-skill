@@ -624,8 +624,8 @@ def test_graph_modern_effects_uses_the_same_source_proven_empty_list_kernel(tmp_
     assert len(writes) == 1 and proofs
 
 
-def _native_shared_control_input_task(tmp_path):
-    task, writes = rtpc_task(tmp_path)
+def _native_shared_control_input_task(tmp_path, version='2025.1'):
+    task, writes = rtpc_task(tmp_path, version)
     # Actual native2025 ControlInput restriction, retained664 dispatcher SHA
     # ffd75a8dbb1606c1a75c89e2ca1736f53d1737c4528dd3506f0c6cc525a21450.
     task.metadata['ControlInput'] = {'name': 'ControlInput', 'type': '', 'default': None, 'dependencies': [],
@@ -644,8 +644,9 @@ def _native_shared_control_input_task(tmp_path):
     return task, writes
 
 
-def test_new_rtpc_control_input_uses_actual_class_metadata_and_existing_shared_target(tmp_path):
-    task, writes = _native_shared_control_input_task(tmp_path)
+@pytest.mark.parametrize('version', ['2023.1', '2025.1'])
+def test_new_rtpc_control_input_uses_actual_class_metadata_and_existing_shared_target(tmp_path, version):
+    task, writes = _native_shared_control_input_task(tmp_path, version)
     owner, control = task.bind(FIRST), task.bind(ROOT)
     declare_rtpc(task, owner, control, 'Volume', 'volume')
     declare_rtpc(task, owner, control, 'Pitch', 'pitch')
@@ -752,3 +753,31 @@ def test_rtpc_replacement_preserves_accessor_order_instead_of_sorting_guids(tmp_
     assert len(writes) == 1 and CHILD not in task.objects and CURVE_A not in task.objects
     assert [row['id'] for row in task.objects[FIRST]['@RTPC']] == [first, second]
     assert task.objects[second]['@PropertyName'] == 'Pitch' and task.objects[first]['@PropertyName'] == 'Volume'
+
+
+def test_2022_new_rtpc_accepts_independent_control_when_null_comparison_returns_empty(tmp_path):
+    task, writes = _native_shared_control_input_task(tmp_path, version='2022.1')
+    # Actual e2/2022 ControlInput restriction is the same literal restriction as
+    # the fixture above. Native returned [] for the old owner=null classifier.
+    # select this,owner is the matching SDK's object-projection alternative;
+    # this fixture controls that proposed result, not a native acceptance claim.
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql') in {
+                f'from object "{ROOT}" where owner = null take 1',
+                f'from object "{ROOT}" select this, owner take 3'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert options == {'return': ['id']}, options
+            return {'return': [] if 'where' in args['waql'] else [{'id': ROOT}]}
+        return original(uri, args, options)
+    task.call = call
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert len(writes) == 1
+    classifiers = [args['waql'] for uri, args, _ in task.calls
+        if uri.endswith('object.get') and ('owner = null' in args.get('waql', '') or 'select this, owner' in args.get('waql', ''))]
+    assert classifiers and set(classifiers) == {f'from object "{ROOT}" select this, owner take 3'}

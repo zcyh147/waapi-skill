@@ -7945,6 +7945,13 @@ def _prepare_object_node_specs(
     merge_guards = [] if merge_guards is None else merge_guards
     shareset_placements = {}
     for node in nodes:
+        # Composition can add media after declaring a Voice. Only the complete
+        # request can establish whether an explicit language has a Source effect.
+        if node.language is not None and node.import_arg is None:
+            raise OperationContractError(
+                "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
+                "An explicit language without localized media still needs Source effect evidence; omit language for an empty Voice or add the requested media.",
+            )
         requested_type_token = _object_type_token(node.type)
         uses_2025_actor_mixer_alias = (
             version == "2025.1" and requested_type_token == "actormixer"
@@ -8183,7 +8190,9 @@ def _prepare_object_node_specs(
                 "override_applicability": [proof for proof in applicability.values() if proof is not None]}
             if related:
                 spec["related_conditions"] = related
-        elif any(info.dependencies for info in property_info_by_name.values()):
+        elif property_info_by_name:
+            # Even an unconditional supplied field relies on this exact class
+            # metadata. Reuse the existing per-phase default/condition guard.
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
                 structural_proof = None
@@ -8691,9 +8700,38 @@ def _append_association_condition(requirements, *, source, owner, property_name,
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
 
 
+def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
+    """Reuse sealed class field/default facts at both transaction phases."""
+    if not isinstance(pre_state, Mapping):
+        return []
+    nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
+    if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
+        nodes.append(pre_state["plugin_creation_guard"])
+    assertions, seen = [], set()
+    for node in nodes:
+        for evidence in node.get("new_object_default_evidence", []):
+            scope = evidence["class_scope"]
+            for field, expected in evidence["metadata"].items():
+                key = (scope.get("classId"), field)
+                if key in seen:
+                    continue
+                seen.add(key)
+                args = {**scope, "property": field}
+                result = read(GET_PROPERTY_INFO_URI, args, {})
+                actual = parse_get_property_info_result(result).as_dict()
+                if readbacks is not None:
+                    readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
+                        "args": args, "options": {}, "result": dict(result)})
+                assertions.append({"name": f"new object class metadata {field} unchanged",
+                    "passed": _native_snapshot_equal(actual, expected) and ("default" in result) == evidence["default_presence"][field],
+                    "evidence": {"expected": expected, "actual": actual,
+                        "expected_default_present": evidence["default_presence"][field], "actual_default_present": "default" in result}})
+    return assertions
+
+
 def _condition_metadata_assertions(pre_state, *, read, after_write=False):
     """Keep the exact selected condition metadata valid through verification."""
-    assertions = []
+    assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
     result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
     if result_context:
         try:
@@ -16333,14 +16371,13 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
 
     # Class defaults authorize only genuinely new objects. Re-read the exact
     # metadata sealed at Preview before dispatching their single creation call.
+    assertions.extend(_new_object_class_metadata_assertions(pre_state, read=read_call, readbacks=readbacks))
     if isinstance(pre_state, Mapping):
-        metadata_seen = set()
         condition_nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
         if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
             condition_nodes.append(pre_state["plugin_creation_guard"])
         for node in condition_nodes:
             for evidence in node.get("new_object_default_evidence", []):
-                scope = evidence["class_scope"]
                 for proof in evidence.get("override_applicability", []):
                     from .override_applicability import proof_current
                     assertions.append({"name": "new user-send override applicability proof unchanged",
@@ -16349,21 +16386,6 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     from .new_object_defaults import structural_bus_proof_current
                     assertions.append({"name": "new non-master bus class/source/parent proof unchanged",
                         "passed": structural_bus_proof_current(rule["proof"], read=read_call), "evidence": rule["proof"]})
-                for field, expected in evidence["metadata"].items():
-                    key = (scope.get("classId"), field)
-                    if key in metadata_seen:
-                        continue
-                    metadata_seen.add(key)
-                    args = {**scope, "property": field}
-                    result = read_call(GET_PROPERTY_INFO_URI, args, {})
-                    actual = parse_get_property_info_result(result).as_dict()
-                    readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
-                                      "args": args, "options": {}, "result": dict(result)})
-                    assertions.append({"name": f"new object class metadata {field} unchanged",
-                                       "passed": actual == expected and ("default" in result) == evidence["default_presence"][field],
-                                       "evidence": {"expected": expected, "actual": actual,
-                                                    "expected_default_present": evidence["default_presence"][field],
-                                                    "actual_default_present": "default" in result}})
 
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):
@@ -24469,7 +24491,13 @@ def _require_reference_target_allowed(
 
 
 def _read_shared_reference_target(target_id, *, read, platform, version, require_match=True):
-    """Prove SDK ShareSet relations without interpreting an omitted owner field."""
+    """Prove SDK ShareSet relations without interpreting an omitted owner field.
+
+    The pinned 2022 SDK documents select-this/owner object projection. Its
+    owner=null comparison returned no match for an independently created Game
+    Parameter, so use the relationship projection in that version only. Keeping
+    this in the projection proves the exact source still exists in that read.
+    """
     from .builders.query import WaqlQueryBuilder, STRUCTURED_QUERY_CONTRACT
     options = {"return": ["id", "parent"]}
     if platform is not None:
@@ -24493,16 +24521,34 @@ def _read_shared_reference_target(target_id, *, read, platform, version, require
     preview = WaqlQueryBuilder(version=version).build({
         "contract": STRUCTURED_QUERY_CONTRACT,
         "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},
-        "transforms": [
+        "transforms": ([
+            {"kind": "select", "expressions": [["this"], ["owner"]]},
+            {"kind": "take", "value": 3}] if version == "2022.1" else [
             {"kind": "where", "predicate": {"kind": "compare", "path": ["owner"], "operator": "=", "value": None}},
-            {"kind": "take", "value": 1}],
+            {"kind": "take", "value": 1}]),
         "return": ["id"],
     })
     query_options = dict(preview.envelope.options)
     if platform is not None:
         query_options["platform"] = platform
     query = {"version": version, "args": dict(preview.envelope.args), "options": query_options}
-    matches = _rows(read(OBJECT_GET_URI, query["args"], query_options))
+    result = read(OBJECT_GET_URI, query["args"], query_options)
+    if version == "2022.1":
+        if not isinstance(result, Mapping) or set(result) != {"return"}:
+            raise OperationContractError("INVALID_READBACK", "Owner projection needs a complete native object.get envelope.")
+        rows = _rows(result)
+        ids = [row.get("id") for row in rows]
+        if (not 1 <= len(ids) <= 2
+                or any(not _valid_object_id(value) or _reference_value_is_null(value) for value in ids)
+                or len({_identity_key(value) for value in ids}) != len(ids)
+                or sum(_same_identity(value, target_id) for value in ids) != 1):
+            raise OperationContractError("INVALID_READBACK", "Owner projection must contain the exact source once and at most one distinct owner.")
+        owner_absent = len(ids) == 1
+        if not owner_absent and require_match:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target has a native projected owner and is not a ShareSet.")
+        return {"parent_id": parent_id, "owner_absent": owner_absent, "native_query": query,
+            "native_result": dict(result)}
+    matches = _rows(result)
     if not matches and require_match:
         raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target does not satisfy the native owner-null ShareSet predicate.")
     if matches and (len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id)):
@@ -25034,6 +25080,8 @@ def _native_snapshot_equal(actual: Any, expected: Any) -> bool:
 
 
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:
+    if metadata_type.lower() in {"bool", "boolean"} or isinstance(actual, bool) or isinstance(expected, bool):
+        return type(actual) is bool and type(expected) is bool and actual is expected
     if metadata_type.lower() in {"real32", "real64", "float", "double"}:
         if isinstance(actual, bool) or isinstance(expected, bool):
             return False

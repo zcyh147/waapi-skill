@@ -91,7 +91,14 @@ def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_
     assert classification["revalidate_and_verify"] == "preserve_exact_native_classifier_facts"
     assert classification["mixed_type_category_rows"] == "explicit_boundary_pending_native_combination_semantics"
     assert classification["shared_only_types"]["supported"] is (version != "2021.1")
-    assert classification["shared_only_types"]["omitted_owner_fact"] == "insufficient_without_predicate_membership"
+    shared = classification["shared_only_types"]
+    if version == "2022.1":
+        assert shared["facts"] == "Gateway_owned_exact_GUID_self_and_owner_projection_and_canonical_parent"
+        assert shared["omitted_owner_fact"] == "insufficient_without_exact_source_owner_projection"
+        assert shared["revalidate_and_verify"] == ["versioned_query_meaning", "exact_source_presence", "owner_projection_absence", "exact_parent_GUID"]
+    else:
+        assert shared["omitted_owner_fact"] == "insufficient_without_predicate_membership"
+        assert shared["facts"] == "Gateway_owned_exact_GUID_owner_null_predicate_and_canonical_parent"
     assert condition_contract["conditions"]["reference"]["target_hierarchy"]["restriction"] == "childOfReference"
     assert condition_contract["conditions"]["reference"]["target_hierarchy"]["atomic_value"] == "explicit_prospective_controlling_reference"
     assert condition_contract["conditions"]["visibility"]["prerequisite_write"] is False
