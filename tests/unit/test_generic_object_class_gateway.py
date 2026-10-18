@@ -51,6 +51,6 @@ def test_ordinary_create_cannot_verify_contradictory_actual_class(tmp_path):
     declare_sound(task)
     tx, shown = task.preview()
     execute(task, tx, shown)
-    task.objects[CHILD]['classId'] = 1  # Sound type token, ActorMixer class.
+    task.objects['{99999999-9999-9999-9999-999999999999}']['classId'] = 1  # Sound type token, ActorMixer class.
     code, result = task.run('verify', tx)
     assert code == 2 and result.get('verified') is not True, json.dumps(result)
