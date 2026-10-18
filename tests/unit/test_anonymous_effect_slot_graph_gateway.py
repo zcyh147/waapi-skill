@@ -712,3 +712,24 @@ def test_separate_existing_rows_cannot_hide_explicit_render_contradiction(tmp_pa
     code, failed = task.step('draft-check')
     assert code == 2 and failed['error_code'] == 'EFFECT_RENDER_CHAIN_CONFLICT', failed
     assert not any(uri.endswith(('object.set', 'object.setProperty')) for uri, _, _ in task.calls)
+
+
+def test_render_clear_before_retained_true_successor_is_explicit_pending_boundary(tmp_path):
+    task, _ = list_task(tmp_path, operation='object.setProperty')
+    task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return original(uri, args, options)
+    task.call = call
+    target = task.bind(ROOT)
+    render = select_field(task, owner=target, token='Render')
+    code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+        '--field-handle', render, '--business-value', 'false')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_SUFFIX_OBSERVATION_REQUIRED', rejected
+    assert rejected['details']['mutation_dispatched'] is False
+    assert not any(uri.endswith('object.setProperty') for uri, _, _ in task.calls)

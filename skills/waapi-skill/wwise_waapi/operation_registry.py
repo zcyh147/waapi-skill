@@ -12617,6 +12617,11 @@ def _prepare_import_dynamic_fields(
                 }
             )
 
+        from .effect_render_conditions import require_import_adapter, EffectRenderConditionError
+        try:
+            require_import_adapter(version=request.version, class_id=type_info.class_id, properties=property_specs)
+        except EffectRenderConditionError as exc:
+            raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
         reference_specs: list[dict[str, Any]] = []
         derived_properties: dict[str, Any] = {}
         for reference_index, descriptor in enumerate(reference_requests):

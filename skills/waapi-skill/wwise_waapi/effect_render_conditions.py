@@ -10,6 +10,25 @@ from typing import Any, Mapping, Sequence
 from copy import deepcopy
 
 
+# Exact installed English Help member evidence, extracted without starting Wwise.
+# 2024 source is the installed 9056 patch, not an invented older Help archive.
+AUTHORITY = {
+    "2021.1": ("2021.1.14.8108", "ch15s02s03s04.html", "409a34fbb7a36a4e1afc799c478286cd5d015cd01f2b443e0e892cc194214aa7"),
+    "2022.1": ("2022.1.19.8584", "ch16s02s03s04.html", "f7aea2c6bb41365fcda0b6f7742a69331ed3e5d4f8a625012a9c141a92b26ea2"),
+    "2023.1": ("2023.1.19.8928", "ch23.html", "af60eb6dcd7ba4f881f45f16077784a9f0f5f0544d9f47249847e3df06e32aac"),
+    "2024.1": ("2024.1.13.9056", "ch24.html", "00549a9cfe93df65d22c3cc87115652feb20e506860e93337d3dc627b6f7088c"),
+    "2025.1": ("2025.1.7.9143", "ch25.html", "1eb0c622255539a0343285cba60884f613f9d8c4c3cfd6884168c8f7257355cf"),
+}
+
+
+def source_authority(version):
+    build, member, digest = AUTHORITY[version]
+    return {"build": build, "archive": "Authoring/Help/WwiseHelp_en.chm", "member": member,
+        "anchor": "rendering_effects", "html_sha256": digest,
+        "rule": "rendering a later Effect automatically renders every preceding Effect",
+        "stored_flag_verification_only": True, "native_acceptance": False}
+
+
 class EffectRenderConditionError(ValueError):
     def __init__(self, code: str, message: str, *, details: Mapping[str, Any] | None = None):
         super().__init__(message)
@@ -71,6 +90,7 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
             raise r.OperationContractError("EFFECT_RENDER_CHAIN_UNPROVED", "EffectSlot Render needs its actual owner GUID")
         exact.setdefault((owner_id, spec.get("platform")), []).append(spec)
     chains = []
+    observed_members = 0
     work = [(parent_path, platform, members, None) for (parent_path, platform), members in groups.items()]
     work.extend((None, platform, members, owner_id) for (owner_id, platform), members in exact.items())
     combined = {}
@@ -104,7 +124,10 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
         mode = constructing[0].get("list_mode", "append") if constructing else "existing"
         before = (r._read_object_list(owner_id, "Effects", fields=[*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId", "@Effect", "@Bypass", "@Render"],
                     read=read, platform=platform, version=version) if owner_id else [])
-        metadata, snapshots, entries = [], [], []
+        observed_members += len(before) + sum(not spec.get("preexisting_id", spec.get("target_id")) for spec in members)
+        if observed_members > r.OBJECT_LIST_MAX_SUBTREE_NODES:
+            raise r.OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Effect Render observations exceed the existing aggregate List snapshot bound")
+        metadata, snapshots, entries, targets = [], [], [], []
         for row in before:
             if row.get("classId") != 5505040 or not r._same_identity(r._reference_identity(row.get("owner")), owner_id):
                 raise r.OperationContractError("EFFECT_RENDER_CHAIN_UNPROVED", "Every actual EffectSlot needs its exact class and owner")
@@ -115,6 +138,16 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
             for name in ("Effect", "Bypass", "Render"):
                 info = r._read_property_info(read, object_id=row["id"], name=name)
                 metadata.append({"scope": {"object_id": row["id"]}, "field": name, "raw": dict(info.raw), "normalized": info.as_dict()})
+            effect_id = r._reference_identity(r._field_value(row, "Effect"))
+            if mode != "replaceAll" and not r._reference_value_is_null(r._field_value(row, "Effect")):
+                if not r._valid_object_id(effect_id):
+                    raise r.OperationContractError("INVALID_READBACK", "A retained Effect needs its canonical GUID or explicit native null")
+                if not any(r._same_identity(target["before"]["id"], effect_id) for target in targets):
+                    fields = [*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+                    actual = r._read_object_id_rows(effect_id, fields=fields, read=read, platform=platform)
+                    if len(actual) != 1 or not r._same_identity(actual[0].get("id"), effect_id):
+                        raise r.OperationContractError("INVALID_READBACK", "Retained Effect target must independently resolve once")
+                    targets.append({"fields": fields, "before": actual[0]})
             if mode != "replaceAll":
                 entries.append({"key": row["id"], "render_before": r._field_value(row, "Render"), "render_intent": None})
         for spec in members:
@@ -154,9 +187,9 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
             for snapshot in snapshots:
                 if r._same_identity(snapshot["object_id"], spec.get("preexisting_id", spec.get("target_id"))):
                     snapshot["after_changes"].update({prop["name"]: prop["value"] for prop in spec["properties"]})
-        chains.append({**planned, "version": version, "platform": platform, "source": source,
+        chains.append({**planned, "authority": source_authority(version), "version": version, "platform": platform, "source": source,
             "owner_id": owner_id, "mode": mode, "before_order": [row["id"] for row in before],
-            "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0]})
+            "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets})
     chains.extend(prepare_legacy(specs, native_nodes, version=version, read=read))
     return chains
 
@@ -178,6 +211,8 @@ def prepare_legacy(specs, native_nodes, *, version, read):
         before = r._read_object_id_rows(identity, fields=fields, read=read, platform=spec.get("platform")) if identity else []
         if identity and (len(before) != 1 or not r._same_identity(before[0].get("id"), identity)):
             raise r.OperationContractError("INVALID_READBACK", "Legacy Render chain needs one exact owner")
+        if 4 * (len(chains) + 1) > r.OBJECT_LIST_MAX_SUBTREE_NODES:
+            raise r.OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Legacy Render observations exceed the existing aggregate List snapshot bound")
         class_id = before[0].get("classId") if identity else spec["class_id"]
         classes = [row for row in catalog["classes"] if row["class_id"] == class_id
                    and all(f"Effect{i}" in row["scalar_references"] for i in range(4))]
@@ -219,7 +254,7 @@ def prepare_legacy(specs, native_nodes, *, version, read):
                 native_nodes[spec["request_path"]]["@" + field] = True
                 spec["properties"].append({"name": field, "value": True, "metadata_type": "bool", "derived": True,
                     "condition_source": "effect-render-prefix"})
-        chains.append({**plan, "kind": "legacy-scalars", "version": version, "platform": spec.get("platform"),
+        chains.append({**plan, "authority": source_authority(version), "kind": "legacy-scalars", "version": version, "platform": spec.get("platform"),
             "source": {"catalog_sha256": catalog["catalog_sha256"], "class": source_class}, "owner_id": identity,
             "mode": "existing", "metadata": metadata, "slot_type": live_types[0],
             "snapshots": [{"object_id": identity, "fields": fields, "before": before[0], "after_changes": changes}] if identity else []})
@@ -254,7 +289,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
             # Owner names/paths can change only through the ordinary prepared
             # identity/path guards; the source class/declaration remains exact.
                 source_match = all(current[key] == source[key] for key in source if key != "scope") and current["scope"]["class_id"] == source["scope"]["class_id"]
-            passed = source_match and [row.as_dict() for row in r._read_object_type_catalog(read)
+            passed = source_match and chain["authority"] == source_authority(chain["version"]) and [row.as_dict() for row in r._read_object_type_catalog(read)
                 if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]] == [chain["slot_type"]]
             if not legacy and chain["owner_id"] and (not after_write or chain["mode"] == "existing"):
                 rows = r._read_object_list(chain["owner_id"], "Effects", fields=r.OBJECT_LIST_SNAPSHOT_FIELDS,
@@ -279,8 +314,32 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                 strip = lambda row: {key: value for key, value in row.items() if key.lstrip("@") not in selected}
                 passed = passed and len(actual) == 1 and r._native_snapshot_equal([strip(expected)], [strip(row) for row in actual]) and all(
                     r._reference_requirement_matches(actual[0], name, value) for name, value in selected.items())
+            for target in chain.get("targets", []):
+                actual = r._read_object_id_rows(target["before"]["id"], fields=target["fields"], read=read, platform=chain["platform"])
+                expected = target["before"]
+                if after_write:
+                    expected = expected_snapshot(expected, edits=edits, read_row=lambda identity: r._read_object_id_rows(identity, fields=r.IDENTITY_RETURN_FIELDS, read=read)[0])
+                passed = passed and r._native_snapshot_equal(actual, [expected])
             evidence = {"source_matches": source_match, "chain": chain}
         except (r.OperationContractError, ValueError, KeyError, TypeError) as exc:
             passed, evidence = False, {"error": str(exc)}
         assertions.append({"name": "Effect Render chain metadata and complete stored state match prepared intent", "passed": bool(passed), "evidence": evidence})
     return assertions
+
+
+def require_import_adapter(*, version, class_id, properties):
+    """Keep the real legacy owner-field gap explicit rather than dispatch unsafe intent."""
+    if version not in {"2021.1", "2022.1"}:
+        return
+    selected = [row["name"] for row in properties if row["name"] in {f"RenderEffect{i}" for i in range(4)}]
+    if not selected:
+        return
+    from .documented_list_fields import load_catalog
+    matches = [row for row in load_catalog(version)["classes"] if row["class_id"] == class_id
+        and all(f"Effect{i}" in row["scalar_references"] for i in range(4))]
+    if matches:
+        raise EffectRenderConditionError("EFFECT_RENDER_IMPORT_CHAIN_PENDING",
+            "This import's owner Render fields require the complete effect-chain adapter before they can be executed together with media changes.",
+            details={"fields": selected, "source_member": matches[0]["source_member"], "mutation_dispatched": False,
+                "remaining_obligation": "audio.import and audio.importTabDelimited owner Render chain observations",
+                "separate_supported_operation": "object.setProperty"})

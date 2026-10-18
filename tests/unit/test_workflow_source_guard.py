@@ -3073,7 +3073,7 @@ def test_anonymous_effect_collector_full_public_flow_reaches_real_category_write
     assert len(receipt['calls']) <= 256 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
     target_ids = [row['id'] for row in receipt['baseline']['targets']]
     assert [row['notes'] for row in receipt['baseline']['targets']] == ['Keep target0', 'Keep target1']
-    expected = lambda targets: [{'type': 'EffectSlot', 'name': '', '@Effect': target, '@Bypass': index == 0, '@Render': index != 0}
+    expected = lambda targets: [{'type': 'EffectSlot', 'name': '', '@Effect': target, '@Bypass': index != 0, '@Render': index == 0}
         for index, target in enumerate(targets)]
     assert writes[3]['objects'] == [{'object': receipt['baseline']['owner']['id'], '@Effects': expected(target_ids)}]
     assert writes[4]['listMode'] == 'replaceAll'
