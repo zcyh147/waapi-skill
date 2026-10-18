@@ -371,7 +371,7 @@ def _soundcaster_source_witness(batch, destination):
 
 
 def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_layout_node):
-    """One image per exact session; only independent image review can observe values."""
+    """Inspect one exact Minigun object; session activation requires image review."""
     batch, call = owned_authoring_layout_node
     assert batch.runtime.version == '2024.1' and batch.info['version']['build'] == 9056
     runtime = batch.node_runtimes[SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE]
@@ -384,8 +384,10 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
         'coverage_credit': 'none; diagnostic observation only', 'visual_review': 'unobserved; independent review required',
         'media_operation_executed': False, 'host': batch.info, 'candidate': batch.candidate,
         'source_context': batch.source_context, 'sessions': [], 'requests': [], 'errors': [],
+        'activation_request': 'Inspect one exact Minigun object; Soundcaster session loading is unproven',
+        'remaining_preservation_scope': 'Music and the complete original 100 saved bindings remain unresolved',
         'limits': {'public_calls': 48, 'reply_bytes': 1024 * 1024, 'total_reply_bytes': 4 * 1024 * 1024,
-            'image_base64_chars': 1024 * 1024, 'image_count': 2}}
+            'image_base64_chars': 1024 * 1024, 'image_count': 1}}
     path.write_text(json.dumps(report) + '\n', encoding='utf-8')
     total, executed = 0, {}
     def bounded_call(argv):
@@ -408,17 +410,50 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
         assert verified['verification']['business_state_verified'] is False, verified
         return {'transaction_id': preview['transaction_id'], 'artifact_hash': preview['artifact_hash'],
             'state': verified['state'], 'business_state_verified': False}
+    def observe_inspection():
+        selected = bounded_call(['selected'])
+        current = bounded_call(['layout-read', 'current'])
+        layout = current['result'].get('name')
+        assert isinstance(layout, str) and layout, 'No exact current layout for inspection observation'
+        instances = bounded_call(['layout-read', 'instances', '--layout-name', layout])
+        return {'selected': selected, 'current_layout': current, 'instances': instances,
+            'scope': 'active-view selection and current-layout views; not saved session values'}
     try:
         report['source'] = _soundcaster_source_witness(batch, destination)
-        # Preflight both identities before any UI command or image dispatch.
-        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS[1:]:
+        # This controlled activation experiment selects only Minigun. Keep all
+        # original saved expectations, but verify the selected identity before UI writes.
+        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS[1:2]:
             rows = bounded_call(['query-object', '--exact-id', identity, '--include', 'class-id', '--max-results', '1'])['objects']
             assert (len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name
                 and rows[0]['type'] == 'SoundcasterSession' and rows[0]['class_id'] == 1703952), 'Exact source session identity/class changed'
             report['sessions'].append({'id': identity, 'name': name, 'identity': rows[0]})
         for session in report['sessions']:
-            session['command'] = effect('ui.commands.execute', ['--command-id', 'ShowSoundcaster', '--command-object', session['id']])
-            session['capture'] = effect('ui.captureScreen', [])
+            session['before'] = observe_inspection()
+            session['command'] = effect('ui.commands.execute', ['--command-id', 'Inspect', '--command-object', session['id']])
+            session['after'] = observe_inspection()
+            layout = session['after']['current_layout']['result']['name']
+            types = bounded_call(['layout-read', 'types'])['result'].get('viewTypes', [])
+            registered = [row for row in types if row.get('viewDisplayName') == 'Soundcaster']
+            names = {row['viewName'] for row in registered if row.get('viewName')}
+            instances = session['after']['instances']['result'].get('viewInstances', [])
+            matches = [row for row in instances if row.get('viewName') in names]
+            unique = (len(registered) == 1 and len(matches) == 1 and bool(matches[0].get('viewID'))
+                and type(matches[0].get('viewIsDocked')) is bool)
+            session['view_locator'] = {'complete': unique, 'layout_name': layout,
+                'registered_types': registered, 'instances': matches, 'session_id': session['id'],
+                'command_transaction_id': session['command']['transaction_id'],
+                'binding_scope': 'observed view instance only; selected session requires independent image review'}
+            if unique:
+                session['view_locator']['instance'] = matches[0]
+                fields = ['--view-name', matches[0]['viewName']]
+                image_scope = {'kind': 'soundcaster-view', 'view_name': matches[0]['viewName']}
+            else:
+                # Normal absence/ambiguity must not hide Inspect's other UI
+                # effects. This is one diagnostic main image, not a retry.
+                fields = []
+                image_scope = {'kind': 'main-ui',
+                    'reason': 'Soundcaster instance absent or ambiguous; observe generic inspection effect'}
+            session['capture'] = effect('ui.captureScreen', fields)
             capture = session['capture']
             original = executed[capture['transaction_id']]
             assert original['artifact_hash'] == capture['artifact_hash']
@@ -449,7 +484,7 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
             image_proof = capture_file_proof(image_path, field='Soundcaster diagnostic image',
                 max_bytes=1024 * 1024, io_root=destination)
             assert image_proof['size'] == len(raw) and image_proof['sha256'] == hashlib.sha256(raw).hexdigest()
-            session['image'] = {'file_proof': image_proof, 'path': image_path.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+            session['image'] = {'scope': image_scope, 'file_proof': image_proof, 'path': image_path.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
                 'content_type': captured['contentType'], 'capture_transaction_id': session['capture']['transaction_id'],
                 'command_transaction_id': session['command']['transaction_id'], 'session_id': session['id'],
                 'visual_review': 'unobserved; image/schema success grants no business credit'}
