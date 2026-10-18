@@ -9506,12 +9506,19 @@ def _object_type_token(value: Any) -> str:
     return "".join(character for character in str(value).casefold() if character.isalnum())
 
 
+def _object_class_matches(actual: Any, expected: Any) -> bool:
+    return (type(actual) is int and type(expected) is int
+        and 0 <= expected <= 0xFFFFFFFF and actual == expected)
+
+
 def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_id: Any = None) -> bool:
     class_proof = spec.get("documented_list_element_class", spec.get("documented_list_owner_class", spec.get("planned_reference_target_class", spec.get("structural_class_id"))))
+    expected_class = class_proof if class_proof is not None else spec.get("class_id")
+    if not (_object_class_matches(actual_class_id, expected_class)
+            and isinstance(actual, str) and bool(actual)):
+        return False
     if class_proof is not None:
-        return (isinstance(actual, str) and bool(actual)
-            and isinstance(actual_class_id, int) and not isinstance(actual_class_id, bool)
-            and actual_class_id == class_proof)
+        return True
     token = _object_type_token(actual)
     return token in {
         _object_type_token(spec.get("requested_type")),
@@ -10222,7 +10229,7 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
-            *(("classId",) if "documented_list_element_class" in spec or "documented_list_owner_class" in spec or "planned_reference_target_class" in spec or "structural_class_id" in spec else ()),
+            "classId",
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}
