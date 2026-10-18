@@ -1024,7 +1024,7 @@ _OBJECT_LIST_NAME_SCHEMA: Mapping[str, Any] = {
     "pattern": r"^[:_a-zA-Z0-9]+$",
     "description": (
         "Canonical Wwise object-list name without the native @ prefix. "
-        "Unnamed RTPC members use their closed typed pair/curve variant; plug-in construction remains dedicated."
+        "Source/Effect plug-ins and RTPCs remain dedicated operations."
     ),
 }
 _OBJECT_LIST_ARGUMENT_SCHEMA: Mapping[str, Any] = {
@@ -1032,7 +1032,9 @@ _OBJECT_LIST_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "required": ["name", "objects"],
     "additionalProperties": False,
     "properties": {
-        "name": _OBJECT_LIST_NAME_SCHEMA,
+        "name": {**_OBJECT_LIST_NAME_SCHEMA, "description": (
+            "Canonical Wwise object-list name without the native @ prefix. "
+            "Unnamed RTPC members use their closed object.set pair/curve variant; plug-in construction remains dedicated.")},
         "objects": {
             "type": "array",
             "maxItems": 32,
