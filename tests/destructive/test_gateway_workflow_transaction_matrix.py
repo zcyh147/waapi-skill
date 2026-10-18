@@ -7203,6 +7203,12 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
         completed_media = []
         for index, phase_name in enumerate(('setup_existing_sound_no_credit', 'existing_media_render', 'new_media_refs_render', 'immutable_tsv_structure_render')):
             setup, tsv = index == 0, index == 3
+            if runtime.version == '2021.1' and not setup:
+                # The 2021 LanguageList authority is the clean saved project.
+                prerequisite = {'before_phase': phase_name, 'coverage_credit': False}
+                receipt.setdefault('prerequisites', []).append(prerequisite)
+                prerequisite['save'] = _save_sandbox_project(gateway)
+                persist()
             existing = index == 1
             name = existing_name if index < 2 else prefix + ('_TSV' if tsv else '_New')
             phase = {'phase': phase_name, 'setup': setup, 'native_outcome': 'not_executed', 'effect_verified': False}

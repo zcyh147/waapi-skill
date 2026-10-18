@@ -3954,8 +3954,16 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
     for token, label in {'Effect0': 'Effect 0', 'RenderEffect1': 'Render Effect 1'}.items():
         assert any(row['metadata']['name'] == token and row['label'] == label for row in selected)
     assert receipt['setup_coverage_credit'] is False and receipt['tsv_media_verified'] is False
-    assert len(writes) == 4 and [row[0] for row in commands].count('execute') == 4
-    assert [row[0] for row in commands].count('verify') == 4
+    save_count = 3 if version == '2021.1' else 0
+    assert len(writes) == 4 and [row[0] for row in commands].count('execute') == 4 + save_count
+    assert [row[0] for row in commands].count('verify') == 4 + save_count
+    prerequisites = receipt.get('prerequisites', [])
+    assert len(prerequisites) == save_count
+    assert all(row['coverage_credit'] is False and row['save']['verify']['state'] == 'result_schema_checked'
+        for row in prerequisites)
+    if save_count:
+        assert [row['before_phase'] for row in prerequisites] == [
+            'existing_media_render', 'new_media_refs_render', 'immutable_tsv_structure_render']
     effects = [row for row in receipt['transactions'] if not row['setup']]
     assert len(effects) == 3 and all(row['effect_verified'] for row in effects)
     assert all(row['verify']['payload']['verified'] is True for row in effects)
@@ -4001,7 +4009,11 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
         transactions=exact_transaction_outcomes(runtime.state_dir))
     record = json.loads(output.read_text())
     assert record['contract'] == 'waapi-skill.host-category-evidence/v3' and record['categories'] == runtime.category_results
-    assert len(record['transactions']) == 4 and all(row['state'] == 'verified' for row in record['transactions'])
+    assert len(record['transactions']) == 4 + save_count
+    save_ids = {row['save']['preview']['transaction_id'] for row in prerequisites}
+    assert all(row['state'] == ('result_schema_checked' if row['transaction_id'] in save_ids else 'verified')
+        for row in record['transactions'])
+    assert sum(row['transaction_id'] in save_ids for row in record['transactions']) == save_count
     assert record['categories'][0]['observation_sha256'] == hashlib.sha256(Path(category['observation_path']).read_bytes()).hexdigest()
 
 
