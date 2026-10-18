@@ -841,7 +841,7 @@ def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proo
             'build': int(build.split('.')[3]) + (1 if broken == 'build' else 0), 'displayName': build}}
         return SimpleNamespace(host_kind='wwise-authoring', host='127.0.0.1', port=8080,
             process=SimpleNamespace(pid=424242), ready_result=info,
-            command=['/owned/bin/wine', '--bottle', 'Wwise2019x64', '--enable-alt-loader', 'macdrv', '--wait-children',
+            command=['/owned/bin/wine', 'start.exe', '/wait',
                      f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe',
                      native if broken != 'native-argv' else 'Z:\\user-project.wproj'],
             launch_cwd=sandbox.sandbox_root, launch_env=environment, launch_project_attestation=proof, launch_preparation=[])
