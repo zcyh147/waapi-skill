@@ -1185,9 +1185,10 @@ and independently verify creation, undo and redo. These are component results,
 not transferred final-candidate evidence.
 
 The integrated 2022.1 case on `51906536` **failed (23.63s)**. Existing-reference
-creation and undo passed; the second, null-reference creation executed, but its
-verification lost the WAAPI transport. The effect is not certified and the case
-is not complete. Source full hashes, mtimes/tree and all tracked files remained
+creation and undo passed. For the second, null-reference creation, Gateway
+recorded accepted execution despite a null result and lost transport; no native
+creation acknowledgement was retained. Verification could not connect. The
+effect is unknown and the case is not complete. Source full hashes, mtimes/tree and all tracked files remained
 unchanged; owned processes ended and the failed sandbox was quarantined.
 Read-only diagnosis continues without replaying the transaction. Original
 receipts and exact paths are listed in NATIVE_FOLLOWUPS.md.

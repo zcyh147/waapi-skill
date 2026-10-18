@@ -22,8 +22,11 @@ original result/category byte hashes; it does not rebind their candidate.
 
 Integrated `51906536fc435e94c616f63754fea614046779cb` includes the 2022
 shared-reference correction. Its matching 2022.1 attempt **failed in 23.63s**:
-setup and existing-reference creation/undo passed, then null-reference creation
-executed and verification lost transport. That effect remains unverified.
+setup and existing-reference creation/undo passed. The null-reference create
+returned a null result during transport loss; Gateway incorrectly labelled it
+accepted without a native creation acknowledgement. Verification could not
+connect, so the effect remains unknown. The shared response-loss handling needs
+repair; this evidence does not establish a native crash or successful creation.
 Original root: `.waapi-skill-state/full-coverage/created-history-51906536-2022-r1`.
 The category record retains the quarantine path and original transaction
 records. Source full hash/mtime/tree and 1,883 tracked files stayed unchanged;
