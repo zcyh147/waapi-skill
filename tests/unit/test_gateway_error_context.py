@@ -176,9 +176,10 @@ def test_field_discovery_error_keeps_complete_keys_after_large_rejected_candidat
     task.bind(FIRST)
     task.types = [{'name': 'AuxBus', 'classId': 3997712, 'type': 'WObject'}]
     kind = task.discover_kind('AuxBus')
-    # The real failing neighbours; all eight are class-scope conditional fields.
+    # Legitimate AuxBus conditions are discoverable. Use deliberately unsupported
+    # fake native types to exercise eight complete errors without mutating the Draft.
     task.metadata = {f'UserAuxSend{band}{index}': {
-        'name': f'UserAuxSend{band}{index}', 'type': 'int16',
+        'name': f'UserAuxSend{band}{index}', 'type': 'UnsupportedPropertyType',
         'display': {'name': f'User-Defined Auxiliary {band} {index}'},
         'restriction': {'type': 'range', 'min': 0, 'max': 100},
         'dependencies': [{'action': 'Show', 'context': 'Self', 'type': 'isMasterBus', 'value': False},
