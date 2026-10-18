@@ -520,3 +520,39 @@ records remain diagnostic-only; they justify implementing the modern suffix
 rule, not claiming its successor is already accepted. Legacy 2021/2022 remains
 separate. Root's ignored `render-suffix-modern-observation-summary.json` hashes
 the three original observations without replacing them.
+
+## R42 retained object-dump diagnostic and verification defect
+
+On fixed `bfd411ac4dfcbad7cfd88e4571d6cf72b8ef1c42`, one existing owned
+2024.1 Console lifecycle executed the closed object-dump request with session
+objects included. The original test **failed in 9.57s** during verification;
+the Gateway reported `INVALID_PROJECT_ARTIFACT`. The original remains FAIL,
+with its sandbox quarantined. All 1,885 tracked files, source-project full
+hash, mtime and tree metadata remained unchanged; no owned process remained.
+
+The archived output is 3,638,677 bytes, SHA-256
+`a7ae6716bffcb90cc4e282f8ce58790d0d952ce5c53a7de94b487998a0ea0011`.
+Independent offline inspection found valid UTF-8 JSON without duplicate keys
+or nonfinite numbers: 3,780 GUID-keyed objects, 134,036 value nodes and depth
+three. The verifier incorrectly applies the XML-specific 32,768-node limit,
+then catches its own `LIMIT_EXCEEDED` exception as `ValueError` and reports
+invalid JSON. The diagnostic collector repeats that node limit. This is
+required #184 implementation work; repairing the parser does not regrade the
+original native run. The retained artifact permits focused offline validation
+without another Wwise launch.
+
+The three exact Soundcaster Session rows expose only name, type, color and
+color override. They do not expose the 100 saved RTPC/State/Switch selections.
+For example, Minigun's saved Engine_Load value is 0.69, while the global Game
+Parameter's SimulationValue is 1; the global value cannot substitute for the
+session value. This observation does not prove native semantic absence.
+Independent offline rehashing also confirmed equal bytes and original file
+proofs for all 64 saved model files before and after this dump. It proves only
+that this diagnostic preserved those files, not that the earlier media-format
+operation preserved the session settings.
+
+Original evidence is in the short-ID worktree's
+`soundcaster-dump-bfd411ac-2024-r1`, including the failed public verification,
+archived native output, before/after model images and final category record.
+The earlier format-conversion failure and missing REV backend remain separate
+unresolved work; this dump grants no business-effect acceptance.
