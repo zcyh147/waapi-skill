@@ -724,7 +724,7 @@ def test_separate_existing_rows_cannot_hide_explicit_render_contradiction(tmp_pa
 
 
 def test_render_clear_before_retained_true_successor_is_explicit_pending_boundary(tmp_path):
-    task, _ = list_task(tmp_path, operation='object.setProperty')
+    task, _ = list_task(tmp_path, version='2023.1', operation='object.setProperty')
     task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
     original = task.call
     def call(uri, args=None, options=None):

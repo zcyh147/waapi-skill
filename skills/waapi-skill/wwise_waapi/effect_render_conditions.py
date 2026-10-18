@@ -29,6 +29,17 @@ def source_authority(version):
         "stored_flag_verification_only": True, "native_acceptance": False}
 
 
+# Exact Root-owned public Gateway diagnostic; stored flags only. Other versions
+# require their own observation, not a borrowed version-family inference.
+CLEAR_SUFFIX_OBSERVATIONS = {
+    "2025.1": {"version": "2025.1", "candidate": "98c1f74ff9bf2e7fbec91689980ead53a3887998",
+        "observation_sha256": "bb8e143ef5b6aacbf02f10aedf042fe957115fcc860c71e346e6868aa17f0be8",
+        "observed_before": [True, True], "observed_after": [False, False],
+        "rule": "clearing a Render flag clears all subsequent stored Render flags",
+        "acceptance_scope": "stored_slot_state_not_rendered_audio"},
+}
+
+
 class EffectRenderConditionError(ValueError):
     def __init__(self, code: str, message: str, *, details: Mapping[str, Any] | None = None):
         super().__init__(message)
@@ -36,8 +47,8 @@ class EffectRenderConditionError(ValueError):
         self.details = dict(details or {})
 
 
-def plan_chain(entries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Plan the true prefix without changing any explicit false or Bypass."""
+def plan_chain(entries: Sequence[Mapping[str, Any]], *, version: str) -> dict[str, Any]:
+    """Plan explicit intent and observed induced flags without changing Bypass."""
     explicit_true = [i for i, entry in enumerate(entries) if entry.get("render_intent") is True]
     derived: list[dict[str, Any]] = []
     if explicit_true:
@@ -54,14 +65,23 @@ def plan_chain(entries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 derived.append({"key": entry["key"], "before": entry.get("render_before"), "after": True})
     final = [entry.get("render_intent") if entry.get("render_intent") is not None
              else entry.get("render_before") for entry in entries]
+    suffix_rule = CLEAR_SUFFIX_OBSERVATIONS.get(version)
     for i, entry in enumerate(entries):
         if entry.get("render_intent") is False and any(value is True for value in final[i + 1:]):
-            raise EffectRenderConditionError("EFFECT_RENDER_SUFFIX_OBSERVATION_REQUIRED",
-                "Clearing a Render flag before a retained rendered successor requires a separately observed suffix rule.",
-                details={"member": entry["key"], "mutation_dispatched": False,
-                         "remaining_obligation": "observe native stored-flag clearing/suffix behavior"})
-    return {"derived": derived, "bypass_policy": "preserve_stored_flags; Bypass takes precedence during processing",
+            if suffix_rule is None:
+                raise EffectRenderConditionError("EFFECT_RENDER_SUFFIX_OBSERVATION_REQUIRED",
+                    "Clearing a Render flag before a retained rendered successor requires a separately observed suffix rule.",
+                    details={"member": entry["key"], "mutation_dispatched": False,
+                             "remaining_obligation": "observe native stored-flag clearing/suffix behavior"})
+            for j in range(i + 1, len(entries)):
+                if final[j] is True:
+                    derived.append({"key": entries[j]["key"], "before": entries[j].get("render_before"), "after": False})
+                    final[j] = False
+    result = {"derived": derived, "bypass_policy": "preserve_stored_flags; Bypass takes precedence during processing",
             "acceptance_scope": "stored_slot_state_not_rendered_audio"}
+    if any(change["after"] is False for change in derived):
+        result["suffix_rule"] = deepcopy(suffix_rule)
+    return result
 
 
 
@@ -174,18 +194,18 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                 matches[0].update(render_intent=intent)
             else:
                 entries.append(entry)
-        planned = plan_chain(entries)
+        planned = plan_chain(entries, version=version)
         for change in planned["derived"]:
             spec = by_path.get(change["key"])
             if spec:
-                native_nodes[spec["request_path"]]["@Render"] = True
-                spec["properties"].append({"name": "Render", "value": True, "metadata_type": "bool", "derived": True,
-                    "condition_source": "effect-render-prefix"})
+                native_nodes[spec["request_path"]]["@Render"] = change["after"]
+                spec["properties"].append({"name": "Render", "value": change["after"], "metadata_type": "bool", "derived": True,
+                    "condition_source": "effect-render-prefix" if change["after"] else "effect-render-suffix"})
             else:
                 snapshot = next(item for item in snapshots if r._same_identity(item["object_id"], change["key"]))
-                if r._reference_value_is_null(r._field_value(snapshot["before"], "Effect")):
+                if change["after"] is True and r._reference_value_is_null(r._field_value(snapshot["before"], "Effect")):
                     raise r.OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "A derived rendered predecessor needs its actual Effect reference")
-                snapshot["after_changes"]["Render"] = True
+                snapshot["after_changes"]["Render"] = change["after"]
         # Explicit changes to existing members are included in the same complete
         # chain proof. Native coupling is expected, never inferred as a pass.
         for spec in members:
@@ -248,7 +268,7 @@ def prepare_legacy(specs, native_nodes, *, version, read):
                     if type(value) is not bool:
                         raise r.OperationContractError("INVALID_READBACK", "Legacy Render needs observed Boolean state or a fresh actual default")
                     entries.append({"key": field, "render_before": value, "render_intent": intents.get(field)})
-        plan = plan_chain(entries)
+        plan = plan_chain(entries, version=version)
         changes = {name: value for name, value in intents.items() if name in fields}
         for change in plan["derived"]:
             field = change["key"]
