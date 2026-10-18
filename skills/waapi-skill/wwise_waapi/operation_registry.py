@@ -7068,7 +7068,7 @@ def _prepare_object_set_rtpc(
         version=request.version,
         read=read,
     )
-    matches = _match_rtpc_pair(before_rows, descriptor.property, control.object, mode=mode)
+    matches = _match_rtpc_pair(before_rows, descriptor.property, control.object, mode=mode, rtpc_support=rtpc_support)
 
     action = "update" if matches else "add"
     if action == "add":
@@ -7163,13 +7163,21 @@ def _prepare_object_set_rtpc(
     return (
         preview,
         {"object": target, "control_input": control},
-        {"rtpc_snapshot": rtpc_snapshot},
+        {"rtpc_snapshot": rtpc_snapshot, "condition_metadata": {"object_id": target.object,
+            "fields": [info.as_dict()]}},
         verification,
         cleanup,
     )
 
 
-def _match_rtpc_pair(rows, property_name, control_id, *, mode):
+def _require_rtpc_property_count(property_name, rtpc_support, count):
+    if isinstance(rtpc_support, str) and rtpc_support.casefold() == "exclusive" and count > 1:
+        raise OperationContractError("RTPC_EXCLUSIVE_CONFLICT",
+            "Exclusive RTPC support permits only one curve per property, regardless of ControlInput; an append cannot replace an unrequested old pair.",
+            details={"property": property_name, "rtpc_support": rtpc_support, "expected_count": count, "limit": 1})
+
+
+def _match_rtpc_pair(rows, property_name, control_id, *, mode, rtpc_support=None):
     """The pair, rather than the empty native name, defines RTPC identity."""
     matches = [row for row in rows if _field_value(row, "PropertyName") == property_name
         and _same_identity(_reference_identity(_field_value(row, "ControlInput")), control_id)]
@@ -7179,6 +7187,9 @@ def _match_rtpc_pair(rows, property_name, control_id, *, mode):
     if mode == "add" and matches:
         raise OperationContractError("TARGET_EXISTS", "RTPC add requires the property/ControlInput pair to be absent.",
             details={"property": property_name, "control_input": control_id})
+    existing_property_count = sum(isinstance(_field_value(row, "PropertyName"), str)
+        and _field_value(row, "PropertyName").casefold() == property_name.casefold() for row in rows)
+    _require_rtpc_property_count(property_name, rtpc_support, existing_property_count + (not matches))
     return matches
 
 
@@ -7213,7 +7224,8 @@ def _validate_graph_rtpc_capacity(specs, *, version):
         owner = (("existing", _identity_key(guard["owner_id"])) if guard is not None else
             ("planned", spec.get("parent_request_path")))
         group = owners.setdefault(owner, {"before": guard["before"] if guard else [],
-            "class_id": spec["class_id"], "version": version, "modes": set(), "pairs": set(), "new": 0})
+            "class_id": spec["class_id"], "version": version, "modes": set(), "pairs": set(), "new": 0,
+            "properties": {}})
         if group["class_id"] != spec["class_id"] or (guard and group["before"] != guard["before"]):
             raise OperationContractError("INVALID_READBACK", "One RTPC owner needs one exact class and complete pre-state.")
         mode = spec.get("list_mode", parent.get("list_mode", "append"))
@@ -7223,10 +7235,23 @@ def _validate_graph_rtpc_capacity(specs, *, version):
         if pair in group["pairs"]:
             raise OperationContractError("DUPLICATE_RTPC_PAIR", "One owner may request each exact RTPC pair once across the graph.")
         group["pairs"].add(pair)
-        group["new"] += spec.get("preexisting_id") is None
+        is_new = spec.get("preexisting_id") is None
+        group["new"] += is_new
+        support = spec["rtpc_property_guard"]["metadata"]["supports"].get("rtpc")
+        property_group = group["properties"].setdefault(pair[0], {"support": support, "requested": 0, "new": 0})
+        if property_group["support"] != support:
+            raise OperationContractError("INVALID_READBACK", "One RTPC property needs one unchanged support mode.")
+        property_group["requested"] += 1
+        property_group["new"] += is_new
     for owner, group in owners.items():
         if len(group["modes"]) != 1:
             raise OperationContractError("OBJECT_SET_LIST_BEHAVIOR_CONFLICT", "One actual RTPC owner cannot mix list modes.")
+        for property_name, property_group in group["properties"].items():
+            before_count = sum(isinstance(_field_value(row, "PropertyName"), str)
+                and _field_value(row, "PropertyName").casefold() == property_name for row in group["before"])
+            count = (property_group["requested"] if group["modes"] == {"replaceAll"} else
+                before_count + property_group["new"])
+            _require_rtpc_property_count(property_name, property_group["support"], count)
         count = (len(group["pairs"]) if group["modes"] == {"replaceAll"} else
             len(group["before"]) + group["new"])
         if count > RTPC_MAX_LIST_ROWS:
@@ -7257,7 +7282,7 @@ def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read,
         return None
     before = _read_graph_rtpc_rows(owner_id, version=version, class_id=spec["class_id"], read=read, snapshot_cache=snapshot_cache)
     spec["rtpc_list_guard"] = {"owner_id": owner_id, "version": version, "class_id": spec["class_id"], "before": before}
-    matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode)
+    matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode, rtpc_support=support)
     if not matches:
         if not replace_all and len(before) >= RTPC_MAX_LIST_ROWS:
             raise OperationContractError("RTPC_LIST_LIMIT_EXCEEDED", "Adding an RTPC exceeds the complete-list limit.")
