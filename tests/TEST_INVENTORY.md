@@ -7,6 +7,15 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-18 constructor repair and Authoring startup follow-ups
 
+Final integration `59b270b1` passed **6 selected cross-path tests in 12.22s**:
+2021 legacy import, 2022 null creation, multi-field history, modern and legacy
+Render history, and raw-metadata drift rejection. The run preserved all 1,885
+tracked files and left no owned process. Serial generators/checks passed with
+unchanged native obligation/ownership/requirement/evidence bytes and Program
+roster 262. No local 825-test preflight, full Program/Non-live or new native
+campaign was run for this integration; original component evidence below stays
+bound to its original candidate.
+
 Later focused native successors completed separately: `a3b70b45` passed the
 2021 legacy import collector (**1 passed, 17.16s**); `3b8f88ba` passed the
 2024 Authoring startup/metadata diagnostic with child-only automation mode
