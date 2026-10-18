@@ -6186,6 +6186,7 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         assert len(body) <= 8 * 1024 * 1024, 'Anonymous EffectSlot receipt byte bound exceeded'
         output.parent.mkdir(parents=True, exist_ok=True)
         temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        if render_suffix_diagnostic: category['observation_sha256'] = hashlib.sha256(body).hexdigest()
     class ReceiptGateway:
         def raw_gateway(self, argv):
             assert len(receipt['calls']) < 256, 'Anonymous EffectSlot public call bound exceeded'
@@ -6402,15 +6403,17 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             phase['native_outcome'] = 'rejected' if executed.get('state') == 'execution_failed' else 'indeterminate'
             phase['original_durable_state'] = executed.get('state')
             native = executed.get('dispatch_result', {})
-            explicit_rejection = (isinstance(native, Mapping) and native.get('api') == 'ak.wwise.core.object.setProperty'
+            explicit_error_response = (isinstance(native, Mapping) and native.get('api') == 'ak.wwise.core.object.setProperty'
                 and native.get('version') == runtime.version and native.get('ok') is False
                 and native.get('waapi_error_uri') == 'ak.wwise.invalid_arguments')
             # An explicit native error response is an observed fact even though
             # e2 conservatively journals a failed named write as indeterminate.
             # Neither classification establishes a no-mutation/effect outcome.
-            phase['native_response_class'] = 'explicit_invalid_arguments' if explicit_rejection else 'unresolved_failure'
-            receipt['classification'] = 'native_rejected' if explicit_rejection else 'indeterminate'
-            receipt['diagnostic_complete'] = explicit_rejection
+            phase['native_response_class'] = 'explicit_invalid_arguments' if explicit_error_response else 'unresolved_failure'
+            receipt['classification'] = 'native_error_response' if explicit_error_response else 'indeterminate'
+            receipt['diagnostic_complete'] = explicit_error_response
+            phase['effects_unknown'] = receipt['effects_unknown'] = True
+            phase['native_error_code'] = native.get('waapi_error_uri', native.get('error_code'))
             category.update(status='blocked' if receipt['diagnostic_complete'] else 'FAIL',
                 classification=receipt['classification'], diagnostic_complete=receipt['diagnostic_complete'],
                 reason='Original execution failure retained; no verify, read-after or retry; no business credit')
@@ -6570,6 +6573,6 @@ def test_effect_render_suffix_observation(workflow_sandbox_runtime: _WorkflowSan
         pytest.skip('Stored suffix observation begins with2025 only; no cross-version inference')
     category = _collect_effect_render_suffix_observation(workflow_sandbox_runtime, prefix='WAAPI_SUFFIX_' + uuid.uuid4().hex[:10])
     assert category.get('diagnostic_complete') is True, category
-    # A diagnosed native rejection remains a failed attempt with a retained
+    # A diagnosed native error response remains a failed attempt with a retained
     # sandbox under the existing finalizer, never a business acceptance PASS.
     assert category.get('classification') in {'cleared', 'retained'}, category

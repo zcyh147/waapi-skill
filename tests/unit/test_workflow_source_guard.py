@@ -3154,7 +3154,7 @@ def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared')
             assert len(slots) == 2 and args == {'object': slots[0]['id'], 'property': 'Render', 'value': False}, args
             assert [row['@Render'] for row in slots] == [True, True], slots
             if outcome == 'native-error': raise RuntimeError('Original native suffix rejection; never replay')
-            if outcome == 'native-rejected':
+            if outcome == 'native-error-response':
                 class NativeSuffixRejection(RuntimeError):
                     uri = 'ak.wwise.invalid_arguments'
                     kwargs = {'details': {'procedureUri': 'ak.wwise.core.object.setProperty'}}
@@ -3219,7 +3219,8 @@ def test_render_suffix_diagnostic_cannot_classify_incomplete_or_unrequested_chan
 
 
 @pytest.mark.parametrize('outcome,classification,complete,status', [
-    ('native-error', 'indeterminate', False, 'FAIL'), ('native-rejected', 'native_rejected', True, 'blocked')])
+    pytest.param('native-error', 'indeterminate', False, 'FAIL', id='exception-indeterminate'),
+    pytest.param('native-error-response', 'native_error_response', True, 'blocked', id='native-error-response')])
 def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry(tmp_path, workflow, outcome, classification, complete, status):
     runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=outcome)
     category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
@@ -3227,6 +3228,9 @@ def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry
     assert category['classification'] == classification and receipt['diagnostic_complete'] is complete
     assert category['status'] == status and receipt['business_effect_verified'] is False
     assert receipt['transactions'][-1]['original_durable_state'] == 'indeterminate'
+    assert receipt['effects_unknown'] is True and receipt['transactions'][-1]['effects_unknown'] is True
+    if outcome == 'native-error-response':
+        assert receipt['transactions'][-1]['native_error_code'] == 'ak.wwise.invalid_arguments'
     assert 'Original native suffix rejection' in json.dumps(receipt['transactions'][-1]['execute'])
     assert len(writes) == 5 and commands[-1][0] == 'execute'
     assert [command[0] for command in commands].count('verify') == 4
