@@ -50,6 +50,87 @@ def _scalar_matches(actual: Any, expected: Any, metadata_type: str) -> bool:
     return value_type is not None and type(actual) is value_type and type(expected) is value_type and actual == expected
 
 
+def _read_error(exc: Exception) -> dict[str, Any]:
+    from .operation_registry import OperationContractError
+    if isinstance(exc, OperationContractError):
+        return exc.as_dict()  # Already bounded/normalized by the owning read path.
+    return {"type": type(exc).__name__, "message": str(exc)[:2048]}
+
+
+def _reference_value(value: Any) -> str | None:
+    # Reuse the owning reference primitive's null/identity representations,
+    # then require the canonical GUID observation this history proof promises.
+    from .operation_registry import _reference_identity, _reference_value_is_null
+    if _reference_value_is_null(value):
+        return None
+    if isinstance(value, Mapping) and ("id" not in value or set(value) - {"id", "name", "type", "path"}
+            or any(not isinstance(item, str) for item in value.values())):
+        raise ValueError("History reference readback lacks a canonical object-reference shape")
+    identity = _reference_identity(value)
+    if not isinstance(identity, str) or not _GUID.fullmatch(identity):
+        raise ValueError("History reference readback lacks a canonical target GUID or explicit null")
+    return identity.upper()
+
+
+def capture_field_read_platform(version: str, selector: str | None, *, read: Callable[..., Any]) -> dict[str, Any]:
+    """Certify object.get's original view; never infer a mutation's omission meaning."""
+    proof = {"contract": "waapi-skill.field-read-platform/v1", "version": version, "selector": selector}
+    if version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
+        return {**proof, "status": "unobserved", "reason": "no_pinned_current_platform_observer_in_this_lane"}
+    context = read("ak.wwise.core.getProjectInfo", {}, {})
+    rows = context.get("platforms") if isinstance(context, Mapping) else None
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 32:
+        return {**proof, "status": "unobserved", "reason": "complete_bounded_project_platform_inventory_not_exposed"}
+    ids, names = set(), set()
+    for row in rows:
+        if (not isinstance(row, Mapping) or not isinstance(row.get("id"), str) or not _GUID.fullmatch(row["id"])
+            or row["id"] == "{00000000-0000-0000-0000-000000000000}" or not isinstance(row.get("name"), str)
+            or not row["name"] or row["id"].upper() in ids or row["name"].casefold() in names):
+            return {**proof, "status": "unobserved", "reason": "project_platform_identity_or_uniqueness_not_exposed"}
+        ids.add(row["id"].upper()); names.add(row["name"].casefold())
+    matches = [row for row in rows if (row["id"].upper() == str(context.get("currentPlatformId")).upper()
+        if selector is None else row["name"] == selector)]
+    if len(matches) != 1:
+        return {**proof, "status": "unobserved", "reason": "original_read_platform_not_uniquely_observed"}
+    return {**proof, "status": "certified", "platform_id": matches[0]["id"].upper(),
+        "platform_name": matches[0]["name"], "source": "live_getProjectInfo_and_object_get_platform_contract"}
+
+
+def observe_field_read_platform(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
+    proof = pre_state.get("field_read_platform")
+    if not isinstance(proof, Mapping) or proof.get("status") != "certified":
+        return None  # An explicit receipt limitation, never a fabricated view.
+    readbacks = []
+    def retained(uri, args, options):
+        record = {"uri": uri, "args": args, "options": options}
+        readbacks.append(record)
+        try:
+            result = read(uri, args, options)
+            record["result"] = result
+            return result
+        except Exception as exc:
+            record["error"] = _read_error(exc)
+            raise
+    try:
+        actual = capture_field_read_platform(proof["version"], proof["selector"], read=retained)
+        return {"matches": lifecycle_snapshot_equal(proof, actual), "expected": dict(proof), "actual": actual, "readbacks": readbacks}
+    except Exception as exc:
+        return {"matches": False, "expected": dict(proof), "error": {"type": type(exc).__name__, "message": str(exc)[:2048]}, "readbacks": readbacks}
+
+
+def _receipt_platform(plan: Mapping[str, Any], state: Mapping[str, Any]) -> str:
+    platform = plan.get("platform")
+    if isinstance(platform, str) and _GUID.fullmatch(platform):
+        return platform
+    proof = state.get("field_read_platform")
+    if (not isinstance(proof, Mapping) or proof.get("status") != "certified" or proof.get("selector") != platform
+        or not isinstance(proof.get("platform_id"), str) or not _GUID.fullmatch(proof["platform_id"])
+        or plan.get("observation_platform") != proof["platform_id"]
+        or state.get("field_before", {}).get("observation_platform") != proof["platform_id"]):
+        raise ValueError("Receipt original current/named read platform is not certified; its missing source observation remains an implementation/evidence obligation")
+    return proof["platform_id"]
+
+
 def _identity(row: Any) -> dict[str, Any]:
     bound = normalize_live_object_identity(row)
     return {"id": bound.object_id, "name": bound.name, "type": bound.object_type, "path": bound.path}
@@ -95,15 +176,35 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
                     after["path"] = after_by_id[object_id]["path"] + after["path"][len(before_path):]
             row["object_after"] = after
         return observations
+    if plan.get("kind") == "same-guid-reference":
+        from .operation_registry import _has_field, _field_value
+        identity = _identity(state.get("object"))
+        field, platform = plan.get("field"), _receipt_platform(plan, state)
+        before, info = state.get("field_before", {}), state.get("field_info", {})
+        if (identity["id"] != str(plan.get("object_id")).upper() or not isinstance(field, str)
+            or not isinstance(before, Mapping) or "value" not in before or before.get("field") != field
+            or before.get("platform") != plan.get("platform") or not isinstance(before.get("row"), Mapping)
+            or not _has_field(before["row"], field) or not isinstance(info, Mapping)
+            or not ((info.get("type") or "").casefold() in {"reference", "objectreference"}
+                    or str(info.get("restriction", {}).get("type", "")).casefold() == "reference"
+                    or info.get("supports", {}).get("reference") is True)):
+            raise ValueError("Reference receipt requires exact metadata, identity and an observed before value/platform")
+        old = _reference_value(before["value"])
+        if _reference_value(_field_value(before["row"], field)) != old:
+            raise ValueError("Reference receipt before projection disagrees with its sealed value")
+        new = None if plan.get("expected_clear") is True else _reference_value(plan.get("expected_target_id"))
+        if new is None and plan.get("expected_clear") is not True:
+            raise ValueError("Reference receipt lacks its canonical expected target")
+        return [{"object_before": identity, "object_after": dict(identity), "field": field,
+            "before": old, "after": new, "platform": platform, "field_kind": "reference",
+            "metadata_type": info.get("type"), "field_info": dict(info)}]
     if plan.get("kind") == "same-guid-property":
         identity = _identity(state.get("object"))
-        field, platform, metadata_type = plan.get("field"), plan.get("platform"), plan.get("metadata_type")
+        field, platform, metadata_type = plan.get("field"), _receipt_platform(plan, state), plan.get("metadata_type")
         field_before, info = state.get("field_before", {}), state.get("field_info", {})
-        if not isinstance(platform, str) or not _GUID.fullmatch(platform):
-            raise ValueError("Property receipt effective platform is not yet certified; current/named-platform receipt resolution remains implementation work")
         old, new = field_before.get("value"), plan.get("expected_value")
         if (identity["id"] != str(plan.get("object_id")).upper() or not isinstance(field, str)
-            or field_before.get("field") != field or field_before.get("platform") != platform
+            or field_before.get("field") != field or field_before.get("platform") != plan.get("platform")
             or not isinstance(info, Mapping) or info.get("type") != metadata_type
             or not _scalar_matches(old, old, metadata_type) or not _scalar_matches(new, new, metadata_type)):
             raise ValueError("Property receipt requires an exact typed before/after value and platform view")
@@ -196,10 +297,15 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
     observations = binding["observations"]
     readbacks, checks = [], []
     def retained_read(uri, args, options):
-        result = read(uri, args, options)
-        readbacks.append({"uri": uri, "args": args, "options": options,
-            "result": dict(result) if isinstance(result, Mapping) else result})
-        return result
+        record = {"uri": uri, "args": args, "options": options}
+        readbacks.append(record)
+        try:
+            result = read(uri, args, options)
+            record["result"] = dict(result) if isinstance(result, Mapping) else result
+            return result
+        except Exception as exc:
+            record["error"] = _read_error(exc)
+            raise HistoryObservationError("History observation read failed", readbacks) from exc
     try:
         groups = {}
         metadata_cache = {}
@@ -236,8 +342,11 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                 identity = expected["object_" + side]
                 row = found[identity["id"]]
                 field = expected["field"]
-                actual = row[field] if field in row else row.get("@" + field)
-                equal = (_scalar_matches(actual, expected[side], expected["metadata_type"])
+                from .operation_registry import _has_field, _field_value
+                actual = _field_value(row, field)
+                equal = (_has_field(row, field) and _reference_value(actual) == expected[side]
+                    if expected.get("field_kind") == "reference" else
+                    _scalar_matches(actual, expected[side], expected["metadata_type"])
                     if "metadata_type" in expected else isinstance(actual, str) and actual == expected[side])
                 checks.append({"object": identity, "field": field, "platform": platform,
                     "expected": expected[side], "actual": actual, "passed": _identity(row) == identity and equal})
@@ -257,4 +366,5 @@ def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
         "verification_boundary": "owned_receipt_scoped_state_only" if receipt else "result_schema_only; effect_and_preservation_unobserved",
         "stack_head_observed": False, "outside_scope_preservation_observed": False,
         "automatic_retry": False, "automatic_compensation": False,
-        "expected_observations": binding["observations"]}
+        "expected_observations": [{**{key: value for key, value in row.items() if key != "field_info"},
+            **({"metadata_bound": True} if "field_info" in row else {})} for row in binding["observations"]]}

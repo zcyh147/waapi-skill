@@ -711,7 +711,7 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
     assert snapshotted["request"]["arguments"]["value"] == "snapshotted"
 
 
-def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None, property_child=False, duplicate_property=False, parent_check_error=None, second_platform=None, child_ids=None, first_platform=None):
+def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None, property_child=False, duplicate_property=False, parent_check_error=None, second_platform=None, child_ids=None, first_platform=None, reference_child=False):
     state_dir = tmp_path / "state"
     env = gateway_env(tmp_path, version=version)
     def run(*argv):
@@ -722,7 +722,8 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
     parent = run("draft-start", "waapi.undoGroup")
     draft, authority, revision = parent["draft"]["draft_id"], parent["task_authority"], str(parent["draft"]["revision"])
     children = []
-    child_specs = (("object.setProperty", "--business-value", "2") if property_child else
+    child_specs = (("object.setReference", "--target-handle", "") if reference_child else
+                   ("object.setProperty", "--business-value", "2") if property_child else
                    ("object.setNotes", "--notes", "after"),
                    ("object.setProperty", "--business-value", "3") if duplicate_property else ("object.setName", "--new-name", "Renamed"))
     for child_index, (operation, flag, value) in enumerate(child_specs):
@@ -732,11 +733,15 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
         phase = run("draft-bind-object", child, "--task-authority", child_authority,
                     "--expected-revision", str(phase["draft"]["revision"]), "--object-id",
                     child_ids[child_index] if child_ids else OBJECT_GUID)
-        if operation == "object.setProperty":
+        if operation in {"object.setProperty", "object.setReference"}:
             object_handle = phase["bound_object"]["handle"]
+            if operation == "object.setReference":
+                phase = run("draft-bind-object", child, "--task-authority", child_authority,
+                    "--expected-revision", str(phase["draft"]["revision"]), "--object-id", client.parent["id"])
+                value = phase["bound_object"]["handle"]
             phase = run("draft-discover-fields", child, "--task-authority", child_authority,
                 "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
-                "--meaning", "volume",
+                "--meaning", "attenuation" if reference_child else "volume",
                 *(("--platform", first_platform) if child_index == 0 and first_platform else ()),
                 *(("--platform", second_platform) if child_index == 1 and second_platform else ()))
             phase = run("draft-declare-field-change", child, "--task-authority", child_authority,
@@ -1212,9 +1217,10 @@ def test_compound_current_platform_membership_drift_blocks_before_begin_group(tm
     assert not any(row[0].endswith("setProperty") for row in client.calls)
 
 
-def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False):
+def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}"):
     from tests.unit.test_remaining_core_business_gateway import _env
     from tests.unit.test_object_graph_business_gateway import _info
+    reference_case = source_operation == "object.setReference" or compound_reference
     class Client(ObjectLifecycleClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.getInfo":
@@ -1234,11 +1240,36 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                 self.history_after = dict(self.source)
                 self.history_parent_after = dict(self.parent)
                 return {}
+            if uri == "ak.wwise.core.getProjectInfo" and (reference_case or source_operation == "object.setProperty"):
+                result = super().call(uri, args, options)
+                return {**result, "platforms": self.platform_rows, "currentPlatformId": self.current_platform} if platform_inventory else result
+            if uri == "ak.wwise.core.object.get" and reference_case:
+                result = super().call(uri, args, options)
+                platform = (options or {}).get("platform") or self.current_platform
+                if platform == "Windows":
+                    platform = self.platform_rows[0]["id"]
+                if platform != self.platform_rows[0]["id"]:
+                    for row in result["return"]:
+                        if row["id"] == self.source["id"]:
+                            row["@Attenuation"] = self.other_reference
+                return result
+            if uri == "ak.wwise.core.object.getTypes" and reference_case:
+                self.calls.append((uri, args, options))
+                return {"return": [{"name": "Sound", "classId": 65552, "type": "WObject"},
+                    {"name": "Attenuation", "classId": 2686992, "type": "WObject"}]}
+            if uri == "ak.wwise.core.object.setReference":
+                self.calls.append((uri, args, options))
+                self.source["@Attenuation"] = None if args["value"] == "{00000000-0000-0000-0000-000000000000}" else {"id": args["value"]}
+                self.history_after = dict(self.source)
+                return {}
             if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
                 self.calls.append((uri, args, options))
-                return {"return": ["Volume"]}
+                return {"return": ["Attenuation" if reference_case else "Volume"]}
             if uri == "ak.wwise.core.object.getPropertyInfo":
                 self.calls.append((uri, args, options))
+                if reference_case:
+                    return {**({} if omitted_reference_metadata else {"name": "Attenuation", "type": "Reference"}),
+                        "restriction": {"type": "reference", "restrictions": [{"type": ["Attenuation"]}]}}
                 return {**({} if omitted_property_name else {"name": "Volume"}), "type": "Real32", "default": 0,
                     "restriction": {"type": "range", "min": -96, "max": 6}, "supports": {"unlink": True}}
             if uri == "ak.wwise.core.object.isLinked":
@@ -1264,6 +1295,14 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                 return {}
             return super().call(uri, args, options)
     client = Client()
+    if reference_case:
+        client.source["classId"] = 65552
+        client.parent.update(type="Attenuation", classId=2686992, path=r"\Attenuations\Default Work Unit\Destination")
+        client.source["@Attenuation"] = {"id": client.parent["id"]} if reference_clear else None
+    client.platform_rows = [{"id": "{55555555-5555-5555-5555-555555555555}", "name": "Windows"},
+        {"id": "{66666666-6666-6666-6666-666666666666}", "name": "Mac"}]
+    client.current_platform = client.platform_rows[0]["id"]
+    client.other_reference = None
     client.source["notes"] = initial_notes
     client.source["@Volume"] = 1.0
     if compound_ancestor:
@@ -1291,8 +1330,8 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
         state, env, source = _preview_cancellation_case(tmp_path, client, version=version,
             cancellation="native-default" if version == "2022.1" else "undo-changes",
             child_ids=(OBJECT_GUID, client.parent["id"]) if compound_ancestor else None,
-            property_child=compound_property,
-            first_platform="{55555555-5555-5555-5555-555555555555}" if compound_property else None)
+            property_child=compound_property, reference_child=compound_reference,
+            first_platform="{55555555-5555-5555-5555-555555555555}" if compound_property or compound_reference else None)
     else:
         code, phase = run("draft-start", source_operation)
         assert code == 0, phase
@@ -1300,11 +1339,26 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
         code, phase = run("draft-bind-object", draft, "--task-authority", authority,
             "--expected-revision", str(phase["draft"]["revision"]), "--object-id", OBJECT_GUID)
         assert code == 0, phase
-        if source_operation == "object.setProperty":
+        if source_operation == "object.setReference":
+            object_handle = phase["bound_object"]["handle"]
+            target_handle = "clear"
+            if not reference_clear:
+                code, phase = run("draft-bind-object", draft, "--task-authority", authority,
+                    "--expected-revision", str(phase["draft"]["revision"]), "--object-id", client.parent["id"])
+                assert code == 0, json.dumps(phase)
+                target_handle = phase["bound_object"]["handle"]
+            code, phase = run("draft-discover-fields", draft, "--task-authority", authority,
+                "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
+                "--meaning", "attenuation", *(["--platform", reference_platform] if reference_platform is not None else []))
+            assert code == 0, phase
+            code, phase = run("draft-declare-field-change", draft, "--task-authority", authority,
+                "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
+                "--field-handle", phase["field_candidates"][0]["handle"], *(["--clear-reference"] if reference_clear else ["--target-handle", target_handle]))
+        elif source_operation == "object.setProperty":
             object_handle = phase["bound_object"]["handle"]
             code, phase = run("draft-discover-fields", draft, "--task-authority", authority,
                 "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
-                "--meaning", "volume", "--platform", "{55555555-5555-5555-5555-555555555555}")
+                "--meaning", "volume", *(["--platform", property_platform] if property_platform is not None else []))
             assert code == 0, phase
             code, phase = run("draft-declare-field-change", draft, "--task-authority", authority,
                 "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
@@ -1315,6 +1369,8 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                 *( ["--notes", "after history edit"] if source_operation == "object.setNotes" else ["--new-name", "AfterHistoryName"] ))
         assert code == 0, phase
         source, _shown = check_preview(draft, authority, phase["draft"]["revision"])
+    if source_prepared_only:
+        return client, state, source, source, None, run
     code, result = run("execute", source["transaction_id"])
     assert code == 0, json.dumps(result)
     if verify_source:
@@ -1798,3 +1854,191 @@ def test_standalone_history_multi_object_compound_recovers_property_view_and_anc
     assert client.source["@Volume"] == (1.0 if direction == "undo" else 2.0)
     assert client.parent["name"] == ("Destination" if direction == "undo" else "Renamed")
     assert client.source["path"] == client.parent["path"] + r"\OldName"
+
+
+@pytest.mark.parametrize("version,direction", [("2022.1", "undo"), ("2023.1", "undo"), ("2024.1", "undo"), ("2025.1", "undo"),
+    ("2023.1", "redo"), ("2024.1", "redo"), ("2025.1", "redo")])
+@pytest.mark.parametrize("clear", [False, True])
+def test_standalone_history_observes_verified_reference_receipt_in_exact_platform(tmp_path, version, direction, clear):
+    client, state, source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference",
+        version=version, direction=direction, reference_clear=clear)
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert client.source["@Attenuation"] == (client.history_before if direction == "undo" else client.history_after)["@Attenuation"]
+    code, shown = run("transaction-show", preview["transaction_id"])
+    assert code == 0, shown
+    binding = shown["artifact"]["request"]["arguments"]["history_binding"]
+    assert binding["source_receipt"]["transaction_id"] == source["transaction_id"]
+    assert binding["observations"][0]["before"] == (client.parent["id"] if clear else None)
+    assert binding["observations"][0]["after"] == (None if clear else client.parent["id"])
+    assert binding["observations"][0]["platform"] == "{55555555-5555-5555-5555-555555555555}"
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.undo." + direction]) == 1
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_standalone_history_reference_receipt_certifies_original_current_or_named_read_view(tmp_path, version, platform):
+    client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference",
+        reference_platform=platform, version=version)
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    assert binding["observations"][0]["platform"] == client.platform_rows[0]["id"]
+    client.current_platform = client.platform_rows[1]["id"]
+    if platform is not None:
+        client.platform_rows[0]["name"], client.platform_rows[1]["name"] = "Renamed Windows", "Windows"
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    readbacks = next(event["details"]["verification"]["readbacks"] for event in reversed(TransactionStore(state).load_snapshot(preview["transaction_id"]).events)
+        if event["event_type"] == "verification_recorded")
+    assert any(row["uri"] == "ak.wwise.core.object.get" and "Attenuation" in row["options"].get("return", [])
+        and row["options"].get("platform") == "{55555555-5555-5555-5555-555555555555}" for row in readbacks)
+
+
+@pytest.mark.parametrize("stage", ["prewrite", "readback"])
+@pytest.mark.parametrize("damage", ["wrong-guid", "missing", "path", "extra-member", "boolean", "read-error", "identity", "metadata"])
+def test_standalone_history_reference_wrong_or_missing_observation_never_proves_effect(tmp_path, stage, damage):
+    client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference")
+    if stage == "readback":
+        code, executed = run("execute", preview["transaction_id"])
+        assert code == 0, executed
+    value = {"wrong-guid": {"id": "{77777777-7777-7777-7777-777777777777}"}, "path": r"\Attenuations\Destination",
+        "extra-member": {"id": client.parent["id"], "hidden": True}, "boolean": True}.get(damage)
+    if damage in {"wrong-guid", "path", "extra-member", "boolean"}:
+        client.source["@Attenuation"] = value
+    elif damage == "missing":
+        client.source.pop("@Attenuation")
+    elif damage == "identity":
+        client.source.update(name="Unrelated rename", path=r"\Other\Unrelated rename")
+    original = client.call
+    def changed(uri, args=None, options=None):
+        if damage == "read-error" and uri == "ak.wwise.core.object.get" and "Attenuation" in (options or {}).get("return", []):
+            raise ValueError("fixture exact reference view is unavailable")
+        result = original(uri, args, options)
+        if damage == "metadata" and uri == "ak.wwise.core.object.getPropertyInfo":
+            return {**result, "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
+        return result
+    client.call = changed
+    code, rejected = run("execute" if stage == "prewrite" else "verify", preview["transaction_id"])
+    assert code == 2 and rejected.get("verified") is not True, rejected
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.undo.undo"]) == (1 if stage == "readback" else 0)
+    if damage == "read-error":
+        assert "fixture exact reference view is unavailable" in json.dumps(rejected)
+        assert '"options": {"return": ["id", "name", "type", "path", "Attenuation"]' in json.dumps(rejected)
+
+
+@pytest.mark.parametrize("platform", [None, "Windows"])
+@pytest.mark.parametrize("stage", ["prewrite", "readback"])
+def test_source_reference_original_read_platform_drift_stops_dispatch_or_verification(tmp_path, platform, stage):
+    client, state, source, _preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference",
+        reference_platform=platform, source_prepared_only=True)
+    original = TransactionStore(state).load_preview(source["transaction_id"]).artifact
+    native = original["prepared_operation"]["dispatch"]["args"]
+    assert ("platform" not in native) if platform is None else native["platform"] == platform
+    assert original["prepared_operation"]["pre_state"]["field_read_platform"]["status"] == "certified"
+    if stage == "readback":
+        code, executed = run("execute", source["transaction_id"])
+        assert code == 0, executed
+    if platform is None:
+        client.current_platform = client.platform_rows[1]["id"]
+    else:
+        client.platform_rows[0]["name"], client.platform_rows[1]["name"] = "Moved Windows", "Windows"
+    code, rejected = run("execute" if stage == "prewrite" else "verify", source["transaction_id"])
+    assert code == 2 and rejected.get("verified") is not True, rejected
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.setReference"]) == (1 if stage == "readback" else 0)
+    assert "original read-platform binding unchanged" in json.dumps(rejected)
+
+
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+def test_standalone_history_compound_reference_and_name_reuse_the_scoped_observer(tmp_path, direction):
+    client, state, source, preview, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="waapi.undoGroup", compound_reference=True, direction=direction)
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    assert {row["field"] for row in binding["observations"]} == {"Attenuation", "name"}
+    code, compact = run("transaction-show", preview["transaction_id"], "--summary-only")
+    assert code == 0, compact
+    summary = compact["preview_summary"]["history_action"]["expected_observations"]
+    reference = next(row for row in summary if row["field"] == "Attenuation")
+    assert reference["metadata_bound"] is True and reference["field_kind"] == "reference"
+    assert "field_info" not in reference
+    assert reference == {**{key: value for key, value in binding["observations"][0].items() if key != "field_info"}, "metadata_bound": True}
+    assert "latest_project_history" in json.dumps(compact)
+    code, full = run("transaction-show", preview["transaction_id"])
+    assert code == 0, full
+    full_binding = full["artifact"]["request"]["arguments"]["history_binding"]
+    assert full_binding == binding
+    assert full_binding["observations"][0]["field_info"]["restriction"]["type"] == "reference"
+    code, source_full = run("transaction-show", source["transaction_id"])
+    assert code == 0, source_full
+    child = source_full["artifact"]["prepared_operation"]["pre_state"]["execution_plan"]["calls"][0]["prepared_operation"]
+    assert child["pre_state"]["field_info"] == full_binding["observations"][0]["field_info"]
+    assert child["pre_state"]["field_before"]["value"] == reference["before"]
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    assert verified["agent_result"]["result"] == {} and list(verified)[-1] == "agent_result"
+    expected = client.history_before if direction == "undo" else client.history_after
+    assert client.source["@Attenuation"] == expected["@Attenuation"] and client.source["name"] == expected["name"]
+
+
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_standalone_history_scalar_receipt_reuses_original_read_platform_certification(tmp_path, platform):
+    client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="object.setProperty", property_platform=platform)
+    observation = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]["observations"][0]
+    assert observation["platform"] == "{55555555-5555-5555-5555-555555555555}"
+    client.current_platform = client.platform_rows[1]["id"]
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+
+
+def test_reference_source_without_platform_inventory_retains_receipt_limitation_without_blocking_write(tmp_path):
+    client, state, source, rejected, _shown, _run = _owned_notes_history_case(tmp_path,
+        source_operation="object.setReference", reference_platform=None, platform_inventory=False, declaration_error=True)
+    assert "original current/named read platform is not certified" in rejected["message"]
+    snapshot = TransactionStore(state).load_snapshot(source["transaction_id"])
+    assert snapshot.record.state == TransactionState.VERIFIED
+    assert snapshot.preview.artifact["prepared_operation"]["pre_state"]["field_read_platform"]["status"] == "unobserved"
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.setReference"]) == 1
+    assert not any(call[0] == "ak.wwise.core.undo.undo" for call in client.calls)
+
+
+def test_standalone_history_reference_retains_omitted_metadata_name_and_type(tmp_path):
+    client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="object.setReference", omitted_reference_metadata=True)
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    observation = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]["observations"][0]
+    assert observation["field_info"]["name"] is None and observation["field_info"]["type"] is None
+    assert observation["field_info"]["field_binding"]["token"] == "Attenuation"
+
+
+@pytest.mark.parametrize("null_value", ["{00000000-0000-0000-0000-000000000000}", {"id": "{00000000-0000-0000-0000-000000000000}", "name": ""}])
+def test_standalone_history_reference_observer_uses_owning_explicit_null_representations(tmp_path, null_value):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference")
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    client.source["@Attenuation"] = null_value
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+
+
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_history_reference_wrong_original_view_cannot_pass_from_another_current_platform(tmp_path, platform):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference",
+        reference_platform=platform, effect=False)
+    client.current_platform = client.platform_rows[1]["id"]
+    assert client.other_reference is None  # A tempting but unrelated cleared view.
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 2 and verified.get("verified") is not True, verified
+    assert client.source["@Attenuation"] == {"id": client.parent["id"]}
