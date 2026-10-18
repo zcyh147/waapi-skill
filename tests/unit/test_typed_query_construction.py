@@ -1353,3 +1353,43 @@ def test_short_id_query_rejects_unbound_or_duplicate_native_candidates(tmp_path:
         env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 2 and result["error_code"] == "INVALID_QUERY_RESULT", result
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_path, version):
+    sound = "{11111111-1111-1111-1111-111111111111}"
+    source = "{22222222-2222-2222-2222-222222222222}"
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri != "ak.wwise.core.object.get":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args), dict(options)))
+            expected = "originalWavFilePath" if version == "2021.1" else "originalFilePath"
+            assert expected in options["return"]
+            if version == "2021.1":
+                assert not {"originalFilePath", "activeSource"} & set(options["return"])
+                assert args["waql"] == f'from object "{sound}" select activeSource take 1'
+                row = {"id": source, "name": "Audio", "type": "AudioFileSource", "path": r"\Sound\Audio"}
+            else:
+                assert args["waql"] == f'from object "{sound}"'
+                row = {"id": sound, "name": "Sound", "type": "Sound", "path": r"\Sound", "activeSource": {"id": source}}
+            row[expected] = "/owned/Originals/SFX/Audio.wav"
+            return {"return": [row]}
+    env, client = _env(tmp_path, version), Client(version)
+    argv = ["query-object", "--exact-id", sound, "--language", "SFX", "--include", "original-file-path"]
+    argv += ["--relationship", "active-source"] if version == "2021.1" else ["--include", "active-source"]
+    code, result = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["objects"][0]["original_file_path"] == "/owned/Originals/SFX/Audio.wav"
+    assert result["objects"][0]["id"] == (source if version == "2021.1" else sound)
+    assert client.calls[-1][2]["language"] == "SFX"
+    if version == "2021.1":
+        code, schema = gateway.execute_gateway(["query-schema", "--output", "active-source"], env=env)
+        detail = schema["business_output"]
+        assert code == 0 and detail["available"] is False
+        assert detail["alternative"]["relationship"] == "active-source"
+        before = len(client.calls)
+        code, error = gateway.execute_gateway(["query-object", "--exact-id", sound, "--include", "active-source"],
+            env=env, client_factory=lambda _: client)
+        assert code != 0 and "--relationship active-source" in error["message"]
+        assert len(client.calls) == before

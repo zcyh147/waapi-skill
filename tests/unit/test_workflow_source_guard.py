@@ -3881,6 +3881,8 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
             import re
             expression = args['waql']
+            if version == '2021.1':
+                assert not {'activeSource', 'originalFilePath'} & set(options['return']), options
             match = re.fullmatch(r'from object "([^"]+)"(?: take 1)?', expression)
             assert match, expression
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -3927,6 +3929,7 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
                     row['classId'] = 16
                 if version == '2021.1' and 'originalFilePath' in row:
                     row['sound:originalWavFilePath'] = row['originalFilePath']
+                    row['originalWavFilePath'] = row['originalFilePath']
         return result
     task.call = call
     runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
