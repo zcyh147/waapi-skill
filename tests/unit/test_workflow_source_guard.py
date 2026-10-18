@@ -1896,3 +1896,81 @@ def test_migrated_media_collector_retains_legacy_owned_fixture_boundary_without_
     assert category['selected_reopen_uri'] == operation
     assert 'ak.wwise.ui.project.open' in category['unassessed_alternative']
     assert 'owned lifecycle fixture work' in category['reason']
+
+
+@pytest.mark.parametrize('version,outcome,paged', [
+    (version, outcome, False) for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']
+    for outcome in ['true', 'false', 'native-refusal']] + [('2025.1', 'true', True)])
+def test_reference_enabled_probe_uses_actual_gateway_and_never_writes(tmp_path, workflow, version, outcome, paged):
+    import re
+    from copy import deepcopy
+    from tests.unit.test_metadata_property_state_selection_gateway import selected_reference_task
+    from tests.unit.test_metadata_discovery_gateway import (
+        OBJECT_GUID, GET_INFO_URI, OBJECT_GET_URI, GET_TYPES_URI, GET_NAMES_URI,
+        GET_PROPERTY_INFO_URI, IS_PROPERTY_ENABLED_URI, waapi_gateway,
+    )
+    run, client, _selection, reference = selected_reference_task(tmp_path, version)
+    parent, platform = '{33333333-3333-3333-3333-333333333333}', '{44444444-4444-4444-4444-444444444444}'
+    rows = {OBJECT_GUID: {'id': OBJECT_GUID, 'name': 'Reverb', 'type': 'AuxBus', 'classId': 3997712,
+        'path': r'\Busses\Default Work Unit\Master\Reverb', 'parent': {'id': parent}},
+        parent: {'id': parent, 'name': 'Master', 'type': 'Bus', 'classId': 1376272,
+            'path': r'\Busses\Default Work Unit\Master', 'parent': None},
+        platform: {'id': platform, 'name': 'Windows', 'type': 'Platform', 'classId': 4522000,
+            'path': r'\Platforms\Windows', 'parent': None}}
+    project_result = client.responses[OBJECT_GET_URI]
+    def objects(args, options):
+        if args == {'waql': 'from type Project take 2'}:
+            return project_result
+        if 'waql' in args:
+            expression = args['waql']
+            typed = re.fullmatch(r'from type (AuxBus|Platform) take (\d+)', expression)
+            exact = re.fullmatch(r'from object "(\{[A-Fa-f0-9-]+\})"(?: take (\d+))?', expression)
+            assert typed or exact, args
+            selected = [rows[OBJECT_GUID if typed[1] == 'AuxBus' else platform]] if typed else [rows[exact[1]]]
+        else:
+            assert set(args) == {'from'} and set(args['from']) == {'id'}, args
+            selected = [rows[value] for value in args['from']['id']]
+        return {'return': [{key: deepcopy(row[key]) for key in options['return'] if key in row} for row in selected]}
+    client.responses[OBJECT_GET_URI] = objects
+    client.responses[GET_TYPES_URI] = {'return': [{'name': name, 'classId': number, 'type': 'WObject'} for name, number in
+        [('AuxBus', 3997712), ('Bus', 1376272), ('Platform', 4522000)]]}
+    def info(args, _options):
+        assert args in ({'object': OBJECT_GUID, 'property': 'UserAuxSend0'}, {'classId': 3997712, 'property': 'UserAuxSend0'}), args
+        return deepcopy(reference)
+    client.responses[GET_PROPERTY_INFO_URI] = info
+    if paged:
+        client.responses[GET_NAMES_URI]['return'] = [f'Unrelated{i}' for i in range(64)] + client.responses[GET_NAMES_URI]['return']
+    client.responses[IS_PROPERTY_ENABLED_URI] = {'return': outcome == 'true'}
+    if outcome == 'native-refusal':
+        class WaapiRequestFailed(Exception):
+            uri = 'ak.wwise.invalid_arguments'
+            kwargs = {'details': {'property': 'UserAuxSend0', 'procedureUri': IS_PROPERTY_ENABLED_URI}, 'message': 'Native reference probe refused'}
+        client.errors[IS_PROPERTY_ENABLED_URI] = WaapiRequestFailed('reference probe refused')
+    config = tmp_path / 'config' / 'config.json'
+    settings = json.loads(config.read_text())
+    settings['project_modification_policy'] = 'read_only'
+    config.write_text(json.dumps(settings))
+    evidence = tmp_path / 'evidence'
+    evidence.mkdir(exist_ok=True)
+    env = {'WAAPI_SKILL_CONFIG_PATH': str(config), 'WWISE_EVIDENCE_DIR': str(evidence)}
+    commands = []
+    runtime = SimpleNamespace(version=version, candidate='unit-fixture-not-native', state_dir=tmp_path / 'probe-state',
+        env=env, category_results=[], port=31337, lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw_gateway(command):
+        commands.append(list(command))
+        return waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command], env=env, client_factory=lambda _url: client)
+    runtime.raw_gateway = raw_gateway
+    result = workflow._collect_reference_enabled_metadata_probe(runtime)
+    receipt = json.loads((runtime.state_dir / 'reference-enabled-metadata-observation.json').read_text())
+    assert result['status'] == ('FAIL' if outcome == 'native-refusal' else 'PASS'), receipt
+    assert receipt['mutation_authority'] is receipt['prospective_authority'] is receipt['business_effect_verified'] is False
+    assert receipt['controller_name_absence']['class'] is receipt['controller_name_absence']['object'] is True
+    assert receipt['class_field']['metadata']['type'] == receipt['object_field']['metadata']['type'] == ''
+    assert len([call for call in client.calls if call[0] == IS_PROPERTY_ENABLED_URI]) == 1
+    assert [call[1] for call in client.calls if call[0] == IS_PROPERTY_ENABLED_URI] == [
+        {'object': OBJECT_GUID, 'property': 'UserAuxSend0', 'platform': platform}]
+    assert all(command[0] in {'metadata', 'query-object'} for command in commands)
+    if outcome == 'native-refusal':
+        assert receipt['enabled_response']['payload']['call']['waapi_error_uri'] == 'ak.wwise.invalid_arguments'
+    else:
+        assert receipt['observed_enabled'] is (outcome == 'true')
