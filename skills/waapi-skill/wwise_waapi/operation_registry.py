@@ -4983,7 +4983,9 @@ def _prepare_object_create(
                     if len(candidates) > 1:
                         raise OperationContractError("AMBIGUOUS_IDENTITY", "A merged list descendant name is not unique.")
                     if candidates:
-                        if not _object_type_matches(candidates[0].get("type"), spec):
+                        candidates = _read_object_id_rows(candidates[0]["id"], fields=_object_spec_return_fields(spec), read=read)
+                        if len(candidates) != 1 or not _object_type_matches(candidates[0].get("type"), spec,
+                                actual_class_id=candidates[0].get("classId")):
                             raise OperationContractError("INVALID_TARGET_TYPE", "A merged list descendant has another live type.")
                         spec["preexisting_id"] = candidates[0]["id"]
                         spec["pre_state"] = candidates[0]
@@ -5993,7 +5995,19 @@ def _prepare_object_set(
             )
         if lists:
             _require_object_list_owner(target)
+        class_rows = _read_object_id_rows(target.object, fields=(*IDENTITY_RETURN_FIELDS, "classId"), read=read)
+        if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), target.object)
+                or any(not _native_snapshot_equal(class_rows[0].get(key), target.row.get(key))
+                       for key in ("id", "name", "type", "path"))):
+            raise OperationContractError("INVALID_READBACK", "Existing graph target class requires its exact bound identity.")
+        target_class = class_rows[0].get("classId")
+        _require_object_class_id(target_class)
+        class_types = [row for row in type_catalog if row.class_id == target_class]
+        if len(class_types) != 1:
+            raise OperationContractError("INVALID_OBJECT_TYPE", "Existing graph target class must resolve to one live getTypes row.")
         target_spec: dict[str, Any] = {
+            "class_id": target_class,
+            "class_metadata": class_types[0].as_dict(),
             "request_path": f"$.objects[{index}]",
             "parent_request_path": None,
             "existing_target": True,
@@ -6799,6 +6813,7 @@ def _prepare_object_set(
         snapshot_fields = _dedupe_fields(
             [
                 *IDENTITY_RETURN_FIELDS,
+                "classId",
                 *(row["name"] for row in target_spec["properties"]),
                 *(row["name"] for row in target_spec["references"]),
             ]
@@ -7655,6 +7670,7 @@ def _resolve_object_type(
             details={"requested": requested, "matches": [row.as_dict() for row in matches]},
         )
     row = matches[0]
+    _require_object_class_id(row.class_id)
     forbidden = {
         "workunit",
         "effect",
@@ -7700,6 +7716,7 @@ def _resolve_object_set_import_type(
             },
         )
     row = matches[0]
+    _require_object_class_id(row.class_id)
     return row
 
 
@@ -8000,6 +8017,7 @@ def _resolve_graph_node_type(node, *, catalog, version):
     matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == "Effect"]
     if len(matches) != 1:
         raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph Effect requires one fresh exact plugin class")
+    _require_object_class_id(matches[0].class_id)
     return matches[0]
 
 
@@ -8082,6 +8100,7 @@ def _prepare_object_node_specs(
             "requested_type": node.type,
             "canonical_type": canonical_type,
             "class_id": type_info.class_id,
+            "class_metadata": type_info.as_dict(),
             "notes_supplied": node.notes is not None,
             "requested_notes": node.notes,
             "properties": [],
@@ -8798,6 +8817,19 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
         nodes.append(pre_state["plugin_creation_guard"])
     assertions, seen = [], set()
+    class_bindings = [node["class_metadata"] for node in nodes if "class_metadata" in node]
+    class_bindings.extend(pre_state.get("import_guard", {}).get("class_metadata", []))
+    for node in nodes:
+        if isinstance(node.get("import"), Mapping):
+            class_bindings.extend(node["import"].get("class_metadata", []))
+    if class_bindings:
+        actual_classes = [row.as_dict() for row in _read_object_type_catalog(read)]
+        expected_classes = {canonical_json_bytes(row): row for row in class_bindings}
+        assertions.append({"name": "selected object classes still match live getTypes metadata",
+            "passed": all(actual_classes.count(row) == 1 for row in expected_classes.values()),
+            "evidence": {"expected": list(expected_classes.values()),
+                "actual": [row for row in actual_classes if row.get("class_id") in
+                    {expected.get("class_id") for expected in expected_classes.values()}]}})
     for node in nodes:
         for evidence in node.get("new_object_default_evidence", []):
             scope = evidence["class_scope"]
@@ -9504,6 +9536,11 @@ def _materialize_canonical_object_node(
 
 def _object_type_token(value: Any) -> str:
     return "".join(character for character in str(value).casefold() if character.isalnum())
+
+
+def _require_object_class_id(value: Any) -> None:
+    if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
+        raise OperationContractError("INVALID_READBACK", "Object class identity must be a live unsigned 32-bit integer.")
 
 
 def _object_class_matches(actual: Any, expected: Any) -> bool:
