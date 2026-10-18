@@ -98,6 +98,25 @@ def test_cli_rejects_damaged_portable_inputs_without_omitting_them(tmp_path, cap
     assert not output.exists()
 
 
+def test_default_portable_input_keeps_absent_explicit_requirement_unresolved(tmp_path, capsys):
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    requirements = tmp_path / 'requirements.json'
+    write_json(requirements, policy)
+    output = tmp_path / 'incomplete.json'
+    assert audit.main(['--requirements', str(requirements), '--output', str(output), '--require-complete']) == 2
+    message = json.loads(capsys.readouterr().out)
+    assert message['structural_check'] == 'consistent' and message['business_coverage'] == 'incomplete'
+    coverage = audit.load(output)['native_coverage']
+    branch = next(row for row in coverage['obligations'] if row['id'] ==
+        '2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.cli.moveMediaIdsToSingleFile|/resultSchema')
+    assert branch['state'] == 'unresolved'
+    assert branch['reasons'] == ['reviewed exact branch evidence requirements missing or stale']
+    assert branch['requirements'] == [] and branch['evidence_results'] == {}
+    assert coverage['requirements_sha256'] == audit.digest(policy)
+    assert coverage['completion']['complete'] is False
+    assert coverage['completion']['states'] == {'approved_exclusion': 116, 'unresolved': 272197}
+
+
 @pytest.fixture(scope='module')
 def ping_scope(tmp_path_factory):
     path = tmp_path_factory.mktemp('complete-controlled-scope')

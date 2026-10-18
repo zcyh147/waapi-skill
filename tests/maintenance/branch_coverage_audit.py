@@ -400,7 +400,8 @@ def portable_binding_inputs(index_path, requirements):
         policy = originals['requirements']
         if (policy.get('contract') != 'waapi-skill.branch-evidence-requirements/v1'
                 or set(policy['branches']) != set(expected['bindings'])
-                or any(requirements['branches'].get(key) != value for key, value in policy['branches'].items())):
+                or any(key in requirements['branches'] and requirements['branches'][key] != value
+                       for key, value in policy['branches'].items())):
             raise ValueError('portable requirement differs from reviewed exact branch policy')
         bindings.update(projected['bindings'])
     return {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}, base, {

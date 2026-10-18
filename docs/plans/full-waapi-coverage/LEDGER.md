@@ -551,7 +551,10 @@ sources and no native attachment exists. Neither the index nor a historical
 PASS grants current verification, descendant credit or completion. Missing or
 malformed selected inputs fail explicitly; unlisted obligations remain visible.
 Duplicate exact bindings and projection changes beyond the locator are rejected.
-The existing committed program-plus-native requirement remains unchanged.
+The existing committed program-plus-native requirement remains unchanged. An
+explicit override that omits a policy row leaves that branch unresolved in the
+existing evaluator; the imported historical policy is provenance and never
+fills the missing row. A conflicting present policy is rejected.
 
 `--bindings FILE` remains the explicit maintainer override; `--binding-index FILE`
 selects a reviewed alternative portable index and cannot be combined with
