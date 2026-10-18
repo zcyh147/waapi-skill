@@ -803,3 +803,43 @@ def test_legacy_import_owner_render_fields_are_explicit_unfinished_chain_boundar
     assert rejected['details']['mutation_dispatched'] is False
     assert 'audio.importTabDelimited' in rejected['details']['remaining_obligation']
     assert not any(uri.endswith('audio.import') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('operation', ['object.setProperty', 'object.set'])
+def test_render_clear_previews_and_verifies_observed_suffix_without_changing_bypass(tmp_path, operation):
+    task, _ = list_task(tmp_path, operation=operation)
+    task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith(('object.set', 'object.setProperty')):
+            writes.append(deepcopy(args))
+            if operation == 'object.setProperty':
+                assert args == {'object': ROOT, 'property': 'Render', 'value': False}
+            else:
+                assert args['objects'] == [{'object': ROOT, '@Render': False}]
+            task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = False
+            return {'objects': [{'id': ROOT, 'name': task.objects[ROOT]['name']}]} if operation == 'object.set' else {}
+        return original(uri, args, options)
+    task.call = call
+    before = deepcopy(task.objects)
+    target = task.bind(ROOT)
+    render = select_field(task, owner=target, token='Render')
+    if operation == 'object.setProperty':
+        code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+            '--field-handle', render, '--business-value', 'false')
+    else:
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'slot', '--object-handle', target,
+            '--field-value', render, 'false')
+    assert code == 0, declared
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert chain['derived'] == [{'key': CHILD, 'before': True, 'after': False}]
+    assert chain['suffix_rule']['rule'] == 'clearing a Render flag clears all subsequent stored Render flags'
+    assert chain['suffix_rule']['version'] == '2025.1'
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects == {**before, ROOT: {**before[ROOT], '@Render': False}, CHILD: {**before[CHILD], '@Render': False}}
+    assert len(writes) == 1
