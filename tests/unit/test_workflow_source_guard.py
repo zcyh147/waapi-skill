@@ -3952,6 +3952,21 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
     assert [row['phase'] for row in effects] == ['existing_media_render', 'new_media_refs_render', 'immutable_tsv_structure_render']
     assert all(row['independent_owner']['properties']['RenderEffect0'] is True for row in effects)
     assert all(row['independent_owner']['properties']['RenderEffect1'] is True for row in effects)
+    tsv = effects[-1]
+    table_bytes = Path(tsv['table']['path']).read_bytes()
+    assert hashlib.sha256(table_bytes).hexdigest() == tsv['table']['sha256']
+    import csv, io
+    records = list(csv.DictReader(io.StringIO(table_bytes.decode('utf-8')), delimiter='\t'))
+    assert len(records) == 1
+    record, = records
+    assert record['Object Type'] == 'Sound SFX'
+    assert record['Object Path'] == '<Sound SFX>WAAPI_LEGACY_IMPORT_TEST_TSV'
+    assert 'Property[IsVoice]' not in record
+    assert set(record) == {'Object Path', 'Object Type', 'Notes', 'Property[Volume]', 'Property[OverrideEffect]',
+        'Reference[Effect0]', 'Reference[Effect1]', 'Property[RenderEffect1]'}
+    assert record['Property[Volume]'] == '-9' and record['Property[OverrideEffect]'] == record['Property[RenderEffect1]'] == 'true'
+    assert record['Notes'] == 'Keep legacy WAAPI_LEGACY_IMPORT_TEST_TSV'
+    assert tsv['independent_owner']['properties']['IsVoice'] is False
     for row in effects[:2]:
         assert row['independent_source']['parent']['id'] == row['independent_owner']['id']
         assert row['media']['copied_sha256'] == row['media']['input_sha256']
