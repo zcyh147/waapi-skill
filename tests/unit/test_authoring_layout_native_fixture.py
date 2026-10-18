@@ -296,6 +296,18 @@ def _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch):
     client.responses.update({'ak.wwise.ui.commands.getCommands': {'commands': ['Inspect']},
         'ak.wwise.ui.commands.execute': {},
         'ak.wwise.ui.captureScreen': {'contentType': 'image/png', 'contentBase64': base64.b64encode(png).decode()}})
+    original_call = client.call
+    def call_native(uri, args=None, options=None):
+        inspected = any(row[0] == 'ak.wwise.ui.commands.execute' for row in client.calls)
+        if uri == 'ak.wwise.ui.getSelectedObjects':
+            client.calls.append((uri, args, options))
+            row = client.rows['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']
+            return {'objects': [{field: row[field] for field in ('id', 'name', 'type', 'path')}] if inspected else []}
+        if uri == URI + 'getViewInstances' and not inspected:
+            client.calls.append((uri, args, options))
+            return {'viewInstances': []}
+        return original_call(uri, args, options)
+    client.call = call_native
     def factory(*, skill_source, runtime, version, receipts):
         env = gateway_env(runtime.owned_root)
         env['WWISE_EVIDENCE_DIR'] = runtime.runner_environment['WWISE_EVIDENCE_DIR']
@@ -330,6 +342,11 @@ def test_soundcaster_images_are_archived_without_business_preservation_credit(ow
     for row in report['sessions']:
         assert (report_path.parent / row['image']['path']).read_bytes() == png
         assert row['command']['state'] == row['capture']['state'] == 'result_schema_checked'
+        assert row['before']['selected']['objects'] == []
+        assert row['after']['selected']['objects'][0]['id'] == row['id']
+        assert row['before']['instances']['result']['viewInstances'] == []
+        assert len(row['after']['instances']['result']['viewInstances']) == 1
+        assert row['image']['scope']['kind'] == 'soundcaster-view'
         assert row['view_locator']['layout_name'] == 'Designer'
         assert row['view_locator']['instance']['viewIsDocked'] is False
         assert row['view_locator']['instance']['viewName'] == 'DisclosedSoundcasterView'
@@ -403,25 +420,31 @@ def test_soundcaster_wrong_selected_identity_stops_before_all_ui_writes(owned_au
 
 
 @pytest.mark.parametrize('instance_count', [0, 2], ids=['absent', 'ambiguous'])
-def test_soundcaster_missing_unique_view_retains_observation_without_image(owned_authoring, tmp_path, monkeypatch, instance_count):
+def test_soundcaster_missing_unique_view_records_main_ui_without_extra_command(owned_authoring, tmp_path, monkeypatch, instance_count):
     from copy import deepcopy
     from pathlib import Path
-    native, batch, call, client, _, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
+    native, batch, call, client, png, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
     view = deepcopy(client.views['Designer'][0])
     client.views['Designer'] = [] if instance_count == 0 else [view, {**view,
         'viewID': '{33333333-3333-3333-3333-333333333333}'}]
-    with pytest.raises(AssertionError, match='No unique actual Soundcaster instance'):
-        native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
+    native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
     destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
     report = json.loads((destination / 'soundcaster-frontend-diagnostic.json').read_text())
-    assert report['complete'] is False and report['business_preservation_verified'] is False
+    assert report['complete'] is True and report['business_preservation_verified'] is False
     assert report['runtime_session_values_observed'] is False
-    observed = report['sessions'][0]['view_locator']
+    session = report['sessions'][0]
+    observed = session['view_locator']
     assert observed['complete'] is False and len(observed['instances']) == instance_count
     assert observed['session_id'] == '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'
-    assert not list(destination.glob('*.png'))
+    assert session['before']['selected']['objects'] == []
+    assert session['after']['selected']['objects'][0]['id'] == session['id']
+    assert session['before']['instances']['result']['viewInstances'] == []
+    assert len(session['after']['instances']['result']['viewInstances']) == instance_count
+    assert session['image']['scope']['kind'] == 'main-ui'
+    assert session['image']['scope']['reason'] == 'Soundcaster instance absent or ambiguous; observe generic inspection effect'
+    assert (destination / session['image']['path']).read_bytes() == png
     writes = [(uri, args) for uri, args, _ in client.calls if uri in
         {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
     assert writes == [('ak.wwise.ui.commands.execute', {'command': 'Inspect',
-        'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']})]
-    assert len([row for row in batch.receipts[nodeid] if row['argv'][0] == 'preview-from-draft']) == 1
+        'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']}), ('ak.wwise.ui.captureScreen', {})]
+    assert len([row for row in batch.receipts[nodeid] if row['argv'][0] == 'preview-from-draft']) == 2
