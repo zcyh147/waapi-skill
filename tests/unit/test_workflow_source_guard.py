@@ -4200,12 +4200,14 @@ def _stationary_tone_runtime(tmp_path, workflow, *, fault=None):
             fmt = struct.pack('<HHIIHH', 3 if floating else 1, 1, 48000, 192000 if floating else 96000,
                 4 if floating else 2, 32 if floating else 16)
             raw = b'RIFF' + struct.pack('<I', 36 + len(audio)) + b'WAVEfmt ' + struct.pack('<I', 16) + fmt + b'data' + struct.pack('<I', len(audio)) + audio
+            if fault == 'unrecognized-file': raw = b'fixture native writer bytes requiring investigation'
             client.artifact_bytes = raw
             if fault == 'missing-file': client.write_output = False
             native_files[args['path']] = raw
         result = original(uri, args, options)
         if uri == 'ak.wwise.core.getInfo':
             result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+            if fault == 'wrong-build': result['version']['build'] = 9999
         return result
     client.call = call
     env = {**_env(tmp_path, '2025.1'), 'WWISE_EVIDENCE_DIR': str(tmp_path / 'dispatcher-evidence'),
@@ -4226,7 +4228,7 @@ def _stationary_tone_runtime(tmp_path, workflow, *, fault=None):
     return runtime, commands, writes, native_files
 
 
-def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_public_transactions(tmp_path, workflow):
+def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_public_transactions(tmp_path, workflow, monkeypatch):
     import hashlib
     runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow)
     category = workflow._collect_stationary_tone_characterization(runtime)
@@ -4250,6 +4252,26 @@ def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_p
     assert receipt['get_info']['isCommandLine'] is True
     assert receipt['get_info']['version']['build'] == 9143
     assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', runtime.env['WWISE_CATEGORY_EVIDENCE_PATH'])
+    node = 'fixture::stationary_tone_characterization'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True, 'hash_before': 'same', 'hash_after': 'same'},
+        residual_state={'sandbox': 'deleted', 'process_cleanup': 'cleaned', 'residual_processes': []},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(Path(runtime.env['WWISE_CATEGORY_EVIDENCE_PATH']).read_text())
+    assert len(record['transactions']) == 4 and all(row['state'] == 'result_schema_checked' for row in record['transactions'])
+    assert record['categories'][0]['status'] == 'blocked' and record['categories'][0]['business_effect_verified'] is False
+    assert record['categories'][0]['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    assert record['residual_state']['process_cleanup'] == 'cleaned'
+    calls_before = len(commands)
+    with pytest.raises(AssertionError, match='overwrite'):
+        workflow._collect_stationary_tone_characterization(runtime)
+    assert len(commands) == calls_before and len(writes) == 4
 
 
 def test_stationary_tone_diagnostic_late_archive_failure_keeps_incomplete_nonpass_receipt(tmp_path, workflow, monkeypatch):
@@ -4268,6 +4290,35 @@ def test_stationary_tone_diagnostic_late_archive_failure_keeps_incomplete_nonpas
     assert receipt['archive_failure']['type'] == 'OSError'
     assert len(writes) == 4 and sum(argv[0] == 'execute' for argv in commands) == 4
     assert all(Path(phase['wav']['archive_path']).is_file() for phase in receipt['phases'])
+
+
+@pytest.mark.parametrize('fault,expected_writes', [('authoring', 0), ('wrong-build', 0), ('native-error', 1), ('missing-file', 1)])
+def test_stationary_tone_diagnostic_stops_on_wrong_host_or_generation_failure_without_retry(tmp_path, workflow, fault, expected_writes):
+    runtime, commands, writes, _ = _stationary_tone_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(Exception):
+        workflow._collect_stationary_tone_characterization(runtime)
+    receipt = json.loads((runtime.state_dir / 'tone-stationary-characterization.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['collection_complete'] is False and receipt['business_effect_verified'] is False
+    assert len(writes) == expected_writes and sum(argv[0] == 'execute' for argv in commands) == expected_writes
+    assert not any(argv[0] == 'verify' for argv in commands)
+    assert receipt['failure'] and receipt['native_evidence']
+    if expected_writes:
+        assert receipt['phases'][0]['execution_attempted'] is True
+        final = json.loads(Path(receipt['phases'][0]['transaction']['path']).read_text())
+        assert final['state'] == ('execution_indeterminate' if fault == 'native-error' else 'executed_unverified')
+
+
+def test_stationary_tone_diagnostic_retains_unrecognized_output_and_failed_verification_without_effect_credit(tmp_path, workflow):
+    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow, fault='unrecognized-file')
+    category = workflow._collect_stationary_tone_characterization(runtime)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'blocked' and receipt['collection_complete'] is True
+    assert receipt['business_effect_verified'] is False and len(writes) == 4
+    for phase in receipt['phases']:
+        assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
+        assert phase['verification']['exit_code'] == 2 and phase['verification']['state'] == 'verification_failed'
+        assert phase['signal_verified'] is False
 
 
 def test_soundcaster_dump_wrong_guid_cannot_certify_same_named_session_values(tmp_path, workflow, monkeypatch):
