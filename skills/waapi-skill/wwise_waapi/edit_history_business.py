@@ -252,6 +252,10 @@ def _compound_observations(prepared, execution, verification):
     if path_context is not None:
         from .object_graph_paths import validate_compound_path_context, compound_context_result_matches
         validate_compound_path_context(path_context, calls)
+        from .object_graph_paths import compound_phase_arguments
+        if any(not lifecycle_snapshot_equal(call.get('args'), compound_phase_arguments(calls, index, path_context))
+                for index, call in enumerate(calls) if 'prepared_operation' in call):
+            raise ValueError('Compound phase args differ from their original child and prior rename intent')
         witnesses = [row for row in assertions if row.get('kind') == 'compound_path_context']
         context_reads = [row for row in readbacks if row.get('role') == 'compound-path-context']
         if (len(witnesses) != 1 or witnesses[0].get('passed') is not True
@@ -269,7 +273,8 @@ def _compound_observations(prepared, execution, verification):
                 or proof.get("prepared_sha256") != canonical_sha256(child)
                 or proof.get("dispatch_sha256") != canonical_sha256(phase["dispatch_result"])):
             raise ValueError("Compound child index, prepared proof or actual dispatch association differs")
-        if path_context is not None and proof.get('path_context_sha256') != canonical_sha256(path_context):
+        if path_context is not None and (proof.get('path_context_sha256') != canonical_sha256(path_context)
+                or proof.get('phase_args_sha256') != canonical_sha256(call['args'])):
             raise ValueError('Compound child path context differs from its immutable parent')
         header = proof.get("verification")
         if (not isinstance(header, Mapping) or header.get("contract") != verification.get("contract")
@@ -350,13 +355,13 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
         observations, covered = render_observations(prepared, verification)
         if plan["kind"] == "object-set-batch":
             from .existing_field_observations import receipt_observations
-            observations.extend(receipt_observations(prepared, verification, exclude_fields=covered))
+            observations.extend(receipt_observations(prepared, verification, exclude_fields=covered, path_context=compound_path_context))
         elif plan["field"] not in covered.get((str(plan["object_id"]).upper(), _receipt_platform(plan, prepared["pre_state"])), set()):
             raise ValueError("Render source selected field is missing from its complete chain observation")
         return observations
     if plan.get("kind") == "object-set-batch":
         from .existing_field_observations import receipt_observations
-        return receipt_observations(prepared, verification)
+        return receipt_observations(prepared, verification, path_context=compound_path_context)
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
         raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":

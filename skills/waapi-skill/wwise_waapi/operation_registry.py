@@ -10616,6 +10616,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             compound_path_context = prepare_compound_path_context(prepared_children, read=read)
         except ValueError as exc:
             raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN', str(exc)) from exc
+        if compound_path_context is not None:
+            from .object_graph_paths import compound_phase_arguments
+            for index, child in enumerate(prepared_children):
+                child['args'] = compound_phase_arguments(prepared_children, index, compound_path_context)
         execution_plan = {
             **execution_plan,
             "calls": prepared_children,
@@ -15732,6 +15736,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             try:
                 rebuilt_context = prepare_compound_path_context(actual_plan['calls'], read=path_guard_read)
                 context_unchanged = lifecycle_snapshot_equal(rebuilt_context, actual_plan.get('path_context'))
+                from .object_graph_paths import compound_phase_arguments
+                context_unchanged = context_unchanged and all(lifecycle_snapshot_equal(
+                    child.get('args'), compound_phase_arguments(actual_plan['calls'], index, rebuilt_context))
+                    for index, child in enumerate(actual_plan['calls']) if 'prepared_operation' in child)
             except ValueError:
                 context_unchanged = False
             passed = passed and context_unchanged
@@ -18288,7 +18296,8 @@ def verify_prepared_operation(
                     "evidence": {
                         "index": index,
                         "prepared_sha256": canonical_sha256(prepared_child),
-                        **({'path_context_sha256': canonical_sha256(path_context)} if path_context is not None else {}),
+                        **({'path_context_sha256': canonical_sha256(path_context),
+                            'phase_args_sha256': canonical_sha256(child_plan['args'])} if path_context is not None else {}),
                         "dispatch_sha256": canonical_sha256(dispatch_result),
                         "verification": child_header,
                         "assertions": {"start": assertion_start, "count": len(assertions) - assertion_start,
@@ -19829,6 +19838,9 @@ def verify_prepared_operation(
                 except (ValueError, KeyError, TypeError, OperationContractError) as exc:
                     path_ok, path_evidence = False, {"error": str(exc)}
                 check(f"{request_path} exact GUID ancestry and requested rename paths match", path_ok, path_evidence)
+            if compound_path_context and kind == 'object-set-batch' and isinstance(spec.get('pre_state'), Mapping):
+                from .object_graph_paths import project_compound_snapshot
+                expected_path = project_compound_snapshot(spec['pre_state'], compound_path_context)['path']
             if isinstance(expected_path, str):
                 check(
                     f"{request_path} exact path matches",
