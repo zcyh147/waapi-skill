@@ -6008,6 +6008,11 @@ def _prepare_object_set(
         class_types = [row for row in type_catalog if row.class_id == target_class]
         if len(class_types) != 1:
             raise OperationContractError("INVALID_OBJECT_TYPE", "Existing graph target class must resolve to one live getTypes row.")
+        def type_matches(row):
+            return _ordinary_object_type_matches(target.row.get("type"),
+                {"requested_type": row.type, "canonical_type": row.name})
+        if any(type_matches(row) for row in type_catalog) and not type_matches(class_types[0]):
+            raise OperationContractError("INVALID_TARGET_TYPE", "Existing ordinary native type contradicts its live class metadata.")
         target_spec: dict[str, Any] = {
             "class_id": target_class,
             "class_metadata": class_types[0].as_dict(),
@@ -6542,7 +6547,7 @@ def _prepare_object_set(
                 if node.import_arg is not None:
                     trusted_import, import_spec = _prepare_object_set_import(
                         node.import_arg,
-                    version=request.version,
+                        version=request.version,
                         canonical_type=canonical_types[node.request_path],
                         type_catalog=type_catalog,
                         file_proofs=object_set_file_proofs,
@@ -8834,7 +8839,7 @@ def _append_association_condition(requirements, *, source, owner, property_name,
 
 
 def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
-    """Reuse sealed class field/default facts at both transaction phases."""
+    """Revalidate selected class identities and field/default facts once per phase."""
     if not isinstance(pre_state, Mapping):
         return []
     nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
@@ -9581,12 +9586,16 @@ def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_i
         return False
     if class_proof is not None:
         return True
-    token = _object_type_token(actual)
-    return token in {
-        _object_type_token(spec.get("requested_type")),
-        _object_type_token(spec.get("canonical_type")),
-        "propertycontainer" if _object_type_token(spec.get("canonical_type")) == "actormixer" else "",
-    }
+    return _ordinary_object_type_matches(actual, spec)
+
+
+def _ordinary_object_type_matches(actual: Any, spec: Mapping[str, Any]) -> bool:
+    if not isinstance(actual, str) or not actual:
+        return False
+    expected = {_object_type_token(spec.get("requested_type")), _object_type_token(spec.get("canonical_type"))}
+    if expected & {"actormixer", "propertycontainer"}:
+        expected.update({"actormixer", "propertycontainer"})
+    return _object_type_token(actual) in expected
 
 
 def _child_path(parent_path: Any, name: Any, *, field: str) -> str:
@@ -13590,7 +13599,7 @@ def _prepare_closed_import_plan(
             requested_type = target.get("requested_object_type")
             if (not _object_class_matches(rows[0].get("classId"), target.get("metadata_class_id"))
                     or isinstance(requested_type, str) and not _import_object_type_matches(
-                        rows[0].get("type"), requested_type)) :
+                        rows[0].get("type"), requested_type)):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "An existing import target does not match the requested object type.",
