@@ -216,7 +216,7 @@ def test_media_diagnostic_owned_batch_category_cannot_grant_business_credit(owne
         sandbox.metadata.process_cleanup_result = 'cleaned'
         sandbox.metadata.process_cleanup_details = {'residual_processes': []}
     monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
-    monkeypatch.setattr(authoring_batch, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', lambda *_: None)
     monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
     target = tmp_path / 'category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
@@ -288,6 +288,11 @@ def _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch):
         assert zlib.crc32(payload) == struct.unpack('>I', png[offset + 8 + length:offset + 12 + length])[0]
         offset += length + 12
     assert offset == len(png)
+    client.responses[URI + 'getViewTypes']['viewTypes'].append(
+        {'viewName': 'DisclosedSoundcasterView', 'viewDisplayName': 'Soundcaster'})
+    client.views['Designer'] = [{'viewName': 'DisclosedSoundcasterView',
+        'viewID': '{22222222-2222-2222-2222-222222222222}',
+        'viewDisplayName': 'Soundcaster', 'viewIsDocked': False}]
     client.responses.update({'ak.wwise.ui.commands.getCommands': {'commands': ['ShowSoundcaster']},
         'ak.wwise.ui.commands.execute': {},
         'ak.wwise.ui.captureScreen': {'contentType': 'image/png', 'contentBase64': base64.b64encode(png).decode()}})
@@ -324,12 +329,17 @@ def test_soundcaster_images_are_archived_without_business_preservation_credit(ow
     for row in report['sessions']:
         assert (report_path.parent / row['image']['path']).read_bytes() == png
         assert row['command']['state'] == row['capture']['state'] == 'result_schema_checked'
+        assert row['view_locator']['layout_name'] == 'Designer'
+        assert row['view_locator']['instance']['viewIsDocked'] is False
+        assert row['view_locator']['instance']['viewName'] == 'DisclosedSoundcasterView'
+        assert row['view_locator']['command_transaction_id'] == row['command']['transaction_id']
+        assert row['view_locator']['session_id'] == row['id']
     writes = [(uri, args) for uri, args, _ in client.calls if uri in
         {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
     assert writes == [('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster', 'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']}),
-        ('ak.wwise.ui.captureScreen', {}),
+        ('ak.wwise.ui.captureScreen', {'viewName': 'DisclosedSoundcasterView'}),
         ('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster', 'objects': ['{F4B8069C-3C15-4157-B570-8A41AB2463C2}']}),
-        ('ak.wwise.ui.captureScreen', {})]
+        ('ak.wwise.ui.captureScreen', {'viewName': 'DisclosedSoundcasterView'})]
     receipts = batch.receipts[nodeid]
     captures = [row for row in receipts if row['argv'][0] == 'execute'
         and row['payload']['stdout_projection']['full_dispatch_result_in_stdout'] is False]
@@ -351,7 +361,7 @@ def test_soundcaster_images_are_archived_without_business_preservation_credit(ow
         sandbox.metadata.process_cleanup_result = 'cleaned'
         sandbox.metadata.process_cleanup_details = {'residual_processes': []}
     monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
-    monkeypatch.setattr(authoring_batch, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', lambda *_: None)
     monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
     item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})
     batch.prepare_stop([item])
@@ -391,3 +401,28 @@ def test_soundcaster_wrong_second_identity_stops_before_all_ui_writes(owned_auth
     batch.prepare_stop([item])
     rows = [json.loads(line)['categories'][0] for line in target.read_text().splitlines()]
     assert rows and all(row['status'] == 'FAIL' and row['business_preservation_verified'] is False for row in rows)
+
+
+@pytest.mark.parametrize('instance_count', [0, 2], ids=['absent', 'ambiguous'])
+def test_soundcaster_missing_unique_view_retains_observation_without_image(owned_authoring, tmp_path, monkeypatch, instance_count):
+    from copy import deepcopy
+    from pathlib import Path
+    native, batch, call, client, _, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
+    view = deepcopy(client.views['Designer'][0])
+    client.views['Designer'] = [] if instance_count == 0 else [view, {**view,
+        'viewID': '{33333333-3333-3333-3333-333333333333}'}]
+    with pytest.raises(AssertionError, match='No unique actual Soundcaster instance'):
+        native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
+    destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
+    report = json.loads((destination / 'soundcaster-frontend-diagnostic.json').read_text())
+    assert report['complete'] is False and report['business_preservation_verified'] is False
+    assert report['runtime_session_values_observed'] is False
+    observed = report['sessions'][0]['view_locator']
+    assert observed['complete'] is False and len(observed['instances']) == instance_count
+    assert observed['session_id'] == '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'
+    assert not list(destination.glob('*.png'))
+    writes = [(uri, args) for uri, args, _ in client.calls if uri in
+        {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
+    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster',
+        'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']})]
+    assert len([row for row in batch.receipts[nodeid] if row['argv'][0] == 'preview-from-draft']) == 1

@@ -418,7 +418,21 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
             report['sessions'].append({'id': identity, 'name': name, 'identity': rows[0]})
         for session in report['sessions']:
             session['command'] = effect('ui.commands.execute', ['--command-id', 'ShowSoundcaster', '--command-object', session['id']])
-            session['capture'] = effect('ui.captureScreen', [])
+            layout = bounded_call(['layout-read', 'current'])['result'].get('name')
+            assert isinstance(layout, str) and layout, 'No exact current layout for Soundcaster observation'
+            types = bounded_call(['layout-read', 'types'])['result'].get('viewTypes', [])
+            registered = [row for row in types if row.get('viewDisplayName') == 'Soundcaster']
+            assert len(registered) == 1 and registered[0].get('viewName'), 'No unique live registered Soundcaster view type'
+            instances = bounded_call(['layout-read', 'instances', '--layout-name', layout])['result'].get('viewInstances', [])
+            matches = [row for row in instances if row.get('viewName') == registered[0]['viewName']]
+            session['view_locator'] = {'complete': False, 'layout_name': layout,
+                'registered_type': registered[0], 'instances': matches, 'session_id': session['id'],
+                'command_transaction_id': session['command']['transaction_id'],
+                'binding_scope': 'observed view instance only; selected session requires independent image review'}
+            assert (len(matches) == 1 and matches[0].get('viewID')
+                and type(matches[0].get('viewIsDocked')) is bool), 'No unique actual Soundcaster instance; session remains unobserved'
+            session['view_locator'].update(complete=True, instance=matches[0])
+            session['capture'] = effect('ui.captureScreen', ['--view-name', matches[0]['viewName']])
             capture = session['capture']
             original = executed[capture['transaction_id']]
             assert original['artifact_hash'] == capture['artifact_hash']

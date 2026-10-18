@@ -203,7 +203,7 @@ def test_shared_owner_stops_prepared_then_releases_after_last_teardown(owned_aut
         sandbox.metadata.process_cleanup_result = 'cleaned'
         sandbox.metadata.process_cleanup_details = {'residual_processes': []}
     monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
-    monkeypatch.setattr(authoring_batch, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', lambda *_: None)
     monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
     target = tmp_path / 'category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
@@ -242,7 +242,7 @@ def _batch_ready_for_final_reports(owner, tmp_path, monkeypatch, *, nodeids=('la
         sandbox.metadata.process_cleanup_result = 'cleaned'
         sandbox.metadata.process_cleanup_details = {'residual_processes': []}
     monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
-    monkeypatch.setattr(authoring_batch, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', lambda *_: None)
     monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
     target = tmp_path / 'category.jsonl'
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
@@ -453,3 +453,43 @@ def test_batch_cannot_substitute_a_process_list_without_prefix_environment_proof
     assert batch.finalize([item])['outcome'] == 'BLOCKED'
     assert commands == [['ps', 'eww', '-axo', 'pid=,command=']]
     assert owned_authoring.runtime.owned_root.exists()
+
+
+@pytest.mark.parametrize('release', [True, False], ids=['busy-then-free', 'still-busy-at-deadline'])
+def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_authoring, tmp_path, monkeypatch, release):
+    import json
+    from tests.destructive.support import authoring_batch, sandbox_fixture
+    from wwise_waapi import headless
+    batch, item, target = _batch_ready_for_final_reports(owned_authoring, tmp_path, monkeypatch)
+    item._waapi_phase_reports['teardown'] = 'passed'
+    # Keep the real existing wildcard-bind probe and release helper. Only the
+    # OS socket/time boundaries are fake; final categories and owner are real.
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', sandbox_fixture.wait_for_port_release)
+    clock, attempts = [0.0], []
+    class Socket:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            pass
+        def bind(self, endpoint):
+            attempts.append(endpoint)
+            if not release or len(attempts) < 3:
+                raise OSError('owned socket not yet bindable')
+    monkeypatch.setattr(headless.socket, 'socket', lambda *_: Socket())
+    monkeypatch.setattr(sandbox_fixture.time, 'monotonic', lambda: clock[0])
+    monkeypatch.setattr(sandbox_fixture.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    outcome = batch.finalize([item], terminal=True)
+    records = [json.loads(line) for line in target.read_text().splitlines()]
+    assert attempts and set(attempts) == {('0.0.0.0', 31337)}
+    if release:
+        assert outcome['outcome'] == 'PASS'
+        assert len(attempts) == 3 and 0 < clock[0] < 15
+        assert records[-1]['invocation']['outcome'] == 'PASS'
+        assert records[-1]['residual_state']['sandbox'] == 'deleted'
+    else:
+        assert outcome['outcome'] == 'BLOCKED'
+        assert 15 <= clock[0] <= 15.11
+        assert all(row['invocation']['outcome'] != 'PASS' for row in records)
+        assert owned_authoring.runtime.sandbox.sandbox_project.exists()
+        assert (owned_authoring.runtime.evidence_root / 'lifecycle-release-error.json').exists()
+    assert [row['argv'][0] for row in batch.receipts['last-node']] == ['config-set', 'status']
