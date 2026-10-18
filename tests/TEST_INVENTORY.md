@@ -7,6 +7,17 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-18 constructor repair and Authoring startup follow-ups
 
+Later focused native successors completed separately: `a3b70b45` passed the
+2021 legacy import collector (**1 passed, 17.16s**); `3b8f88ba` passed the
+2024 Authoring startup/metadata diagnostic with child-only automation mode
+(**1 passed, 47.68s**). Both preserved source full hash/mtime and 1,883 tracked
+files, deleted their passing sandboxes and left no owned process. The import
+case also preserved source tree metadata. The first proves the original three
+import effects with a complete unique-source-child oracle, not generic 2021
+active-source selection; the second proves startup and metadata observation,
+not Authoring mutation or full media-format acceptance. Earlier failures below
+retain their original verdicts.
+
 Staging `5acc4054`, macOS Console 2022.1: the separate null-source diagnostic
 passed **1 test in 9.83s**, followed in a fresh root by the unchanged complete
 created-field history case, **1 passed in 7.95s**. Both source variants and

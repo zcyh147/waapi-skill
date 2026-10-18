@@ -87,6 +87,21 @@ verification; removing the case is not a repair.
 
 ## Legacy import Render: two effects verified, TSV still open — #180 / #182
 
+Successor `a3b70b45` passed the complete 2021 collector in **17.16s**. It uses
+the existing complete children query, requires exactly one actual AudioFileSource
+with matching GUID/class/parent/SFX language, and compares the Sound and Source
+WAV paths plus copied bytes. All three original import effects and preservation
+checks pass. The prior attempted `select activeSource` mapping at `76eb4d7c`
+also failed on the matching native Console despite its SDK documentation; that
+experimental public relationship was removed. Generic multi-source active
+selection remains required #181 work, separate from this one-source fixture.
+
+Original root: `legacy-import-render-a3b70b45-2021-r1` in the native-conditions
+worktree. Source full hash/mtime/tree and 1,883 tracked files stayed unchanged,
+the passing sandbox was deleted and no owned process remained. The earlier
+failed roots are retained unchanged. TSV-media and read-only TSV property
+admission obligations remain open despite this structure-only TSV PASS.
+
 The 2021 collector at staging `5acc4054` saved the sandbox through normal public
 transactions before language-bound imports. Setup and the first media/Render
 transaction passed Gateway verification, but the independent check then failed:
@@ -122,6 +137,18 @@ Both preserved source full hash/mtime and 1,883 tracked files and cleaned owned
 processes. Existing diagnostics retained only response types; a bounded snapshot
 of the already-returned client value is needed before another meaningful attempt.
 Do not weaken the host/build guard or infer raw transport data from this record.
+
+The bounded diagnostic at `9d88c7e2` established an actual empty client result;
+`93138143` then observed the client's documented `None` failure result. Final
+successor `3b8f88ba` treats only these two absent-identity values as pending
+inside the existing readiness deadline. Nonempty malformed results and explicit
+wrong host/build still stop immediately. Its fresh 2024 automation-mode run
+passed **1 diagnostic test in 47.68s**, including exact host/build/project
+readiness. Source full hash/mtime and 1,883 tracked files stayed unchanged,
+the sandbox was deleted and owned processes ended. Original root in the
+short-id worktree: `authoring-metadata-3b8f88ba-automation-r1`. This resolves
+the observed startup obstacle and supplies the requested metadata diagnostic;
+it does not certify all Authoring mutations or project-format preservation.
 
 ## Earlier legacy import evidence
 
