@@ -261,6 +261,8 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                     read=read, platform=chain["platform"], version=chain["version"])
                 passed = passed and [row["id"] for row in rows] == chain["before_order"]
             for field in chain["metadata"]:
+                if (after_write and chain["mode"] == "replaceAll" and field["scope"].get("object_id") in chain["before_order"]):
+                    continue  # sealed old GUIDs must be deleted by the replacement verifier
                 info = r._read_property_info(read, **field["scope"], name=field["field"])
                 passed = passed and dict(info.raw) == field["raw"] and info.as_dict() == field["normalized"]
             for snapshot in chain["snapshots"]:

@@ -6279,8 +6279,8 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
     def declare_slots(draft, owner, effects, kind, fields, targets):
         handles = []
         for index, target in enumerate(targets):
-            values = ['--field-value', fields['Bypass'], 'true' if index == 0 else 'false',
-                '--field-value', fields['Render'], 'false' if index == 0 else 'true']
+            values = ['--field-value', fields['Bypass'], 'false' if index == 0 else 'true',
+                '--field-value', fields['Render'], 'true' if index == 0 else 'false']
             if target is not None: values += ['--field-value', fields['Effect'], target]
             declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', f'slot{index}',
                 '--parent-handle', owner, '--kind', kind, '--field', 'object_list', effects, *values], live=False)
@@ -6319,8 +6319,8 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             assert guid(row.get('owner')) == owner, row
             assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
             assert guid(row.get('references', {}).get('Effect')) == expected_targets[index], row
-            assert row.get('properties', {}).get('Bypass') is (index == 0), row
-            assert row.get('properties', {}).get('Render') is (index != 0), row
+            assert row.get('properties', {}).get('Bypass') is (index != 0), row
+            assert row.get('properties', {}).get('Render') is (index == 0), row
             slots.append(row)
         return {'owner': sound, 'slots': slots, 'ordered_ids': [row['id'] for row in listed]}
     def preserved(*, new_child=None):
