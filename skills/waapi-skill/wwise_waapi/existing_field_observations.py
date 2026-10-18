@@ -149,14 +149,13 @@ def capture_after(proof, *, read):
         return {**record, "reason": "optional_source_postread_failed", "error": _read_error(exc)}
 
 
-def receipt_observations(snapshot, *, exclude_fields=None):
+def receipt_observations(prepared, verification, *, exclude_fields=None):
     """Associate every ordinary existing-field outcome with actual source reads."""
     from .edit_history_business import _identity, _scalar_matches, _reference_value, NAMES, INFO, GET
     from .builders.metadata import bind_get_property_info_result, parse_property_and_reference_names_result
     from .object_lifecycle_graph import lifecycle_snapshot_equal
     from .operation_registry import _has_field, _field_value
 
-    prepared = snapshot.preview.artifact["prepared_operation"]
     plan, state = prepared["verification_plan"], prepared["pre_state"]
     nodes = plan.get("nodes", [])
     if (not nodes or any(node.get("existing_target") is not True or node.get("preexisting_id") is not None
@@ -167,8 +166,6 @@ def receipt_observations(snapshot, *, exclude_fields=None):
     proofs = state.get("existing_field_observations", [])
     if len(proofs) != len(nodes) or len({proof.get("request_path") for proof in proofs}) != len(nodes):
         raise ValueError("Existing-field receipt lacks every original source observation")
-    verification = next(event["details"]["verification"] for event in reversed(snapshot.events)
-        if event.get("event_type") == "verification_recorded")
     captured = [record for record in verification.get("readbacks", []) if record.get("role") == ROLE]
     observations = []
     for node in nodes:

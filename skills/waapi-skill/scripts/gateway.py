@@ -31231,7 +31231,7 @@ def history_verification_continuation(payload, verification, *, state_dir):
 def transaction_show_summary(
     artifact: Any,
     events: Sequence[Mapping[str, Any]],
-    *, state_dir: str | Path | None = None,
+    *, state_dir: str | Path | None = None, _page_history: bool = False,
 ) -> dict[str, Any]:
     """Return a bounded review projection of one immutable transaction preview.
 
@@ -31317,7 +31317,7 @@ def transaction_show_summary(
         if isinstance(history_binding, Mapping):
             from wwise_waapi.edit_history_business import history_summary
             notice = history_summary(history_binding)
-            if len(canonical_json_bytes(notice)) > 2048:
+            if _page_history or len(canonical_json_bytes(notice)) > 2048:
                 transaction_id = next((event.get('transaction_id') for event in events if event.get('transaction_id')), None)
                 if transaction_id is None or state_dir is None:
                     raise GatewayResultShapeError('History detail lacks its immutable transaction/store binding')
@@ -31462,6 +31462,15 @@ def transaction_show_summary(
             "event_count": len(event_rows),
             "events": event_rows,
         }
+        if ("history_action" in derived_notice and not variant["include_dispatch_payload"]
+                and prepared.get("dispatch", {}).get("args") == {}
+                and prepared.get("dispatch", {}).get("options") == {}):
+            # Native undo/redo has genuinely empty arguments. Their exact values
+            # are more legible and smaller than two repeated empty-value hashes.
+            dispatch_value = prepared["dispatch"]
+            result["preview_summary"]["dispatch"] = {
+                "uri": dispatch_value["uri"], "args": {}, "options": {},
+                "canonical_sha256": canonical_sha256(dispatch_value), "payload_included": True}
         if "history_action" in derived_notice and prepared.get("resolved_roles") == {}:
             # The complete history identities are in history_action and its sealed
             # request. An empty role map needs no repeated shape/digest headers.
@@ -31494,6 +31503,11 @@ def transaction_show_summary(
 
     if bounded_fallback is not None:
         return bounded_fallback
+
+    if not _page_history and "history_action" in derived_notice and "detail" not in derived_notice["history_action"]:
+        # Canonical notice size is only a cheap initial choice; actual pretty
+        # review bytes can still exceed the fixed budget. Reuse its exact reader.
+        return transaction_show_summary(artifact, events, state_dir=state_dir, _page_history=True)
 
     raise GatewayResultShapeError(
         "The transaction review summary could not fit its fixed JSON budget",
