@@ -2927,3 +2927,213 @@ def test_rtpc_graph_collector_preserves_nonlexicographic_replacement_accessor_or
     assert [row['pair'][0] for row in members] == ['Volume', 'CenterPercentage']
     assert members[0]['object']['id'] > members[1]['object']['id']
     assert [node['@PropertyName'] for node in writes[-1]['objects'][0]['@RTPC']] == ['Volume', 'CenterPercentage']
+
+
+def _anonymous_effect_construction_runtime(tmp_path, workflow, *, fault=None):
+    """Actual public Gateway; source-shaped native boundary, never a collector success stub."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT_PARENT
+    task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
+    task.types = [{'name': name, 'classId': value, 'type': kind} for name, value, kind in (
+        ('Sound', 65552, 'WObject'), ('Folder', 131088, 'WObject'), ('WorkUnit', 1638416, 'WObject'),
+        ('EffectSlot', 5505040, 'WObject'), ('Wwise Gain', 9109507, 'Effect'))]
+    task.objects = {identity: {'id': identity, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 1638416, 'path': path, 'notes': 'Keep WorkUnit'} for identity, path in (
+            (SECOND, r'\Containers\Default Work Unit'), (EFFECT_PARENT, r'\Effects\Default Work Unit'))}
+    task.metadata = {'Effect': {'name': 'Effect', 'type': '', 'default': None,
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}}
+    for name in ('Bypass', 'Render'):
+        task.metadata[name] = {'name': name, 'type': 'bool', 'default': False,
+            'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': 'Effect',
+                'conditions': [{'referenceIsSet': True}]}]}
+    original, writes, commands, next_id = task.call, [], [], 100
+    def identity():
+        nonlocal next_id
+        next_id += 1
+        return '{' + str(uuid.UUID(int=next_id)).upper() + '}'
+    def named(node, parent):
+        assert node['type'] in {'Sound', 'Folder', 'Effect'} and node['name'], node
+        created = identity()
+        class_id = {'Sound': 65552, 'Folder': 131088, 'Effect': 9109507}[node['type']]
+        if node['type'] == 'Effect': assert node['classId'] == class_id, node
+        row = {'id': created, 'name': node['name'], 'type': node['type'], 'classId': class_id,
+            'path': task.objects[parent]['path'] + '\\' + node['name'], 'parent': {'id': parent}, 'notes': node.get('notes', '')}
+        if node['type'] == 'Sound': row.update({'@IsVoice': False, '@Effects': []})
+        if node['type'] == 'Effect': row.update({'@FullBandGain': 0.0, '@LFEGain': 0.0})
+        task.objects[created] = row
+        result = {'id': created, 'name': row['name']}
+        if '@Effects' in node: result['@Effects'] = slots(node['@Effects'], created, 'append')
+        return result
+    def slots(nodes, owner, mode):
+        if mode == 'replaceAll':
+            for old in task.objects[owner]['@Effects']:
+                task.objects.pop(old['id'])
+            task.objects[owner]['@Effects'] = []
+        results = []
+        for index, node in enumerate(nodes):
+            assert node['type'] == 'EffectSlot' and node['name'] == '', node
+            slot = identity()
+            reference = node['@Effect']
+            if isinstance(reference, dict):
+                assert reference['type'] == 'Effect' and reference['classId'] == 9109507, reference
+                effect = identity()
+                task.objects[effect] = {'id': effect, 'name': reference['name'], 'type': 'Effect', 'classId': 9109507,
+                    'owner': {'id': slot}, 'path': '\\opaque-local-' + effect, 'notes': reference.get('notes', ''),
+                    '@FullBandGain': 0.0, '@LFEGain': 0.0}
+            else:
+                matching = [row['id'] for row in task.objects.values() if reference in (row['id'], row['path'])]
+                assert len(matching) == 1, reference
+                effect = matching[0]
+            task.objects[slot] = {'id': slot, 'name': '', 'type': 'EffectSlot', 'classId': 5505040,
+                'owner': {'id': owner, 'name': task.objects[owner]['name']}, 'path': '\\opaque-slot-' + slot, 'notes': '',
+                '@Effect': {'id': effect}, '@Bypass': node.get('@Bypass', False), '@Render': node.get('@Render', False)}
+            task.objects[owner]['@Effects'].append({'id': slot})
+            result = {'id': slot, 'name': ''}
+            if isinstance(reference, dict): result['@Effect'] = {'id': effect, 'name': reference['name']}
+            results.append(result)
+        return list(reversed(results))  # Native associations never supply the order oracle.
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith('object.set'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append(deepcopy(args))
+            results = []
+            for node in args['objects']:
+                parent = node['object']; result = {'id': parent, 'name': task.objects[parent]['name']}
+                if 'children' in node: result['children'] = [named(child, parent) for child in node['children']]
+                if '@Effects' in node: result['@Effects'] = slots(node['@Effects'], parent, args.get('listMode', 'append'))
+                results.append(result)
+            return {'objects': list(reversed(results))}
+        if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            expression = args.get('waql', '')
+            if expression:
+                assert expression.startswith('from object "'), expression
+                source = expression.split('"')[1]
+                rows = [row for row in task.objects.values() if source in (row['id'], row['path'])]
+                if 'select @Effects' in expression:
+                    assert len(rows) == 1, expression
+                    rows = [task.objects[item['id']] for item in rows[0]['@Effects']]
+                elif 'select children' in expression:
+                    assert len(rows) == 1, expression
+                    rows = [row for row in task.objects.values() if row.get('parent', {}).get('id') == rows[0]['id']]
+            elif 'id' in args.get('from', {}): rows = [task.objects[value] for value in args['from']['id'] if value in task.objects]
+            else: rows = [row for row in task.objects.values() if row['path'] in args['from']['path']]
+            for transform in args.get('transform', []):
+                assert len(rows) == 1, args
+                source, token = rows[0], transform['select'][0]
+                if token == 'children': rows = [row for row in task.objects.values() if row.get('parent', {}).get('id') == source['id']]
+                elif token == '@Effects': rows = [task.objects[item['id']] for item in source['@Effects']]
+                elif token == 'descendants':
+                    rows, frontier = [], [source['id']]
+                    while frontier:
+                        parent = frontier.pop()
+                        children = [row for row in task.objects.values() if row.get('parent', {}).get('id') == parent]
+                        rows.extend(children); frontier.extend(row['id'] for row in children)
+                else: raise AssertionError(args)
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and (args.get('classId') == 9109507 or task.objects.get(args.get('object'), {}).get('type') == 'Effect'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': ['FullBandGain', 'LFEGain']} if uri.endswith('getPropertyAndReferenceNames') else {'name': args['property'], 'type': 'Real64', 'default': 0.0}
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version='2025.1', state_dir=tmp_path / 'state', env=task.env,
+        candidate='a' * 40, category_results=[], port=31337,
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _: task)
+        if fault and command[0] == 'verify' and len(writes) == 4 and payload.get('verified') is True:
+            # Mutate only AFTER the real Gateway verified the intended first
+            # append. The collector's independent oracle must reject this.
+            sound = next(row for row in task.objects.values() if row['name'] == 'WAAPI_ANON_TEST_Sound')
+            slot = task.objects[sound['@Effects'][0]['id']]
+            if fault == 'independent-owner': slot['owner'] = {'id': SECOND}
+            if fault == 'independent-order': sound['@Effects'].reverse()
+        if fault == 'independent-previous-owner' and command[0] == 'verify' and len(writes) == 6 and payload.get('verified') is True:
+            next(row for row in task.objects.values() if row['name'] == 'WAAPI_ANON_TEST_Sound')['notes'] = 'Unrequested reset'
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+def test_anonymous_effect_collector_full_public_flow_reaches_real_category_writer(tmp_path, workflow, monkeypatch):
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes, _task = _anonymous_effect_construction_runtime(tmp_path, workflow)
+    category = workflow._collect_anonymous_effect_slot_construction_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    assert category['status'] == 'PASS' and category['verifier_strength']
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['business_effect_verified'] is True and receipt['setup_coverage_credit'] is False
+    assert len(writes) == 6 and [command[0] for command in commands].count('execute') == 6
+    assert [command[0] for command in commands].count('verify') == 6
+    assert all(phase['effect_verified'] for phase in receipt['transactions'][3:])
+    assert len(receipt['calls']) <= 256 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+    target_ids = [row['id'] for row in receipt['baseline']['targets']]
+    assert [row['notes'] for row in receipt['baseline']['targets']] == ['Keep target0', 'Keep target1']
+    expected = lambda targets: [{'type': 'EffectSlot', 'name': '', '@Effect': target, '@Bypass': index == 0, '@Render': index != 0}
+        for index, target in enumerate(targets)]
+    assert writes[3]['objects'] == [{'object': receipt['baseline']['owner']['id'], '@Effects': expected(target_ids)}]
+    assert writes[4]['listMode'] == 'replaceAll'
+    assert writes[4]['objects'] == [{'object': receipt['baseline']['owner']['id'], '@Effects': expected(list(reversed(target_ids)))}]
+    last = next(row['children'][0] for row in writes[5]['objects'] if row['children'][0]['type'] == 'Sound')
+    assert last['@Effects'][1]['@Effect'] == {'type': 'Effect', 'classId': receipt['live_classes']['Wwise Gain'],
+        'name': 'WAAPI_ANON_TEST_LocalGain', 'notes': 'Keep local Effect'}
+    slot_declarations = [command for command in commands if command[0] == 'draft-declare-new'
+        and command[command.index('--declaration-id') + 1] in {'slot0', 'slot1'}]
+    assert len(slot_declarations) == 6 and all('--name' not in command for command in slot_declarations)
+    output = tmp_path / 'actual-category-writer.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::anonymous_constructor'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True, 'hash_before': 'same', 'hash_after': 'same'}, residual_state={'sandbox': 'deleted'},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert record['categories'] == runtime.category_results
+    assert len(record['transactions']) == 6 and all(row['state'] == 'verified' for row in record['transactions'])
+
+
+@pytest.mark.parametrize('fault', ['independent-owner', 'independent-order'])
+def test_anonymous_effect_collector_rejects_independent_corruption_after_gateway_verified(tmp_path, workflow, monkeypatch, fault):
+    runtime, commands, writes, _task = _anonymous_effect_construction_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_anonymous_effect_slot_construction_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and category['verifier_strength']
+    assert receipt['business_effect_verified'] is False and receipt['failure']
+    phase = receipt['transactions'][-1]
+    assert phase['phase'] == 'append_existing_sharesets' and phase['verify']['payload']['verified'] is True
+    assert phase['execute']['payload']['state'] == 'executed_unverified' and phase['effect_verified'] is False
+    assert len(writes) == 4 and [command[0] for command in commands].count('execute') == 4
+    assert [command[0] for command in commands].count('verify') == 4
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    output = tmp_path / 'actual-failure-category-writer.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::anonymous_constructor_failure'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results, source={'fixture_only': True},
+        residual_state={'sandbox': 'retained'}, invocation={'selected_test_nodeids': [node],
+            'node_outcomes': [{'nodeid': node, 'outcome': 'FAIL'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'FAIL'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['categories'][0]['status'] == 'FAIL' and record['invocation']['outcome'] == 'FAIL'
+    assert len(record['transactions']) == 4 and all(row['state'] == 'verified' for row in record['transactions'])
+
+
+def test_anonymous_collector_preserves_previous_owner_after_the_planned_graph_effect(tmp_path, workflow):
+    runtime, commands, writes, _task = _anonymous_effect_construction_runtime(tmp_path, workflow, fault='independent-previous-owner')
+    with pytest.raises(AssertionError):
+        workflow._collect_anonymous_effect_slot_construction_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    receipt = json.loads(Path(runtime.category_results[-1]['observation_path']).read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL' and receipt['failure']
+    assert len(writes) == 6 and [command[0] for command in commands].count('execute') == 6
+    assert receipt['transactions'][-1]['verify']['payload']['verified'] is True
+    assert receipt['transactions'][-1]['effect_verified'] is False
