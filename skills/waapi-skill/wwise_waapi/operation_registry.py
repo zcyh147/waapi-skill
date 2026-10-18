@@ -4961,7 +4961,7 @@ def _prepare_object_create(
                     merge_options,
                 )
             )
-            if len(merge_rows) != 1:
+            if (len(merge_rows) != 1 or not _object_spec_row_matches(merge_rows[0], node_specs[0], collisions[0]["id"])):
                 raise OperationContractError(
                     "INVALID_READBACK",
                     "The merged object.create list member must resolve exactly once.",
@@ -5001,7 +5001,7 @@ def _prepare_object_create(
                         fields = _object_spec_return_fields(spec)
                         options = {"return": fields, **({"platform": platform} if platform else {})}
                         observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [spec["preexisting_id"]]}}, options))
-                        if len(observed) != 1 or not _same_identity(observed[0].get("id"), spec["preexisting_id"]):
+                        if len(observed) != 1 or not _object_spec_row_matches(observed[0], spec, spec["preexisting_id"]):
                             raise OperationContractError("INVALID_READBACK", "Merged list descendant lost its exact identity.")
                         spec["pre_state"] = observed[0]
                         merge_field_snapshots.append({"object_id": spec["preexisting_id"], "fields": fields, "platform": platform, "rows": observed})
@@ -6674,7 +6674,7 @@ def _prepare_object_set(
                             existing_options,
                         )
                     )
-                    if len(existing_rows) != 1:
+                    if len(existing_rows) != 1 or not _object_spec_row_matches(existing_rows[0], root_spec, collisions[0]["id"]):
                         raise OperationContractError(
                             "INVALID_READBACK",
                             "A merged object-list member must resolve exactly once.",
@@ -6811,7 +6811,7 @@ def _prepare_object_set(
                             fields = _object_spec_return_fields(spec)
                             options = {"return": fields, **({"platform": spec["platform"]} if spec.get("platform") else {})}
                             observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [collisions[0]["id"]]}}, options))
-                            if len(observed) != 1 or not _same_identity(observed[0].get("id"), collisions[0]["id"]):
+                            if len(observed) != 1 or not _object_spec_row_matches(observed[0], spec, collisions[0]["id"]):
                                 raise OperationContractError("INVALID_READBACK", "Merged nested member lost its exact identity.")
                             field_snapshots.append({"object_id": collisions[0]["id"], "fields": fields, "platform": spec.get("platform"), "rows": observed})
                             spec["pre_state"] = observed[0]
@@ -6835,8 +6835,8 @@ def _prepare_object_set(
             snapshot_options["platform"] = platform
         snapshot_result = read(OBJECT_GET_URI, snapshot_args, snapshot_options)
         snapshot_rows = _rows(snapshot_result)
-        if len(snapshot_rows) != 1:
-            raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve exactly once.")
+        if len(snapshot_rows) != 1 or not _object_spec_row_matches(snapshot_rows[0], target_spec, target.object):
+            raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve once with its exact identity and class.")
         field_snapshots.append(
             {
                 "object_id": target.object,
@@ -9589,13 +9589,22 @@ def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_i
     return _ordinary_object_type_matches(actual, spec)
 
 
+def _object_spec_row_matches(row: Mapping[str, Any], spec: Mapping[str, Any], object_id: str) -> bool:
+    return (_same_identity(row.get("id"), object_id)
+        and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")))
+
+
 def _ordinary_object_type_matches(actual: Any, spec: Mapping[str, Any]) -> bool:
     if not isinstance(actual, str) or not actual:
         return False
-    expected = {_object_type_token(spec.get("requested_type")), _object_type_token(spec.get("canonical_type"))}
+    token = _object_type_token(actual)
+    expected = {_object_type_token(value) for value in (spec.get("requested_type"), spec.get("canonical_type"))
+        if isinstance(value, str) and _object_type_token(value)}
+    if not token:
+        return False
     if expected & {"actormixer", "propertycontainer"}:
         expected.update({"actormixer", "propertycontainer"})
-    return _object_type_token(actual) in expected
+    return token in expected
 
 
 def _child_path(parent_path: Any, name: Any, *, field: str) -> str:

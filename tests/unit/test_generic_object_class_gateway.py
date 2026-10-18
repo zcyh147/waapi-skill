@@ -262,3 +262,13 @@ def test_existing_root_final_snapshot_cannot_seal_a_different_class(tmp_path):
     code, rejected = task.step('draft-check')
     assert code == 2 and class_reads >= 2, rejected
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+
+
+def test_correct_class_cannot_certify_malformed_ordinary_type(tmp_path):
+    task = class_task(tmp_path)
+    declare_sound(task)
+    tx, shown = task.preview()
+    execute(task, tx, shown)
+    task.objects['{99999999-9999-9999-9999-999999999999}']['type'] = '---'
+    code, result = task.run('verify', tx)
+    assert code == 2 and result.get('verified') is not True, json.dumps(result)
