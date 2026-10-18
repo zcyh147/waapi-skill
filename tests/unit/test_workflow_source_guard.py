@@ -3830,6 +3830,9 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
     from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT, EFFECT_PARENT
     from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND, ROOT
     task, writes = legacy_render_import_task(tmp_path, version, media=True)
+    # Native/UI labels are distinct from exact selected metadata field tokens.
+    for token, label in {'Effect0': 'Effect 0', 'RenderEffect1': 'Render Effect 1'}.items():
+        task.metadata[token]['display'] = {'name': label}
     task.objects.pop(FIRST)
     if version == '2021.1':
         import xml.etree.ElementTree as ET
