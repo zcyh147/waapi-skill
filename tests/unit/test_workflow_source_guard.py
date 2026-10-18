@@ -2850,6 +2850,7 @@ def test_rtpc_graph_collector_categories_survive_existing_exact_finalizer(tmp_pa
             workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
     else:
         workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    (tmp_path / 'lifecycle').mkdir()
     fixture, events, records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
     fixture_runtime = next(fixture)
     fixture_runtime.category_results.extend(runtime.category_results)
