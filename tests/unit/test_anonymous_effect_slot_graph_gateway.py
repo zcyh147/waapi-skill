@@ -949,6 +949,26 @@ def test_legacy_tab_structure_import_seals_original_file_and_full_owner_prefix(t
     assert row['@RenderEffect0'] is row['@RenderEffect1'] is True
 
 
+def test_2022_tab_sound_isvoice_assignment_is_rejected_before_preview(tmp_path):
+    task, writes = legacy_render_import_task(tmp_path, '2022.1', 'audio.importTabDelimited')
+    code, bound = task.step('draft-bind-object', '--role', 'import_location', '--object-id', SECOND)
+    assert code == 0, bound
+    table = tmp_path / 'sound.tsv'
+    table.write_text('Object Path\tObject Type\tProperty[IsVoice]\n<Sound>Tabbed\tSound\tfalse\n')
+    original = table.read_bytes()
+    code, declared = task.step('draft-declare-artifact-plan', '--table-file', str(table),
+        '--location-handle', bound['bound_object']['handle'], '--language', 'SFX')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'TAB_PROPERTY_NOT_MODIFIABLE', rejected
+    assert rejected['details']['version'] == '2022.1'
+    assert rejected['details']['row'] == 2
+    assert rejected['details']['header'] == 'Property[IsVoice]'
+    assert rejected['details']['property'] == 'IsVoice'
+    assert 'Sound SFX' in rejected['message'] and 'Sound Voice' in rejected['message']
+    assert table.read_bytes() == original and writes == []
+
+
 @pytest.mark.parametrize('fault', ['missing-reference', 'explicit-prefix-false', 'explicit-override-false'])
 def test_legacy_import_render_rejects_real_prerequisite_or_intent_conflict_before_write(tmp_path, fault):
     task, writes = legacy_render_import_task(tmp_path)
