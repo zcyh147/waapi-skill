@@ -2106,3 +2106,188 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
     assert code == 2 and rejected.get("executed") is not True, rejected
     assert "getProjectInfo" in rejected["message"]
     assert not any(row[0] == "ak.wwise.core.object.setReference" for row in client.calls)
+
+
+def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed"):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD
+    task = OwnedGraphTask(tmp_path, version, "object.create")
+    parent = task.bind(SECOND)
+    code, declared = task.step("draft-declare-new", "--declaration-id", "leaf", "--parent-handle", parent,
+        "--kind", "sound-sfx", "--name", "Rain", *([] if notes is None else ["--field", "notes", notes]))
+    assert code == 0, declared
+    source, shown = task.preview()
+    if source_notes != "observed":
+        source_call = task.call
+        def source_boundary(uri, args=None, options=None):
+            result = source_call(uri, args, options)
+            if uri.endswith("object.create") and source_notes == "native-default":
+                task.objects[result["id"]]["notes"] = "Native observed default"
+            if uri.endswith("object.get") and source_notes == "missing":
+                for row in result.get("return", []):
+                    if row.get("name") == "Rain":
+                        row.pop("notes", None)
+            return result
+        task.call = source_boundary
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    created = deepcopy(next(row for row in task.objects.values() if row["name"] == "Rain"))
+    created_id = created["id"]
+    original = task.call
+    task.history_effect = True
+    def call(uri, args=None, options=None):
+        if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if task.history_effect:
+                if uri.endswith(".undo"):
+                    task.objects.pop(created_id, None)
+                else:
+                    task.objects[created_id] = deepcopy(created)
+            return {}
+        return original(uri, args, options)
+    task.call = call
+    return task, source, created
+
+
+def _created_leaf_history_preview(task, source, direction="undo"):
+    code, phase = task.run("draft-start", "ak.wwise.core.undo." + direction)
+    assert code == 0, phase
+    draft, authority, revision = phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"]
+    code, phase = task.run("draft-declare-core-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(revision), "--value", "history_scope", "latest_project_history",
+        "--value", "expectation_receipt", source)
+    assert code == 0, phase
+    for command in ("draft-check", "preview-from-draft"):
+        code, result = task.run(command, draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]))
+        assert code == 0, json.dumps(result)
+        if "draft" in result:
+            phase = result
+    tx = result["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    return tx
+
+
+def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_path):
+    task, source, created = _created_leaf_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert created["id"] not in task.objects
+    assert [row[1:] for row in task.calls if row[0] == "ak.wwise.core.undo.undo"] == [({}, {})]
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("notes", [None, "Explicit creation notes"])
+def test_created_leaf_history_restores_exact_guid_and_observed_default_notes(tmp_path, version, notes):
+    task, source, created = _created_leaf_history_case(tmp_path, version=version, notes=notes)
+    assert created["notes"] == ("" if notes is None else notes)
+    for direction in (["undo"] if version == "2022.1" else ["undo", "redo"]):
+        tx = _created_leaf_history_preview(task, source, direction)
+        code, executed = task.run("execute", tx)
+        assert code == 0, executed
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, json.dumps(verified)
+        assert verified["verification_strength"] == "scoped_history_effect_readback"
+        assert list(verified)[-1] == "agent_result"
+        assert verified["agent_result"]["result"] == {}
+        code, repeated = task.run("execute", tx)
+        assert code == 2, repeated
+    if version != "2022.1":
+        assert task.objects[created["id"]] == created
+    assert len([row for row in task.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+    assert len([row for row in task.calls if row[0] == "ak.wwise.core.undo.redo"]) == int(version != "2022.1")
+
+
+@pytest.mark.parametrize("corruption", ["no-effect", "replacement-at-path", "missing-return", "partial-row", "duplicate", "read-error"])
+def test_created_leaf_history_never_treats_incomplete_or_wrong_reads_as_absence(tmp_path, corruption):
+    from copy import deepcopy
+    task, source, created = _created_leaf_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    if corruption == "no-effect":
+        task.history_effect = False
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    if corruption == "replacement-at-path":
+        replacement = {**created, "id": "{77777777-7777-7777-7777-777777777777}"}
+        task.objects[replacement["id"]] = replacement
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith("object.get") and args.get("from") in ({"id": [created["id"]]}, {"path": [created["path"]]}):
+            if corruption == "missing-return":
+                return {}
+            if corruption == "partial-row":
+                return {"return": [{"id": created["id"]}]}
+            if corruption == "duplicate":
+                return {"return": [deepcopy(created), deepcopy(created)]}
+            if corruption == "read-error":
+                raise RuntimeError("object read unavailable")
+        return original(uri, args, options)
+    task.call = call
+    code, verified = task.run("verify", tx)
+    assert code == 2 and verified["verified"] is False, json.dumps(verified)
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert len([row for row in task.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+    assert not any(row[0] == "ak.wwise.core.undo.redo" for row in task.calls)
+
+
+@pytest.mark.parametrize("changed", ["id", "parent", "notes", "path"])
+def test_created_leaf_history_redo_requires_original_scoped_state(tmp_path, changed):
+    task, source, created = _created_leaf_history_case(tmp_path)
+    undo = _created_leaf_history_preview(task, source)
+    assert task.run("execute", undo)[0] == 0
+    assert task.run("verify", undo)[0] == 0
+    redo = _created_leaf_history_preview(task, source, "redo")
+    code, executed = task.run("execute", redo)
+    assert code == 0, executed
+    row = task.objects[created["id"]]
+    if changed == "parent":
+        row["parent"] = {"id": "{77777777-7777-7777-7777-777777777777}"}
+    elif changed == "id":
+        del task.objects[created["id"]]
+        row["id"] = "{77777777-7777-7777-7777-777777777777}"
+        task.objects[row["id"]] = row
+    else:
+        row[changed] = "unreviewed changed state"
+    code, verified = task.run("verify", redo)
+    assert code == 2 and verified["verified"] is False, json.dumps(verified)
+
+
+def test_created_leaf_history_scope_drift_blocks_native_history_before_dispatch(tmp_path):
+    task, source, created = _created_leaf_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    task.objects[created["id"]]["notes"] = "later edit"
+    code, executed = task.run("execute", tx)
+    assert code == 2, executed
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+
+
+
+def test_created_leaf_history_uses_durable_actual_default_without_user_notes(tmp_path):
+    task, source, created = _created_leaf_history_case(tmp_path, notes=None, source_notes="native-default")
+    assert created["notes"] == "Native observed default"
+    undo = _created_leaf_history_preview(task, source)
+    assert task.run("execute", undo)[0] == 0
+    assert task.run("verify", undo)[0] == 0
+    redo = _created_leaf_history_preview(task, source, "redo")
+    assert task.run("execute", redo)[0] == 0
+    code, verified = task.run("verify", redo)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[created["id"]]["notes"] == "Native observed default"
+
+
+def test_created_leaf_history_requires_source_notes_observation_even_when_source_did_not_request_notes(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, notes=None, source_notes="missing")
+    code, phase = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, phase
+    code, rejected = task.run("draft-declare-core-plan", phase["draft"]["draft_id"],
+        "--task-authority", phase["task_authority"], "--expected-revision", str(phase["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "actual notes are incomplete" in json.dumps(rejected), rejected
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)

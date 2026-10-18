@@ -235,6 +235,82 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [{"object_before": identity, "object_after": after_identity, "field": field, "before": old, "after": new}]
 
 
+def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
+    prepared = snapshot.preview.artifact["prepared_operation"]
+    plan = prepared.get("verification_plan", {})
+    if plan.get("kind") != "object-create-graph":
+        return _receipt_observations(prepared)
+    # This first presence observer has one ordinary new child, never an
+    # inferred graph/List/merge/replace restoration image.
+    nodes = plan.get("nodes")
+    if (prepared.get("operation") != "object.create" or not isinstance(nodes, list) or len(nodes) != 1
+        or plan.get("on_name_conflict") != "fail" or plan.get("list") is not None
+        or plan.get("preexisting_root_rows") != [] or plan.get("replaced_subtree_rows") != []):
+        raise ValueError("Creation history currently requires one new fail-mode child; graph/List/merge/replace remain implementation obligations")
+    node = nodes[0]
+    if (not isinstance(node, Mapping) or node.get("request_path") != "$" or node.get("parent_request_path") is not None
+        or node.get("collection") != "children" or node.get("existing_target") is not False
+        or node.get("preexisting_id") is not None or node.get("properties") != [] or node.get("references") != []
+        or node.get("platform") is not None or node.get("requested_language") is not None):
+        raise ValueError("Creation history lacks a supported ordinary leaf observation")
+    from .creation_observations import verified_created_root_identity
+    from .operation_object import flatten_create_result
+    verification = next(event["details"]["verification"] for event in reversed(snapshot.events)
+        if event.get("event_type") == "verification_recorded")
+    identity = verified_created_root_identity(verification)
+    execution = [event.get("details", {}).get("dispatch_result") for event in snapshot.events
+        if event.get("event_type") == "execution_completed"]
+    if identity is None or len(execution) != 1 or not isinstance(execution[0], Mapping) or execution[0].get("ok") is not True:
+        raise ValueError("Creation history requires the actual successful result and one verified root witness")
+    returned = flatten_create_result(execution[0].get("result"), max_nodes=1)
+    if (len(returned) != 1 or returned[0].object.upper() != identity["id"] or returned[0].name != identity["name"]
+        or identity["name"] != node.get("requested_name") or identity["type"] != node.get("canonical_type")):
+        raise ValueError("Creation history root witness differs from its actual native result or declaration")
+    paths = prepared.get("pre_state", {}).get("object_graph_guard", {}).get("path_snapshots", [])
+    if len(paths) != 1 or paths[0].get("path") != identity["path"] or paths[0].get("rows") != []:
+        raise ValueError("Creation history requires the exact sealed path absence before creation")
+    fields = [*IDENTITY, "parent", "notes"]
+    reads = [row for row in verification.get("readbacks", []) if isinstance(row, Mapping)
+        and row.get("uri") == GET and row.get("args") == {"from": {"id": [identity["id"]]}}
+        and isinstance(row.get("options"), Mapping) and set(row["options"].get("return", [])) >= set(fields)
+        and not set(row["options"]) - {"return"} and "error" not in row]
+    if len(reads) != 1:
+        raise ValueError("Creation history requires one independent complete root readback")
+    rows = reads[0].get("result", {}).get("return")
+    if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping):
+        raise ValueError("Creation history source root readback is incomplete")
+    row = rows[0]
+    if (_identity(row) != identity or not isinstance(row.get("notes"), str)
+        or _reference_value(row.get("parent")) != str(plan.get("parent_id")).upper()
+        or "parent" not in row or (node.get("notes_supplied") is True and row["notes"] != node.get("requested_notes"))):
+        raise ValueError("Creation history source identity, parent or actual notes are incomplete")
+    return [{"kind": "creation_presence", "object": identity, "parent_id": str(plan["parent_id"]).upper(),
+        "notes": row["notes"], "before": False, "after": True}]
+
+
+def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable[..., Any]) -> dict[str, Any]:
+    identity = expected["object"]
+    observations = []
+    for selector in ({"id": [identity["id"]]}, {"path": [identity["path"]]}):
+        result = read(GET, {"from": selector}, {"return": [*IDENTITY, "parent", "notes"]})
+        if not isinstance(result, Mapping) or set(result) != {"return"} or not isinstance(result["return"], list):
+            raise ValueError("History presence read requires a complete exact-selector result")
+        rows = result["return"]
+        if len(rows) > 1 or any(not isinstance(row, Mapping) for row in rows):
+            raise ValueError("History presence read contains duplicate or malformed rows")
+        if rows:
+            row = rows[0]
+            actual = _identity(row)
+            if "parent" not in row or not isinstance(row.get("notes"), str):
+                raise ValueError("History presence read lacks parent or notes projection")
+            matches = (actual == identity and _reference_value(row["parent"]) == expected["parent_id"]
+                and row["notes"] == expected["notes"])
+        else:
+            matches = False
+        observations.append((len(rows) == 1 and matches) if present else not rows)
+    return {"object": identity, "field": "presence", "expected": present, "passed": all(observations)}
+
+
 def _verified_snapshot(store: TransactionStore, transaction_id: str) -> Any:
     snapshot = store.load_snapshot(transaction_id)
     if snapshot.record.state != TransactionState.VERIFIED:
@@ -266,7 +342,7 @@ def capture_history_binding(uri: str, store: TransactionStore, transaction_id: s
         "source_receipt": {"state_dir": str(store.state_dir), "transaction_id": transaction_id,
             "artifact_hash": snapshot.preview.artifact_hash, "event_sequence": snapshot.record.event_sequence,
             "last_event_hash": snapshot.record.last_event_hash},
-        "observations": _receipt_observations(artifact["prepared_operation"])}
+        "observations": _snapshot_observations(snapshot)}
     validate_history_binding(uri, str(version), binding)
     return binding
 
@@ -291,7 +367,7 @@ def validate_history_binding(uri: str, version: str, value: Any) -> dict[str, An
         or snapshot.record.event_sequence != receipt["event_sequence"]
         or snapshot.preview.artifact.get("project_guard", {}).get("context_fingerprint") != value["source_context_fingerprint"]):
         raise ValueError("History expectation receipt changed after it was selected")
-    observations = _receipt_observations(snapshot.preview.artifact["prepared_operation"])
+    observations = _snapshot_observations(snapshot)
     if not any(row["before"] != row["after"] for row in observations):
         raise ValueError("History expectation receipt has no observable transition")
     if not 1 <= len(observations) <= MAX_OBSERVATIONS or not lifecycle_snapshot_equal(value["observations"], observations):
@@ -321,6 +397,9 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
         groups = {}
         metadata_cache = {}
         for expected in observations:
+            if expected.get("kind") == "creation_presence":
+                checks.append(_observe_presence(expected, expected[side], retained_read))
+                continue
             groups.setdefault(expected.get("platform"), []).append(expected)
             if "field_info" in expected:
                 object_id, field = expected["object_" + side]["id"], expected["field"]
