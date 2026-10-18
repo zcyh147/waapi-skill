@@ -18,6 +18,17 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Integration `841ae9b2` adds immutable history expectation/verification pages
+  and repairs object-dump validation that incorrectly applied an XML node cap
+  to valid JSON. The existing file/depth and public reply limits remain in
+  force. Three selected cross-path tests passed in **2.98s**, with all 1,885
+  tracked files unchanged and no owned process remaining. Four serial inventory
+  generation/check commands passed; native obligations and historical evidence
+  are unchanged. The original 2024 dump FAIL remains preserved; offline parsing
+  of its retained artifact proves the parser repair, not session preservation.
+  Generic class verification and compound child-history association are the
+  next implementation batch. Final broad gates and review remain pending.
+
 - Staging `5acc4054` passes the 2022 null-source diagnostic and original complete
   created-field history case on real macOS Console. Successor `a3b70b45` passes
   all three 2021 legacy import effects with a complete unique-source-child

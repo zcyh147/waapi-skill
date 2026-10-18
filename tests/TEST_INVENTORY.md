@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 object-dump and immutable history-page integration
+
+Fixed `841ae9b2` passed **3 selected tests in 2.98s**: large external dump
+validation with a compact reply, lossless long-notes history pages, and the
+existing immutable None-state page/cursor contract. All 1,885 tracked files and
+HEAD remained unchanged; the owned process group was empty. Four serial
+inventory generation/check commands exited zero. A separate wrapper bookkeeping
+assertion stopped after the second generator because it incorrectly required
+changed source hashes to remain equal; its original failure was retained, the
+exact source changes were reviewed, and only the remaining checks ran.
+
+No local preflight, full Program/Non-live or native rerun was added. The original
+`bfd411ac` 2024 dump test remains **1 failed in 9.57s**. Fixed `4dcf1a6f` then
+parsed its exact retained 3,638,677-byte artifact offline: 134,036 nodes, depth
+three, original hash unchanged. This proves the parser repair only. Session
+preservation, compound history and generic class completion remain separate
+work. The prior completed gate results retain their original candidates.
+
 ## 2026-10-18 constructor repair and Authoring startup follow-ups
 
 Final integration `59b270b1` passed **6 selected cross-path tests in 12.22s**:
