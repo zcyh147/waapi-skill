@@ -7,6 +7,27 @@ and existing obligations remain in SPEC.md and LEDGER.md.
 
 ## Current Soundcaster activation and Tone artifacts
 
+Successor `1e07d63f` repairs the observed Tone header interpretation and collects
+matching Console 2023.1.19.8928/2024.1.13.9056 originals. The roots are
+`tone-stationary-1e07d63f-2023-r1` and `tone-stationary-1e07d63f-2024-r1` in the
+native-conditions worktree coordination directory. Both final lifecycle rows
+pass, with unchanged source full hash/mtime/tree, 1,891 tracked files and no
+owned processes. Each collection contains 39 public replies, 28 native receipts
+and four separate one-execution transactions. All eight WAVs match corresponding
+2025 files byte-for-byte. New verification is `partial_tone_artifact`, not
+business acceptance; waveform/frequency/gain/envelope work remains open.
+The original 2025 receipt and its four failed verifications remain unchanged.
+
+The `soundcaster-operator-6570e7c2-2024-r1` root in the short-id worktree is
+final **BLOCKED**, with the sandbox retained and processes cleaned. The gate
+published the exact owned 2024 host/session and Minigun selection, but the
+computer-use inventory reported no running Wwise app. Root wrote the bounded
+blocked marker without GUI actions or launching another app. The 29 public
+calls retain Engine_Load=1 and RPM=1000 both before and after Inspect, different
+from saved values 0.69/716. The pre-operator image matches `0153f5ee...` below.
+No full saved-value or media-preservation proof follows; stop repeating this
+GUI path until an observer can access the owned window.
+
 `ae95b5cc` establishes actual Minigun session activation through Inspect on
 2024.1.13.9056. The preserved main image shows the Minigun ObjectTab/session
 selector, Play/Stop modules and Materials=Concrete. Before selection is empty;

@@ -5,6 +5,31 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-19 Tone writer compatibility and bounded operator observation
+
+Integration `af637e20` preserves the two accepted component filesets without
+merge edits; four serial inventory commands passed, changing only the native
+candidate hash. Tone regression evidence remains staged: four original-byte
+controls passed after their genuine failures; eight format/older-lane controls,
+two new matching-catalog controls and five compatibility controls passed in
+separate scoped runs. No aggregate full-gate result is inferred.
+
+On fixed `1e07d63f`, matching Console 2023/2024 collection passed **1 test in
+11.07s** and **1 test in 9.95s**, respectively. Both final lifecycle rows pass;
+source full hash/mtime/tree and 1,891 tracked files are unchanged, sandboxes are
+deleted and owned processes ended. All eight native WAVs match corresponding
+original 2025 files. Each has a separate transaction with successful structural
+verification and explicit `partial_tone_artifact`; active signal acceptance is
+unfinished. The original four 2025 failed verifications remain unchanged.
+
+The developer operator gate passed **2 focused controls in 8.88s**. Its owned
+2024 attempt on `6570e7c2` is final **BLOCKED** (**1 skipped in 58.79s**): the
+computer-use inventory could not identify the isolated Wine app. No GUI action
+occurred; source hash/mtime and 1,886 tracked files stayed unchanged, processes
+ended and the sandbox/evidence are retained. Pre/post Inspect global scalars
+remain 1/1000 and do not prove saved-session values. No further GUI attempt,
+Fresh, Windows acceptance or whole-ticket closure is claimed.
+
 ## 2026-10-19 ordinary hierarchy history and native diagnostic evidence
 
 Integration `3f7205e1` preserves accepted graph `4469adba`, frontend `ae95b5cc`

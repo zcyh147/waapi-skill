@@ -18,6 +18,23 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Integration `af637e20` repairs Tone WAV parsing for the observed reserved-zero
+  field, restricted to explicit PCM16/16 and IEEE-float/32 pairs. Contradictory
+  formats still fail; original bytes are LFS regression fixtures. Accepted
+  component files merged unchanged, four inventory commands passed once, and
+  all semantic contracts/native obligations remain unchanged.
+- Matching Console 2023/2024 collection on `1e07d63f` passed in **11.07s/9.95s**.
+  All eight WAVs exactly match their original 2025 counterparts; each run has
+  four separately executed transactions, unchanged source and clean teardown.
+  Structural verification now succeeds, but active waveform/gain verification
+  remains partial. The original four 2025 failures are not regraded.
+- The `6570e7c2` Soundcaster operator attempt is **BLOCKED**: the computer-use
+  inventory cannot identify the isolated Wine window. No GUI action occurred;
+  source and tracked files are unchanged, processes ended and evidence/sandbox
+  were retained. Engine_Load/RPM remain 1/1000 before and after Inspect, rather
+  than the saved 0.69/716, so these global fields do not establish saved-session
+  preservation. Repeated GUI launches are stopped pending a usable observer.
+
 - Integration `3f7205e1` extends creation history to complete ordinary nested
   hierarchies: each actual node, class, parent, notes, fields and membership is
   checked, including references between newly created nodes. Root review found
