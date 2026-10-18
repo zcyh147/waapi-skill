@@ -55,11 +55,14 @@ def declare_slots(task, *, owner=None, owner_kind=None, targets=None):
 @pytest.mark.parametrize('version,mode,fault', [
     ('2023.1', 'append', None), ('2024.1', 'replace-all', None),
     ('2025.1', 'append', None), ('2025.1', 'replace-all', None),
+    ('2025.1', 'replace-all', 'nonlexicographic-guids'),
     *[('2025.1', 'append', fault) for fault in ['old-bypass', 'order', 'class', 'owner',
         'duplicate-return', 'old-return', 'spare-notes', 'target-notes', 'value']],
     *[('2025.1', 'replace-all', fault) for fault in ['order', 'old-return', 'retained-old-member']],
 ])
 def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_path, version, mode, fault):
+    new_a, new_b = (SLOT_B, SLOT_A) if fault == 'nonlexicographic-guids' else (SLOT_A, SLOT_B)
+    expect_failure = fault is not None and fault != 'nonlexicographic-guids'
     task = anonymous_task(tmp_path, version)
     before = deepcopy(task.objects)
     declare_slots(task)
@@ -74,8 +77,8 @@ def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_
                 {'type': 'EffectSlot', 'name': '', '@Bypass': True, '@Render': False, '@Effect': EFFECT},
                 {'type': 'EffectSlot', 'name': '', '@Bypass': False, '@Render': True, '@Effect': EFFECT_B}]}], args
             for identity, effect, bypass, render, path in [
-                (SLOT_A, EFFECT, True, False, r'\Opaque new slot A'),
-                (SLOT_B, EFFECT_B, False, True, r'\Opaque new slot B')]:
+                (new_a, EFFECT, True, False, r'\Opaque new slot A'),
+                (new_b, EFFECT_B, False, True, r'\Opaque new slot B')]:
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject',
                     'classId': 5505040, 'owner': {'id': FIRST}, 'path': path, 'notes': '',
                     '@Effect': {'id': effect}, '@Bypass': bypass, '@Render': render}
@@ -87,12 +90,12 @@ def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_
                 else:
                     del task.objects[ROOT]
                 del task.objects[CHILD]
-            task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
+            task.objects[FIRST]['@Effects'] += [{'id': new_a}, {'id': new_b}]
             if fault == 'order':
-                task.objects[FIRST]['@Effects'][-2:] = [{'id': SLOT_B}, {'id': SLOT_A}]
-            if fault == 'class': task.objects[SLOT_A]['classId'] = 5570560
-            if fault == 'owner': task.objects[SLOT_A]['owner'] = {'id': EFFECT_PARENT}
-            if fault == 'value': task.objects[SLOT_A]['@Bypass'] = False
+                task.objects[FIRST]['@Effects'][-2:] = [{'id': new_b}, {'id': new_a}]
+            if fault == 'class': task.objects[new_a]['classId'] = 5570560
+            if fault == 'owner': task.objects[new_a]['owner'] = {'id': EFFECT_PARENT}
+            if fault == 'value': task.objects[new_a]['@Bypass'] = False
             if fault == 'spare-notes': task.objects[CHILD]['notes'] = 'Reset'
             if fault == 'target-notes': task.objects[EFFECT_B]['notes'] = 'Reset'
             if fault == 'old-bypass':
@@ -100,18 +103,18 @@ def test_two_anonymous_slots_bind_independent_membership_not_returned_order(tmp_
             # Returned associations are explicitly reversed. Their order cannot
             # identify declarations; independent owner Effects order can.
             return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [
-                {'id': SLOT_A if fault == 'duplicate-return' else ROOT if fault == 'old-return' else SLOT_B, 'name': ''},
-                {'id': SLOT_A, 'name': ''}]}]}
+                {'id': new_a if fault == 'duplicate-return' else ROOT if fault == 'old-return' else new_b, 'name': ''},
+                {'id': new_a, 'name': ''}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
-    assert code == (2 if fault else 0), json.dumps(verified)
-    assert (verified.get('verified') is True) == (fault is None), verified
+    assert code == (2 if expect_failure else 0), json.dumps(verified)
+    assert (verified.get('verified') is True) == (not expect_failure), verified
     assert len(writes) == 1
-    if fault:
+    if expect_failure:
         return
-    expected = [SLOT_A, SLOT_B] if mode == 'replace-all' else [ROOT, CHILD, SLOT_A, SLOT_B]
+    expected = [new_a, new_b] if mode == 'replace-all' else [ROOT, CHILD, new_a, new_b]
     assert [row['id'] for row in task.objects[FIRST]['@Effects']] == expected
     preserved = [EFFECT, EFFECT_B, EFFECT_PARENT] + ([ROOT, CHILD] if mode == 'append' else [])
     assert all(task.objects[identity] == before[identity] for identity in preserved)

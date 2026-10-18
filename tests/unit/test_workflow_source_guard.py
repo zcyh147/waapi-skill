@@ -2647,7 +2647,10 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
         if matches and task.conflict != 'merge': raise ValueError('Native name collision requires selected merge')
         row = matches[0] if matches else None
         if row is None:
-            identity = allocate()
+            if fault == 'replacement-nonlexicographic-guids' and owned and node['type'] == 'RTPC' and task.list_mode == 'replaceAll':
+                identity = '{' + str(uuid.UUID(int=902 if node['@PropertyName'] == 'Volume' else 901)).upper() + '}'
+            else:
+                identity = allocate()
             row = {'id': identity, 'name': node['name'], 'type': node['type'],
                 'classId': next(entry['classId'] for entry in task.types if entry['name'] == node['type']),
                 'path': ('\\opaque-' + identity if owned else task.objects[parent]['path'] + '\\' + node['name']),
@@ -2910,3 +2913,17 @@ def test_rtpc_graph_collector_stops_before_update_when_base_state_read_fails(tmp
     assert len(receipt['effects']) == 1 and receipt['complete'] is False
     assert receipt['enabled_observations'][-1]['exit_code'] != 0
     assert runtime.category_results[0]['status'] == 'FAIL'
+
+
+def test_rtpc_graph_collector_preserves_nonlexicographic_replacement_accessor_order(tmp_path, workflow):
+    runtime, _commands, writes, _task = _rtpc_graph_runtime(
+        tmp_path, workflow, fault='replacement-nonlexicographic-guids')
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and receipt['complete'] is True and len(writes) == 6
+    replacement = receipt['effects'][-1]
+    assert replacement['phase'] == 'replace_all' and replacement['effect_verified'] is True
+    members = replacement['independent_effect']['members']
+    assert [row['pair'][0] for row in members] == ['Volume', 'CenterPercentage']
+    assert members[0]['object']['id'] > members[1]['object']['id']
+    assert [node['@PropertyName'] for node in writes[-1]['objects'][0]['@RTPC']] == ['Volume', 'CenterPercentage']

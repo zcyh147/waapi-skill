@@ -20358,9 +20358,9 @@ def verify_prepared_operation(
                     if _valid_object_id(object_id) and object_id not in expected_order:
                         expected_order.append(object_id)
                 # The complete List reader preserves the exact owner accessor
-                # order when resolving member details, including a source-proven
-                # empty omission. Reuse that same bounded observation.
-                actual_order = [row["id"] for row in actual_rows]
+                # order. The normalized identity snapshot sorts GUIDs, so only
+                # the validated reader sequence can prove declaration order.
+                actual_order = [row["id"] for row in list_rows]
                 check(f"{owner_path}.@{list_name} ordered membership matches the reviewed declaration",
                     complete_expected and actual_order == expected_order,
                     {"expected": expected_order, "actual": actual_order})
