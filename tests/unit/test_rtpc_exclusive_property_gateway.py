@@ -204,3 +204,35 @@ def test_planned_owner_class_support_cannot_admit_two_exclusive_inputs(tmp_path)
     code, checked = task.step('draft-check')
     assert code == 2 and 'RTPC_EXCLUSIVE_CONFLICT' in json.dumps(checked), checked
     assert not writes
+
+
+@pytest.mark.parametrize('operation', ['object.set', 'object.setRTPC'])
+def test_public_schema_discloses_exclusive_cardinality_and_explicit_replacement(tmp_path, operation):
+    task, _ = support_task(tmp_path, operation=operation)
+    code, schema = task.run('operation-schema', operation)
+    assert code == 0, schema
+
+    def find_cardinality(value):
+        if isinstance(value, dict):
+            if 'property_cardinality' in value:
+                return value['property_cardinality']
+            for nested in value.values():
+                found = find_cardinality(nested)
+                if found is not None:
+                    return found
+        elif isinstance(value, list):
+            for nested in value:
+                found = find_cardinality(nested)
+                if found is not None:
+                    return found
+
+    cardinality = find_cardinality(schema)
+    assert cardinality == {
+        'metadata_source': 'selected_owner_property_supports.rtpc',
+        'Exclusive': 'at_most_one_RTPC_per_property_regardless_of_ControlInput',
+        'Additive': 'distinct_ControlInput_pairs_remain_allowed_within_the_list_bounds',
+        'Multiplicative': 'distinct_ControlInput_pairs_remain_allowed_within_the_list_bounds',
+        'same_pair_update': 'retain_the_exact_existing_RTPC_GUID',
+        'different_input_append': 'cannot_remove_an_unrequested_existing_Exclusive_pair',
+        'replace_all': 'explicit_complete_list_replacement_still_obeys_each_Exclusive_property_limit',
+    }
