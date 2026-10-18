@@ -6042,6 +6042,7 @@ def _prepare_object_set(
                 conditions=reference_target_conditions, property_info_cache=property_info_cache,
                 wwise_version=request.version)
         reference_requirements: dict[str, Any] = {}
+        override_applicability = {}
         for descriptor in (*properties, *references):
             if descriptor.name.casefold() not in property_info_by_name:
                 continue  # Exact documented-list evidence is re-read independently; no property-info receipt is invented.
@@ -6053,6 +6054,7 @@ def _prepare_object_set(
                 derived_properties=derived_target_properties,
                 request_path=descriptor.request_path,
                 property_info_cache=property_info_cache,
+                wwise_version=request.version, override_applicability=override_applicability,
                 _condition_sources=tuple(property_info_by_name.values()),
                 reference_requirements=reference_requirements,
                 desired_references=desired_references,
@@ -6071,6 +6073,7 @@ def _prepare_object_set(
                 "object_id": target.object,
                 "platform": platform,
                 "fields": [info.as_dict() for info in property_info_by_name.values()],
+                "override_applicability": [proof for proof in override_applicability.values() if proof is not None],
             })
         for property_name, value in derived_target_properties.items():
             trusted[f"@{property_name}"] = value
@@ -6675,6 +6678,14 @@ def _prepare_object_set(
                 details={"count": len(node_specs), "limit": DEFAULT_MAX_NODES},
             )
         dispatch_objects.append(trusted)
+
+    from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
+    try:
+        added_ancestors = prepare_ancestor_path_guards(node_specs, read=read)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise OperationContractError("ANCESTOR_RENAME_PATH_UNPROVED", str(exc)) from exc
+    for row in added_ancestors:
+        field_snapshots.append({"object_id": row["id"], "fields": list(ANCESTOR_PATH_FIELDS), "rows": [row], "platform": None})
 
     replaced_ids = {
         _identity_key(row["id"])
@@ -8155,6 +8166,16 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
             observed_fields[key] = _read_property_info(read, object_id=object_id, name=name)
         return observed_fields[key]
     for condition_metadata in condition_metadata_groups:
+        for proof in condition_metadata.get("override_applicability", []):
+            from .override_applicability import proof_current
+            try:
+                passed = proof_current(proof, read=read, after_write=after_write,
+                    edits=pre_state.get("object_set_nodes", []) if after_write else ())
+                evidence = proof
+            except (ValueError, OSError, KeyError, TypeError, OperationContractError) as exc:
+                passed, evidence = False, {"error": str(exc), "proof": proof}
+            assertions.append({"name": "existing user-send class/actual placement applicability remains bound",
+                "passed": bool(passed), "evidence": evidence})
         for expected in condition_metadata["fields"]:
             name = expected.get("field_binding", {}).get("token", expected["name"])
             observed = observed_field(condition_metadata["object_id"], name).as_dict()
@@ -8214,8 +8235,25 @@ def _related_condition_assertions(requirements, *, read):
     return assertions, readbacks
 
 
+def _existing_override_applicability(info, dependency, *, read, object_id, version, proofs):
+    if object_id is None or version is None or proofs is None:
+        return None
+    from .override_applicability import prove_existing_absent_override, DEPENDENCY
+    if dependency != DEPENDENCY:
+        return None
+    key = (info.name, canonical_sha256(dependency))
+    if key not in proofs:
+        try:
+            proofs[key] = prove_existing_absent_override(version=version, object_id=object_id,
+                info=info, dependency=dependency, read=read)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            raise OperationContractError("OVERRIDE_APPLICABILITY_INVALID", str(exc)) from exc
+    return proofs[key]
+
+
 def _collect_existing_condition_closure(
     sources, *, read, object_id, property_info_by_name, property_info_cache,
+    wwise_version=None, override_applicability=None,
 ):
     """Acquire the complete bounded Self graph before selecting prerequisites.
 
@@ -8245,6 +8283,9 @@ def _collect_existing_condition_closure(
             name = dependency.get("property")
             if not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
                 continue  # The ordinary planner reports the malformed shape.
+            if _existing_override_applicability(info, dependency, read=read, object_id=object_id,
+                    version=wwise_version, proofs=override_applicability) is not None:
+                continue
             controller = name.casefold()
             controllers.add(controller)
             if len(controllers) > MAX_CONDITION_CONTROLLERS:
@@ -8287,6 +8328,8 @@ def _apply_reference_activation_dependencies(
     related_conditions: list[dict[str, Any]] | None = None,
     platform: str | None = None,
     _closure_collected: bool = False,
+    wwise_version: str | None = None,
+    override_applicability: dict | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded scalar and reference-presence activation requirements.
 
@@ -8303,6 +8346,7 @@ def _apply_reference_activation_dependencies(
         _condition_sources = _collect_existing_condition_closure(
             (metadata, *_condition_sources), read=read, object_id=object_id,
             property_info_by_name=property_info_by_name, property_info_cache=property_info_cache,
+            wwise_version=wwise_version, override_applicability=override_applicability,
         )
         _closure_collected = True
 
@@ -8315,6 +8359,9 @@ def _apply_reference_activation_dependencies(
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
         if is_terminal_override_dependency(metadata.name, metadata.type, dependency):
+            continue
+        if _existing_override_applicability(metadata, dependency, read=read, object_id=object_id,
+                version=wwise_version, proofs=override_applicability) is not None:
             continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
@@ -8396,6 +8443,7 @@ def _apply_reference_activation_dependencies(
                 related_conditions=related_conditions,
                 platform=platform,
                 _closure_collected=_closure_collected,
+                wwise_version=wwise_version, override_applicability=override_applicability,
             ))
             continue
         fields = set(dependency)
@@ -8595,6 +8643,7 @@ def _apply_reference_activation_dependencies(
             related_conditions=related_conditions,
             platform=platform,
             _closure_collected=_closure_collected,
+            wwise_version=wwise_version, override_applicability=override_applicability,
         ))
 
         matching_specs = [
@@ -10356,12 +10405,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         activation_reference_requirements: dict[str, Any] = {}
         related_conditions: list[dict[str, Any]] = []
         activation_metadata: dict[str, PropertyInfoMetadataRecord] = {}
+        override_applicability = {}
         if request.operation == "object.setProperty" or arguments["target"] is not None:
             activation_specs: list[dict[str, Any]] = []
             _apply_reference_activation_dependencies(
                 info, read=read, object_id=source.object,
                 property_specs=activation_specs, property_info_by_name=activation_metadata,
                 derived_properties={}, request_path="$.reference",
+                wwise_version=request.version, override_applicability=override_applicability,
                 reference_requirements=activation_reference_requirements,
                 related_conditions=related_conditions,
                 platform=platform,
@@ -10371,6 +10422,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 metadata["related_conditions"] = related_conditions
             if info.dependencies:
                 metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
+        metadata["condition_metadata"]["override_applicability"] = [proof for proof in override_applicability.values() if proof is not None]
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
@@ -18606,6 +18658,14 @@ def verify_prepared_operation(
                         {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
                     )
             expected_path = spec.get("expected_path")
+            if isinstance(spec.get("ancestor_rename_path_guard"), Mapping):
+                from .object_graph_paths import verify_ancestor_path_guard
+                try:
+                    path_ok, expected_path, path_evidence = verify_ancestor_path_guard(
+                        spec["ancestor_rename_path_guard"], edits=specs, read=read_call)
+                except (ValueError, KeyError, TypeError, OperationContractError) as exc:
+                    path_ok, path_evidence = False, {"error": str(exc)}
+                check(f"{request_path} exact GUID ancestry and requested rename paths match", path_ok, path_evidence)
             if isinstance(expected_path, str):
                 check(
                     f"{request_path} exact path matches",

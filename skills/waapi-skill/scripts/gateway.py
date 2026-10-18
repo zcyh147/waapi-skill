@@ -19883,6 +19883,8 @@ def dispatch_business_field_discovery(
                 "unit": metadata_unit(metadata),
                 "value_input": value_input,
                 "matched_meanings": list(candidate.get("matched_queries", [])),
+                **({"scope_evidence": {"kind": "class_metadata", "placement": "unresolved",
+                    "required_before_mutation": True, "mutation_authority": False}} if scope_kind == "class" else {}),
             }
         )
     meaning_results: list[dict[str, Any]] = []

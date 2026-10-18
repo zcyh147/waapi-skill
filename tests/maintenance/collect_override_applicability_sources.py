@@ -64,11 +64,25 @@ def extract(source, *, version, build, types):
             dependencies.append({'type': 'isMasterBus', 'action': 'Show', 'context': 'Self', 'value': False})
         else:
             raise ValueError('Unreviewed UserAuxSends dependency grammar')
-    payload = {'contract': 'waapi-skill.override-applicability-source/v1', 'version': version,
+    field_dependencies = {}
+    for field in group.findall('./Properties/*'):
+        own = []
+        for dep in field.findall('./Dependencies/*'):
+            target = dep.attrib.get('Name')
+            conditions = dep.findall('./Condition/*')
+            if (dep.tag != 'ReferenceDependency' or dep.attrib != {'Name': target, 'Action': 'Enable'}
+                    or target not in {'UserAuxSend0', 'UserAuxSend1', 'UserAuxSend2', 'UserAuxSend3'}
+                    or len(conditions) != 1 or conditions[0].tag != 'ReferenceIsSet'
+                    or conditions[0].attrib != {'Value': 'true'}):
+                raise ValueError('Unreviewed user-send field dependency grammar')
+            own.append({'type': 'reference', 'action': 'Enable', 'context': 'Self',
+                        'property': target, 'conditions': [{'referenceIsSet': True}]})
+        field_dependencies[field.attrib['Name']] = own
+    payload = {'contract': 'waapi-skill.override-applicability-source/v2', 'version': version,
         'source': {'build': build, 'member': 'Authoring/Data/WObjects/WObjects.xml',
                    'sha256': hashlib.sha256(raw).hexdigest(), 'indexed_nodes': len(nodes)},
         'classes': classes, 'nodes': [selected[key] for key in sorted(selected)],
-        'group': {'node': 'ObjectBase:UserAuxSends', 'controller': 'OverrideUserAuxSends', 'dependencies': dependencies}}
+        'group': {'node': 'ObjectBase:UserAuxSends', 'controller': 'OverrideUserAuxSends', 'dependencies': dependencies, 'field_dependencies': field_dependencies}}
     return {**payload, 'catalog_sha256': digest(payload)}
 
 

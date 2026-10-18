@@ -26,7 +26,7 @@ class NewObjectDefaultError(ValueError):
 
 def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
                            supplied_references=None, planned_references=None, discovery=False, validate_scalar=None,
-                           structural_bus_proof=None):
+                           structural_bus_proof=None, version=None):
     """Collect the complete graph, then evaluate combined prerequisites.
 
     Discovery certifies grammar and seals metadata without choosing missing
@@ -79,11 +79,11 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
                 continue
             if context != "Self":
                 raise NewObjectDefaultError("Related-object conditions require verified object-scoped configuration.")
-            if kind == "override" and structural_bus_proof is not None:
+            if kind == "override" and (structural_bus_proof is not None or (discovery and version is not None)):
                 from .override_applicability import prove_absent_override
                 try:
-                    proof = prove_absent_override(version=structural_bus_proof["version"], class_id=scope.get("classId"),
-                        info=info, dependency=dependency, read=read_call, structural_proof=structural_bus_proof)
+                    proof = prove_absent_override(version=structural_bus_proof["version"] if structural_bus_proof else version, class_id=scope.get("classId"),
+                        info=info, dependency=dependency, read=read_call, structural_proof=structural_bus_proof, discovery=discovery)
                 except (ValueError, OSError, KeyError, TypeError) as exc:
                     raise NewObjectDefaultError(str(exc), error_code="OVERRIDE_APPLICABILITY_INVALID") from exc
                 if proof is not None:
