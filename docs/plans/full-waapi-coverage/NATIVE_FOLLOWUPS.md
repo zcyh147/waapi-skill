@@ -202,10 +202,11 @@ inline List merge, Windows, Fresh or whole-ticket completion follows.
 
 Root `.waapi-skill-state/full-coverage/rtpc-graph-96660a68-2025-r1` is an
 overall FAIL with four verified effect phases, followed by an accepted replaceAll
-whose sole failing Gateway assertion compares RTPC membership order. Native
-returned the new CenterPercentage and Volume GUIDs in the reverse order from
-the declaration. Pair identities, curves and the other verification assertions
-passed. Establish the RTPC-specific ordering contract and repair its verifier;
+whose sole failing Gateway assertion compares RTPC membership order. The raw
+native owner accessor and returned associations both retain Volume then
+CenterPercentage. Gateway incorrectly compares a GUID-sorted normalized snapshot
+instead. Pair identities, curves and the other assertions passed. Repair the
+ordered verifier to use its already-validated original member sequence;
 retain ordered Effects checks and every GUID/cardinality/ownership/preservation
 check. Do not replay the original transaction or call this complete acceptance.
 The original final category records source full-hash/mtime/tree preservation,
@@ -227,3 +228,33 @@ successful initialization. Current computer-control inventory cannot identify
 this direct-Wine window by its host PID. Continue diagnosis from retained evidence
 or an explicitly supported window-observation route; do not copy global user
 preferences, accept an unobserved license prompt, or repeat blind timeouts.
+
+## R30 RTPC acceptance and Effect Render follow-up
+
+The ordered-membership correction uses the validated native member sequence;
+GUID-normalized snapshots still serve identity-set and preservation checks.
+On fixed `e2bbf7e5`, the existing RTPC graph case passed once on each macOS
+Console 2023.1, 2024.1 and 2025.1 (25.26s, 22.73s and 23.66s).
+Each case verified all five separate effect phases and the Exclusive conflict
+negative. The 2022.1 attempt on that candidate failed before the first intended
+effect: an owner-null predicate incorrectly rejected an independent GameParameter.
+
+Fixed `567a9fd3` changes only the 2022 shared-target strategy to a documented,
+bounded exact-source/owner projection. Canonical parent validation remains;
+missing, malformed, duplicate and extra results cannot establish a shared target.
+The same 2022 RTPC case then passed (24.29s), including all five effect phases.
+The 2023–2025 classifier is unchanged. These are version-specific component
+results on two fixed candidates, not one final release gate. All passing
+lifecycles preserved source full hashes, mtimes/tree metadata and 1,881 tracked
+files, deleted their sandboxes and left no owned process. Original failures
+remain quarantined. Evidence lives under `rtpc-graph-e2bbf7e5-*-r1` in the query
+worktree and `rtpc-graph-567a9fd3-2022-r1` in the short-ID worktree.
+
+The separate 2025 anonymous EffectSlot constructor on `e2bbf7e5` failed
+(8.05s): Wwise accepted the write, then changed an earlier Render=false to true
+when a later effect requested Render=true. Matching help for all five versions
+documents this automatic prefix behavior. This is a Gateway condition-planning
+gap, not an identity/order failure. The repair must reject contradictory explicit
+values and disclose and verify induced predecessor changes across applicable
+routes. The original failed sandbox is retained. No constructor PASS, rendered
+audio claim or whole-ticket completion follows from the RTPC results.

@@ -5,6 +5,26 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R30 component results
+
+Hosted preflight on published `03f5ef62`: **825 passed** (64.76s), run
+39097821039. This is a completed preflight, not the full Program/Non-live gate.
+
+The existing RTPC graph case passed separately on macOS Console 2023.1,
+2024.1 and 2025.1 at `e2bbf7e5`: **1 passed** in 25.26s, 22.73s and 23.66s.
+The 2022.1 attempt there failed (12.17s) because shared-target classification
+rejected a valid independent parameter before the first intended effect.
+Version-specific repair `567a9fd3` passed that 2022 case: **1 passed** (24.29s).
+Every passing case verified five effects, kept source hashes/mtime/tree and
+1,881 tracked files unchanged, deleted its sandbox and left no owned process.
+These are component results on two candidates, not a single-candidate matrix.
+
+The separate anonymous EffectSlot constructor at `e2bbf7e5` on 2025.1 remains
+**1 failed** (8.05s), quarantined: a later Render=true automatically changed an
+earlier requested Render=false. The Gateway's cross-slot condition repair is
+pending. Source integrity and process cleanup passed. No Fresh, Windows,
+2021 RTPC-construction or whole-ticket acceptance is added.
+
 ## 2026-10-18 full-coverage R29 checkpoint
 
 Central `90e63ad9`: **824 passed / 1 failed** (30.13s). The sole failure was
@@ -18,9 +38,9 @@ branches. Native obligation/owner/requirement/policy bytes remain unchanged.
 
 Native macOS 2025.1 RTPC graph case on `96660a68`: **1 failed** (20.42s).
 Four effect phases passed both Gateway and independent verification; replaceAll
-was accepted but its Gateway ordered-membership assertion failed on native
-RTPC reordering. The whole case remains FAIL/quarantined. Source full hash,
-mtime/tree and 1,881 tracked files were unchanged; owned processes ended.
+was accepted but its Gateway ordered-membership assertion used a GUID-sorted
+snapshot; the raw native accessor actually preserved request order. The whole
+case remains FAIL/quarantined. Source full hash, mtime/tree and 1,881 tracked files were unchanged; owned processes ended.
 No Fresh, Windows, full-gate or whole-ticket pass follows. Authoring startup
 remains unresolved after bounded owned diagnostics; historical direct-Wine argv
 is retained, and its partial process sample grants no business acceptance.

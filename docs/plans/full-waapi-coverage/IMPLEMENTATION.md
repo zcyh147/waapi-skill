@@ -1090,8 +1090,9 @@ Actual macOS 2025.1 RTPC validation on `96660a68` recorded four independently
 verified phases: two new pairs, exact update plus append, a planned owner, and
 a merged planned owner. The Exclusive second-input conflict was rejected before
 write. The full case remains FAIL (20.42s): replaceAll executed, but verification
-required request order while native RTPC membership returned the opposite order.
-That exact list-semantics discrepancy remains a required repair; no replay or
+compared request order with its own GUID-sorted snapshot. Raw native membership
+actually preserved the requested order. This verifier defect remains a required
+repair; no replay or
 replacement PASS was manufactured. Source full hash/mtime/tree and 1,881 tracked
 files were unchanged, no owned process remained, and the failed sandbox was
 quarantined. Earlier empty-list/shared-target and collector failures are retained.
@@ -1109,3 +1110,21 @@ Full gates, remaining implementations, native reconciliation and final review
 remain required. No Fresh, Windows, additional ticket closure or merge approval
 is claimed. Detailed ignored roots and original argv/log/source hashes are
 listed in the R29 integration handoff and root checkpoint.
+
+## R30 component progress before integration
+
+The RTPC membership verifier now compares actual native order rather than its
+GUID-sorted snapshot. Fixed `e2bbf7e5` passed the complete existing RTPC graph
+case on macOS 2023.1, 2024.1 and 2025.1. A separate 2022 classifier defect was
+repaired in `567a9fd3`, which passed the same matching 2022 case. Each version
+verified five separate effects, preserved the source project and cleaned its
+owned sandbox/processes. These fixed component results await integration and
+evidence reconciliation; 2021 arbitrary RTPC construction remains unresolved.
+
+Anonymous EffectSlot construction exposed Wwise's automatic Render-prefix
+behavior. A shared condition planner is being implemented so explicit conflicts
+fail before Preview and induced changes are disclosed and verified. Ordinary
+created-field history is implemented at `a93a2377` with focused program evidence;
+matching native history validation and richer graph/list history remain pending.
+No additional ticket is closed, no Fresh run is added and no final gate is
+claimed. See NATIVE_FOLLOWUPS.md for exact candidate/version outcomes.
