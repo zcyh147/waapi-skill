@@ -176,16 +176,27 @@ def test_field_discovery_error_keeps_complete_keys_after_large_rejected_candidat
     task.bind(FIRST)
     task.types = [{'name': 'AuxBus', 'classId': 3997712, 'type': 'WObject'}]
     kind = task.discover_kind('AuxBus')
-    # Legitimate AuxBus conditions are discoverable. Use deliberately unsupported
-    # fake native types to exercise eight complete errors without mutating the Draft.
+    # Legitimate AuxBus conditions are discoverable. Let discovery see the
+    # supported fields, then reject unrecognized types on their fresh binding read.
     task.metadata = {f'UserAuxSend{band}{index}': {
-        'name': f'UserAuxSend{band}{index}', 'type': 'UnsupportedPropertyType',
+        'name': f'UserAuxSend{band}{index}', 'type': 'int16',
         'display': {'name': f'User-Defined Auxiliary {band} {index}'},
         'restriction': {'type': 'range', 'min': 0, 'max': 100},
         'dependencies': [{'action': 'Show', 'context': 'Self', 'type': 'isMasterBus', 'value': False},
             {'action': 'Enable', 'context': 'Self',
             'property': 'OverrideUserAuxSends', 'type': 'override'}],
     } for band in ('HPF', 'LPF') for index in range(4)}
+    original_call = task.call
+    field_reads = {}
+    def changing_type(uri, args=None, options=None):
+        result = original_call(uri, args, options)
+        if uri == 'ak.wwise.core.object.getPropertyInfo':
+            name = args['property']
+            field_reads[name] = field_reads.get(name, 0) + 1
+            if field_reads[name] > 1:
+                return {**result, 'type': 'UnsupportedPropertyType'}
+        return result
+    task.call = changing_type
     revision = task.revision
     code, result = task.step('draft-discover-fields', '--type-handle', kind,
         '--meaning', 'User-Defined Auxiliary Send 0')
@@ -193,6 +204,7 @@ def test_field_discovery_error_keeps_complete_keys_after_large_rejected_candidat
     assert result['details']['draft_changed'] is False
     rejected = result['details']['rejected_candidates']
     assert len(rejected) == 8
+    assert all(row['error_code'] == 'FIELD_TYPE_UNSUPPORTED' for row in rejected)
     assert all(set(row) == {'error_code', 'field_kind', 'field', 'reason', 'details'} for row in rejected)
     assert all(row['details']['draft_changed'] is False for row in rejected)
     assert task.revision == revision
