@@ -723,9 +723,19 @@ def test_separate_existing_rows_cannot_hide_explicit_render_contradiction(tmp_pa
     assert not any(uri.endswith(('object.set', 'object.setProperty')) for uri, _, _ in task.calls)
 
 
-def test_render_clear_before_retained_true_successor_is_explicit_pending_boundary(tmp_path):
-    task, _ = list_task(tmp_path, version='2023.1', operation='object.setProperty')
-    task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+def test_legacy_render_clear_before_true_successor_still_requires_own_observation(tmp_path):
+    task, _ = list_task(tmp_path, version='2022.1', operation='object.setProperty')
+    del task.objects[ROOT], task.objects[CHILD], task.objects[FIRST]['@Effects']
+    task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    task.metadata = {}
+    for i in range(4):
+        task.objects[FIRST].update({f'@Effect{i}': {'id': EFFECT}, f'@RenderEffect{i}': i < 2, f'@BypassEffect{i}': False})
+        task.metadata[f'Effect{i}'] = {'name': f'Effect{i}', 'type': '', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
+        for prefix in ('Bypass', 'Render'):
+            task.metadata[f'{prefix}Effect{i}'] = {'name': f'{prefix}Effect{i}', 'type': 'bool', 'default': False,
+                'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self',
+                    'property': 'Effect' + str(i), 'conditions': [{'referenceIsSet': True}]}]}
     original = task.call
     def call(uri, args=None, options=None):
         if uri.endswith('isPropertyEnabled'):
@@ -733,8 +743,8 @@ def test_render_clear_before_retained_true_successor_is_explicit_pending_boundar
             return {'return': True}
         return original(uri, args, options)
     task.call = call
-    target = task.bind(ROOT)
-    render = select_field(task, owner=target, token='Render')
+    target = task.bind(FIRST)
+    render = select_field(task, owner=target, token='RenderEffect0')
     code, declared = task.step('draft-declare-field-change', '--object-handle', target,
         '--field-handle', render, '--business-value', 'false')
     assert code == 0, declared
@@ -805,9 +815,15 @@ def test_legacy_import_owner_render_fields_are_explicit_unfinished_chain_boundar
     assert not any(uri.endswith('audio.import') for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize('operation', ['object.setProperty', 'object.set'])
-def test_render_clear_previews_and_verifies_observed_suffix_without_changing_bypass(tmp_path, operation):
-    task, _ = list_task(tmp_path, operation=operation)
+@pytest.mark.parametrize('version,operation,fault', [
+    pytest.param(version, operation, None, id=version + '-' + operation)
+    for version in ['2023.1', '2024.1', '2025.1'] for operation in ['object.setProperty', 'object.set']
+] + [
+    pytest.param('2025.1', 'object.setProperty', 'ignored-suffix', id='ignored-suffix'),
+    pytest.param('2025.1', 'object.set', 'metadata-drift', id='metadata-drift'),
+])
+def test_render_clear_previews_and_verifies_observed_suffix_without_changing_bypass(tmp_path, version, operation, fault):
+    task, _ = list_task(tmp_path, version=version, operation=operation)
     task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
     original, writes = task.call, []
     def call(uri, args=None, options=None):
@@ -820,7 +836,8 @@ def test_render_clear_previews_and_verifies_observed_suffix_without_changing_byp
                 assert args == {'object': ROOT, 'property': 'Render', 'value': False}
             else:
                 assert args['objects'] == [{'object': ROOT, '@Render': False}]
-            task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = False
+            task.objects[ROOT]['@Render'] = False
+            task.objects[CHILD]['@Render'] = fault == 'ignored-suffix'
             return {'objects': [{'id': ROOT, 'name': task.objects[ROOT]['name']}]} if operation == 'object.set' else {}
         return original(uri, args, options)
     task.call = call
@@ -838,8 +855,17 @@ def test_render_clear_previews_and_verifies_observed_suffix_without_changing_byp
     chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
     assert chain['derived'] == [{'key': CHILD, 'before': True, 'after': False}]
     assert chain['suffix_rule']['rule'] == 'clearing a Render flag clears all subsequent stored Render flags'
-    assert chain['suffix_rule']['version'] == '2025.1'
+    assert chain['suffix_rule']['version'] == version
+    if operation == 'object.set':
+        code, schema = task.run('operation-schema', operation)
+        assert code == 0 and 'derive_visible_false_for_retained_successors' in json.dumps(schema), schema
+    if fault == 'metadata-drift':
+        task.metadata['Render']['default'] = True
     code, verified = task.finish(tx, shown)
+    if fault:
+        assert code == 2 and verified.get('verified') is not True, verified
+        assert len(writes) == (0 if fault == 'metadata-drift' else 1)
+        return
     assert code == 0 and verified['verified'] is True, verified
     assert task.objects == {**before, ROOT: {**before[ROOT], '@Render': False}, CHILD: {**before[CHILD], '@Render': False}}
     assert len(writes) == 1

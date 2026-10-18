@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .documented_list_fields import discovery_contract as documented_list_discovery_contract
+from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
 
 from typing import Any
 
@@ -277,7 +278,8 @@ def object_graph_business_contract_data(
                         "omitted_predecessors": "derive_visible_true_from_actual_state_or_fresh_class_default",
                         "verification": "complete_stored_slot_state_not_rendered_audio",
                         "bypass": "preserve_stored_flags; Bypass takes precedence during processing",
-                        "clearing_before_retained_true": "pending_native_suffix_observation; reject_before_write",
+                        "clearing_before_retained_true": ("derive_visible_false_for_retained_successors; exact_complete_chain_verification"
+                            if version in CLEAR_SUFFIX_OBSERVATIONS else "pending_native_suffix_observation; reject_before_write"),
                     },
                 },
                 "graph_plugin": {"type": "effect_Type_Handle", "plugin_placement": ["shareset", "owner"], "shareset_parent": "bound_Effects_WorkUnit_or_fresh_source_proven_Folder", "native_class_id": "Gateway_owned_from_Type_Handle"},

@@ -2495,7 +2495,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setProperty",
         "ak.wwise.core.object.setProperty",
         "property-reference",
-        "Set one property for the current or an explicit platform using live property metadata and typed readback; Effect Render also previews and verifies its source-proved owner-chain prefix.",
+        "Set one property for the current or an explicit platform using live property metadata and typed readback; Effect Render also previews and verifies its source-proved owner-chain prefix and version-observed clearing suffix.",
         ("object", "property", "value"),
         ("platform",),
         argument_contract=_object_contract(

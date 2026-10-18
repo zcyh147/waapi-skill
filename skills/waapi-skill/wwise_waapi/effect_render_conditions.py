@@ -32,6 +32,16 @@ def source_authority(version):
 # Exact Root-owned public Gateway diagnostic; stored flags only. Other versions
 # require their own observation, not a borrowed version-family inference.
 CLEAR_SUFFIX_OBSERVATIONS = {
+    "2023.1": {"version": "2023.1", "candidate": "a4936b071bafbc3997eb9b4bab00f06429e9aa6e",
+        "observation_sha256": "0274570cb87476bf13305807f9d283c1d314673a8af81b0e4f9fa8e7348093ee",
+        "observed_before": [True, True], "observed_after": [False, False],
+        "rule": "clearing a Render flag clears all subsequent stored Render flags",
+        "acceptance_scope": "stored_slot_state_not_rendered_audio"},
+    "2024.1": {"version": "2024.1", "candidate": "a4936b071bafbc3997eb9b4bab00f06429e9aa6e",
+        "observation_sha256": "d8c15c727173d5799d8aa44f5ee061c4a91ff37edfe0090329f3f74f4c26269f",
+        "observed_before": [True, True], "observed_after": [False, False],
+        "rule": "clearing a Render flag clears all subsequent stored Render flags",
+        "acceptance_scope": "stored_slot_state_not_rendered_audio"},
     "2025.1": {"version": "2025.1", "candidate": "98c1f74ff9bf2e7fbec91689980ead53a3887998",
         "observation_sha256": "bb8e143ef5b6aacbf02f10aedf042fe957115fcc860c71e346e6868aa17f0be8",
         "observed_before": [True, True], "observed_after": [False, False],
