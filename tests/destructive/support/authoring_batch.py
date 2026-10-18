@@ -13,9 +13,8 @@ from typing import Sequence
 import pytest
 
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle, ScenarioRuntime
-from tests.destructive.support.sandbox_fixture import hash_project
+from tests.destructive.support.sandbox_fixture import hash_project, wait_for_port_release
 from tests.destructive.support.category_evidence import exact_git_candidate, append_category_evidence, exact_transaction_outcomes
-from wwise_waapi.headless import assert_port_free
 from wwise_waapi.native_catalog import load_native_catalog
 from wwise_waapi.host_paths import localize_waapi_host_path
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
@@ -302,7 +301,9 @@ class AuthoringBatchAdapter:
         self.last_resources = {'residual_processes': residual}
         if residual:
             raise ValueError('Owned Authoring resources reappeared after teardown')
-        assert_port_free(runtime.host, runtime.port)
+        # A clean process can precede socket release; keep the existing fixed
+        # deadline and exact port, with no new host or mutation attempt.
+        wait_for_port_release(runtime.host, runtime.port)
         self.last_resources.update(cleanup_report=asdict(report), owned_prefix=str(prefix),
             fresh_inspection={'checked_at_unix_ns': time.time_ns(), 'row_count': len(rows)},
             port={'host': runtime.host, 'port': runtime.port, 'released': True})
