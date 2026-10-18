@@ -136,6 +136,8 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_
 
 def test_existing_and_old_root_send_witnesses_retain_distinct_shared_state_receipts(tmp_path, workflow):
     shared = tmp_path / 'shared-state'
+    (tmp_path / 'ordinary').mkdir()
+    (tmp_path / 'old-root').mkdir()
     ordinary, _commands, _writes, _task = _existing_bus_send_runtime(tmp_path / 'ordinary', workflow, '2021.1')
     old_root, _commands, _writes, _task = _existing_bus_send_runtime(tmp_path / 'old-root', workflow, '2021.1', root_sources=True)
     ordinary.state_dir = old_root.state_dir = shared
