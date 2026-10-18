@@ -3857,8 +3857,13 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
     # Literal fixture-only Effect metadata, not claimed as native observation.
     effect_metadata = {name: {'name': name, 'type': 'Real32'} for name in ('DelayTime', 'WetDryMix')}
     original, commands = task.call, []
+    project_dirty = {'value': False}
     def call(uri, args=None, options=None):
         args, options = args or {}, options or {}
+        if uri == 'ak.wwise.core.project.save':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            project_dirty['value'] = False
+            return {}
         if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')):
             obj = task.objects.get(args.get('object'), {})
             if obj.get('type') == 'Effect' or args.get('classId') == 6946819:
@@ -3867,7 +3872,7 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
         if uri.endswith('object.get') and args.get('waql') in {'from type Project take 1', 'from type Project take 2'}:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             return {'return': [{'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'Fixture', 'type': 'Project',
-                'path': '\\', 'filePath': str(task.project_file), 'workunitIsDirty': False}]}
+                'path': '\\', 'filePath': str(task.project_file), 'workunitIsDirty': project_dirty['value']}]}
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
             import re
             expression = args['waql']
@@ -3899,6 +3904,7 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
                     if row.get('@RenderEffect' + str(i)) is True:
                         for j in range(i): row['@RenderEffect' + str(j)] = True
                 task.objects[identity] = row; results.append(deepcopy(row))
+            project_dirty['value'] = True
             return {'objects': results}
         result = original(uri, args, options)
         if uri.endswith('audio.import'):
@@ -3910,6 +3916,7 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
                     for row in result['objects']:
                         if row['path'] == source_path: row['notes'] = node.get('notes', '')
         if uri.endswith(('audio.import', 'audio.importTabDelimited')):
+            project_dirty['value'] = True
             for row in task.objects.values():
                 if row['type'] == 'AudioFileSource':
                     row['classId'] = 16
