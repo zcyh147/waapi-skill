@@ -6178,9 +6178,9 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'setup_coverage_credit': False, 'business_effect_verified': False,
-        'diagnostic_complete': False, 'classification': 'not_observed',
         'scope': 'stored_Render_suffix_observation_not_business_acceptance' if render_suffix_diagnostic else 'new_anonymous_EffectSlot_construction_not_existing_member_name_merge',
         'lifecycle_acceptance': 'existing host-category-evidence/v3 finalizer owns source/cleanup acceptance'}
+    if render_suffix_diagnostic: receipt.update(diagnostic_complete=False, classification='not_observed')
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(body) <= 8 * 1024 * 1024, 'Anonymous EffectSlot receipt byte bound exceeded'

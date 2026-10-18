@@ -3153,22 +3153,72 @@ def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared')
             slots = [row for row in task.objects.values() if row['type'] == 'EffectSlot']
             assert len(slots) == 2 and args == {'object': slots[0]['id'], 'property': 'Render', 'value': False}, args
             assert [row['@Render'] for row in slots] == [True, True], slots
+            if outcome == 'native-error': raise RuntimeError('Original native suffix rejection; never replay')
             slots[0]['@Render'] = False
-            if outcome == 'cleared': slots[1]['@Render'] = False
+            if outcome in {'cleared', 'missing-render', 'bypass-change', 'owner-change', 'reference-change', 'read-error'}:
+                slots[1]['@Render'] = False
+            if outcome == 'missing-render': del slots[1]['@Render']
+            if outcome == 'bypass-change': slots[1]['@Bypass'] = True
+            if outcome == 'owner-change': slots[1]['owner'] = {'id': slots[0]['id']}
+            if outcome == 'reference-change': slots[1]['@Effect'] = deepcopy(slots[0]['@Effect'])
             return {}
+        if outcome == 'read-error' and len(writes) == 5 and uri.endswith('object.get'):
+            raise RuntimeError('Original readback error after write; never classify a suffix')
         return original(uri, args, options)
     task.call = call
     return runtime, commands, writes, task
 
 
-def test_render_suffix_diagnostic_classifies_actual_cleared_chain_without_business_credit(tmp_path, workflow):
-    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow)
+@pytest.mark.parametrize('outcome', ['cleared', 'retained'])
+def test_render_suffix_diagnostic_classifies_actual_chain_without_business_credit(tmp_path, workflow, monkeypatch, outcome):
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=outcome)
     category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
     receipt = json.loads(Path(category['observation_path']).read_text())
-    assert receipt['diagnostic_complete'] is True and receipt['classification'] == 'cleared'
+    assert receipt['diagnostic_complete'] is True and receipt['classification'] == outcome
     assert category['diagnostic_only'] is True and category['status'] == 'blocked'
     assert receipt['business_effect_verified'] is False
     assert [row['properties']['Render'] for row in receipt['suffix_before']['slots']] == [True, True]
-    assert [row['properties']['Render'] for row in receipt['suffix_after']['slots']] == [False, False]
+    assert [row['properties']['Render'] for row in receipt['suffix_after']['slots']] == [False, outcome == 'retained']
     assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
     assert [command[0] for command in commands].count('verify') == 5
+    assert all(phase['setup_no_credit'] is True for phase in receipt['transactions'][:4])
+    assert all(phase['effect_verified'] is False for phase in receipt['transactions'])
+    assert len(receipt['calls']) < 256 and Path(category['observation_path']).stat().st_size < 8 * 1024 * 1024
+    output = tmp_path / 'diagnostic-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::render_suffix_diagnostic'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True, 'hash_before': 'same', 'hash_after': 'same'}, residual_state={'sandbox': 'deleted'},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert record['invocation']['outcome'] == 'PASS' and record['categories'][0]['status'] == 'blocked'
+    assert record['categories'][0]['business_effect_verified'] is False
+    assert len(record['transactions']) == 5
+
+
+@pytest.mark.parametrize('fault', ['missing-render', 'bypass-change', 'owner-change', 'reference-change', 'read-error'])
+def test_render_suffix_diagnostic_cannot_classify_incomplete_or_unrequested_changes(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['diagnostic_complete'] is False
+    assert receipt['classification'] == 'not_observed' and receipt['business_effect_verified'] is False
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
+
+
+def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry(tmp_path, workflow):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome='native-error')
+    category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['classification'] == 'native_rejected' and receipt['diagnostic_complete'] is True
+    assert category['status'] == 'blocked' and receipt['business_effect_verified'] is False
+    assert 'Original native suffix rejection' in json.dumps(receipt['transactions'][-1]['execute'])
+    assert len(writes) == 5 and commands[-1][0] == 'execute'
+    assert [command[0] for command in commands].count('verify') == 4
