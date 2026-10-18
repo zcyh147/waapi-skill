@@ -353,9 +353,13 @@ def capture_slot_reference_targets(specs, roles):
     for role in roles.values():
         if role.object in selected:
             row = {key: value for key, value in role.row.items() if key in fields}
-            if role.object in result and result[role.object] != row:
+            previous = result.get(role.object, {})
+            if any(previous[key] != row[key] for key in previous.keys() & row.keys()):
                 raise ValueError("External slot reference targets disagreed within this Preview")
-            result[role.object] = row
+            # A condition guard may observe class/owner in addition to the
+            # ordinary exact-identity projection. Retain their compatible union;
+            # every observed field is independently revalidated and preserved.
+            result[role.object] = {**previous, **row}
     if set(result) != selected or len(result) > 128:
         raise ValueError("Every external slot reference target requires a complete bounded observation")
     return [result[identity] for identity in sorted(result)]
