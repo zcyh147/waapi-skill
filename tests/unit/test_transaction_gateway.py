@@ -6771,7 +6771,7 @@ def test_generic_isolated_call_runs_full_chain_with_bound_io_audit(tmp_path: Pat
                 "args": {"files": ["/remote-only/Project.wwu"]},
                 "options": {},
             },
-            ("execution_contract.isolated_transaction",),
+            ("source_control.files",),
         ),
         (
             "2024.1",
@@ -6841,6 +6841,24 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
     assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo"
     ]
+
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_status_read_requires_local_file_proof_host(tmp_path, version):
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info(year=int(version[:4]))]})
+    env = gateway_env(tmp_path, version=version)
+    set_gateway_config(env, waapi_host="192.0.2.10")
+    code, result = waapi_gateway.execute_gateway(
+        ["core-call", "ak.wwise.core.sourceControl.getStatus",
+         "--exact-file", "/remote-only/Project.wwu", "--io-root", "/remote-only"],
+        env=env, client_factory=lambda _: client,
+    )
+    assert code == 2, result
+    assert result["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED", result
+    assert result["details"]["path_roles"] == ["source_control.files"]
+    assert result["executed"] is False
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
 def test_confirmed_generic_isolated_transaction_stays_confirmed_on_remote_execute(

@@ -11891,6 +11891,12 @@ def dispatch_soundengine_business_read(
 
 def dispatch_source_control_status_read(args, *, connection, detected_version, live_info, dispatcher, common):
     """Observe each exact file through one catalog-proven read-only call."""
+    locality = local_filesystem_transaction_boundary(
+        {"operation": "waapi.call", "version": detected_version, "arguments": {"api": args.api}},
+        command=args.command, endpoint_host=connection.host, common=common,
+    )
+    if locality is not None:
+        return locality
     from wwise_waapi.source_control_status_read import observe_status_files, MAX_STATUS_NATIVE_BYTES
     from wwise_waapi.source_control_business import materialize_source_control_business_request
     from wwise_waapi.builders.schema import validate_resolved_semantic_payload
