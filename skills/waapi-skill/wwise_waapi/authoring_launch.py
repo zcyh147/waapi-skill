@@ -85,7 +85,11 @@ class OwnedMacAuthoringContext:
         roundtrip = self._run([str(self.cx / 'bin/wine'), str(self.cx / 'lib/wine/x86_64-windows/winepath.exe'), '-u', native], timeout=10).strip()
         if len(roundtrip.splitlines()) != 1 or _real(Path(roundtrip), directory=False) != self.project:
             raise AuthoringLaunchError('Owned Authoring project path roundtrip differs from the sandbox')
-        command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
+        # Match the bundled wwise_launcher GUI loader/wait strategy. CrossOver's
+        # private-bottle resolver accepts an absolute path, so no default/user
+        # bottle lookup is needed for this already validated owner prefix.
+        command = [str(self.cx / 'bin/wine'), '--bottle', str(self.prefix),
+            '--enable-alt-loader', 'macdrv', '--wait-children',
             f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe', native]
         return command, {'method': 'owned_winepath_roundtrip', 'project': str(self.project), 'native_project': native,
                          'roundtrip_project': str(self.project), 'build': self.build}

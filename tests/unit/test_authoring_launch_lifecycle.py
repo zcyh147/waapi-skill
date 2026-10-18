@@ -88,7 +88,10 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     command, options = started[0]
     native_executable = {'2024.1.13.9056': 'c:/Program Files/Audiokinetic/Wwise 2024.1.13.9056/Authoring/x64/Release/bin/Wwise.exe',
         '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe'}[build]
-    assert command == [str(facts.cx / 'bin/wine'), 'start.exe', '/wait', native_executable, native_project]
+    # Matching bundled wwise_launcher selects macdrv and waits for descendants.
+    # Bind its bottle explicitly to this owner, never the user's default bottle.
+    assert command == [str(facts.cx / 'bin/wine'), '--bottle', str(facts.prefix),
+        '--enable-alt-loader', 'macdrv', '--wait-children', native_executable, native_project]
     assert options['cwd'] == str(facts.project.parent)
     assert options['env']['HOME'] == str(facts.home)
     assert options['env']['WINEPREFIX'] == str(facts.prefix)
