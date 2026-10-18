@@ -43,6 +43,10 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
     writes, commands = [], []
     def call(uri, args=None, options=None):
         args, options = args or {}, options or {}
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['property'] in ('Bypass', 'Render') and task.objects[args['object']]['@Effect']['id'] in task.objects, args
+            return {'return': True}
         if uri.endswith('object.create'):
             task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
             assert args == {'parent': SECOND, 'type': 'Sound', 'name': 'WAAPI_SLOT_TEST',
