@@ -28,8 +28,17 @@ references. No main merge is authorized.
   has passed focused program checks and Root runtime review; native history
   proof and the larger remaining history branches are still pending. See
   NATIVE_FOLLOWUPS.md for original candidates, runs and scope. These fixed
-  components are queued for integration; ticket and final-gate status is
+  components are integrated at `59b270b1`; ticket and final-gate status is
   unchanged.
+
+- Integrated `59b270b1` passed six selected shared-path checks in **12.22s**.
+  All 1,885 tracked files remained unchanged during the run and the owned
+  process group ended. Serial inventory generation/checks passed, retaining
+  897 public version rows, 228 URIs, 515 contracts, 32,978 public branches and
+  the 262-entry Program roster. All 272,313 native obligations and their
+  original ownership, requirements and historical evidence remain unchanged.
+  The local 825-check preflight was deliberately not repeated; one hosted
+  preflight follows publication. This does not replace final broad gates.
 
 - Draft integration PR: [#196](https://github.com/zcyh147/waapi-skill/pull/196).
 - #175 is complete and closed. Integration candidate `faa704ff` passed the fixed
