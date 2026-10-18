@@ -197,3 +197,33 @@ List construction, empty-name conflict semantics, planned plugin targets and
 RTPC graph/Exclusive native effects still require implementation or evidence.
 Legacy 2021/2022 scalar EffectN contracts are distinct. No blanket owner rule,
 inline List merge, Windows, Fresh or whole-ticket completion follows.
+
+## R29 actual RTPC graph and Authoring outcomes
+
+Root `.waapi-skill-state/full-coverage/rtpc-graph-96660a68-2025-r1` is an
+overall FAIL with four verified effect phases, followed by an accepted replaceAll
+whose sole failing Gateway assertion compares RTPC membership order. Native
+returned the new CenterPercentage and Volume GUIDs in the reverse order from
+the declaration. Pair identities, curves and the other verification assertions
+passed. Establish the RTPC-specific ordering contract and repair its verifier;
+retain ordered Effects checks and every GUID/cardinality/ownership/preservation
+check. Do not replay the original transaction or call this complete acceptance.
+The original final category records source full-hash/mtime/tree preservation,
+clean process shutdown and a quarantined failed sandbox.
+
+Earlier 2025 roots at `66413dbd` and `28dc59aa` remain failures. The former
+exposed missing prospective-source inputs to sharedOnlyTypes validation; the
+latter passed initial curve creation but its collector incorrectly required the
+base property to remain enabled after Exclusive RTPC attachment. Their fixes
+have public regressions and progressed the later native case; original results
+are never rewritten. New anonymous Effects construction still needs its own
+native collector and carries no credit from exact-member tests.
+
+Authoring 2024 roots at `8db47c61`, `bd6d9521`, `8d20e25a`, `02a42a09` and
+`7459b8ea` preserve distinct startup failures. The last restores the historically
+proved direct-Wine command and retains a partial, ownership-certified process
+sample. It does not prove a particular modal, a disabled WAAPI preference or
+successful initialization. Current computer-control inventory cannot identify
+this direct-Wine window by its host PID. Continue diagnosis from retained evidence
+or an explicitly supported window-observation route; do not copy global user
+preferences, accept an unobserved license prompt, or repeat blind timeouts.

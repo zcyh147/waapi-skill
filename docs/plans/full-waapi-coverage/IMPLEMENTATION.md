@@ -1058,3 +1058,54 @@ Original receipts and the candidate-bound summary are under the root ignored
 Anonymous slot/plugin graph construction, RTPC graph native effects, other
 condition/host branches, exact evidence completion and final broad gates remain
 same-parent work. No Fresh, Windows, final review or ticket closure is added.
+
+## R29: anonymous Effects, ShareSet Folders, creation history and RTPC native diagnosis
+
+Frozen code `96660a68` adds source-proven anonymous EffectSlot construction on
+2023.1–2025.1, including existing/planned ShareSets and inline local Effects.
+New identity binding uses complete owner membership and exact GUID/class/owner
+readback. Effect ShareSets may be created under a freshly proved Effects Folder
+on 2022.1–2025.1. Existing targets, member values and ancestry remain guarded.
+Nondefault anonymous name-conflict semantics and additional composition gaps
+remain in scope; this is not whole-ticket completion.
+
+History now consumes verified ordinary leaf-creation presence receipts for
+undo/redo identity, parent and actual notes. Creation fields and larger graphs
+remain unfinished. Missing RTPC/modern Effects accessors normalize to empty only
+with exact source/class proof and an independent empty membership read. New RTPC
+ControlInput validation now retains fresh class-scoped metadata while applying
+the ordinary shared-target proof to an already-existing control object.
+
+Central preflight on `90e63ad9` recorded 824 passed / 1 failed in 30.13s. The
+sole failure was the reviewed non-object-set schema seal: only four versioned
+createPlugin constraints changed to disclose Folder placement. A test-only
+repair preserves the earlier seals through that exact inverse. On `96660a68`,
+the failed node passed separately (0.48s) and nine affected cross-checks passed
+(11.74s); the original failed run is not relabelled. Serial generation/checks
+passed; roster 261, public 897 rows / 228 URIs / 515 contracts / 32,978 branches.
+All 272,313 native obligation IDs and their policy/owner/requirement bytes remain
+unchanged (116 exclusions; 272,197 unresolved default rows).
+
+Actual macOS 2025.1 RTPC validation on `96660a68` recorded four independently
+verified phases: two new pairs, exact update plus append, a planned owner, and
+a merged planned owner. The Exclusive second-input conflict was rejected before
+write. The full case remains FAIL (20.42s): replaceAll executed, but verification
+required request order while native RTPC membership returned the opposite order.
+That exact list-semantics discrepancy remains a required repair; no replay or
+replacement PASS was manufactured. Source full hash/mtime/tree and 1,881 tracked
+files were unchanged, no owned process remained, and the failed sandbox was
+quarantined. Earlier empty-list/shared-target and collector failures are retained.
+
+Authoring diagnostics now retain bounded startup errors and prove private/managed
+bottle resolution. Historical successful direct-Wine start.exe argv is retained;
+copying native-app macdrv/wait-children options did not reproduce its enclosing
+launch context and was reverted before publication. The restored `7459b8ea`
+owned 2024.1 attempt still timed out. A certified owned-process sample captured
+roughly 2.4 seconds near cleanup, showing the Mac GUI event loop but no specific
+modal or initialization cause. It is partial diagnostic evidence, not readiness
+or media acceptance. No user preferences or project were changed.
+
+Full gates, remaining implementations, native reconciliation and final review
+remain required. No Fresh, Windows, additional ticket closure or merge approval
+is claimed. Detailed ignored roots and original argv/log/source hashes are
+listed in the R29 integration handoff and root checkpoint.
