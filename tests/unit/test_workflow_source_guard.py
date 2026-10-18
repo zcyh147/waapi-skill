@@ -3658,6 +3658,39 @@ def test_created_fields_history_collector_preserves_actual_same_call_reference_c
         assert len(json.dumps(phase['verify'], ensure_ascii=False, indent=2).encode('utf-8')) <= 24 * 1024
 
 
+def test_null_source_only_diagnostic_uses_fresh_setup_and_same_five_fields_without_history(tmp_path, workflow):
+    # Literal2025 metadata is a labelled source-shaped fixture here, not2022
+    # native metadata credit. The public compiler still uses the2022 lane.
+    runtime, commands, writes, _task = _created_fields_history_runtime(tmp_path, workflow, version='2022.1',
+        source_metadata=_CREATED_HISTORY_NATIVE_2025_METADATA)
+    category = workflow._collect_created_leaf_fields_history_acceptance(runtime,
+        name='WAAPI_NULL_DIAGNOSTIC_TEST', null_source_only_diagnostic=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['complete'] is True and receipt['business_effect_verified'] is False
+    assert receipt['diagnostic_only'] is True and receipt['history_acceptance_credit'] is False
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True
+    assert category['history_acceptance_credit'] is False
+    assert [row['phase'] for row in receipt['setup']] == ['setup-target']
+    assert [row['phase'] for row in receipt['effects']] == ['null-source']
+    assert len(writes) == 2 and all(uri == 'ak.wwise.core.object.create' for uri, _args in writes)
+    assert [command[0] for command in commands].count('execute') == 2
+    assert [command[0] for command in commands].count('verify') == 2
+    assert not any('ak.wwise.core.undo.' in str(command) for command in commands)
+    assert not any(uri.startswith('ak.wwise.core.undo.') for uri, _args, _options in _task.calls)
+    _uri, native = writes[-1]
+    expected_fields = {'IsLoopingEnabled': True, 'IsLoopingInfinite': True, 'Volume': -6.0,
+        'OverridePositioning': True, 'Attenuation': None}
+    assert {key: native['@' + key] for key in expected_fields} == expected_fields
+    phase, = receipt['effects']
+    actual = phase['independent_effect']
+    assert {key: actual['properties'][key] for key in expected_fields if key != 'Attenuation'} == {
+        key: value for key, value in expected_fields.items() if key != 'Attenuation'}
+    assert 'Attenuation' in actual['references'] and actual['references']['Attenuation'] is None
+    assert phase['native_outcome'] == 'accepted' and phase['effect_verified'] is True
+    assert category['observation_sha256'] and category['verifier_strength']
+    assert len(receipt['calls']) < 256 and Path(category['observation_path']).stat().st_size < 16 * 1024 * 1024
+
+
 def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared', version='2025.1'):
     from copy import deepcopy
     runtime, commands, writes, task = _anonymous_effect_construction_runtime(tmp_path, workflow, version=version)
