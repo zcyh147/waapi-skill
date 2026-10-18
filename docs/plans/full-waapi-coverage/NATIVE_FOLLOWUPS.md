@@ -5,6 +5,35 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## Created-field history: current exact results — #192 / #178
+
+Fixed `854d28aa0b570733280fd77729d108d8bcde3788` passed the existing
+`test_created_leaf_fields_history_receipt_native_acceptance` on macOS Console
+2023.1, 2024.1 and 2025.1 (16.31s, 10.00s and 19.71s). Both original cases
+preserve five materialized scalar/reference fields, with existing or null
+Attenuation. Creation, undo and redo are independently checked; setup has no
+effect-coverage credit. Source full hash/mtime/tree and 1,881 tracked files
+remained unchanged, PASS sandboxes were deleted and owned processes ended.
+
+The original roots are in the authoring worktree under
+`.waapi-skill-state/full-coverage/created-history-854d28aa-{2023,2024,2025}-r1`.
+The root checkout's `created-history-854d28aa-modern-summary.json` indexes their
+original result/category byte hashes; it does not rebind their candidate.
+
+Integrated `51906536fc435e94c616f63754fea614046779cb` includes the 2022
+shared-reference correction. Its matching 2022.1 attempt **failed in 23.63s**:
+setup and existing-reference creation/undo passed, then null-reference creation
+executed and verification lost transport. That effect remains unverified.
+Original root: `.waapi-skill-state/full-coverage/created-history-51906536-2022-r1`.
+The category record retains the quarantine path and original transaction
+records. Source full hash/mtime/tree and 1,883 tracked files stayed unchanged;
+no owned process remained. Diagnose the preserved failure before choosing a new
+test; never replay the failed root or drop the null-reference case.
+
+The 2021 pinned catalog has no standalone undo/redo route. These tests grant no
+graph/List restoration, arbitrary history-stack selection, GUI or whole-ticket
+acceptance. Earlier `807f33e7` failure evidence remains unchanged.
+
 ## Inline WAV without Base64 padding — #182 / #180
 
 The pinned 2023.1–2025.1 definition

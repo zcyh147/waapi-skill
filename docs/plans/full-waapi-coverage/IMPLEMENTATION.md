@@ -1162,3 +1162,37 @@ receipt reference in Draft and request, with the complete proof in the immutable
 prepared operation and journal. It must retain original source event/context
 checks and current store authority; no global limits or proof strength are to be
 relaxed. This repair and its required native acceptance remain in progress.
+
+## R33 integrated Voice, Render and owned history proofs
+
+Integration `51906536fc435e94c616f63754fea614046779cb` combines Voice
+creation, the 2022 shared-reference correction, Render prefix/modern suffix
+planning, and the compact owned original-receipt history proof. The full raw
+proof stays in the prepared operation and journal; the immutable request carries
+a store/context/hash-bound reference. Global size limits are unchanged.
+
+One central preflight passed **825 tests in 30.82s**; eight selected shared-seam
+checks passed in **22.37s**. Both runs preserved all 1,883 tracked files and left
+no owned process. Serial inventory generation/checks passed. The Program roster
+is 262; public counts remain 897 version rows / 228 URIs / 515 contracts /
+32,978 branches. Native obligation, ownership, requirement and policy bytes are
+unchanged. The handoff is `/tmp/full-coverage-r30-integration-handoff.md`.
+
+Created-field history on fixed component `854d28aa` passed matching macOS
+Console 2023.1, 2024.1 and 2025.1: **16.31s / 10.00s / 19.71s**. Both original
+cases retain all five materialized fields, including existing or null Attenuation,
+and independently verify creation, undo and redo. These are component results,
+not transferred final-candidate evidence.
+
+The integrated 2022.1 case on `51906536` **failed (23.63s)**. Existing-reference
+creation and undo passed; the second, null-reference creation executed, but its
+verification lost the WAAPI transport. The effect is not certified and the case
+is not complete. Source full hashes, mtimes/tree and all tracked files remained
+unchanged; owned processes ended and the failed sandbox was quarantined.
+Read-only diagnosis continues without replaying the transaction. Original
+receipts and exact paths are listed in NATIVE_FOLLOWUPS.md.
+
+Legacy import Render/source-parent verification, richer history/graph/list
+branches, Authoring readiness, evidence reconciliation and final broad gates
+remain required. No additional ticket closes; no Fresh, Windows or final-review
+acceptance is claimed.
