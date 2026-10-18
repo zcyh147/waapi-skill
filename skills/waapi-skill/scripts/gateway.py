@@ -446,6 +446,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     BoundFieldHandle,
     ExistingObjectTarget,
     NewDescendantTarget,
+    AnonymousListTarget,
     bind_live_field,
     business_repair,
     normalize_live_object_identity,
@@ -3053,7 +3054,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_declaration_arguments(draft_declare_new)
     draft_declare_new.add_argument("--parent-handle", required=True)
-    draft_declare_new.add_argument("--name", required=True)
+    draft_declare_new.add_argument("--name", help="Required for named descendants; omit only for a certified anonymous List member")
     draft_declare_new.add_argument("--kind", required=True)
 
     draft_declare_existing = subparsers.add_parser(
@@ -17832,9 +17833,9 @@ def dispatch_offline_business_draft_update(
             def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
                 candidate = current.with_new_declaration(
                     declaration_id=args.declaration_id,
-                    target=NewDescendantTarget(
+                    target=(AnonymousListTarget if args.name is None else NewDescendantTarget)(
                         parent_handle=args.parent_handle,
-                        name=args.name,
+                        name="" if args.name is None else args.name,
                         kind=args.kind,
                     ),
                     fields=fields,

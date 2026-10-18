@@ -278,6 +278,11 @@ class NewDescendantTarget:
 
 
 @dataclass(frozen=True, slots=True)
+class AnonymousListTarget(NewDescendantTarget):
+    """A Gateway-owned blank name, requiring exact List/class proof at compile."""
+
+
+@dataclass(frozen=True, slots=True)
 class OwnedRtpcTarget:
     owner_handle: str
 

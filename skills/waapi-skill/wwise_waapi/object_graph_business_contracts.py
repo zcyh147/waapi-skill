@@ -263,6 +263,8 @@ def object_graph_business_contract_data(
                 },
                 "existing_required_fields": ["object_handle"],
                 "new_required_fields": ["parent_handle", "name", "kind"],
+                "anonymous_list_member": {"subcommand": "draft-declare-new", "omit": ["name"], "requires": ["EffectSlot_Type_Handle", "source_proven_Effects_List_Field_Handle"], "versions": ["2023.1", "2024.1", "2025.1"], "native_name": "Gateway_owned_empty_string", "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values"},
+                "graph_plugin": {"type": "effect_Type_Handle", "plugin_placement": ["shareset", "owner"], "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [
                     "field_values",
                     "language",
@@ -289,6 +291,7 @@ def object_graph_business_contract_data(
                     "new_name": "string",
                     "object_list": "string",
                     "platform": "string",
+                    "plugin_placement": "string",
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
                 "existing_target_choices": {

@@ -23,6 +23,7 @@ from enum import Enum
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
+from .operation_plugin import PluginCreationDescriptor, normalize_plugin_creation
 
 
 JsonScalar = str | int | float | bool
@@ -44,7 +45,7 @@ OBJECT_SET_REFERENCE_ARRAY_VERSIONS = frozenset({"2023.1", "2024.1", "2025.1"})
 DEFAULT_MAX_IMPORT_FILES = 16
 
 NODE_FIELDS = frozenset({"type", "name", "notes", "properties", "references", "children"})
-OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import", "lists"}
+OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import", "lists", "anonymous", "plugin"}
 LIST_FIELDS = frozenset({"name", "objects"})
 PROPERTY_FIELDS = frozenset({"name", "value"})
 REFERENCE_FIELDS = frozenset({"name", "target"})
@@ -333,11 +334,17 @@ class ObjectNodeDescriptor:
     collection: str = "children"
     rtpc: RtpcDescriptor | None = None
     rtpc_mode: str | None = None
+    anonymous: bool = False
+    plugin: PluginCreationDescriptor | None = None
 
     def as_dict(self) -> dict[str, Any]:
         if self.rtpc is not None:
             return {"rtpc": self.rtpc.as_dict(), "rtpc_mode": self.rtpc_mode}
         result: dict[str, Any] = {"type": self.type, "name": self.name}
+        if self.anonymous:
+            result["anonymous"] = True
+        if self.plugin is not None:
+            result["plugin"] = self.plugin.as_dict()
         if self.notes is not None:
             result["notes"] = self.notes
         if self.platform is not None:
@@ -1067,8 +1074,12 @@ def materialize_waapi_node(
             else:
                 _require_object_id(target, path=reference.request_path)
             result[f"@{reference.name}"] = target
-        if current.children:
-            result["children"] = [build(child) for child in current.children]
+        ordinary = [child for child in current.children if child.collection == "children"]
+        if ordinary:
+            result["children"] = [build(child) for child in ordinary]
+        for child in current.children:
+            if child.collection == "Effect":
+                result["@Effect"] = build(child)
         for descriptor in current.lists:
             result["@" + descriptor.name] = [build(child) for child in descriptor.objects]
         return result
@@ -1327,7 +1338,13 @@ class _NormalizationState:
             max_length=self.limits.max_type_length,
             disallow_path_separator=False,
         )
-        name = _bounded_token(
+        plugin = normalize_plugin_creation(mapping["plugin"]) if "plugin" in mapping else None
+        if plugin is not None and (plugin.kind != "effect" or object_type != "Effect" or plugin.name != mapping.get("name")):
+            raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN", "Typed graph plugins retain their selected kind and name")
+        anonymous = mapping.get("anonymous", False)
+        if type(anonymous) is not bool or (anonymous and (collection != "Effects" or object_type != "EffectSlot" or mapping.get("name") != "")):
+            raise ObjectOperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Blank names require a certified EffectSlot in Effects")
+        name = "" if anonymous else _bounded_token(
             mapping.get("name"),
             path=f"{request_path}.name",
             max_length=self.limits.max_name_length,
@@ -1428,6 +1445,12 @@ class _NormalizationState:
             )
             for index, child in enumerate(raw_children)
         )
+        owned = [child for child in children if child.plugin is not None and child.plugin.placement == "owner"]
+        if owned:
+            if not anonymous or object_type != "EffectSlot" or collection != "Effects" or len(owned) != 1 or any(ref.name == "Effect" for ref in references):
+                raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "One new local Effect belongs to one new anonymous slot and cannot conflict with another Effect target")
+            from dataclasses import replace
+            children = tuple(replace(child, collection="Effect") if child in owned else child for child in children)
         _reject_duplicate_sibling_names(children, path=f"{request_path}.children")
         lists: list[ObjectListDescriptor] = []
         for index, raw_list in enumerate(_descriptor_rows(
@@ -1457,6 +1480,8 @@ class _NormalizationState:
             children=children,
             lists=tuple(lists),
             collection=collection,
+            anonymous=anonymous,
+            plugin=plugin,
         )
 
 
@@ -2020,6 +2045,8 @@ def _reject_duplicate_sibling_names(nodes: Sequence[ObjectNodeDescriptor], *, pa
     seen: dict[str, str] = {}
     duplicates: list[str] = []
     for node in nodes:
+        if node.anonymous:
+            continue
         key = ("rtpc:" + json.dumps([node.rtpc.property, node.rtpc.control_input.as_dict()], sort_keys=True)
                if node.rtpc is not None else node.name.casefold())
         if key in seen:
