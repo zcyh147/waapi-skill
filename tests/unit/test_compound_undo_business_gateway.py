@@ -4104,10 +4104,11 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def test_created_graph_history_restores_internal_reference_without_preserving_absent_target(tmp_path):
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_created_graph_history_restores_internal_reference_without_preserving_absent_target(tmp_path, version):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
-    task = OwnedGraphTask(tmp_path, '2025.1', 'object.create')
+    task = OwnedGraphTask(tmp_path, version, 'object.create')
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for cid, name in
         ((1638416, 'WorkUnit'), (1376272, 'Bus'), (3997712, 'AuxBus'))]
     task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
@@ -4162,7 +4163,10 @@ def test_created_graph_history_restores_internal_reference_without_preserving_ab
     code, verified = task.finish(source, shown)
     assert code == 0 and verified['verified'] is True, verified
     after = deepcopy(task.objects)
-    for direction in ('undo', 'redo'):
+    if version == '2021.1':
+        assert task.run('draft-start', 'ak.wwise.core.undo.undo')[0] == 2
+        return
+    for direction in (('undo',) if version == '2022.1' else ('undo', 'redo')):
         tx = _created_leaf_history_preview(task, source, direction)
         assert task.run('execute', tx)[0] == 0
         code, verified = task.run('verify', tx)
