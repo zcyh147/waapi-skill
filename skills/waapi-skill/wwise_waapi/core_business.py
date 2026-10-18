@@ -312,6 +312,7 @@ def _blend_edges(value: Any) -> list[dict[str, Any]]:
 def materialize_core_business_request(
     operation: str,
     session: BusinessDeclarationSession,
+    *, history_state_dir=None,
 ) -> dict[str, Any]:
     """Compile one generic Core business declaration at the shared seam."""
 
@@ -779,7 +780,13 @@ def materialize_core_business_request(
         "options": {},
     }
     if operation in HISTORY_VERSIONS:
-        operation_arguments["history_binding"] = plan["history_binding"]
+        from .edit_history_business import materialize_history_reference
+        from .transactions import TransactionStore
+        history = plan["history_binding"]
+        if isinstance(history, Mapping) and history.get("contract") == "waapi-skill.history-draft-reference/v1":
+            materialize_history_reference(operation, version, history,
+                store=None if history_state_dir is None else TransactionStore(history_state_dir), context=session.context)
+        operation_arguments["history_binding"] = history
     if operation == "ak.wwise.core.audio.convert":
         io_root = plan["io_root"]
         if not isinstance(io_root, str) or not io_root:

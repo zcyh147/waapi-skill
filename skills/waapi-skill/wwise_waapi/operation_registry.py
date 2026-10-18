@@ -4291,9 +4291,13 @@ def _public_call_arguments(
         validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
     from .edit_history_contracts import HISTORY_VERSIONS
     if api in HISTORY_VERSIONS:
-        from .edit_history_business import validate_history_binding
+        from .edit_history_business import validate_history_binding, validate_history_reference, REFERENCE_CONTRACT
         try:
-            validate_history_binding(api, version, arguments.get("history_binding"))
+            binding = arguments.get("history_binding")
+            if isinstance(binding, Mapping) and binding.get("contract") == REFERENCE_CONTRACT:
+                validate_history_reference(api, version, binding)
+            else:
+                validate_history_binding(api, version, binding)
             if raw_args != {} or raw_options != {}:
                 raise ValueError("Latest-history actions accept only the sealed empty native request")
         except ValueError as exc:
@@ -10224,7 +10228,7 @@ def _compound_field_outcome_scope(
     return scope
 
 
-def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> PreparedOperation:
+def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
     spec = describe_operation(request.operation)
@@ -10397,22 +10401,27 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
 
 
         if arguments.get("history_binding") is not None:
-            from .edit_history_business import observe_history_state, history_summary
+            from .edit_history_business import observe_history_state, history_summary, REFERENCE_CONTRACT
             try:
-                if arguments["history_binding"]["source_receipt"] is not None:
-                    observed = observe_history_state(arguments["history_binding"], after_action=False, read=read)
+                history = arguments["history_binding"]
+                if history.get("contract") == REFERENCE_CONTRACT:
+                    if history_resolver is None:
+                        raise ValueError("History reference requires its owning Gateway resolver")
+                    history = history_resolver(api, request.version, history)
+                if history["source_receipt"] is not None:
+                    observed = observe_history_state(history, after_action=False, read=read)
                     if not observed["matches"]:
                         raise ValueError("Current scoped state differs from the owned history expectation")
             except ValueError as exc:
                 raise OperationContractError("HISTORY_EXPECTATION_CHANGED", str(exc)) from exc
-            metadata["history_binding"] = dict(arguments["history_binding"])
-            metadata["history_expectation"] = history_summary(arguments["history_binding"])
+            metadata["history_binding"] = dict(history)
+            metadata["history_expectation"] = history_summary(history)
             preview = SemanticPreview(envelope=SemanticEnvelope(uri=api, args=call_args, options=call_options,
                 metadata={**dict(preview.envelope.metadata), "history_expectation": metadata["history_expectation"]}),
                 source_note_family="latest-project-history", version=request.version,
                 requires_destructive_gate=True, raw_dispatch_allowed=False)
-            verification = {"kind": "history-scoped-effect" if arguments["history_binding"]["source_receipt"] is not None else "history-result-schema-only", "uri": api, "version": request.version,
-                "history_binding": dict(arguments["history_binding"])}
+            verification = {"kind": "history-scoped-effect" if history["source_receipt"] is not None else "history-result-schema-only", "uri": api, "version": request.version,
+                "history_binding": dict(history)}
         if arguments.get("provider_profile_binding") is not None:
             from .source_control_profiles import check_profile
             try:
@@ -15239,7 +15248,7 @@ def _prepare_switch_assignment(
     return preview, roles, state, verification, cleanup
 
 
-def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall) -> Mapping[str, Any]:
+def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall, history_resolver=None) -> Mapping[str, Any]:
     """Re-read every canonical role and prove it still matches the preview snapshot."""
 
     if prepared.get("contract") != PREPARED_OPERATION_CONTRACT:
@@ -15524,15 +15533,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             }
         )
         if arguments.get("history_binding") is not None:
-            from .edit_history_business import observe_history_state, validate_history_binding
+            from .edit_history_business import observe_history_state, resolved_prepared_history
             try:
-                history_binding = validate_history_binding(api, version, arguments["history_binding"])
+                history_binding = resolved_prepared_history(prepared, history_resolver)
                 history_observation = (observe_history_state(history_binding, after_action=False, read=read_call)
                     if history_binding["source_receipt"] is not None else {"matches": True, "readbacks": [], "effect_expectation": "none"})
             except ValueError as exc:
                 history_observation = {"matches": False, "error": str(exc), "readbacks": getattr(exc, "readbacks", [])}
-            unchanged = (_native_snapshot_equal(arguments["history_binding"], prepared.get("pre_state", {}).get("history_binding"))
-                         and history_observation["matches"])
+            unchanged = history_observation["matches"]
             passed = passed and unchanged
             readbacks.extend(history_observation["readbacks"])
             assertions.append({"name": "owned history expectation scoped prestate unchanged", "passed": unchanged,
@@ -17532,6 +17540,7 @@ def verify_prepared_operation(
     *,
     execution_result: Mapping[str, Any],
     read_call: ReadCall,
+    history_resolver=None,
 ) -> VerificationResult:
     """Run the closed postcondition for one persisted prepared operation."""
 
@@ -20651,15 +20660,21 @@ def verify_prepared_operation(
             old_rows = read_object(path=old_path, fields=("id", "path"))
             check("old path no longer resolves to GUID", not any(_same_identity(row.get("id"), object_id) for row in old_rows), old_rows)
     elif kind == "history-result-schema-only":
+        from .edit_history_business import resolved_prepared_history
+        try:
+            resolved_prepared_history(prepared, history_resolver)
+        except ValueError as exc:
+            check("latest-history reference retains its owning context", False, {"error": str(exc)})
         check_result_schema(str(plan["uri"]), str(plan["version"]))
         success_status = "result_schema_checked"
         verification_strength = "result_schema_only"
         business_state_verified = False
     elif kind == "history-scoped-effect":
         check_result_schema(str(plan["uri"]), str(plan["version"]))
-        from .edit_history_business import observe_history_state
+        from .edit_history_business import observe_history_state, resolved_prepared_history
         try:
-            history_observation = observe_history_state(plan["history_binding"], after_action=True, read=read_call)
+            history_binding = resolved_prepared_history(prepared, history_resolver)
+            history_observation = observe_history_state(history_binding, after_action=True, read=read_call)
             readbacks.extend(history_observation["readbacks"])
             check("latest project history action matches the owned scoped state expectation", history_observation["matches"], history_observation)
         except ValueError as exc:

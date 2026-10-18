@@ -276,6 +276,7 @@ def build_transaction_preview_artifact(
     read_call: ReadCall,
     project_guard: Mapping[str, Any],
     skill_root: Path,
+    history_resolver=None,
     now: datetime | None = None,
     ttl_seconds: int = DEFAULT_PREVIEW_TTL_SECONDS,
 ) -> TransactionArtifact:
@@ -290,7 +291,7 @@ def build_transaction_preview_artifact(
     if ttl_seconds <= 0:
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
-    prepared = prepare_operation(request, read_call=read_call)
+    prepared = prepare_operation(request, read_call=read_call, history_resolver=history_resolver)
     post_execution_project_guard_policy = _prepared_post_execution_project_guard_policy(
         prepared
     )

@@ -792,6 +792,7 @@ class OperationDraftStore:
                 record.operation,
                 record.version,
                 record.composition,
+                history_state_dir=self.state_dir,
             )
             return OperationDraftMaterialization(
                 record=record,
@@ -1023,6 +1024,7 @@ class OperationDraftStore:
                 record.operation,
                 record.version,
                 record.composition,
+                history_state_dir=self.state_dir,
             )
             current_request_digest = canonical_sha256(current_request)
             if not hmac.compare_digest(current_request_digest, request_digest):
@@ -1170,6 +1172,7 @@ class OperationDraftStore:
             }:
                 return _replay_seal_reservation(
                     record,
+                    history_state_dir=self.state_dir,
                     expected_revision=expected_revision,
                     apply=apply,
                     ttl_seconds=ttl_seconds,
@@ -1195,6 +1198,7 @@ class OperationDraftStore:
                 record.operation,
                 record.version,
                 record.composition,
+                history_state_dir=self.state_dir,
             )
             request_digest = canonical_sha256(request)
             if (
@@ -1614,6 +1618,7 @@ class OperationDraftStore:
                 stage = "business_content"
                 record = _parse_canonical_record_bytes(
                     record_read.data,
+                    history_state_dir=self.state_dir,
                     expected_draft_id=match.group(1),
                 )
                 loaded = _LoadedOperationDraft(
@@ -1687,6 +1692,7 @@ class OperationDraftStore:
             record_read = self._read_record_snapshot(self._record_path(draft_id))
             record = _parse_canonical_record_bytes(
                 record_read.data,
+                history_state_dir=self.state_dir,
                 expected_draft_id=draft_id,
             )
             return _LoadedOperationDraft(
@@ -2124,6 +2130,7 @@ def _seal_reservation_from_record(
 def _replay_seal_reservation(
     record: OperationDraftRecord,
     *,
+    history_state_dir: Path | None = None,
     expected_revision: int,
     apply: bool,
     ttl_seconds: int,
@@ -2161,6 +2168,7 @@ def _replay_seal_reservation(
         record.operation,
         record.version,
         record.composition,
+        history_state_dir=history_state_dir,
     )
     if (
         seal.get("request") != current_request
@@ -2209,6 +2217,7 @@ def _materialize_draft_composition(
     version: str,
     composition: Mapping[str, Any],
     *,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any]:
     raw_business_session = composition.get("business_session")
@@ -2221,6 +2230,7 @@ def _materialize_draft_composition(
             adapter = business_adapter(operation)
             return adapter.materialize(
                 session,
+                history_state_dir=history_state_dir,
                 allow_cleaned_file_evidence=(
                     allow_cleaned_file_evidence
                     and adapter.supports_cleaned_file_evidence
@@ -2485,12 +2495,14 @@ def _parse_canonical_record_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
     allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     payload = json.loads(data.decode("utf-8"))
     record = _record_from_mapping(
         payload,
+        history_state_dir=history_state_dir,
         expected_draft_id=expected_draft_id,
         allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         allow_retired_audio_import_composition=allow_retired_audio_import_composition,
@@ -2504,6 +2516,7 @@ def parse_operation_draft_archive_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
     allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
@@ -2520,6 +2533,7 @@ def parse_operation_draft_archive_bytes(
     try:
         return _parse_canonical_record_bytes(
             data,
+            history_state_dir=history_state_dir,
             expected_draft_id=expected_draft_id,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             allow_retired_audio_import_composition=allow_retired_audio_import_composition,
@@ -2617,6 +2631,7 @@ def load_operation_draft_archive_records(
         _attest_managed_directory_identities(identities)
         records[draft_id] = parse_operation_draft_archive_bytes(
             snapshot.data,
+            history_state_dir=state_dir,
             expected_draft_id=draft_id,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             allow_retired_audio_import_composition=allow_retired_audio_import_composition,
@@ -2763,6 +2778,7 @@ def _record_from_mapping(
     payload: Any,
     *,
     expected_draft_id: str,
+    history_state_dir: Path | None = None,
     allow_cleaned_file_evidence: bool = False,
     allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
@@ -2813,6 +2829,7 @@ def _record_from_mapping(
                     payload["operation"],
                     payload["version"],
                     composition,
+                    history_state_dir=history_state_dir,
                     allow_cleaned_file_evidence=cleaned_file_replay,
                 )
             except OperationComposerError as exc:
