@@ -1,0 +1,31 @@
+{
+  "base": "../tests/fixtures/branch-evidence/product",
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "entries": [
+    {
+      "bindings": {
+        "artifact": "move-single-r26-2025.1.bindings.json",
+        "sha256": "215185a15d513fc1ed9a82d11e5db6fa5ef390cda8920883a469ec373ddccd5e"
+      },
+      "id": "move-single-r26-2025.1",
+      "origin": {
+        "bindings": {
+          "artifact": "move-single-r26-2025.1/bindings.original.json",
+          "sha256": "99ea0ddaa122fcf2d08c6355d7df5a0e50a1ff9e1da542d216e8e52a46ae1ebd"
+        },
+        "capture": {
+          "artifact": "move-single-r26-2025.1/capture.original.json",
+          "sha256": "b34b99434ecf3b45111202e6f3c1c5a986a4efb0e2463650e899990e839d4122"
+        },
+        "program": {
+          "artifact": "move-single-r26-2025.1/program.original.json",
+          "sha256": "533c1ba92cfa07c86f86d6297897f4093b9dbbe1c08f803382c191f560f9ce2e"
+        },
+        "requirements": {
+          "artifact": "move-single-r26-2025.1/requirements.original.json",
+          "sha256": "4ae5cab8da16243f7473f64e1fb66473fa8bd8edb98fad2c93c1e69d3fc4bf9a"
+        }
+      }
+    }
+  ]
+}

@@ -340,6 +340,74 @@ def write_inventory(path, inventory):
         'rows_sha256': digest(rows), 'rows': len(rows), 'compact_bytes': len(packed), 'compressed_bytes': len(compressed)}
     path.write_text(render_inventory({**inventory, 'native_coverage': native}), encoding='utf-8')
 
+def portable_binding_inputs(index_path, requirements):
+    """Select sealed original receipts through reviewed locator-only projections.
+
+    This maintainer code is in candidate_identity's existing source closure.
+    Evidence/index bytes have separate integrity seals, avoiding self-reference.
+    """
+    from copy import deepcopy
+    from tests.maintenance.branch_audit_completion import read_sealed_artifact
+    raw = index_path.read_bytes()
+    index = json.loads(raw)
+    if (set(index) != {'contract', 'base', 'entries'}
+            or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
+            or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
+            or not isinstance(index['entries'], list) or not index['entries']):
+        raise ValueError('invalid portable evidence index')
+    boundary = ROOT.resolve() if index_path.resolve().is_relative_to(ROOT.resolve()) else index_path.parent.resolve()
+    base = (index_path.parent / index['base']).resolve(strict=True)
+    if not base.is_relative_to(boundary):
+        raise ValueError('portable evidence base escapes its index context')
+    def read(descriptor):
+        if (not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}
+                or not isinstance(descriptor['artifact'], str) or Path(descriptor['artifact']).is_absolute()
+                or not (base / descriptor['artifact']).resolve().is_relative_to(base)):
+            raise ValueError('portable evidence descriptor must remain relative to its bundle')
+        return read_sealed_artifact(descriptor, base)
+    bindings, names = {}, set()
+    for entry in index['entries']:
+        if (set(entry) != {'id', 'bindings', 'origin'} or not isinstance(entry['id'], str)
+                or not entry['id'] or entry['id'] in names):
+            raise ValueError('invalid or duplicate portable evidence entry')
+        names.add(entry['id'])
+        origin = entry['origin']
+        if not isinstance(origin, dict) or set(origin) != {'bindings', 'program', 'requirements', 'capture'}:
+            raise ValueError('portable evidence original descriptors missing')
+        originals = {name: read(descriptor) for name, descriptor in origin.items()}
+        projected = read(entry['bindings'])
+        original = originals['bindings']
+        if (set(original) != {'contract', 'bindings'}
+                or original['contract'] != 'waapi-skill.branch-bindings/v1'
+                or not isinstance(original['bindings'], dict) or not original['bindings']):
+            raise ValueError('invalid original branch bindings')
+        # Only this closed program-receipt transport is imported. Other existing
+        # reader closures require their own reviewed portable attachment.
+        program = originals['program']
+        if any(program.get(key) for key in ('artifacts', 'native_runs', 'metadata_run', 'observation_artifacts')):
+            raise ValueError('portable program has an unresolved nested artifact dependency')
+        expected = deepcopy(original)
+        for branch_id, binding in expected['bindings'].items():
+            if branch_id in bindings:
+                raise ValueError('duplicate exact branch binding in portable evidence index')
+            if (set(binding.get('evidence', {})) != {'program'}
+                    or binding.get('equivalence') or binding.get('native_equivalence')
+                    or binding['evidence']['program']['sha256'] != origin['program']['sha256']):
+                raise ValueError('portable projection must retain its original program evidence')
+            binding['evidence']['program']['artifact'] = origin['program']['artifact']
+        if projected != expected:
+            raise ValueError('portable projection changed more than its original artifact locator')
+        policy = originals['requirements']
+        if (policy.get('contract') != 'waapi-skill.branch-evidence-requirements/v1'
+                or set(policy['branches']) != set(expected['bindings'])
+                or any(requirements['branches'].get(key) != value for key, value in policy['branches'].items())):
+            raise ValueError('portable requirement differs from reviewed exact branch policy')
+        bindings.update(projected['bindings'])
+    return {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}, base, {
+        'mode': 'portable-index', 'index_sha256': hashlib.sha256(raw).hexdigest(),
+        'selected_documents_sha256': digest(index['entries'])}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "docs/branch-coverage-inventory.json")
@@ -349,6 +417,7 @@ def main(argv=None):
     parser.add_argument("--scope-sha256", help="independent byte seal of controlled scope")
     parser.add_argument("--requirements", type=Path, help="reviewed exact branch evidence requirements")
     parser.add_argument("--bindings", type=Path, help="exact branch implementation/evidence bindings")
+    parser.add_argument("--binding-index", type=Path, help="reviewed portable evidence index (default: committed product index)")
     args = parser.parse_args(argv)
     try:
         inventory = build_inventory()
@@ -359,12 +428,23 @@ def main(argv=None):
             scope = load(args.controlled_scope)
         elif args.scope_sha256 is not None:
             raise ValueError("scope seal requires explicit controlled scope")
-        bindings = load(args.bindings) if args.bindings else {"contract": "waapi-skill.branch-bindings/v1", "bindings": {}}
+        if args.binding_index is not None and (args.bindings is not None or scope is not None):
+            raise ValueError('binding index cannot be combined with explicit bindings or controlled scope')
+        requirements = load(args.requirements) if args.requirements else load(ROOT / 'docs/branch-coverage-requirements.json')
+        if args.bindings is not None:
+            bindings, evidence_base = load(args.bindings), args.bindings.parent
+            inputs = {'mode': 'explicit-bindings', 'document_sha256': hashlib.sha256(args.bindings.read_bytes()).hexdigest()}
+        elif scope is not None:
+            bindings, evidence_base = {"contract": "waapi-skill.branch-bindings/v1", "bindings": {}}, ROOT
+            inputs = {'mode': 'controlled'}
+        else:
+            bindings, evidence_base, inputs = portable_binding_inputs(
+                args.binding_index or ROOT / 'docs/branch-coverage-evidence-index.json', requirements)
         from tests.maintenance.branch_audit_completion import evaluate_coverage
-        if scope is not None or args.bindings is not None or args.requirements is not None:
-            inventory["native_coverage"] = evaluate_coverage(ROOT, inventory, bindings, digest=digest,
-                scope=scope, evidence_base=args.bindings.parent if args.bindings else ROOT,
-                requirements_document=load(args.requirements) if args.requirements else None)
+        inventory["native_coverage"] = evaluate_coverage(ROOT, inventory, bindings, digest=digest,
+            scope=scope, evidence_base=evidence_base,
+            requirements_document=requirements if scope is None or args.requirements else None)
+        inventory['native_coverage']['binding_inputs'] = inputs
         if args.check:
             previous = load(args.output)
             errors = [("branch ledger" if key == "branches" else key) + " differs" for key in inventory if previous.get(key) != inventory[key]]

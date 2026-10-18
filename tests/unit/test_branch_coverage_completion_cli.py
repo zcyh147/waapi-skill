@@ -30,6 +30,74 @@ def write_json(path, data):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def test_default_product_inputs_select_portable_stale_receipt_without_business_credit(tmp_path, capsys, monkeypatch):
+    import shutil
+    original_open = Path.open
+    def portable_open(path, *args, **kwargs):
+        assert '/waapi-query-coverage/' not in str(path), 'Historical workstation path was opened'
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', portable_open)
+    output = tmp_path / 'default.json'
+    argv = ['--output', str(output), '--require-complete']
+    assert audit.main(argv) == 2
+    capsys.readouterr()
+    default = audit.load(output)['native_coverage']
+    branch_id = ('2025.1|wwise-console|2025.1.7.9143|function|'
+                 'ak.wwise.cli.moveMediaIdsToSingleFile|/resultSchema')
+    branch = next(row for row in default['obligations'] if row['id'] == branch_id)
+    assert branch['state'] == 'implemented_unverified'
+    assert branch['requirements'] == ['native', 'program']
+    assert branch['evidence_results']['program']['outcome'] == 'missing'
+    assert branch['evidence_results']['native']['outcome'] == 'missing'
+    assert default['completion']['complete'] is False
+    assert default['completion']['obligations'] == 272313
+    assert default['completion']['states'] == {'approved_exclusion': 116,
+        'implemented_unverified': 1, 'unresolved': 272196}
+    assert audit.main([*argv, '--check']) == 2
+    capsys.readouterr()
+    copied = tmp_path / 'relocated-product'
+    shutil.copytree(audit.ROOT / 'tests/fixtures/branch-evidence/product', copied)
+    explicit = tmp_path / 'explicit.json'
+    assert audit.main(['--bindings', str(copied / 'move-single-r26-2025.1.bindings.json'),
+        '--output', str(explicit), '--require-complete']) == 2
+    capsys.readouterr()
+    actual = audit.load(explicit)['native_coverage']
+    assert actual['obligations'] == default['obligations']
+    assert actual['bindings_sha256'] == default['bindings_sha256']
+    assert actual['requirements_sha256'] == default['requirements_sha256']
+
+
+@pytest.mark.parametrize('damage,reason', [
+    ('duplicate', 'duplicate exact branch'), ('program-byte', 'artifact digest mismatch'),
+    ('missing-descriptor', 'original descriptors missing'), ('projection', 'changed more than')])
+def test_cli_rejects_damaged_portable_inputs_without_omitting_them(tmp_path, capsys, damage, reason):
+    import shutil
+    base = tmp_path / 'product'
+    shutil.copytree(audit.ROOT / 'tests/fixtures/branch-evidence/product', base)
+    index = json.loads((audit.ROOT / 'docs/branch-coverage-evidence-index.json').read_bytes())
+    index['base'] = 'product'
+    entry = index['entries'][0]
+    if damage == 'duplicate':
+        index['entries'].append({**deepcopy(entry), 'id': 'second-authority-for-same-branch'})
+    elif damage == 'program-byte':
+        program = base / entry['origin']['program']['artifact']
+        program.write_bytes(program.read_bytes() + b' ')
+    elif damage == 'missing-descriptor':
+        del entry['origin']['program']
+    else:
+        projection = base / entry['bindings']['artifact']
+        altered = json.loads(projection.read_bytes())
+        next(iter(altered['bindings'].values()))['input']['gateway_argv'][-1] = 'forged-transaction'
+        entry['bindings']['sha256'] = write_json(projection, altered)
+    source = tmp_path / 'index.json'
+    write_json(source, index)
+    output = tmp_path / 'ledger.json'
+    assert audit.main(['--binding-index', str(source), '--output', str(output), '--require-complete']) == 1
+    message = json.loads(capsys.readouterr().out)
+    assert message['structural_check'] == 'invalid' and reason in message['errors'][0]
+    assert not output.exists()
+
+
 @pytest.fixture(scope='module')
 def ping_scope(tmp_path_factory):
     path = tmp_path_factory.mktemp('complete-controlled-scope')
