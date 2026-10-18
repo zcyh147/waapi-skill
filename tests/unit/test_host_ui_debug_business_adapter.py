@@ -1611,3 +1611,26 @@ def test_tone_128_empty_label_markers_verify_through_actual_main_with_ordinary_o
     assert journal['readbacks'][0]['wav']['markers']['label_count'] == 0
     assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
     (tmp_path / 'terminal.stdout.json').write_text(rendered, encoding='utf-8')
+
+
+@pytest.mark.parametrize('name', ['int16-0db', 'int16-6db', 'float32-0db', 'float32-6db'])
+def test_tone_original_native_zero_valid_bits_outputs_parse_without_claiming_signal_acceptance(tmp_path, name):
+    import hashlib
+    fixture_root = Path(__file__).resolve().parents[1] / 'fixtures' / 'tone' / 'console-2025.1.7.9143'
+    manifest = json.loads((fixture_root / 'manifest.json').read_text())
+    specimen = manifest['files'][name + '.wav']
+    raw = (fixture_root / (name + '.wav')).read_bytes()
+    assert len(raw) == specimen['size'] and hashlib.sha256(raw).hexdigest() == specimen['sha256']
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'waveform': 'sine', 'channel_layout': '1.0', 'sample_rate_hz': '48000',
+            'bit_depth': specimen['bit_depth'], 'attack_seconds': '0', 'sustain_seconds': '0.25',
+            'release_seconds': '0', 'sustain_db': str(specimen['sustain_db'])})
+    client.artifact_bytes = raw
+    verified = _finish_tone_collection(env, state, client, preview)
+    wav = verified['verification']['readbacks'][0]['wav']
+    assert (wav['format_tag'], wav['sample_format'], wav['bits'], wav['valid_bits']) == (
+        65534, specimen['bit_depth'], 16 if specimen['bit_depth'] == 'int16' else 32, 0)
+    assert (wav['channels'], wav['speaker_mask'], wav['sample_rate'], wav['frames']) == (1, 4, 48000, 12000)
+    assert verified['verification_strength'] == 'partial_tone_artifact'
+    assert verified['verification']['business_state_verified'] is False
+    assert 'active waveform' in str(verified['verification']['readbacks'][0]['unresolved'])
