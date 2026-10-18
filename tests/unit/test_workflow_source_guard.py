@@ -3846,7 +3846,7 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
     other = '{83E0619D-B89C-4190-9D6E-A353DE39D1E4}'
     task.types += [{'name': 'Folder', 'classId': 131088, 'type': 'WObject'},
         {'name': 'Wwise Delay', 'classId': 6946819, 'type': 'Effect'},
-        {'name': 'AudioFileSource', 'classId': 16, 'type': 'WObject'}]
+        {'name': 'AudioSource' if version == '2021.1' else 'AudioFileSource', 'classId': 16, 'type': 'WObject'}]
     task.objects[EFFECT_PARENT].update(name='Factory Effects', path=r'\Effects\Factory Effects')
     task.objects[folder] = {'id': folder, 'name': 'Delay', 'type': 'Folder', 'classId': 131088,
         'path': r'\Effects\Factory Effects\Delay', 'parent': {'id': EFFECT_PARENT}, 'notes': 'Keep Delay'}
