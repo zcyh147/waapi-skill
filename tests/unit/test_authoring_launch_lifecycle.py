@@ -291,6 +291,15 @@ def test_authoring_readiness_waits_for_identity_after_empty_client_response(monk
 def test_authoring_pending_identity_failure_retains_empty_observation(monkeypatch, terminal):
     from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
     from wwise_waapi.headless import EarlyProcessExit, LifecycleTimeouts, ReadinessTimeout
+    import wwise_waapi.headless as headless
+    if terminal == 'deadline':
+        clock = SimpleNamespace(now=0.0, sleeps=[])
+        def sleep(seconds):
+            clock.sleeps.append(seconds)
+            clock.now += seconds
+        # Replace this module's reference, never attributes on global time.
+        # The threaded probe, client.call and disconnect remain real.
+        monkeypatch.setattr(headless, 'time', SimpleNamespace(monotonic=lambda: clock.now, sleep=sleep))
     clients, calls = [], []
     process = FakeProcess()
     def client_factory(_):
@@ -301,7 +310,8 @@ def test_authoring_pending_identity_failure_retains_empty_observation(monkeypatc
         return client
     lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
         waapi_client_factory=client_factory,
-        timeouts=LifecycleTimeouts(readiness=0.02, probe=0.01, probe_interval=0.001))
+        timeouts=(LifecycleTimeouts(readiness=1, probe=5, probe_interval=0.25) if terminal == 'deadline'
+                  else LifecycleTimeouts(readiness=0.02, probe=0.01, probe_interval=0.001)))
     lifecycle.process = process
     monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
     monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
@@ -318,7 +328,8 @@ def test_authoring_pending_identity_failure_retains_empty_observation(monkeypatc
     assert calls and set(calls) == {'ak.wwise.core.getInfo'}
     assert all(client.disconnected for client in clients)
     if terminal == 'deadline':
-        assert len(calls) > 1
+        assert len(calls) == 4 and clock.sleeps == [0.25] * 4
+        assert failure.value.diagnostics['duration'] == 1
         assert process.terminated and lifecycle.cleanup_report.process_exited
     else:
         assert len(calls) == 1
