@@ -2929,19 +2929,20 @@ def test_rtpc_graph_collector_preserves_nonlexicographic_replacement_accessor_or
     assert [node['@PropertyName'] for node in writes[-1]['objects'][0]['@RTPC']] == ['Volume', 'CenterPercentage']
 
 
-def _anonymous_effect_construction_runtime(tmp_path, workflow, *, fault=None):
+def _anonymous_effect_construction_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     """Actual public Gateway; source-shaped native boundary, never a collector success stub."""
     from copy import deepcopy
     import uuid
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT_PARENT
-    task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
+    task = OwnedGraphTask(tmp_path, version, 'object.set')
     task.types = [{'name': name, 'classId': value, 'type': kind} for name, value, kind in (
         ('Sound', 65552, 'WObject'), ('Folder', 131088, 'WObject'), ('WorkUnit', 1638416, 'WObject'),
         ('EffectSlot', 5505040, 'WObject'), ('Wwise Gain', 9109507, 'Effect'))]
     task.objects = {identity: {'id': identity, 'name': 'Default Work Unit', 'type': 'WorkUnit',
         'classId': 1638416, 'path': path, 'notes': 'Keep WorkUnit'} for identity, path in (
-            (SECOND, r'\Containers\Default Work Unit'), (EFFECT_PARENT, r'\Effects\Default Work Unit'))}
+            (SECOND, ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + r'\Default Work Unit'),
+            (EFFECT_PARENT, r'\Effects\Default Work Unit'))}
     task.metadata = {'Effect': {'name': 'Effect', 'type': '', 'default': None,
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}}
     for name in ('Bypass', 'Render'):
@@ -3039,7 +3040,7 @@ def _anonymous_effect_construction_runtime(tmp_path, workflow, *, fault=None):
             return {'return': ['FullBandGain', 'LFEGain']} if uri.endswith('getPropertyAndReferenceNames') else {'name': args['property'], 'type': 'Real64', 'default': 0.0}
         return original(uri, args, options)
     task.call = call
-    runtime = SimpleNamespace(version='2025.1', state_dir=tmp_path / 'state', env=task.env,
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
         candidate='a' * 40, category_results=[], port=31337,
         lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
     def raw(command):
@@ -3415,3 +3416,135 @@ def test_created_fields_history_collector_rejects_unbound_live_context_or_path(t
         assert receipt['effects'][-1]['verify']['verified'] is True
     else:
         assert writes == []
+
+
+def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared', version='2025.1'):
+    from copy import deepcopy
+    runtime, commands, writes, task = _anonymous_effect_construction_runtime(tmp_path, workflow, version=version)
+    if outcome == 'color-change':
+        task.metadata['Color'] = {'name': 'Color', 'type': 'int32', 'default': 0}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith('object.setProperty'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            writes.append(deepcopy(args))
+            slots = [row for row in task.objects.values() if row['type'] == 'EffectSlot']
+            assert len(slots) == 2 and args == {'object': slots[0]['id'], 'property': 'Render', 'value': False}, args
+            assert [row['@Render'] for row in slots] == [True, True], slots
+            if outcome == 'native-error': raise RuntimeError('Original native suffix rejection; never replay')
+            if outcome == 'native-error-response':
+                class NativeSuffixRejection(RuntimeError):
+                    uri = 'ak.wwise.invalid_arguments'
+                    kwargs = {'details': {'procedureUri': 'ak.wwise.core.object.setProperty'}}
+                raise NativeSuffixRejection('Original native suffix rejection; never replay')
+            slots[0]['@Render'] = False
+            if outcome in {'cleared', 'missing-render', 'bypass-change', 'owner-change', 'reference-change', 'read-error'}:
+                slots[1]['@Render'] = False
+            if outcome == 'missing-render': del slots[1]['@Render']
+            if outcome == 'bypass-change': slots[1]['@Bypass'] = True
+            if outcome == 'owner-change': slots[1]['owner'] = {'id': slots[0]['id']}
+            if outcome == 'reference-change': slots[1]['@Effect'] = deepcopy(slots[0]['@Effect'])
+            if outcome == 'color-change': slots[1]['@Color'] = 123
+            return {}
+        if outcome == 'read-error' and len(writes) == 5 and uri.endswith('object.get'):
+            raise RuntimeError('Original readback error after write; never classify a suffix')
+        result = original(uri, args, options)
+        if outcome == 'color-change' and uri.endswith('object.set'):
+            for row in task.objects.values():
+                if row['type'] == 'EffectSlot': row.setdefault('@Color', 0)
+        return result
+    task.call = call
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('outcome', ['cleared', 'retained'])
+def test_render_suffix_diagnostic_classifies_actual_chain_without_business_credit(tmp_path, workflow, monkeypatch, outcome):
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=outcome)
+    category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['diagnostic_complete'] is True and receipt['classification'] == outcome
+    assert category['diagnostic_only'] is True and category['status'] == 'blocked'
+    assert receipt['business_effect_verified'] is False
+    assert [row['properties']['Render'] for row in receipt['suffix_before']['slots']] == [True, True]
+    assert [row['properties']['Render'] for row in receipt['suffix_after']['slots']] == [False, outcome == 'retained']
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
+    assert [command[0] for command in commands].count('verify') == 5
+    assert all(phase['setup_no_credit'] is True for phase in receipt['transactions'][:4])
+    assert all(phase['effect_verified'] is False for phase in receipt['transactions'])
+    assert len(receipt['calls']) < 256 and Path(category['observation_path']).stat().st_size < 8 * 1024 * 1024
+    output = tmp_path / 'diagnostic-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::render_suffix_diagnostic'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True, 'hash_before': 'same', 'hash_after': 'same'}, residual_state={'sandbox': 'deleted'},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert record['invocation']['outcome'] == 'PASS' and record['categories'][0]['status'] == 'blocked'
+    assert record['categories'][0]['business_effect_verified'] is False
+    assert len(record['transactions']) == 5
+
+
+@pytest.mark.parametrize('fault', ['missing-render', 'bypass-change', 'owner-change', 'reference-change', 'read-error'])
+def test_render_suffix_diagnostic_cannot_classify_incomplete_or_unrequested_changes(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['diagnostic_complete'] is False
+    assert receipt['classification'] == 'not_observed' and receipt['business_effect_verified'] is False
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
+
+
+@pytest.mark.parametrize('outcome,classification,complete,status', [
+    pytest.param('native-error', 'indeterminate', False, 'FAIL', id='exception-indeterminate'),
+    pytest.param('native-error-response', 'native_error_response', True, 'blocked', id='native-error-response')])
+def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry(tmp_path, workflow, outcome, classification, complete, status):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome=outcome)
+    category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['classification'] == classification and receipt['diagnostic_complete'] is complete
+    assert category['status'] == status and receipt['business_effect_verified'] is False
+    assert receipt['transactions'][-1]['original_durable_state'] == 'indeterminate'
+    assert receipt['effects_unknown'] is True and receipt['transactions'][-1]['effects_unknown'] is True
+    if outcome == 'native-error-response':
+        assert receipt['transactions'][-1]['native_error_code'] == 'ak.wwise.invalid_arguments'
+    assert 'Original native suffix rejection' in json.dumps(receipt['transactions'][-1]['execute'])
+    assert len(writes) == 5 and commands[-1][0] == 'execute'
+    assert [command[0] for command in commands].count('verify') == 4
+
+
+def test_render_suffix_diagnostic_preserves_other_disclosed_slot_scalars(tmp_path, workflow):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome='color-change')
+    with pytest.raises(AssertionError):
+        workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['diagnostic_complete'] is False
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+def test_render_suffix_diagnostic_modern_version_public_routes(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, version=version)
+    category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['version'] == version and receipt['classification'] == 'cleared'
+    assert receipt['diagnostic_complete'] is True and receipt['business_effect_verified'] is False
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True
+    assert [row['properties']['Render'] for row in receipt['suffix_before']['slots']] == [True, True]
+    assert [row['properties']['Render'] for row in receipt['suffix_after']['slots']] == [False, False]
+    assert receipt['baseline']['parents']['sound']['path'] == r'\Actor-Mixer Hierarchy\Default Work Unit'
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
+    assert [command[0] for command in commands].count('verify') == 5
+    assert receipt['transactions'][-1]['compiled_native_request']['args'] == {
+        'object': receipt['suffix_before']['ordered_ids'][0], 'property': 'Render', 'value': False}
+    assert len(receipt['calls']) < 256 and Path(category['observation_path']).stat().st_size < 8 * 1024 * 1024
