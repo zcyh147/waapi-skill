@@ -252,6 +252,7 @@ tests/unit/test_condition_scalar_requirements.py
 tests/unit/test_condition_source_chain_gateway.py
 tests/unit/test_condition_closure_gateway.py
 tests/unit/test_new_object_conditions_gateway.py
+tests/unit/test_new_object_bus_conditions_gateway.py
 tests/unit/test_scalar_program_admission.py
 tests/unit/test_object_query_result_pages.py
 tests/unit/test_gateway_error_context.py

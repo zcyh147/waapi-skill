@@ -149,6 +149,19 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
     return runtime, commands, writes, task
 
 
+def test_new_result_reference_exact_selection_and_native_condition_share_one_write(tmp_path, workflow):
+    runtime, commands, writes, task = _new_result_reference_runtime(
+        tmp_path, workflow, "2025.1", noisy_fields=True, native_conditions=True)
+    category = workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    assert category["status"] == "PASS", category
+    assert len(writes) == 1 and [command[0] for command in commands].count("execute") == 1
+    assert {args["property"] for uri, args, _ in task.calls if uri.endswith("getPropertyInfo")} == {
+        "UserAuxSend0", "OverrideUserAuxSends"}
+    sender = writes[0][1]["objects"][0]["children"][0]["children"][1]
+    assert sender["@OverrideUserAuxSends"] is True
+    assert sender["@UserAuxSend0"].endswith(r"\Destination")
+
+
 def test_new_result_reference_acceptance_selects_exact_listed_reference_amid_native_neighbours(tmp_path, workflow):
     runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", noisy_fields=True)
     category = workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
