@@ -2108,7 +2108,7 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
     assert not any(row[0] == "ak.wwise.core.object.setReference" for row in client.calls)
 
 
-def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes"):
+def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed"):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD
     task = OwnedGraphTask(tmp_path, version, "object.create")
@@ -2117,6 +2117,18 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
         "--kind", "sound-sfx", "--name", "Rain", *([] if notes is None else ["--field", "notes", notes]))
     assert code == 0, declared
     source, shown = task.preview()
+    if source_notes != "observed":
+        source_call = task.call
+        def source_boundary(uri, args=None, options=None):
+            result = source_call(uri, args, options)
+            if uri.endswith("object.create") and source_notes == "native-default":
+                task.objects[result["id"]]["notes"] = "Native observed default"
+            if uri.endswith("object.get") and source_notes == "missing":
+                for row in result.get("return", []):
+                    if row.get("name") == "Rain":
+                        row.pop("notes", None)
+            return result
+        task.call = source_boundary
     code, verified = task.finish(source, shown)
     assert code == 0 and verified["verified"] is True, verified
     created = deepcopy(next(row for row in task.objects.values() if row["name"] == "Rain"))
@@ -2253,4 +2265,29 @@ def test_created_leaf_history_scope_drift_blocks_native_history_before_dispatch(
     task.objects[created["id"]]["notes"] = "later edit"
     code, executed = task.run("execute", tx)
     assert code == 2, executed
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+
+
+
+def test_created_leaf_history_uses_durable_actual_default_without_user_notes(tmp_path):
+    task, source, created = _created_leaf_history_case(tmp_path, notes=None, source_notes="native-default")
+    assert created["notes"] == "Native observed default"
+    undo = _created_leaf_history_preview(task, source)
+    assert task.run("execute", undo)[0] == 0
+    assert task.run("verify", undo)[0] == 0
+    redo = _created_leaf_history_preview(task, source, "redo")
+    assert task.run("execute", redo)[0] == 0
+    code, verified = task.run("verify", redo)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[created["id"]]["notes"] == "Native observed default"
+
+
+def test_created_leaf_history_requires_source_notes_observation_even_when_source_did_not_request_notes(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, notes=None, source_notes="missing")
+    code, phase = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, phase
+    code, rejected = task.run("draft-declare-core-plan", phase["draft"]["draft_id"],
+        "--task-authority", phase["task_authority"], "--expected-revision", str(phase["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "actual notes are incomplete" in json.dumps(rejected), rejected
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
