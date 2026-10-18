@@ -64,16 +64,13 @@ def _owner(chain, model):
     return identity, scope["class_id"]
 
 
-def receipt_observations(snapshot):
+def receipt_observations(prepared, verification):
     """Return shared changed-field rows plus full ordered preservation witnesses."""
     from .edit_history_business import _GUID, _identity, _scalar_matches, _receipt_platform
     from .operation_registry import _has_field, _field_value
 
-    prepared = snapshot.preview.artifact["prepared_operation"]
     state, plan = prepared["pre_state"], prepared["verification_plan"]
     chains = state.get("effect_render_chains", [])
-    verification = next(event["details"]["verification"] for event in reversed(snapshot.events)
-        if event.get("event_type") == "verification_recorded")
     fields, preservation, covered = [], [], {}
     for chain in chains:
         if (chain.get("mode") != "existing" or chain.get("construction") or not chain.get("snapshots")

@@ -314,6 +314,7 @@ UNDO_GROUP_MAX_REQUEST_BYTES = 128 * 1024
 UNDO_GROUP_MAX_PLAN_BYTES = 256 * 1024
 _UNDO_GROUP_2021_INNER_URIS = frozenset(
     {
+        "ak.wwise.core.object.create",
         "ak.wwise.core.object.setAttenuationCurve",
         "ak.wwise.core.object.setName",
         "ak.wwise.core.object.setNotes",
@@ -326,6 +327,7 @@ _UNDO_GROUP_2021_INNER_URIS = frozenset(
     }
 )
 _UNDO_GROUP_2022_INNER_URIS = _UNDO_GROUP_2021_INNER_URIS | {
+    "ak.wwise.core.object.set",
     "ak.wwise.core.object.pasteProperties",
     "ak.wwise.core.sound.setActiveSource",
 }
@@ -10226,6 +10228,25 @@ def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
     return canonical_sha256(identity)
 
 
+def _require_compound_ordinary_creation(prepared: PreparedOperation) -> None:
+    plan = prepared.verification_plan
+    nodes = plan.get("nodes")
+    from .creation_observations import ordinary_creation_fields
+    if (prepared.request.operation != "object.create" or not isinstance(nodes, list) or len(nodes) != 1
+            or plan.get("on_name_conflict") != "fail" or plan.get("list") is not None
+            or plan.get("preexisting_root_rows") != [] or plan.get("replaced_subtree_rows") != []):
+        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED",
+            "Compound creation currently requires one ordinary new fail-mode leaf; graph/List/merge/replace remain implementation obligations.")
+    node = nodes[0]
+    if (node.get("request_path") != "$" or node.get("parent_request_path") is not None
+            or node.get("collection") != "children" or node.get("existing_target") is not False
+            or node.get("preexisting_id") is not None or node.get("requested_language") is not None
+            or node.get("children_request_paths") or node.get("list_request_paths")
+            or ordinary_creation_fields(node) is None):
+        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED",
+            "Compound creation needs its complete ordinary leaf observation; richer source unions remain implementation obligations.")
+
+
 def _compound_platform_guid(value: Any) -> bool:
     return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
 
@@ -10296,6 +10317,65 @@ def _compound_field_outcome_scope(
     return scope
 
 
+def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read: ReadCall, evidence: dict[str, Any]):
+    """Own each materialized field, including Render-induced writes, separately."""
+    plan, state = prepared.verification_plan, prepared.pre_state
+    kind = plan.get("kind")
+    scopes = []
+    if kind == "object-create-graph":
+        _require_compound_ordinary_creation(prepared)
+        paths = state.get("object_graph_guard", {}).get("path_snapshots", [])
+        if len(paths) != 1 or not isinstance(paths[0].get("path"), str):
+            raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", "Compound creation needs its exact sealed absent path.")
+        return [{"object_id": "path:" + paths[0]["path"].casefold(), "field": "presence", "kind": "all", "platform": None}]
+    elif kind == "object-set-batch":
+        nodes = plan.get("nodes", [])
+        if (prepared.request.operation != "object.set" or not nodes
+                or any(node.get("existing_target") is not True or node.get("preexisting_id") is not None
+                    or node.get("import") or node.get("children_request_paths") or node.get("list_request_paths")
+                    or node.get("list_snapshots") or node.get("requested_language") for node in nodes)
+                or plan.get("replaced_subtree_rows") or plan.get("replaced_list_subtree_rows")):
+            raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED",
+                "Compound object.set currently needs existing-only ordinary fields; graph/List/restoration remain implementation obligations.")
+        proofs = state.get("existing_field_observations", [])
+        for node in nodes:
+            if node.get("requested_name") != node.get("original_name"):
+                scopes.append({"object_id": node["target_id"], "field": "name", "platform": None, "kind": "all"})
+            if node.get("notes_supplied"):
+                scopes.append({"object_id": node["target_id"], "field": "notes", "platform": None, "kind": "all"})
+            for field_kind, key in (("same-guid-property", "properties"), ("same-guid-reference", "references")):
+                for field in node.get(key, []):
+                    if (field_kind == "same-guid-property" and ("value" not in field or not isinstance(field["value"], (str, bool, int, float)))
+                            or field_kind == "same-guid-reference" and ("target_id" not in field or not (field["target_id"] is None or isinstance(field["target_id"], str)))):
+                        raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", "Compound field union needs its complete observation.")
+                    matching = [item for proof in proofs if proof.get("request_path") == node["request_path"]
+                        for item in proof.get("fields", []) if item.get("field") == field["name"]]
+                    info = matching[0].get("field_info", {}) if len(matching) == 1 else {}
+                    child = replace(prepared, verification_plan={"kind": field_kind, "object_id": node["target_id"],
+                        "field": field["name"], "platform": node.get("platform")}, pre_state={"field_info": info})
+                    scopes.append(_compound_field_outcome_scope(child, version=version, read=read, evidence=evidence))
+    elif kind in {"same-guid-property", "same-guid-reference", "object-linked-state"}:
+        scopes.append(_compound_field_outcome_scope(prepared, version=version, read=read, evidence=evidence))
+    elif kind in {"same-guid-notes", "same-guid-renamed"}:
+        scopes.append({"object_id": plan["object_id"], "field": "notes" if kind.endswith("notes") else "name",
+            "platform": None, "kind": "all"})
+    else:
+        scopes.append({"object_id": "business:" + _compound_business_outcome_key(plan), "field": "outcome",
+            "platform": None, "kind": "all"})
+    # A selected later Render can also write earlier slots. They participate in
+    # the same collision algebra as explicit property/object.set declarations.
+    for chain in state.get("effect_render_chains", []):
+        for item in chain.get("snapshots", []):
+            for field in item.get("after_changes", {}):
+                matches = [info for info in chain["metadata"]
+                    if str(info["scope"].get("object_id")).upper() == str(item["object_id"]).upper() and info["field"] == field]
+                info = matches[0]["normalized"] if matches else {}
+                child = replace(prepared, verification_plan={"kind": "same-guid-property", "object_id": item["object_id"],
+                    "field": field, "platform": chain.get("platform")}, pre_state={"field_info": info})
+                scopes.append(_compound_field_outcome_scope(child, version=version, read=read, evidence=evidence))
+    return scopes
+
+
 def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
@@ -10325,7 +10405,6 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
     if request.operation == "waapi.undoGroup":
         execution_plan = build_undo_group_execution_plan(request.version, arguments)
         prepared_children: list[Mapping[str, Any]] = []
-        outcome_owners: dict[str, int] = {}
         platform_outcomes: dict[tuple[str, str], list[tuple[int, Mapping[str, Any]]]] = {}
         for index, child_plan in enumerate(execution_plan["calls"]):
             child_request = parse_operation_request(
@@ -10336,38 +10415,25 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 prepared_children.append(dict(child_plan))
                 continue
             child_prepared = prepare_operation(child_request, read_call=read)
-            child_verification = child_prepared.verification_plan
-            scope = _compound_field_outcome_scope(child_prepared, version=request.version, read=read, evidence=metadata)
-            if scope is not None:
+            for scope in _compound_outcome_scopes(child_prepared, version=request.version, read=read, evidence=metadata):
                 field_key = (_identity_key(scope["object_id"]), str(scope["field"]))
-                for previous_index, previous_scope in platform_outcomes.get(field_key, []):
+                previous_scopes = platform_outcomes.setdefault(field_key, [])
+                for previous_index, previous_scope in previous_scopes:
+                    if previous_index == index:
+                        continue  # Explicit and induced writes within one sealed child are one outcome.
                     same_platform = (_same_identity(scope["platform"], previous_scope["platform"])
                         if _compound_platform_guid(scope["platform"]) and _compound_platform_guid(previous_scope["platform"])
                         else scope["platform"] == previous_scope["platform"])
                     if scope["kind"] == "all" or previous_scope["kind"] == "all" or same_platform:
                         raise OperationContractError("UNDO_GROUP_OVERLAPPING_OUTCOME",
-                            "Compound field children affect the same effective platform scope.",
+                            "Compound children affect the same final field and effective platform scope.",
                             details={"first_index": previous_index, "second_index": index, "field": scope["field"]})
                     if scope["kind"] != "platform" or previous_scope["kind"] != "platform":
                         raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN",
                             "Distinct platform selectors need live unlinked scope evidence before their outcomes can be composed.",
                             details={"first_index": previous_index, "second_index": index,
-                                     "field": scope["field"], "implementation_obligation": "effective_platform_and_linkage_scope"})
-                platform_outcomes.setdefault(field_key, []).append((index, scope))
-            outcome_key = _compound_business_outcome_key(child_verification)
-            previous = outcome_owners.get(outcome_key)
-            if previous is not None:
-                raise OperationContractError(
-                    "UNDO_GROUP_OVERLAPPING_OUTCOME",
-                    "Compound Undo children cannot independently verify two "
-                    "writes to the same final business outcome.",
-                    details={
-                        "first_index": previous,
-                        "second_index": index,
-                        "operation": child_request.operation,
-                    },
-                )
-            outcome_owners[outcome_key] = index
+                                "field": scope["field"], "implementation_obligation": "effective_platform_and_linkage_scope"})
+                previous_scopes.append((index, scope))
             child_dispatch = child_prepared.semantic_preview.dispatch_payload()
             if child_dispatch.get("uri") != child_plan["api"]:
                 raise OperationContractError(
@@ -15443,7 +15509,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             and child["prepared_operation"].get("verification_plan", {}).get("kind") == "same-guid-property"
             and child["prepared_operation"]["verification_plan"].get("platform") is None
         ] if isinstance(actual_plan, Mapping) else []
-        if current_platform_children:
+        if current_platform_children or "compound_current_platform" in pre_state:
             expected_platform = pre_state.get("compound_current_platform")
             actual_platform = None
             context = None
@@ -17948,6 +18014,7 @@ def verify_prepared_operation(
                     child_business_state_verified
                     and child_verification.business_state_verified
                 )
+                assertion_start, readback_start = len(assertions), len(readbacks)
                 assertions.extend(
                     {
                         **dict(assertion),
@@ -17965,6 +18032,27 @@ def verify_prepared_operation(
                     }
                     for readback in child_verification.readbacks
                 )
+                # The parent owns these exact flattened ranges. No independent
+                # child transaction or inferred after-state is manufactured.
+                child_header = child_verification.as_dict()
+                child_header.pop("assertions")
+                child_header.pop("readbacks")
+                assertions.append({
+                    "name": f"Undo Group child[{index}] actual observation association",
+                    "kind": "compound_child_observation",
+                    "passed": child_verification.business_state_verified,
+                    "evidence": {
+                        "index": index,
+                        "prepared_sha256": canonical_sha256(prepared_child),
+                        "dispatch_sha256": canonical_sha256(dispatch_result),
+                        "verification": child_header,
+                        "assertions": {"start": assertion_start, "count": len(assertions) - assertion_start,
+                            "sha256": canonical_sha256(assertions[assertion_start:])},
+                        "readbacks": {"start": readback_start, "count": len(readbacks) - readback_start,
+                            "sha256": canonical_sha256(readbacks[readback_start:])},
+                    },
+                })
+
         business_state_verified = (
             child_business_state_verified
             and verified_child_count == len(inner_plan)

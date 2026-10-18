@@ -171,41 +171,7 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(plan, Mapping) or not isinstance(state, Mapping):
         raise ValueError("History expectation receipt lacks a prepared business observation")
     if plan.get("kind") == "undo-group-result-schemas":
-        calls = state.get("execution_plan", {}).get("calls")
-        if not isinstance(calls, list) or not calls:
-            raise ValueError("Compound history receipt lacks its exact prepared children")
-        observations = []
-        for child in calls:
-            if not isinstance(child, Mapping) or not isinstance(child.get("prepared_operation"), Mapping):
-                raise ValueError("Compound history receipt lacks a recoverable child observation")
-            observations.extend(_receipt_observations(child["prepared_operation"]))
-        if not 1 <= len(observations) <= MAX_OBSERVATIONS:
-            raise ValueError("Compound history receipt exceeds its observation bound")
-        before_by_id, after_by_id = {}, {}
-        outcomes = set()
-        for row in observations:
-            identity = row["object_before"]
-            object_id = identity["id"]
-            if object_id in before_by_id and before_by_id[object_id] != identity:
-                raise ValueError("Compound history children disagree about their before identity")
-            before_by_id[object_id] = identity
-            key = (object_id, row["field"], row.get("platform"))
-            if key in outcomes:
-                raise ValueError("Compound history receipt has overlapping observed outcomes")
-            outcomes.add(key)
-            if row["field"] == "name":
-                after_by_id[object_id] = row["object_after"]
-        for row in observations:
-            after = dict(after_by_id.get(row["object_before"]["id"], row["object_after"]))
-            # A rename changes the native hierarchy path of observed descendants
-            # too. Apply deepest ancestors first, always using the sealed before
-            # path to distinguish hierarchy segments from matching name prefixes.
-            for object_id in sorted(after_by_id, key=lambda key: len(before_by_id[key]["path"]), reverse=True):
-                before_path = before_by_id[object_id]["path"]
-                if row["object_before"]["path"].startswith(before_path + "\\"):
-                    after["path"] = after_by_id[object_id]["path"] + after["path"][len(before_path):]
-            row["object_after"] = after
-        return observations
+        raise ValueError("Compound history needs actual parent-owned child execution and verification associations")
     if plan.get("kind") == "same-guid-reference":
         from .operation_registry import _has_field, _field_value
         identity = _identity(state.get("object"))
@@ -257,21 +223,125 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
-    prepared = snapshot.preview.artifact["prepared_operation"]
+    executions = [event["details"]["dispatch_result"] for event in snapshot.events
+        if event.get("event_type") == "execution_completed"]
+    verifications = [event["details"]["verification"] for event in snapshot.events
+        if event.get("event_type") == "verification_recorded"]
+    if len(executions) != 1 or len(verifications) != 1:
+        raise ValueError("History requires one actual source execution and verification event pair")
+    return _source_observations(snapshot.preview.artifact["prepared_operation"], executions[0], verifications[0])
+
+
+def _compound_observations(prepared, execution, verification):
+    """Read child proof only from the original parent-owned event pair."""
+    calls = prepared.get("pre_state", {}).get("execution_plan", {}).get("calls")
+    if (not isinstance(calls, list) or not calls
+            or not lifecycle_snapshot_equal(prepared["pre_state"]["execution_plan"],
+                prepared.get("verification_plan", {}).get("execution_plan"))
+            or execution.get("ok") is not True or execution.get("result", {}).get("same_connection") is not True):
+        raise ValueError("Compound receipt lacks its exact successful parent execution plan")
+    phases = execution["result"].get("phases")
+    expected_uris = ["ak.wwise.core.undo.beginGroup", *(call["api"] for call in calls), "ak.wwise.core.undo.endGroup"]
+    if (not isinstance(phases, list) or len(phases) != len(expected_uris)
+            or [phase.get("uri") for phase in phases] != expected_uris
+            or any(phase.get("dispatch_result", {}).get("ok") is not True for phase in phases)
+            or phases[0].get("phase") != "begin" or phases[-1].get("phase") != "end"):
+        raise ValueError("Compound receipt phase order or successful acknowledgement is missing")
+    assertions, readbacks = verification.get("assertions", []), verification.get("readbacks", [])
+    records = [row for row in assertions if row.get("kind") == "compound_child_observation"]
+    if len(records) != len(calls):
+        raise ValueError("Compound receipt lacks one actual verification association per child")
+    observations, used_assertions, used_reads = [], set(), set()
+    for index, (call, record) in enumerate(zip(calls, records, strict=True)):
+        child, phase, proof = call.get("prepared_operation"), phases[index + 1], record.get("evidence", {})
+        if (not isinstance(child, Mapping) or phase.get("phase") != "inner" or type(phase.get("index")) is not int or phase["index"] != index
+                or record.get("passed") is not True or type(proof.get("index")) is not int or proof["index"] != index
+                or proof.get("prepared_sha256") != canonical_sha256(child)
+                or proof.get("dispatch_sha256") != canonical_sha256(phase["dispatch_result"])):
+            raise ValueError("Compound child index, prepared proof or actual dispatch association differs")
+        header = proof.get("verification")
+        if (not isinstance(header, Mapping) or header.get("contract") != verification.get("contract")
+                or header.get("operation") != child.get("operation")
+                or header.get("business_state_verified") is not True or header.get("status") != "verified"
+                or header.get("ok") is not True):
+            raise ValueError("Compound child lacks an actual strong business verification")
+        sections = {}
+        for name, source, used in (("assertions", assertions, used_assertions), ("readbacks", readbacks, used_reads)):
+            bounds = proof.get(name, {})
+            start, count = bounds.get("start"), bounds.get("count")
+            if (type(start) is not int or type(count) is not int or start < 0 or count < 0
+                    or start + count > len(source) or used.intersection(range(start, start + count))):
+                raise ValueError("Compound child observation ranges overlap or exceed the recorded proof")
+            rows = source[start:start + count]
+            if canonical_sha256(rows) != bounds.get("sha256"):
+                raise ValueError("Compound child observation range hash differs from its recorded proof")
+            if name == "assertions" and (not rows or any(row.get("kind") == "compound_child_observation" for row in rows)
+                    or any(row.get("passed") is not True or not str(row.get("name", "")).startswith(f"Undo Group child[{index}] ") for row in rows)):
+                raise ValueError("Compound child assertion range belongs to another child")
+            if name == "readbacks" and any(row.get("compound_child_index") != index for row in rows):
+                raise ValueError("Compound child readback range belongs to another child")
+            used.update(range(start, start + count))
+            sections[name] = rows
+        observations.extend(_source_observations(child, phase["dispatch_result"], {**header, **sections}))
+    if not 1 <= len(observations) <= MAX_OBSERVATIONS:
+        raise ValueError("Compound history receipt exceeds its observation bound")
+    before_by_id, after_by_id = {}, {}
+    outcomes = set()
+    for row in observations:
+        if row.get("kind") == "creation_field":
+            key = (row["object_id"], row["field"], row.get("platform"))
+            if key in outcomes:
+                raise ValueError("Compound history receipt has overlapping created field outcomes")
+            outcomes.add(key)
+            continue
+        identity = row["object"] if row.get("kind") == "creation_presence" else row["object_before"]
+        object_id = identity["id"]
+        if object_id in before_by_id and before_by_id[object_id] != identity:
+            raise ValueError("Compound history children disagree about their before identity")
+        before_by_id[object_id] = identity
+        key = (object_id, "presence" if row.get("kind") == "creation_presence" else row["field"], row.get("platform"))
+        if key in outcomes:
+            raise ValueError("Compound history receipt has overlapping observed outcomes")
+        outcomes.add(key)
+        if row.get("field") == "name":
+            after_by_id[object_id] = row["object_after"]
+    for row in observations:
+        if row.get("kind") in {"creation_presence", "creation_field"}:
+            continue
+        after = dict(after_by_id.get(row["object_before"]["id"], row["object_after"]))
+        # A rename changes the native hierarchy path of observed descendants
+        # too. Apply deepest ancestors first, always using the sealed before
+        # path to distinguish hierarchy segments from matching name prefixes.
+        for object_id in sorted(after_by_id, key=lambda key: len(before_by_id[key]["path"]), reverse=True):
+            before_path = before_by_id[object_id]["path"]
+            if row["object_before"]["path"].startswith(before_path + "\\"):
+                after["path"] = after_by_id[object_id]["path"] + after["path"][len(before_path):]
+        row["object_after"] = after
+    return observations
+
+
+
+def _source_observations(prepared, execution, verification) -> list[dict[str, Any]]:
+    """Interpret actual source outcomes, including explicit parent-owned children."""
+    if (execution.get("ok") is not True or verification.get("business_state_verified") is not True
+            or verification.get("status") != "verified"):
+        raise ValueError("History observations require successful actual source execution and verification")
     plan = prepared.get("verification_plan", {})
+    if plan.get("kind") == "undo-group-result-schemas":
+        return _compound_observations(prepared, execution, verification)
     if (prepared.get("pre_state", {}).get("effect_render_chains")
             and plan.get("kind") in {"same-guid-property", "object-set-batch"}):
         from .render_history_observations import receipt_observations as render_observations
-        observations, covered = render_observations(snapshot)
+        observations, covered = render_observations(prepared, verification)
         if plan["kind"] == "object-set-batch":
             from .existing_field_observations import receipt_observations
-            observations.extend(receipt_observations(snapshot, exclude_fields=covered))
+            observations.extend(receipt_observations(prepared, verification, exclude_fields=covered))
         elif plan["field"] not in covered.get((str(plan["object_id"]).upper(), _receipt_platform(plan, prepared["pre_state"])), set()):
             raise ValueError("Render source selected field is missing from its complete chain observation")
         return observations
     if plan.get("kind") == "object-set-batch":
         from .existing_field_observations import receipt_observations
-        return receipt_observations(snapshot)
+        return receipt_observations(prepared, verification)
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
         raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":
@@ -301,14 +371,10 @@ def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
             raise ValueError("Creation receipt original read platform is not certified")
         platform = view["platform_id"]
     from .operation_object import flatten_create_result
-    verification = next(event["details"]["verification"] for event in reversed(snapshot.events)
-        if event.get("event_type") == "verification_recorded")
     identity = verified_created_root_identity(verification)
-    execution = [event.get("details", {}).get("dispatch_result") for event in snapshot.events
-        if event.get("event_type") == "execution_completed"]
-    if identity is None or len(execution) != 1 or not isinstance(execution[0], Mapping) or execution[0].get("ok") is not True:
+    if identity is None:
         raise ValueError("Creation history requires the actual successful result and one verified root witness")
-    returned = flatten_create_result(execution[0].get("result"), max_nodes=1)
+    returned = flatten_create_result(execution.get("result"), max_nodes=1)
     if (len(returned) != 1 or returned[0].object.upper() != identity["id"] or returned[0].name != identity["name"]
         or identity["name"] != node.get("requested_name") or identity["type"] != node.get("canonical_type")):
         raise ValueError("Creation history root witness differs from its actual native result or declaration")

@@ -2111,10 +2111,12 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
 
 
 def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed",
-    created_fields=False, reference=None, observer="complete", prepared_only=False, platform=None):
+    created_fields=False, reference=None, observer="complete", prepared_only=False, platform=None, compound=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD, ROOT
     task = OwnedGraphTask(tmp_path, version, "object.create")
+    if compound:
+        _start_parent_owned_graph_child(task, "object.create")
     if created_fields or reference:
         task.metadata.update(IsLoopingEnabled={"name": "IsLoopingEnabled", "type": "bool", "default": False},
             IsLoopingInfinite={"name": "IsLoopingInfinite", "type": "bool", "default": False},
@@ -2163,6 +2165,9 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
         "--kind", "sound-sfx", "--name", "Rain",
         *([] if notes is None else ["--field", "notes", notes]), *values)
     assert code == 0, declared
+    if compound:
+        assert task.step("draft-check")[0] == 0
+        return task, None, None
     source, shown = task.preview()
     if prepared_only:
         return task, source, shown
@@ -2260,11 +2265,13 @@ def test_created_source_missing_acknowledgement_is_indeterminate_and_never_repla
 
 
 def _existing_fields_history_case(tmp_path, *, version="2025.1", second=False,
-    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, postread_error=False):
+    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, postread_error=False, compound=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND, CHILD, ROOT
 
     task = OwnedGraphTask(tmp_path, version, "object.set")
+    if compound:
+        _start_parent_owned_graph_child(task, "object.set")
     task.require_class_projection = True
     task.types = [{"classId": value, "name": name, "type": "WObject"}
         for name, value in (("Sound", 65552), ("Attenuation", 655376), ("WorkUnit", 1638416))]
@@ -2329,6 +2336,9 @@ def _existing_fields_history_case(tmp_path, *, version="2025.1", second=False,
             "--object-handle", owner, "--field-value", fields[0], volume,
             "--field-value", fields[1], priority, "--field-value", fields[2], attenuation)
         assert code == 0, declared
+    if compound:
+        assert task.step("draft-check")[0] == 0
+        return task, None, before, after
     tx, shown = task.preview()
     task.source_preview = shown
     if prepared_only:
@@ -2491,13 +2501,15 @@ def test_optional_existing_history_unknown_union_remains_unobserved_without_read
 
 
 def _render_history_case(tmp_path, *, version="2025.1", operation="object.setProperty", clear=False,
-    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, platform_inventory=True, target_read_failure=None):
+    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, platform_inventory=True, target_read_failure=None, compound=False):
     from copy import deepcopy
     from tests.unit.test_list_merge_existing_conditions_gateway import list_task
     from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
     from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
 
     task, _ = list_task(tmp_path, version=version, operation=operation)
+    if compound:
+        _start_parent_owned_graph_child(task, operation)
     legacy = version in {"2021.1", "2022.1"}
     if legacy:
         del task.objects[ROOT], task.objects[CHILD], task.objects[FIRST]["@Effects"]
@@ -2562,6 +2574,9 @@ def _render_history_case(tmp_path, *, version="2025.1", operation="object.setPro
         code, declared = task.step("draft-declare-existing", "--declaration-id", "slot", "--object-handle", target,
             "--field-value", render, "false" if clear else "true")
     assert code == 0, declared
+    if compound:
+        assert task.step("draft-check")[0] == 0
+        return task, None, before, after, writes
     source, shown = task.preview()
     task.source_preview = shown
     if not prepared_only:
@@ -3487,3 +3502,275 @@ def test_history_verification_page_preserves_failed_or_incomplete_recorded_outco
     assert value['status'] == 'verification_failed'
     if read_error:
         assert 'Exact history read unavailable' in json.dumps(value)
+
+
+def test_compound_history_uses_actual_indexed_child_execution_and_verification(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256
+    client, _state, source, history, _shown, run = _owned_notes_history_case(
+        tmp_path, source_operation="waapi.undoGroup")
+    code, shown = run("transaction-show", source["transaction_id"])
+    assert code == 0, shown
+    artifact = shown["artifact"]
+    events = shown["events"]
+    executed = next(event["details"]["dispatch_result"] for event in events
+        if event["event_type"] == "execution_completed")
+    verified = next(event["details"]["verification"] for event in events
+        if event["event_type"] == "verification_recorded")
+    associations = [item["evidence"] for item in verified["assertions"]
+        if item.get("kind") == "compound_child_observation"]
+    assert len(associations) == 2
+    calls = artifact["prepared_operation"]["pre_state"]["execution_plan"]["calls"]
+    for index, association in enumerate(associations):
+        assert association["index"] == index
+        assert association["prepared_sha256"] == canonical_sha256(calls[index]["prepared_operation"])
+        assert association["dispatch_sha256"] == canonical_sha256(executed["result"]["phases"][index + 1]["dispatch_result"])
+        assert association["verification"]["business_state_verified"] is True
+    code, result = run("execute", history["transaction_id"])
+    assert code == 0, result
+    code, result = run("verify", history["transaction_id"])
+    assert code == 0 and result["verified"] is True, result
+    assert (client.source["name"], client.source["notes"]) == (
+        client.history_before["name"], client.history_before["notes"])
+
+
+def _start_parent_owned_graph_child(task, operation):
+    code, phase = task.run("draft-start", "waapi.undoGroup")
+    assert code == 0, phase
+    parent = (phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"])
+    code, phase = task.run("draft-start-undo-child", parent[0], "--task-authority", parent[1],
+        "--expected-revision", str(parent[2]), "--operation", operation)
+    assert code == 0, json.dumps(phase)
+    task.compound_parent = parent
+    task.draft, task.authority, task.revision = phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"]
+
+
+def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion="object.setNotes", field=None, value="false"):
+    from copy import deepcopy
+    before = deepcopy(task.objects)
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri in {"ak.wwise.core.undo.beginGroup", "ak.wwise.core.undo.endGroup", "ak.wwise.core.undo.cancelGroup"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {}
+        if uri == "ak.wwise.core.object.setNotes":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects[args["object"]]["notes"] = args["value"]
+            return {}
+        return original(uri, args, options)
+    task.call = call
+    children = [task.draft, task.authority]
+    parent, authority, revision = task.compound_parent
+    code, phase = task.run("draft-start-undo-child", parent, "--task-authority", authority,
+        "--expected-revision", str(revision), "--operation", companion)
+    assert code == 0, json.dumps(phase)
+    task.draft, task.authority, task.revision = phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"]
+    owner = task.bind(notes_id)
+    if field:
+        code, fields = task.step("draft-discover-fields", "--object-handle", owner, "--meaning", field,
+            "--platform", "{44444444-4444-4444-4444-444444444444}")
+        assert code == 0, fields
+        selected = fields.get("field_candidates", fields.get("meaning_results", [{}])[0].get("candidates"))[0]["handle"]
+        if companion == "object.setProperty":
+            code, declared = task.step("draft-declare-field-change", "--object-handle", owner,
+                "--field-handle", selected, "--business-value", value)
+        else:
+            code, declared = task.step("draft-declare-existing", "--declaration-id", "companion", "--object-handle", owner,
+                "--field-value", selected, value)
+        assert code == 0, declared
+    elif companion == "object.set":
+        assert task.step("draft-declare-existing", "--declaration-id", "companion", "--object-handle", owner,
+            "--field", "notes", "Compound companion notes")[0] == 0
+    else:
+        assert task.step("draft-declare-object-change", "--notes", "Compound companion notes")[0] == 0
+    assert task.step("draft-check")[0] == 0
+    children.extend([task.draft, task.authority])
+    task.draft, task.authority, task.revision = parent, authority, revision
+    code, phase = task.step("draft-declare-undo-plan", "--display-name", "Owned compound fields",
+        *[token for index in range(0, len(children), 2) for token in ("--child-draft", children[index], children[index + 1])])
+    assert code == 0, json.dumps(phase)
+    if expected_error:
+        code, rejected = task.step("draft-check")
+        assert code == 2 and rejected["error_code"] == expected_error, rejected
+        assert task.objects == before
+        return rejected
+    source, shown = task.preview()
+    code, result = task.finish(source, shown)
+    assert code == 0 and result["verified"] is True, result
+    after = deepcopy(task.objects)
+    source_call = task.call
+    def history(uri, args=None, options=None):
+        if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects = deepcopy(before if uri.endswith(".undo") else after)
+            return {}
+        return source_call(uri, args, options)
+    task.call = history
+    return source, before, after
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_compound_created_leaf_history_uses_actual_returned_identity_and_all_fields(tmp_path, version):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT
+    task, _unused_preview, _shown = _created_leaf_history_case(tmp_path,
+        version=version, created_fields=True, reference="null", compound=True)
+    source, before, after = _compound_from_graph_task(task, notes_id=FIRST)
+    created = next(row for row in after.values() if row["name"] == "Rain")
+    for direction, expected in [("undo", before), *([] if version == "2022.1" else [("redo", after)])]:
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+        assert task.objects == expected
+        assert (created["id"] in task.objects) is (direction == "redo")
+    assert after[FIRST]["notes"] == "Compound companion notes"
+    assert created["@IsLoopingEnabled"] is True and created["@IsLoopingInfinite"] is True
+    assert created["@Volume"] == -6 and created["@Attenuation"] is None
+    assert len([row for row in task.calls if row[0] == "ak.wwise.core.object.create"]) == 1
+
+
+@pytest.mark.parametrize("operation", ["object.setProperty", "object.set"])
+def test_compound_render_and_notes_history_restores_actual_full_chain(tmp_path, operation):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, _, _, _, _ = _render_history_case(tmp_path, operation=operation, compound=True)
+    source, before, after = _compound_from_graph_task(task, notes_id=FIRST)
+    for direction, expected in (("undo", before), ("redo", after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        code, compact = task.run("transaction-show", tx, "--summary-only")
+        assert code == 0, compact
+        notice = compact["preview_summary"]["history_action"]
+        assert notice["observations_complete"] is False
+        binding, pages = _collect_history_pages(task.run, notice["detail"], task)
+        code, full = task.run("transaction-show", tx)
+        assert code == 0, full
+        assert binding == full["artifact"]["prepared_operation"]["pre_state"]["history_binding"]
+        assert any(row.get("kind") == "existing_render_chain" for row in binding["observations"])
+        assert any(row.get("field") == "notes" and row["after"] == "Compound companion notes" for row in binding["observations"])
+        assert pages[-1]["complete"] is True
+        assert task.run("execute", tx)[0] == 0
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+        assert task.objects == expected
+        assert task.objects[EFFECT] == before[EFFECT]
+        assert task.objects[ROOT]["@Bypass"] is True and task.objects[CHILD]["@Bypass"] is False
+    assert after[ROOT]["@Render"] is True and after[CHILD]["@Render"] is True
+    assert before[ROOT]["@Render"] is False and before[CHILD]["@Render"] is False
+    assert after[FIRST]["notes"] == "Compound companion notes"
+
+
+@pytest.mark.parametrize("companion,field,owner", [
+    ("object.setProperty", "Volume", "ordinary"),
+    ("object.set", "Render", "derived"),
+    ("object.setProperty", "Render", "derived"),
+])
+def test_compound_cross_kind_and_render_derived_field_collisions_block_before_write(tmp_path, companion, field, owner):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT
+    if owner == "ordinary":
+        task, _, _, _ = _existing_fields_history_case(tmp_path, compound=True)
+    else:
+        task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _compound_from_graph_task(task, notes_id=FIRST if owner == "ordinary" else ROOT,
+        companion=companion, field=field, value="-12" if owner == "ordinary" else "true",
+        expected_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
+    assert not any(uri.startswith("ak.wwise.core.undo.") or uri.endswith(("object.set", "object.setProperty"))
+        for uri, _, _ in task.calls)
+
+
+def test_compound_existing_multi_field_receipt_preserves_actual_scalar_and_reference_outcomes(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND, ROOT
+    task, _, _, _ = _existing_fields_history_case(tmp_path, compound=True)
+    source, before, after = _compound_from_graph_task(task, notes_id=SECOND)
+    for direction, expected in (("undo", before), ("redo", after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+        assert task.objects == expected
+        assert task.objects[ROOT] == before[ROOT]
+    assert after[FIRST]["@Volume"] == -6 and after[FIRST]["@Priority"] == 42
+    assert after[FIRST]["@Attenuation"] is None
+
+
+
+def test_compound_same_uri_children_keep_distinct_actual_observation_ranges(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND
+    task, _, _, _ = _existing_fields_history_case(tmp_path, compound=True)
+    source, before, after = _compound_from_graph_task(task, notes_id=SECOND, companion="object.set")
+    code, shown = task.run("transaction-show", source)
+    assert code == 0, shown
+    verification = next(row["details"]["verification"] for row in shown["events"] if row["event_type"] == "verification_recorded")
+    records = [row["evidence"] for row in verification["assertions"] if row.get("kind") == "compound_child_observation"]
+    assert [row["index"] for row in records] == [0, 1]
+    assert records[0]["prepared_sha256"] != records[1]["prepared_sha256"]
+    assert records[0]["dispatch_sha256"] != records[1]["dispatch_sha256"]
+    writes = [args for uri, args, _ in task.calls if uri == "ak.wwise.core.object.set"]
+    assert [args["objects"][0]["object"] for args in writes] == [FIRST, SECOND]
+    for direction, expected in (("undo", before), ("redo", after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+        assert task.objects == expected
+
+
+@pytest.mark.parametrize("fault", ["missing", "prepared", "dispatch", "index", "boolean-index", "range", "phase-index", "weak-child"])
+def test_compound_history_rejects_structurally_valid_but_misassociated_child_events(tmp_path, fault):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    client, state, source, _, _, run = _owned_notes_history_case(tmp_path,
+        source_operation="waapi.undoGroup", source_prepared_only=True)
+    assert run("execute", source["transaction_id"])[0] == 0
+    assert run("verify", source["transaction_id"])[0] == 0
+    code, shown = run("transaction-show", source["transaction_id"])
+    assert code == 0, shown
+    events = shown["events"]
+    verification = next(row["details"]["verification"] for row in events if row["event_type"] == "verification_recorded")
+    associations = [row for row in verification["assertions"] if row.get("kind") == "compound_child_observation"]
+    proof = associations[0]["evidence"]
+    if fault == "missing": verification["assertions"].remove(associations[0])
+    elif fault == "prepared": proof["prepared_sha256"] = associations[1]["evidence"]["prepared_sha256"]
+    elif fault == "dispatch": proof["dispatch_sha256"] = associations[1]["evidence"]["dispatch_sha256"]
+    elif fault == "index": proof["index"] = 1
+    elif fault == "boolean-index": proof["index"] = False
+    elif fault == "weak-child": proof["verification"]["business_state_verified"] = False
+    elif fault == "range": proof["readbacks"] = associations[1]["evidence"]["readbacks"]
+    else:
+        execution = next(row["details"]["dispatch_result"] for row in events if row["event_type"] == "execution_completed")
+        execution["result"]["phases"][1]["index"] = 1
+    # Model a malformed persisted producer, with a valid journal chain. The
+    # public receipt consumer must check semantic associations as well as hashes.
+    previous = ""
+    for event in events:
+        event["previous_event_hash"] = previous
+        event.pop("event_hash")
+        event["event_hash"] = previous = canonical_sha256(event)
+    directory = state / "transactions" / source["transaction_id"]
+    (directory / "events.jsonl").write_bytes(b"".join(canonical_json_bytes(event) + b"\n" for event in events))
+    state_path = directory / "state.json"
+    record = json.loads(state_path.read_text())
+    record["last_event_hash"] = previous
+    state_path.write_bytes(canonical_json_bytes(record))
+    code, loaded = run("transaction-show", source["transaction_id"])
+    assert code == 0 and loaded["state"] == "verified", loaded
+    code, phase = run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, phase
+    code, rejected = run("draft-declare-core-plan", phase["draft"]["draft_id"], "--task-authority", phase["task_authority"],
+        "--expected-revision", str(phase["draft"]["revision"]), "--value", "history_scope", "latest_project_history",
+        "--value", "expectation_receipt", source["transaction_id"])
+    assert code == 2 and "Compound" in rejected["message"], rejected
+    assert not any(uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_boundary(tmp_path, version):
+    code, schema = offline_execute(tmp_path, "--version", version, "operation-schema", "waapi.undoGroup", version=version)
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    choices = declaration["eligible_child_operations"]
+    assert "object.create" in choices
+    assert ("object.set" in choices) is (version != "2021.1")
+    assert "object.createPlugin" not in choices and "object.setRTPC" not in choices
+    scope = declaration["child_observation_scope"]
+    assert "fail_mode_leaf" in scope["object.create"]
+    assert "actual_parent_execution_phase" in scope["history_receipt"]
+    assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
+    assert declaration["native_request_input"] == "forbidden"
