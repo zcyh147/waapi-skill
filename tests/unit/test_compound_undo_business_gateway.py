@@ -2148,7 +2148,9 @@ def _created_leaf_history_preview(task, source, direction="undo"):
     for command in ("draft-check", "preview-from-draft"):
         code, result = task.run(command, draft, "--task-authority", authority,
             "--expected-revision", str(phase["draft"]["revision"]))
-        assert code == 0, result
+        assert code == 0, json.dumps(result)
+        if "draft" in result:
+            phase = result
     tx = result["transaction_id"]
     code, shown = task.run("transaction-show", tx)
     assert code == 0, shown
