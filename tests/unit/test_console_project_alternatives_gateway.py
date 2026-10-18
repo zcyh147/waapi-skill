@@ -1421,6 +1421,12 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     ('2025.1', 'PluginMediaSource', 'plugin-conflicting-encodings'),
     ('2025.1', 'PluginMediaSource', 'plugin-value-list'),
     *[(version, 'AudioFileSource', 'serialization') for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[(version, 'AudioFileSource', 'plugin-lists-reorder')
+      for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[('2021.1', 'AudioFileSource', 'plugin-lists-' + fault) for fault in
+      ['effect-owner', 'inner-order', 'value', 'id', 'type', 'member-loss', 'list-loss',
+       'duplicate', 'unnamed', 'list-attribute', 'container-attribute', 'list-text',
+       'container-text', 'unknown-member', 'unknown-container', 'unknown-unchanged']],
     *[('2021.1', 'AudioFileSource', change) for change in
       ['serialization-rtpc', 'serialization-rtpc-change', 'serialization-rtpc-remove']],
     *[('2022.1', 'AudioFileSource', change) for change in
@@ -1502,6 +1508,25 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                 if change and (change.startswith('bus-') or change == 'other-empty-reference'):
                     owner = tree.find('.//Bus' if change.startswith('bus-') else './/Sound')
                     owner.remove(owner.find('ReferenceList'))
+                if change and change.startswith('plugin-lists-'):
+                    lists = tree.find('.//PluginInnerObjectList')
+                    if lists is None:
+                        lists = tree.find('.//UnrecognizedObjectList')
+                    if change != 'plugin-lists-unknown-unchanged':
+                        lists[:] = list(reversed(lists))
+                    engine = lists.find('List[@Name="EngineSimulationControlData"]')
+                    if change == 'plugin-lists-inner-order':
+                        engine[:] = list(reversed(engine))
+                    elif change == 'plugin-lists-value':
+                        engine.find('.//Property').set('Value', '0.5')
+                    elif change == 'plugin-lists-id':
+                        engine[0].set('ID', '{BBBBBBBB-BBBB-CCCC-DDDD-EEEEEEEEEEEE}')
+                    elif change == 'plugin-lists-type':
+                        engine[0].set('PluginID', '418')
+                    elif change == 'plugin-lists-member-loss':
+                        engine.remove(engine[0])
+                    elif change == 'plugin-lists-list-loss':
+                        lists.remove(engine)
                 tree.write(self.unit)
                 tree = ET.parse(self.project_file)
                 if change != 'mode-unchanged':
@@ -1539,6 +1564,36 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     else:
         ET.SubElement(source, 'Language').text = 'SFX'
         ET.SubElement(source, 'AudioFile' if source_kind == 'AudioFileSource' else 'MidiFile').text = 'Keep.wav'
+    if change and change.startswith('plugin-lists-'):
+        plugin = ET.SubElement(tree.find('.//Sound/ChildrenList'), 'SourcePlugin',
+            Name='Chevrolet Camaro SS', ID='{29975930-6548-4A1B-BEE0-7AA549180D4F}',
+            PluginName='CrankcaseAudio REV', CompanyID='261', PluginID='416')
+        plugin.append(ET.fromstring('''<PluginInnerObjectList>
+<List Name="EngineSimulationControlData">
+<PluginInnerObject Name="" ID="{3A157243-6760-4CF8-B34C-310207907AEC}" PluginName="EngineSimulationControlData" CompanyID="261" PluginID="417"><PropertyList><Property Name="ClutchRPMSpike" Type="Real32" Value="0.66"/></PropertyList></PluginInnerObject>
+<PluginInnerObject Name="" ID="{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}" PluginName="EngineSimulationControlData" CompanyID="261" PluginID="417"><PropertyList><Property Name="ClutchRPMSpike" Type="Real32" Value="0.77"/></PropertyList></PluginInnerObject>
+</List>
+<List Name="AccelDecelModelControlData"><PluginInnerObject Name="" ID="{CE8AB2CE-EA04-4B32-A673-7ED205ECADDC}" PluginName="AccelDecelModelControlData" CompanyID="261" PluginID="418"><PropertyList><Property Name="Acceleration" Type="Real32" Value="2"/></PropertyList></PluginInnerObject></List>
+</PluginInnerObjectList>'''))
+        lists = plugin.find('PluginInnerObjectList')
+        if change == 'plugin-lists-effect-owner':
+            plugin.tag = 'Effect'
+        elif change == 'plugin-lists-duplicate':
+            lists[1].set('Name', lists[0].get('Name'))
+        elif change == 'plugin-lists-unnamed':
+            del lists[0].attrib['Name']
+        elif change == 'plugin-lists-list-attribute':
+            lists[0].set('Unestablished', 'x')
+        elif change == 'plugin-lists-container-attribute':
+            lists.set('Unestablished', 'x')
+        elif change == 'plugin-lists-list-text':
+            lists[0].text = 'unestablished'
+        elif change == 'plugin-lists-container-text':
+            lists.text = 'unestablished'
+        elif change == 'plugin-lists-unknown-member':
+            lists[0][0].tag = 'UnrecognizedInnerObject'
+        elif change in {'plugin-lists-unknown-container', 'plugin-lists-unknown-unchanged'}:
+            lists.tag = 'UnrecognizedObjectList'
     if change and change.startswith('serialization'):
         ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='PlainScalar', Type='Real32', Value='22.7')
         if change.startswith('serialization-rtpc'):
@@ -1577,7 +1632,8 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'serialization-rtpc', 'bus-empty-reference'}:
+    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'serialization-rtpc', 'bus-empty-reference',
+            'plugin-lists-reorder', 'plugin-lists-effect-owner', 'plugin-lists-unknown-unchanged'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         if change == 'serialization-value':

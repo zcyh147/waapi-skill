@@ -700,9 +700,20 @@ def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_med
                         for child in retained]
                     return [node.tag, sorted([*node.attrib.items(), ('Value', value.text or '')]), '',
                         [child for child in children if child is not None]]
+    children = list(node)
+    if (node.tag == 'PluginInnerObjectList' and not node.attrib and not (node.text or '').strip()
+            and all(child.tag == 'List' and set(child.attrib) == {'Name'} and child.get('Name')
+                and not (child.text or '').strip() and not (child.tail or '').strip()
+                and all(member.tag == 'PluginInnerObject' and not (member.tail or '').strip() for member in child)
+                for child in children)
+            and len({child.get('Name') for child in children}) == len(children)):
+        # HostObjectStore.h (all five pinned SDKs): list-name enumeration is
+        # arbitrary across project loads. Each named list is an indexed vector;
+        # canonicalize only the outer names, retaining every inner member.
+        children.sort(key=lambda child: child.get('Name'))
     excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
     return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
-        (node.text if node.text and node.text.strip() else ''), [value for child in node
+        (node.text if node.text and node.text.strip() else ''), [value for child in children
             if (value := _xml_value(child, excluded_platform=excluded_platform, exclude_media_storage=exclude_media_storage,
                 _path=(*_path, node.tag))) is not None]]
 
