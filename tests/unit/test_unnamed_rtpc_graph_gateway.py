@@ -545,3 +545,74 @@ def test_graph_rtpc_accepts_live_proven_omitted_empty_owner_list(tmp_path):
     assert code == 0 and verified['verified'] is True, json.dumps(verified)
     assert len(writes) == 1 and proof_calls
     assert all(options == {'return': ['id']} for _args, options in proof_calls)
+
+
+@pytest.mark.parametrize('fault', ['nonempty-proof', 'partial-proof', 'missing-proof-return', 'partial-owner'])
+def test_graph_rtpc_rejects_omitted_list_without_complete_empty_proof(tmp_path, fault):
+    task, writes = rtpc_task(tmp_path)
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql') == f'from object "{FIRST}" select @RTPC take 1':
+            return {'return': [{'id': CHILD}]} if fault == 'nonempty-proof' else (
+                {'return': [], 'more': True} if fault == 'partial-proof' else {})
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and options.get('return') == ['id', '@RTPC'] and args == {'from': {'id': [FIRST]}}:
+            return {'return': [{'id': FIRST, **({'name': 'Sender'} if fault == 'partial-owner' else {})}]}
+        return result
+    task.call = call
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'INVALID_READBACK', json.dumps(rejected)
+    assert writes == []
+
+
+@pytest.mark.parametrize('list_name', ['Metadata', 'InventedList'])
+def test_graph_empty_normalization_does_not_authorize_other_list_representations(tmp_path, list_name):
+    task, writes = rtpc_task(tmp_path)
+    owner = task.bind(FIRST)
+    code, listed = task.step('draft-discover-fields', '--object-handle', owner, '--field-source', 'documented-lists', '--list')
+    assert code == 0, listed
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args == {'from': {'id': [FIRST]}} and options.get('return') == ['id', '@' + list_name]:
+            return {'return': [{'id': FIRST}]}
+        return original(uri, args, options)
+    task.call = call
+    code, declared = task.step('draft-clear-object-list', '--declaration-id', 'clear', '--object-handle', owner, '--list-name', list_name)
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] in {'INVALID_READBACK', 'DOCUMENTED_LIST_SELECTION_REQUIRED'}, json.dumps(rejected)
+    assert writes == []
+
+
+def test_graph_modern_effects_uses_the_same_source_proven_empty_list_kernel(tmp_path):
+    from tests.unit.test_list_merge_existing_conditions_gateway import list_task
+    task, writes = list_task(tmp_path, operation='object.set')
+    task.objects[FIRST]['@Effects'] = []
+    original = task.call
+    proofs = []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql') == f'from object "{FIRST}" select @Effects take 1':
+            proofs.append(deepcopy(args))
+            return {'return': []}
+        if uri.endswith('object.set'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            writes.append((uri, deepcopy(args)))
+            assert args['objects'] == [{'object': FIRST, 'listMode': 'replaceAll', '@Effects': []}], args
+            return {'objects': [{'id': FIRST, 'name': 'Sender'}]}
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and args == {'from': {'id': [FIRST]}} and options.get('return') == ['id', '@Effects']:
+            return {'return': [{'id': FIRST}]}
+        return result
+    task.call = call
+    owner = task.bind(FIRST)
+    code, listed = task.step('draft-discover-fields', '--object-handle', owner, '--field-source', 'documented-lists', '--list')
+    assert code == 0, listed
+    code, declared = task.step('draft-clear-object-list', '--declaration-id', 'clear', '--object-handle', owner, '--list-name', 'Effects')
+    assert code == 0, declared
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert len(writes) == 1 and proofs
