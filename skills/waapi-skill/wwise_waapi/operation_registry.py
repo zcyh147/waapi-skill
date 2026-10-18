@@ -6362,6 +6362,7 @@ def _prepare_object_set(
                     fields=OBJECT_LIST_SNAPSHOT_FIELDS,
                     read=read,
                     platform=platform,
+                    version=request.version,
                 ),
                 owner_id=target.object,
                 list_name=descriptor.name,
@@ -6624,7 +6625,7 @@ def _prepare_object_set(
                 if owner_id is not None:
                     before_rows = _normalize_object_list_snapshot(
                         _read_object_list(owner_id, descriptor.name, fields=OBJECT_LIST_SNAPSHOT_FIELDS, read=read,
-                                          platform=owner_spec.get("platform")), owner_id=owner_id, list_name=descriptor.name,
+                                          platform=owner_spec.get("platform"), version=request.version), owner_id=owner_id, list_name=descriptor.name,
                     )
                 snapshot = {"object_id": owner_id, "list": descriptor.name, "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
                             "platform": owner_spec.get("platform"), "rows": before_rows}
@@ -9353,7 +9354,7 @@ def _prove_omitted_object_list_empty(
         "options": options,
         "result": dict(result) if isinstance(result, Mapping) else result,
     }
-    if not isinstance(result, Mapping) or result.get("return") != []:
+    if not isinstance(result, Mapping) or set(result) != {"return"} or result.get("return") != []:
         raise OperationContractError(
             "INVALID_READBACK",
             "An omitted object-list field requires an independently empty list readback.",
@@ -9371,6 +9372,7 @@ def _read_object_list_rows_with_evidence(
     platform: str | None = None,
     context: str,
     allow_missing_empty: bool = False,
+    version: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Resolve one object list without using an invalid transform selector.
 
@@ -9417,7 +9419,15 @@ def _read_object_list_rows_with_evidence(
     owner_row = owner_rows[0]
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
-        if allow_missing_empty and set(owner_row) == {"id"}:
+        if version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}:
+            from .documented_list_fields import resolve_live_list_evidence, prove_source_owned_empty_list
+            try:
+                source = resolve_live_list_evidence(version, object_id, canonical_name, read=read)
+                compatibility_normalization = prove_source_owned_empty_list(source, owner_row, read=read, platform=platform)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", str(exc)) from exc
+            raw_references = []
+        elif allow_missing_empty and set(owner_row) == {"id"}:
             emptiness_readback = _prove_omitted_object_list_empty(
                 object_id, canonical_name, read=read, platform=platform,
             )
@@ -9558,6 +9568,7 @@ def _read_object_list(
     fields: Sequence[str],
     read: ReadCall,
     platform: str | None = None,
+    version: str | None = None,
 ) -> list[dict[str, Any]]:
     rows, _readbacks = _read_object_list_rows_with_evidence(
         object_id,
@@ -9566,6 +9577,7 @@ def _read_object_list(
         read=read,
         platform=platform,
         context="object-list snapshot",
+        version=version,
     )
     return rows
 
@@ -16168,6 +16180,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 read=read_call,
                 platform=platform,
                 context=f"object-graph-list[{index}]",
+                version=version,
             )
             actual = _normalize_object_list_snapshot(
                 list_rows,
@@ -20028,6 +20041,7 @@ def verify_prepared_operation(
                 read=read_call,
                 platform=effective_platform,
                 context=f"object-list-verification[{owner_path}].{list_name}",
+                version=version,
             )
             actual_rows = _normalize_object_list_snapshot(
                 list_rows,

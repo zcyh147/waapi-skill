@@ -5944,7 +5944,9 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
         (receipt['effects'] if effect else receipt.setdefault('setup', [])).append(phase)
         phase_category = {'category': 'rtpc-graph-' + label, 'status': 'FAIL', 'observation_path': str(output),
-            'setup_coverage_credit': False}
+            'setup_coverage_credit': False,
+            'verifier_strength': ('gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'
+                if effect else 'gateway_verified_setup_only_no_effect_coverage_credit')}
         runtime.category_results.append(phase_category)
         _update_business_draft(gateway, draft, 'draft-check', live=True)
         preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
@@ -6088,7 +6090,8 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             receipt['exclusive']['status'] = 'observed_and_conflict_rejected'
         else:
             runtime.category_results.append({'category': 'rtpc-graph-exclusive-cardinality', 'status': 'blocked',
-                'reason': receipt['exclusive']['reason'], 'observation_path': str(output)})
+                'reason': receipt['exclusive']['reason'], 'observation_path': str(output),
+                'verifier_strength': 'unobserved_exclusive_property_no_effect_credit'})
         nested_name = name + '_Nested'
         def planned(*, merge, value):
             draft = _start_business_draft(gateway, 'object.set')

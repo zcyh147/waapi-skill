@@ -251,6 +251,28 @@ def planned_list_guard_assertions(guards, *, read, after_write=False):
     return assertions
 
 
+def prove_source_owned_empty_list(evidence, owner_row, *, read, platform=None):
+    """Normalize only a source-proven fixed owned List with an independent empty read.
+
+    A missing projection alone is never membership evidence. RTPC and modern
+    Effects have the existing operation-owned empty-list observation kernel;
+    other documented Lists need their own representation authority first.
+    """
+    scope = evidence.get("scope", {})
+    name = evidence.get("declaration", {}).get("name")
+    owner = scope.get("scope_value")
+    if (evidence.get("kind") != "documented-list" or scope.get("scope_kind") != "object"
+            or name not in {"RTPC", "Effects"} or not isinstance(owner_row, Mapping)
+            or set(owner_row) != {"id"} or owner_row.get("id", "").upper() != owner
+            or not isinstance(evidence.get("source_sha256"), str)):
+        raise ValueError("Missing List projection requires its exact documented owner/source and supported empty-list representation")
+    from .operation_registry import _prove_omitted_object_list_empty
+    empty = _prove_omitted_object_list_empty(owner, name, read=read, platform=platform)
+    return {"kind": "missing-empty-object-list", "version": evidence["version"],
+        "field": "@" + name, "observed_row_keys": ["id"], "normalized_value": [],
+        "list_source": dict(evidence), "emptiness_readback": empty}
+
+
 def observe_list_binding(evidence, *, read, preserve_reference_ids=(), after_write=False):
     """Observe ordered member IDs, exact classes, and actual owner presence."""
     if not isinstance(evidence, Mapping) or evidence.get("kind") != "documented-list":
@@ -283,7 +305,13 @@ def observe_list_binding(evidence, *, read, preserve_reference_ids=(), after_wri
     rows = result.get("return") if isinstance(result, Mapping) else None
     if not isinstance(rows, list) or len(rows) != 1 or rows[0].get("id", "").upper() != owner:
         raise ValueError("Documented List owner must resolve once")
-    members = rows[0].get(accessor)
+    if accessor not in rows[0]:
+        # actual_evidence has just been re-resolved against this exact live
+        # owner/class and immutable List declaration above.
+        prove_source_owned_empty_list(evidence, rows[0], read=read)
+        members = []
+    else:
+        members = rows[0][accessor]
     if not isinstance(members, list) or len(members) > 128:
         raise ValueError("Documented List needs a complete bounded membership observation")
     ids = [member.get("id") if isinstance(member, Mapping) else None for member in members]
