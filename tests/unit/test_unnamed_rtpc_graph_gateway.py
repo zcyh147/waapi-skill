@@ -13,9 +13,9 @@ RTPC_B = '{77777777-7777-7777-7777-777777777777}'
 POINTS = [(0, -48), (100, 0)]
 
 
-def rtpc_task(tmp_path, version='2025.1', fault=None):
+def rtpc_task(tmp_path, version='2025.1', fault=None, operation='object.set'):
     tmp_path.mkdir(parents=True, exist_ok=True)
-    task = OwnedGraphTask(tmp_path, version, 'object.set')
+    task = OwnedGraphTask(tmp_path, version, operation)
     task.types = [{'name': name, 'classId': value, 'type': 'WObject'} for name, value in
         [('Sound', 65552), ('GameParameter', 1507344), ('RTPC', 1441808), ('Curve', 917520), ('WorkUnit', 1638416)]]
     base = r'\Actor-Mixer Hierarchy\Default Work Unit'
