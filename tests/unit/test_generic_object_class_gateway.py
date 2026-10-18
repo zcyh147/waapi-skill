@@ -239,3 +239,26 @@ def test_existing_ordinary_root_type_and_live_class_must_agree_at_preview(tmp_pa
     assert code == 0, declared
     code, rejected = task.step('draft-check')
     assert code == 2 and not any(uri.endswith('object.set') for uri, _, _ in task.calls), rejected
+
+
+def test_existing_root_final_snapshot_cannot_seal_a_different_class(tmp_path):
+    task = class_task(tmp_path, operation='object.set')
+    owner = task.bind(FIRST)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'owner',
+        '--object-handle', owner, '--field', 'notes', 'Reviewed')
+    assert code == 0, declared
+    original = task.call
+    class_reads = 0
+    def call(uri, args=None, options=None):
+        nonlocal class_reads
+        result = original(uri, args, options)
+        if (uri.endswith('object.get') and args.get('from', {}).get('id') == [FIRST]
+                and 'classId' in options.get('return', [])):
+            class_reads += 1
+            if class_reads >= 2:
+                result['return'][0]['classId'] = 2
+        return result
+    task.call = call
+    code, rejected = task.step('draft-check')
+    assert code == 2 and class_reads >= 2, rejected
+    assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
