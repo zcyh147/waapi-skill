@@ -253,12 +253,16 @@ def observe_compound_path_context(context, *, read):
     record = {'role': 'compound-path-context', 'uri': 'ak.wwise.core.object.get', 'args': args,
         'options': options, 'result': result}
     passed = compound_context_result_matches(context, record)
+    missing_parent = [row['id'] for row in context['snapshots'] if 'parent' not in row]
     return {'name': 'compound final GUID ancestry matches sealed name intent', 'kind': 'compound_path_context',
-        'passed': passed, 'evidence': {'sha256': canonical_sha256(context)}}, record
+        'passed': passed, 'evidence': {'sha256': canonical_sha256(context),
+            **({'missing_original_parent_facts': missing_parent} if missing_parent else {})}}, record
 
 
 def compound_context_result_matches(context, record):
     expected = compound_context_expected(context)
+    if any('parent' not in row for row in expected):
+        return False
     if (record.get('role') != 'compound-path-context' or record.get('uri') != 'ak.wwise.core.object.get'
             or record.get('args') != {'from': {'id': [row['id'] for row in expected]}}
             or record.get('options') != {'return': list(FIELDS)} or 'error' in record):
@@ -278,8 +282,8 @@ def canonical_path_row(row):
     if isinstance(result.get('id'), str):
         result['id'] = result['id'].upper()
     if 'parent' in result:
-        value = parent_id(result['parent'])
-        result['parent'] = value.upper() if isinstance(value, str) else value
+        from .edit_history_business import _reference_value
+        result['parent'] = _reference_value(result['parent'])
     return result
 
 
@@ -313,3 +317,25 @@ def project_compound_snapshot(row, context):
         return {'name': next(node['requested_name'] for node in context['edits']
             if node['target_id'].casefold() == key.casefold())}
     return expected_snapshot(row, edits=context['edits'], read_row=intent)
+
+
+def compound_created_child_roots(calls, phases):
+    """Associate actual sibling create roots with their original child and parent."""
+    from .operation_object import flatten_create_result
+    roots = []
+    for index, call in enumerate(calls):
+        child = call.get('prepared_operation', {})
+        plan = child.get('verification_plan', {})
+        if child.get('operation') != 'object.create' or plan.get('kind') != 'object-create-graph':
+            continue
+        phase = phases[index + 1]
+        result = phase.get('dispatch_result', {})
+        if (phase.get('phase') != 'inner' or type(phase.get('index')) is not int or phase['index'] != index
+                or result.get('ok') is not True):
+            raise ValueError('Compound created child root lacks its successful actual sibling phase')
+        returned = [row for row in flatten_create_result(result.get('result')) if row.request_path == '$']
+        if len(returned) != 1 or returned[0].name != plan['nodes'][0]['requested_name']:
+            raise ValueError('Compound sibling root differs from its original creation declaration')
+        roots.append({'child_index': index, 'request_path': '$', 'parent_id': plan['parent_id'].upper(),
+            'object_id': returned[0].object.upper()})
+    return roots

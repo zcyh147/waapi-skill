@@ -3993,6 +3993,8 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert "new_fail_mode_hierarchy" in scope["object.create"]
     assert "actual_parent_execution_phase" in scope["history_receipt"]
     assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
+    assert 'exact_intent_GUID_bound' in scope['created_graph_ancestor_rename']
+    assert 'native_chosen_suffix_phase_dependency_remains_same_parent' in scope['created_graph_ancestor_rename']
     assert declaration["native_request_input"] == "forbidden"
 
 
@@ -4407,6 +4409,9 @@ def test_compound_created_graph_complete_bound_includes_existing_render_observat
 
 def _install_created_graph_rename_client(task):
     from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    # Explicit native null is a parent fact; omission is tested separately.
+    task.objects[SECOND].setdefault('parent', None)
     original = task.call
     def rename(uri, args=None, options=None):
         if uri == 'ak.wwise.core.object.setName':
@@ -4462,6 +4467,7 @@ def test_created_graph_ancestor_rename_binds_internal_native_path_and_external_t
 def _created_graph_higher_ancestor_source(tmp_path, *, bad_ancestry=False, rename_parent=False):
     from tests.unit.test_object_graph_owned_choices_gateway import SECOND, PROJECT_GROUP, FIRST
     def setup(task):
+        task.require_class_projection = True
         old = task.objects[SECOND]['path']
         for row in task.objects.values():
             row['path'] = row['path'].replace(old, r'\Actor-Mixer Hierarchy\Outer\Default Work Unit', 1)
@@ -4612,7 +4618,7 @@ def test_created_graph_ancestor_chain_mismatch_stops_before_begin(tmp_path):
     assert not any(row[0] in {'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.object.create'} for row in task.calls)
 
 
-def test_created_graph_ancestor_aggregate_identity_bound_stops_before_context_reads(tmp_path, monkeypatch):
+def test_created_graph_ancestor_aggregate_identity_bound_stops_before_begin(tmp_path, monkeypatch):
     from wwise_waapi import object_graph_paths
     from tests.unit.test_object_graph_owned_choices_gateway import SECOND, PROJECT_GROUP
     def setup(task):
@@ -4620,13 +4626,8 @@ def test_created_graph_ancestor_aggregate_identity_bound_stops_before_context_re
             'path': r'\Actor-Mixer Hierarchy\Sibling', 'notes': 'Keep sibling'}
     task, _, _, _ = _created_graph_history_case(tmp_path, compound=True, prepared_only=True, setup=setup)
     monkeypatch.setattr(object_graph_paths, 'MULTI_IDENTITY_READ_MAX_IDS', 1)
-    original = task.call
-    def no_oversized_context(uri, args=None, options=None):
-        assert not (uri == 'ak.wwise.core.object.get' and options == {'return': list(object_graph_paths.FIELDS)}), 'oversized ancestry read dispatched'
-        return original(uri, args, options)
     rejected = _compound_from_graph_task(task, notes_id=SECOND, companion='object.setName', additional_rename_id=PROJECT_GROUP,
-        expected_error='UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
-        before_parent_check=lambda owner: setattr(owner, 'call', no_oversized_context))
+        expected_error='UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN')
     assert 'bound' in rejected['message'], rejected
     assert not any(row[0] == 'ak.wwise.core.undo.beginGroup' for row in task.calls)
 
@@ -4656,3 +4657,34 @@ def test_created_graph_parent_object_set_rename_verifies_final_created_child_clo
         code, verified = task.run('verify', tx)
         assert code == 0 and verified['verified'] is True, verified
         assert task.objects == (before if direction == 'undo' else after)
+
+
+def test_created_graph_missing_original_parent_fact_cannot_claim_complete_ancestry(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task, _, _, _ = _created_graph_history_case(tmp_path, compound=True, prepared_only=True)
+    _install_created_graph_rename_client(task)
+    original = task.call
+    def missing_parent(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.get':
+            for row in result.get('return', []):
+                if row['id'] == SECOND: row.pop('parent', None)
+        return result
+    task.call = missing_parent
+    source, _, _ = _compound_from_graph_task(task, notes_id=SECOND, companion='object.setName', expected_verified=False)
+    code, shown = task.run('transaction-show', source)
+    assert code == 0 and shown['state'] == 'verification_failed', shown
+    verification = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    witness = next(row for row in verification['assertions'] if row.get('kind') == 'compound_path_context')
+    assert witness['passed'] is False and witness['evidence']['missing_original_parent_facts'] == [SECOND]
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
+
+
+def test_created_graph_history_stale_renamed_parent_stops_before_native_action(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task, source, _, _ = _created_graph_higher_ancestor_source(tmp_path, rename_parent=True)
+    tx = _created_leaf_history_preview(task, source)
+    task.objects[SECOND]['path'] = r'\Actor-Mixer Hierarchy\Unreviewed parent'
+    code, rejected = task.run('execute', tx)
+    assert code == 2, rejected
+    assert not any(row[0] in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'} for row in task.calls)

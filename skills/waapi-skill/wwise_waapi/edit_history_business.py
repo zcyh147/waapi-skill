@@ -249,9 +249,12 @@ def _compound_observations(prepared, execution, verification):
         raise ValueError("Compound receipt phase order or successful acknowledgement is missing")
     assertions, readbacks = verification.get("assertions", []), verification.get("readbacks", [])
     path_context = prepared['pre_state']['execution_plan'].get('path_context')
+    created_children = ()
     if path_context is not None:
         from .object_graph_paths import validate_compound_path_context, compound_context_result_matches
         validate_compound_path_context(path_context, calls)
+        from .object_graph_paths import compound_created_child_roots
+        created_children = compound_created_child_roots(calls, phases)
         from .object_graph_paths import compound_phase_arguments
         if any(not lifecycle_snapshot_equal(call.get('args'), compound_phase_arguments(calls, index, path_context))
                 for index, call in enumerate(calls) if 'prepared_operation' in call):
@@ -274,7 +277,8 @@ def _compound_observations(prepared, execution, verification):
                 or proof.get("dispatch_sha256") != canonical_sha256(phase["dispatch_result"])):
             raise ValueError("Compound child index, prepared proof or actual dispatch association differs")
         if path_context is not None and (proof.get('path_context_sha256') != canonical_sha256(path_context)
-                or proof.get('phase_args_sha256') != canonical_sha256(call['args'])):
+                or proof.get('phase_args_sha256') != canonical_sha256(call['args'])
+                or proof.get('created_children_sha256') != canonical_sha256(created_children)):
             raise ValueError('Compound child path context differs from its immutable parent')
         header = proof.get("verification")
         if (not isinstance(header, Mapping) or header.get("contract") != verification.get("contract")

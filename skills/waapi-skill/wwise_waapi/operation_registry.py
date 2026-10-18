@@ -17927,6 +17927,7 @@ def verify_prepared_operation(
     read_call: ReadCall,
     history_resolver=None,
     compound_path_context=None,
+    compound_created_children=(),
 ) -> VerificationResult:
     """Run the closed postcondition for one persisted prepared operation."""
 
@@ -18232,6 +18233,10 @@ def verify_prepared_operation(
                         validation.as_dict(),
                     )
             path_context = execution_plan.get('path_context')
+            created_children = ()
+            if path_context is not None:
+                from .object_graph_paths import compound_created_child_roots
+                created_children = compound_created_child_roots(inner_plan, phases)
             if path_context is not None:
                 from .object_graph_paths import validate_compound_path_context, observe_compound_path_context
                 validate_compound_path_context(path_context, inner_plan)
@@ -18259,6 +18264,7 @@ def verify_prepared_operation(
                     execution_result=dispatch_result,
                     read_call=read_call,
                     compound_path_context=path_context,
+                    compound_created_children=created_children,
                 )
                 verified_child_count += 1
                 child_business_state_verified = (
@@ -18297,7 +18303,8 @@ def verify_prepared_operation(
                         "index": index,
                         "prepared_sha256": canonical_sha256(prepared_child),
                         **({'path_context_sha256': canonical_sha256(path_context),
-                            'phase_args_sha256': canonical_sha256(child_plan['args'])} if path_context is not None else {}),
+                            'phase_args_sha256': canonical_sha256(child_plan['args']),
+                            'created_children_sha256': canonical_sha256(created_children)} if path_context is not None else {}),
                         "dispatch_sha256": canonical_sha256(dispatch_result),
                         "verification": child_header,
                         "assertions": {"start": assertion_start, "count": len(assertions) - assertion_start,
@@ -20651,6 +20658,8 @@ def verify_prepared_operation(
                     if isinstance(row, Mapping) and _valid_object_id(row.get("id"))
                 }
                 expected_ids.difference_update(replaced_set_ids)
+                expected_ids.update(_identity_key(root['object_id']) for root in compound_created_children
+                    if _same_identity(root['parent_id'], parent_id))
                 complete_expected = True
                 for child_spec in direct_specs_by_parent.get(parent_path, ()):
                     child_id = resolved_id_by_path.get(str(child_spec.get("request_path")))
