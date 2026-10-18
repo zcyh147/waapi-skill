@@ -148,6 +148,7 @@ from .operation_plugin import (
     plugin_verification_fields,
     validate_plugin_property_metadata,
     verify_created_plugin_row,
+    _materialize_plugin_object,
 )
 from .operation_ui_commands import (
     EXECUTE_URI as UI_COMMAND_EXECUTE_URI,
@@ -4768,8 +4769,7 @@ def _prepare_object_create(
     type_catalog = _read_object_type_catalog(read)
     from .planned_references import prepare_result_context
     result_context = prepare_result_context(arguments.get("graph_result_bindings", []), normalized.nodes,
-        {"$": (parent, requested_conflict)}, resolve_type=lambda name: _resolve_object_type(
-            "PropertyContainer" if request.version == "2025.1" and name == "ActorMixer" else name, catalog=type_catalog), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
+        {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
     derived_properties: dict[str, dict[str, Any]] = {}
@@ -5826,8 +5826,7 @@ def _prepare_object_set(
                 request_path=prefix + ".lists", allow_platform=True, allow_language=True,
                 allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS) for node in descriptor.nodes)
         result_context = prepare_result_context(arguments["graph_result_bindings"], result_nodes, result_roots,
-            resolve_type=lambda name: _resolve_object_type("PropertyContainer" if request.version == "2025.1" and name == "ActorMixer" else name,
-                catalog=type_catalog), read=read, references=result_references, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
+            resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, references=result_references, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     resolved_target_ids: dict[str, int] = {}
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
@@ -6162,6 +6161,7 @@ def _prepare_object_set(
                     materialized_imports=materialized_imports,
                     prepared_names=result_context["prepared_names"] if result_context else None,
                     rtpc_updates={spec["request_path"]: spec for spec in child_specs if spec.get("rtpc_update")},
+                    plugin_materializations={spec["request_path"]: spec["graph_plugin_native"] for spec in child_specs if "graph_plugin_native" in spec},
                     rtpc_update_rows=dispatch_objects,
                 )
                 for root in children.roots
@@ -6367,6 +6367,9 @@ def _prepare_object_set(
                 owner_id=target.object,
                 list_name=descriptor.name,
             )
+            if (any(member.anonymous for member in descriptor.objects)
+                    and len(descriptor.objects) + (len(before_rows) if row_list_mode == "append" else 0) > OBJECT_LIST_MAX_SUBTREE_NODES):
+                raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Anonymous construction exceeds the Gateway complete ordered membership bound before dispatch")
             list_snapshot = {
                 "object_id": target.object,
                 "list": descriptor.name,
@@ -6376,6 +6379,9 @@ def _prepare_object_set(
             }
             list_snapshots.append(list_snapshot)
             target_list_snapshots.append(list_snapshot)
+            if any(member.anonymous for member in descriptor.objects):
+                field_snapshots.extend(_capture_anonymous_member_state(before_rows, read=read, platform=platform,
+                    preserve=row_list_mode == "append"))
             if row_list_mode == "replaceAll":
                 replacement_subtrees = _capture_object_list_replace_subtrees(
                     before_rows,
@@ -6462,6 +6468,10 @@ def _prepare_object_set(
                 raise OperationContractError("DUPLICATE_RTPC_PAIR", "An owner may request each exact RTPC pair once.")
             collisions_by_name: dict[str, list[dict[str, Any]]] = {}
             for root_spec in root_specs:
+                if root_spec.get("anonymous_list_member"):
+                    if row_conflict != "fail":
+                        raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
+                    continue
                 if root_spec.get("rtpc_binding"):
                     continue
                 requested_name = root_spec.get("requested_name")
@@ -6563,6 +6573,7 @@ def _prepare_object_set(
                     prepared_names=result_context["prepared_names"] if result_context else None,
                     rtpc_updates={spec["request_path"]: spec for spec in prepared_specs if spec.get("rtpc_update")},
                     rtpc_update_rows=dispatch_objects,
+                    plugin_materializations={spec["request_path"]: spec["graph_plugin_native"] for spec in prepared_specs if "graph_plugin_native" in spec},
                 )
                 for root in descriptor.objects
             ]
@@ -6627,12 +6638,18 @@ def _prepare_object_set(
                         _read_object_list(owner_id, descriptor.name, fields=OBJECT_LIST_SNAPSHOT_FIELDS, read=read,
                                           platform=owner_spec.get("platform"), version=request.version), owner_id=owner_id, list_name=descriptor.name,
                     )
+                if (any(member.anonymous for member in descriptor.objects)
+                        and len(descriptor.objects) + (len(before_rows) if row_list_mode == "append" else 0) > OBJECT_LIST_MAX_SUBTREE_NODES):
+                    raise OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Anonymous construction exceeds the Gateway complete ordered membership bound before dispatch")
                 snapshot = {"object_id": owner_id, "list": descriptor.name, "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
                             "platform": owner_spec.get("platform"), "rows": before_rows}
                 owner_spec.setdefault("list_snapshots", []).append(snapshot)
                 owner_spec["list_mode"] = row_list_mode
                 if owner_id is not None:
                     list_snapshots.append(snapshot)
+                    if any(member.anonymous for member in descriptor.objects):
+                        field_snapshots.extend(_capture_anonymous_member_state(before_rows, read=read,
+                            platform=owner_spec.get("platform"), preserve=row_list_mode == "append"))
                     if row_list_mode == "replaceAll":
                         removed = _capture_object_list_replace_subtrees(before_rows, read=read)
                         for subtree in removed:
@@ -6642,6 +6659,10 @@ def _prepare_object_set(
                     spec = nested_specs[member.request_path]
                     spec.update({"collection": descriptor.name, "list_name": descriptor.name,
                                  "list_mode": row_list_mode, "on_name_conflict": row_conflict})
+                    if member.anonymous:
+                        if row_conflict != "fail":
+                            raise OperationContractError("ANONYMOUS_LIST_CONFLICT_UNRESOLVED", "Anonymous nondefault name conflict semantics remain pending exact source/native proof")
+                        continue
                     collisions = [row for row in before_rows if str(row.get("name", "")).casefold() == member.name.casefold()]
                     if len(collisions) > 1:
                         raise OperationContractError("AMBIGUOUS_IDENTITY", "A nested list member name resolves more than once.")
@@ -6739,6 +6760,18 @@ def _prepare_object_set(
         if set(trusted) != {"object"}:
             dispatch_objects.append(trusted)
 
+    unique_snapshots = []
+    for snapshot in field_snapshots:
+        if snapshot not in unique_snapshots:
+            unique_snapshots.append(snapshot)
+    field_snapshots = unique_snapshots
+    for spec in node_specs:
+        for snapshot in spec.pop("anonymous_target_snapshots", []):
+            matching = [row for row in field_snapshots if row.get("object_id") == snapshot["object_id"] and row.get("fields") == snapshot["fields"]]
+            if matching and matching != [snapshot]:
+                raise OperationContractError("INVALID_READBACK", "One selected ShareSet requires one unchanged preparation snapshot")
+            if not matching:
+                field_snapshots.append(snapshot)
     _validate_graph_rtpc_capacity(node_specs, version=request.version)
     from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
     try:
@@ -6876,6 +6909,7 @@ def _prepare_object_set(
                 if isinstance(row.get("list_name"), str)
             }
             | {snapshot["list"] for row in node_specs for snapshot in row.get("list_snapshots", [])}
+            | {row["collection"] for row in node_specs if row.get("owned_reference")}
         ),
         "replaced_subtree_rows": [dict(row) for snapshot in replace_subtree_snapshots for row in snapshot["rows"]],
         "replaced_list_subtree_rows": [
@@ -7716,6 +7750,81 @@ def _resolve_merge_node_target(
         resolution="live-exact-merge-collision", row=row)
 
 
+def _capture_anonymous_member_state(members, *, read, platform, preserve):
+    snapshots, targets = [], set()
+    for member in members:
+        fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId", "@Effect", "@Bypass", "@Render"]
+        rows = _read_object_id_rows(member["id"], fields=fields, read=read, platform=platform)
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), member["id"]):
+            raise OperationContractError("INVALID_READBACK", "Anonymous preservation needs one exact existing member")
+        snapshots.append({"object_id": member["id"], "fields": fields, "platform": platform,
+            "rows": rows, "preserve_after_write": preserve, "reference_fields": ["Effect"]})
+        if not preserve or not _has_field(rows[0], "Effect"):
+            continue
+        value = _field_value(rows[0], "Effect")
+        if _reference_value_is_null(value):
+            continue
+        target_id = _reference_identity(value)
+        if not _valid_object_id(target_id):
+            raise OperationContractError("INVALID_READBACK", "Preserved Effect reference needs its exact GUID or explicit native null")
+        if _identity_key(target_id) in targets:
+            continue
+        targets.add(_identity_key(target_id))
+        fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+        actual = _read_object_id_rows(target_id, fields=fields, read=read, platform=platform)
+        if len(actual) != 1 or not _same_identity(actual[0].get("id"), target_id):
+            raise OperationContractError("INVALID_READBACK", "Preserved Effect target must independently resolve once")
+        snapshots.append({"object_id": target_id, "fields": fields, "platform": platform, "rows": actual, "preserve_after_write": True})
+    return snapshots
+
+
+def _observe_independent_effect_ancestry(effect, *, catalog, read, platform):
+    """Bind an existing ShareSet, rather than reuse a creation destination rule.
+
+    All pinned SampleProject Effects/Factory Effects Work Units contain Effect
+    children below Folder nodes. Exact fresh parent GUIDs/classes prove this
+    hierarchy; an opaque owner-local Effect is not made independent by its path.
+    """
+    if len([row for row in catalog if row.class_id == effect.get("classId") and row.type == "Effect"]) != 1:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "Selected Effect needs one fresh exact plugin class")
+    fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+    rows, seen, current = [], set(), effect
+    for depth in range(DEFAULT_MAX_DEPTH + 1):
+        identity = current.get("id")
+        if not _valid_object_id(identity) or _identity_key(identity) in seen:
+            raise OperationContractError("INVALID_READBACK", "Independent ShareSet ancestry needs unique exact GUIDs")
+        seen.add(_identity_key(identity))
+        rows.append(current)
+        if "owner" in current and not _reference_value_is_null(current["owner"]):
+            if depth == 0 and _valid_object_id(_reference_identity(current["owner"])):
+                raise OperationContractError("LOCAL_EFFECT_REUSE_UNRESOLVED", "Existing owner-local Effect reuse is not proved by ShareSet construction authority; its actual owner cannot be silently replaced")
+            raise OperationContractError("INVALID_READBACK", "Independent ShareSet ancestry has non-null or malformed ownership")
+        if depth:
+            matches = [row for row in catalog if row.class_id == current.get("classId") and row.name in {"WorkUnit", "Folder"}]
+            if len(matches) != 1:
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestors require their fresh WorkUnit or Folder classes")
+            path = current.get("path")
+            if not isinstance(path, str) or not path.startswith("\\Effects\\"):
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestry must remain in the actual Effects hierarchy")
+            if matches[0].name == "WorkUnit":
+                return rows
+        parent_id = _reference_identity(current.get("parent"))
+        parent = _read_object_id_rows(parent_id, fields=fields, read=read, platform=platform) if _valid_object_id(parent_id) else []
+        if len(parent) != 1 or not _same_identity(parent[0].get("id"), parent_id):
+            raise OperationContractError("INVALID_READBACK", "ShareSet parent must resolve once by its actual GUID")
+        current = parent[0]
+    raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestry exceeds the graph depth bound")
+
+
+def _resolve_graph_node_type(node, *, catalog, version):
+    if node.plugin is None:
+        return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
+    matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == "Effect"]
+    if len(matches) != 1:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph Effect requires one fresh exact plugin class")
+    return matches[0]
+
+
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
@@ -7756,7 +7865,7 @@ def _prepare_object_node_specs(
             if uses_2025_actor_mixer_alias
             else node.type
         )
-        type_info = _resolve_object_type(metadata_type, catalog=type_catalog)
+        type_info = _resolve_graph_node_type(node, catalog=type_catalog, version=version)
         if (
             uses_2025_actor_mixer_alias
             and _object_type_token(type_info.name) != "propertycontainer"
@@ -7776,7 +7885,7 @@ def _prepare_object_node_specs(
         canonical_type = (
             "ActorMixer"
             if uses_2025_actor_mixer_alias
-            else type_info.name
+            else node.plugin.object_type if node.plugin is not None else type_info.name
         )
         canonical_types[node.request_path] = canonical_type
         spec: dict[str, Any] = {
@@ -7817,6 +7926,10 @@ def _prepare_object_node_specs(
             merge_target = _resolve_graph_rtpc_target(node, spec, specs, root_parent=root_parent,
                 version=version, read=read, identity_cache=identity_cache, property_info_cache=property_info_cache,
                 snapshot_cache=rtpc_snapshots, replace_all=rtpc_replace_all)
+        elif node.anonymous:
+            if version not in {"2023.1", "2024.1", "2025.1"} or node.collection != "Effects" or type_info.name != "EffectSlot":
+                raise OperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Anonymous construction requires source-proven EffectSlot/Effects placement")
+            spec["anonymous_list_member"] = True
         elif merge_existing:
             merge_target = _resolve_merge_node_target(node, spec, specs, node_paths=node_paths,
                 root_parent=root_parent, root_collection=root_collection, version=version, read=read,
@@ -7841,6 +7954,21 @@ def _prepare_object_node_specs(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
         reference_targets = []
+        for child in node.children:
+            if child.collection != "Effect":
+                continue
+            if result_context is None or not node.anonymous:
+                raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Local graph Effect requires its exact planned anonymous owner")
+            info = _read_property_info_cached(read, cache=property_info_cache, class_id=type_info.class_id, name="Effect")
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            property_info_by_name["effect"] = info
+            fact = result_context["facts"][child.request_path]
+            from .planned_references import PlannedReferenceTarget
+            target = PlannedReferenceTarget(fact)
+            reference_targets.append((info, [target]))
+            spec["references"].append({"name": "Effect", "target_request_path": child.request_path,
+                "target_result_handle": fact["result_handle"]})
+            result_context["metadata"].append({"class_id": type_info.class_id, "name": "Effect", "metadata": info.as_dict()})
         for descriptor in node.references:
             documented = [binding for binding in list_bindings
                 if binding.get("planned_owner", {}).get("request_path") == node.request_path
@@ -7903,6 +8031,17 @@ def _prepare_object_node_specs(
             for offset, target_descriptor in enumerate(descriptor.targets):
                 role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
                 resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                if node.anonymous and descriptor.name == "Effect":
+                    fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+                    rows = _read_object_id_rows(resolved.object, fields=fields, read=read, platform=platform)
+                    if len(rows) != 1 or not _same_identity(rows[0].get("id"), resolved.object):
+                        raise OperationContractError("INVALID_READBACK", "A selected Effect needs its actual identity/class/ownership")
+                    actual = rows[0]
+                    observed = _observe_independent_effect_ancestry(actual, catalog=type_catalog, read=read, platform=platform)
+                    resolved = ResolvedObject(identity=resolved.identity, object=resolved.object, resolution=resolved.resolution, row=actual)
+                    spec.setdefault("anonymous_target_snapshots", []).extend([
+                        {"object_id": row["id"], "fields": fields, "rows": [row], "platform": platform, "preserve_after_write": True}
+                        for row in observed])
                 targets.append(resolved)
                 roles[role] = resolved
                 identities.append(resolved.object)
@@ -7991,6 +8130,20 @@ def _prepare_object_node_specs(
                 node_derived_properties[name] = value
                 spec["properties"].append({"name": name, "value": value,
                     "metadata_type": evidence["metadata"][name]["type"], "derived": True})
+        if node.plugin is not None:
+            if node.plugin.placement == "shareset":
+                if node.parent_request_path in node_paths or root_parent is None:
+                    raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require the exact bound Effects Work Unit")
+                validate_plugin_target(node.plugin, target_type=root_parent.row["type"], target_path=root_parent.row["path"])
+            else:
+                parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
+                if node.collection != "Effect" or parent_spec is None or not parent_spec.get("anonymous_list_member"):
+                    raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Local graph Effects require source-proven anonymous slot ownership")
+                spec["owned_reference"] = True
+            metadata = [{**property_info_by_name[prop.name.casefold()].raw, "name": prop.name} for prop in node.plugin.fields]
+            validated = validate_plugin_property_metadata(node.plugin, metadata)
+            spec["graph_plugin_native"] = _materialize_plugin_object(node.plugin, validated)
+            spec["structural_class_id"] = type_info.class_id
         if node_derived_properties:
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
@@ -8450,7 +8603,7 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
         try:
             types = _read_object_type_catalog(read)
             valid_types = all(len([info for info in types if info.class_id == result_context["facts"][path]["class_id"]
-                and info.name == result_context["facts"][path]["type"]]) == 1 for path in result_context["target_paths"])
+                and info.name == result_context["facts"][path].get("class_name", result_context["facts"][path]["type"])]) == 1 for path in result_context["target_paths"])
             metadata_cache = {}
             changed_fields = [binding["name"] for binding in result_context["metadata"]
                 if _read_property_info_cached(read, cache=metadata_cache,
@@ -9034,6 +9187,7 @@ def _materialize_canonical_object_node(
     prepared_names: Mapping[str, str] | None = None,
     rtpc_updates: Mapping[str, Mapping[str, Any]] | None = None,
     rtpc_update_rows: list[dict[str, Any]] | None = None,
+    plugin_materializations: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
@@ -9061,6 +9215,11 @@ def _materialize_canonical_object_node(
 
     def apply(current: ObjectNodeDescriptor, row: dict[str, Any]) -> None:
         row["type"] = canonical_types[current.request_path]
+        if current.plugin is not None:
+            payload = (plugin_materializations or {}).get(current.request_path)
+            if payload is None:
+                raise OperationContractError("INVALID_PREVIEW", "Graph plugin materialization requires validated live metadata")
+            row.update(payload)
         if prepared_names and current.request_path in prepared_names:
             row["name"] = prepared_names[current.request_path]
         for property_name, value in derived_properties.get(current.request_path, {}).items():
@@ -9093,8 +9252,12 @@ def _materialize_canonical_object_node(
             rtpc_update_rows.append({"object": spec["preexisting_id"], "@Curve": row["@Curve"],
                 **({"notes": row["notes"]} if "notes" in row else {}),
                 **{"@" + name: value for name, value in derived_properties.get(current.request_path, {}).items()}})
-        for child, child_row in zip(current.children, row.get("children", []), strict=True):
+        ordinary = [child for child in current.children if child.collection == "children"]
+        for child, child_row in zip(ordinary, row.get("children", []), strict=True):
             apply(child, child_row)
+        for child in current.children:
+            if child.collection == "Effect":
+                apply(child, row["@Effect"])
         for descriptor in current.lists:
             for child, child_row in zip(descriptor.objects, row.get("@" + descriptor.name, []), strict=True):
                 apply(child, child_row)
@@ -9217,8 +9380,8 @@ def _read_object_path_rows(
     )
 
 
-def _read_object_id_rows(object_id: Any, *, fields: Sequence[str], read: ReadCall) -> list[dict[str, Any]]:
-    return _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": list(fields)}))
+def _read_object_id_rows(object_id: Any, *, fields: Sequence[str], read: ReadCall, platform: str | None = None) -> list[dict[str, Any]]:
+    return _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": list(fields), **({"platform": platform} if platform is not None else {})}))
 
 
 def _bounded_multi_identity_read(
@@ -16904,6 +17067,7 @@ def _bind_object_set_result_nodes(
     *,
     on_name_conflict: str,
     observed_rtpcs: Mapping[str, Mapping[str, Any]] | None = None,
+    observe_anonymous: Callable | None = None,
 ) -> dict[str, ObjectResultNode]:
     """Bind sparse ``object.set`` associations to the sealed request graph.
 
@@ -16959,9 +17123,12 @@ def _bind_object_set_result_nodes(
             returned_children.setdefault(node.parent_request_path, []).append(node)
 
     bound: dict[str, ObjectResultNode] = {}
+    anonymous_ids: dict[str, str] = {}
     seen_result_ids: dict[str, str] = {}
 
     def name_matches(node: ObjectResultNode, spec: Mapping[str, Any], *, owner_id=None) -> bool:
+        if spec.get("anonymous_list_member"):
+            return node.name == "" and _same_identity(node.object, anonymous_ids.get(str(spec["request_path"])))
         if spec.get("rtpc_binding"):
             actual = (observed_rtpcs or {}).get(node.object, {})
             control = next((ref.get("target_id") for ref in spec.get("references", []) if ref["name"] == "ControlInput"), None)
@@ -17043,6 +17210,10 @@ def _bind_object_set_result_nodes(
         seen_result_ids[result_id_key] = request_path
 
         available = list(children_by_parent.get(request_path, ()))
+        if any(child.get("anonymous_list_member") for child in available):
+            if observe_anonymous is None:
+                raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require independent ordered membership")
+            anonymous_ids.update(observe_anonymous(node.object, spec, available))
         for child in returned_children.get(node.request_path, ()):  # result-relative parent path
             collection_matches = [
                 candidate
@@ -18906,9 +19077,39 @@ def verify_prepared_operation(
                             if len(observations) != 1 or not _same_identity(observations[0].get("id"), result_node.object):
                                 raise ObjectOperationContractError("INVALID_READBACK", "Returned RTPC must resolve by its exact GUID once")
                             observed_rtpcs[result_node.object] = observations[0]
+                def observe_anonymous(owner_id, owner_spec, children):
+                    # Native List order, not returned association order or post
+                    # values, assigns stable declaration identities.
+                    anonymous = [child for child in children if child.get("anonymous_list_member")]
+                    if any(child.get("collection") != "Effects" for child in anonymous):
+                        raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require their certified Effects placement")
+                    guards = [guard for guard in pre_state.get("documented_list_guards", [])
+                        if _same_identity(guard["evidence"]["scope"]["scope_value"], owner_id)
+                        and guard["evidence"]["declaration"]["name"] == "Effects"]
+                    planned = [guard for guard in pre_state.get("documented_planned_list_guards", [])
+                        if guard["binding"]["planned_owner"]["request_path"] == owner_spec["request_path"]
+                        and guard["binding"]["declaration"]["name"] == "Effects"]
+                    if len(guards) + len(planned) != 1:
+                        raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results need one exact source List proof")
+                    before = (guards[0] if guards else planned[0].get("before") or {"members": []})["members"]
+                    old_ids = [_identity_key(member["id"]) for member in before]
+                    replacement = owner_spec.get("list_mode", "append") == "replaceAll"
+                    prefix = [] if replacement else old_ids
+                    rows = read_object(object_id=owner_id, fields=("id", "@Effects"), platform=owner_spec.get("platform"))
+                    members = rows[0].get("@Effects") if len(rows) == 1 and _same_identity(rows[0].get("id"), owner_id) else None
+                    ids = [_reference_identity(member) for member in members] if isinstance(members, list) and len(members) <= OBJECT_LIST_MAX_SUBTREE_NODES else []
+                    reviewed = [child for child in children if child.get("collection") == "Effects"]
+                    if (len(ids) != len(prefix) + len(reviewed) or any(not _valid_object_id(identity) for identity in ids)
+                            or len({_identity_key(identity) for identity in ids}) != len(ids)
+                            or [_identity_key(identity) for identity in ids[:len(prefix)]] != prefix
+                            or any(_identity_key(identity) in old_ids for identity in ids[len(prefix):])):
+                        raise ObjectOperationContractError("ANONYMOUS_LIST_MEMBERSHIP_MISMATCH", "Anonymous creation requires the complete new ordered GUID population and preserved append prefix")
+                    return {child["request_path"]: identity for child, identity in zip(reviewed, ids[len(prefix):], strict=True)
+                        if child.get("anonymous_list_member")}
+
                 result_by_path = _bind_object_set_result_nodes(
                     result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),
-                    observed_rtpcs=observed_rtpcs,
+                    observed_rtpcs=observed_rtpcs, observe_anonymous=observe_anonymous,
                 )
         except ObjectOperationContractError as exc:
             assertion_name = (
@@ -19936,6 +20137,7 @@ def verify_prepared_operation(
             if (
                 isinstance(collection, str)
                 and collection != "children"
+                and not list_spec.get("owned_reference")
             ):
                 if kind == "object-create-graph" and parent_path is None:
                     parent_path = "$create-parent"
@@ -20114,6 +20316,37 @@ def verify_prepared_operation(
                     )
                     check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
                           {"before": dict(before_member), "after": matches})
+        for snapshot in pre_state.get("object_graph_guard", {}).get("field_snapshots", []):
+            if not snapshot.get("preserve_after_write"):
+                continue
+            from .object_graph_paths import expected_snapshot
+            expected = expected_snapshot(snapshot["rows"][0], edits=specs, read_row=read_renamed_owner)
+            selected_references = {}
+            observed_fields = {field.lstrip("@") for field in snapshot["fields"]}
+            for name in snapshot.get("reference_fields", []):
+                if _has_field(expected, name):
+                    value = _field_value(expected, name)
+                    selected_references[name] = None if _reference_value_is_null(value) else _reference_identity(value)
+            for node in specs:
+                if not _same_identity(node.get("target_id", node.get("preexisting_id")), snapshot["object_id"]):
+                    continue
+                for prop in node.get("properties", []):
+                    if prop["name"] in observed_fields:
+                        expected["@" + prop["name"]] = prop["value"]
+                for reference in node.get("references", []):
+                    if reference.get("condition_guard") or reference["name"] not in observed_fields:
+                        continue
+                    selected_references[reference["name"]] = resolved_id_by_path.get(reference.get("target_request_path"), reference.get("target_id"))
+            actual = read_object(object_id=snapshot["object_id"], fields=snapshot["fields"], platform=snapshot.get("platform"))
+            # A deliberately retargeted reference uses the ordinary canonical
+            # identity/null primitive, never old target display labels with a
+            # new id spliced into them. All unselected fields remain exact.
+            expected_unselected = {key: value for key, value in expected.items() if key.lstrip("@") not in selected_references}
+            actual_unselected = [{key: value for key, value in row.items() if key.lstrip("@") not in selected_references} for row in actual]
+            passed = (_native_snapshot_equal(actual_unselected, [expected_unselected]) and len(actual) == 1
+                and all(_reference_requirement_matches(actual[0], name, value) for name, value in selected_references.items()))
+            check("unrequested existing anonymous member state remains unchanged", passed,
+                {"expected": expected, "selected_reference_intent": selected_references, "actual": actual})
         rtpc_guards = [spec for spec in specs if spec.get("rtpc_binding")]
         rtpc_snapshots, rtpc_verified = {}, set()
         for spec in rtpc_guards:
@@ -24389,12 +24622,13 @@ def _require_specialized_object_tree_relationships(
     version: str,
 ) -> None:
     for node in nodes:
-        if not node.children:
+        ordinary_children = [child for child in node.children if child.collection == "children"]
+        if not ordinary_children:
             continue
         _require_specialized_object_child_types(
             version=version,
             parent_type=node.type,
-            child_types=tuple(child.type for child in node.children),
+            child_types=tuple(child.type for child in ordinary_children),
             details={"request_path": node.request_path},
         )
 

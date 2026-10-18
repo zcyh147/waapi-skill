@@ -12,6 +12,7 @@ from .business_declarations import (
     BusinessHandleRegistry,
     ExistingObjectTarget,
     NewDescendantTarget,
+    AnonymousListTarget,
     OwnedRtpcTarget,
     business_repair,
     repair_at_draft_revision,
@@ -73,7 +74,9 @@ class BusinessDeclaration:
 
     def as_dict(self) -> dict[str, Any]:
         target = (
-            {
+            {"form": "anonymous-list-member", "parent_handle": self.target.parent_handle, "kind": self.target.kind}
+            if isinstance(self.target, AnonymousListTarget)
+            else {
                 "form": "new-descendant",
                 "parent_handle": self.target.parent_handle,
                 "name": self.target.name,
@@ -657,7 +660,7 @@ def _validate_target(
                 ("name", target.name),
                 ("kind", target.kind),
             )
-            if not isinstance(value, str) or not value
+            if not isinstance(value, str) or (not value and not (field == "name" and isinstance(target, AnonymousListTarget)))
         ]
         if missing:
             raise business_repair(
@@ -695,6 +698,10 @@ def _validate_target(
                 exc,
                 draft_revision=0 if draft_revision is None else draft_revision,
             ) from exc
+        if isinstance(target, AnonymousListTarget):
+            kind = handles.resolve_type(target.kind)
+            if (target.name != "" or kind.name != "EffectSlot" or handles.context.wwise_version not in {"2023.1", "2024.1", "2025.1"}):
+                raise business_repair("ANONYMOUS_LIST_PLACEMENT_INVALID", field="kind", action="select a source-proven anonymous List member Type Handle")
         return target
     if isinstance(target, OwnedRtpcTarget):
         if handles.context.wwise_version == "2021.1":
@@ -808,6 +815,8 @@ def _declaration_from_dict(
             name=str(target_payload.get("name")),
             kind=str(target_payload.get("kind")),
         )
+    elif form == "anonymous-list-member" and set(target_payload) == {"form", "parent_handle", "kind"}:
+        target = AnonymousListTarget(parent_handle=str(target_payload["parent_handle"]), name="", kind=str(target_payload["kind"]))
     elif form == "owned-rtpc" and set(target_payload) == {"form", "owner_handle"}:
         target = OwnedRtpcTarget(str(target_payload.get("owner_handle")))
     elif form == "existing-object" and set(target_payload) == {

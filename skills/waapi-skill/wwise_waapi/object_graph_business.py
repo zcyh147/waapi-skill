@@ -14,6 +14,7 @@ from .business_declarations import (
     BusinessDeclarationError,
     ExistingObjectTarget,
     NewDescendantTarget,
+    AnonymousListTarget,
     OwnedRtpcTarget,
     business_repair,
     resolve_semantic_kind,
@@ -69,6 +70,7 @@ _SET_NODE_EXTENSION_FIELDS = frozenset(
         "media_files",
         "object_list",
         "platform",
+        "plugin_placement",
     }
 )
 _RTPC_FIELDS = frozenset(
@@ -336,6 +338,18 @@ def _compile_set_new_node(
             allow_reference_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
             allow_inline_curve=True),
     }
+    placement = extension_fields.get("plugin_placement")
+    if placement is not None:
+        kind = session.handles.resolve_type(declaration.target.kind)
+        if kind.type_category.casefold() != "effect" or placement not in {"shareset", "owner"}:
+            raise _repair(session, "TYPE_HANDLE_ROLE_MISMATCH", field="plugin_placement", action="select an Effect Type Handle and a disclosed plugin placement")
+        node["plugin"] = {"kind": "effect", "placement": placement, "name": declaration.target.name,
+            "class_id": kind.class_id, "properties": node.get("properties", []),
+            **({"notes": node["notes"]} if "notes" in node else {})}
+    if isinstance(declaration.target, AnonymousListTarget):
+        if extension_fields.get("object_list") is None:
+            raise _repair(session, "ANONYMOUS_LIST_PLACEMENT_INVALID", field="object_list", action="select the certified owning List Field Handle")
+        node["anonymous"] = True
     platform = extension_fields.get("platform")
     if platform is not None:
         if not isinstance(platform, str) or not platform.strip():
@@ -482,7 +496,8 @@ def _resolve_native_object_type(
                     "or the metadata operations"
                 ),
             )
-        return native_type
+        bound = session.handles.resolve_type(kind_name)
+        return "Effect" if bound.type_category.casefold() == "effect" else native_type
     version = session.context.wwise_version
     kind = resolve_semantic_kind(kind_name, version=version)
     if kind.name in {"sound-sfx", "sound-voice"}:
@@ -1414,7 +1429,8 @@ def _materialize_set(
                                       action="use one inherited per-target list behavior for this graph")
                     list_behavior = child_behavior
                 if child_list is None:
-                    _validate_specialized_relationship(session, parent_type=node["type"], child_type=child_node["type"])
+                    if "plugin" not in child_node:
+                        _validate_specialized_relationship(session, parent_type=node["type"], child_type=child_node["type"])
                     node.setdefault("children", []).append(child_node)
                 else:
                     lists = node.setdefault("lists", [])
@@ -1461,7 +1477,8 @@ def _materialize_set(
         node, object_list, list_behavior = compile_node(declaration)
         _apply_row_list_behavior(session, row, list_behavior)
         if object_list is None:
-            _validate_specialized_relationship(session, parent_type=parent.object_type, child_type=node["type"])
+            if "plugin" not in node:
+                _validate_specialized_relationship(session, parent_type=parent.object_type, child_type=node["type"])
             row.setdefault("children", []).append(node)
         else:
             lists = row.setdefault("lists", [])

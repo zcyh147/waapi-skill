@@ -52,23 +52,26 @@ def expected_snapshot(snapshot, *, edits, read_row):
             continue
         if not isinstance(old_path, str):
             raise ValueError('A requested rename lacks its original path')
-        if not (snapshot['path'] == old_path or snapshot['path'].startswith(old_path + '\\')):
+        path_affected = snapshot['path'] == old_path or snapshot['path'].startswith(old_path + '\\')
+        projected_relations = [key for key in ('parent', 'owner') if isinstance(row.get(key), dict)
+            and isinstance(row[key].get('id'), str) and row[key]['id'].casefold() == target_id.casefold()
+            and 'name' in row[key]]
+        if not path_affected and not projected_relations:
             continue
         actual = read_row(target_id)
         actual_name = actual.get('name')
         if (not isinstance(name, str) or not isinstance(actual_name, str) or not actual_name or '\\' in actual_name
                 or not (actual_name == name or (node.get('on_name_conflict') == 'rename' and actual_name.startswith(name)))):
             raise ValueError('Actual name differs from the sealed graph rename policy')
-        segments[len(old_path.split('\\')) - 1] = actual_name
+        if path_affected:
+            segments[len(old_path.split('\\')) - 1] = actual_name
         if same:
             row['name'] = actual_name
-        reference = row.get('parent')
-        if (isinstance(reference, dict) and isinstance(reference.get('id'), str)
-                and reference['id'].casefold() == target_id.casefold() and 'name' in reference):
-            # Native identity references may also project the parent label. Only
-            # that exact renamed parent may change it; keep its GUID and every
-            # other projected field subject to the ordinary preservation check.
-            row['parent'] = {**reference, 'name': actual_name}
+        for relation in projected_relations:
+            # Only the exact sealed renamed parent/owner may change its label.
+            # Opaque member paths remain unchanged unless the prior path itself
+            # contains the source-proven ancestor component above.
+            row[relation] = {**row[relation], 'name': actual_name}
     row['path'] = '\\'.join(segments)
     return row
 
