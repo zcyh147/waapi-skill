@@ -862,7 +862,10 @@ class _ExceptionMetadataSanitizer:
         elif isinstance(key, int):
             if int.bit_length(key) > self.string_bytes_remaining * 4:
                 return None
-            safe_key = int.__repr__(key)
+            try:
+                safe_key = int.__repr__(key)
+            except (ValueError, OverflowError):
+                return None
         elif isinstance(key, float) and math.isfinite(key):
             safe_key = float.__repr__(key)
         else:
