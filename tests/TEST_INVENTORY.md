@@ -5,6 +5,22 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R26 checkpoint
+
+Frozen `3c3423eb` passed central preflight **825 tests** (27.22s) and a separate
+cross-feature focus **8 tests** (7.89s). Both source snapshots were unchanged,
+with no owned processes remaining. The actual Program roster has 257 entries.
+A separate exact 2025.1 media-result program capture passed **1 test** (1.13s);
+its full-product overlay records program proof and missing native proof, not
+completed coverage. Both overlay generation and identical check returned
+expected exit 2 while other obligations remain open.
+
+Authoring diagnostic `a79ef03b` failed before launch; repaired `f4abca75` launched
+but timed out before WAAPI readiness. Both source projects stayed unchanged;
+the latter's owned process cleanup completed. Neither is a native business PASS.
+No new full Program, Non-live, Fresh or Windows result is added. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-sixth-integration-checkpoint).
+
 ## 2026-10-18 full-coverage R25 checkpoint
 
 The complete five-version Program gate at `55383f8c` ended **12,245 passed /
