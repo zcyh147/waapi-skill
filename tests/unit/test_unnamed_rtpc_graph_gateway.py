@@ -655,3 +655,54 @@ def test_new_rtpc_control_input_uses_actual_class_metadata_and_existing_shared_t
     assert len(writes) == 1
     native_queries = [args['waql'] for uri, args, _ in task.calls if uri.endswith('object.get') and 'owner = null' in args.get('waql', '')]
     assert native_queries and set(native_queries) == {f'from object "{ROOT}" where owner = null take 1'}
+
+
+@pytest.mark.parametrize('fault', ['not-shared', 'missing-parent'])
+def test_new_rtpc_shared_control_input_requires_observed_target_classification(tmp_path, fault):
+    task, writes = _native_shared_control_input_task(tmp_path)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    if fault == 'not-shared':
+        task.shared_control = False
+    else:
+        task.objects[ROOT].pop('parent')
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] in {'INVALID_REFERENCE_TARGET', 'CONSTRAINED_REFERENCE_BOUNDARY'}, json.dumps(rejected)
+    assert writes == []
+
+
+@pytest.mark.parametrize('fault', ['metadata', 'class'])
+def test_new_rtpc_shared_control_input_revalidates_actual_class_metadata_before_write(tmp_path, fault):
+    task, writes = _native_shared_control_input_task(tmp_path)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    tx, shown = task.preview()
+    if fault == 'metadata':
+        task.metadata['ControlInput']['restriction']['restrictions'][0]['sharedOnlyTypes'] = []
+    else:
+        next(row for row in task.types if row['name'] == 'RTPC')['classId'] = 1441809
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and writes == [], json.dumps(rejected)
+
+
+@pytest.mark.parametrize('fault', ['metadata', 'classification'])
+def test_new_rtpc_shared_control_input_cannot_verify_after_source_or_target_drift(tmp_path, fault):
+    task, writes = _native_shared_control_input_task(tmp_path)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', tx)
+    assert code == 0 and len(writes) == 1, executed
+    if fault == 'metadata':
+        task.metadata['ControlInput']['restriction']['restrictions'][0]['sharedOnlyTypes'] = []
+    else:
+        task.shared_control = False
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['verified'] is False and len(writes) == 1, json.dumps(verified)
+    assert task.run('execute', tx)[0] == 2 and len(writes) == 1
