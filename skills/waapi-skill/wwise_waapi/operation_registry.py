@@ -5160,6 +5160,12 @@ def _prepare_object_create(
             "irreversible_preexisting_changes": conflict == "merge",
         }
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}
+    from .creation_observations import ordinary_creation_fields
+    fields = ordinary_creation_fields(node_specs[0]) if len(node_specs) == 1 else None
+    if (fields and conflict == "fail" and list_name is None and node_specs[0].get("collection") == "children"
+            and not node_specs[0].get("requested_language") and not node_specs[0].get("import_requested")):
+        from .edit_history_business import capture_field_read_platform
+        state["field_read_platform"] = capture_field_read_platform(request.version, platform, read=read)
     condition_guards = [spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec]
     if condition_guards:
         state["condition_metadata_guards"] = condition_guards
@@ -17540,6 +17546,7 @@ def verify_prepared_operation(
     readbacks: list[Mapping[str, Any]] = []
     assertions: list[Mapping[str, Any]] = []
     success_status = "verified"
+    created_history_metadata: list[tuple[Mapping[str, Any], str]] = []
     verification_strength = "operation_specific_readback"
     business_state_verified = True
 
@@ -19263,6 +19270,12 @@ def verify_prepared_operation(
                 )
             fields = _object_spec_return_fields(spec)
             platform = spec.get("platform")
+            history_view = (pre_state or {}).get("field_read_platform", {})
+            history_fields = (kind == "object-create-graph" and len(specs) == 1
+                and history_view.get("status") == "certified")
+            if history_fields:
+                fields = _dedupe_fields([*fields, "classId"])
+                platform = history_view["platform_id"]
             if platform is not None and (not isinstance(platform, str) or not platform):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
@@ -19397,6 +19410,8 @@ def verify_prepared_operation(
                 )
                 assertions.append({"name": "created root identity is independently verified",
                     "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
+                if identity_ok and history_fields:
+                    created_history_metadata.append((spec, object_id))
             if spec.get("notes_supplied") is True:
                 check(
                     f"{request_path} notes match",
@@ -22390,6 +22405,12 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
+    if created_history_metadata and all(item.get("passed") is True for item in assertions):
+        # Optional receipt evidence follows all mandatory source readbacks.
+        # A missing/failed optional read cannot consume a later required read.
+        from .creation_observations import capture_created_field_metadata
+        for spec, object_id in created_history_metadata:
+            readbacks.extend(capture_created_field_metadata(spec, object_id, read=read_call))
     outcome = _verification(
         operation,
         assertions,
