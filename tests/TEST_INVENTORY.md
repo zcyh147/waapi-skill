@@ -5,6 +5,26 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-19 TSV admission and Soundcaster diagnostic follow-up
+
+Integration `dacfa842` preserves component evidence without redundant reruns.
+The original 2022 TSV regression first failed because `draft-check` accepted
+`IsVoice`; its repaired control passed **1 test in 0.69s**. At `6ed4f2e4`,
+the alias rejection and valid Sound SFX import passed **2 tests in 0.81s**.
+These are separate staged results. The conflict-free merge preserves each
+accepted source file; four serial inventory generation/check commands passed,
+with unchanged schema seals, Program roster and native obligations.
+
+Diagnostic component `72021d16` passed **2 focused tests in 4.60s**. The real
+2024 Authoring attempt on `493b0d35` has a **BLOCKED final outcome**: the test
+body passed in **54.13s**, but the post-teardown port check failed. Source full
+hash/mtime and all 1,886 tracked files stayed unchanged; no owned process
+remained. A later independent bind found the port free without regrading the
+original attempt. Both archived PNGs were identical main-editor images; Root
+review found no Soundcaster session or values. No preservation credit is given.
+The original sandbox, receipts and images remain retained. No Fresh or broad
+regression was added; final gates and remaining native validation stay open.
+
 ## 2026-10-19 actual class and compound history integration
 
 Fixed `a047bf0d` passed **5 selected tests in 7.71s**: the cross-platform

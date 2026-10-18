@@ -12869,6 +12869,14 @@ def _prepare_import_dynamic_fields(
                     }
                 )
             else:
+                _require_tab_import_property_admission(
+                    version=request.version,
+                    metadata_type=type_info.name,
+                    metadata_class_id=type_info.class_id,
+                    info=info,
+                    row_number=target.get("row_number"),
+                    header=item.get("header"),
+                )
                 property_requests.append(
                     {
                         "name": name,
@@ -13411,6 +13419,37 @@ def _import_metadata_object_type(value: str, *, version: str) -> str:
         "virtualfolder": "Folder",
     }
     return aliases.get(token, value)
+
+
+def _require_tab_import_property_admission(
+    *,
+    version: str,
+    metadata_type: str,
+    metadata_class_id: int,
+    info: PropertyInfoMetadataRecord,
+    row_number: Any,
+    header: Any,
+) -> None:
+    # The matching 2022.1.19.8584 importTabDelimited refusal establishes this
+    # route-specific rule. getPropertyInfo and IsVisible do not certify general
+    # writability; this must not restrict ordinary Sound kind construction or
+    # claim the same TSV restriction in the other four version lanes.
+    if version == "2022.1" and metadata_type == "Sound" and info.name == "IsVoice":
+        raise OperationContractError(
+            "TAB_PROPERTY_NOT_MODIFIABLE",
+            "Wwise 2022.1 does not allow TSV assignment to Sound.IsVoice. "
+            "Supply a corrected table using <Sound SFX> with Object Type=Sound SFX "
+            "or <Sound Voice> with Object Type=Sound Voice, without the IsVoice assignment.",
+            details={
+                "version": version,
+                "row": row_number,
+                "header": header,
+                "property": info.name,
+                "metadata_object_type": metadata_type,
+                "metadata_class_id": metadata_class_id,
+                "source_operation": "audio.importTabDelimited",
+            },
+        )
 
 
 def _tab_import_reference_identity(value: str, *, field: str) -> Mapping[str, Any]:

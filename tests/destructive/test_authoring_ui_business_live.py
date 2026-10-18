@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import base64
 import json
 import os
 import hashlib
@@ -300,6 +301,169 @@ def test_authoring_2024_media_preservation_metadata_diagnostic(owned_authoring_l
     assert report['complete'], report['errors']
 
 
+SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_authoring_2024_soundcaster_frontend_image_diagnostic')
+
+
+def _soundcaster_source_witness(batch, destination):
+    """Retain original saved expectations; never interpret these as live values."""
+    from tests.destructive.support.console_file_observation import observe_console_file
+    source = batch.runtime.sandbox.source_root
+    files, sessions, members, total = [], [], {}, 0
+    for directory in ('Soundcaster Sessions', 'States', 'Switches'):
+        entries = []
+        for entry in (source / directory).iterdir():
+            assert len(entries) < 32, 'Source diagnostic directory exceeds entry bound'
+            entries.append(entry)
+        for path in sorted(entries):
+            assert path.is_file() and path.suffix == '.wwu', 'Unexpected source diagnostic entry'
+            observed = observe_console_file(path, io_root=source)
+            raw = base64.b64decode(observed['content_base64'], validate=True)
+            total += len(raw)
+            assert len(raw) <= 1024 * 1024 and total <= 2 * 1024 * 1024, 'Source diagnostic byte bound exceeded'
+            assert b'<!DOCTYPE' not in raw.upper() and b'<!ENTITY' not in raw.upper()
+            root = ET.fromstring(raw)
+            assert root.tag == 'WwiseDocument' and root.get('Type') == 'WorkUnit'
+            assert len(list(root.iter())) <= 16384, 'Source diagnostic XML node bound exceeded'
+            relative = path.relative_to(source).as_posix()
+            archive = destination / 'original-source' / relative
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open('xb') as stream:
+                stream.write(raw)
+            files.append({'source_path': relative, 'artifact_path': archive.relative_to(destination).as_posix(),
+                'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(), 'source_file_proof': observed['file_proof']})
+            if directory == 'Soundcaster Sessions':
+                for session in root.iter('SoundcasterSession'):
+                    bindings = []
+                    for row in session.findall('./RTPCValueList/RTPCValue'):
+                        ref = row.find('GameParameterRef')
+                        assert ref is not None and row.findtext('Value') is not None
+                        bindings.append({'kind': 'RTPC', 'id': ref.attrib['ID'], 'name': ref.attrib['Name'],
+                            'value': row.findtext('Value')})
+                    for kind in ('State', 'Switch'):
+                        for ref in session.findall(f'./Current{kind}List/Current{kind}Ref'):
+                            bindings.append({'kind': kind, 'id': ref.attrib['ID'], 'name': ref.attrib['Name']})
+                    sessions.append({'id': session.attrib['ID'], 'name': session.attrib['Name'],
+                        'source_path': relative, 'bindings': bindings})
+            else:
+                kind = 'State' if directory == 'States' else 'Switch'
+                for group in root.iter(kind + 'Group'):
+                    for member in group.findall('./ChildrenList/' + kind):
+                        key = (kind, member.attrib['ID'])
+                        assert key not in members, 'Duplicate original group member'
+                        members[key] = {'id': group.attrib['ID'], 'name': group.attrib['Name'],
+                            'member_name': member.attrib['Name']}
+    assert sorted((row['id'], row['name']) for row in sessions) == sorted(MEDIA_DIAGNOSTIC_SESSIONS)
+    assert len({row['name'] for row in sessions}) == 3, 'Original session names are not unique'
+    counts = {kind: 0 for kind in ('RTPC', 'State', 'Switch')}
+    for session in sessions:
+        for binding in session['bindings']:
+            counts[binding['kind']] += 1
+            if binding['kind'] != 'RTPC':
+                group = members[(binding['kind'], binding['id'])]
+                assert binding['name'] == group['member_name'], 'Original member identity/name mismatch'
+                binding['group'] = {'id': group['id'], 'name': group['name']}
+    assert counts == {'RTPC': 72, 'State': 16, 'Switch': 12}, 'Original saved binding set changed'
+    return {'full_tree_hash': batch.runtime.source_hash_before.digest,
+        'project_mtime_ns': batch.runtime.source_mtime_before_ns, 'files': files,
+        'sessions': sessions, 'binding_counts': counts,
+        'scope': 'original saved expectations only; not loaded session state'}
+
+
+def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_layout_node):
+    """One image per exact session; only independent image review can observe values."""
+    batch, call = owned_authoring_layout_node
+    assert batch.runtime.version == '2024.1' and batch.info['version']['build'] == 9056
+    runtime = batch.node_runtimes[SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE]
+    destination = Path(runtime.runner_environment['WWISE_EVIDENCE_DIR'])
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / 'soundcaster-frontend-diagnostic.json'
+    assert not path.exists() and not path.is_symlink(), 'Diagnostic cannot overwrite an earlier observation'
+    report = {'contract': 'waapi-skill.soundcaster-frontend-diagnostic/v1', 'complete': False,
+        'business_preservation_verified': False, 'runtime_session_values_observed': False,
+        'coverage_credit': 'none; diagnostic observation only', 'visual_review': 'unobserved; independent review required',
+        'media_operation_executed': False, 'host': batch.info, 'candidate': batch.candidate,
+        'source_context': batch.source_context, 'sessions': [], 'requests': [], 'errors': [],
+        'limits': {'public_calls': 48, 'reply_bytes': 1024 * 1024, 'total_reply_bytes': 4 * 1024 * 1024,
+            'image_base64_chars': 1024 * 1024, 'image_count': 2}}
+    path.write_text(json.dumps(report) + '\n', encoding='utf-8')
+    total, executed = 0, {}
+    def bounded_call(argv):
+        nonlocal total
+        assert len(report['requests']) < report['limits']['public_calls'], 'Diagnostic call bound exceeded'
+        entry = {'argv': list(argv)}
+        report['requests'].append(entry)
+        payload = call(argv)
+        size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+        total += size
+        assert size <= report['limits']['reply_bytes'] and total <= report['limits']['total_reply_bytes'], 'Diagnostic reply bound exceeded'
+        entry.update(reply_bytes=size, complete_reply_retained_by_owner=True)
+        if argv[0] == 'execute':
+            executed[payload['transaction_id']] = payload
+        return payload
+    def effect(operation, fields):
+        preview = _preview_business_plan(operation, fields, owner_call=bounded_call)
+        verified = _execute_and_verify(preview, owner_call=bounded_call)
+        assert verified['state'] == TransactionState.RESULT_SCHEMA_CHECKED.value, verified
+        assert verified['verification']['business_state_verified'] is False, verified
+        return {'transaction_id': preview['transaction_id'], 'artifact_hash': preview['artifact_hash'],
+            'state': verified['state'], 'business_state_verified': False}
+    try:
+        report['source'] = _soundcaster_source_witness(batch, destination)
+        # Preflight both identities before any UI command or image dispatch.
+        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS[1:]:
+            rows = bounded_call(['query-object', '--exact-id', identity, '--include', 'class-id', '--max-results', '1'])['objects']
+            assert (len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name
+                and rows[0]['type'] == 'SoundcasterSession' and rows[0]['class_id'] == 1703952), 'Exact source session identity/class changed'
+            report['sessions'].append({'id': identity, 'name': name, 'identity': rows[0]})
+        for session in report['sessions']:
+            session['command'] = effect('ui.commands.execute', ['--command-id', 'ShowSoundcaster', '--command-object', session['id']])
+            session['capture'] = effect('ui.captureScreen', [])
+            capture = session['capture']
+            original = executed[capture['transaction_id']]
+            assert original['artifact_hash'] == capture['artifact_hash']
+            captured = original['dispatch_result'].get('result')
+            if not isinstance(captured, dict):
+                # Execute deliberately digests large successes. Read its one
+                # already-sealed offline event; never capture again or lift caps.
+                shown = bounded_call(['transaction-show', capture['transaction_id']])
+                assert (shown['transaction_id'] == capture['transaction_id']
+                    and shown['artifact_hash'] == capture['artifact_hash']
+                    and shown['state'] == TransactionState.RESULT_SCHEMA_CHECKED.value)
+                events = [event for event in shown['events'] if event['event_type'] == 'execution_completed']
+                assert len(events) == 1 and events[0]['artifact_hash'] == capture['artifact_hash']
+                captured = events[0]['details']['dispatch_result']['result']
+                capture['image_source'] = {'kind': 'public_transaction_show_execution_completed',
+                    'event_hash': events[0]['event_hash']}
+            else:
+                capture['image_source'] = {'kind': 'public_execute_dispatch_result'}
+            assert isinstance(captured, dict), 'Exact image absent from bounded public result; session remains unobserved'
+            encoded = captured.get('contentBase64')
+            assert captured.get('contentType') == 'image/png' and isinstance(encoded, str) and 0 < len(encoded) <= 1024 * 1024
+            raw = base64.b64decode(encoded, validate=True)
+            assert raw.startswith(b'\x89PNG\r\n\x1a\n'), 'Capture does not contain PNG bytes'
+            image_path = destination / (session['name'].lower() + '.png')
+            with image_path.open('xb') as stream:
+                stream.write(raw)
+            from wwise_waapi.operation_soundbank import capture_file_proof
+            image_proof = capture_file_proof(image_path, field='Soundcaster diagnostic image',
+                max_bytes=1024 * 1024, io_root=destination)
+            assert image_proof['size'] == len(raw) and image_proof['sha256'] == hashlib.sha256(raw).hexdigest()
+            session['image'] = {'file_proof': image_proof, 'path': image_path.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+                'content_type': captured['contentType'], 'capture_transaction_id': session['capture']['transaction_id'],
+                'command_transaction_id': session['command']['transaction_id'], 'session_id': session['id'],
+                'visual_review': 'unobserved; image/schema success grants no business credit'}
+        report['complete'] = True
+    except Exception as exc:
+        report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:2048]})
+    finally:
+        report['public_call_count'], report['total_reply_bytes'] = len(report['requests']), total
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        temporary.replace(path)
+    assert report['complete'], report['errors']
+
+
 def _gateway_env(tmp_path: Path, *, version: str) -> dict[str, str]:
     sandbox = Path(os.environ["WWISE_AUTHORING_SANDBOX_PROJECT"]).resolve(
         strict=True
@@ -347,11 +511,13 @@ def _preview_business_plan(
     operation: str,
     declaration_args: list[str],
     *,
-    env: dict[str, str],
-    state_dir: Path,
+    env: dict[str, str] | None = None,
+    state_dir: Path | None = None,
+    owner_call=None,
     registration_key: str | None = None,
 ) -> dict[str, object]:
-    started = _call(
+    invoke = (lambda argv, **_: owner_call(argv)) if owner_call else (lambda argv, **_: _call(argv, env=env, state_dir=state_dir))
+    started = invoke(
         ["draft-start", operation],
         env=env,
         state_dir=state_dir,
@@ -360,7 +526,7 @@ def _preview_business_plan(
     assert isinstance(draft, dict)
     draft_id = str(draft["draft_id"])
     authority = str(started["task_authority"])
-    declared = _call(
+    declared = invoke(
         [
             "draft-declare-ui-plan",
             draft_id,
@@ -377,7 +543,7 @@ def _preview_business_plan(
     assert isinstance(current, dict)
     if operation == "ui.commands.register":
         assert registration_key is not None
-        current = _call(
+        current = invoke(
             [
                 "draft-add-ui-command",
                 draft_id,
@@ -396,7 +562,7 @@ def _preview_business_plan(
             state_dir=state_dir,
         )["draft"]
         assert isinstance(current, dict)
-    checked = _call(
+    checked = invoke(
         [
             "draft-check",
             draft_id,
@@ -410,7 +576,7 @@ def _preview_business_plan(
     )
     checked_draft = checked["draft"]
     assert isinstance(checked_draft, dict)
-    return _call(
+    return invoke(
         [
             "preview-from-draft",
             draft_id,
@@ -487,28 +653,31 @@ def _preview_host_plan(
 def _execute_and_verify(
     preview: dict[str, object],
     *,
-    env: dict[str, str],
-    state_dir: Path,
+    env: dict[str, str] | None = None,
+    state_dir: Path | None = None,
+    owner_call=None,
 ) -> dict[str, object]:
     transaction_id = str(preview["transaction_id"])
-    snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
-    _call(
+    invoke = (lambda argv, **_: owner_call(argv)) if owner_call else (lambda argv, **_: _call(argv, env=env, state_dir=state_dir))
+    token = (owner_call(["transaction-show", transaction_id])["confirmation"]["token"]
+             if owner_call else TransactionStore(state_dir).load_snapshot(transaction_id).confirmation_token)
+    invoke(
         [
             "confirm",
             transaction_id,
             "--confirmation-token",
-            snapshot.confirmation_token,
+            token,
         ],
         env=env,
         state_dir=state_dir,
     )
-    executed = _call(
+    executed = invoke(
         ["execute", transaction_id],
         env=env,
         state_dir=state_dir,
     )
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value
-    return _call(
+    return invoke(
         ["verify", transaction_id],
         env=env,
         state_dir=state_dir,

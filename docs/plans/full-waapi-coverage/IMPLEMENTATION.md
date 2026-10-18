@@ -18,6 +18,20 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Integration `dacfa842` rejects the observed 2022 TSV `IsVoice` assignment
+  before Preview, naming the row and field and explaining Sound SFX/Voice type
+  construction. Caller files and ordinary constructors remain unchanged.
+  Three focused controls passed in separate staged runs; no aggregate rerun was
+  needed for the conflict-free merge. Four serial inventory commands passed
+  with unchanged contracts and native obligations. Other-version TSV admission,
+  nested graph history and final gates remain open.
+- The `493b0d35` 2024 Soundcaster diagnostic captured two identical main-editor
+  images, without visible session values. Its test body passed, but final cleanup
+  was BLOCKED by the immediate port-release check. Source integrity and process
+  cleanup passed; the original result and sandbox remain preserved. A successor
+  will use an independently discovered view and the existing bounded port-release
+  wait. This is diagnosis, not session-preservation acceptance.
+
 - Integration `a047bf0d` makes actual class identity mandatory for ordinary
   create/set/merge and import verification, preserving documented aliases and
   stronger opaque-class proofs. Compound history now associates each child's
@@ -37,8 +51,8 @@ references. No main merge is authorized.
   generation/check commands passed; native obligations and historical evidence
   are unchanged. The original 2024 dump FAIL remains preserved; offline parsing
   of its retained artifact proves the parser repair, not session preservation.
-  Generic class verification and compound child-history association are the
-  next implementation batch. Final broad gates and review remain pending.
+  Generic class verification and compound child-history association were
+  subsequently integrated at `a047bf0d`. Final broad gates and review remain pending.
 
 - Staging `5acc4054` passes the 2022 null-source diagnostic and original complete
   created-field history case on real macOS Console. Successor `a3b70b45` passes
