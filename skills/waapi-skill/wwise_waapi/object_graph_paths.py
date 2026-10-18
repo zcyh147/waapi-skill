@@ -61,6 +61,13 @@ def expected_snapshot(snapshot, *, edits, read_row):
         segments[len(old_path.split('\\')) - 1] = actual_name
         if same:
             row['name'] = actual_name
+        reference = row.get('parent')
+        if (isinstance(reference, dict) and isinstance(reference.get('id'), str)
+                and reference['id'].casefold() == node['target_id'].casefold() and 'name' in reference):
+            # Native identity references may also project the parent label. Only
+            # that exact renamed parent may change it; keep its GUID and every
+            # other projected field subject to the ordinary preservation check.
+            row['parent'] = {**reference, 'name': actual_name}
     row['path'] = '\\'.join(segments)
     return row
 

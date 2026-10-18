@@ -384,3 +384,42 @@ def test_generic_ancestor_rename_seals_missing_intermediate_guid_snapshot(tmp_pa
         assert code == 0 and verified['verified'] is True, verified
         assert task.objects[FIRST]['path'] == base + r'\RoutingEdited\Middle\Edited'
         assert len(writes) == 1
+
+
+@pytest.mark.parametrize('source_kind', ['AuxBus', 'Sound'])
+@pytest.mark.parametrize('fault', [None, 'parent-name', 'parent-guid', 'path'])
+def test_renamed_parent_reference_label_is_derived_from_admitted_exact_parent(tmp_path, source_kind, fault):
+    task, writes = existing_task(tmp_path, field='UserAuxSend0' if source_kind == 'AuxBus' else 'Volume', source_kind=source_kind)
+    if source_kind == 'Sound':
+        task.types.append({'name': 'ActorMixer', 'classId': 73744, 'type': 'WObject'})
+        task.objects[SECOND].update(type='ActorMixer', classId=73744)
+        task.metadata = {'Volume': {'name': 'Volume', 'type': 'Real64',
+            'restriction': {'type': 'range', 'min': -200, 'max': 12}}}
+        task.objects[FIRST]['@Volume'] = -3.0
+    for row in task.objects.values():
+        parent = row.get('parent')
+        if isinstance(parent, dict):
+            parent['name'] = task.objects[parent['id']]['name']
+    parent = task.bind(SECOND)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'parent', '--object-handle', parent,
+        '--field', 'new_name', 'RoutingEdited')
+    assert code == 0, declared
+    declare_existing(task, extra=['--field', 'new_name', 'Edited'])
+    tx, shown = task.preview()
+    original = task.call
+    def call(uri, args=None, options=None):
+        value = original(uri, args, options)
+        if uri.endswith('object.set'):
+            for row in task.objects.values():
+                parent = row.get('parent')
+                if isinstance(parent, dict):
+                    parent['name'] = task.objects[parent['id']]['name']
+            if fault == 'parent-name': task.objects[FIRST]['parent']['name'] = 'Unrequested label'
+            if fault == 'parent-guid': task.objects[FIRST]['parent']['id'] = CHILD
+            if fault == 'path': task.objects[FIRST]['path'] += 'Unrequested'
+        return value
+    task.call = call
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get('verified') is True) == (fault is None), verified
+    assert len(writes) == 1
