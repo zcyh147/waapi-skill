@@ -26397,11 +26397,13 @@ def _compact_object_set_update_continuation(
             "declare_existing",
             "declare_existing_batch",
             "declare_new",
+            "declare_rtpc",
         ],
         "draft-discover-fields": [
             "field_discovery",
             "declare_existing",
             "declare_existing_batch",
+            "declare_rtpc",
         ],
         "draft-declare-existing": [
             "completion_candidate",

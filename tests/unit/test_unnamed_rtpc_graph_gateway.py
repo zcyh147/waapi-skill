@@ -13,7 +13,7 @@ RTPC_B = '{77777777-7777-7777-7777-777777777777}'
 POINTS = [(0, -48), (100, 0)]
 
 
-def rtpc_task(tmp_path, version='2025.1'):
+def rtpc_task(tmp_path, version='2025.1', fault=None):
     task = OwnedGraphTask(tmp_path, version, 'object.set')
     task.types = [{'name': name, 'classId': value, 'type': 'WObject'} for name, value in
         [('Sound', 65552), ('GameParameter', 1507344), ('RTPC', 1441808), ('Curve', 917520), ('WorkUnit', 1638416)]]
@@ -58,6 +58,16 @@ def rtpc_task(tmp_path, version='2025.1'):
                 task.objects[curve] = {'id': curve, 'name': '', 'type': 'Curve', 'classId': 917520,
                     'path': '\\opaque-curve-' + curve, 'owner': {'id': identity}, 'notes': ''}
             task.objects[FIRST]['@RTPC'] = [{'id': CHILD}, {'id': RTPC_B}]
+            if fault == 'wrong-pair':
+                task.objects[CHILD]['@PropertyName'] = 'Unrequested'
+            elif fault == 'wrong-value':
+                task.objects[CHILD]['@Curve']['points'][0]['y'] = -47
+            elif fault == 'wrong-owner':
+                task.objects[CHILD]['owner'] = {'id': SECOND}
+            elif fault == 'missing-member':
+                task.objects[FIRST]['@RTPC'] = [{'id': RTPC_B}]
+            elif fault == 'partial-curve':
+                del task.objects[CHILD]['@Curve']['points']
             return {'objects': [{'id': FIRST, 'name': 'Sender', '@RTPC': [
                 {'id': CHILD, 'name': ''}, {'id': RTPC_B, 'name': ''}]}]}
         result = original(uri, args, options)
@@ -78,9 +88,10 @@ def declare_rtpc(task, owner, control, token, declaration_id):
     return declared
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
-def test_graph_adds_two_unnamed_rtpc_pairs_in_one_public_transaction(tmp_path, version):
-    task, writes = rtpc_task(tmp_path, version)
+@pytest.mark.parametrize('version,fault', [(version, None) for version in ['2022.1', '2023.1', '2024.1', '2025.1']] +
+    [('2025.1', fault) for fault in ['wrong-pair', 'wrong-value', 'wrong-owner', 'missing-member', 'partial-curve']])
+def test_graph_adds_two_unnamed_rtpc_pairs_in_one_public_transaction(tmp_path, version, fault):
+    task, writes = rtpc_task(tmp_path, version, fault=fault)
     owner, control = task.bind(FIRST), task.bind(ROOT)
     first = declare_rtpc(task, owner, control, 'Volume', 'volume')
     second = declare_rtpc(task, owner, control, 'Pitch', 'pitch')
@@ -89,9 +100,11 @@ def test_graph_adds_two_unnamed_rtpc_pairs_in_one_public_transaction(tmp_path, v
     code, verified = task.finish(tx, shown)
     if code:
         (tmp_path / 'rtpc-verification.json').write_text(json.dumps(verified, indent=2))
-    assert code == 0 and verified.get('verified') is True, verified
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get('verified') is True) == (fault is None), verified
     assert len(writes) == 1
-    assert task.objects[CHILD]['@PropertyName'] == 'Volume' and task.objects[RTPC_B]['@PropertyName'] == 'Pitch'
+    if fault is None:
+        assert task.objects[CHILD]['@PropertyName'] == 'Volume' and task.objects[RTPC_B]['@PropertyName'] == 'Pitch'
 
 
 def seed_pair(task, identity=CHILD, property_name='Volume', curve=CURVE_A):
@@ -309,4 +322,68 @@ def test_planned_owner_merge_updates_existing_unnamed_pair_in_same_batch(tmp_pat
     if code:
         (tmp_path / 'merge-rtpc-verification.json').write_text(json.dumps(verified, indent=2))
     assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1
+
+
+def test_graph_schema_and_copied_continuation_disclose_rtpc_arguments(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    code, schema = task.run('operation-schema', 'object.set')
+    assert code == 0, schema
+    # Public projection may nest the versioned business contract; inspect its
+    # actual JSON rather than importing a private contract constructor.
+    encoded = json.dumps(schema)
+    assert 'rtpc_declaration' in encoded and 'draft-declare-rtpc' in encoded
+    assert 'add-only' in encoded and 'add-or-update' in encoded
+    assert '2022.1' in encoded and '2025.1' in encoded
+    code, bound = task.step('draft-bind-object', '--object-id', FIRST)
+    assert code == 0, bound
+    action = bound['draft']['next_action_binding']['declare_rtpc']
+    assert '--declaration-id' in action['append'] and '--control-input-handle' in action['append']
+    assert action['semantics']['existing_pair_update'] == 'exact_actual_RTPC_GUID_row_in_same_object_set;_no_name_merge'
+
+
+def test_rtpc_descriptor_does_not_relax_ordinary_object_names(tmp_path):
+    task, writes = rtpc_task(tmp_path)
+    parent = task.bind(SECOND)
+    code, result = task.step('draft-declare-new', '--declaration-id', 'ordinary', '--parent-handle', parent,
+        '--name', '', '--kind', 'sound-sfx')
+    assert code == 2, result
+    assert not writes
+
+
+@pytest.mark.parametrize('fault', [None, 'unrequested-path', 'unrequested-curve'])
+def test_requested_owner_rename_preserves_unrequested_rtpc_suffix_and_curve(tmp_path, fault):
+    task, _ = rtpc_task(tmp_path)
+    seed_pair(task, identity=RTPC_B, property_name='Pitch', curve=CURVE_B)
+    # Literal retained native RTPC readbacks use an owner path plus an RTPC
+    # display component. Only the admitted owner prefix is changed here.
+    task.objects[RTPC_B]['path'] = task.objects[FIRST]['path'] + r'\[RTPC: Voice Pitch, Intensity]'
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'owner', '--object-handle', owner,
+        '--field', 'new_name', 'Renamed')
+    assert code == 0, declared
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            row = args['objects'][0]
+            assert row['name'] == 'Renamed'
+            old_path = task.objects[FIRST]['path']
+            task.objects[FIRST]['name'] = 'Renamed'
+            task.objects[FIRST]['path'] = old_path.rsplit('\\', 1)[0] + '\\Renamed'
+            task.objects[RTPC_B]['path'] = task.objects[FIRST]['path'] + r'\[RTPC: Voice Pitch, Intensity]'
+            if fault == 'unrequested-path':
+                task.objects[RTPC_B]['path'] += '-wrong'
+            elif fault == 'unrequested-curve':
+                task.objects[RTPC_B]['@Curve']['points'][0]['y'] = -99
+            seed_pair(task)
+            task.objects[CHILD]['@Curve']['points'] = deepcopy(row['@RTPC'][0]['@Curve']['points'])
+            return {'objects': [{'id': FIRST, 'name': 'Renamed', '@RTPC': [{'id': CHILD, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get('verified') is True) == (fault is None), verified
     assert len(writes) == 1

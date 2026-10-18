@@ -20015,7 +20015,14 @@ def verify_prepared_operation(
                 if before["id"] in requested:
                     continue
                 matches = [row for row in actual if _same_identity(row["id"], before["id"])]
-                check("unrequested RTPC complete state and curve remain unchanged", matches == [before], {"before": before, "after": matches})
+                from .object_graph_paths import expected_snapshot
+                try:
+                    expected = expected_snapshot(dict(before), edits=specs, read_row=read_renamed_owner)
+                except (ValueError, KeyError, TypeError) as exc:
+                    check("unrequested RTPC path intent is bound", False, {"error": str(exc)})
+                    continue
+                check("unrequested RTPC complete state and curve remain unchanged", matches == [expected],
+                    {"before": before, "expected": expected, "after": matches})
         if kind == "object-set-batch":
             replaced_rows = replaced_set_rows
             if not isinstance(replaced_rows, list):
