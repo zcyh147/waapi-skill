@@ -446,7 +446,6 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     BoundFieldHandle,
     ExistingObjectTarget,
     NewDescendantTarget,
-    OwnedRtpcTarget,
     bind_live_field,
     business_repair,
     normalize_live_object_identity,

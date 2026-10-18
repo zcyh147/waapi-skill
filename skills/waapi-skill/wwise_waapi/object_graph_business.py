@@ -861,13 +861,6 @@ def _materialize_create(
 
     node_result_handles = {}
 
-    def compile_rtpc(row):
-        rtpc_args = _materialize_set_rtpc(replace(session, declarations=(row,)), planned_owners=new_by_result)["arguments"]
-        node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
-            "rtpc_mode": rtpc_args["mode"]}
-        node_result_handles[id(node)] = row.result_handle
-        return node
-
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
         fields = dict(row.fields)
