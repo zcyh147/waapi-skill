@@ -21,10 +21,13 @@ def _bundle(tmp_path, build='2025.1.7.9143'):
     console = _executable(bundle / 'Contents/Tools/WwiseConsole.sh')
     (bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleVersion': build}))
     cx = bundle / 'Contents/SharedSupport/Wwise2019x64'
-    for name in ('wine', 'winepath', 'wineprefixcreate', 'wineloader64', 'wineserver'):
+    for name in ('wine', 'wineprefixcreate', 'wineloader64', 'wineserver'):
         _executable(cx / 'bin' / name)
+    # Matching installed2024/25 bundles ship winepath as a Windows program,
+    # without a host bin/winepath executable.
+    _executable(cx / 'lib/wine/x86_64-windows/winepath.exe')
     (cx / 'support').mkdir()
-    (cx / 'lib/wine').mkdir(parents=True)
+
     _executable(bundle / 'Contents/SharedSupport/Wwise/bin/wwise_prepare')
     installed = tmp_path / 'Library/Application Support/Audiokinetic' / ('Wwise ' + build)
     _executable(installed / 'Authoring/x64/Release/bin/Wwise.exe')
@@ -70,9 +73,9 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
             link = facts.prefix / 'drive_c/Program Files/Audiokinetic' / ('Wwise ' + facts.build)
             link.parent.mkdir(parents=True)
             link.symlink_to(facts.installed, target_is_directory=True)
-        elif command[1] == '-w':
+        elif command[1:] == [str(facts.cx / 'lib/wine/x86_64-windows/winepath.exe'), '-w', str(facts.project)]:
             stdout = native_project + '\n'
-        elif command[1] == '-u':
+        elif command[1:] == [str(facts.cx / 'lib/wine/x86_64-windows/winepath.exe'), '-u', native_project]:
             stdout = str(facts.project) + '\n'
         return SimpleNamespace(returncode=0, stdout=stdout, stderr='')
     monkeypatch.setattr(authoring_launch.subprocess, 'run', run)
@@ -95,7 +98,7 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     assert lifecycle.launch_project_attestation == {'method': 'owned_winepath_roundtrip',
         'project': str(facts.project), 'native_project': native_project, 'roundtrip_project': str(facts.project),
         'build': build}
-    assert [Path(row[0][0]).name for row in preparation] == ['wineprefixcreate', 'wwise_prepare', 'winepath', 'winepath']
+    assert [Path(row[0][0]).name for row in preparation] == ['wineprefixcreate', 'wwise_prepare', 'wine', 'wine']
     assert all(row[1]['env']['WINEPREFIX'] == str(facts.prefix) and 0 < row[1]['timeout'] <= 120 for row in preparation)
 
 
@@ -121,6 +124,7 @@ def test_failed_authoring_preparation_still_uses_the_owners_prefix_cleanup_once(
         process_factory=lambda *_args, **_kwargs: pytest.fail('No Authoring process after preparation failure'))
     with pytest.raises(ValueError, match='preparation'):
         lifecycle.launch()
+    assert lifecycle.launch_preflight_failure is None
     assert lifecycle.cleanup_report is not None
     assert lifecycle.cleanup_report.is_clean
     assert lifecycle.cleanup_report.wine_prefix == str(facts.prefix)
@@ -156,7 +160,7 @@ def test_authoring_readiness_rejects_wrong_host_or_build_without_retry(tmp_path,
     assert process.terminated
 
 
-@pytest.mark.parametrize('invalid', ['project-alias', 'unowned-project', 'existing-prefix', 'bundle-build', 'port', 'extra-args', 'windows'])
+@pytest.mark.parametrize('invalid', ['project-alias', 'unowned-project', 'existing-prefix', 'bundle-build', 'port', 'extra-args', 'windows', 'winepath-absent', 'winepath-alias', 'winepath-directory', 'prefix-drift'])
 def test_authoring_ownership_rejects_invalid_context_before_any_tool_or_process(tmp_path, monkeypatch, invalid):
     facts = _bundle(tmp_path)
     from wwise_waapi import authoring_launch
@@ -165,6 +169,13 @@ def test_authoring_ownership_rejects_invalid_context_before_any_tool_or_process(
     monkeypatch.setattr(authoring_launch, 'MACOS_AUTHORING_INSTALL_ROOT', facts.installed.parent)
     monkeypatch.setattr(headless, 'assert_port_free', lambda *_: None)
     monkeypatch.setattr(authoring_launch.subprocess, 'run', lambda *_a, **_kw: pytest.fail('No tool before owned-context validation'))
+    if invalid in {'winepath-absent', 'winepath-alias', 'winepath-directory'}:
+        program = facts.cx / 'lib/wine/x86_64-windows/winepath.exe'
+        program.unlink()
+        if invalid == 'winepath-alias':
+            program.symlink_to(_executable(tmp_path / 'foreign-winepath.exe'))
+        elif invalid == 'winepath-directory':
+            program.mkdir()
     project = facts.project
     if invalid == 'project-alias':
         project = facts.project.parent / 'alias.wproj'
@@ -177,8 +188,56 @@ def test_authoring_ownership_rejects_invalid_context_before_any_tool_or_process(
     lifecycle = HeadlessLifecycle(console_path=facts.console, project_path=project,
         port=8081 if invalid == 'port' else 8080, command_extra_args=['extra'] if invalid == 'extra-args' else [],
         host_kind='wwise-authoring', authoring_build='2025.1.7.9144' if invalid == 'bundle-build' else facts.build,
-        authoring_owned_root=facts.owned, launch_env={'HOME': str(facts.home), 'WINEPREFIX': str(facts.prefix)},
+        authoring_owned_root=facts.owned, launch_env={'HOME': str(facts.home), 'WINEPREFIX': str(facts.prefix) + ('-foreign' if invalid == 'prefix-drift' else '')},
         process_factory=lambda *_a, **_kw: pytest.fail('No process before owned-context validation'))
     with pytest.raises((ValueError, HeadlessLifecycleError)):
         lifecycle.launch()
     assert lifecycle._authoring_context is None
+    if invalid not in {'port', 'extra-args'}:
+        assert lifecycle.launch_preflight_failure == {
+            'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False}
+        assert lifecycle.cleanup_report is None
+        assert lifecycle.launch_preparation == []
+
+
+@pytest.mark.parametrize('translation', ['relative', 'multiline', 'foreign-roundtrip'])
+def test_authoring_invalid_project_translation_cleans_only_owned_prefix_without_launch(tmp_path, monkeypatch, translation):
+    facts = _bundle(tmp_path)
+    from wwise_waapi import authoring_launch
+    import wwise_waapi.headless as headless
+    monkeypatch.setattr(authoring_launch.sys, 'platform', 'darwin')
+    monkeypatch.setattr(authoring_launch, 'MACOS_AUTHORING_INSTALL_ROOT', facts.installed.parent)
+    monkeypatch.setattr(headless, 'assert_port_free', lambda *_: None)
+    commands = []
+    def run(command, **kwargs):
+        commands.append(command)
+        name = Path(command[0]).name
+        stdout = ''
+        if name == 'wineprefixcreate':
+            facts.prefix.mkdir(parents=True)
+        elif name == 'wwise_prepare':
+            link = facts.prefix / 'drive_c/Program Files/Audiokinetic' / ('Wwise ' + facts.build)
+            link.parent.mkdir(parents=True)
+            link.symlink_to(facts.installed, target_is_directory=True)
+        elif name == 'wine' and command[-2] == '-w':
+            stdout = {'relative': 'relative.wproj', 'multiline': 'Z:\\one.wproj\nZ:\\two.wproj',
+                      'foreign-roundtrip': 'Z:\\foreign.wproj'}[translation]
+        elif name == 'wine' and command[-2] == '-u':
+            stdout = str(_executable(tmp_path / 'foreign.wproj'))
+        if name == 'ps':
+            stdout = '999 fake pytest process\n'
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr='')
+    monkeypatch.setattr(authoring_launch.subprocess, 'run', run)
+    lifecycle = HeadlessLifecycle(console_path=facts.console, project_path=facts.project, port=8080,
+        host_kind='wwise-authoring', authoring_build=facts.build, authoring_owned_root=facts.owned,
+        launch_env={'HOME': str(facts.home), 'WINEPREFIX': str(facts.prefix)},
+        process_factory=lambda *_a, **_kw: pytest.fail('No process after invalid translation'))
+    with pytest.raises(ValueError, match='mapping|roundtrip'):
+        lifecycle.launch()
+    assert lifecycle.launch_preflight_failure is None
+    assert lifecycle.cleanup_report.is_clean
+    assert lifecycle.cleanup_report.launch_pid is None
+    assert lifecycle.cleanup_report.wine_prefix == str(facts.prefix)
+    assert not any('start.exe' in command for command in commands)
+    assert [command for command in commands if Path(command[0]).name == 'wineserver'] == [
+        [str(facts.cx / 'bin/wineserver'), '-k']]
