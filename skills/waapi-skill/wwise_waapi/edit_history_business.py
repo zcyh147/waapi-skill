@@ -341,7 +341,7 @@ def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
                         raise ValueError("Creation reference requires its exact source existing-target role")
                     target_identity = targets[0]
             captured.append({"field": token, "field_kind": field["kind"], "value": actual,
-                "metadata_type": info.type, "field_info": info.as_dict(),
+                "metadata_type": info.type, "field_info": info.as_dict(include_raw=True),
                 **({"reference_target": target_identity} if target_identity is not None else {})})
         observation.update(platform=platform, class_id=row["classId"])
         return [observation, *({"kind": "creation_field", "object_id": identity["id"], "before": False, "after": True,
@@ -368,7 +368,7 @@ def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable
         for field in fields:
             info = bind_get_property_info_result(read(INFO, {"object": identity["id"], "property": field["field"]}, {}),
                 field_token=field["field"], available_names=names)
-            if info.name != field["field"] or not lifecycle_snapshot_equal(info.as_dict(), field["field_info"]):
+            if info.name != field["field"] or not lifecycle_snapshot_equal(info.as_dict(include_raw=True), field["field_info"]):
                 raise ValueError("Created-object history field metadata changed")
     for selector in ({"id": [identity["id"]]}, {"path": [identity["path"]]}):
         result = read(GET, {"from": selector}, {"return": [*IDENTITY, "parent", "notes",

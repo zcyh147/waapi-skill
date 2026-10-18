@@ -2280,8 +2280,20 @@ def test_created_reference_metadata_omission_is_bound_from_exact_source_names(tm
     field = next(item for item in binding["observations"] if item.get("kind") == "creation_field")
     assert field["field_info"]["name"] is None and field["field_info"]["type"] is None
     assert field["field_info"]["field_binding"]["token"] == "Attenuation"
+    assert "name" not in field["field_info"]["raw"] and "type" not in field["field_info"]["raw"]
     assert task.run("execute", tx)[0] == 0
     assert task.run("verify", tx)[0] == 0
+
+
+def test_created_fields_history_rejects_native_metadata_omission_to_null_before_dispatch(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True)
+    assert "default" not in task.metadata["Volume"]
+    tx = _created_leaf_history_preview(task, source)
+    task.metadata["Volume"]["default"] = None
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(call[0].startswith("ak.wwise.core.undo.") for call in task.calls)
+    assert '"default": null' in json.dumps(rejected)
 
 
 def test_created_fields_review_is_compact_and_full_source_metadata_remains_available(tmp_path):
@@ -2297,6 +2309,9 @@ def test_created_fields_review_is_compact_and_full_source_metadata_remains_avail
     assert code == 0, full
     raw = full["artifact"]["request"]["arguments"]["history_binding"]["observations"]
     assert all(item["field_info"]["type"] for item in raw if item.get("kind") == "creation_field")
+    volume = next(item["field_info"] for item in raw if item.get("field") == "Volume")
+    assert volume["default"] is None and "default" not in volume["raw"]
+    assert volume["raw"] == task.metadata["Volume"]
     assert compact.get("agent_result") == full.get("agent_result")
 
 
