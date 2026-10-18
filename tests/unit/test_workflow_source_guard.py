@@ -2910,3 +2910,137 @@ def test_rtpc_graph_collector_stops_before_update_when_base_state_read_fails(tmp
     assert len(receipt['effects']) == 1 and receipt['complete'] is False
     assert receipt['enabled_observations'][-1]['exit_code'] != 0
     assert runtime.category_results[0]['status'] == 'FAIL'
+
+
+def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fault=None):
+    """Public Gateway with native-shaped create/history state, never manufactured receipts."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
+    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    actor = ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + '\\Default Work Unit'
+    attenuation_parent = '{66666666-6666-6666-6666-666666666666}'
+    task.objects = {identity: {'id': identity, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 1638416, 'path': path, 'parent': None, 'notes': 'Keep parent'}
+        for identity, path in [(SECOND, actor), (attenuation_parent, r'\Attenuations\Default Work Unit')]}
+    task.types = [{'name': name, 'classId': value, 'type': 'WObject'} for name, value in (
+        ('Sound', 65552), ('Attenuation', 655376), ('WorkUnit', 1638416))]
+    task.metadata = {'IsLoopingEnabled': {'name': 'IsLoopingEnabled', 'type': 'bool', 'default': False},
+        'IsLoopingInfinite': {'name': 'IsLoopingInfinite', 'type': 'bool', 'default': False},
+        'Volume': {'name': 'Volume', 'type': 'Real32', 'restriction': {'type': 'range', 'min': -96, 'max': 6}},
+        'Attenuation': {'name': 'Attenuation', 'type': '', 'restriction': {
+            'type': 'reference', 'restrictions': [{'type': ['Attenuation']}]}}}
+    platform = '{77777777-7777-7777-7777-777777777777}'
+    original, commands, writes = task.call, [], []
+    history = {}
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith('getProjectInfo'):
+            return {**original(uri, args, options), 'currentPlatformId': platform,
+                'platforms': [{'id': platform, 'name': 'Windows'}]}
+        if uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
+            identity = '{' + str(uuid.UUID(int=200 + len(writes))).upper() + '}'
+            row = {'id': identity, 'name': args['name'], 'type': args['type'],
+                'classId': next(item['classId'] for item in task.types if item['name'] == args['type']),
+                'path': task.objects[args['parent']]['path'] + '\\' + args['name'],
+                'parent': {'id': args['parent']}, 'notes': args.get('notes', '')}
+            row.update({key: deepcopy(value) for key, value in args.items() if key.startswith('@')})
+            task.objects[identity] = row
+            if row['type'] == 'Sound': history.update(id=identity, after=deepcopy(row))
+            return {'id': identity, 'name': row['name']}
+        if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
+            if fault == 'undo-error' and uri.endswith('.undo'): raise RuntimeError('fixture undo native refused')
+            if uri.endswith('.undo'): task.objects.pop(history['id'], None)
+            else: task.objects[history['id']] = deepcopy(history['after'])
+            return {}
+        if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            source = args.get('from', {})
+            if 'id' in source: rows = [task.objects[key] for key in source['id'] if key in task.objects]
+            elif 'path' in source: rows = [row for row in task.objects.values() if row['path'] in source['path']]
+            else:
+                expression = args['waql']; assert expression.startswith('from object "'), expression
+                selector = expression.split('"')[1]
+                rows = [row for row in task.objects.values() if selector in (row['id'], row['path'])]
+            for transform in args.get('transform', []):
+                assert transform == {'select': ['children']}, transform
+                rows = [row for row in task.objects.values() if row.get('parent') == {'id': rows[0]['id']}]
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='fixture-candidate', category_results=[])
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: task)
+        if command[0] == 'verify' and code == 0 and history:
+            last = writes[-1][0]
+            if last.endswith('object.create') and fault == 'derived-after-verify':
+                task.objects[history['id']]['@IsLoopingInfinite'] = False
+            elif last.endswith('object.create') and fault == 'target-after-verify':
+                next(row for row in task.objects.values() if row['type'] == 'Attenuation')['notes'] = 'Unexpected target change'
+            elif last.endswith('object.create') and fault == 'null-cross-root-after-verify' and history['after']['name'].endswith('_null'):
+                other = next(row for row in task.objects.values() if row['type'] == 'Sound' and row['name'].endswith('_existing'))
+                task.objects[history['id']]['@Attenuation'] = deepcopy(other['@Attenuation'])
+            elif last.endswith('.undo') and fault == 'undo-after-verify':
+                task.objects[history['id']] = deepcopy(history['after'])
+            elif last.endswith('.redo') and fault == 'redo-after-verify':
+                task.objects[history['id']].pop('@Attenuation')
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
+def test_created_fields_history_collector_executes_public_source_and_history_effects(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _created_fields_history_runtime(tmp_path, workflow, version)
+    category = workflow._collect_created_leaf_fields_history_acceptance(runtime, name='WAAPI_HISTORY_TEST')
+    assert category['status'] == 'PASS'
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['complete'] is True and receipt['business_effect_verified'] is True
+    assert receipt['setup_coverage_credit'] is False
+    assert [row['phase'] for row in receipt['effects']] == [item for case in ('existing', 'null')
+        for item in ([case + '-source', case + '-undo'] if version == '2022.1'
+            else [case + '-source', case + '-undo', case + '-redo'])]
+    assert len(writes) == (5 if version == '2022.1' else 7)
+    assert all(row['effect_verified'] is True for row in receipt['effects'])
+    roots = [row['independent_effect']['id'] for row in receipt['effects'] if row['phase'].endswith('-source')]
+    assert len(set(roots)) == 2
+    for row in receipt['effects']:
+        if row['phase'].endswith(('-undo', '-redo')):
+            binding = row['immutable_preview']['request']['arguments']['history_binding']
+            root = roots[int(row['phase'].startswith('null-'))]
+            assert {item['object_id'] for item in binding['observations'] if item['kind'] == 'creation_field'} == {root}
+    assert sum(command[0] == 'execute' for command in commands) == len(writes)
+    if version == '2022.1': assert not any(uri.endswith('.redo') for uri, _args in writes)
+
+
+@pytest.mark.parametrize('fault', ['derived-after-verify', 'target-after-verify', 'undo-after-verify', 'redo-after-verify', 'null-cross-root-after-verify', 'undo-error'])
+def test_created_fields_history_collector_independent_oracle_retains_failed_effect(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _created_fields_history_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_created_leaf_fields_history_acceptance(runtime, name='WAAPI_HISTORY_TEST')
+    category = runtime.category_results[0]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['complete'] is False and receipt['business_effect_verified'] is False
+    assert receipt['failure']['type'] == 'AssertionError'
+    assert any(row['effect_verified'] is False for row in receipt['effects'])
+    if fault == 'undo-error':
+        assert 'fixture undo native refused' in json.dumps(receipt)
+        assert len([uri for uri, _args in writes if uri.endswith('.undo')]) == 1
+    else:
+        # Gateway already reported verification; independent object/absence reads reject damage.
+        phase = receipt['effects'][-1]
+        assert phase['verify']['verified'] is True
+        assert any(command[0] == 'query-object' for command in commands)
+
+
+def test_created_fields_history_collector_never_dispatches_unpinned_2021_history(tmp_path, workflow):
+    runtime, commands, writes, _task = _created_fields_history_runtime(tmp_path, workflow, '2021.1')
+    with pytest.raises(AssertionError, match='No pinned native history'):
+        workflow._collect_created_leaf_fields_history_acceptance(runtime, name='WAAPI_HISTORY_TEST')
+    assert commands == writes == []

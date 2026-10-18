@@ -2301,8 +2301,8 @@ def test_created_fields_review_is_compact_and_full_source_metadata_remains_avail
     tx = _created_leaf_history_preview(task, source)
     code, compact = task.run("transaction-show", tx, "--summary-only")
     assert code == 0, compact
-    fields = [item for item in compact["preview_summary"]["history_action"]["expected_observations"]
-        if item.get("kind") == "creation_field"]
+    presence, = compact["preview_summary"]["history_action"]["expected_observations"]
+    fields = presence["fields"]
     assert {item["field"] for item in fields} == {"IsLoopingEnabled", "IsLoopingInfinite", "Volume"}
     assert all(item["metadata_bound"] is True and "field_info" not in item for item in fields)
     code, full = task.run("transaction-show", tx)
@@ -2546,3 +2546,47 @@ def test_created_leaf_history_requires_source_notes_observation_even_when_source
         "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
     assert code == 2 and "actual notes are incomplete" in json.dumps(rejected), rejected
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+
+
+@pytest.mark.parametrize('reference', ['existing', 'null'])
+def test_created_fields_combined_receipt_review_keeps_complete_root_fields_and_exact_proof(tmp_path, reference):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True, reference=reference)
+    tx = _created_leaf_history_preview(task, source)
+    code, compact = task.run('transaction-show', tx, '--summary-only')
+    assert code == 0, compact
+    observations = compact['preview_summary']['history_action']['expected_observations']
+    presence, = observations
+    assert presence['kind'] == 'creation_presence' and presence['before'] is False and presence['after'] is True
+    assert {row['field'] for row in presence['fields']} == {'IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'Attenuation'}
+    assert all(row['metadata_bound'] is True and 'field_info' not in row for row in presence['fields'])
+    code, full = task.run('transaction-show', tx)
+    assert code == 0, full
+    sealed = full['artifact']['request']['arguments']['history_binding']['observations']
+    field_rows = [row for row in sealed if row['kind'] == 'creation_field']
+    assert len(field_rows) == 4 and all('raw' in row['field_info'] for row in field_rows)
+    assert all(row['object_id'] == presence['object']['id'] for row in field_rows)
+    compact_fields = [{key: value for key, value in row.items() if key not in {'kind', 'object_id', 'before', 'after', 'field_info'}}
+        for row in field_rows]
+    assert presence['fields'] == [{**row, 'metadata_bound': True} for row in compact_fields]
+    assert task.run('execute', tx)[0] == 0
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert list(verified)[-1] == 'agent_result' and verified['agent_result']['result'] == {}
+
+
+@pytest.mark.parametrize('corruption', ['missing', 'duplicate', 'other-root'])
+def test_created_fields_compact_review_cannot_weaken_immutable_field_proof(tmp_path, corruption):
+    from copy import deepcopy
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True, reference='existing')
+    tx = _created_leaf_history_preview(task, source)
+    path = tmp_path / 'state' / 'transactions' / tx / 'preview.json'
+    document = json.loads(path.read_text())
+    observations = document['artifact']['request']['arguments']['history_binding']['observations']
+    field = next(item for item in observations if item['kind'] == 'creation_field')
+    if corruption == 'missing': observations.remove(field)
+    elif corruption == 'duplicate': observations.append(deepcopy(field))
+    else: field['object_id'] = '{33333333-3333-3333-3333-333333333333}'
+    path.write_text(json.dumps(document), encoding='utf-8')
+    code, rejected = task.run('execute', tx)
+    assert code == 2, rejected
+    assert not any(call[0].startswith('ak.wwise.core.undo.') for call in task.calls)

@@ -542,6 +542,20 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
 
 def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
     receipt = binding["source_receipt"]
+    observations = []
+    for row in binding["observations"]:
+        if row.get("kind") == "creation_field":
+            continue
+        compact = {**{key: value for key, value in row.items() if key != "field_info"},
+            **({"metadata_bound": True} if "field_info" in row else {})}
+        if row.get("kind") == "creation_presence":
+            fields = [field for field in binding["observations"] if field.get("kind") == "creation_field"
+                and field["object_id"] == row["object"]["id"]]
+            if fields:
+                compact["fields"] = [{**{key: value for key, value in field.items()
+                    if key not in {"kind", "object_id", "before", "after", "field_info"}},
+                    "metadata_bound": True} for field in fields]
+        observations.append(compact)
     return {"scope": "latest_project_history", "action": binding["uri"].rsplit(".", 1)[-1],
         "expectation_receipt": receipt["transaction_id"] if receipt else None,
         "effect_expectation": "owned_receipt_scoped_state" if receipt else "none",
@@ -549,5 +563,4 @@ def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
         "verification_boundary": "owned_receipt_scoped_state_only" if receipt else "result_schema_only; effect_and_preservation_unobserved",
         "stack_head_observed": False, "outside_scope_preservation_observed": False,
         "automatic_retry": False, "automatic_compensation": False,
-        "expected_observations": [{**{key: value for key, value in row.items() if key != "field_info"},
-            **({"metadata_bound": True} if "field_info" in row else {})} for row in binding["observations"]]}
+        "expected_observations": observations}
