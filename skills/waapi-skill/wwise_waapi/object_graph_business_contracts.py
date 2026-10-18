@@ -79,7 +79,7 @@ def object_graph_business_contract_data(
                 "properties_and_references": "class_scoped_field_handles",
                 "placement_targets": {
                     "owner": "compatible audio object; never a Work Unit",
-                    "shareset": "WorkUnit under Effects, Audio Devices, or Metadata for the exact Effect, Sink, or Metadata class",
+                    "shareset": "Effect: WorkUnit or fresh source-proven Folder under Effects; Sink/Metadata: matching WorkUnit under Audio Devices/Metadata",
                 },
             },
             "type_discovery": {
@@ -273,7 +273,7 @@ def object_graph_business_contract_data(
                         "pending_behavior": "reject_before_dispatch_without_selecting_old_blank_name_members_or_changing_policy"},
                     "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values",
                 },
-                "graph_plugin": {"type": "effect_Type_Handle", "plugin_placement": ["shareset", "owner"], "native_class_id": "Gateway_owned_from_Type_Handle"},
+                "graph_plugin": {"type": "effect_Type_Handle", "plugin_placement": ["shareset", "owner"], "shareset_parent": "bound_Effects_WorkUnit_or_fresh_source_proven_Folder", "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [
                     "field_values",
                     "language",

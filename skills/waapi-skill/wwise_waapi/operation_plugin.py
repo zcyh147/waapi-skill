@@ -524,9 +524,12 @@ def validate_plugin_target(
 ) -> None:
     if descriptor.placement == "shareset":
         hierarchy = PLUGIN_SHARESET_HIERARCHIES[descriptor.kind]
-        if target_type != "WorkUnit" or not isinstance(target_path, str) or not target_path.startswith("\\" + hierarchy + "\\"):
+        allowed_types = {"WorkUnit", "Folder"} if descriptor.kind == "effect" else {"WorkUnit"}
+        if target_type not in allowed_types or not isinstance(target_path, str) or not target_path.startswith("\\" + hierarchy + "\\"):
             raise PluginOperationContractError(
-                "INVALID_SHARESET_TARGET", f"This plug-in ShareSet requires a Work Unit beneath the {hierarchy} hierarchy.",
+                "INVALID_SHARESET_TARGET",
+                (f"This Effect ShareSet requires a Work Unit or source-proven Folder beneath the {hierarchy} hierarchy."
+                 if descriptor.kind == "effect" else f"This plug-in ShareSet requires a Work Unit beneath the {hierarchy} hierarchy."),
                 details={"target_type": target_type, "target_path": target_path},
             )
     elif descriptor.kind == "effect" and target_type not in EFFECT_TARGET_TYPES:
