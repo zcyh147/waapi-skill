@@ -3142,6 +3142,8 @@ def test_anonymous_collector_preserves_previous_owner_after_the_planned_graph_ef
 def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared'):
     from copy import deepcopy
     runtime, commands, writes, task = _anonymous_effect_construction_runtime(tmp_path, workflow)
+    if outcome == 'color-change':
+        task.metadata['Color'] = {'name': 'Color', 'type': 'int32', 'default': 0}
     original = task.call
     def call(uri, args=None, options=None):
         if uri.endswith('isPropertyEnabled'):
@@ -3166,10 +3168,15 @@ def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared')
             if outcome == 'bypass-change': slots[1]['@Bypass'] = True
             if outcome == 'owner-change': slots[1]['owner'] = {'id': slots[0]['id']}
             if outcome == 'reference-change': slots[1]['@Effect'] = deepcopy(slots[0]['@Effect'])
+            if outcome == 'color-change': slots[1]['@Color'] = 123
             return {}
         if outcome == 'read-error' and len(writes) == 5 and uri.endswith('object.get'):
             raise RuntimeError('Original readback error after write; never classify a suffix')
-        return original(uri, args, options)
+        result = original(uri, args, options)
+        if outcome == 'color-change' and uri.endswith('object.set'):
+            for row in task.objects.values():
+                if row['type'] == 'EffectSlot': row.setdefault('@Color', 0)
+        return result
     task.call = call
     return runtime, commands, writes, task
 
@@ -3234,3 +3241,13 @@ def test_render_suffix_diagnostic_retains_native_failure_and_stops_without_retry
     assert 'Original native suffix rejection' in json.dumps(receipt['transactions'][-1]['execute'])
     assert len(writes) == 5 and commands[-1][0] == 'execute'
     assert [command[0] for command in commands].count('verify') == 4
+
+
+def test_render_suffix_diagnostic_preserves_other_disclosed_slot_scalars(tmp_path, workflow):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow, outcome='color-change')
+    with pytest.raises(AssertionError):
+        workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['diagnostic_complete'] is False
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
