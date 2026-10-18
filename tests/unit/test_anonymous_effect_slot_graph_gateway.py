@@ -382,6 +382,8 @@ def test_public_schema_and_continuation_disclose_source_owned_blank_name(tmp_pat
     contract = find(schema)
     assert contract['omit'] == ['name']
     assert contract['versions'] == ['2023.1', '2024.1', '2025.1']
+    assert contract['on_name_conflict']['supported'] == ['fail']
+    assert contract['on_name_conflict']['pending_source_native_proof'] == ['rename', 'merge', 'replace']
     task.bind(FIRST)
     code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'EffectSlot')
     assert code == 0, found
@@ -389,6 +391,7 @@ def test_public_schema_and_continuation_disclose_source_owned_blank_name(tmp_pat
     assert '--name' not in continuation['append']
     assert '--kind' in continuation['append'] and 'object_list' in continuation['append']
     assert continuation['native_name'] == 'Gateway_owned_empty_string'
+    assert continuation['semantics']['on_name_conflict'] == contract['on_name_conflict']
     assert continuation['local_plugin']['plugin_placement'] == 'owner'
 
 
@@ -471,4 +474,15 @@ def test_anonymous_append_rejects_aggregate_population_beyond_complete_read_boun
     declare_slots(task)
     code, checked = task.step('draft-check')
     assert code == 2 and 'LIST_SNAPSHOT_LIMIT_EXCEEDED' in json.dumps(checked), checked
+    assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('conflict', ['rename', 'merge', 'replace'])
+def test_anonymous_nondefault_conflict_policy_is_explicitly_pending_before_dispatch(tmp_path, conflict):
+    task = anonymous_task(tmp_path)
+    declare_slots(task)
+    code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+    assert code == 0, configured
+    code, checked = task.step('draft-check')
+    assert code == 2 and 'ANONYMOUS_LIST_CONFLICT_UNRESOLVED' in json.dumps(checked), checked
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
