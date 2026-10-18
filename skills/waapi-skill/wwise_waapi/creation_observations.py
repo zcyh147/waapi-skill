@@ -19,7 +19,7 @@ def ordinary_creation_fields(node: Mapping[str, Any]) -> list[dict[str, Any]] | 
     return fields
 
 
-def ordinary_creation_graph(plan, state, *, max_observations=128):
+def ordinary_creation_graph(plan, state, *, parent, max_observations=128):
     """Validate the complete ordinary new hierarchy, never a supported subset."""
     nodes = plan.get('nodes')
     if (not isinstance(nodes, list) or not nodes or not all(isinstance(node, Mapping) for node in nodes)
@@ -61,11 +61,15 @@ def ordinary_creation_graph(plan, state, *, max_observations=128):
         for field in ordinary_creation_fields(node):
             if 'target_request_path' in field and field['target_request_path'] not in paths:
                 raise ValueError('Creation history reference lacks its declared graph target')
+    parent_identity = normalize_live_object_identity(parent)
+    if parent_identity.object_id.upper() != str(plan.get('parent_id')).upper():
+        raise ValueError('Creation history requires its exact sealed parent identity')
+    root_path = parent_identity.path.rstrip('\\') + '\\' + nodes[0]['requested_name']
     roots = [row for row in state.get('object_graph_guard', {}).get('path_snapshots', [])
-             if str(row.get('path', '')).endswith('\\' + nodes[0]['requested_name'])]
-    if len({row['path'] for row in roots}) != 1 or any(row.get('rows') != [] for row in roots):
+             if row.get('path') == root_path]
+    if not roots or any(row.get('rows') != [] for row in roots):
         raise ValueError('Creation history requires one sealed absent root path')
-    expected_paths = {'$': roots[0]['path']}
+    expected_paths = {'$': root_path}
     pending = dict(paths)
     while pending:
         ready = [path for path, node in pending.items() if path == '$' or node['parent_request_path'] in expected_paths]
@@ -101,7 +105,8 @@ def require_compound_creation_scope(calls):
                 key = (str(item['scope'].get('object_id')).upper(), chain.get('platform'))
                 covered.setdefault(key, set()).add(item['field'])
         if kind == 'object-create-graph':
-            nodes, paths = ordinary_creation_graph(plan, state, max_observations=MAX_OBSERVATIONS)
+            nodes, paths = ordinary_creation_graph(plan, state,
+                parent=child.get('resolved_roles', {}).get('parent', {}).get('row'), max_observations=MAX_OBSERVATIONS)
             graphs.append((index, paths))
             known_count += len(nodes) + sum(len(ordinary_creation_fields(node)) for node in nodes)
         elif kind == 'same-guid-renamed':

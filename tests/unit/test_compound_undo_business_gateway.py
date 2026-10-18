@@ -4107,8 +4107,7 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
-def test_created_graph_history_restores_internal_reference_without_preserving_absent_target(tmp_path, version):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination'):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     task = OwnedGraphTask(tmp_path, version, 'object.create')
@@ -4128,16 +4127,16 @@ def test_created_graph_history_restores_internal_reference_without_preserving_ab
         if uri.endswith('object.create'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             base = task.objects[SECOND]['path'] + r'\Routing'
-            for name, cid, parent in (('Routing', 1376272, SECOND), ('Destination', 3997712, ids['Routing']), ('Sender', 3997712, ids['Routing'])):
-                task.objects[ids[name]] = {'id': ids[name], 'name': name, 'classId': cid,
-                    'type': 'Bus' if name == 'Routing' else 'AuxBus', 'parent': {'id': parent}, 'notes': '',
-                    'path': base + ('' if name == 'Routing' else '\\' + name)}
+            for key, name, cid, parent in (('Routing', 'Routing', 1376272, SECOND), ('Destination', target_name, 3997712, ids['Routing']), ('Sender', 'Sender', 3997712, ids['Routing'])):
+                task.objects[ids[key]] = {'id': ids[key], 'name': name, 'classId': cid,
+                    'type': 'Bus' if key == 'Routing' else 'AuxBus', 'parent': {'id': parent}, 'notes': '',
+                    'path': base + ('' if key == 'Routing' else '\\' + name)}
             native_target = args['children'][1]['@UserAuxSend0']
             actual_targets = [row['id'] for row in task.objects.values() if row['path'] == native_target]
             assert len(actual_targets) == 1, native_target
             task.objects[ids['Sender']]['@UserAuxSend0'] = {'id': actual_targets[0]}
             return {'id': ids['Routing'], 'name': 'Routing', 'children': [
-                {'id': ids['Destination'], 'name': 'Destination'}, {'id': ids['Sender'], 'name': 'Sender'}]}
+                {'id': ids['Destination'], 'name': target_name}, {'id': ids['Sender'], 'name': 'Sender'}]}
         if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             task.objects = deepcopy(before if uri.endswith('.undo') else after)
@@ -4156,7 +4155,7 @@ def test_created_graph_history_restores_internal_reference_without_preserving_ab
     code, root = task.step('draft-declare-new', '--declaration-id', 'root', '--parent-handle', parent, '--kind', kinds['Bus'], '--name', 'Routing')
     assert code == 0, root
     root = root['draft']['declared_object']['result_handle']
-    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Destination')
+    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', target_name)
     assert code == 0, target
     code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Sender',
         '--field-value', field, target['draft']['declared_object']['result_handle'])
@@ -4175,6 +4174,15 @@ def test_created_graph_history_restores_internal_reference_without_preserving_ab
         code, verified = task.run('verify', tx)
         assert code == 0 and verified['verified'] is True, verified
         assert task.objects == (before if direction == 'undo' else after)
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_created_graph_history_restores_internal_reference_without_preserving_absent_target(tmp_path, version):
+    _exercise_created_graph_internal_reference_history(tmp_path, version)
+
+
+def test_created_graph_internal_reference_target_may_share_root_basename(tmp_path):
+    _exercise_created_graph_internal_reference_history(tmp_path, '2025.1', target_name='Routing')
 
 
 @pytest.mark.parametrize('compound', [False, True])

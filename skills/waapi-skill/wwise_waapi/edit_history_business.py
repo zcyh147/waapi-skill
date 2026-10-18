@@ -351,7 +351,8 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
     from .creation_observations import ordinary_creation_graph, ordinary_creation_fields, verified_created_root_identity
     from .operation_object import flatten_create_result
     from .operation_registry import _object_type_matches
-    nodes, expected_paths = ordinary_creation_graph(plan, prepared.get("pre_state", {}), max_observations=MAX_OBSERVATIONS)
+    nodes, expected_paths = ordinary_creation_graph(plan, prepared.get("pre_state", {}),
+        parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"), max_observations=MAX_OBSERVATIONS)
     returned = flatten_create_result(execution.get("result"))
     if [row.request_path for row in returned] != [node["request_path"] for node in nodes]:
         raise ValueError("Creation history requires every actual returned graph node exactly once")

@@ -5256,7 +5256,7 @@ def _prepare_object_create(
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs, "effect_render_chains": effect_render_chains}
     from .creation_observations import ordinary_creation_fields, ordinary_creation_graph
     try:
-        ordinary_creation_graph(verification, state)
+        ordinary_creation_graph(verification, state, parent=parent.row)
     except ValueError:
         history_fields = []
     else:
@@ -10400,7 +10400,8 @@ def _require_compound_ordinary_creation(prepared: PreparedOperation) -> None:
     try:
         if prepared.request.operation != "object.create":
             raise ValueError("Creation history requires object.create")
-        ordinary_creation_graph(prepared.verification_plan, prepared.pre_state, max_observations=MAX_OBSERVATIONS)
+        ordinary_creation_graph(prepared.verification_plan, prepared.pre_state,
+            parent=prepared.resolved_roles.get("parent", {}).get("row"), max_observations=MAX_OBSERVATIONS)
     except ValueError as exc:
         raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
 
@@ -10483,7 +10484,7 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     if kind == "object-create-graph":
         _require_compound_ordinary_creation(prepared)
         from .creation_observations import ordinary_creation_graph
-        _, paths = ordinary_creation_graph(plan, state)
+        _, paths = ordinary_creation_graph(plan, state, parent=prepared.resolved_roles.get("parent", {}).get("row"))
         return [{"object_id": "path:" + path.casefold(), "field": "presence", "kind": "all", "platform": None}
             for path in paths.values()]
     elif kind == "object-set-batch":
@@ -19500,7 +19501,7 @@ def verify_prepared_operation(
         if kind == "object-create-graph" and len(specs) > 1:
             from .creation_observations import ordinary_creation_graph
             try:
-                ordinary_creation_graph(plan, pre_state or {})
+                ordinary_creation_graph(plan, pre_state or {}, parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"))
             except ValueError:
                 pass  # Richer unions retain their existing source verifier.
             else:
