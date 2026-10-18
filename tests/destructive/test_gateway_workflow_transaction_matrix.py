@@ -4571,8 +4571,8 @@ def _collect_existing_bus_send_acceptance(
     runtime: _WorkflowSandboxRuntime, *, root_name: str, root_sources: bool = False,
 ) -> dict[str, Any]:
     """Existing-source writes in one owned lifecycle, with independent effect reads."""
-    output = runtime.state_dir / "existing-bus-send-acceptance.json"
-    category = {"category": "existing-bus-user-send", "status": "FAIL",
+    output = runtime.state_dir / ("old-root-bus-send-acceptance.json" if root_sources else "existing-bus-send-acceptance.json")
+    category = {"category": "old-root-bus-user-send" if root_sources else "existing-bus-user-send", "status": "FAIL",
         "verifier_strength": "gateway_verified_plus_independent_exact_identity_parent_reference_scalar_and_notes",
         "observation_path": str(output)}
     runtime.category_results.append(category)

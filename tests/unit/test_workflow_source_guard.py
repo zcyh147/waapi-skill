@@ -166,7 +166,7 @@ def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workf
     runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
     category = workflow._collect_existing_bus_send_acceptance(runtime,
         root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
-    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    receipt = json.loads((runtime.state_dir / 'old-root-bus-send-acceptance.json').read_text())
     assert category['status'] == 'PASS'
     assert receipt['setup_coverage_credit'] is False
     assert receipt['business_effect_verified'] is True
@@ -197,7 +197,7 @@ def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workf
     else:
         assert writes[-1][1]['objects'][0]['object'] == baseline['batch_source']['id']
     assert len(receipt['calls']) <= 192
-    assert (runtime.state_dir / 'existing-bus-send-acceptance.json').stat().st_size <= 8 * 1024 * 1024
+    assert (runtime.state_dir / 'old-root-bus-send-acceptance.json').stat().st_size <= 8 * 1024 * 1024
 
 
 @pytest.mark.parametrize(('version', 'fault', 'write_count'), [
@@ -214,7 +214,7 @@ def test_old_root_bus_send_acceptance_rejects_wrong_authority_or_effect(tmp_path
     with pytest.raises(AssertionError):
         workflow._collect_existing_bus_send_acceptance(runtime,
             root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
-    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    receipt = json.loads((runtime.state_dir / 'old-root-bus-send-acceptance.json').read_text())
     assert runtime.category_results[-1]['status'] == 'FAIL'
     assert receipt['business_effect_verified'] is False
     assert len(writes) == write_count
@@ -233,7 +233,7 @@ def test_old_root_bus_witness_keeps_new_version_boundary_before_calls(tmp_path, 
     with pytest.raises(AssertionError, match='2024–2025 retain'):
         workflow._collect_existing_bus_send_acceptance(runtime,
             root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
-    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    receipt = json.loads((runtime.state_dir / 'old-root-bus-send-acceptance.json').read_text())
     assert receipt['calls'] == [] and commands == [] and writes == []
     assert receipt['business_effect_verified'] is False
     assert runtime.category_results[-1]['status'] == 'FAIL'
