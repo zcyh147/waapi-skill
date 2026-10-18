@@ -5865,6 +5865,11 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False, 'metadata': {},
         'exclusive': {'status': 'pending', 'reason': 'No legal active source-backed Exclusive field proved'},
         'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    if null_source_only_diagnostic:
+        receipt.update(diagnostic_only=True, history_acceptance_credit=False,
+            scope='fresh_setup_then_full_null_source_creation_without_undo_or_redo')
+        category.update(diagnostic_only=True, history_acceptance_credit=False,
+            verifier_strength='diagnostic_full_null_source_stored_fields_without_history_acceptance_credit')
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(body) <= 16 * 1024 * 1024, 'RTPC graph receipt byte bound exceeded'
@@ -5997,6 +6002,8 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             'setup_coverage_credit': False,
             'verifier_strength': ('gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'
                 if effect else 'gateway_verified_setup_only_no_effect_coverage_credit')}
+        if null_source_only_diagnostic:
+            phase_category.update(diagnostic_only=True, history_acceptance_credit=False)
         runtime.category_results.append(phase_category)
         _update_business_draft(gateway, draft, 'draft-check', live=True)
         preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
@@ -6767,12 +6774,15 @@ def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSand
     assert category['status'] == 'PASS', category
 
 
-def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
+def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str,
+        null_source_only_diagnostic: bool = False) -> dict[str, Any]:
     """Ordinary created fields, then latest-project undo/redo with the owned receipt."""
     assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No pinned native history route in 2021.1'
     endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
-    output = runtime.state_dir / 'created-fields-history-acceptance.json'
-    category = {'category': 'created-fields-history-acceptance', 'status': 'FAIL',
+    if null_source_only_diagnostic:
+        assert runtime.version == '2022.1', 'Null-only minimization is pinned2022; other native lanes remain independent'
+    output = runtime.state_dir / ('created-null-source-diagnostic.json' if null_source_only_diagnostic else 'created-fields-history-acceptance.json')
+    category = {'category': 'created-null-source-diagnostic' if null_source_only_diagnostic else 'created-fields-history-acceptance', 'status': 'FAIL',
         'observation_path': str(output), 'verifier_strength': 'owned_source_receipt_plus_independent_created_fields_absence_and_restoration'}
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint, 'calls': [], 'setup': [], 'effects': [],
@@ -6881,7 +6891,7 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         target = exact(target_id)
         assert target['type'] == 'Attenuation' and target['name'] == name + '_Target', target
         phase['independent_setup'] = target; setup_category['status'] = 'PASS'
-        for case in ('existing', 'null'):
+        for case in (('null',) if null_source_only_diagnostic else ('existing', 'null')):
             source_name = name + '_' + case
             source_segments = (*actor_segments, source_name)
             draft = _start_business_draft(gateway, 'object.create')
@@ -6928,6 +6938,12 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
                 and uuid.UUID(reference_id) == uuid.UUID(target_id)), original
             assert exact(target_id) == target and exact(parent['id']) == parent, 'Source changed its target or parent'
             admit(phase, phase_category, original)
+            if null_source_only_diagnostic:
+                phase_category['status'] = 'blocked'
+                receipt.update(complete=True, classification='created_and_independently_observed')
+                category.update(status='blocked', classification=receipt['classification'],
+                    reason='Diagnostic null creation only; no undo/redo performed and no full history acceptance credit')
+                return category
             phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id, expected_fields=fields)
             absence = {'id': query(['--exact-id', created_id]), 'path': by_path(source_segments), 'target': exact(target_id)}
             assert absence['id'] == absence['path'] == [] and absence['target'] == target, absence
@@ -6957,6 +6973,18 @@ def test_created_leaf_fields_history_receipt_native_acceptance(workflow_sandbox_
     category = _collect_created_leaf_fields_history_acceptance(workflow_sandbox_runtime,
         name='WAAPI_HISTORY_' + uuid.uuid4().hex[:12])
     assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_created_null_source_only_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """One fresh setup and the full null source request; never precede it with undo."""
+    if workflow_sandbox_runtime.version != '2022.1':
+        pytest.skip('Null-source-only crash minimization is pinned2022; no other-version acceptance inference')
+    category = _collect_created_leaf_fields_history_acceptance(workflow_sandbox_runtime,
+        name='WAAPI_NULL_ONLY_' + uuid.uuid4().hex[:12], null_source_only_diagnostic=True)
+    assert category.get('classification') == 'created_and_independently_observed', category
+    assert category['status'] == 'blocked' and category['history_acceptance_credit'] is False, category
 
 
 def _collect_effect_render_suffix_observation(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
