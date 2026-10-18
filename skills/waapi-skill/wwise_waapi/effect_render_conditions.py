@@ -45,17 +45,6 @@ def plan_chain(entries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "acceptance_scope": "stored_slot_state_not_rendered_audio"}
 
 
-def reject_explicit_graph_conflicts(specs: Sequence[Mapping[str, Any]]) -> None:
-    groups: dict[tuple[Any, Any], list[dict[str, Any]]] = {}
-    for spec in specs:
-        if spec.get("collection") != "Effects" or spec.get("canonical_type") != "EffectSlot":
-            continue
-        intent = next((row["value"] for row in spec.get("properties", []) if row["name"] == "Render"), None)
-        groups.setdefault((spec.get("parent_request_path"), spec.get("platform")), []).append(
-            {"key": spec["request_path"], "render_intent": intent})
-    for entries in groups.values():
-        plan_chain(entries)
-
 
 # These adapters use the same bounded registry readers as the ordinary graph.
 # The import is local because Registry owns the public operation orchestration.
@@ -282,7 +271,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                 if after_write:
                     expected = expected_snapshot(expected, edits=edits, read_row=lambda identity: r._read_object_id_rows(identity, fields=r.IDENTITY_RETURN_FIELDS, read=read)[0])
                     for name, value in snapshot["after_changes"].items():
-                        expected["@" + name] = value
+                        expected[name if name in expected else "@" + name] = value
                 selected = {name: r._reference_identity(r._field_value(expected, name)) for name in
                     ([f"Effect{i}" for i in range(4)] if legacy else ["Effect"]) if r._has_field(expected, name)}
                 strip = lambda row: {key: value for key, value in row.items() if key.lstrip("@") not in selected}
