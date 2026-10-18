@@ -2912,7 +2912,7 @@ def test_rtpc_graph_collector_stops_before_update_when_base_state_read_fails(tmp
     assert runtime.category_results[0]['status'] == 'FAIL'
 
 
-def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fault=None):
+def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fault=None, null_value=None):
     """Public Gateway with native-shaped create/history state, never manufactured receipts."""
     from copy import deepcopy
     import uuid
@@ -2946,6 +2946,8 @@ def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fau
                 'path': task.objects[args['parent']]['path'] + '\\' + args['name'],
                 'parent': {'id': args['parent']}, 'notes': args.get('notes', '')}
             row.update({key: deepcopy(value) for key, value in args.items() if key.startswith('@')})
+            if '@Attenuation' in row and row['@Attenuation'] is None:
+                row['@Attenuation'] = deepcopy(null_value)
             task.objects[identity] = row
             if row['type'] == 'Sound': history.update(id=identity, after=deepcopy(row))
             return {'id': identity, 'name': row['name']}
@@ -3044,3 +3046,14 @@ def test_created_fields_history_collector_never_dispatches_unpinned_2021_history
     with pytest.raises(AssertionError, match='No pinned native history'):
         workflow._collect_created_leaf_fields_history_acceptance(runtime, name='WAAPI_HISTORY_TEST')
     assert commands == writes == []
+
+
+@pytest.mark.parametrize('null_value', ['{00000000-0000-0000-0000-000000000000}',
+    {'id': '{00000000-0000-0000-0000-000000000000}', 'name': ''}])
+def test_created_fields_history_collector_retains_native_explicit_null_representations(tmp_path, workflow, null_value):
+    runtime, _commands, _writes, _task = _created_fields_history_runtime(tmp_path, workflow, null_value=null_value)
+    category = workflow._collect_created_leaf_fields_history_acceptance(runtime, name='WAAPI_HISTORY_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    source = next(row for row in receipt['effects'] if row['phase'] == 'null-source')
+    assert source['independent_effect']['references']['Attenuation'] == null_value
+    assert category['status'] == 'PASS' and receipt['complete'] is True

@@ -6300,7 +6300,13 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
             assert 'Attenuation' in original.get('references', {}), original
             reference = original['references']['Attenuation']
             reference_id = reference.get('id') if isinstance(reference, Mapping) else reference
-            assert (reference is None if case == 'null' else reference_id == target_id), original
+            if isinstance(reference, Mapping):
+                assert 'id' in reference and not set(reference) - {'id', 'name', 'type', 'path'}, original
+                assert all(isinstance(value, str) for value in reference.values()), original
+            explicit_null = reference is None or (isinstance(reference_id, str)
+                and reference_id == '{00000000-0000-0000-0000-000000000000}')
+            assert (explicit_null if case == 'null' else isinstance(reference_id, str)
+                and uuid.UUID(reference_id) == uuid.UUID(target_id)), original
             assert exact(target_id) == target and exact(parent['id']) == parent, 'Source changed its target or parent'
             admit(phase, phase_category, original)
             phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id)
