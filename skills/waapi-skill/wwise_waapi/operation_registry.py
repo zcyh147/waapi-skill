@@ -7592,7 +7592,7 @@ def _resolve_object_set_import_type(
 
 
 def _prepare_prospective_reference_hierarchy(
-    references, *, class_id,
+    references, *, class_id, class_info=None, version=None, read=None, platform=None,
 ):
     """Validate new-node reference edges against explicit prospective values."""
     from .planned_references import PlannedReferenceTarget
@@ -7620,7 +7620,24 @@ def _prepare_prospective_reference_hierarchy(
         # checked parent edges are removed from this ordinary target check.
         ordinary = replace(info, restriction={**info.restriction, "restrictions": [
             row for row in rows if not (isinstance(row, Mapping) and "childOfReference" in row)]})
-        _require_reference_target_allowed(ordinary, target)
+        if (class_info is not None and class_info.class_id == class_id and class_info.name == "RTPC"
+                and info.name == "ControlInput" and version in {"2022.1", "2023.1", "2024.1", "2025.1"}
+                and not isinstance(target, PlannedReferenceTarget)):
+            # The source has an actual class scope; its chosen target already
+            # exists and must satisfy the existing native classifier unchanged.
+            scoped = []
+            _require_reference_target_allowed(ordinary, target, read=read, platform=platform,
+                conditions=scoped, wwise_version=version)
+            if not scoped:
+                scoped.append({"kind": "prospective_reference_metadata", "reference": info.name,
+                    "target_id": target.object, "version": version})
+            for condition in scoped:
+                condition["source_class_metadata"] = {"class": class_info.as_dict(include_raw=True),
+                    "field": info.name, "normalized": info.as_dict(), "native": dict(info.raw), "version": version}
+                if condition not in conditions:
+                    conditions.append(condition)
+        else:
+            _require_reference_target_allowed(ordinary, target)
         for name in parents:
             controllers.add(name.casefold())
             if len(controllers) > MAX_CONDITION_CONTROLLERS:
@@ -8051,7 +8068,8 @@ def _prepare_object_node_specs(
             spec["references"].append({"name": descriptor.name, "target_id": value})
         hierarchy = []
         if merge_target is None:
-            hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id)
+            hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id,
+                class_info=type_info, version=version, read=read, platform=platform)
         else:
             desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in spec["references"]}
             for info, targets in reference_targets:
@@ -24410,6 +24428,22 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        source_metadata = condition.get("source_class_metadata")
+        if source_metadata is not None:
+            expected_class = source_metadata["class"]
+            types = [row for row in _read_object_type_catalog(read) if row.class_id == expected_class["classId"]]
+            info = _read_property_info(read, class_id=expected_class["classId"], name=source_metadata["field"])
+            valid = (source_metadata["version"] == condition.get("version")
+                and expected_class["name"] == "RTPC" and source_metadata["field"] == "ControlInput"
+                and len(types) == 1 and types[0].as_dict(include_raw=True) == expected_class
+                and _native_snapshot_equal(info.as_dict(), source_metadata["normalized"])
+                and _native_snapshot_equal(dict(info.raw), source_metadata["native"]))
+            assertions.append({"name": "prospective RTPC ControlInput class and full metadata remain bound",
+                "passed": valid, "evidence": {"expected": source_metadata,
+                    "actual_class": [row.as_dict(include_raw=True) for row in types],
+                    "actual_metadata": info.as_dict(), "actual_native_metadata": dict(info.raw)}})
+        if condition.get("kind") == "prospective_reference_metadata":
+            continue
         if condition.get("kind") == "planned_reference_parent":
             valid = all(_native_snapshot_equal(_read_property_info(read, class_id=condition["class_id"], name=name).as_dict(), expected["normalized"])
                 for name, expected in condition["metadata"].items())
