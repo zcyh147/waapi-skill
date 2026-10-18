@@ -136,13 +136,6 @@ def require_compound_creation_scope(calls):
     if known_count > MAX_OBSERVATIONS:
         raise OperationContractError('UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED',
             'Compound created graph and known companion outcomes exceed the complete history observation bound.')
-    for graph_index, paths in graphs:
-        for rename_index, old_path in renames:
-            if rename_index != graph_index and any(path.casefold().startswith(old_path.casefold().rstrip('\\') + '\\') for path in paths.values()):
-                raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
-                    'Compound creation with an ancestor rename requires the next graph path-dependency algebra; this is an implementation gap, not native absence.',
-                    details={'creation_index': graph_index, 'rename_index': rename_index,
-                        'implementation_obligation': 'created_graph_ancestor_rename_path_algebra'})
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:

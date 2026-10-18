@@ -4371,3 +4371,33 @@ def test_compound_created_graph_complete_bound_includes_existing_render_observat
     _compound_from_graph_task(task, notes_id=SECOND, companion='object.create',
         expected_error='UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED')
     assert not any(row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.undo.beginGroup'} for row in task.calls)
+
+
+def test_created_graph_and_parent_rename_share_actual_source_and_history_paths(tmp_path):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task, _, _, _ = _created_graph_history_case(tmp_path, compound=True, prepared_only=True)
+    original = task.call
+    def rename(uri, args=None, options=None):
+        if uri == 'ak.wwise.core.object.setName':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            row = task.objects[args['object']]
+            old = row['path']
+            row.update(name=args['value'], path=old.rsplit('\\', 1)[0] + '\\' + args['value'])
+            for child in task.objects.values():
+                if child['path'].startswith(old + '\\'):
+                    child['path'] = row['path'] + child['path'][len(old):]
+            return {}
+        return original(uri, args, options)
+    task.call = rename
+    source, before, after = _compound_from_graph_task(task, notes_id=SECOND, companion='object.setName')
+    assert after[SECOND]['name'] == 'Renamed parent'
+    assert all(row['path'].startswith(r'\Actor-Mixer Hierarchy\Renamed parent\Container')
+        for row in after.values() if row['name'] in {'Container', 'Rain', 'Inner', 'Wind'})
+    for direction in ('undo', 'redo'):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == (before if direction == 'undo' else after)
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1

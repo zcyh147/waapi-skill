@@ -10611,9 +10611,15 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             )
         from .creation_observations import require_compound_creation_scope
         require_compound_creation_scope(prepared_children)
+        from .object_graph_paths import prepare_compound_path_context
+        try:
+            compound_path_context = prepare_compound_path_context(prepared_children, read=read)
+        except ValueError as exc:
+            raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN', str(exc)) from exc
         execution_plan = {
             **execution_plan,
             "calls": prepared_children,
+            **({'path_context': compound_path_context} if compound_path_context is not None else {}),
         }
         prepared_plan_size = len(canonical_json_bytes(execution_plan))
         if prepared_plan_size > UNDO_GROUP_MAX_PLAN_BYTES:
@@ -15716,6 +15722,20 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                             for key in ("args", "options", "request_validation")
                         )
                     passed = passed and binding_ok
+        if passed and isinstance(actual_plan, Mapping):
+            from .object_graph_paths import prepare_compound_path_context
+            def path_guard_read(uri, args, options):
+                result = read_call(uri, args, options)
+                child_readbacks.append({'role': 'compound-path-context-before', 'uri': uri,
+                    'args': args, 'options': options, 'result': result})
+                return result
+            try:
+                rebuilt_context = prepare_compound_path_context(actual_plan['calls'], read=path_guard_read)
+                context_unchanged = lifecycle_snapshot_equal(rebuilt_context, actual_plan.get('path_context'))
+            except ValueError:
+                context_unchanged = False
+            passed = passed and context_unchanged
+            child_assertions.append({'name': 'compound original GUID ancestry is unchanged', 'passed': context_unchanged})
         current_platform_children = [
             child for child in actual_plan.get("calls", [])
             if isinstance(child, Mapping)
@@ -17898,6 +17918,7 @@ def verify_prepared_operation(
     execution_result: Mapping[str, Any],
     read_call: ReadCall,
     history_resolver=None,
+    compound_path_context=None,
 ) -> VerificationResult:
     """Run the closed postcondition for one persisted prepared operation."""
 
@@ -18202,6 +18223,13 @@ def verify_prepared_operation(
                         True,
                         validation.as_dict(),
                     )
+            path_context = execution_plan.get('path_context')
+            if path_context is not None:
+                from .object_graph_paths import validate_compound_path_context, observe_compound_path_context
+                validate_compound_path_context(path_context, inner_plan)
+                context_assertion, context_read = observe_compound_path_context(path_context, read=read_call)
+                assertions.append(context_assertion)
+                readbacks.append(context_read)
             for index, child_plan in enumerate(inner_plan):
                 if not isinstance(child_plan, Mapping):
                     child_business_state_verified = False
@@ -18222,6 +18250,7 @@ def verify_prepared_operation(
                     prepared_child,
                     execution_result=dispatch_result,
                     read_call=read_call,
+                    compound_path_context=path_context,
                 )
                 verified_child_count += 1
                 child_business_state_verified = (
@@ -18259,6 +18288,7 @@ def verify_prepared_operation(
                     "evidence": {
                         "index": index,
                         "prepared_sha256": canonical_sha256(prepared_child),
+                        **({'path_context_sha256': canonical_sha256(path_context)} if path_context is not None else {}),
                         "dispatch_sha256": canonical_sha256(dispatch_result),
                         "verification": child_header,
                         "assertions": {"start": assertion_start, "count": len(assertions) - assertion_start,
@@ -19777,6 +19807,12 @@ def verify_prepared_operation(
                         {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
                     )
             expected_path = spec.get("expected_path")
+            if kind == 'object-create-graph' and compound_path_context:
+                from .creation_observations import ordinary_creation_graph
+                from .object_graph_paths import project_compound_path
+                _, original_paths = ordinary_creation_graph(plan, pre_state,
+                    parent=prepared['resolved_roles']['parent']['row'])
+                expected_path = project_compound_path(original_paths[request_path], compound_path_context)
             if (spec.get("preexisting_id") is not None and spec.get("collection") not in {None, "children"}
                     and isinstance(spec.get("pre_state"), Mapping)):
                 from .object_graph_paths import expected_snapshot

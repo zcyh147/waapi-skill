@@ -132,3 +132,128 @@ def verify_ancestor_path_guard(guard, *, edits, read):
     expected_rows = [expected_snapshot(row, edits=edits, read_row=read_row) for row in snapshots]
     passed = all(read_row(row['id']) == expected for row, expected in zip(snapshots, expected_rows))
     return passed, expected_rows[0]['path'], {'expected': expected_rows, 'actual': list(cache.values())}
+
+
+def compound_rename_edits(calls):
+    """Normalize only original, explicit existing-object name outcomes."""
+    edits = []
+    for call in calls:
+        child = call.get('prepared_operation', {})
+        plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
+        if plan.get('kind') == 'same-guid-renamed':
+            before = state['object']
+            edits.append({'existing_target': True, 'target_id': plan['object_id'],
+                'pre_state': before, 'original_name': before['name'],
+                'requested_name': plan['expected_name'], 'on_name_conflict': 'fail'})
+        elif plan.get('kind') == 'object-set-batch':
+            edits.extend(dict(node) for node in plan.get('nodes', [])
+                if node.get('existing_target') is True and node.get('requested_name') != node.get('original_name'))
+    return edits
+
+
+def project_compound_path(path, context):
+    if not context:
+        return path
+    return expected_snapshot({'id': '', 'name': path.rsplit('\\', 1)[-1], 'path': path},
+        edits=context['edits'], read_row=lambda key: {'name': next(node['requested_name']
+            for node in context['edits'] if node['target_id'].casefold() == key.casefold())})['path']
+
+
+def prepare_compound_path_context(calls, *, read):
+    """Seal missing GUID ancestry without changing any original child artifact."""
+    edits = compound_rename_edits(calls)
+    graphs = [call['prepared_operation'] for call in calls
+        if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph']
+    if not edits or not any(any(child['resolved_roles']['parent']['row']['path'] == node['pre_state']['path']
+            or child['resolved_roles']['parent']['row']['path'].startswith(node['pre_state']['path'] + '\\')
+            for node in edits) for child in graphs):
+        return None
+    identities = {}
+    def collect(value):
+        if isinstance(value, dict):
+            if all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path')) and _GUID.fullmatch(value['id']):
+                if any(value['path'] == node['pre_state']['path'] or value['path'].startswith(node['pre_state']['path'] + '\\') for node in edits):
+                    key = value['id'].casefold()
+                    if key in identities and any(identities[key][field] != value[field] for field in ('id', 'name', 'type', 'path')):
+                        raise ValueError('Compound path roles disagree about their original GUID identity')
+                    identities[key] = value
+            for item in value.values(): collect(item)
+        elif isinstance(value, list):
+            for item in value: collect(item)
+    for call in calls: collect(call.get('prepared_operation', {}))
+    for node in edits: identities[node['target_id'].casefold()] = node['pre_state']
+    roots, snapshots = [], {}
+    for key, before in sorted(identities.items()):
+        actual = read_identity(read, before['id'])
+        if any(actual.get(field) != before.get(field) for field in ('id', 'name', 'type', 'path')):
+            raise ValueError('Compound path role differs from its exact live GUID identity')
+        snapshots[key] = actual
+        edit = next((node for node in edits if node['target_id'].casefold() == key), None)
+        roots.append({'existing_target': True, 'target_id': actual['id'], 'pre_state': actual,
+            'original_name': actual['name'], 'requested_name': edit['requested_name'] if edit else actual['name']})
+    for row in prepare_ancestor_path_guards(roots, read=read): snapshots[row['id'].casefold()] = row
+    context = {'edits': edits, 'snapshots': [snapshots[key] for key in sorted(snapshots)],
+        'guards': [node['ancestor_rename_path_guard'] for node in roots if 'ancestor_rename_path_guard' in node]}
+    validate_compound_path_context(context, calls)
+    return context
+
+
+def validate_compound_path_context(context, calls):
+    from .canonical import canonical_sha256
+    if not isinstance(context, dict) or set(context) != {'edits', 'snapshots', 'guards'}:
+        raise ValueError('Compound path context is malformed')
+    if canonical_sha256(context['edits']) != canonical_sha256(compound_rename_edits(calls)):
+        raise ValueError('Compound path context differs from the original child rename intent')
+    rows = {row['id'].casefold(): row for row in context['snapshots']}
+    if len(rows) != len(context['snapshots']):
+        raise ValueError('Compound path context repeats an ancestor GUID')
+    for edit in context['edits']:
+        before = rows.get(edit['target_id'].casefold(), {})
+        if any(before.get(key) != edit['pre_state'].get(key) for key in ('id', 'name', 'type', 'path')):
+            raise ValueError('Compound rename context lacks its original GUID identity')
+    for guard in context['guards']:
+        chain = [guard['source'], *guard['ancestors']]
+        if len(chain) > DEFAULT_MAX_DEPTH + 1 or len({row['id'].casefold() for row in chain}) != len(chain):
+            raise ValueError('Compound ancestor context contains a cyclic or oversized chain')
+        for child, parent in zip(chain, chain[1:]):
+            if parent_id(child.get('parent')) != parent['id'] or child['path'] != parent['path'] + '\\' + child['name']:
+                raise ValueError('Compound ancestor context disagrees with its GUID/path edges')
+        if any(rows.get(row['id'].casefold()) != row for row in chain):
+            raise ValueError('Compound ancestor context differs from its sealed snapshots')
+    return context
+
+
+def compound_context_expected(context):
+    def intent(key):
+        edit = next(node for node in context['edits'] if node['target_id'].casefold() == key.casefold())
+        return {'name': edit['requested_name']}
+    return [{key: value for key, value in expected_snapshot(row, edits=context['edits'], read_row=intent).items()
+        if key != 'notes'} for row in context['snapshots']]
+
+
+def observe_compound_path_context(context, *, read):
+    from .canonical import canonical_sha256
+    expected = compound_context_expected(context)
+    args = {'from': {'id': [row['id'] for row in expected]}}
+    options = {'return': list(FIELDS)}
+    result = read('ak.wwise.core.object.get', args, options)
+    record = {'role': 'compound-path-context', 'uri': 'ak.wwise.core.object.get', 'args': args,
+        'options': options, 'result': result}
+    passed = compound_context_result_matches(context, record)
+    return {'name': 'compound final GUID ancestry matches sealed name intent', 'kind': 'compound_path_context',
+        'passed': passed, 'evidence': {'sha256': canonical_sha256(context)}}, record
+
+
+def compound_context_result_matches(context, record):
+    expected = compound_context_expected(context)
+    if (record.get('role') != 'compound-path-context' or record.get('uri') != 'ak.wwise.core.object.get'
+            or record.get('args') != {'from': {'id': [row['id'] for row in expected]}}
+            or record.get('options') != {'return': list(FIELDS)} or 'error' in record):
+        return False
+    result = record.get('result')
+    rows = result.get('return') if isinstance(result, dict) and set(result) == {'return'} else None
+    if not isinstance(rows, list) or len(rows) != len(expected) or any(not isinstance(row, dict) for row in rows):
+        return False
+    actual = {str(row.get('id')).casefold(): row for row in rows}
+    return len(actual) == len(rows) and all(all(actual.get(row['id'].casefold(), {}).get(key) == value
+        for key, value in row.items()) for row in expected)
