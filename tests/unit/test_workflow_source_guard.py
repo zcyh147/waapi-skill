@@ -134,6 +134,31 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_
     return runtime, commands, writes, task
 
 
+def test_existing_and_old_root_send_witnesses_retain_distinct_shared_state_receipts(tmp_path, workflow):
+    shared = tmp_path / 'shared-state'
+    ordinary, _commands, _writes, _task = _existing_bus_send_runtime(tmp_path / 'ordinary', workflow, '2021.1')
+    old_root, _commands, _writes, _task = _existing_bus_send_runtime(tmp_path / 'old-root', workflow, '2021.1', root_sources=True)
+    ordinary.state_dir = old_root.state_dir = shared
+    first = workflow._collect_existing_bus_send_acceptance(ordinary, root_name='WAAPI_EXISTING_SEND_TEST')
+    first_path = Path(first['observation_path'])
+    first_bytes = first_path.read_bytes()
+    second = workflow._collect_existing_bus_send_acceptance(old_root,
+        root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    second_path = Path(second['observation_path'])
+    assert first['status'] == second['status'] == 'PASS'
+    assert first['category'] == 'existing-bus-user-send'
+    assert second['category'] == 'old-root-bus-user-send'
+    assert first_path == shared / 'existing-bus-send-acceptance.json'
+    assert second_path == shared / 'old-root-bus-send-acceptance.json'
+    assert first_path != second_path
+    assert first_path.read_bytes() == first_bytes
+    for path, placement, count in [(first_path, 'aux_bus_children', 4), (second_path, 'old_root_bus_sources', 6)]:
+        receipt = json.loads(path.read_text())
+        assert receipt['placement'] == placement
+        assert receipt['business_effect_verified'] is True
+        assert len(receipt['transactions']) == count
+
+
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
 def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workflow, version):
     runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version, root_sources=True)
