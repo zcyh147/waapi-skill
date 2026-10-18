@@ -352,7 +352,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 261
+    assert len(nodes) == 262
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_branch_evidence_readers.py"
     assert {
@@ -386,6 +386,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_unnamed_rtpc_graph_gateway.py",
         "tests/unit/test_rtpc_exclusive_property_gateway.py",
         "tests/unit/test_anonymous_effect_slot_graph_gateway.py",
+        "tests/unit/test_sound_voice_creation_gateway.py",
         "tests/unit/test_effect_shareset_folder_gateway.py",
         "tests/unit/test_existing_bus_override_applicability_gateway.py",
         "tests/unit/test_metadata_property_state_selection_gateway.py",
