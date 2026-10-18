@@ -140,3 +140,51 @@ def test_class_catalogue_binding_preserves_actor_alias_and_rejects_drift(tmp_pat
     code, result = task.run('verify', tx)
     assert code == (0 if phase == 'unchanged-alias' else 2), result
     assert task.objects[ROOT]['type'] == 'PropertyContainer'
+
+
+def import_task(path, *, version='2022.1'):
+    from tests.unit.test_anonymous_effect_slot_graph_gateway import legacy_render_import_task
+    task, writes = legacy_render_import_task(path, version, media=True)
+    task.types.append({'name': 'AudioSource' if version == '2021.1' else 'AudioFileSource',
+        'classId': 16, 'type': 'WObject'})
+    task.require_class_projection = True
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('audio.import'):
+            for row in task.objects.values():
+                if row['type'] == 'AudioFileSource':
+                    row['classId'] = 16
+        return result
+    task.call = call
+    return task, writes
+
+
+def declare_import(task, path):
+    import wave
+    source = path / 'independent.wav'
+    with wave.open(str(source), 'wb') as wav:
+        wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(48000); wav.writeframes(b'\0\0' * 8)
+    parent = task.bind(SECOND)
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'rain',
+        '--parent-handle', parent, '--kind', 'sound-sfx', '--name', 'New Sound',
+        '--field', 'media_file', str(source), '--field', 'volume_db', '-9')
+    assert code == 0, declared
+
+
+@pytest.mark.parametrize('fault', ['target-class', 'source-class', None])
+def test_import_independent_target_and_source_reads_require_live_classes(tmp_path, fault):
+    task, writes = import_task(tmp_path)
+    declare_import(task, tmp_path)
+    tx, shown = task.preview()
+    execute(task, tx, shown)
+    target = next(row for row in task.objects.values() if row['name'] == 'New Sound')
+    source = task.objects[target['activeSource']['id']]
+    if fault == 'target-class':
+        target['classId'] = 16
+    elif fault == 'source-class':
+        source['classId'] = 65552
+    code, result = task.run('verify', tx)
+    assert code == (0 if fault is None else 2), json.dumps(result)
+    assert (result.get('verified') is True) is (fault is None)
+    assert len(writes) == 1
