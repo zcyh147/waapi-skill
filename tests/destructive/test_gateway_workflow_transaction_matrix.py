@@ -7147,15 +7147,23 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
         assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
         assert verified.get('verification', {}).get('business_state_verified') is True, verified
     try:
+        # Pinned2021 SDK calls class16 AudioSource; actual object.get still
+        # returns AudioFileSource. Keep catalog and object projection distinct.
+        source_class_name = 'AudioSource' if runtime.version == '2021.1' else 'AudioFileSource'
         disclosed = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'WorkUnit',
-            '--meaning', 'Folder', '--meaning', 'Wwise Delay', '--meaning', 'AudioFileSource', '--page-size', '64'], live=True)['agent_result']
+            '--meaning', 'Folder', '--meaning', 'Wwise Delay', '--meaning', source_class_name, '--page-size', '64'], live=True)['agent_result']
         assert disclosed.get('complete') is True, disclosed
         classes = {}
         for name in ('Sound', 'WorkUnit', 'Folder', 'Wwise Delay', 'AudioFileSource'):
-            matches = [row for row in disclosed['types'] if row.get('name') == name]
+            native_name = source_class_name if name == 'AudioFileSource' else name
+            matches = [row for row in disclosed['types'] if row.get('name') == native_name]
             assert len(matches) == 1 and type(matches[0].get('classId')) is int, (name, disclosed)
             classes[name] = matches[0]['classId']
         assert classes['Sound'] == 65552, classes
+        if runtime.version == '2021.1':
+            assert classes['AudioFileSource'] == 16, classes  # Exact2021 AudioSource SDK class authority.
+        receipt['source_class_discovery'] = {'name': source_class_name, 'class_id': classes['AudioFileSource']}
+
         receipt['live_classes'] = classes
         segments = ('Actor-Mixer Hierarchy', 'Default Work Unit')
         parent = at(segments)

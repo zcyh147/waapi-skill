@@ -3977,6 +3977,8 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
         assert len(nodes) == 2 and '@RenderEffect1' in nodes[0]
         assert not any(key.startswith('@') for key in nodes[1])
     if version == '2021.1':
+        assert receipt['source_class_discovery'] == {'name': 'AudioSource', 'class_id': 16}
+        assert all(row['independent_source']['type'] == 'AudioFileSource' and row['independent_source']['class_id'] == 16 for row in effects[:2])
         assert category['read_view_scope'] == 'current_default_view_only_unobserved_platform_identity'
         assert all(row['read_view']['status'] == 'unobserved' for row in effects)
     else:
