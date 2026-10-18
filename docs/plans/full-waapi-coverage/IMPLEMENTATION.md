@@ -834,6 +834,51 @@ quarantine remain; the runtime repair stays #184. New Bus/AuxBus condition code
 same-graph native effects. None of these results closes a ticket or transfers
 native credit to R23.
 
+## Twenty-fourth integration checkpoint
+
+R24 fixed code `55383f8c` integrates prospective Bus/AuxBus structural conditions,
+empty Bus reference-list and scalar/RTPC serialization preservation, separately
+authorized project reopening after migration, and the existing guarded Wine
+none-to-target mapping for Console open/create on 2023.1–2025.1. The merge keeps
+both noisy field discovery and native-condition controls, including one public
+case exercising both. The new Bus condition test file is explicitly included in
+the fixed Program roster, now **252 entries**. No native obligation identity,
+owner, requirement or evidence changed; v1 evidence reuse remains byte-strict.
+
+On unchanged `55383f8c`, central preflight passed **825 in 26.75 seconds** and
+the proportional integration focus passed **27 in 11.88 seconds**. Both sealed
+1,858 unchanged tracked hashes and zero owned processes. One full five-version
+Program gate is running separately on this fixed candidate; it is not a pass
+until terminal evidence exists. No full Non-live or Fresh rerun was started.
+R23 hosted run `39082897954` independently passed **825 in 57.63 seconds** on
+published `3e3a31ec`.
+
+The R24 native 2023 migrated-media lifecycle remains **FAIL (10.82 seconds)**.
+Its new reopen step did execute once and strongly verified saved/live project
+GUID, name and path. The later media write preserved all 734 exact mappings and
+storage mode, but the independent non-media preservation assertion failed. This
+is progress through the former prewrite gap, not a whole-lifecycle PASS. The
+2025 same-graph reference case remains **FAIL (8.86 seconds), before any write**:
+the real AuxBus class exposes a UserAuxSend0 override dependency but rejects
+metadata for OverrideUserAuxSends because that property does not exist on the
+class. Previously simulated Boolean controller metadata was never native proof.
+This exact class/field applicability gap remains #177/#180 work.
+
+A separate unpublished compatibility candidate `01ed6d4e` tested legacy
+`ak.wwise.ui.project.open` through the complete closed transaction on Console
+2021.1 and 2022.1. Both native hosts returned exact `ak.wwise.unavailable` with
+matching procedure URI and an instance-type refusal. Their original Gateway
+states remain indeterminate; no verify or execute replay followed. Both whole
+cases remain FAIL, and the candidate is not integrated or published as Console
+support. These are host-specific observations, not removal of the Authoring API
+from scope. Existing public Authoring-host restrictions remain intact.
+
+Every native run preserved source full hashes, mtimes, tree metadata and tracked
+source; owned processes ended and failed sandboxes remain quarantined. Further
+work retains complete before/after file images for diagnosis and uses matching
+SDK authority for plug-in named-list ordering. Original native failures are not
+regraded by later code or offline comparisons. No ticket closes at this checkpoint.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
