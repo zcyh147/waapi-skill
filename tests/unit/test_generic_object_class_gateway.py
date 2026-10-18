@@ -46,8 +46,9 @@ def execute(task, tx, shown):
     assert code == 0, result
 
 
-def test_ordinary_create_cannot_verify_contradictory_actual_class(tmp_path):
-    task = class_task(tmp_path)
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_ordinary_create_cannot_verify_contradictory_actual_class(tmp_path, version):
+    task = class_task(tmp_path, version=version)
     declare_sound(task)
     tx, shown = task.preview()
     execute(task, tx, shown)
