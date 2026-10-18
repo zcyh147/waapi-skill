@@ -37,6 +37,36 @@ The 2021 pinned catalog has no standalone undo/redo route. These tests grant no
 graph/List restoration, arbitrary history-stack selection, GUI or whole-ticket
 acceptance. Earlier `807f33e7` failure evidence remains unchanged.
 
+The next exact 2022.1 run on `09bec56f` failed again (16.54s), after the same
+existing-reference creation/undo passed. The repaired Gateway correctly stopped
+the null-reference creation at `WAAPI_RESPONSE_MISSING`, persisted an
+indeterminate outcome, and did not verify or replay it. This run's new
+pre-teardown diagnostic observed the owned launch process already exited with
+code 5 and retained the explicit Wwise crash message. This proves a native crash
+for this run; it does not retroactively supply missing exit evidence to `51906536`
+or isolate whether null creation or the preceding undo caused the crash.
+
+Original root in the native-conditions worktree:
+`.waapi-skill-state/full-coverage/created-history-09bec56f-2022-r1`.
+The reported dump was copied without deleting the original; its SHA-256 is
+`d5cbf95196f4deb34e90a9f095c40f932b409892e126c7df9eb21acbf417ada1`.
+Source hash/mtime/tree and 1,883 tracked files remained unchanged, owned processes
+ended, and the failed sandbox was quarantined. The original acceptance case
+remains unchanged; a separate null-source-only diagnostic will isolate the
+preceding-undo factor without dropping any requested field.
+
+That separate diagnostic on `88673436` also failed (16.44s). It performed fresh
+setup and the same five-field null-source creation, with no preceding or later
+undo. The pre-teardown snapshot again observed exit code 5 and the Wwise crash
+message. Its original root is `null-source-only-88673436-2022-r1`; dump SHA-256
+is `d41a5b2495885c7492ea81e491dd7e77da502cf9d1c458ccd228ae873f6a6384`.
+Source integrity and cleanup checks passed; the failed sandbox is quarantined.
+This rules out a preceding undo as a necessary trigger for this request. It
+does not establish that every null reference or every 2022 creation is broken.
+The request's existing-reference counterpart passed. A compatible construction
+must retain the public null intent, all other fields and independent null-state
+verification; removing the case is not a repair.
+
 ## Inline WAV without Base64 padding — #182 / #180
 
 The pinned 2023.1–2025.1 definition
