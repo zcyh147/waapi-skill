@@ -7927,6 +7927,13 @@ def _prepare_object_node_specs(
     merge_guards = [] if merge_guards is None else merge_guards
     shareset_placements = {}
     for node in nodes:
+        # Composition can add media after declaring a Voice. Only the complete
+        # request can establish whether an explicit language has a Source effect.
+        if node.language is not None and node.import_arg is None:
+            raise OperationContractError(
+                "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
+                "An explicit language without localized media still needs Source effect evidence; omit language for an empty Voice or add the requested media.",
+            )
         requested_type_token = _object_type_token(node.type)
         uses_2025_actor_mixer_alias = (
             version == "2025.1" and requested_type_token == "actormixer"
@@ -8165,7 +8172,9 @@ def _prepare_object_node_specs(
                 "override_applicability": [proof for proof in applicability.values() if proof is not None]}
             if related:
                 spec["related_conditions"] = related
-        elif any(info.dependencies for info in property_info_by_name.values()):
+        elif property_info_by_name:
+            # Even an unconditional supplied field relies on this exact class
+            # metadata. Reuse the existing per-phase default/condition guard.
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
                 structural_proof = None
@@ -8673,9 +8682,38 @@ def _append_association_condition(requirements, *, source, owner, property_name,
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
 
 
+def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
+    """Reuse sealed class field/default facts at both transaction phases."""
+    if not isinstance(pre_state, Mapping):
+        return []
+    nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
+    if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
+        nodes.append(pre_state["plugin_creation_guard"])
+    assertions, seen = [], set()
+    for node in nodes:
+        for evidence in node.get("new_object_default_evidence", []):
+            scope = evidence["class_scope"]
+            for field, expected in evidence["metadata"].items():
+                key = (scope.get("classId"), field)
+                if key in seen:
+                    continue
+                seen.add(key)
+                args = {**scope, "property": field}
+                result = read(GET_PROPERTY_INFO_URI, args, {})
+                actual = parse_get_property_info_result(result).as_dict()
+                if readbacks is not None:
+                    readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
+                        "args": args, "options": {}, "result": dict(result)})
+                assertions.append({"name": f"new object class metadata {field} unchanged",
+                    "passed": _native_snapshot_equal(actual, expected) and ("default" in result) == evidence["default_presence"][field],
+                    "evidence": {"expected": expected, "actual": actual,
+                        "expected_default_present": evidence["default_presence"][field], "actual_default_present": "default" in result}})
+    return assertions
+
+
 def _condition_metadata_assertions(pre_state, *, read, after_write=False):
     """Keep the exact selected condition metadata valid through verification."""
-    assertions = []
+    assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
     result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
     if result_context:
         try:
@@ -16295,14 +16333,13 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
 
     # Class defaults authorize only genuinely new objects. Re-read the exact
     # metadata sealed at Preview before dispatching their single creation call.
+    assertions.extend(_new_object_class_metadata_assertions(pre_state, read=read_call, readbacks=readbacks))
     if isinstance(pre_state, Mapping):
-        metadata_seen = set()
         condition_nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
         if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
             condition_nodes.append(pre_state["plugin_creation_guard"])
         for node in condition_nodes:
             for evidence in node.get("new_object_default_evidence", []):
-                scope = evidence["class_scope"]
                 for proof in evidence.get("override_applicability", []):
                     from .override_applicability import proof_current
                     assertions.append({"name": "new user-send override applicability proof unchanged",
@@ -16311,21 +16348,6 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     from .new_object_defaults import structural_bus_proof_current
                     assertions.append({"name": "new non-master bus class/source/parent proof unchanged",
                         "passed": structural_bus_proof_current(rule["proof"], read=read_call), "evidence": rule["proof"]})
-                for field, expected in evidence["metadata"].items():
-                    key = (scope.get("classId"), field)
-                    if key in metadata_seen:
-                        continue
-                    metadata_seen.add(key)
-                    args = {**scope, "property": field}
-                    result = read_call(GET_PROPERTY_INFO_URI, args, {})
-                    actual = parse_get_property_info_result(result).as_dict()
-                    readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
-                                      "args": args, "options": {}, "result": dict(result)})
-                    assertions.append({"name": f"new object class metadata {field} unchanged",
-                                       "passed": actual == expected and ("default" in result) == evidence["default_presence"][field],
-                                       "evidence": {"expected": expected, "actual": actual,
-                                                    "expected_default_present": evidence["default_presence"][field],
-                                                    "actual_default_present": "default" in result}})
 
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):
@@ -25015,6 +25037,8 @@ def _native_snapshot_equal(actual: Any, expected: Any) -> bool:
 
 
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:
+    if metadata_type.lower() in {"bool", "boolean"} or isinstance(actual, bool) or isinstance(expected, bool):
+        return type(actual) is bool and type(expected) is bool and actual is expected
     if metadata_type.lower() in {"real32", "real64", "float", "double"}:
         if isinstance(actual, bool) or isinstance(expected, bool):
             return False
