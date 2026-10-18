@@ -27,7 +27,7 @@ from .layout_blueprint import declared_layout_matches, declared_layout_mismatche
 from .authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, validate_model_call, state_query_from_assignments, canonical_state_result, model_file_audit
 from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, LAYOUT_RESET_URI, reset_selection_observation, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
@@ -9800,7 +9800,20 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             metadata['layout_original_current'] = dict(current)
             verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
                 'expected_name': call_args.get('name', arguments['layout_binding']['layout_name'])}
-            if api == LAYOUT_SET_URI:
+            if api == LAYOUT_RESET_URI:
+                try:
+                    metadata['layout_reset_catalog'] = reset_selection_observation(arguments['layout_binding'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('STALE_LAYOUT_RESET_SELECTION', str(exc)) from exc
+                verification.update(kind='authoring-layout-reset-observation',
+                    selected_names=list(dict.fromkeys(call_args.get('layouts', []))),
+                    reset_scope=arguments['layout_binding']['reset_request']['scope'],
+                    effect_boundary='Native defaults and omission/empty selection scope are not certified; #188 remains open')
+                preview = SemanticPreview(envelope=SemanticEnvelope(uri=api, args=call_args, options=call_options,
+                    metadata={**dict(preview.envelope.metadata), 'reset_selection_scope': verification['reset_scope'],
+                        'effect_boundary': verification['effect_boundary']}), source_note_family='authoring-layout-reset',
+                    version=request.version, requires_destructive_gate=True, raw_dispatch_allowed=False)
+            elif api == LAYOUT_SET_URI:
                 try:
                     metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
                 except ValueError as exc:
@@ -14764,7 +14777,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 pre_state = prepared.get('pre_state')
                 if not isinstance(pre_state, Mapping) or current != pre_state.get('layout_original_current'):
                     raise ValueError('Current layout changed since preview; inspect and preview again')
-                if api == LAYOUT_SET_URI:
+                if api == LAYOUT_RESET_URI:
+                    if reset_selection_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_reset_catalog'):
+                        raise ValueError('Live layout catalog changed after reset Preview')
+                elif api == LAYOUT_SET_URI:
                     absence = require_layout_absence(call_args['name'], read=read_call)
                     readbacks.append(absence)
                     if blueprint_view_catalog(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_blueprint_view_catalog'):
@@ -17299,6 +17315,31 @@ def verify_prepared_operation(
             import re
             value = execution_result.get('result', {}).get('windowID')
             check('Window creation returned an owned native identity', isinstance(value, str) and bool(re.fullmatch(r'\{[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\}', value)), {'windowID': value})
+    elif kind == 'authoring-layout-reset-observation':
+        try:
+            validation = validate_semantic_result(str(plan['uri']), execution_result.get('result'),
+                version=str(plan['version']), authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Layout reset returned its exact Authoring result contract', False, exc.as_dict())
+        else:
+            check('Layout reset returned its exact Authoring result contract', True, validation.as_dict())
+        for subject, read_uri, read_args in [
+                ('names', 'ak.wwise.ui.layout.getLayoutNames', {}),
+                ('current', 'ak.wwise.ui.layout.getCurrentLayoutName', {}),
+                *[('contents', 'ak.wwise.ui.layout.getLayout', {'name': name}) for name in plan['selected_names']]]:
+            observed = read_call(read_uri, read_args, {})
+            readbacks.append({'uri': read_uri, 'args': read_args, 'options': {}, 'result': observed})
+            try:
+                validate_layout_read_result(subject, observed)
+                complete = (isinstance(observed.get('layouts'), list) if subject == 'names' else
+                    isinstance(observed.get('name'), str) if subject == 'current' else
+                    isinstance(observed.get('Layout'), Mapping))
+                check('Post-reset ' + subject + ' observation is present', complete, {'uri': read_uri, 'args': read_args, 'result': observed})
+            except ValueError as exc:
+                check('Post-reset ' + subject + ' observation is valid', False, {'error': str(exc), 'result': observed})
+        success_status = 'result_schema_checked'
+        verification_strength = 'result_schema_only'
+        business_state_verified = False
     elif kind == "authoring-layout-state":
         uri, version = plan.get('uri'), plan.get('version')
         if uri not in LAYOUT_MUTATION_URIS or not isinstance(version, str):
@@ -21484,6 +21525,11 @@ def verify_prepared_operation(
         business_state_verified=business_state_verified,
     )
 
+    if kind == 'authoring-layout-reset-observation':
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            ('Native result schema checked and bounded post-reset state observed. Layout defaults, selection effects and unrelated-state preservation remain unverified under #188; do not replay automatically.'
+             if outcome.ok else 'Reset result or required post-reset observations failed validation. Default-state effects remain unverified; do not replay automatically.'),
+            outcome.verification_strength, outcome.business_state_verified)
     if kind in {"history-scoped-effect", "history-result-schema-only"}:
         message = ("Only the native result schema was checked. No effect expectation was selected; native history-entry identity, effects and preservation remain unobserved."
                    if kind == "history-result-schema-only" and outcome.ok else

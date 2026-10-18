@@ -455,6 +455,7 @@ def test_real_authoring_discovery_exposes_new_shapes_and_exact_version_absence()
     assert code == 0, payload
     assert {version: row["available"] for version, row in payload["availability"].items()} == {"2021.1": False, "2022.1": False, "2023.1": False, "2024.1": False, "2025.1": True}
     row = payload["availability"]["2025.1"]["capability"]
-    assert row["interface"]["status"] == "missing_implementation"
+    assert row["interface"]["status"] == "available_via_transaction"
+    assert row["execution_schema_comparison"]["status"] == "identical"
     assert row["schema"]["full"]["argsSchema"]["properties"]["layouts"]["type"] == "array"
     assert set(row["schema"]["definitions"]["documents"]) == {"common_definitions.json", "waapi_definitions.json", "waapi_ui_definitions.json", "wafm_definitions.json"}

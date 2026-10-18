@@ -52,7 +52,7 @@ from wwise_waapi.authoring_model_business import MODEL_OPERATIONS, MODEL_READ_UR
 from wwise_waapi.authoring_resources import AuthoringResourceStore  # noqa: E402
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor, validate_layout_call,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, LAYOUT_RESET_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor, validate_layout_call,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -2683,6 +2683,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_business_draft_binding_arguments(draft_layout_plan)
     draft_layout_plan.add_argument("--layout-handle", required=True)
     draft_layout_plan.add_argument("--new-layout-name")
+    draft_layout_plan.add_argument('--reset-scope', choices=('native_omission', 'empty_selection', 'selected_layouts'))
+    draft_layout_plan.add_argument('--reset-layout-handle', action='append', default=[])
     draft_layout_plan.add_argument("--view-handle")
     draft_layout_plan.add_argument("--position-x", type=int)
     draft_layout_plan.add_argument("--position-y", type=int)
@@ -13922,6 +13924,19 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
     identity = resolve_layout_identity(args.layout_handle, role='layout', context=context, args=args,
         env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
     plan = {'layout_handle': args.layout_handle}
+    reset_request = None
+    if pending.operation == LAYOUT_RESET_URI:
+        selected = []
+        if len(args.reset_layout_handle) > 32:
+            raise GatewayInputError('Reset selection exceeds the disclosed 32-handle Gateway resource ceiling')
+        for handle in args.reset_layout_handle:
+            record = resolve_layout_identity(handle, role='layout', context=context, args=args,
+                env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+            selected.append(layout_binding_descriptor(record))
+        reset_request = {'scope': args.reset_scope, 'layouts': selected}
+        plan.update(reset_scope=args.reset_scope, reset_layout_handles=list(args.reset_layout_handle))
+    elif args.reset_scope is not None or args.reset_layout_handle:
+        raise GatewayInputError('Reset selection choices belong only to reset-layouts')
     if pending.operation == LAYOUT_SET_URI:
         plan['new_layout_name'] = args.new_layout_name
     elif args.new_layout_name is not None:
@@ -13979,7 +13994,8 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
                     registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None,
                     view_request=view_request, view_identity=view_identity, position_request=position_request,
                     target_identity=target_identity, dock_request=dock_request,
-                    splitter_identity=splitter_identity, splitter_request=splitter_request, blueprint=blueprint)}
+                    splitter_identity=splitter_identity, splitter_request=splitter_request, blueprint=blueprint,
+                    reset_request=reset_request)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
         materialized = adapter.materialize(candidate)

@@ -40,7 +40,7 @@ def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path
         assert schema["version"] == version
     assert ("ak.wwise.ui.getSelectedFiles" in rows) is (version == "2025.1")
     assert {uri for uri in rows if uri.startswith("ak.wwise.ui.layout.")} == {
-        "ak.wwise.ui.layout." + suffix for suffix in ("getLayoutNames", "getCurrentLayoutName", "getLayout", "getViewInstances", "getViewTypes", "getElementRectangle", "getViewHandle", "switchLayout", "setLayout", "removeLayout", "getOrCreateView", "undockView", "dockView", "moveSplitter", *(("closeView",) if version == "2025.1" else ()))
+        "ak.wwise.ui.layout." + suffix for suffix in ("getLayoutNames", "getCurrentLayoutName", "getLayout", "getViewInstances", "getViewTypes", "getElementRectangle", "getViewHandle", "switchLayout", "setLayout", "removeLayout", "getOrCreateView", "undockView", "dockView", "moveSplitter", *(("closeView", "resetLayouts") if version == "2025.1" else ()))
     }
     assert {uri for uri in rows if uri.startswith("ak.wwise.ui.model.")} == {"ak.wwise.ui.model." + suffix for suffix in ("createHandle", "destroyHandle", "getState", "registerWafm", "setState")}
 
@@ -70,7 +70,6 @@ def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp
 
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))
 @pytest.mark.parametrize("suffix", (
-    "layout.resetLayouts",
     "cli.executeLuaScript", "cli.launch",
 ))
 def test_unapproved_ui_families_remain_unavailable(version, suffix):

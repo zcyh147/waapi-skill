@@ -36,6 +36,9 @@ class LayoutClient(FakeClient):
             URI + 'getViewInstances': {'viewInstances': []}})
 
     def call(self, uri, args=None, options=None):
+        if uri == URI + 'resetLayouts':
+            self.calls.append((uri, args, options))
+            return {}
         if uri == URI + 'getViewInstances':
             self.calls.append((uri, args, options))
             return {'viewInstances': deepcopy(self.views.get(args['name'], []))}
@@ -91,7 +94,7 @@ class LayoutClient(FakeClient):
         return super().call(uri, args, options)
 
 
-def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', operation='switchLayout', fields=(), client_setup=None, expect_check_error=False, expect_declaration_error=False, layout_name='Profiler'):
+def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', operation='switchLayout', fields=(), client_setup=None, expect_check_error=False, expect_declaration_error=False, layout_name='Profiler', apply=False, expect_preview_error=False):
     env = gateway_env(tmp_path)
     set_gateway_config(env, wwise_version=version, project_modification_policy=policy)
     state_dir = tmp_path / 'state'
@@ -129,8 +132,12 @@ def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', o
         return env, state, client, checked
     assert code == 0, (checked.get("error_code"), checked.get("message"), checked.get("details"))
     code, preview = gateway.execute_gateway([*state, 'preview-from-draft', draft['draft_id'],
-        '--task-authority', authority, '--expected-revision', str(checked['draft']['revision'])],
+        '--task-authority', authority, '--expected-revision', str(checked['draft']['revision']), *(['--apply'] if apply else [])],
         env=env, client_factory=lambda _: client)
+    if expect_preview_error:
+        assert code != 0, preview
+        assert URI + operation not in [call[0] for call in client.calls]
+        return env, state, client, preview
     assert code == 0, (preview.get('error_code'), preview.get('message'), preview.get('details'))
     artifact = TransactionStore(state_dir).load_preview(preview['transaction_id']).artifact
     if operation == 'switchLayout':
@@ -163,6 +170,145 @@ def confirm_execute_verify(env, state, client, preview, *, expect_verification_f
     code, verified = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
     assert (code != 0) if expect_verification_failure else (code == 0), verified
     return verified
+
+
+@pytest.mark.parametrize('scope,selected,expected', [
+    ('native_omission', (), {}), ('empty_selection', (), {'layouts': []}),
+    ('selected_layouts', ('Profiler',), {'layouts': ['Profiler']}),
+    ('selected_layouts', ('Profiler', 'Designer', 'Profiler'), {'layouts': ['Profiler', 'Designer', 'Profiler']}),
+])
+def test_reset_preserves_native_selection_forms_and_does_not_claim_default_effect(tmp_path, scope, selected, expected):
+    def fields(inspected):
+        # A second exact public inspection certifies each independently selected layout.
+        result = ['--reset-scope', scope]
+        for name in selected:
+            if name == 'Profiler':
+                handle = inspected['layout_handle']
+            else:
+                code, other = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'),
+                    'layout-inspect', '--layout-name', name], env=env_holder[0], client_factory=lambda _: client_holder[0])
+                assert code == 0, other
+                handle = other['layout_handle']
+            result.extend(['--reset-layout-handle', handle])
+        return result
+    env_holder, client_holder = [], []
+    # The helper configures the same isolated file before calling our setup hook.
+    def setup(client):
+        client_holder.append(client)
+        env_holder.append(gateway_env(tmp_path))
+    env, state, client, preview = switch_preview(tmp_path, operation='resetLayouts', fields=fields, client_setup=setup)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    assert prepared['dispatch'] == {'uri': URI + 'resetLayouts', 'args': expected, 'options': {}}
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['status'] == 'result_schema_checked'
+    assert verified['verification']['business_state_verified'] is False
+    assert verified['verified'] is False
+    assert verified['verification']['verification_strength'] == 'result_schema_only'
+    assert 'defaults' in prepared['verification_plan']['effect_boundary']
+    code, repeated = gateway.execute_gateway([*state, 'execute', preview['transaction_id']], env=env, client_factory=lambda _: client)
+    assert code != 0, repeated
+    assert [call[0] for call in client.calls].count(URI + 'resetLayouts') == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_reset_discovery_matches_independent_native_version_and_discloses_selection_uncertainty(tmp_path, version):
+    from wwise_waapi.native_catalog import load_native_catalog
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    native = load_native_catalog(version, 'wwise-authoring')
+    assert (URI + 'resetLayouts' in native['functions']) is (version == '2025.1')
+    code, schema = gateway.execute_gateway(['request-schema', URI + 'resetLayouts'], env=env,
+        client_factory=lambda _: pytest.fail('schema discovery must stay offline'))
+    if version != '2025.1':
+        assert code != 0, schema
+        return
+    assert code == 0, schema
+    text = str(schema)
+    assert all(word in text for word in ('native_omission', 'empty_selection', 'selected_layouts', '--reset-layout-handle'))
+    assert 'do not define' in text and 'default-state oracle' in text
+    assert 'ordered native names only from selected handles' in text
+    assert 'current-layout verifier' not in text
+    code, described = gateway.execute_gateway(['describe', URI + 'resetLayouts', '--profile', 'wwise-authoring-ui'], env=env)
+    assert code == 0, described
+    assert described['availability'][version]['capability']['interface']['host_surface'] == 'wwise-authoring'
+
+
+@pytest.mark.parametrize('fields', [(), ('--reset-scope', 'selected_layouts'),
+    lambda i: ('--reset-scope', 'native_omission', '--reset-layout-handle', i['layout_handle']),
+    lambda i: ('--reset-scope', 'empty_selection', '--reset-layout-handle', i['layout_handle']),
+    lambda i: ['--reset-scope', 'selected_layouts', *(['--reset-layout-handle', i['layout_handle']] * 33)],
+    ('--reset-scope', 'selected_layouts', '--reset-layout-handle', 'Profiler')])
+def test_reset_rejects_incomplete_or_mixed_selection_and_unissued_names(tmp_path, fields):
+    switch_preview(tmp_path, operation='resetLayouts', fields=fields, expect_declaration_error=True)
+
+
+@pytest.mark.parametrize('drift', ['selected-layout', 'catalog', 'current', 'session', 'host'])
+def test_reset_revalidates_actual_selected_layout_and_live_instance_before_dispatch(tmp_path, drift):
+    holder = []
+    def fields(inspected):
+        code, selected = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'),
+            'layout-inspect', '--layout-name', 'Designer'], env=gateway_env(tmp_path), client_factory=lambda _: holder[0])
+        assert code == 0, selected
+        return ['--reset-scope', 'selected_layouts', '--reset-layout-handle', selected['layout_handle']]
+    env, state, client, preview = switch_preview(tmp_path, operation='resetLayouts', fields=fields, client_setup=holder.append)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, confirmed = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0, confirmed
+    original = client.call
+    def changed(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if drift == 'selected-layout' and uri == URI + 'getLayout' and args['name'] == 'Designer':
+            result['Layout']['StackPanel']['Orientation'] = 'Vertical'
+        if drift == 'catalog' and uri == URI + 'getLayoutNames':
+            result = {'layouts': ['Designer', 'Profiler', 'NewlyRegistered']}
+        if drift == 'current' and uri == URI + 'getCurrentLayoutName':
+            result = {'name': 'Profiler'}
+        if uri == 'ak.wwise.core.getInfo':
+            if drift == 'session': result = {**result, 'sessionId': 'another-session'}
+            if drift == 'host': result = {**result, 'isCommandLine': True}
+        return result
+    client.call = changed
+    code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert URI + 'resetLayouts' not in [call[0] for call in client.calls]
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_reset_retains_each_modification_policy_and_separate_durable_authority(tmp_path, policy):
+    env, state, client, result = switch_preview(tmp_path, operation='resetLayouts', policy=policy,
+        fields=('--reset-scope', 'native_omission'), apply=True, expect_preview_error=policy == 'read_only')
+    assert URI + 'resetLayouts' not in [call[0] for call in client.calls]
+    if policy == 'read_only':
+        assert 'read_only' in str(result)
+        return
+    assert result['state'] == ('policy_authorized' if policy == 'allow_changes' else 'awaiting_confirmation')
+    code, executed = gateway.execute_gateway([*state, 'execute', result['transaction_id']], env=env, client_factory=lambda _: client)
+    assert (code == 0) is (policy == 'allow_changes'), executed
+    events = TransactionStore(Path(state[1])).read_events(result['transaction_id'])
+    assert any(row['event_type'] == 'policy_authorized' for row in events) is (policy == 'allow_changes')
+
+
+@pytest.mark.parametrize('failure', ['extra-native-result', 'omitted-post-layout'])
+def test_reset_does_not_hide_invalid_native_result_or_missing_post_observation(tmp_path, failure):
+    env, state, client, preview = switch_preview(tmp_path, operation='resetLayouts',
+        fields=lambda inspected: ['--reset-scope', 'selected_layouts', '--reset-layout-handle', inspected['layout_handle']])
+    original = client.call
+    dispatched = []
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'resetLayouts':
+            dispatched.append(True)
+            if failure == 'extra-native-result': return {'unexpected': 'original-result'}
+        if dispatched and failure == 'omitted-post-layout' and uri == URI + 'getLayout':
+            return {}
+        return result
+    client.call = call
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    if failure == 'omitted-post-layout':
+        assert any(row.get('uri') == URI + 'getLayout' and row['result'] == {} for row in verified['verification']['readbacks'])
+    assert len(dispatched) == 1
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])

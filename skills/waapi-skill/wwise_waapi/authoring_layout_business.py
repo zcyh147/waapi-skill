@@ -20,14 +20,15 @@ LAYOUT_SPLITTER_URI = 'ak.wwise.ui.layout.moveSplitter'
 LAYOUT_DOCK_URI = 'ak.wwise.ui.layout.dockView'
 LAYOUT_UNDOCK_URI = 'ak.wwise.ui.layout.undockView'
 LAYOUT_CLOSE_URI = 'ak.wwise.ui.layout.closeView'
+LAYOUT_RESET_URI = 'ak.wwise.ui.layout.resetLayouts'
 LAYOUT_GET_OR_CREATE_URI = 'ak.wwise.ui.layout.getOrCreateView'
-LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI})
+LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, LAYOUT_RESET_URI})
 MUTATION_RESOURCE = 'authoring-layout-mutation-supplement.json'
-MUTATION_SHA256: dict[str, str] = {'2024.1': 'a93363f7c0cf837f90eff10ae04430854405dcb22ecc1fb000e583d5ee04486e', '2025.1': 'ff8bf4e3072c20fa93bb5de34f4ed897bb29449173a8b2d3f8a7005ca849e7d3'}
+MUTATION_SHA256: dict[str, str] = {'2024.1': 'a93363f7c0cf837f90eff10ae04430854405dcb22ecc1fb000e583d5ee04486e', '2025.1': '7972f87c11b0e88f61e9c19b28352692cd10d2860f4b85153dd14d61f42699a9'}
 
 
 def layout_mutation_versions(operation: str) -> tuple[str, ...]:
-    return ('2025.1',) if operation == LAYOUT_CLOSE_URI else LAYOUT_VERSIONS if operation in LAYOUT_MUTATION_URIS else ()
+    return ('2025.1',) if operation in {LAYOUT_CLOSE_URI, LAYOUT_RESET_URI} else LAYOUT_VERSIONS if operation in LAYOUT_MUTATION_URIS else ()
 
 
 def layout_mutation_uris(version: str) -> frozenset[str]:
@@ -55,7 +56,30 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
         'safety': {'immutable_preview': True, 'single_execute': True, 'authoring_host_required': True,
                    'native_request_fields': 'gateway_owned', 'automatic_retry': False},
         'verifier': {'kind': 'authoring-layout-state', 'observation': 'independent current layout name'}}
-    if operation == LAYOUT_SET_URI:
+    if operation == LAYOUT_RESET_URI:
+        result['declaration']['required_fields'].append('reset_scope')
+        result['declaration']['optional_fields'] = ['reset_layout_handles']
+        result['declaration']['public_fields'].extend(['reset_scope', 'reset_layout_handles'])
+        result['declaration']['field_types'].update(reset_scope='enum:native_omission,empty_selection,selected_layouts',
+            reset_layout_handles='ordered_scoped_layout_handles')
+        result['declaration']['input_forms'].update(reset_scope={'gateway_flag': '--reset-scope', 'shape': 'scalar'},
+            reset_layout_handles={'gateway_flag': '--reset-layout-handle', 'shape': 'repeatable_scalar'})
+        result['selection_semantics'] = {'native_omission': 'omit native layouts', 'empty_selection': 'send native layouts: []',
+            'selected_layouts': 'send exact discovered names in supplied order, preserving repeats',
+            'unspecified_native_scope': 'Matching native schema/docs do not define the omission/empty scope; neither is labelled all or none.',
+            'resource_boundary': 'at most 32 selected handle entries; larger native lists remain an implementation obligation'}
+        result['selection_discovery'] = {'gateway_argv': ['layout-read', 'names'],
+            'catalog_scope': 'factory layout names; this is not an enumeration of all temporary layouts',
+            'certify_each_choice': ['layout-inspect', '--layout-name', '<observed-layout-name>'],
+            'anchor_role': 'layout_handle binds the live instance; it does not add that layout to the reset selection'}
+        result['responsibility_split']['agent'] = ['choose the exact native selection form and any discovered layout handles']
+        result['responsibility_split']['gateway'] = ['bind live session and exact selected layouts', 'freeze and revalidate the live name catalog',
+            'preserve omission, empty and ordered repeated selections', 'reset once after authorization', 'observe layouts without claiming defaults were certified']
+        result['gateway_derivations'] = ['ordered native names only from selected handles', 'native omission or empty-array envelope from explicit scope',
+            'independent bounded post-reset observations with no certified default-state oracle']
+        result['verifier'] = {'kind': 'authoring-layout-reset-observation', 'observation': 'bounded current/name/selected layout readbacks',
+            'business_state_verified': False, 'boundary': 'default-state oracle and omission/empty effect semantics remain unproved under #188'}
+    elif operation == LAYOUT_SET_URI:
         result['declaration']['required_fields'].append('new_layout_name')
         result['declaration']['public_fields'].extend(['new_layout_name', 'blueprint'])
         result['declaration']['optional_fields'] = ['blueprint']
@@ -131,7 +155,7 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
 
 
 def layout_business_catalog_rows() -> tuple[dict[str, Any], ...]:
-    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view', LAYOUT_UNDOCK_URI: 'float a discovered view', LAYOUT_DOCK_URI: 'dock or redock a discovered view', LAYOUT_SPLITTER_URI: 'move a discovered splitter by signed pixels'}[uri],
+    return tuple({'api': uri, 'intent': {LAYOUT_RESET_URI: 'reset layout selection to native defaults', LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view', LAYOUT_UNDOCK_URI: 'float a discovered view', LAYOUT_DOCK_URI: 'dock or redock a discovered view', LAYOUT_SPLITTER_URI: 'move a discovered splitter by signed pixels'}[uri],
                   'supported_versions': list(layout_mutation_versions(uri))} for uri in sorted(LAYOUT_MUTATION_URIS))
 
 
@@ -163,9 +187,12 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
                               dock_request: Mapping[str, Any] | None = None,
                               splitter_identity: Mapping[str, Any] | None = None,
                               splitter_request: Mapping[str, Any] | None = None,
-                              blueprint: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                              blueprint: Mapping[str, Any] | None = None,
+                              reset_request: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body = {key: record[key] for key in ('handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at')}
     body['observation_sha256'] = canonical_sha256(record['observation'])
+    if reset_request is not None:
+        body['reset_request'] = dict(reset_request)
     if registration_name is not None:
         body['registration_name'] = validate_new_layout_name(registration_name)
     if blueprint is not None:
@@ -194,7 +221,7 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
 
 def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, Any]:
     expected = {'handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at', 'observation_sha256', 'binding_sha256'}
-    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'registration_name', 'layout_blueprint', 'blueprint_node_ids'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}, expected | {'view_identity', 'target_identity', 'dock_request'}, expected | {'splitter_identity', 'splitter_request'}):
+    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'reset_request'}, expected | {'registration_name'}, expected | {'registration_name', 'layout_blueprint', 'blueprint_node_ids'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}, expected | {'view_identity', 'target_identity', 'dock_request'}, expected | {'splitter_identity', 'splitter_request'}):
         raise ValueError('Layout mutation lacks an exact Gateway-owned identity binding')
     body = dict(binding)
     digest = body.pop('binding_sha256')
@@ -224,6 +251,11 @@ def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, 
             or len(body['layout_name'].encode('utf-8')) > 4096
             or type(body['expires_at']) not in (int, float) or not math.isfinite(body['expires_at'])):
         raise ValueError('Layout mutation identity binding fields are malformed')
+    if 'reset_request' in body:
+        reset_native_args(body['reset_request'])
+        for selected in body['reset_request']['layouts']:
+            if selected['context'] != body['context'] or 'reset_request' in selected:
+                raise ValueError('Reset selections must share the exact live session scope')
     if 'registration_name' in body:
         validate_new_layout_name(body['registration_name'])
     if 'layout_blueprint' in body:
@@ -262,7 +294,13 @@ def materialize_layout_business_request(operation: str, session: Any) -> Mapping
             or not set(plan) <= set(contract['declaration']['public_fields']) or plan['layout_handle'] != binding['handle']):
         raise ValueError('Layout plan requires the exact discovered layout handle')
     native_args = {'name': binding['layout_name']}
-    if operation == LAYOUT_SET_URI:
+    if operation == LAYOUT_RESET_URI:
+        reset = binding.get('reset_request')
+        if (not isinstance(reset, Mapping) or plan['reset_scope'] != reset['scope']
+                or plan.get('reset_layout_handles', []) != [row['handle'] for row in reset['layouts']]):
+            raise ValueError('Reset declaration differs from its exact discovered selection binding')
+        native_args = reset_native_args(reset)
+    elif operation == LAYOUT_SET_URI:
         name = validate_new_layout_name(plan['new_layout_name'])
         if name != binding.get('registration_name'):
             raise ValueError('New layout name differs from the Gateway-owned declaration binding')
@@ -306,7 +344,9 @@ def validate_layout_call(version: str, api: str, args: Mapping[str, Any], option
     layout_business_contract_data(api, version)
     verified = validate_layout_binding(binding)
     expected = {'name': verified['layout_name']}
-    if api == LAYOUT_SET_URI:
+    if api == LAYOUT_RESET_URI:
+        expected = reset_native_args(verified.get('reset_request'))
+    elif api == LAYOUT_SET_URI:
         name = validate_new_layout_name(verified.get('registration_name'))
         expected = {'name': name, 'layout': registration_layout(verified)}
     elif api == LAYOUT_GET_OR_CREATE_URI:
@@ -324,6 +364,33 @@ def validate_layout_call(version: str, api: str, args: Mapping[str, Any], option
     if dict(args) != expected or options:
         raise ValueError('Layout native request differs from the Gateway-owned business binding')
     return verified
+
+
+def reset_native_args(request: Any) -> dict[str, Any]:
+    if (not isinstance(request, Mapping) or set(request) != {'scope', 'layouts'}
+            or request['scope'] not in {'native_omission', 'empty_selection', 'selected_layouts'}
+            or not isinstance(request['layouts'], list) or len(request['layouts']) > 32
+            or (bool(request['layouts']) != (request['scope'] == 'selected_layouts'))):
+        raise ValueError('Reset requires native_omission, empty_selection, or 1–32 ordered discovered layout handles')
+    names = []
+    for selected in request['layouts']:
+        if not isinstance(selected, Mapping) or 'reset_request' in selected:
+            raise ValueError('Reset selection must be a plain scoped layout identity')
+        names.append(validate_layout_binding(selected)['layout_name'])
+    return {} if request['scope'] == 'native_omission' else {'layouts': names}
+
+
+def reset_selection_observation(binding: Mapping[str, Any], *, read: Any) -> dict[str, Any]:
+    """Bind selected rows and the bounded factory-name catalog, without a default oracle."""
+    request = binding['reset_request']
+    reset_native_args(request)
+    catalog = read('ak.wwise.ui.layout.getLayoutNames', {}, {})
+    validate_layout_read_result('names', catalog)
+    if 'layouts' not in catalog:
+        raise ValueError('Reset requires an observed live factory layout name catalog')
+    for selected in request['layouts']:
+        validate_layout_live_binding(selected, read=read)
+    return dict(catalog)
 
 
 def validate_new_layout_name(name: Any) -> str:
