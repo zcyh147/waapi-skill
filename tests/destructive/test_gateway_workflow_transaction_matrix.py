@@ -7206,13 +7206,13 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
                     '--max-results', '100', '--language', 'SFX', *projection], live=True)
                 children = result.get('objects')
                 assert isinstance(children, list) and result.get('count') == len(children) < 100, result
-                assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+                assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', {'reason': 'source_child_page_incomplete', 'result': result}
                 assert len({row['id'] for row in children}) == len(children), children
                 for child in children:
                     assert isinstance(child.get('type'), str) and type(child.get('class_id')) is int and guid(child.get('parent')) == owner['id'], child
                     assert (child['type'] == 'AudioFileSource') == (child['class_id'] == classes['AudioFileSource']), child
                 candidates = [child for child in children if child['type'] == 'AudioFileSource']
-                assert len(candidates) == 1, children
+                assert len(candidates) == 1, {'reason': 'source_child_cardinality', 'children': children}
                 selected = candidates[0]
                 source_id = selected['id']
             else:

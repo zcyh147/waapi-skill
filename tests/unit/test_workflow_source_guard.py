@@ -3892,7 +3892,8 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
             if match[2]:
                 assert version == '2021.1' and options['language'] == 'SFX'
                 owner_ids = {row['id'] for row in rows}
-                rows = [row for row in task.objects.values() if row.get('parent', {}).get('id') in owner_ids]
+                rows = [row for row in task.objects.values()
+                    if (row['parent'].get('id') if isinstance(row.get('parent'), dict) else row.get('parent')) in owner_ids]
                 if fault == 'empty-source' and len(writes) == 2:
                     rows = []
                 if fault == 'selected-source-guid' and len(writes) == 2:
@@ -4097,3 +4098,9 @@ def test_legacy_2021_source_oracle_stops_after_verified_import_on_mismatched_sel
     assert len(writes) == 2
     assert [command[0] for command in commands].count('execute') == 3  # imports2 + save prerequisite1
     assert [command[0] for command in commands].count('verify') == 3
+    if fault in {'empty-source', 'ambiguous-source', 'partial-source'}:
+        children_calls = [call for call in receipt['calls'] if '--relationship' in call['argv']]
+        assert len(children_calls) == 1
+        assert children_calls[0]['exit_code'] == 0 and children_calls[0]['payload']['ok'] is True
+        reason = 'source_child_page_incomplete' if fault == 'partial-source' else 'source_child_cardinality'
+        assert reason in receipt['failure']['message']
