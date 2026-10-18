@@ -76,11 +76,12 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             },
             "eligible_child_operations": eligible,
             "child_observation_scope": {
-                "object.create": "one_ordinary_new_fail_mode_leaf_with_complete_absence_identity_and_materialized_fields",
+                "object.create": "complete_ordinary_new_fail_mode_hierarchy_with_actual_node_identity_class_parent_notes_fields_and_membership",
                 **({"object.set": "existing_only_scalar_existing_reference_or_null_name_and_notes_fields"}
                     if version != "2021.1" else {}),
                 "render_effects": "explicit_and_induced_existing_fields_plus_complete_original_chain",
                 "graph_list_merge_replace_restoration": "remaining_same_parent_implementation_obligation",
+                "created_graph_ancestor_rename": "remaining_same_parent_path_dependency_algebra;_prewrite_rejection_is_not_native_absence",
                 "history_receipt": "actual_parent_execution_phase_and_child_verification_range_hash_association",
             },
             "prohibited_generic_child_operations": prohibited_generic,
