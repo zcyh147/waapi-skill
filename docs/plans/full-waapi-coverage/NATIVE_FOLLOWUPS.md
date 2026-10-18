@@ -258,3 +258,44 @@ gap, not an identity/order failure. The repair must reject contradictory explici
 values and disclose and verify induced predecessor changes across applicable
 routes. The original failed sandbox is retained. No constructor PASS, rendered
 audio claim or whole-ticket completion follows from the RTPC results.
+
+## R31 modern anonymous Effects construction acceptance
+
+Fixed `5e22e208183f1701b91a61207695aeb7c19d5a56` passed the existing
+anonymous EffectSlot constructor case sequentially on macOS Console 2023.1,
+2024.1 and 2025.1: one test each in 16.92s, 19.27s and 22.24s.
+Each case made 164 public Gateway calls. Three setup transactions receive no
+effect credit; three separately previewed effects prove append with existing
+ShareSets, replacement of the entire population, and a planned owner with both
+a planned ShareSet and an inline local Effect. Independent reads verify actual
+GUIDs, classes, owners, references, flags, order, deletion and retained objects.
+
+The legal requested flags are first Render=true/Bypass=false, then
+Render=false/Bypass=true. The original contradictory false/true failure remains
+quarantined; the repair separately rejects that explicit conflict before write.
+The replacement verifier now checks old metadata before execution and does not
+attempt to read metadata from old slots after their proven deletion.
+
+All three lifecycles preserved source full hashes, mtimes/tree and 1,882 tracked
+files, deleted passing sandboxes and left no owned process. Originals live in
+the query worktree under `anonymous-effect-slot-5e22e208-{2023,2024,2025}-r1`.
+Root's ignored `anonymous-effect-slot-5e22e208-native-summary.json` hashes the
+original result and observation files; it is an index, not replacement evidence.
+Legacy scalar effects, native clearing/suffix behavior, the import adapter,
+nondefault anonymous conflict policies and multi-field history remain in scope.
+These results do not close #180 or grant Windows/Fresh acceptance.
+
+The first created-field history attempt at `807f33e7` on 2025.1 failed before
+its source creation dispatched: **1 failed in 11.36s**. Only the independent
+Attenuation setup was created and verified; undo and redo were not reached.
+Live Sound.Attenuation metadata contains `isMasterBus=false` visibility plus
+ListenerRelativeRouting and OverridePositioning prerequisites. The new-object
+planner incorrectly requires Bus/AuxBus structure for that visibility rule even
+on Sound. The error's suggested IsLoopingEnabled field is not the causal field:
+its actual metadata has no dependencies, and Volume also has none. Correct the
+class/structural proof and supply any genuinely required controls through the
+same public creation request; do not remove Attenuation or switch to a later
+configuration step just to pass the case. The original 22-call receipt is in the
+authoring worktree's `created-history-807f33e7-2025-r1`. Source hashes, mtime/tree
+and 1,881 tracked files were unchanged, processes were cleaned and the failed
+sandbox was quarantined. No history effect acceptance follows from setup.

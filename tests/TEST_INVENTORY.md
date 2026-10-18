@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R31 native component
+
+At fixed `5e22e208`, the existing anonymous EffectSlot construction case passed
+once on each macOS Console 2023.1, 2024.1 and 2025.1: **1 passed** in 16.92s,
+19.27s and 22.24s, respectively. Each case independently verifies three effects
+through 164 public calls; setup receives no effect credit. All three source
+hash/mtime/tree and 1,882 tracked-file checks passed, sandboxes were deleted and
+no owned process remained. The earlier contradictory Render request remains a
+separate failed/quarantined result. These are exact modern construction results,
+not legacy, import, clearing/suffix, history, Fresh or whole-ticket acceptance.
+
+The separate created-field history tracer at `807f33e7` on macOS 2025.1
+recorded **1 failed** (11.36s). Sound creation was rejected before dispatch by
+the new-object non-master-bus visibility proof; undo/redo were not reached.
+The setup Attenuation was verified without history credit. The original failed
+sandbox remains quarantined; source hash/mtime/tree and 1,881 tracked files
+were unchanged and no owned process remained.
+
 ## 2026-10-18 full-coverage R30 component results
 
 Hosted preflight on published `03f5ef62`: **825 passed** (64.76s), run

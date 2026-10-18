@@ -1128,3 +1128,19 @@ created-field history is implemented at `a93a2377` with focused program evidence
 matching native history validation and richer graph/list history remain pending.
 No additional ticket is closed, no Fresh run is added and no final gate is
 claimed. See NATIVE_FOLLOWUPS.md for exact candidate/version outcomes.
+
+## R31 modern Effects construction component
+
+The reviewed Render planner checkpoint `5e22e208` passed the existing real
+anonymous EffectSlot constructor on macOS 2023.1, 2024.1 and 2025.1. Each version
+independently verifies append, replaceAll and a planned owner with planned/local
+Effects. Source projects and tracked files stayed unchanged, passing sandboxes
+were deleted and owned processes ended. Original failures remain preserved.
+
+This is component acceptance before integration. Legacy import Render handling,
+clearing/suffix semantics, richer history and other open graph branches remain
+required. The four-field history collector exposed a real preview-size defect;
+its repair retains the original combined request and compacts repeated summary
+identity fields without raising limits. Sound Voice creation also exposed an
+unconditional Skill rejection and generic Boolean/metadata verification defects;
+those repairs are in progress. No new ticket is closed.
