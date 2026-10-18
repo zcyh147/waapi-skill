@@ -4762,6 +4762,8 @@ def _prepare_object_create(
     derived_properties: dict[str, dict[str, Any]] = {}
     node_specs = _prepare_object_node_specs(
         normalized.nodes,
+        root_parent=parent,
+        root_collection=list_name or "children",
         version=request.version,
         type_catalog=type_catalog,
         read=read,
@@ -6078,6 +6080,7 @@ def _prepare_object_set(
         derived_child_properties: dict[str, dict[str, Any]] = {}
         child_specs = _prepare_object_node_specs(
             children.nodes,
+            root_parent=target,
             version=request.version,
             type_catalog=type_catalog,
             read=read,
@@ -6343,6 +6346,7 @@ def _prepare_object_set(
 
             prepared_specs = _prepare_object_node_specs(
                 descriptor.nodes,
+                root_parent=target,
                 version=request.version,
                 type_catalog=type_catalog,
                 read=read,
@@ -7447,6 +7451,8 @@ def _prepare_prospective_reference_hierarchy(
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
+    root_parent: ResolvedObject | None = None,
+    root_collection: str = "children",
     version: str,
     type_catalog: Sequence[ObjectTypeMetadataRecord],
     read: ReadCall,
@@ -7615,9 +7621,16 @@ def _prepare_object_node_specs(
         if hierarchy:
             spec["reference_target_conditions"] = hierarchy
         if any(info.dependencies for info in property_info_by_name.values()):
-            from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+            from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
+                structural_proof = None
+                if any(is_master_bus_visibility_dependency(item) and item["value"] is False
+                       for info in property_info_by_name.values() for item in info.dependencies):
+                    structural_proof = planned_non_master_bus_proof(version=version, node=node, info=type_info,
+                        nodes=nodes, resolve_type=lambda name: _resolve_object_type(name, catalog=type_catalog),
+                        root_parent=root_parent, root_collection=root_collection, read=read)
                 evidence = class_default_evidence(
+                    structural_bus_proof=structural_proof,
                     infos=tuple(property_info_by_name.values()),
                     scope={"classId": type_info.class_id}, read_call=read,
                     supplied_values={descriptor.name: descriptor.value for descriptor in node.properties},
@@ -7642,6 +7655,17 @@ def _prepare_object_node_specs(
         if node_derived_properties:
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
+    structural_classes = {}
+    for spec in specs:
+        for evidence in spec.get("new_object_default_evidence", []):
+            for rule in evidence.get("structural_visibility", []):
+                proof = rule["proof"]
+                structural_classes[proof["request_path"]] = proof["class_id"]
+                if "request_path" in proof["parent"]:
+                    structural_classes[proof["parent"]["request_path"]] = proof["parent"]["class_id"]
+    for spec in specs:
+        if spec["request_path"] in structural_classes:
+            spec["structural_class_id"] = structural_classes[spec["request_path"]]
     return specs
 
 
@@ -8694,7 +8718,7 @@ def _object_type_token(value: Any) -> str:
 
 
 def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_id: Any = None) -> bool:
-    class_proof = spec.get("documented_list_element_class", spec.get("documented_list_owner_class", spec.get("planned_reference_target_class")))
+    class_proof = spec.get("documented_list_element_class", spec.get("documented_list_owner_class", spec.get("planned_reference_target_class", spec.get("structural_class_id"))))
     if class_proof is not None:
         return (isinstance(actual, str) and bool(actual)
             and isinstance(actual_class_id, int) and not isinstance(actual_class_id, bool)
@@ -9398,7 +9422,7 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
-            *(("classId",) if "documented_list_element_class" in spec or "documented_list_owner_class" in spec or "planned_reference_target_class" in spec else ()),
+            *(("classId",) if "documented_list_element_class" in spec or "documented_list_owner_class" in spec or "planned_reference_target_class" in spec or "structural_class_id" in spec else ()),
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}
@@ -15587,6 +15611,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         for node in condition_nodes:
             for evidence in node.get("new_object_default_evidence", []):
                 scope = evidence["class_scope"]
+                for rule in evidence.get("structural_visibility", []):
+                    from .new_object_defaults import structural_bus_proof_current
+                    assertions.append({"name": "new non-master bus class/source/parent proof unchanged",
+                        "passed": structural_bus_proof_current(rule["proof"], read=read_call), "evidence": rule["proof"]})
                 for field, expected in evidence["metadata"].items():
                     key = (scope.get("classId"), field)
                     if key in metadata_seen:
@@ -18612,6 +18640,10 @@ def verify_prepared_operation(
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
             for evidence in spec.get("new_object_default_evidence", []):
+                for rule in evidence.get("structural_visibility", []):
+                    from .new_object_defaults import structural_bus_proof_current
+                    check(f"{request_path} non-master bus class/source/parent proof remains valid",
+                        structural_bus_proof_current(rule["proof"], read=read_call, after_write=True), rule["proof"])
                 for requirement in evidence["requirements"]:
                     name = requirement["name"]
                     expected = requirement["effective_value"]

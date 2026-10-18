@@ -13,7 +13,7 @@ from .builders.metadata import GET_PROPERTY_INFO_URI, parse_get_property_info_re
 from .metadata_restrictions import (
     MetadataRestrictionError, condition_matches, condition_restriction,
     intersect_condition_restrictions, is_terminal_override_dependency,
-    reference_presence_condition,
+    reference_presence_condition, is_master_bus_visibility_dependency,
 )
 
 
@@ -25,7 +25,8 @@ class NewObjectDefaultError(ValueError):
 
 
 def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
-                           supplied_references=None, planned_references=None, discovery=False, validate_scalar=None):
+                           supplied_references=None, planned_references=None, discovery=False, validate_scalar=None,
+                           structural_bus_proof=None):
     """Collect the complete graph, then evaluate combined prerequisites.
 
     Discovery certifies grammar and seals metadata without choosing missing
@@ -40,6 +41,7 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
     restrictions, presences = {}, {}
     visited, controllers, override_controllers = set(), set(), set()
     derived_properties = {}
+    structural_visibility = []
 
     def visit(info, path):
         name = info.name
@@ -51,6 +53,11 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
             raise NewObjectDefaultError("Class condition path exceeds the bounded field budget.", error_code="REFERENCE_DEPENDENCY_LIMIT")
         for dependency in info.dependencies:
             if is_terminal_override_dependency(name, info.type, dependency):
+                continue
+            if is_master_bus_visibility_dependency(dependency) and dependency["value"] is False:
+                if not discovery and structural_bus_proof is None:
+                    raise NewObjectDefaultError("Non-master bus visibility requires a proved new Bus/AuxBus child below a Bus/AuxBus parent.")
+                structural_visibility.append({"field": name, "dependency": dict(dependency), "proof": structural_bus_proof})
                 continue
             kind, action, context = (dependency.get(key) for key in ("type", "action", "context"))
             fields = {"type", "action", "context", "property"}
@@ -160,4 +167,60 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
         raise NewObjectDefaultError(str(exc), error_code=("NEW_OBJECT_DEPENDENCY_CONFLICT" if exc.error_code == "CONDITION_CONFLICT" else exc.error_code)) from exc
     return {"class_scope": dict(scope), "requirements": requirements, "derived_properties": derived_properties,
             "default_presence": {name: "default" in info.raw for name, info in metadata.items()},
-            "metadata": {name: info.as_dict() for name, info in metadata.items()}}
+            "metadata": {name: info.as_dict() for name, info in metadata.items()},
+            **({"structural_visibility": structural_visibility} if structural_visibility else {})}
+
+
+def planned_non_master_bus_proof(*, version, node, info, nodes, resolve_type, root_parent, read, root_collection="children"):
+    """Prove normal Bus/AuxBus child placement from pinned classes and this graph."""
+    from .documented_list_fields import load_catalog, scope_evidence
+    if node.collection != "children" or info.name not in {"Bus", "AuxBus"}:
+        return None
+    catalog = load_catalog(version)
+    classes = {row["name"]: row for row in catalog["classes"] if row["name"] in {"Bus", "AuxBus"}}
+    if info.name not in classes or info.class_id != classes[info.name]["class_id"]:
+        return None
+    if node.parent_request_path is not None:
+        parent_node = next((item for item in nodes if item.request_path == node.parent_request_path), None)
+        if parent_node is None:
+            return None
+        ancestor = parent_node
+        while ancestor is not None:
+            if ancestor.collection != "children" or (ancestor.parent_request_path is None and root_collection != "children"):
+                return None
+            ancestor = next((item for item in nodes if item.request_path == ancestor.parent_request_path), None)
+        parent_info = resolve_type(parent_node.type)
+        if parent_info.name not in classes or parent_info.class_id != classes[parent_info.name]["class_id"]:
+            return None
+        parent = {"request_path": parent_node.request_path, "type": parent_info.name, "class_id": parent_info.class_id}
+    else:
+        if root_collection != "children" or root_parent is None or root_parent.row.get("type") not in classes:
+            return None
+        _catalog, parent_class, scope = scope_evidence(version, scope_kind="object", scope_value=root_parent.object, read=read)
+        if (parent_class is None or parent_class["name"] not in classes
+                or scope["owner"] != {key: root_parent.row[key] for key in ("id", "name", "type", "path")}):
+            return None
+        parent = {"object_id": root_parent.object, "identity": scope["owner"],
+            "type": parent_class["name"], "class_id": parent_class["class_id"]}
+    return {"version": version, "catalog_sha256": catalog["catalog_sha256"],
+        "request_path": node.request_path, "type": info.name, "class_id": info.class_id,
+        "relation": "children", "parent": parent}
+
+
+def structural_bus_proof_current(proof, *, read, after_write=False):
+    """Recheck source/type bindings and any existing parent without replaying a write."""
+    from .documented_list_fields import load_catalog, scope_evidence
+    from .builders.metadata import GET_TYPES_URI, parse_get_types_result
+    catalog = load_catalog(proof["version"])
+    types = parse_get_types_result(read(GET_TYPES_URI, {}, {}))
+    parent = proof["parent"]
+    passed = catalog["catalog_sha256"] == proof["catalog_sha256"] and all(
+        [row.class_id for row in types if row.name.casefold() == item["type"].casefold()] == [item["class_id"]]
+        for item in (proof, parent))
+    if "object_id" in parent:
+        _catalog, parent_class, scope = scope_evidence(proof["version"], scope_kind="object", scope_value=parent["object_id"], read=read)
+        identity = scope["owner"]
+        passed = passed and parent_class is not None and parent_class["class_id"] == parent["class_id"]
+        passed = passed and (all(identity[key] == parent["identity"][key] for key in ("id", "type"))
+            if after_write else identity == parent["identity"])
+    return bool(passed)
