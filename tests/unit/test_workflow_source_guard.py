@@ -2692,6 +2692,11 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
             return {**original(uri, args, options), 'currentPlatformId': '{55555555-5555-5555-5555-555555555555}'}
         if uri.endswith('isPropertyEnabled'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if fault == 'exclusive-disabled-after-create' and args['property'] == 'CenterPercentage':
+                # Literal native28dc transition: the base scalar becomes disabled
+                # once this Exclusive RTPC exists; its Curve remains a distinct edit.
+                controlled = any(row.get('@PropertyName') == 'CenterPercentage' for row in task.objects.values())
+                return {'return': not controlled}
             return {'return': True}
         if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -2872,3 +2877,22 @@ def test_rtpc_graph_collector_categories_survive_existing_exact_finalizer(tmp_pa
     assert phases and all(row['verifier_strength'] for row in phases)
     assert any(row['status'] == ('FAIL' if failed_effect else 'blocked') for row in phases)
     assert events.index('shutdown') < events.index('release')
+
+
+def test_rtpc_graph_collector_updates_existing_exclusive_curve_after_base_field_disables(tmp_path, workflow):
+    runtime, _commands, writes, _task = _rtpc_graph_runtime(
+        tmp_path, workflow, fault='exclusive-disabled-after-create')
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and receipt['complete'] is True
+    assert len(writes) == 6  # One setup and five separately previewed effects.
+    observed = [row['payload']['agent_result']['enabled'] for row in receipt['enabled_observations']
+        if row['field'] == 'CenterPercentage']
+    assert observed == [True, False]
+    first, second = receipt['effects'][:2]
+    existing = first['independent_effect']['members'][1]['object']['id']
+    assert second['independent_effect']['members'][1]['object']['id'] == existing
+    assert any(row.get('object') == existing and '@Curve' in row for row in writes[2]['objects'])
+    assert receipt['exclusive']['status'] == 'observed_and_conflict_rejected'
+    assert receipt['exclusive']['rejection']['payload']['error_code'] == 'RTPC_EXCLUSIVE_CONFLICT'
+    assert receipt['exclusive']['reason'] != 'No legal active source-backed Exclusive field proved'
