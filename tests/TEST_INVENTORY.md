@@ -5,6 +5,31 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R33 integration and history
+
+Integrated runtime `51906536` passed one central preflight: **825 passed**
+(30.82s), followed by **8 selected integration checks passed** (22.37s).
+Both runs preserved 1,883 tracked files and left no owned processes. Serial
+inventory generation/checks passed; the Program roster is 262. These focused
+runs do not replace the outstanding full Program and Non-live gates.
+
+Created-field history at component `854d28aa` passed on matching macOS Console
+2023.1, 2024.1 and 2025.1: **1 passed** per version in 16.31s, 10.00s and
+19.71s. Each retains both original five-field creation/undo/redo cases, with
+existing or null Attenuation. Source hash/mtime/tree and 1,881 tracked files
+were unchanged; passing sandboxes were deleted and owned processes ended.
+
+The same collector on integrated `51906536`, Wwise 2022.1, recorded **1 failed /
+1 warning** (23.63s). Existing-reference creation and undo passed. Null-reference
+creation returned no native acknowledgement during transport loss, but Gateway
+incorrectly recorded accepted execution; verification then could not connect.
+Its effect remains unknown. Source hash/mtime/tree and 1,883 tracked files were
+unchanged, processes ended and the failed sandbox was quarantined. The original
+root `created-history-51906536-2022-r1` is preserved without replay. See
+[native follow-ups](../docs/plans/full-waapi-coverage/NATIVE_FOLLOWUPS.md) for
+the original candidate/path boundaries. No Fresh, Windows or whole-ticket
+acceptance follows from these results.
+
 ## 2026-10-18 full-coverage R32 native components
 
 Voice creation at `b560eaab` passed the exact collector separately on macOS
