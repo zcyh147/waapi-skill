@@ -54,3 +54,44 @@ def test_ordinary_create_cannot_verify_contradictory_actual_class(tmp_path):
     task.objects['{99999999-9999-9999-9999-999999999999}']['classId'] = 1  # Sound type token, ActorMixer class.
     code, result = task.run('verify', tx)
     assert code == 2 and result.get('verified') is not True, json.dumps(result)
+
+
+@pytest.mark.parametrize('operation,nested,actual_class', [
+    ('object.create', True, 1), ('object.create', False, None),
+    ('object.create', False, True), ('object.create', False, '2'),
+    ('object.set', False, 2), ('object.set', True, 1)])
+def test_created_node_class_is_strict_and_projected_at_every_depth(tmp_path, operation, nested, actual_class):
+    task = class_task(tmp_path, operation=operation)
+    declare_sound(task, nested=nested)
+    tx, shown = task.preview()
+    execute(task, tx, shown)
+    sound = next(row for row in task.objects.values() if row['name'] == 'Rain')
+    sound['classId'] = actual_class
+    code, result = task.run('verify', tx)
+    accepted = operation == 'object.set' and not nested
+    assert code == (0 if accepted else 2), json.dumps(result)
+    assert (result.get('verified') is True) is accepted
+
+
+@pytest.mark.parametrize('phase', ['unchanged', 'before-write', 'after-write'])
+def test_existing_graph_root_class_is_bound_before_write_and_verified(tmp_path, phase):
+    task = class_task(tmp_path, operation='object.set')
+    owner = task.bind(FIRST)
+    code, result = task.step('draft-declare-existing', '--declaration-id', 'owner',
+        '--object-handle', owner, '--field', 'notes', 'Reviewed note')
+    assert code == 0, result
+    tx, shown = task.preview()
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, result
+    if phase == 'before-write':
+        task.objects[FIRST]['classId'] = 2
+    code, result = task.run('execute', tx)
+    if phase == 'before-write':
+        assert code == 2 and not any(uri.endswith('object.set') for uri, _, _ in task.calls), result
+        return
+    assert code == 0, result
+    if phase == 'after-write':
+        task.objects[FIRST]['classId'] = 2
+    code, result = task.run('verify', tx)
+    assert code == (0 if phase == 'unchanged' else 2), json.dumps(result)
+    assert (result.get('verified') is True) is (phase == 'unchanged')
