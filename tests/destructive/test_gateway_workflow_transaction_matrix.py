@@ -5309,3 +5309,230 @@ def test_read_only_reference_enabled_native_metadata_observation(workflow_sandbo
     if category['status'] == 'blocked':
         pytest.skip(f'Existing reference observation blocked; receipt retained: {category}')
     assert category['status'] == 'PASS', category
+
+
+def _collect_2021_rtpc_representation_diagnostic(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Inspect two source-pinned identities; no RTPC construction or effect claim."""
+    assert runtime.version == '2021.1', 'This diagnostic is pinned to the2021 sample and catalog'
+    output = runtime.state_dir / 'rtpc-2021-representation-diagnostic.json'
+    assert not output.exists(), 'An earlier diagnostic must never be overwritten'
+    evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_evidence = set(evidence_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    report: dict[str, Any] = {
+        'contract': 'waapi-skill.rtpc-2021-representation-diagnostic/v1',
+        'candidate': runtime.candidate, 'version': runtime.version,
+        'endpoint': {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url},
+        'config_path': str(config), 'config_sha256': hashlib.sha256(config.read_bytes()).hexdigest(),
+        'source': {'sdk_build': '2021.1.14.8108',
+            'authority_report': '/tmp/full-coverage-180-rtpc-2021-authority.md',
+            'sdk_archive': '/Applications/Audiokinetic/Wwise2021.1.14.8108/SDK/Help/WwiseSDK-Windows.chm',
+            'sdk_members': ['ak_wwise_core_object_create.html', 'wwiseobject_curve.html'],
+            'saved_model': 'tests/_org/2021.1/Actor-Mixer Hierarchy/Car Engine.wwu',
+            'saved_model_sha256': '499654bb8ab436ae52ef74067d14beb7fe4335009b1ff2cea380aabfada9d214',
+            'scope': 'saved identities only; no live class/list/field token inferred from saved XML'},
+        'bounds': {'calls': 32, 'name_pages_per_object': 4, 'names_per_page': 64,
+            'detail_fields': 6, 'detail_pages_per_field': 2, 'relationship_reads': 2,
+            'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
+            'receipt_bytes': 4 * 1024 * 1024, 'native_evidence_files': 512,
+            'native_evidence_bytes': 32 * 1024 * 1024},
+        'calls': [], 'objects': [], 'field_details': [], 'relationship_reads': [],
+        'boundaries': [], 'native_evidence': [], 'collection_complete': False,
+        'mutation_authority': False, 'business_effect_verified': False, 'native_absence_proven': False,
+    }
+    category = {'category': 'rtpc-2021-representation-diagnostic', 'status': 'FAIL',
+        'diagnostic_only': True, 'business_effect_verified': False, 'observation_path': str(output),
+        'verifier_strength': 'read_only_source_guid_identity_and_disclosed_metadata_observation',
+        'reason': 'diagnostic collection incomplete'}
+    runtime.category_results.append(category)
+    total_bytes = 0
+
+    def retain() -> None:
+        body = json.dumps(report, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        assert len(body) <= report['bounds']['receipt_bytes'], 'RTPC diagnostic receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp')
+        temporary.write_bytes(body)
+        temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+
+    def boundary(stage: str, reason: str, **facts: Any) -> None:
+        report['boundaries'].append({'stage': stage, 'reason': reason, **facts})
+
+    def read(stage: str, command: Sequence[str]) -> dict[str, Any] | None:
+        nonlocal total_bytes
+        assert len(report['calls']) < report['bounds']['calls'], 'RTPC diagnostic public call bound exceeded'
+        entry = {'stage': stage, 'gateway_argv': list(command)}
+        report['calls'].append(entry)
+        try:
+            code, payload = runtime.raw_gateway(command)
+            entry.update(exit_code=code, payload=payload)
+            size = len(json.dumps(payload, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+            total_bytes += size
+            assert size <= report['bounds']['reply_bytes'] and total_bytes <= report['bounds']['total_reply_bytes'], 'RTPC diagnostic reply byte bound exceeded'
+            if code != 0 or payload.get('ok') is not True:
+                boundary(stage, 'public_read_rejected', error_code=payload.get('error_code'))
+                return None
+            if command[0] not in {'config-show', 'query-schema'}:
+                assert payload.get('endpoint') == report['endpoint'], 'RTPC diagnostic endpoint changed'
+                assert payload.get('detected_version') == runtime.version, 'RTPC diagnostic version changed'
+            return payload
+        except Exception as exc:
+            entry['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            raise
+        finally:
+            retain()
+
+    def query(stage: str, source: Sequence[str]) -> list[dict[str, Any]]:
+        payload = read(stage, ['query-object', *source, '--max-results', '2',
+            '--include', 'class-id', '--include', 'parent', '--include', 'owner'])
+        if payload is None:
+            return []
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and len(rows) <= 1, 'Exact diagnostic query returned ambiguous rows'
+        assert payload.get('projection_complete') is not False and payload.get('status') != 'partial', 'RTPC diagnostic projection is incomplete'
+        return rows
+
+    def canonical(value: Any) -> bool:
+        try:
+            return isinstance(value, str) and value.casefold() == ('{' + str(uuid.UUID(value)) + '}').casefold()
+        except ValueError:
+            return False
+
+    def names(item: dict[str, Any]) -> list[dict[str, Any]]:
+        fields, seen_pages, page = [], set(), None
+        for _ in range(report['bounds']['name_pages_per_object']):
+            command = ['metadata', 'list', '--exact-id', item['requested_id'], '--page-size', '64']
+            if page is not None:
+                command += ['--page', page]
+            payload = read(item['role'] + '-names', command)
+            if payload is None:
+                return []
+            result = payload['agent_result']
+            batch = result.get('fields')
+            assert isinstance(batch, list) and len(batch) <= 64, 'RTPC diagnostic name row bound exceeded'
+            for field in batch:
+                name = field.get('name')
+                assert isinstance(name, str) and name and name not in item['field_names'], 'Malformed or duplicate disclosed field name'
+                item['field_names'].append(name)
+                assert isinstance(field.get('selection'), str) and field['selection'], 'Disclosed field lacks scoped selection'
+                fields.append(field)
+            page = result.get('next_page')
+            if page is None:
+                assert result.get('complete') is True and result.get('total_count') == len(fields), 'Incomplete RTPC diagnostic name inventory'
+                item['names_complete'] = True
+                return fields
+            assert isinstance(page, str) and page and page not in seen_pages, 'Repeated or malformed metadata page'
+            seen_pages.add(page)
+        raise AssertionError('RTPC diagnostic metadata exceeds four pages; no complete inventory or absence claim')
+
+    def detail(item: dict[str, Any], field: Mapping[str, Any]) -> dict[str, Any] | None:
+        record = {'object_id': item['requested_id'], 'disclosed_field': field['name'], 'pages': []}
+        report['field_details'].append(record)
+        command = ['metadata', 'detail', '--exact-id', item['requested_id'], '--selection', field['selection']]
+        for _ in range(report['bounds']['detail_pages_per_field']):
+            payload = read(item['role'] + '-' + field['name'] + '-detail', command)
+            if payload is None:
+                return None
+            result = payload['agent_result']
+            record['pages'].append(result)
+            if result.get('complete') is True:
+                return result.get('metadata') if len(record['pages']) == 1 else None
+            command = result.get('next_command', {}).get('gateway_argv')
+            assert isinstance(command, list) and command[:2] == ['metadata', 'detail'], 'Metadata detail continuation unavailable'
+        boundary(item['role'], 'detail_page_bound_reached', disclosed_field=field['name'])
+        return None
+
+    def follow(stage: str, identity: Any, *, source: Sequence[str] | None = None) -> None:
+        assert len(report['relationship_reads']) < 2, 'RTPC diagnostic relationship bound exceeded'
+        if source is None and not canonical(identity):
+            boundary(stage, 'disclosed_relationship_identity_missing_or_malformed', value=identity)
+            return
+        rows = query(stage, source or ['--exact-id', identity])
+        report['relationship_reads'].append({'stage': stage, 'source_id': identity, 'identity_rows': rows})
+        if rows and source is not None:
+            returned = rows[0].get('id')
+            if not canonical(returned):
+                boundary(stage, 'returned_relationship_identity_missing_or_malformed', value=returned)
+                return
+            exact = query(stage + '-exact-id', ['--exact-id', returned])
+            report['relationship_reads'][-1]['exact_identity_rows'] = exact
+            if exact != rows:
+                boundary(stage, 'relationship_exact_readback_changed')
+        elif rows and rows[0].get('id', '').casefold() != identity.casefold():
+            boundary(stage, 'exact_relationship_identity_mismatch')
+
+    try:
+        read('configuration', ['config-show'])
+        status = read('host-and-project', ['status'])
+        assert status is not None, 'Exact2021 host/project status unavailable'
+        report['runtime_version_observed'] = status.get('wwise', {}).get('version')
+        observed = report['runtime_version_observed']
+        assert (isinstance(observed, Mapping)
+            and all(type(observed.get(key)) is int for key in ('year', 'major', 'minor', 'build'))
+            and [observed[key] for key in ('year', 'major', 'minor', 'build')] == [2021, 1, 14, 8108]), 'Exact2021.1.14.8108 source/SDK build differs from observed host'
+        read('disclosed-read-contract', ['query-schema', '--advanced'])
+        for role, identity in [('Sound', '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'),
+                               ('saved-internal-RTPC', '{A809A571-6012-42BE-A00D-D8E7C89D1248}')]:
+            item = {'role': role, 'requested_id': identity, 'identity_rows': [], 'field_names': [], 'names_complete': False}
+            report['objects'].append(item)
+            item['identity_rows'] = query(role + '-exact-id', ['--exact-id', identity])
+            if not item['identity_rows']:
+                boundary(role, 'exact_internal_identity_not_observed', requested_id=identity,
+                    meaning='zero/error observation only; no native absence or construction conclusion')
+                continue
+            row = item['identity_rows'][0]
+            if not canonical(row.get('id')) or row['id'].casefold() != identity.casefold():
+                boundary(role, 'exact_identity_mismatch')
+                continue
+            for key in ('name', 'type', 'path', 'class_id', 'parent', 'owner'):
+                if key not in row:
+                    boundary(role, 'identity_output_omitted', field=key)
+            fields = names(item)
+            for field in fields:
+                if not any(word in field['name'].casefold() for word in ('rtpc', 'curve', 'controlinput', 'property', 'owner')):
+                    continue
+                if len(report['field_details']) == 6:
+                    report['detail_limit_reached'] = True
+                    break
+                metadata = detail(item, field)
+                restriction = metadata.get('restriction', {}) if isinstance(metadata, Mapping) else {}
+                if (role == 'saved-internal-RTPC' and field['name'] == 'Curve'
+                        and isinstance(restriction, Mapping) and restriction.get('type') == 'reference'):
+                    follow('disclosed-RTPC-Curve', identity,
+                        source=['--advanced-waql', f'from object "{identity}" select @{field["name"]}'])
+            if role == 'saved-internal-RTPC' and isinstance(row.get('owner'), Mapping):
+                follow('returned-RTPC-owner', row['owner'].get('id'))
+        report['collection_complete'] = True
+        category.update(status='blocked', reason='Read-only diagnostic only; no construction, mutation, absence or business effect credit')
+        return category
+    except Exception as exc:
+        report['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        completed_status, completed_reason = category['status'], category['reason']
+        category.update(status='FAIL', reason='Diagnostic evidence retention incomplete')
+        try:
+            paths = sorted(set(evidence_root.glob('*.json')) - prior_evidence)
+            assert len(paths) <= 512, 'RTPC diagnostic dispatcher evidence file bound exceeded'
+            total = 0
+            for path in paths:
+                assert path.stat().st_size <= 32 * 1024 * 1024 - total, 'RTPC diagnostic dispatcher evidence byte bound exceeded'
+                body = path.read_bytes()
+                total += len(body)
+                assert total <= 32 * 1024 * 1024, 'RTPC diagnostic dispatcher evidence byte bound exceeded'
+                report['native_evidence'].append({'path': str(path), 'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
+        except Exception as exc:
+            report['retention_failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            retain()
+            raise
+        retain()
+        category.update(status=completed_status, reason=completed_reason)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_gateway_2021_rtpc_representation_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Developer-only collection can complete; its category never grants effect credit."""
+    category = _collect_2021_rtpc_representation_diagnostic(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category

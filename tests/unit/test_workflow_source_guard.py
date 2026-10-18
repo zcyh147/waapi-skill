@@ -2251,3 +2251,175 @@ def test_reference_enabled_probe_uses_actual_gateway_and_never_writes(tmp_path, 
         assert receipt['enabled_response']['payload']['call']['waapi_error_uri'] == 'ak.wwise.invalid_arguments'
     else:
         assert receipt['observed_enabled'] is (outcome == 'true')
+
+
+def _rtpc_2021_representation_runtime(tmp_path, workflow, *, fault=None):
+    """Actual public Gateway; internal-class facts below are synthetic protocol data."""
+    from copy import deepcopy
+    import re
+    from tests.unit.test_metadata_discovery_gateway import (
+        FakeClient, _gateway_env, _live_info, _project_row, GET_INFO_URI, OBJECT_GET_URI,
+        GET_TYPES_URI, GET_NAMES_URI, GET_PROPERTY_INFO_URI,
+    )
+    sound = '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'
+    rtpc = '{A809A571-6012-42BE-A00D-D8E7C89D1248}'
+    curve = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    objects = {
+        sound: {'id': sound, 'name': 'Outside_Idle_1000', 'type': 'Sound',
+            'path': r'\Actor-Mixer Hierarchy\Car Engine\Outside_Idle_1000', 'classId': 65552,
+            'parent': None, 'owner': None},
+        # No native2021 class ID or path claim: this is injected boundary data.
+        rtpc: {'id': rtpc, 'name': '', 'type': 'RTPC', 'path': '', 'classId': 424242,
+            'parent': None, 'owner': {'id': sound}},
+        curve: {'id': curve, 'name': '', 'type': 'Curve', 'path': '', 'classId': 917520,
+            'parent': None, 'owner': {'id': rtpc}},
+    }
+    if fault == 'omission':
+        objects[rtpc].pop('classId')
+        objects[rtpc].pop('owner')
+    fields = {sound: ['Volume'], rtpc: ['Curve', 'ControlInput', 'PropertyName']}
+    if fault == 'many-details':
+        fields[rtpc] = ['Curve'] + [f'ControlInput{n}' for n in range(8)]
+    if fault == 'pages':
+        fields[rtpc] = [f'Unrelated{n:03}' for n in range(257)]
+    if fault == 'no-curve-disclosure':
+        fields[rtpc] = ['ControlInput']
+    env = _gateway_env(tmp_path, version='2021.1')
+    config = Path(env['WAAPI_SKILL_CONFIG_PATH'])
+    settings = json.loads(config.read_text());settings['project_modification_policy'] = 'read_only'
+    config.write_text(json.dumps(settings))
+    evidence = Path(env['WWISE_EVIDENCE_DIR']);evidence.mkdir()
+    dispatches, commands = [], []
+    def get(args, options):
+        dispatches.append((deepcopy(args), deepcopy(options)))
+        expression = args.get('waql', '')
+        if expression == 'from type Project take 1':
+            return {'return': [_project_row(tmp_path)]}
+        match = re.fullmatch(r'from object "(\{[A-Fa-f0-9-]+\})"(?: select @Curve)?(?: take \d+)?', expression)
+        if match:
+            identity = match[1]
+            if identity == rtpc and fault == 'missing':
+                return {'return': []}
+            selected = [objects[curve if 'select @Curve' in expression else identity]]
+        else:
+            assert args.keys() == {'from'} and args['from'].keys() == {'id'}, args
+            selected = [objects[identity] for identity in args['from']['id']]
+        return {'return': [{key: deepcopy(row[key]) for key in options['return'] if key in row} for row in selected]}
+    def names(args, _options):
+        if fault == 'names-error' and args['object'] == rtpc:
+            class WaapiRequestFailed(Exception):
+                uri = 'ak.wwise.invalid_arguments'
+                kwargs = {'message': 'Exact internal metadata refused; original detail',
+                    'details': {'object': rtpc, 'original': None}}
+            raise WaapiRequestFailed('Exact internal metadata refused; original detail')
+        return {'return': fields[args['object']]}
+    def info(args, _options):
+        assert args['property'] in fields[args['object']]
+        if args['property'] == 'Curve':
+            # Preserve metadata name/type omission; reference restriction is explicit.
+            return {'restriction': {'type': 'reference', 'restrictions': [{'type': ['Curve']}]},
+                'nativeOptionalNull': None}
+        return {'type': 'string', 'nativeOptionalNull': None}
+    live_info = _live_info('2021.1')
+    live_info['version']['minor'] = 14
+    client = FakeClient({GET_INFO_URI: live_info, OBJECT_GET_URI: get,
+        GET_TYPES_URI: {'return': [{'name': 'Sound', 'classId': 65552, 'type': 'WObject'}]},
+        GET_NAMES_URI: names, GET_PROPERTY_INFO_URI: info})
+    runtime = SimpleNamespace(version='2021.1', candidate='synthetic-program-control',
+        state_dir=tmp_path / 'state', env=env, category_results=[], port=31337,
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(command):
+        commands.append(list(command))
+        return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=env, client_factory=lambda _url: client)
+    runtime.raw_gateway = raw
+    return runtime, commands, client, dispatches, objects
+
+
+@pytest.mark.parametrize('fault', [None, 'missing', 'names-error'])
+def test_rtpc_2021_representation_probe_uses_public_scope_and_retains_boundaries(tmp_path, workflow, fault):
+    runtime, commands, client, dispatches, objects = _rtpc_2021_representation_runtime(tmp_path, workflow, fault=fault)
+    workflow.test_gateway_2021_rtpc_representation_diagnostic(runtime)
+    result, = runtime.category_results
+    receipt = json.loads(Path(result['observation_path']).read_text())
+    assert result['status'] == 'blocked' and result['diagnostic_only'] is True
+    assert receipt['collection_complete'] is True
+    assert receipt['mutation_authority'] is receipt['business_effect_verified'] is False
+    assert receipt['native_absence_proven'] is False
+    assert receipt['version'] == '2021.1' and receipt['source']['sdk_build'] == '2021.1.14.8108'
+    assert all(command[0] in {'config-show', 'status', 'query-schema', 'query-object', 'metadata'} for command in commands)
+    assert {uri for uri, _args, _options in client.calls} <= {
+        'ak.wwise.core.getInfo', 'ak.wwise.core.object.get', 'ak.wwise.core.object.getTypes',
+        'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
+    rtpc = receipt['objects'][1]
+    assert rtpc['requested_id'] == '{A809A571-6012-42BE-A00D-D8E7C89D1248}'
+    if fault == 'missing':
+        assert rtpc['identity_rows'] == [] and rtpc['names_complete'] is False
+        assert any(row['reason'] == 'exact_internal_identity_not_observed' for row in receipt['boundaries'])
+    elif fault == 'names-error':
+        failed = [call for call in receipt['calls'] if call['exit_code'] != 0]
+        assert len(failed) == 1 and failed[0]['payload']['error_code'] == 'LIVE_METADATA_READ_FAILED'
+        assert failed[0]['payload']['details']['uri'] == 'ak.wwise.core.object.getPropertyAndReferenceNames'
+        assert any(row['reason'] == 'public_read_rejected' for row in receipt['boundaries'])
+        assert rtpc['names_complete'] is False
+    else:
+        assert rtpc['identity_rows'][0]['class_id'] == 424242
+        assert rtpc['names_complete'] is True and rtpc['field_names'] == ['ControlInput', 'Curve', 'PropertyName']
+        detail = next(row for row in receipt['field_details'] if row['disclosed_field'] == 'Curve')
+        metadata = detail['pages'][0]['metadata']
+        assert 'name' not in metadata and 'type' not in metadata and metadata['nativeOptionalNull'] is None
+        assert len(receipt['relationship_reads']) == 2
+        assert any('select @Curve' in args.get('waql', '') for args, _ in dispatches)
+    assert not any('curve-points' in command or any('RTPCList' in item for item in command) for command in commands)
+
+
+@pytest.mark.parametrize('fault', ['many-details', 'no-curve-disclosure', 'pages', 'omission'])
+def test_rtpc_2021_representation_probe_keeps_discovery_and_observation_bounds(tmp_path, workflow, fault):
+    runtime, commands, client, _dispatches, _objects = _rtpc_2021_representation_runtime(tmp_path, workflow, fault=fault)
+    if fault == 'pages':
+        with pytest.raises(AssertionError, match='four pages'):
+            workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    else:
+        workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    result, = runtime.category_results
+    report = json.loads(Path(result['observation_path']).read_text())
+    assert len(commands) <= 32
+    assert len(report['field_details']) <= 6 and len(report['relationship_reads']) <= 2
+    assert all(uri in {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get', 'ak.wwise.core.object.getTypes',
+        'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
+        for uri, _args, _options in client.calls)
+    if fault == 'pages':
+        assert result['status'] == 'FAIL' and report['collection_complete'] is False
+        assert len(report['objects'][1]['field_names']) == 256 and report['objects'][1]['names_complete'] is False
+        assert 'four pages' in report['failure']['message']
+    else:
+        assert result['status'] == 'blocked' and report['collection_complete'] is True
+        if fault == 'many-details':
+            assert len(report['objects'][1]['field_names']) == 9 and report['objects'][1]['names_complete'] is True
+            assert len(report['field_details']) == 6 and report['detail_limit_reached'] is True
+        elif fault == 'no-curve-disclosure':
+            assert not any('--advanced-waql' in command for command in commands)
+            assert [row['stage'] for row in report['relationship_reads']] == ['returned-RTPC-owner']
+        elif fault == 'omission':
+            assert 'class_id' not in report['objects'][1]['identity_rows'][0]
+            assert any(row['reason'] == 'identity_output_omitted' and row['field'] == 'class_id' for row in report['boundaries'])
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_rtpc_2021_representation_probe_does_not_apply_source_identity_to_other_versions(tmp_path, workflow, version):
+    runtime, commands, _client, _dispatches, _objects = _rtpc_2021_representation_runtime(tmp_path, workflow)
+    runtime.version = version
+    with pytest.raises(AssertionError, match='pinned'):
+        workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    assert commands == [] and runtime.category_results == []
+
+
+def test_rtpc_2021_representation_probe_stops_before_source_reads_on_wrong_build(tmp_path, workflow):
+    runtime, commands, client, _dispatches, _objects = _rtpc_2021_representation_runtime(tmp_path, workflow)
+    client.responses['ak.wwise.core.getInfo']['version']['build'] = 8109
+    with pytest.raises(AssertionError, match='build'):
+        workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    report = json.loads(Path(runtime.category_results[0]['observation_path']).read_text())
+    assert report['collection_complete'] is False and report['runtime_version_observed']['build'] == 8109
+    assert not any(command[0] in {'query-object', 'metadata'} for command in commands)
+    assert runtime.category_results[0]['status'] == 'FAIL'
