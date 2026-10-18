@@ -61,11 +61,8 @@ def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp
             assert row["api"] == "ak.wwise.core.getInfo"
             continue
         code, result = gateway.execute_gateway(row["next_command"], env=env, client_factory=no_client)
-        if row["api"] == "ak.wwise.core.sourceControl.setProvider":
-            assert code != 0
-        else:
-            assert code == 0, (row["api"], result)
-            assert result["version"] == version
+        assert code == 0, (row["api"], result)
+        assert result["version"] == version
 
 
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))

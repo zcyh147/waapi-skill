@@ -61,10 +61,10 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
         "bounded_topic_wait": 152,
         "excluded": 6,
         "fixed_command": 57,
-        "isolated_transaction": 141,
+        "isolated_transaction": 138,
         "managed_transaction": 220,
         "compound_transaction_member": 15,
-        "transaction": 113,
+        "transaction": 116,
     }
 
     for row in rows:
@@ -106,10 +106,11 @@ def test_all_transaction_reads_are_explicit_confirmation_only() -> None:
         if entry.route in TRANSACTION_ROUTES and entry.effect == "read"
     ]
 
-    assert len(rows) == 8
+    assert len(rows) == 11
     assert {row.uri for row in rows} == {
         "ak.wwise.core.remote.getAvailableConsoles",
         "ak.wwise.core.transport.getList",
+        "ak.wwise.core.sourceControl.getStatus",
     }
     assert all(
         row.accepted_authorization_modes
@@ -207,7 +208,12 @@ def test_route_families_have_explicit_program_cleanup_or_confirmation_contracts(
 
     transactions = [entry for entry in executable if entry.route in TRANSACTION_ROUTES]
     assert transactions
-    assert all(entry.gateway_commands == ("request-schema",) for entry in transactions)
+    for entry in transactions:
+        assert entry.gateway_commands == (
+            ("request-schema", "core-call")
+            if entry.uri == "ak.wwise.core.sourceControl.getStatus"
+            else ("request-schema",)
+        )
     assert all(entry.requires_authorization for entry in transactions)
 
 

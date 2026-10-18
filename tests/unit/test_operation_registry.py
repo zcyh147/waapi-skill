@@ -280,10 +280,11 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "summary" not in contract_2022
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
-    # Reviewed version projection, Curve proof and documented-list bindings are
-    # machine-owned validity changes; human summaries above remain excluded.
+    # Reviewed version projection, Curve proof, documented-list bindings,
+    # and declaration result bindings are machine-owned validity changes;
+    # human summaries above remain excluded.
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "a98d8c5a047efc931146c394894a3b7709bcb97f0cedf67941f945d303555289"
+        "e5f9f59d1a5c2a4530ecc4f3c1e6d4ef7c8067d388314e92c35533b084f2d1db"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
@@ -471,7 +472,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["waapi.call"]["argument_contract"] == {
         "type": "object",
         "required": ["api"],
-        "optional": ["args", "options", "io_root", "result_projection", "layout_binding", "model_binding"],
+        "optional": ["args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding", "history_binding"],
         "additionalProperties": False,
         "properties": {
             "api": {
@@ -505,6 +506,9 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
                     "inside args."
                 ),
             },
+            "source_control_binding": {"type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded."},
+            "provider_profile_binding": {"type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch."},
+            "history_binding": {"type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded."},
             "layout_binding": {
                 "type": "object",
                 "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
