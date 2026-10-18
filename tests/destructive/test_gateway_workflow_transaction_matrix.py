@@ -5636,11 +5636,26 @@ def _collect_existing_effect_slot_exact_member_acceptance(runtime: _WorkflowSand
                 for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes')), (listed, row)
             assert row['name'] == '' and row['class_id'] == 5505040, row
             assert row.get('owner', {}).get('id') == owner, row
+            if 'parent' in row:
+                assert isinstance(row['parent'], Mapping) and row['parent'].get('id') == owner, row
+                assert 'parent' not in row.get('unavailable_fields', []), row
+            else:
+                assert 'parent' in row.get('unavailable_fields', []), row
             assert all(type(row.get('properties', {}).get(token)) is bool for token in ('Bypass', 'Render')), row
             identity = reference(row)
             effect = exact(identity, effect_fields[identity])
-            assert effect['type'] == 'Effect' and effect.get('owner', {}).get('id') == owner, effect
-            assert effect.get('parent', {}).get('id') == row['id'], effect
+            assert effect['type'] == 'Effect', effect
+            # Match the existing plugin verifier's observed representation, not
+            # an invented hierarchy. Embedded Effects have immediate slot owner
+            # with no parent; a present hierarchy parent is retained explicitly.
+            if 'parent' in effect:
+                assert isinstance(effect['parent'], Mapping) and effect['parent'].get('id') == row['id'], effect
+                assert 'parent' not in effect.get('unavailable_fields', []), effect
+                expected_effect_owner = owner
+            else:
+                assert 'parent' in effect.get('unavailable_fields', []), effect
+                expected_effect_owner = row['id']
+            assert effect.get('owner', {}).get('id') == expected_effect_owner, effect
             slots.append(row); effects.append(effect)
         assert len({row['id'] for row in [sound, *slots, *effects]}) == 5, (slots, effects)
         return {'owner': sound, 'slots': slots, 'effects': effects}
