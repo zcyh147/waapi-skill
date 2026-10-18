@@ -3137,3 +3137,106 @@ def test_anonymous_collector_preserves_previous_owner_after_the_planned_graph_ef
     assert len(writes) == 6 and [command[0] for command in commands].count('execute') == 6
     assert receipt['transactions'][-1]['verify']['payload']['verified'] is True
     assert receipt['transactions'][-1]['effect_verified'] is False
+
+
+def _voice_creation_runtime(tmp_path, workflow, version='2025.1', *, fault=None):
+    """Actual Gateway with a source-shaped native constructor, not collector replies."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_sound_voice_creation_gateway import voice_task
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task = voice_task(tmp_path, version)
+    task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 3, 'path': ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + '\\Default Work Unit',
+        'notes': 'Keep parent'}}
+    container_type = 'PropertyContainer' if version == '2025.1' else 'ActorMixer'
+    original, commands, writes = task.call, [], []
+    def create(node, parent, *, owned=False):
+        assert not owned and node['type'] in {'Sound', 'ActorMixer', container_type}, node
+        identity = '{' + str(uuid.uuid4()).upper() + '}'
+        actual_type = container_type if node['type'] == 'ActorMixer' else node['type']
+        task.objects[identity] = {'id': identity, 'name': node['name'], 'type': actual_type,
+            'classId': 65552 if actual_type == 'Sound' else 1,
+            'parent': {'id': parent}, 'path': task.objects[parent]['path'] + '\\' + node['name'],
+            'notes': node.get('notes', ''), **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
+        children = [create(child, identity) for child in node.get('children', [])]
+        return {'id': identity, 'name': node['name'], **({'children': children} if children else {})}
+    task._create = create
+    def call(uri, args=None, options=None):
+        if uri.endswith(('object.create', 'object.set')):
+            writes.append((uri, deepcopy(args)))
+        if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from object "'):
+            import re
+            expression = args['waql']
+            match = re.fullmatch(r'from object "([^"]+)"(?: take 1)?', expression)
+            assert match, expression
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            rows = [row for row in task.objects.values() if match[1] in (row['id'], row['path'])]
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='a' * 40, category_results=[], port=31337,
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _: task)
+        if command[0] == 'verify' and payload.get('verified') is True:
+            if fault == 'numeric-flag' and len(writes) == 1:
+                next(row for row in task.objects.values() if row['type'] == 'Sound')['@IsVoice'] = 1
+            if fault == 'missing-nested-child' and len(writes) == 2:
+                child = next(row for row in task.objects.values() if row['name'] == 'NestedVoice')
+                del task.objects[child['id']]
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2025.1'])
+def test_voice_creation_collector_uses_public_gateway_and_actual_category_writer(tmp_path, workflow, monkeypatch, version):
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes = _voice_creation_runtime(tmp_path, workflow, version)
+    category = workflow._collect_voice_creation_acceptance(runtime, prefix='WAAPI_VOICE_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    expected = 2 if version == '2021.1' else 3
+    assert category['status'] == 'PASS' and receipt['business_effect_verified'] is True
+    assert len(writes) == expected and [row[0] for row in commands].count('execute') == expected
+    assert [row[0] for row in commands].count('verify') == expected
+    assert all(phase['effect_verified'] and phase['verify']['payload']['verified'] is True for phase in receipt['transactions'])
+    for phase in receipt['transactions']:
+        assert phase['independent_voice']['properties']['IsVoice'] is True
+        assert phase['independent_voice']['properties']['Volume'] == phase['expected']['volume']
+        dispatch = phase['compiled_native_request']
+        args = dispatch['args']
+        node = args['objects'][0]['children'][0] if dispatch['uri'].endswith('object.set') else args
+        voice = node['children'][0] if phase['phase'] == 'ordinary_nested_voice' else node
+        assert voice['@IsVoice'] is True and 'language' not in voice and 'import' not in voice
+    output = tmp_path / 'voice-actual-category-writer.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::voice_creation'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True, 'hash_before': 'same', 'hash_after': 'same'}, residual_state={'sandbox': 'deleted'},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3' and record['categories'] == runtime.category_results
+    assert len(record['transactions']) == expected and all(row['state'] == 'verified' for row in record['transactions'])
+
+
+@pytest.mark.parametrize('fault', ['numeric-flag', 'missing-nested-child'])
+def test_voice_creation_collector_rejects_corruption_after_gateway_verified(tmp_path, workflow, fault):
+    runtime, commands, writes = _voice_creation_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_voice_creation_acceptance(runtime, prefix='WAAPI_VOICE_TEST')
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    phase = receipt['transactions'][-1]
+    expected = 1 if fault == 'numeric-flag' else 2
+    assert category['status'] == 'FAIL' and receipt['business_effect_verified'] is False and receipt['failure']
+    assert phase['execute']['payload']['state'] == 'executed_unverified' and phase['verify']['payload']['verified'] is True
+    assert phase['effect_verified'] is False
+    assert len(writes) == expected and [row[0] for row in commands].count('execute') == expected
