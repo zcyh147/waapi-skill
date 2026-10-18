@@ -5,6 +5,7 @@ from tests.support.gateway_config import set_gateway_config
 import importlib.util
 import base64
 import json
+import shlex
 import sys
 from collections import deque
 from pathlib import Path
@@ -146,14 +147,24 @@ def _live_client(
     )
 
 
+@pytest.mark.parametrize("version,native_type", [
+    ("2021.1", "ActorMixer"), ("2022.1", "ActorMixer"),
+    ("2023.1", "ActorMixer"), ("2024.1", "ActorMixer"),
+    ("2025.1", "PropertyContainer"),
+])
 def test_object_binding_returns_version_stable_business_kind(
-    tmp_path: Path,
+    tmp_path: Path, version: str, native_type: str,
 ) -> None:
-    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    start_code, started = _offline(tmp_path, "draft-start", "object.set", version=version)
+    if version == "2021.1":
+        assert start_code == 2, started
+        assert started["error_code"] == "UNAVAILABLE_IN_VERSION"
+        return
     assert start_code == 0, started
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
-    target_path = r"\Containers\Default Work Unit\SemanticLab\UI\Confirm"
+    hierarchy = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    target_path = rf"\{hierarchy}\Default Work Unit\SemanticLab\UI\Confirm"
     client = _live_client(
         tmp_path,
         {
@@ -163,13 +174,13 @@ def test_object_binding_returns_version_stable_business_kind(
                         {
                             "id": PARENT_ID,
                             "name": "Confirm",
-                            "type": "PropertyContainer",
+                            "type": native_type,
                             "path": target_path,
                         }
                     ]
                 }
             ]
-        },
+        }, version=version,
     )
 
     code, payload = gateway.execute_gateway(
@@ -185,7 +196,7 @@ def test_object_binding_returns_version_stable_business_kind(
             "--object-id",
             PARENT_ID,
         ],
-        env=_env(tmp_path),
+        env=_env(tmp_path, version),
         client_factory=lambda _url: client,
     )
 
@@ -193,16 +204,17 @@ def test_object_binding_returns_version_stable_business_kind(
     assert payload["bound_object"] == {
         "handle": payload["bound_object"]["handle"],
         "name": "Confirm",
-        "type": "PropertyContainer",
+        "type": native_type,
         "path": target_path,
         "business_kind": "actor-mixer",
         "business_kind_resolution": {
             "status": "resolved",
             "candidates": ["actor-mixer"],
-            "reflected_type": "PropertyContainer",
+            "reflected_type": native_type,
         },
         "semantic_kind": None,
     }
+    assert payload["detected_version"] == version
     continuation = payload["draft"]["next_action_binding"]
     assert continuation["object_binding"]["repeat_selector_form"] == "by_id"
     assert set(continuation["object_binding"]) == {
@@ -231,7 +243,30 @@ def test_object_binding_returns_version_stable_business_kind(
         "one_or_two_requested": "use_the_individual_discover_and_declare_routes",
     }
     assert "draft-inspect" in continuation["more_actions"]["copy_command"]
+    assert continuation["field_discovery"]["documented_lists"] == {
+        "append": ["--field-source", "documented-lists", "--list"],
+        "details_via": "more_actions",
+    }
     assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 8_000
+    # Execute the disclosed route in this test's isolated state directory. The
+    # compact reply keeps List discovery actionable; inspect retains its scope,
+    # provenance, selection, and unresolved-source boundaries in full.
+    inspect_command = shlex.split(continuation["more_actions"]["copy_command"])
+    inspect_code, inspected = _offline(
+        tmp_path, *inspect_command[inspect_command.index("gateway.py") + 1 :],
+        version=version,
+    )
+    assert inspect_code == 0, inspected
+    assert inspected["draft"]["next_action_binding"]["field_discovery"][
+        "documented_lists"
+    ] == {
+        "append": ["--field-source", "documented-lists", "--list"],
+        "scope": "copy_exact_bound_owner_handle_or_type_handle",
+        "selection": "copy_one_returned_scoped_selection",
+        "evidence": "versioned_per_type_source_and_live_exact_class; not_getPropertyInfo",
+        "absent_source": "unresolved_not_native_unavailable",
+        "maximum_page_size": 64,
+    }
 
 
 def test_literal_random_container_path_resolves_ambiguous_live_kind(
@@ -2166,7 +2201,7 @@ def test_gateway_declares_named_object_list_without_native_row_json(
         declared["draft"]["next_action_binding"]["clear_object_list"][
             "list_name_input"
         ]
-        == "exact_user_owned_wwise_object_list_name_without_at_prefix"
+        == "selected_List_Field_Handle_or_exact_source_proven_alias_for_this_owner"
     )
 
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(

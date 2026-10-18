@@ -26334,7 +26334,18 @@ def _compact_object_set_update_continuation(
     for key in common_actions:
         if key in value:
             action = value[key]
-            if key == "field_discovery" and command == "draft-discover-fields":
+            if key == "field_discovery" and command == "draft-bind-object":
+                # Scope selectors are already disclosed beside this route.
+                # Retain the copy-ready List discovery choice here; its full
+                # provenance/selection guidance remains in draft-inspect.
+                action = {
+                    **action,
+                    "documented_lists": {
+                        "append": action["documented_lists"]["append"],
+                        "details_via": "more_actions",
+                    },
+                }
+            elif key == "field_discovery" and command == "draft-discover-fields":
                 # The selected handles and metadata are the useful result now.
                 # Further discovery keeps its complete copy-ready routes in the
                 # already disclosed exact draft-inspect continuation.
