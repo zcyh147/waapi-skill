@@ -64,7 +64,7 @@ def test_side_effect_free_failures_disclose_bounded_continuation_without_retry(t
 
 
 def attempted_write(tmp_path, version, *, ambiguous):
-    from tests.unit.test_gateway_connection_binding import BindingClient
+    from tests.unit.test_gateway_connection_binding import BindingClient, project_save_preview
     env = configured_env(tmp_path, version=version, policy="ask_before_changes")
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
     api = "ak.wwise.core.project.save"
