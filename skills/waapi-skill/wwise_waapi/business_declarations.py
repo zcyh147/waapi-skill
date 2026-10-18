@@ -1776,7 +1776,7 @@ def _new_class_field_evidence(registry, info, live_scope, read_call):
         return None
     try:
         return class_default_evidence(infos=(info,), scope=live_scope,
-                                      read_call=read_call, discovery=True)
+                                      read_call=read_call, discovery=True, version=registry.context.wwise_version)
     except NewObjectDefaultError:
         return None
 

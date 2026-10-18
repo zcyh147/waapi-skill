@@ -4774,6 +4774,8 @@ def _prepare_object_create(
         identity_cache=identity_cache,
         property_info_cache=property_info_cache,
         result_context=result_context,
+        merge_existing=requested_conflict == "merge" and list_name is None,
+        platform=platform,
     )
     for index, spec in enumerate(node_specs):
         spec["platform"] = platform
@@ -4932,7 +4934,7 @@ def _prepare_object_create(
                     "object.create merge path must resolve to at most one object.",
                     details={"path": expected_path, "rows": rows},
                 )
-            if rows and not _object_type_matches(rows[0].get("type"), spec):
+            if rows and not _object_type_matches(rows[0].get("type"), spec, actual_class_id=rows[0].get("classId")):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "object.create merge collision has a different live object type.",
@@ -4942,6 +4944,11 @@ def _prepare_object_create(
             spec["expected_path"] = expected_path
             if rows:
                 spec["preexisting_id"] = rows[0].get("id")
+                spec["pre_state"] = rows[0]
+                children_before = _read_direct_children(spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                spec["preexisting_children"] = children_before
+                merge_children_snapshots.append({"object_id": spec["preexisting_id"],
+                    "fields": list(IDENTITY_RETURN_FIELDS), "rows": children_before})
     elif conflict == "rename":
         assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
@@ -5138,6 +5145,12 @@ def _prepare_object_create(
             "irreversible_preexisting_changes": conflict == "merge",
         }
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}
+    condition_guards = [spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec]
+    if condition_guards:
+        state["condition_metadata_guards"] = condition_guards
+    related = [item for spec in node_specs for item in spec.get("related_conditions", [])]
+    if related:
+        state["related_conditions"] = related
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
@@ -6042,6 +6055,7 @@ def _prepare_object_set(
                 conditions=reference_target_conditions, property_info_cache=property_info_cache,
                 wwise_version=request.version)
         reference_requirements: dict[str, Any] = {}
+        override_applicability = {}
         for descriptor in (*properties, *references):
             if descriptor.name.casefold() not in property_info_by_name:
                 continue  # Exact documented-list evidence is re-read independently; no property-info receipt is invented.
@@ -6053,6 +6067,7 @@ def _prepare_object_set(
                 derived_properties=derived_target_properties,
                 request_path=descriptor.request_path,
                 property_info_cache=property_info_cache,
+                wwise_version=request.version, override_applicability=override_applicability,
                 _condition_sources=tuple(property_info_by_name.values()),
                 reference_requirements=reference_requirements,
                 desired_references=desired_references,
@@ -6071,6 +6086,7 @@ def _prepare_object_set(
                 "object_id": target.object,
                 "platform": platform,
                 "fields": [info.as_dict() for info in property_info_by_name.values()],
+                "override_applicability": [proof for proof in override_applicability.values() if proof is not None],
             })
         for property_name, value in derived_target_properties.items():
             trusted[f"@{property_name}"] = value
@@ -6675,6 +6691,14 @@ def _prepare_object_set(
                 details={"count": len(node_specs), "limit": DEFAULT_MAX_NODES},
             )
         dispatch_objects.append(trusted)
+
+    from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
+    try:
+        added_ancestors = prepare_ancestor_path_guards(node_specs, read=read)
+    except (ValueError, KeyError, TypeError) as exc:
+        raise OperationContractError("ANCESTOR_RENAME_PATH_UNPROVED", str(exc)) from exc
+    for row in added_ancestors:
+        field_snapshots.append({"object_id": row["id"], "fields": list(ANCESTOR_PATH_FIELDS), "rows": [row], "platform": None})
 
     replaced_ids = {
         _identity_key(row["id"])
@@ -7467,6 +7491,8 @@ def _prepare_object_node_specs(
     ],
     list_bindings: Sequence[Mapping[str, Any]] = (),
     result_context: Mapping[str, Any] | None = None,
+    merge_existing: bool = False,
+    platform: str | None = None,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     for node in nodes:
@@ -7533,13 +7559,39 @@ def _prepare_object_node_specs(
             spec["platform"] = node.platform
         if node.import_arg is not None:
             spec["import_requested"] = True
+        merge_target = None
+        if merge_existing:
+            assert root_parent is not None and root_collection == "children"
+            expected_path = _request_node_expected_path(root_parent.row.get("path"), spec, [*specs, spec])
+            fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId",
+                *(descriptor.name for descriptor in (*node.properties, *node.references))])
+            rows = _read_object_path_rows(expected_path, fields=fields, read=read)
+            if len(rows) > 1:
+                raise OperationContractError("AMBIGUOUS_IDENTITY", "Create-merge collision must resolve at most once.")
+            if rows:
+                row = rows[0]
+                expected_parent = root_parent.object if node.parent_request_path is None else next(
+                    (parent_spec.get("preexisting_id") for parent_spec in specs
+                     if parent_spec["request_path"] == node.parent_request_path), None)
+                if (not _valid_object_id(row.get("id")) or row.get("path") != expected_path
+                        or row.get("name") != node.name or type(row.get("classId")) is not int
+                        or row["classId"] != type_info.class_id
+                        or not _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId"))
+                        or expected_parent is None or not _same_identity(_parent_value(row.get("parent")), expected_parent)):
+                    raise OperationContractError("INVALID_TARGET_TYPE", "Create-merge needs its exact matching existing class, identity and parent.",
+                        details={"path": expected_path, "expected_class_id": type_info.class_id, "actual": row})
+                merge_target = ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"],
+                    resolution="live-exact-create-merge-collision", row=row)
+                roles[f"merge:{node.request_path}"] = merge_target
+                spec.update(preexisting_id=row["id"], pre_state=row, structural_class_id=type_info.class_id)
+        metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
         for descriptor in node.properties:
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
-                class_id=type_info.class_id,
+                **metadata_scope,
                 name=descriptor.name,
             )
             _require_object_property_value(info, descriptor.value)
@@ -7577,7 +7629,7 @@ def _prepare_object_node_specs(
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
-                class_id=type_info.class_id,
+                **metadata_scope,
                 name=descriptor.name,
             )
             _require_object_reference_metadata(info, allow_hierarchy=True)
@@ -7588,7 +7640,7 @@ def _prepare_object_node_specs(
             if isinstance(descriptor.target, ObjectCurveDescriptor):
                 try:
                     value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
-                                                        scope={"classId": type_info.class_id}, types=type_catalog)
+                                                        scope=({"object": merge_target.object} if merge_target else {"classId": type_info.class_id}), types=type_catalog)
                 except (InlineCurveError, MetadataRestrictionError) as exc:
                     raise OperationContractError(exc.error_code, str(exc)) from exc
                 resolved_references[descriptor.request_path] = value
@@ -7617,14 +7669,47 @@ def _prepare_object_node_specs(
             value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
             resolved_references[descriptor.request_path] = value
             spec["references"].append({"name": descriptor.name, "target_id": value})
-        hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id)
+        hierarchy = []
+        if merge_target is None:
+            hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id)
+        else:
+            desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in spec["references"]}
+            for info, targets in reference_targets:
+                for target in targets:
+                    _require_reference_target_allowed(info, target, source_id=merge_target.object, read=read,
+                        platform=platform, desired_references=desired_references, conditions=hierarchy,
+                        property_info_cache=property_info_cache, wwise_version=version)
         if hierarchy:
             spec["reference_target_conditions"] = hierarchy
-        if any(info.dependencies for info in property_info_by_name.values()):
+        if merge_target is not None:
+            requirements, applicability, related = {}, {}, []
+            for info in tuple(property_info_by_name.values()):
+                activators = _apply_reference_activation_dependencies(info, read=read, object_id=merge_target.object,
+                    property_specs=spec["properties"], property_info_by_name=property_info_by_name,
+                    derived_properties=node_derived_properties, request_path=node.request_path,
+                    property_info_cache=property_info_cache, wwise_version=version, override_applicability=applicability,
+                    _condition_sources=tuple(property_info_by_name.values()), reference_requirements=requirements,
+                    desired_references=desired_references, related_conditions=related, platform=platform)
+                for reference in spec["references"]:
+                    if reference["name"] == info.name and activators:
+                        reference["activation_properties"] = list(activators)
+            for name, identity in requirements.items():
+                if name.casefold() not in desired_references:
+                    spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
+            spec["condition_metadata_guard"] = {"object_id": merge_target.object, "platform": platform,
+                "fields": [info.as_dict() for info in property_info_by_name.values()],
+                "override_applicability": [proof for proof in applicability.values() if proof is not None]}
+            if related:
+                spec["related_conditions"] = related
+        elif any(info.dependencies for info in property_info_by_name.values()):
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
                 structural_proof = None
-                if any(is_master_bus_visibility_dependency(item) and item["value"] is False
+                # The older user-send source group lacks the later Show rule;
+                # absent-override applicability still requires non-master placement.
+                if any((is_master_bus_visibility_dependency(item) and item["value"] is False)
+                       or (type_info.name in {"Bus", "AuxBus"} and item == {"type": "override", "action": "Enable",
+                           "context": "Self", "property": "OverrideUserAuxSends"})
                        for info in property_info_by_name.values() for item in info.dependencies):
                     structural_proof = planned_non_master_bus_proof(version=version, node=node, info=type_info,
                         nodes=nodes, resolve_type=lambda name: _resolve_object_type(name, catalog=type_catalog),
@@ -7658,8 +7743,9 @@ def _prepare_object_node_specs(
     structural_classes = {}
     for spec in specs:
         for evidence in spec.get("new_object_default_evidence", []):
-            for rule in evidence.get("structural_visibility", []):
-                proof = rule["proof"]
+            proofs = [rule["proof"] for rule in evidence.get("structural_visibility", [])]
+            proofs.extend(rule["structural_proof"] for rule in evidence.get("override_applicability", []))
+            for proof in proofs:
                 structural_classes[proof["request_path"]] = proof["class_id"]
                 if "request_path" in proof["parent"]:
                     structural_classes[proof["parent"]["request_path"]] = proof["parent"]["class_id"]
@@ -8150,6 +8236,16 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
             observed_fields[key] = _read_property_info(read, object_id=object_id, name=name)
         return observed_fields[key]
     for condition_metadata in condition_metadata_groups:
+        for proof in condition_metadata.get("override_applicability", []):
+            from .override_applicability import proof_current
+            try:
+                passed = proof_current(proof, read=read, after_write=after_write,
+                    edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", [])) if after_write else ())
+                evidence = proof
+            except (ValueError, OSError, KeyError, TypeError, OperationContractError) as exc:
+                passed, evidence = False, {"error": str(exc), "proof": proof}
+            assertions.append({"name": "existing user-send class/actual placement applicability remains bound",
+                "passed": bool(passed), "evidence": evidence})
         for expected in condition_metadata["fields"]:
             name = expected.get("field_binding", {}).get("token", expected["name"])
             observed = observed_field(condition_metadata["object_id"], name).as_dict()
@@ -8209,8 +8305,25 @@ def _related_condition_assertions(requirements, *, read):
     return assertions, readbacks
 
 
+def _existing_override_applicability(info, dependency, *, read, object_id, version, proofs):
+    if object_id is None or version is None or proofs is None:
+        return None
+    from .override_applicability import prove_existing_absent_override, DEPENDENCY
+    if dependency != DEPENDENCY:
+        return None
+    key = (info.name, canonical_sha256(dependency))
+    if key not in proofs:
+        try:
+            proofs[key] = prove_existing_absent_override(version=version, object_id=object_id,
+                info=info, dependency=dependency, read=read)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            raise OperationContractError("OVERRIDE_APPLICABILITY_INVALID", str(exc)) from exc
+    return proofs[key]
+
+
 def _collect_existing_condition_closure(
     sources, *, read, object_id, property_info_by_name, property_info_cache,
+    wwise_version=None, override_applicability=None,
 ):
     """Acquire the complete bounded Self graph before selecting prerequisites.
 
@@ -8240,6 +8353,9 @@ def _collect_existing_condition_closure(
             name = dependency.get("property")
             if not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
                 continue  # The ordinary planner reports the malformed shape.
+            if _existing_override_applicability(info, dependency, read=read, object_id=object_id,
+                    version=wwise_version, proofs=override_applicability) is not None:
+                continue
             controller = name.casefold()
             controllers.add(controller)
             if len(controllers) > MAX_CONDITION_CONTROLLERS:
@@ -8282,6 +8398,8 @@ def _apply_reference_activation_dependencies(
     related_conditions: list[dict[str, Any]] | None = None,
     platform: str | None = None,
     _closure_collected: bool = False,
+    wwise_version: str | None = None,
+    override_applicability: dict | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded scalar and reference-presence activation requirements.
 
@@ -8298,6 +8416,7 @@ def _apply_reference_activation_dependencies(
         _condition_sources = _collect_existing_condition_closure(
             (metadata, *_condition_sources), read=read, object_id=object_id,
             property_info_by_name=property_info_by_name, property_info_cache=property_info_cache,
+            wwise_version=wwise_version, override_applicability=override_applicability,
         )
         _closure_collected = True
 
@@ -8310,6 +8429,9 @@ def _apply_reference_activation_dependencies(
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
         if is_terminal_override_dependency(metadata.name, metadata.type, dependency):
+            continue
+        if _existing_override_applicability(metadata, dependency, read=read, object_id=object_id,
+                version=wwise_version, proofs=override_applicability) is not None:
             continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
@@ -8391,6 +8513,7 @@ def _apply_reference_activation_dependencies(
                 related_conditions=related_conditions,
                 platform=platform,
                 _closure_collected=_closure_collected,
+                wwise_version=wwise_version, override_applicability=override_applicability,
             ))
             continue
         fields = set(dependency)
@@ -8590,6 +8713,7 @@ def _apply_reference_activation_dependencies(
             related_conditions=related_conditions,
             platform=platform,
             _closure_collected=_closure_collected,
+            wwise_version=wwise_version, override_applicability=override_applicability,
         ))
 
         matching_specs = [
@@ -10357,12 +10481,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         activation_reference_requirements: dict[str, Any] = {}
         related_conditions: list[dict[str, Any]] = []
         activation_metadata: dict[str, PropertyInfoMetadataRecord] = {}
+        override_applicability = {}
         if request.operation == "object.setProperty" or arguments["target"] is not None:
             activation_specs: list[dict[str, Any]] = []
             _apply_reference_activation_dependencies(
                 info, read=read, object_id=source.object,
                 property_specs=activation_specs, property_info_by_name=activation_metadata,
                 derived_properties={}, request_path="$.reference",
+                wwise_version=request.version, override_applicability=override_applicability,
                 reference_requirements=activation_reference_requirements,
                 related_conditions=related_conditions,
                 platform=platform,
@@ -10372,6 +10498,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 metadata["related_conditions"] = related_conditions
             if info.dependencies:
                 metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
+        metadata["condition_metadata"]["override_applicability"] = [proof for proof in override_applicability.values() if proof is not None]
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
@@ -15617,6 +15744,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         for node in condition_nodes:
             for evidence in node.get("new_object_default_evidence", []):
                 scope = evidence["class_scope"]
+                for proof in evidence.get("override_applicability", []):
+                    from .override_applicability import proof_current
+                    assertions.append({"name": "new user-send override applicability proof unchanged",
+                        "passed": proof_current(proof, read=read_call), "evidence": proof})
                 for rule in evidence.get("structural_visibility", []):
                     from .new_object_defaults import structural_bus_proof_current
                     assertions.append({"name": "new non-master bus class/source/parent proof unchanged",
@@ -18602,6 +18733,14 @@ def verify_prepared_operation(
                         {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
                     )
             expected_path = spec.get("expected_path")
+            if isinstance(spec.get("ancestor_rename_path_guard"), Mapping):
+                from .object_graph_paths import verify_ancestor_path_guard
+                try:
+                    path_ok, expected_path, path_evidence = verify_ancestor_path_guard(
+                        spec["ancestor_rename_path_guard"], edits=specs, read=read_call)
+                except (ValueError, KeyError, TypeError, OperationContractError) as exc:
+                    path_ok, path_evidence = False, {"error": str(exc)}
+                check(f"{request_path} exact GUID ancestry and requested rename paths match", path_ok, path_evidence)
             if isinstance(expected_path, str):
                 check(
                     f"{request_path} exact path matches",
@@ -18645,6 +18784,10 @@ def verify_prepared_operation(
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
             for evidence in spec.get("new_object_default_evidence", []):
+                for proof in evidence.get("override_applicability", []):
+                    from .override_applicability import proof_current
+                    check(f"{request_path} user-send override applicability remains valid",
+                        proof_current(proof, read=read_call, after_write=True), proof)
                 for rule in evidence.get("structural_visibility", []):
                     from .new_object_defaults import structural_bus_proof_current
                     check(f"{request_path} non-master bus class/source/parent proof remains valid",
@@ -19347,7 +19490,7 @@ def verify_prepared_operation(
                     raise OperationContractError("INVALID_PREVIEW", "object.set replacement snapshots must be arrays.")
                 replaced_set_rows.extend(rows)
         replaced_set_ids = {_identity_key(row.get("id")) for row in replaced_set_rows if isinstance(row, Mapping) and _valid_object_id(row.get("id"))}
-        if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge" and plan.get("list") is not None):
+        if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge"):
             direct_specs_by_parent: dict[str, list[Mapping[str, Any]]] = {}
             for child_spec in specs:
                 if child_spec.get("collection") not in {None, "children"}:
@@ -19426,7 +19569,7 @@ def verify_prepared_operation(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_child.get(field)))
                          if field in {"id", "parent"} and before_child.get(field) is not None
                          else matches[0].get(field) == before_child.get(field))
-                        for field in ("id", "name", "type", "parent", "notes") if field in before_child
+                        for field in ("id", "name", "type", "parent", "notes", *(["path"] if kind == "object-create-graph" else [])) if field in before_child
                     )
                     check(f"{parent_path} unrequested pre-existing child identity and notes remain unchanged", unchanged,
                           {"before": dict(before_child), "after": matches})
