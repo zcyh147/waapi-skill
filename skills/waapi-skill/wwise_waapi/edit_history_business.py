@@ -109,14 +109,20 @@ def capture_field_read_platform(version: str, selector: str | None, *, read: Cal
 
 
 def observe_field_read_platform(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
+    primary = _observe_field_read_platform_proof(pre_state, read=read)
     existing = pre_state.get("existing_field_observations")
     if isinstance(existing, list):
-        outcomes = [outcome for proof in existing if proof.get("status") == "certified"
-            if (outcome := observe_field_read_platform(proof, read=read)) is not None]
+        outcomes = ([primary] if primary is not None else []) + [
+            outcome for proof in existing if proof.get("status") == "certified"
+            if (outcome := _observe_field_read_platform_proof(proof, read=read)) is not None]
         if outcomes:
             return {"matches": all(item["matches"] for item in outcomes), "views": [
                 {key: value for key, value in item.items() if key != "readbacks"} for item in outcomes],
                 "readbacks": [row for item in outcomes for row in item["readbacks"]]}
+    return primary
+
+
+def _observe_field_read_platform_proof(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
     proof = pre_state.get("field_read_platform")
     if not isinstance(proof, Mapping) or proof.get("status") != "certified":
         return None  # An explicit receipt limitation, never a fabricated view.

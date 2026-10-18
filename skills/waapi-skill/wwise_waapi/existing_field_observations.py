@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .canonical import canonical_sha256
+from .builders.metadata import PropertyInfoMetadataRecord
 
 CONTRACT = "waapi-skill.existing-field-source-observation/v1"
 ROLE = "existing-field-history-source-after"
@@ -19,10 +20,19 @@ def materialized_fields(node: Mapping[str, Any], metadata: Mapping[str, Any]) ->
     if node.get("notes_supplied"):
         fields.append({"field": "notes", "field_kind": "text", "after": node.get("requested_notes")})
     for kind, key in (("scalar", "properties"), ("reference", "references")):
-        for item in node.get(key, []):
+        items = node.get(key, [])
+        if not isinstance(items, (list, tuple)):
+            return None
+        for item in items:
+            if not isinstance(item, Mapping):
+                return None
             token = item.get("name")
-            info = metadata.get(str(token).casefold())
-            if (not isinstance(token, str) or info is None or info.name != token
+            if not isinstance(token, str):
+                return None
+            info = metadata.get(token.casefold())
+            if (not isinstance(info, PropertyInfoMetadataRecord) or info.name != token
+                    or kind == "scalar" and ("value" not in item
+                        or not isinstance(item["value"], (str, bool, int, float)))
                     or kind == "reference" and ("target_id" not in item
                         or item["target_id"] is not None and not isinstance(item["target_id"], str))):
                 return None
@@ -41,10 +51,6 @@ def capture_before(node, metadata, *, version, catalog, read):
 
     proof = {"contract": CONTRACT, "version": version, "request_path": node["request_path"],
         "object_id": node["target_id"], "status": "unobserved", "readbacks": []}
-    fields = materialized_fields(node, metadata)
-    if not fields:
-        return {**proof, "reason": "field_union_requires_its_complete_history_observer"}
-    proof["fields"] = fields
 
     def retained(uri, args, options):
         record = {"uri": uri, "args": args, "options": options}
@@ -57,6 +63,10 @@ def capture_before(node, metadata, *, version, catalog, read):
             raise
 
     try:
+        fields = materialized_fields(node, metadata)
+        if not fields:
+            return {**proof, "reason": "field_union_requires_its_complete_history_observer"}
+        proof["fields"] = fields
         view = capture_field_read_platform(version, node.get("platform"), read=retained)
         proof["field_read_platform"] = view
         if view.get("status") != "certified":

@@ -2448,6 +2448,48 @@ def test_existing_history_uses_frozen_guid_view_after_source_current_platform_ch
     assert field_reads and all(options["platform"] == "{44444444-4444-4444-4444-444444444444}" for options in field_reads)
 
 
+@pytest.mark.parametrize("drift", [False, True])
+def test_field_read_view_observer_composes_top_level_and_existing_certificates(drift):
+    from wwise_waapi.edit_history_business import capture_field_read_platform, observe_field_read_platform
+    windows = "{44444444-4444-4444-4444-444444444444}"
+    mac = "{55555555-5555-5555-5555-555555555555}"
+    current = windows
+    def read(uri, args, options):
+        assert (uri, args, options) == ("ak.wwise.core.getProjectInfo", {}, {})
+        return {"currentPlatformId": current, "platforms": [
+            {"id": windows, "name": "Windows"}, {"id": mac, "name": "Mac"}]}
+    top = capture_field_read_platform("2025.1", None, read=read)
+    existing = capture_field_read_platform("2025.1", "Windows", read=read)
+    # No current public producer emits both groups; this shared observer admits
+    # their composition and must not let one certificate mask the other.
+    if drift:
+        current = mac
+    observed = observe_field_read_platform({"field_read_platform": top,
+        "existing_field_observations": [{"status": "certified", "field_read_platform": existing}]}, read=read)
+    assert observed["matches"] is not drift
+    assert len(observed["views"]) == len(observed["readbacks"]) == 2
+    assert {view["expected"]["selector"] for view in observed["views"]} == {None, "Windows"}
+    assert [view["matches"] for view in observed["views"]].count(False) == int(drift)
+
+
+@pytest.mark.parametrize("kind,value", [
+    ("properties", {"name": "Volume", "array": [1, 2]}),
+    ("properties", {"name": "Volume", "value": [1, 2]}),
+    ("references", {"name": "Volume", "curve": {"curve_points": []}}),
+    ("references", {"name": "Volume", "target_id": []}),
+])
+def test_optional_existing_history_unknown_union_remains_unobserved_without_read(kind, value):
+    from wwise_waapi.existing_field_observations import capture_before
+    from wwise_waapi.builders.metadata import parse_get_property_info_result
+    node = {"request_path": "$.objects[0]", "target_id": "{11111111-1111-1111-1111-111111111111}",
+        "platform": "{44444444-4444-4444-4444-444444444444}", kind: [value]}
+    info = parse_get_property_info_result({"name": "Volume", "type": "Real64"})
+    observed = capture_before(node, {"volume": info}, version="2025.1", catalog=[],
+        read=lambda *_args: pytest.fail("An unsupported optional union must not dispatch reads"))
+    assert observed["status"] == "unobserved"
+    assert observed["reason"] == "field_union_requires_its_complete_history_observer"
+
+
 def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_path):
     task, source, created = _created_leaf_history_case(tmp_path)
     tx = _created_leaf_history_preview(task, source)
