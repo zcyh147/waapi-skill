@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import math
 import os
 import platform
 import queue
@@ -190,6 +192,102 @@ def _exception_summary(exc: BaseException | None) -> dict[str, str] | None:
     if exc is None:
         return None
     return {"type": type(exc).__name__, "message": str(exc)}
+
+
+def _get_info_diagnostic(value: Any) -> dict[str, Any]:
+    """Copy only builtin JSON data from one client result, within an 8KiB envelope."""
+    # Reserve 1KiB for this fixed envelope and omission counters. Costs use the
+    # default JSON separators and ASCII escaping, including complete key bytes.
+    remaining_bytes, remaining_nodes = 7168, 96
+    omitted: dict[str, int] = {}
+    active: set[int] = set()
+    missing = object()
+
+    def omit(reason: str, count: int = 1) -> Any:
+        omitted[reason] = omitted.get(reason, 0) + count
+        return missing
+
+    def copy(item: Any, depth: int) -> Any:
+        nonlocal remaining_bytes, remaining_nodes
+        if remaining_nodes == 0:
+            return omit('nodes')
+        remaining_nodes -= 1
+        if depth > 4:
+            return omit('depth')
+        kind = type(item)
+        if kind is dict or kind is list:
+            if id(item) in active:
+                return omit('cycle')
+            if remaining_bytes < 2:
+                return omit('bytes')
+            remaining_bytes -= 2
+            active.add(id(item))
+            result: Any = {} if kind is dict else []
+            try:
+                iterator = iter(item.items()) if kind is dict else enumerate(item)
+                for index, entry in enumerate(iterator):
+                    if index == 32 or remaining_nodes == 0:
+                        omit('entries' if index == 32 else 'nodes', len(item) - index)
+                        break
+                    key, child = entry
+                    if kind is dict:
+                        if type(key) is not str:
+                            omit('key_type')
+                            continue
+                        if len(key) > 1024:
+                            omit('key_bytes')
+                            continue
+                        prefix = len(json.dumps(key)) + 2
+                    else:
+                        prefix = 0
+                    prefix += 2 if result else 0
+                    if prefix > remaining_bytes:
+                        omit('bytes', len(item) - index)
+                        break
+                    remaining_bytes -= prefix
+                    copied = copy(child, depth + 1)
+                    if copied is missing:
+                        remaining_bytes += prefix
+                        if kind is list:
+                            # A partial sequence must remain an exact prefix:
+                            # never shift later values into an omitted index.
+                            if len(item) > index + 1:
+                                omit('sequence_tail', len(item) - index - 1)
+                            break
+                        continue
+                    if kind is dict:
+                        result[key] = copied
+                    else:
+                        result.append(copied)
+                return result
+            finally:
+                active.remove(id(item))
+        if kind is str:
+            if len(item) > 1024:
+                return omit('string_bytes')
+            try:
+                if len(item.encode('utf-8')) > 1024:
+                    return omit('string_bytes')
+            except UnicodeError:
+                return omit('string_encoding')
+        elif kind is int:
+            if item.bit_length() > 1024:
+                return omit('integer_size')
+        elif kind is float:
+            if not math.isfinite(item):
+                return omit('non_finite')
+        elif item is not None and kind is not bool:
+            return omit('non_json_type')
+        cost = len(json.dumps(item, allow_nan=False))
+        if cost > remaining_bytes:
+            return omit('bytes')
+        remaining_bytes -= cost
+        return item
+
+    copied = copy(value, 0)
+    return {'boundary': 'waapi-client.call', 'uri': 'ak.wwise.core.getInfo',
+            'value': None if copied is missing else copied, 'value_present': copied is not missing,
+            'complete': not omitted, 'omitted': omitted}
 
 
 class PipeDrainer:
@@ -504,6 +602,7 @@ class HeadlessLifecycle:
         started_at = time.monotonic()
         deadline = time.monotonic() + self.timeouts.readiness
         last_error: BaseException | None = None
+        pending_host_info: dict[str, Any] | None = None
         while time.monotonic() < deadline:
             returncode = self._poll()
             if returncode is not None:
@@ -513,6 +612,8 @@ class HeadlessLifecycle:
                     duration=time.monotonic() - started_at,
                     last_error=last_error,
                 )
+                if pending_host_info is not None:
+                    diagnostics['observed_host_info'] = pending_host_info
                 raise EarlyProcessExit(self._failure_message("WwiseConsole exited before WAAPI readiness", diagnostics), diagnostics)
             try:
                 observed = self._probe_once()
@@ -521,6 +622,16 @@ class HeadlessLifecycle:
                 time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
                 continue
             if self.host_kind == 'wwise-authoring':
+                if observed is None or (type(observed) is dict and not observed):
+                    # The client documents None on failure and can return {};
+                    # neither result proves a host identity. Poll only these
+                    # absence shapes within the same deadline;
+                    # nonempty malformed data and proved mismatches fail below.
+                    pending_host_info = {'result_type': type(observed).__name__, 'classification': 'identity_pending',
+                                         'client_result': _get_info_diagnostic(observed)}
+                    last_error = None
+                    time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
+                    continue
                 version = observed.get('version', {}) if isinstance(observed, dict) else {}
                 parts = tuple(version.get(key) for key in ('year', 'major', 'minor', 'build')) if isinstance(version, dict) else ()
                 build = '.'.join(str(value) for value in parts) if len(parts) == 4 and all(type(value) is int for value in parts) else None
@@ -532,6 +643,7 @@ class HeadlessLifecycle:
                         'is_command_line_type': type(observed.get('isCommandLine')).__name__ if isinstance(observed, dict) else None,
                         'is_command_line': observed.get('isCommandLine') if isinstance(observed, dict) and type(observed.get('isCommandLine')) is bool else None,
                         'version_field_types': [type(value).__name__ for value in parts], 'exact_build': build,
+                        'client_result': _get_info_diagnostic(observed),
                     }
                     try:
                         self.shutdown(suppress_errors=True)
@@ -547,6 +659,8 @@ class HeadlessLifecycle:
             duration=time.monotonic() - started_at,
             last_error=last_error,
         )
+        if pending_host_info is not None:
+            diagnostics['observed_host_info'] = pending_host_info
         self.shutdown(suppress_errors=True)
         raise ReadinessTimeout(self._failure_message("WAAPI readiness timed out", diagnostics), diagnostics)
 

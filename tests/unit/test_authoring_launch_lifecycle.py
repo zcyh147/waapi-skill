@@ -234,6 +234,166 @@ def test_authoring_readiness_rejects_wrong_host_or_build_without_retry(tmp_path,
     assert process.terminated
 
 
+@pytest.mark.parametrize('observed', [
+    {'uri': 'ak.wwise.test_refusal', 'message': 'Fixture error envelope', 'details': {'code': 7}},
+    {'result': {'isCommandLine': False, 'version': {'year': 2024, 'major': 1, 'minor': 13, 'build': 9056}}},
+    {'isCommandLine': 0, 'version': {'year': '2024', 'major': 1, 'minor': 13, 'build': 9056}},
+])
+def test_authoring_readiness_preserves_client_response_without_retry(monkeypatch, observed):
+    from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
+    calls = []
+    client = FakeClient(calls, result=observed)
+    lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+        waapi_client_factory=lambda _: client)
+    process = FakeProcess()
+    lifecycle.process = process
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    with pytest.raises(HeadlessLifecycleError, match='Authoring.*host/build') as failure:
+        lifecycle.wait_ready()
+    captured = failure.value.diagnostics['observed_host_info']['client_result']
+    assert captured['boundary'] == 'waapi-client.call'
+    assert captured['uri'] == 'ak.wwise.core.getInfo'
+    assert captured['value'] == observed
+    assert captured['value_present'] is True
+    assert captured['complete'] is True
+    assert captured['omitted'] == {}
+    assert calls == ['ak.wwise.core.getInfo']
+    assert client.disconnected and process.terminated
+    assert lifecycle.ready_result is None
+
+
+@pytest.mark.parametrize('pending', [{}, None], ids=['empty', 'none'])
+def test_authoring_readiness_waits_for_identity_after_absent_client_response(monkeypatch, pending):
+    from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
+    from wwise_waapi.headless import LifecycleTimeouts
+    import wwise_waapi.headless as headless
+    clock = SimpleNamespace(now=0.0)
+    def sleep(seconds):
+        clock.now += seconds
+    monkeypatch.setattr(headless, 'time', SimpleNamespace(monotonic=lambda: clock.now, sleep=sleep))
+    expected = {'isCommandLine': False, 'version': {'year': 2024, 'major': 1, 'minor': 13, 'build': 9056}}
+    responses = [pending, pending, expected]
+    clients, calls = [], []
+    def client_factory(_):
+        client = FakeClient(calls, result={})
+        client.result = responses[len(clients)]  # FakeClient's constructor uses None as its default.
+        clients.append(client)
+        return client
+    lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+        waapi_client_factory=client_factory,
+        timeouts=LifecycleTimeouts(readiness=1, probe=5, probe_interval=0.25))
+    process = FakeProcess()
+    lifecycle.process = process
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    assert lifecycle.wait_ready() == expected
+    assert lifecycle.ready_result is expected
+    assert calls == ['ak.wwise.core.getInfo'] * 3
+    assert clock.now == 0.5
+    assert all(client.disconnected for client in clients)
+    assert not process.terminated
+
+
+@pytest.mark.parametrize('terminal', ['deadline', 'deadline-null', 'process-exit'])
+def test_authoring_pending_identity_failure_retains_empty_observation(monkeypatch, terminal):
+    from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
+    from wwise_waapi.headless import EarlyProcessExit, LifecycleTimeouts, ReadinessTimeout
+    import wwise_waapi.headless as headless
+    is_deadline = terminal != 'process-exit'
+    if is_deadline:
+        clock = SimpleNamespace(now=0.0, sleeps=[])
+        def sleep(seconds):
+            clock.sleeps.append(seconds)
+            clock.now += seconds
+        # Replace this module's reference, never attributes on global time.
+        # The threaded probe, client.call and disconnect remain real.
+        monkeypatch.setattr(headless, 'time', SimpleNamespace(monotonic=lambda: clock.now, sleep=sleep))
+    clients, calls = [], []
+    process = FakeProcess()
+    def client_factory(_):
+        client = FakeClient(calls, result={})
+        if is_deadline:
+            responses = [None, {}] if terminal == 'deadline' else [{}, None]
+            client.result = responses[len(clients) % 2]
+        clients.append(client)
+        if terminal == 'process-exit':
+            process.returncode = 5
+        return client
+    lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+        waapi_client_factory=client_factory,
+        timeouts=(LifecycleTimeouts(readiness=1, probe=5, probe_interval=0.25) if is_deadline
+                  else LifecycleTimeouts(readiness=0.02, probe=0.01, probe_interval=0.001)))
+    lifecycle.process = process
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    expected_error = ReadinessTimeout if is_deadline else EarlyProcessExit
+    with pytest.raises(expected_error) as failure:
+        lifecycle.wait_ready()
+    observed = failure.value.diagnostics['observed_host_info']
+    assert observed['classification'] == 'identity_pending'
+    assert observed['client_result']['value'] == (None if terminal == 'deadline-null' else {})
+    assert observed['client_result']['value_present'] is True
+    assert observed['result_type'] == ('NoneType' if terminal == 'deadline-null' else 'dict')
+    assert observed['client_result']['complete'] is True
+    assert observed['client_result']['omitted'] == {}
+    assert failure.value.diagnostics['last_exception'] is None
+    assert lifecycle.ready_result is None
+    assert calls and set(calls) == {'ak.wwise.core.getInfo'}
+    assert all(client.disconnected for client in clients)
+    if is_deadline:
+        assert len(calls) == 4 and clock.sleeps == [0.25] * 4
+        assert failure.value.diagnostics['duration'] == 1
+        assert process.terminated and lifecycle.cleanup_report.process_exited
+    else:
+        assert len(calls) == 1
+        assert failure.value.diagnostics['exit_code'] == 5
+
+
+def test_authoring_readiness_diagnostic_bounds_hostile_and_oversized_response(monkeypatch):
+    import json
+    from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
+
+    class Hostile(dict):
+        def items(self):
+            pytest.fail('Do not iterate a custom mapping')
+        def __iter__(self):
+            pytest.fail('Do not iterate a custom mapping')
+        def __repr__(self):
+            pytest.fail('Do not render a custom object')
+
+    cycle = []
+    cycle.append(cycle)
+    observed = {'': None, 'false': False, 'hostile': Hostile(), 'cycle': cycle,
+        'deep': [[[[[True]]]]], 'oversized': '雨' * 1025,
+        'key' * 1025: 1, 'escaped': ['"\\' * 256] * 32,
+        'many': [dict.fromkeys([str(i) for i in range(32)], True)] * 32}
+    calls = []
+    client = FakeClient(calls, result=observed)
+    lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+        waapi_client_factory=lambda _: client)
+    process = FakeProcess()
+    lifecycle.process = process
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    with pytest.raises(HeadlessLifecycleError, match='Authoring.*host/build') as failure:
+        lifecycle.wait_ready()
+    captured = failure.value.diagnostics['observed_host_info']['client_result']
+    assert len(json.dumps(captured).encode('utf-8')) <= 8192
+    assert captured['complete'] is False
+    assert captured['value'][''] is None and captured['value']['false'] is False
+    assert 'hostile' not in captured['value'] and 'oversized' not in captured['value']
+    assert 'key' not in captured['value']
+    assert captured['omitted']['non_json_type'] == 1
+    assert captured['omitted']['cycle'] == 1
+    assert captured['omitted']['depth'] > 0
+    assert captured['omitted']['string_bytes'] == 1
+    assert captured['omitted']['key_bytes'] == 1
+    assert captured['omitted']['bytes'] > 0
+    assert calls == ['ak.wwise.core.getInfo']
+    assert client.disconnected and process.terminated and lifecycle.ready_result is None
+
+
 @pytest.mark.parametrize('invalid', ['project-alias', 'unowned-project', 'existing-prefix', 'bundle-build', 'port', 'extra-args', 'windows', 'winepath-absent', 'winepath-alias', 'winepath-directory', 'prefix-drift'])
 def test_authoring_ownership_rejects_invalid_context_before_any_tool_or_process(tmp_path, monkeypatch, invalid):
     facts = _bundle(tmp_path)
