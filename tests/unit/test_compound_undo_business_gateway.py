@@ -3472,3 +3472,197 @@ def test_2022_null_omission_never_changes_native_assignment_for_other_conflict_m
     assert all('native_default_reference_omissions' not in row for row in prepared['pre_state']['object_create_nodes'])
     if mode == 'merge': assert prepared['pre_state']['object_create_nodes'][0]['preexisting_id'] == identity
     assert not any(row[0].endswith('object.create') for row in task.calls)
+
+def _collect_history_pages(run, command, client):
+    from copy import deepcopy
+    from wwise_waapi.canonical import canonical_sha256
+    calls = deepcopy(client.calls)
+    entries, pages, offset = [], [], 0
+    for _ in range(1000):
+        code, payload = run(*command["gateway_argv"])
+        assert code == 0, payload
+        assert "confirmation" not in payload and "authorization" not in payload
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= 32768
+        page = payload["history_view"]
+        assert page["mutation_authority"] is False and page["offset"] == offset and len(page["entries"]) <= 64
+        if pages:
+            assert page["scope"] == pages[0]["scope"] and page["value_sha256"] == pages[0]["value_sha256"]
+        pages.append(page)
+        entries.extend(page["entries"])
+        offset += len(page["entries"])
+        if page["complete"]:
+            assert page["remaining_entries"] == 0 and page["next_page"] is None and "next_command" not in payload
+            break
+        command = payload["next_command"]
+        assert command["gateway_argv"][0] == "transaction-show" and "--history-view" in command["gateway_argv"]
+        assert "--outcome-page" in command["gateway_argv"]
+    else:
+        pytest.fail("History page chain did not terminate")
+    root = None
+    for row in entries:
+        parts = [part.replace("~1", "/").replace("~0", "~") for part in row["pointer"].split("/")[1:]]
+        parent = root
+        for part in parts[:-1]:
+            parent = parent[int(part)] if isinstance(parent, list) else parent[part]
+        key = (int(parts[-1]) if isinstance(parent, list) else parts[-1]) if parts else None
+        if row["kind"] == "object": value = {}
+        elif row["kind"] == "array": value = [None] * row["length"]
+        elif row["kind"] == "string-fragment":
+            previous = parent[key] if row["offset"] else ""
+            assert len(previous) == row["offset"]
+            value = previous + row["value"]
+        else: value = row["value"]
+        if parts: parent[key] = value
+        else: root = value
+    assert canonical_sha256(root) == pages[0]["value_sha256"]
+    assert client.calls == calls
+    return root, pages
+
+
+def test_large_real_notes_history_review_and_verification_are_losslessly_pageable(tmp_path, monkeypatch):
+    from copy import deepcopy
+    protected = []
+    original = waapi_gateway.project_successful_transaction_verify_payload
+    def protect(payload, **kwargs):
+        before = deepcopy(payload["agent_result"])
+        encoded = json.dumps(before, ensure_ascii=False, separators=(",", ":")).encode()
+        result = original(payload, **kwargs)
+        assert result["agent_result"] == before
+        assert json.dumps(result["agent_result"], ensure_ascii=False, separators=(",", ":")).encode() == encoded
+        assert list(result)[-1] == "agent_result"
+        protected.append(True)
+        return result
+    monkeypatch.setattr(waapi_gateway, "project_successful_transaction_verify_payload", protect)
+    client, state, source, preview, shown, run = _owned_notes_history_case(tmp_path,
+        initial_notes="Original multilingual notes Ω/雪\"\n" * 600, confirm_history=False)
+    tx = preview["transaction_id"]
+    notice = shown["preview_summary"]["history_action"]
+    assert notice["observations_complete"] is False and notice["observation_count"] == 1
+    expectation, pages = _collect_history_pages(run, notice["detail"], client)
+    assert len(pages) > 1 and any(entry["kind"] == "string-fragment" for page in pages for entry in page["entries"])
+    code, full = run("transaction-show", tx)
+    assert code == 0, full
+    assert expectation == full["artifact"]["prepared_operation"]["pre_state"]["history_binding"]
+    assert expectation["observations"][0]["before"] == client.history_before["notes"]
+    assert expectation["observations"][0]["after"] == "after history edit"
+    assert expectation["source_receipt"]["transaction_id"] == source["transaction_id"]
+    assert run(*shown["next_command"]["gateway_argv"])[0] == 0
+    assert run("execute", tx)[0] == 0
+    code, verified = run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    agent = deepcopy(verified["agent_result"])
+    observed, actual_pages = _collect_history_pages(run, verified["verification"]["history_detail"], client)
+    code, full = run("transaction-show", tx)
+    event, = [row for row in full["events"] if row["event_type"] == "verification_recorded"]
+    assert observed == event["details"]["verification"]
+    assert actual_pages[0]["scope"]["verification_event_hash"] == event["event_hash"]
+    assert verified["agent_result"] == agent and list(verified)[-1] == "agent_result"
+    assert client.source["notes"] == client.history_before["notes"]
+
+
+
+def test_history_pages_reject_cross_view_cursor_artifact_event_and_store_tamper(tmp_path):
+    from copy import deepcopy
+    import shutil
+    from tests.unit.test_remaining_core_business_gateway import _env
+    client, state, _source, preview, shown, run = _owned_notes_history_case(tmp_path,
+        initial_notes="Owned notes Ω/雪\n" * 1400)
+    tx = preview["transaction_id"]
+    first_command = shown["preview_summary"]["history_action"]["detail"]["gateway_argv"]
+    code, first = run(*first_command)
+    assert code == 0 and first["history_view"]["next_page"], first
+    next_command = first["next_command"]["gateway_argv"]
+    before_calls = deepcopy(client.calls)
+    wrong_cursor = next_command.copy()
+    wrong_cursor[-1] = wrong_cursor[-1][:-1] + ("0" if wrong_cursor[-1][-1] != "0" else "1")
+    wrong_artifact = next_command.copy()
+    wrong_artifact[wrong_artifact.index("--outcome-artifact-hash") + 1] = "0" * 64
+    for command in (wrong_cursor, wrong_artifact, [*first_command, "--outcome-event-hash", "0" * 64]):
+        assert run(*command)[0] == 2
+    assert client.calls == before_calls
+    assert run("execute", tx)[0] == 0
+    code, verified = run("verify", tx)
+    assert code == 0, verified
+    actual_command = verified["verification"]["history_detail"]["gateway_argv"]
+    code, full = run("transaction-show", tx)
+    assert code == 0, full
+    wrong_type_event = next(row["event_hash"] for row in full["events"] if row["event_type"] == "execution_completed")
+    for event in (wrong_type_event, "0" * 64):
+        command = actual_command.copy()
+        command[command.index("--outcome-event-hash") + 1] = event
+        assert run(*command)[0] == 2
+    assert run(*actual_command, "--outcome-page", first["history_view"]["next_page"])[0] == 2
+    assert run(*actual_command[:-2])[0] == 2  # No silently selected latest event.
+    other = tmp_path / "copied-state"
+    shutil.copytree(state, other)
+    code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(other), *next_command], env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("Offline page must not connect"))
+    assert code == 2 and "store" in rejected["message"].casefold(), rejected
+
+
+def test_history_page_reads_sealed_expectation_without_recapturing_source_journal(tmp_path):
+    client, state, source, _preview, shown, run = _owned_notes_history_case(tmp_path,
+        initial_notes="Retained exact source value " * 900, confirm_history=False)
+    source_journal = state / "transactions" / source["transaction_id"] / "events.jsonl"
+    source_journal.write_bytes(source_journal.read_bytes() + b'{"unsealed_source_change":true}\n')
+    value, _pages = _collect_history_pages(run, shown["preview_summary"]["history_action"]["detail"], client)
+    assert value["observations"][0]["before"] == client.history_before["notes"]
+
+
+def test_history_page_zero_observations_is_complete_and_strictly_read_only(tmp_path):
+    client, _state, preview, _shown, run = _latest_history_without_owned_receipt(tmp_path)
+    calls = list(client.calls)
+    code, page = run("transaction-show", preview["transaction_id"], "--history-view", "expectation",
+        "--outcome-artifact-hash", preview["artifact_hash"])
+    assert code == 0, page
+    assert page["history_view"]["total_count"] == 0 and page["history_view"]["complete"] is True
+    assert page["history_view"]["next_page"] is None and "next_command" not in page
+    assert "confirmation" not in page and client.calls == calls
+
+    assert run(*_shown["next_command"]["gateway_argv"])[0] == 0
+    assert run("execute", preview["transaction_id"])[0] == 0
+    code, weak = run("verify", preview["transaction_id"])
+    assert code == 0 and weak["verified"] is False and weak["result_schema_checked"] is True, weak
+    code, full = run("transaction-show", preview["transaction_id"])
+    assert code == 0, full
+    event, = [row for row in full["events"] if row["event_type"] == "verification_recorded"]
+    calls = list(client.calls)
+    code, page = run("transaction-show", preview["transaction_id"], "--history-view", "verification",
+        "--outcome-artifact-hash", preview["artifact_hash"], "--outcome-event-hash", event["event_hash"])
+    assert code == 0 and page["history_view"]["mutation_authority"] is False, page
+    assert client.calls == calls and "confirmation" not in page
+
+
+def test_history_page_cli_discloses_fixed_views_and_generated_hash_options(capsys):
+    with pytest.raises(SystemExit) as outcome:
+        waapi_gateway.execute_gateway(["transaction-show", "--help"])
+    assert outcome.value.code == 0
+    text = capsys.readouterr().out
+    assert "--history-view {expectation,verification}" in text
+    assert "--outcome-artifact-hash" in text and "--outcome-event-hash" in text and "--outcome-page" in text
+
+
+@pytest.mark.parametrize('read_error', [False, True])
+def test_history_verification_page_preserves_failed_or_incomplete_recorded_outcome(tmp_path, read_error):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, effect=False)
+    tx = preview['transaction_id']
+    assert run('execute', tx)[0] == 0
+    if read_error:
+        original = client.call
+        def unavailable(uri, args=None, options=None):
+            if uri.endswith('object.get') and 'notes' in (options or {}).get('return', []):
+                raise RuntimeError('Exact history read unavailable')
+            return original(uri, args, options)
+        client.call = unavailable
+    code, failed = run('verify', tx)
+    assert code == 2 and failed['verified'] is False, failed
+    code, full = run('transaction-show', tx)
+    assert code == 0, full
+    event, = [row for row in full['events'] if row['event_type'] == 'verification_recorded']
+    command = {'gateway_argv': ['transaction-show', tx, '--history-view', 'verification',
+        '--outcome-artifact-hash', full['artifact_hash'], '--outcome-event-hash', event['event_hash']]}
+    value, _pages = _collect_history_pages(run, command, client)
+    assert value == event['details']['verification'] and value['ok'] is False
+    assert value['status'] == 'verification_failed'
+    if read_error:
+        assert 'Exact history read unavailable' in json.dumps(value)
