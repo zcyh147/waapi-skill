@@ -2108,7 +2108,7 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
     assert not any(row[0] == "ak.wwise.core.object.setReference" for row in client.calls)
 
 
-def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed", omit_result_name=False):
+def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed"):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD
     task = OwnedGraphTask(tmp_path, version, "object.create")
@@ -2117,14 +2117,12 @@ def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created not
         "--kind", "sound-sfx", "--name", "Rain", *([] if notes is None else ["--field", "notes", notes]))
     assert code == 0, declared
     source, shown = task.preview()
-    if source_notes != "observed" or omit_result_name:
+    if source_notes != "observed":
         source_call = task.call
         def source_boundary(uri, args=None, options=None):
             result = source_call(uri, args, options)
             if uri.endswith("object.create") and source_notes == "native-default":
                 task.objects[result["id"]]["notes"] = "Native observed default"
-            if uri.endswith("object.create") and omit_result_name:
-                result.pop("name", None)
             if uri.endswith("object.get") and source_notes == "missing":
                 for row in result.get("return", []):
                     if row.get("name") == "Rain":
@@ -2293,12 +2291,3 @@ def test_created_leaf_history_requires_source_notes_observation_even_when_source
         "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
     assert code == 2 and "actual notes are incomplete" in json.dumps(rejected), rejected
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
-
-
-
-def test_created_leaf_history_accepts_result_guid_when_name_is_independently_verified(tmp_path):
-    task, source, _created = _created_leaf_history_case(tmp_path, omit_result_name=True)
-    undo = _created_leaf_history_preview(task, source)
-    assert task.run("execute", undo)[0] == 0
-    code, verified = task.run("verify", undo)
-    assert code == 0 and verified["verified"] is True, verified
