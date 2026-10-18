@@ -333,6 +333,23 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "a3d8593d2d4b0ad167c77264182de22abe49475781c031c0cd96429af874f4f9"
+    )
+    # Only four createPlugin contracts add source-proven Effect Folder placement.
+    # Invert that exact constraint before retaining every earlier reviewed seal.
+    def before_effect_folder_placement(version):
+        contract = operation_request_machine_contract("object.createPlugin", version)
+        assert contract["constraints"][6] == (
+            "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit"
+        )
+        contract["constraints"][6] = (
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation"
+        )
+        return contract
+
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(before_effect_folder_placement(version))
+    assert canonical_sha256(non_object_set_digests) == (
         "8a89bd2ef65432a3a4fcddcb72a5ecfa49c32d6a4497d929199a6cf4802e0191"
     )
     # Only the five create contracts add same-graph result bindings here.
@@ -470,7 +487,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Four plugin lanes add two ShareSet kinds and bound references. Restore
     # only those reviewed additions to reproduce the previous aggregate.
     for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("object.createPlugin", version)
+        contract = before_effect_folder_placement(version)
         plugin = contract["argument_contract"]["properties"]["plugin"]
         plugin["optional"].remove("references")
         assert plugin["properties"]["kind"]["enum"] == ["source", "effect", "sink", "metadata"]
