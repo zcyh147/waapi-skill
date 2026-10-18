@@ -847,9 +847,9 @@ owner, requirement or evidence changed; v1 evidence reuse remains byte-strict.
 
 On unchanged `55383f8c`, central preflight passed **825 in 26.75 seconds** and
 the proportional integration focus passed **27 in 11.88 seconds**. Both sealed
-1,858 unchanged tracked hashes and zero owned processes. One full five-version
-Program gate is running separately on this fixed candidate; it is not a pass
-until terminal evidence exists. No full Non-live or Fresh rerun was started.
+1,858 unchanged tracked hashes and zero owned processes. The subsequent full five-version
+Program gate ended with 12,245 passed, 168 failed and 4 skipped (4,131.32
+seconds); its original failure remains unchanged. No full Non-live or Fresh rerun was started.
 R23 hosted run `39082897954` independently passed **825 in 57.63 seconds** on
 published `3e3a31ec`.
 
@@ -878,6 +878,44 @@ source; owned processes ended and failed sandboxes remain quarantined. Further
 work retains complete before/after file images for diagnosis and uses matching
 SDK authority for plug-in named-list ordering. Original native failures are not
 regraded by later code or offline comparisons. No ticket closes at this checkpoint.
+
+
+## Twenty-fifth integration checkpoint
+
+R25 code `883fd0c7` integrates actual-object conditions for existing Bus/AuxBus
+references and scalars, existing-target create/merge binding, generic ancestor
+rename preservation, and complete saved-model media observations. A move-to-single
+media Preview now discloses source-proven optional empty saved None-state records;
+verification reports exact new identities and preserves all remaining model data.
+Bounded offline pages expose large eligible/actual details through the existing
+transaction store. Neither old XML content nor distinct 2024 plug-in/Soundcaster
+changes are normalized away. External-source verification's local Path shadowing
+and source-status reads' missing local-host boundary are fixed.
+
+The ordered Program roster contains 256 entries. Generated public scope remains
+897 version rows, 228 unique URIs, 515 contracts and 32,978 branch records.
+All 272,313 native obligations, owners and evidence requirements are retained;
+116 exclusions and 272,197 unresolved rows remain. Default evidence mapping is
+still outstanding implementation work, not a claim that those rows are proved.
+
+Original runs stay separate: central `7228c25f` produced 820 passed / 5 failed
+in 27.08s; test-only fixes selected the typed media readback instead of its list
+position. The combined focus at `0311ab60` produced 208 passed / 1 failed in
+117.62s, including those five repairs and all other original Program failures.
+The final metadata-drift error-fixture repair at `883fd0c7` passed its sole
+remaining node in 0.45s. All runs retained 1,875 unchanged tracked files and
+zero owned processes. These are scoped successor passes, not a new full Program,
+Non-live or aggregate 825-case pass. No Fresh was launched.
+
+On exact earlier candidate `6ca8d96c`, the prospective sibling AuxBus reference
+case passed once on each of the five native versions, with independent identity,
+class, parent and reference checks. Source hashes/mtimes remained unchanged and
+passing sandboxes were removed. That evidence does not cover R25's existing-source
+scalar/create-merge changes. Its new three-effect collector has 18 pure controls;
+matching native acceptance is pending. Original 2023/2024 media failures remain
+retained, and the 2024 loss of non-default Soundcaster session values remains a
+separate investigation. Old-version root Bus conditions and existing List
+collision conditions remain same-parent implementation work. No ticket closes.
 
 ## Standing completion rules
 

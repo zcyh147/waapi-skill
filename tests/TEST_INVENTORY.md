@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R25 checkpoint
+
+The complete five-version Program gate at `55383f8c` ended **12,245 passed /
+168 failed / 4 skipped** (4,131.32s). R25 fixes have scoped passing successors
+for those original failures; no replacement full-gate PASS is claimed.
+Central `7228c25f` recorded **820 passed / 5 failed**; combined repair focus
+`0311ab60` recorded **208 passed / 1 failed**, including the five central repairs;
+`883fd0c7` then passed the sole remaining metadata-drift error-fixture node.
+All source snapshots were unchanged and owned processes ended. Counts are not
+summed into a single-candidate gate. The actual Program roster has 256 entries.
+
+Exact earlier `6ca8d96c` passed one prospective AuxBus reference case on each
+supported native version. Existing-source reference/scalar/create-merge and the
+new optional saved None-state handling still need matching native proof.
+No Fresh or Windows run is added. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-fifth-integration-checkpoint)
+for retained failures and scope limits.
+
 ## 2026-10-17 v1.1 repair checkpoint
 
 Candidate `e8ca72d3` passed Program **6942 / 3 skipped** and Non-live
