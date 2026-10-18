@@ -4177,6 +4177,81 @@ def test_soundcaster_dump_observation_uses_gateway_and_actual_category_writer(tm
     assert len(record['transactions']) == 1 and record['transactions'][0]['state'] == 'result_schema_checked'
 
 
+def _stationary_tone_runtime(tmp_path, workflow, *, fault=None):
+    import math
+    import struct
+    from tests.unit.test_host_ui_debug_business_adapter import _ToneFileClient, _env
+    client = _ToneFileClient(tmp_path, '2025.1', is_command_line=fault != 'authoring')
+    original = client.call
+    writes, commands, native_files = [], [], {}
+    def call(uri, args=None, options=None):
+        if uri == 'ak.wwise.debug.generateToneWAV':
+            writes.append(dict(args))
+            assert set(args) == {'path', 'waveform', 'frequency', 'channelConfig', 'bitDepth',
+                'sampleRate', 'attackTime', 'sustainTime', 'releaseTime', 'sustainLevel'}, args
+            assert (args['waveform'], args['frequency'], args['channelConfig'], args['sampleRate'],
+                args['attackTime'], args['sustainTime'], args['releaseTime']) == ('sine', 440, '1.0', 48000, 0, 0.25, 0)
+            if fault == 'native-error':
+                raise RuntimeError('fixture native generation outcome unknown')
+            floating = args['bitDepth'] == 'float32'
+            # Synthetic boundary bytes are not native evidence or a tolerance oracle.
+            samples = [0.5 * math.sin(2 * math.pi * 440 * i / 48000) for i in range(12000)]
+            audio = b''.join(struct.pack('<f' if floating else '<h', value if floating else int(value * 32767)) for value in samples)
+            fmt = struct.pack('<HHIIHH', 3 if floating else 1, 1, 48000, 192000 if floating else 96000,
+                4 if floating else 2, 32 if floating else 16)
+            raw = b'RIFF' + struct.pack('<I', 36 + len(audio)) + b'WAVEfmt ' + struct.pack('<I', 16) + fmt + b'data' + struct.pack('<I', len(audio)) + audio
+            client.artifact_bytes = raw
+            if fault == 'missing-file': client.write_output = False
+            native_files[args['path']] = raw
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo':
+            result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+        return result
+    client.call = call
+    env = {**_env(tmp_path, '2025.1'), 'WWISE_EVIDENCE_DIR': str(tmp_path / 'dispatcher-evidence'),
+        'WWISE_CATEGORY_EVIDENCE_PATH': str(tmp_path / 'category.jsonl')}
+    source = tmp_path / 'immutable-source'; source.mkdir()
+    source_project = source / 'SampleProject.wproj'; source_project.write_text('immutable source fixture')
+    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+        state_dir=tmp_path / 'state', env=env, port=31337,
+        sandbox=SimpleNamespace(sandbox_project=client.project_file, sandbox_root=tmp_path / 'sandbox-output',
+            source_project=source_project, source_root=source),
+        lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
+    runtime.sandbox.sandbox_root.mkdir()
+    def raw(argv):
+        commands.append(list(argv))
+        return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *argv],
+            env=env, client_factory=lambda _: client)
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, native_files
+
+
+def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_public_transactions(tmp_path, workflow):
+    import hashlib
+    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow)
+    category = workflow._collect_stationary_tone_characterization(runtime)
+    receipt_path = Path(category['observation_path'])
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt['collection_complete'] is True and receipt['business_effect_verified'] is False
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True
+    assert category['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert [(p['bit_depth'], p['sustain_db']) for p in receipt['phases']] == [
+        ('int16', 0), ('int16', -6), ('float32', 0), ('float32', -6)]
+    assert len(writes) == 4 and len({p['transaction_id'] for p in receipt['phases']}) == 4
+    assert sum(argv[0] == 'execute' for argv in commands) == 4
+    for phase in receipt['phases']:
+        archived = Path(phase['wav']['archive_path']).read_bytes()
+        assert archived == native_files[phase['output_path']]
+        assert hashlib.sha256(archived).hexdigest() == phase['wav']['archive_proof']['sha256']
+        shown = json.loads(Path(phase['transaction']['path']).read_text())
+        assert shown['transaction_id'] == phase['transaction_id'] and shown['state'] == 'result_schema_checked'
+        assert shown['artifact']['request']['arguments']['args'] == next(row for row in writes if row['path'] == phase['output_path'])
+        assert shown['events'] and phase['verification']['business_state_verified'] is False
+    assert receipt['get_info']['isCommandLine'] is True
+    assert receipt['get_info']['version']['build'] == 9143
+    assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+
+
 def test_soundcaster_dump_wrong_guid_cannot_certify_same_named_session_values(tmp_path, workflow, monkeypatch):
     import hashlib
     from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
