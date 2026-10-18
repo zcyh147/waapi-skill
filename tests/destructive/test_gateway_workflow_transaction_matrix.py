@@ -2186,7 +2186,9 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
     path = project
     try:
         before.save(project, observe_console_file(project, io_root=project.parent))
-        for path in project.parent.rglob("*.wwu"):
+        for path in project.parent.rglob("*"):
+            if not path.name.casefold().endswith(".wwu"):
+                continue
             work_units.append(path)
             assert len(work_units) <= before.MAX_WORK_UNITS, "Console model Work Unit count exceeded"
         work_units.sort()
@@ -2244,7 +2246,9 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
             after = ConsoleModelImageIndex(root=image_root, project=project, phase="after", link=images["after"])
             after_paths = set(work_units)
             try:
-                for path in project.parent.rglob("*.wwu"):
+                for path in project.parent.rglob("*"):
+                    if not path.name.casefold().endswith(".wwu"):
+                        continue
                     after_paths.add(path)
                     assert len(after_paths) <= after.MAX_WORK_UNITS, "Console after-image path count exceeded"
             except Exception as exc:

@@ -77,7 +77,7 @@ class ConsoleModelImageIndex:
         from wwise_waapi.operation_soundbank import prove_artifact_path
         relative = path.relative_to(self.project.parent).as_posix()
         assert relative not in self.files
-        assert path == self.project or path.suffix == ".wwu"
+        assert path == self.project or path.name.casefold().endswith(".wwu")
         assert len(self.files) < self.MAX_WORK_UNITS + 1, "Console model image file count exceeded"
         raw = base64.b64decode(observation["content_base64"], validate=True)
         proof = observation["file_proof"]

@@ -1594,8 +1594,9 @@ def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_
       [("2025.1", False, False), ("2023.1", True, False), ("2024.1", True, False),
        ("2025.1", True, False), ("2023.1", True, True)]],
     *[pytest.param(fault, "2023.1", True, False, id=f"{fault}-2023.1-True-False")
-      for fault in ("preservation", "lost", "new", "after-write", "wrong-media-after-write", "before-write", "preview-drift")],
-    pytest.param("overflow", "2025.1", False, False, id="overflow-2025.1-False-False"),
+      for fault in ("preservation", "lost", "new", "after-write", "wrong-media-after-write", "before-write", "preview-drift", "uppercase-before", "uppercase-after")],
+    *[pytest.param(fault, "2025.1", False, False, id=f"{fault}-2025.1-False-False")
+      for fault in ("overflow", "uppercase-overflow")],
 ])
 def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, monkeypatch, wrong_media, version, migrated, wrong_open):
     from xml.etree import ElementTree as ET
@@ -1655,8 +1656,9 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                     self.other_unit.write_bytes(self.other_unit.read_bytes().replace(b"-6", b"-9"))
                 elif wrong_media == "lost":
                     self.other_unit.unlink()
-                elif wrong_media == "new":
-                    (self.other_unit.parent / "Created.wwu").write_bytes(self.other_unit.read_bytes())
+                elif wrong_media in {"new", "uppercase-after"}:
+                    name = "Created.WWU" if wrong_media == "uppercase-after" else "Created.wwu"
+                    (self.other_unit.parent / name).write_bytes(self.other_unit.read_bytes())
             return super().call(uri, args, options)
 
     # Native migrate leaves the same Console instance alive with no active project.
@@ -1669,16 +1671,17 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
     ET.SubElement(source, "AudioFile").text = "Keep.wav"
     ET.SubElement(ET.SubElement(source, "MediaIDList"), "MediaID", ID="111")
     tree.write(client.unit)
-    client.other_unit = client.unit.with_name("Other Work Unit.wwu")
+    client.other_unit = client.unit.with_name("Other Work Unit.WWU" if wrong_media == "uppercase-before" else "Other Work Unit.wwu")
     other = ET.parse(client.unit)
     for node in other.iter():
         if node.get("ID"):
             node.set("ID", node.get("ID").replace("1", "7").replace("2", "8").replace("3", "9"))
     other.find(".//Sound").remove(other.find(".//Sound/ChildrenList"))
     other.write(client.other_unit)
-    if wrong_media == "overflow":
+    if wrong_media in {"overflow", "uppercase-overflow"}:
         for number in range(511):
-            (client.unit.parent / f"Extra-{number}.wwu").write_bytes(client.other_unit.read_bytes())
+            extension = "WWU" if wrong_media == "uppercase-overflow" else "wwu"
+            (client.unit.parent / f"Extra-{number}.{extension}").write_bytes(client.other_unit.read_bytes())
     if wrong_media in {"before-write", "after-write", "wrong-media-after-write"}:
         original_open = os.open
         phase = "before" if wrong_media == "before-write" else "after"
@@ -1719,7 +1722,8 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         restart=lambda: pytest.fail('Collector must reopen the same Console instance without a host restart'))
     collect = (workflow.test_cli_console_media_id_migrated_project_acceptance if migrated
                else workflow.test_cli_console_media_id_file_observation)
-    if wrong_media or wrong_open:
+    expects_failure = wrong_media not in {False, "uppercase-before"} or wrong_open
+    if expects_failure:
         with pytest.raises(OSError if wrong_media == "before-write" else AssertionError) as failure:
             collect(runtime)
     else:
@@ -1737,7 +1741,7 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         assert not any(uri == client.operation for uri, _, _ in client.calls)
         assert [uri for uri, _, _ in client.calls].count(OPEN) == 1
         return
-    assert category["status"] == ("FAIL" if wrong_media else "PASS")
+    assert category["status"] == ("FAIL" if expects_failure else "PASS")
     if wrong_media == "preview-drift":
         assert "MEDIA_BASELINE_PREVIEW_MISMATCH" in str(failure.value)
         assert len(media_previews) == 1 and not any(uri == client.operation for uri, _, _ in client.calls)
@@ -1747,7 +1751,7 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         assert all(index["complete"] for index in indexes)
         assert indexes[0]["files"][key]["sha256"] != indexes[1]["files"][key]["sha256"]
         return
-    if wrong_media in {"before-write", "overflow"}:
+    if wrong_media in {"before-write", "overflow", "uppercase-overflow"}:
         before = category["model_images"]["before"]
         index = json.loads(Path(before["index_path"]).read_text())
         assert before["complete"] is False and index["complete"] is False
@@ -1773,9 +1777,10 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         index = json.loads(index_raw)
         incomplete = phase == "after" and wrong_media in {"lost", "after-write", "wrong-media-after-write"}
         assert index["complete"] is not incomplete
-        expected_paths = {client.project_file.name, "Actor-Mixer Hierarchy/Default Work Unit.wwu", "Actor-Mixer Hierarchy/Other Work Unit.wwu"}
-        if phase == "after" and wrong_media == "new":
-            expected_paths.add("Actor-Mixer Hierarchy/Created.wwu")
+        other_name = "Other Work Unit.WWU" if wrong_media == "uppercase-before" else "Other Work Unit.wwu"
+        expected_paths = {client.project_file.name, "Actor-Mixer Hierarchy/Default Work Unit.wwu", f"Actor-Mixer Hierarchy/{other_name}"}
+        if phase == "after" and wrong_media in {"new", "uppercase-after"}:
+            expected_paths.add("Actor-Mixer Hierarchy/Created.WWU" if wrong_media == "uppercase-after" else "Actor-Mixer Hierarchy/Created.wwu")
         assert set(index["files"]) == expected_paths
         for relative, row in index["files"].items():
             if row["status"] != "captured":
