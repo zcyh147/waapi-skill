@@ -17206,7 +17206,6 @@ def verify_prepared_operation(
         else:
             readbacks.append(observed)
             if plan['uri'] == AUTHORING_CREATE_URI:
-                from pathlib import Path
                 check('Saved project name matches its requested project-file name',
                     observed['project']['name'] == Path(plan['path']).stem, observed['project'])
             check('Requested project platforms were saved', observed['platforms_match'], observed['platforms'])
