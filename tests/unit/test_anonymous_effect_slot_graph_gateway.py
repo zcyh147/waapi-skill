@@ -26,7 +26,7 @@ def anonymous_task(tmp_path, version='2025.1'):
     return task
 
 
-def declare_slots(task, *, owner=None, owner_kind=None, targets=None, renders=("false", "false")):
+def declare_slots(task, *, owner=None, owner_kind=None, targets=None, renders=("false", "false"), bypasses=("true", "false")):
     owner = task.bind(FIRST) if owner is None else owner
     scope = ["--object-handle", owner] if owner_kind is None else ["--type-handle", owner_kind]
     code, listed = task.step('draft-discover-fields', *scope,
@@ -42,11 +42,11 @@ def declare_slots(task, *, owner=None, owner_kind=None, targets=None, renders=("
     kind = found['type_candidates'][0]['handle']
     fields = {name: select_field(task, kind=kind, token=name) for name in ['Effect', 'Bypass', 'Render']}
     targets = [EFFECT, EFFECT_B] if targets is None else targets
-    for name, target, bypass, render in [('first', targets[0], 'true', renders[0]), ('second', targets[1], 'false', renders[1])]:
+    for name, target, bypass, render in [('first', targets[0], bypasses[0], renders[0]), ('second', targets[1], bypasses[1], renders[1])]:
         handle = target if target.startswith('bnh1-') else task.bind(target)
         code, declared = task.step('draft-declare-new', '--declaration-id', name, '--parent-handle', owner,
             '--kind', kind, '--field', 'object_list', effects,
-            '--field-value', fields['Effect'], handle, '--field-value', fields['Bypass'], bypass,
+            '--field-value', fields['Effect'], handle, *(['--field-value', fields['Bypass'], bypass] if bypass is not None else []),
             *(['--field-value', fields['Render'], render] if render is not None else []))
         assert code == 0, declared
     return owner
@@ -614,6 +614,15 @@ def test_exact_existing_slot_render_uses_same_chain_preview_and_readback(tmp_pat
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
     assert len(writes) == 1
+    if operation == 'object.setProperty':
+        code, started = task.run('draft-start', 'ak.wwise.core.undo.undo')
+        assert code == 0, started
+        history = started['draft']
+        code, rejected = task.run('draft-declare-core-plan', history['draft_id'],
+            '--task-authority', started['task_authority'], '--expected-revision', str(history['revision']),
+            '--value', 'history_scope', 'latest_project_history', '--value', 'expectation_receipt', tx)
+        assert code == 2 and 'Render chain' in json.dumps(rejected), rejected
+        assert not any(uri.endswith('undo.undo') for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize('version,operation', [('2021.1', 'object.setProperty'), ('2022.1', 'object.setProperty'), ('2022.1', 'object.set')])
@@ -733,3 +742,57 @@ def test_render_clear_before_retained_true_successor_is_explicit_pending_boundar
     assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_SUFFIX_OBSERVATION_REQUIRED', rejected
     assert rejected['details']['mutation_dispatched'] is False
     assert not any(uri.endswith('object.setProperty') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('wrong_default', [False, True])
+def test_omitted_bypass_default_is_independently_verified_without_native_rewrite(tmp_path, wrong_default):
+    task = anonymous_task(tmp_path)
+    declare_slots(task, renders=('true', 'false'), bypasses=(None, None))
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            slots = args['objects'][0]['@Effects']
+            assert all('@Bypass' not in node for node in slots), args
+            for identity in (ROOT, CHILD): del task.objects[identity]
+            task.objects[FIRST]['@Effects'] = [{'id': SLOT_A}, {'id': SLOT_B}]
+            for identity, node in zip((SLOT_A, SLOT_B), slots):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject', 'classId': 5505040,
+                    'owner': {'id': FIRST}, 'path': r'\Opaque ' + identity, 'notes': '', '@Effect': {'id': node['@Effect']},
+                    '@Bypass': wrong_default, '@Render': node['@Render']}
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_A, 'name': ''}, {'id': SLOT_B, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    specs = shown['artifact']['prepared_operation']['verification_plan']['nodes']
+    default = next(prop for node in specs for prop in node['properties'] if prop['name'] == 'Bypass')
+    assert default['observed_class_default'] is True and default['value'] is False
+    code, verified = task.finish(tx, shown)
+    assert (code == 0 and verified.get('verified') is True) == (not wrong_default), verified
+
+
+def test_legacy_import_owner_render_fields_are_explicit_unfinished_chain_boundary(tmp_path):
+    import wave
+    task, _ = list_task(tmp_path, version='2022.1', operation='audio.import')
+    task.metadata['IsVoice'] = {'name': 'IsVoice', 'type': 'bool', 'default': False}
+    task.metadata['RenderEffect0'] = {'name': 'RenderEffect0', 'type': 'bool', 'default': False,
+        'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': 'Effect0',
+            'conditions': [{'referenceIsSet': True}]}]}
+    task.metadata['Effect0'] = {'name': 'Effect0', 'type': '', 'default': None,
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
+    parent = task.bind(SECOND)
+    code, found = task.step('draft-discover-fields', '--semantic-kind', 'sound-sfx', '--meaning', 'RenderEffect0')
+    assert code == 0, found
+    field = found['meaning_results'][0]['candidates'][0]['handle']
+    media = tmp_path / 'render-input.wav'
+    with wave.open(str(media), 'wb') as output:
+        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000); output.writeframes(b'\0\0' * 8)
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'sound', '--parent-handle', parent,
+        '--name', 'New sound', '--kind', 'sound-sfx', '--field', 'media_file', str(media), '--field-value', field, 'true')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_IMPORT_CHAIN_PENDING', rejected
+    assert rejected['details']['mutation_dispatched'] is False
+    assert 'audio.importTabDelimited' in rejected['details']['remaining_obligation']
+    assert not any(uri.endswith('audio.import') for uri, _, _ in task.calls)

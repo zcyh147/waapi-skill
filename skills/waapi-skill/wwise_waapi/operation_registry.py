@@ -2495,7 +2495,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setProperty",
         "ak.wwise.core.object.setProperty",
         "property-reference",
-        "Set one property for the current or an explicit platform using live property metadata and typed readback.",
+        "Set one property for the current or an explicit platform using live property metadata and typed readback; Effect Render also previews and verifies its source-proved owner-chain prefix.",
         ("object", "property", "value"),
         ("platform",),
         argument_contract=_object_contract(
@@ -11107,8 +11107,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         if request.operation == "object.setProperty":
             from .effect_render_conditions import prepare_property, EffectRenderConditionError
             try:
-                metadata["effect_render_chains"] = prepare_property(object_id=source.object, field=field_value,
+                render_chains = prepare_property(object_id=source.object, field=field_value,
                     value=arguments["value"], version=request.version, platform=observation_platform, read=read)
+                if render_chains:
+                    metadata["effect_render_chains"] = render_chains
             except EffectRenderConditionError as exc:
                 raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
             preview = PropertyReferenceBuilder(version=request.version).set_property(
@@ -20442,7 +20444,7 @@ def verify_prepared_operation(
                 for member in chain["snapshots"]:
                     if _same_identity(member["object_id"], snapshot["object_id"]):
                         for name, value in member["after_changes"].items():
-                            expected["@" + name] = value
+                            expected[name if name in expected else "@" + name] = value
             selected_references = {}
             observed_fields = {field.lstrip("@") for field in snapshot["fields"]}
             for name in snapshot.get("reference_fields", []):

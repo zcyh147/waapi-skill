@@ -150,6 +150,7 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                     targets.append({"fields": fields, "before": actual[0]})
             if mode != "replaceAll":
                 entries.append({"key": row["id"], "render_before": r._field_value(row, "Render"), "render_intent": None})
+        new_defaults = {}
         for spec in members:
             existing_id = spec.get("preexisting_id", spec.get("target_id"))
             scope = {"object_id": existing_id} if existing_id else {"class_id": spec["class_id"]}
@@ -160,6 +161,10 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
             for name in ("Effect", "Bypass"):
                 companion = r._read_property_info(read, **scope, name=name)
                 metadata.append({"scope": scope, "field": name, "raw": dict(companion.raw), "normalized": companion.as_dict()})
+                if not existing_id and name == "Bypass":
+                    if companion.type.casefold() not in {"bool", "boolean"} or type(companion.raw.get("default")) is not bool:
+                        raise r.OperationContractError("INVALID_METADATA", "New Bypass state needs its actual Boolean default")
+                    new_defaults[spec["request_path"]] = {"Render": info.raw["default"], "Bypass": companion.raw["default"]}
             intent = next((prop["value"] for prop in spec["properties"] if prop["name"] == "Render"), None)
             entry = {"key": spec["request_path"], "render_before": info.raw.get("default"), "render_intent": intent}
             if existing_id:
@@ -187,6 +192,10 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
             for snapshot in snapshots:
                 if r._same_identity(snapshot["object_id"], spec.get("preexisting_id", spec.get("target_id"))):
                     snapshot["after_changes"].update({prop["name"]: prop["value"] for prop in spec["properties"]})
+        for spec in members:
+            for name, value in new_defaults.get(spec["request_path"], {}).items():
+                if not any(prop["name"] == name for prop in spec["properties"]):
+                    spec["properties"].append({"name": name, "value": value, "metadata_type": "bool", "observed_class_default": True})
         chains.append({**planned, "authority": source_authority(version), "version": version, "platform": platform, "source": source,
             "owner_id": owner_id, "mode": mode, "before_order": [row["id"] for row in before],
             "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets})
@@ -275,6 +284,11 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
     from .documented_list_fields import resolve_class_list_evidence, resolve_live_list_evidence
     from .object_graph_paths import expected_snapshot
     assertions = []
+    def read_identity(identity):
+        rows = r._read_object_id_rows(identity, fields=r.IDENTITY_RETURN_FIELDS, read=read)
+        if len(rows) != 1 or not r._same_identity(rows[0].get("id"), identity):
+            raise ValueError("Render preservation identity must resolve once")
+        return rows[0]
     for chain in chains:
         try:
             source = chain["source"]
@@ -306,7 +320,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                 actual = r._read_object_id_rows(snapshot["object_id"], fields=snapshot["fields"], read=read, platform=chain["platform"])
                 expected = deepcopy(snapshot["before"])
                 if after_write:
-                    expected = expected_snapshot(expected, edits=edits, read_row=lambda identity: r._read_object_id_rows(identity, fields=r.IDENTITY_RETURN_FIELDS, read=read)[0])
+                    expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
                     for name, value in snapshot["after_changes"].items():
                         expected[name if name in expected else "@" + name] = value
                 selected = {name: r._reference_identity(r._field_value(expected, name)) for name in
@@ -318,7 +332,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                 actual = r._read_object_id_rows(target["before"]["id"], fields=target["fields"], read=read, platform=chain["platform"])
                 expected = target["before"]
                 if after_write:
-                    expected = expected_snapshot(expected, edits=edits, read_row=lambda identity: r._read_object_id_rows(identity, fields=r.IDENTITY_RETURN_FIELDS, read=read)[0])
+                    expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
                 passed = passed and r._native_snapshot_equal(actual, [expected])
             evidence = {"source_matches": source_match, "chain": chain}
         except (r.OperationContractError, ValueError, KeyError, TypeError) as exc:
