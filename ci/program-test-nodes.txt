@@ -258,8 +258,8 @@ tests/unit/test_object_query_result_pages.py
 tests/unit/test_gateway_error_context.py
 
 tests/unit/test_console_project_alternatives_gateway.py
-tests/unit/test_branch_evidence_readers.py
 tests/unit/test_absent_override_applicability_gateway.py
 tests/unit/test_create_merge_existing_conditions_gateway.py
 tests/unit/test_existing_bus_override_applicability_gateway.py
 tests/unit/test_metadata_property_state_selection_gateway.py
+tests/unit/test_branch_evidence_readers.py
