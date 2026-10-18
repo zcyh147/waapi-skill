@@ -861,3 +861,22 @@ def test_authoring_scenario_requires_private_home_before_allocating(tmp_path):
         lifecycle_v3.ScenarioLifecycle(scenario_id='layout-batch', version='2025.1',
             scenario_root=tmp_path / 'case', live_environment={}, host_kind='wwise-authoring')
     assert not (tmp_path / 'case').exists()
+
+
+@pytest.mark.parametrize('with_phase_proof', [True, False])
+def test_failed_authoring_preflight_needs_exact_no_start_proof(monkeypatch, tmp_path, with_phase_proof):
+    _install_fakes(monkeypatch, tmp_path)
+    def failing_launch(sandbox, env):
+        sandbox.metadata.process_cleanup_result = 'not-started'
+        sandbox.metadata.authoring_launch = {'preflight_failure': {
+            'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False
+        }} if with_phase_proof else {}
+        raise ValueError('required bundled program unavailable')
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', failing_launch)
+    controller, private_home = _private_home_controller(tmp_path)
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError) as caught:
+        controller.start()
+    evidence = json.loads(caught.value.evidence_path.read_text())
+    assert evidence['wwise_stop_status'] == ('not-started' if with_phase_proof else 'unproven')
+    assert caught.value.unsafe_to_continue is (not with_phase_proof)
+    assert bool(evidence['launch_environment_archive_path']) is with_phase_proof

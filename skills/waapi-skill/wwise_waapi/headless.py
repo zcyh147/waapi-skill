@@ -386,6 +386,7 @@ class HeadlessLifecycle:
     authoring_owned_root: Path | None = None
     launch_project_attestation: dict[str, Any] | None = field(init=False, default=None)
     launch_preparation: list[dict[str, Any]] = field(init=False, default_factory=list)
+    launch_preflight_failure: dict[str, Any] | None = field(init=False, default=None)
     _authoring_context: Any = field(init=False, default=None)
     process: Any = field(init=False, default=None)
     output: ProcessOutput = field(init=False, default_factory=ProcessOutput)
@@ -430,11 +431,21 @@ class HeadlessLifecycle:
         )
         if self.host_kind == 'wwise-authoring':
             from .authoring_launch import owned_mac_authoring_context
-            self._authoring_context = owned_mac_authoring_context(console=resolved_path, project=Path(self.project_path) if self.project_path is not None else None,
-                owned_root=self.authoring_owned_root, build=self.authoring_build, environment=self.launch_env)
-            if self.launch_cwd is None or not self.launch_cwd.is_relative_to(self._authoring_context.owned_root):
-                self._authoring_context = None
-                raise HeadlessLifecycleError('Owned Authoring launch cwd must belong to the owner root')
+            fresh_preflight = self.process is None and self._authoring_context is None and not self.launch_preparation
+            self.launch_preflight_failure = None
+            try:
+                context = owned_mac_authoring_context(console=resolved_path, project=Path(self.project_path) if self.project_path is not None else None,
+                    owned_root=self.authoring_owned_root, build=self.authoring_build, environment=self.launch_env)
+                if self.launch_cwd is None or not self.launch_cwd.is_relative_to(context.owned_root):
+                    raise HeadlessLifecycleError('Owned Authoring launch cwd must belong to the owner root')
+            except BaseException:
+                # This exact validation phase performs filesystem reads only.
+                # It proves no launch, not successful helper/process cleanup.
+                if fresh_preflight:
+                    self.launch_preflight_failure = {'phase': 'authoring_context_validation',
+                        'tools_started': False, 'process_started': False}
+                raise
+            self._authoring_context = context
             self.launch_env = self._authoring_context.environment
             self.launch_preparation = self._authoring_context.receipts
         else:

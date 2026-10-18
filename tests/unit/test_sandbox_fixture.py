@@ -1244,3 +1244,33 @@ def test_sandbox_authoring_strategy_is_pinned_and_checks_readiness_before_return
         assert seen[0]['launch_env']['WINEPREFIX'] == str(prefix)
         assert sandbox.metadata.get_info_version['build'] == 9143
         assert stopped == []
+
+
+def test_authoring_missing_bundled_program_records_preflight_without_cleanup_claim(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tests.unit.test_authoring_launch_lifecycle import _bundle
+    from wwise_waapi import authoring_launch
+    import wwise_waapi.headless as headless
+    facts = _bundle(tmp_path)
+    source = make_sample_project(tmp_path / 'source')
+    env = base_env(facts.console, source, facts.owned / 'sandbox-root')
+    env['HOME'] = str(facts.home)
+    sandbox = prepare_sample_project_sandbox(env)
+    (facts.cx / 'lib/wine/x86_64-windows/winepath.exe').unlink()
+    monkeypatch.setattr(authoring_launch.sys, 'platform', 'darwin')
+    monkeypatch.setattr(authoring_launch, 'MACOS_AUTHORING_INSTALL_ROOT', facts.installed.parent)
+    monkeypatch.setattr(headless, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(authoring_launch.subprocess, 'run', lambda *_a, **_kw: pytest.fail('No host tools before preflight'))
+    monkeypatch.setattr(sandbox_fixture, 'require_destructive_environment', lambda _env: SimpleNamespace(
+        version='2025.1', console_path=facts.console, active_destructive_project=sandbox.sandbox_project))
+    with pytest.raises(ValueError, match='winepath'):
+        launch_sandboxed_wwise(sandbox, env, host_kind='wwise-authoring',
+            wine_prefix_path=facts.prefix, case_owned_root=facts.owned)
+    saved = json.loads((sandbox.sandbox_path / 'sandbox-metadata.json').read_text())
+    assert saved['process_cleanup_result'] == 'not-started'
+    assert saved['process_cleanup_details'] is None
+    assert saved['process_pid'] is None
+    assert saved['authoring_launch']['preflight_failure'] == {
+        'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False}
+    assert saved['authoring_launch']['preparation'] == []
+    assert not facts.prefix.exists()

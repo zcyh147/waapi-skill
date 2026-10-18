@@ -576,6 +576,10 @@ def launch_sandboxed_wwise(
             sandbox.metadata.process_cleanup_result = (
                 f"error:{type(cleanup_error).__name__}:{cleanup_error}"
             )
+        elif (host_kind == 'wwise-authoring' and lifecycle.process is None
+                and getattr(lifecycle, 'launch_preflight_failure', None) == {
+                    'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False}):
+            sandbox.metadata.process_cleanup_result = 'not-started'
         else:
             sandbox.metadata.process_cleanup_result = (
                 "cleaned" if cleanup_report is not None and cleanup_report.is_clean else "residual-processes"
@@ -586,6 +590,7 @@ def launch_sandboxed_wwise(
             sandbox.metadata.authoring_launch = {
                 'host_kind': host_kind, 'build': build,
                 'preparation': list(lifecycle.launch_preparation),
+                'preflight_failure': getattr(lifecycle, 'launch_preflight_failure', None),
                 'project_attestation': lifecycle.launch_project_attestation,
                 'get_info': lifecycle.ready_result,
             }

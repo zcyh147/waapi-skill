@@ -409,7 +409,12 @@ class ScenarioLifecycle:
                     "process_cleanup_result",
                     None,
                 )
-                if cleanup_result == "cleaned":
+                preflight = getattr(sandbox.metadata, 'authoring_launch', None)
+                if (cleanup_result == 'not-started' and isinstance(preflight, dict)
+                        and preflight.get('preflight_failure') == {
+                            'phase': 'authoring_context_validation', 'tools_started': False, 'process_started': False}):
+                    wwise_stop_status = 'not-started'
+                elif cleanup_result == "cleaned":
                     wwise_stop_status = "stopped-by-launch-helper"
                 else:
                     proof_errors.append(
