@@ -9,6 +9,7 @@ import math
 import re
 from pathlib import Path
 import sys
+from time import monotonic as _operator_monotonic, sleep as _operator_sleep
 from typing import Mapping
 import uuid
 import xml.etree.ElementTree as ET
@@ -389,6 +390,9 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
         'limits': {'public_calls': 48, 'reply_bytes': 1024 * 1024, 'total_reply_bytes': 4 * 1024 * 1024,
             'image_base64_chars': 1024 * 1024, 'image_count': 1}}
     path.write_text(json.dumps(report) + '\n', encoding='utf-8')
+    operator_enabled = runtime.runner_environment.get('WWISE_SOUNDCASTER_OPERATOR_OBSERVATION') == '1'
+    if operator_enabled:
+        report['limits']['image_count'] = 2
     total, executed = 0, {}
     def bounded_call(argv):
         nonlocal total
@@ -418,6 +422,125 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
         instances = bounded_call(['layout-read', 'instances', '--layout-name', layout])
         return {'selected': selected, 'current_layout': current, 'instances': instances,
             'scope': 'active-view selection and current-layout views; not saved session values'}
+    def capture_image(session, fields, image_scope, filename):
+        capture = effect('ui.captureScreen', fields)
+        original = executed[capture['transaction_id']]
+        assert original['artifact_hash'] == capture['artifact_hash']
+        captured = original['dispatch_result'].get('result')
+        if not isinstance(captured, dict):
+            # Execute deliberately digests large successes. Read its one
+            # already-sealed offline event; never capture again or lift caps.
+            shown = bounded_call(['transaction-show', capture['transaction_id']])
+            assert (shown['transaction_id'] == capture['transaction_id']
+                and shown['artifact_hash'] == capture['artifact_hash']
+                and shown['state'] == TransactionState.RESULT_SCHEMA_CHECKED.value)
+            events = [event for event in shown['events'] if event['event_type'] == 'execution_completed']
+            assert len(events) == 1 and events[0]['artifact_hash'] == capture['artifact_hash']
+            captured = events[0]['details']['dispatch_result']['result']
+            capture['image_source'] = {'kind': 'public_transaction_show_execution_completed',
+                'event_hash': events[0]['event_hash']}
+        else:
+            capture['image_source'] = {'kind': 'public_execute_dispatch_result'}
+        assert isinstance(captured, dict), 'Exact image absent from bounded public result; session remains unobserved'
+        encoded = captured.get('contentBase64')
+        assert captured.get('contentType') == 'image/png' and isinstance(encoded, str) and 0 < len(encoded) <= 1024 * 1024
+        raw = base64.b64decode(encoded, validate=True)
+        assert raw.startswith(b'\x89PNG\r\n\x1a\n'), 'Capture does not contain PNG bytes'
+        image_path = destination / filename
+        with image_path.open('xb') as stream:
+            stream.write(raw)
+        from wwise_waapi.operation_soundbank import capture_file_proof
+        image_proof = capture_file_proof(image_path, field='Soundcaster diagnostic image',
+            max_bytes=1024 * 1024, io_root=destination)
+        assert image_proof['size'] == len(raw) and image_proof['sha256'] == hashlib.sha256(raw).hexdigest()
+        image = {'scope': image_scope, 'file_proof': image_proof, 'path': image_path.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
+            'content_type': captured['contentType'], 'capture_transaction_id': capture['transaction_id'],
+            'command_transaction_id': session['command']['transaction_id'], 'session_id': session['id'],
+            'visual_review': 'unobserved; image/schema success grants no business credit'}
+        return capture, image
+    def publish():
+        report['public_call_count'], report['total_reply_bytes'] = len(report['requests']), total
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        temporary.replace(path)
+    def block_operator(reason):
+        report.setdefault('operator', {}).update(status='blocked', reason=reason)
+        pytest.skip('Operator observation incomplete: ' + reason)
+    def exact_selected(payload, session):
+        rows = payload.get('objects', [])
+        return len(rows) == 1 and all(rows[0].get(field) == session['identity'].get(field)
+            for field in ('id', 'name', 'type', 'path'))
+    def simulation_values():
+        results = []
+        for identity, name in (('{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}', 'Engine_Load'),
+                ('{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'RPM')):
+            payload = bounded_call(['query-object', '--exact-id', identity,
+                '--include-field', 'SimulationValue', '--max-results', '1'])
+            rows = payload['objects']
+            assert len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name and rows[0]['type'] == 'GameParameter', 'Exact GameParameter identity changed'
+            results.append(payload)
+        return results
+    def operator_wait(session):
+        # Developer-only synchronization in this owned node, never a Skill UI fallback.
+        from wwise_waapi.operation_soundbank import capture_file_proof, open_regular_artifact_file
+        if not exact_selected(session['after']['selected'], session):
+            block_operator('Exact Minigun selection was not observed after Inspect')
+        session['pre_operator_capture'], session['pre_operator_image'] = capture_image(session, [],
+            {'kind': 'main-ui', 'phase': 'before-operator'}, 'minigun-before-operator.png')
+        marker_path = destination / 'operator-resume.json'
+        if marker_path.exists() or marker_path.is_symlink():
+            block_operator('Operator marker already exists; stale gate cannot resume collection')
+        saved = next(row for row in report['source']['sessions'] if row['id'] == session['id'])
+        deadline = _operator_monotonic() + 180
+        ready = {'contract': 'waapi-skill.developer-soundcaster-operator/v1', 'gate_id': uuid.uuid4().hex,
+            'candidate': batch.candidate, 'nodeid': SOUNDCASTER_IMAGE_DIAGNOSTIC_NODE,
+            'owner_root': str(batch.runtime.owned_root), 'node_root': str(runtime.owned_root),
+            'evidence_root': str(batch.runtime.evidence_root), 'native_evidence_root': str(destination),
+            'host': batch.info, 'endpoint': {'host': runtime.host, 'port': runtime.port},
+            'launch_pid': batch.launch_pid, 'sandbox_project': str(batch.runtime.sandbox.sandbox_project),
+            'selected': session['after']['selected']['objects'][0], 'pre_image': session['pre_operator_image'],
+            'saved_value_checklist': saved['bindings'], 'marker_path': str(marker_path), 'timeout_seconds': 180,
+            'deadline_monotonic': deadline,
+            'instructions': 'First inventory CUA apps and identify this exact owned Wwise/Wine host/project. If unrecognized, do not launch an installed app: report blocked. Click only the documented RTPC Show All display button in the loaded Minigun ObjectTab. Do not change values, sliders, States, Switches, playback, reset, save, or user projects. Write the exact nonce/context-bound marker to resume collection only; it certifies no values or effect.',
+            'marker_example': {'gate_id': None, 'decision': 'resume', 'host_session_id': batch.info['sessionId'],
+                'host_process_id': batch.info['processId'], 'sandbox_project': str(batch.runtime.sandbox.sandbox_project),
+                'owned_app_identified': True, 'action': 'rtpc-show-all-only'},
+            'blocked_marker': 'Use the same gate_id with decision=blocked and a bounded reason if the owned app/control cannot be identified.'}
+        ready['marker_example']['gate_id'] = ready['gate_id']
+        ready_path = destination / 'operator-ready.json'
+        with ready_path.open('x', encoding='utf-8') as stream:
+            stream.write(json.dumps(ready, ensure_ascii=False, indent=2) + '\n')
+        report['operator'] = {'status': 'waiting', 'ready_path': str(ready_path),
+            'marker_path': str(marker_path), 'gate_id': ready['gate_id'], 'timeout_seconds': 180,
+            'deadline_monotonic': deadline,
+            'marker_certifies_values': False, 'scope': 'explicit developer operator observation only'}
+        publish()
+        print('SOUNDCASTER_OPERATOR_READY ' + str(ready_path), flush=True)
+        while _operator_monotonic() < deadline:
+            if marker_path.exists() or marker_path.is_symlink():
+                try:
+                    proof = capture_file_proof(marker_path, field='Operator marker', max_bytes=4096, io_root=destination)
+                    _, descriptor, before = open_regular_artifact_file(marker_path, field='Operator marker', io_root=destination)
+                    with os.fdopen(descriptor, 'rb') as stream:
+                        raw = stream.read(4097)
+                        after = os.fstat(stream.fileno())
+                    assert len(raw) <= 4096 and len(raw) == proof['size'] and hashlib.sha256(raw).hexdigest() == proof['sha256']
+                    assert all(getattr(before, key) == getattr(after, key)
+                        for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
+                    assert capture_file_proof(marker_path, field='Operator marker', max_bytes=4096, io_root=destination) == proof
+                    marker = json.loads(raw)
+                    report['operator']['marker'] = marker
+                    report['operator']['marker_file_proof'] = proof
+                    assert marker.get('gate_id') == ready['gate_id'], 'Marker belongs to a different gate'
+                    if marker.get('decision') == 'blocked':
+                        block_operator(str(marker.get('reason', 'Owned app/control unavailable'))[:2048])
+                    assert marker == ready['marker_example'], 'Marker does not identify the exact owned app/context and permitted action'
+                except Exception as exc:
+                    block_operator('Invalid operator marker: ' + str(exc)[:1024])
+                report['operator']['status'] = 'resumed'
+                return
+            _operator_sleep(min(0.25, max(0, deadline - _operator_monotonic())))
+        block_operator('No operator marker before the fixed 180-second deadline')
     try:
         report['source'] = _soundcaster_source_witness(batch, destination)
         # This controlled activation experiment selects only Minigun. Keep all
@@ -429,8 +552,13 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
             report['sessions'].append({'id': identity, 'name': name, 'identity': rows[0]})
         for session in report['sessions']:
             session['before'] = observe_inspection()
+            if operator_enabled:
+                session['simulation_values'] = {'before': simulation_values(),
+                    'scope': 'global GameParameter SimulationValue before/after Inspect; relationship to session presets unproven'}
             session['command'] = effect('ui.commands.execute', ['--command-id', 'Inspect', '--command-object', session['id']])
             session['after'] = observe_inspection()
+            if operator_enabled:
+                session['simulation_values']['after'] = simulation_values()
             layout = session['after']['current_layout']['result']['name']
             types = bounded_call(['layout-read', 'types'])['result'].get('viewTypes', [])
             registered = [row for row in types if row.get('viewDisplayName') == 'Soundcaster']
@@ -453,49 +581,21 @@ def test_authoring_2024_soundcaster_frontend_image_diagnostic(owned_authoring_la
                 fields = []
                 image_scope = {'kind': 'main-ui',
                     'reason': 'Soundcaster instance absent or ambiguous; observe generic inspection effect'}
-            session['capture'] = effect('ui.captureScreen', fields)
-            capture = session['capture']
-            original = executed[capture['transaction_id']]
-            assert original['artifact_hash'] == capture['artifact_hash']
-            captured = original['dispatch_result'].get('result')
-            if not isinstance(captured, dict):
-                # Execute deliberately digests large successes. Read its one
-                # already-sealed offline event; never capture again or lift caps.
-                shown = bounded_call(['transaction-show', capture['transaction_id']])
-                assert (shown['transaction_id'] == capture['transaction_id']
-                    and shown['artifact_hash'] == capture['artifact_hash']
-                    and shown['state'] == TransactionState.RESULT_SCHEMA_CHECKED.value)
-                events = [event for event in shown['events'] if event['event_type'] == 'execution_completed']
-                assert len(events) == 1 and events[0]['artifact_hash'] == capture['artifact_hash']
-                captured = events[0]['details']['dispatch_result']['result']
-                capture['image_source'] = {'kind': 'public_transaction_show_execution_completed',
-                    'event_hash': events[0]['event_hash']}
-            else:
-                capture['image_source'] = {'kind': 'public_execute_dispatch_result'}
-            assert isinstance(captured, dict), 'Exact image absent from bounded public result; session remains unobserved'
-            encoded = captured.get('contentBase64')
-            assert captured.get('contentType') == 'image/png' and isinstance(encoded, str) and 0 < len(encoded) <= 1024 * 1024
-            raw = base64.b64decode(encoded, validate=True)
-            assert raw.startswith(b'\x89PNG\r\n\x1a\n'), 'Capture does not contain PNG bytes'
-            image_path = destination / (session['name'].lower() + '.png')
-            with image_path.open('xb') as stream:
-                stream.write(raw)
-            from wwise_waapi.operation_soundbank import capture_file_proof
-            image_proof = capture_file_proof(image_path, field='Soundcaster diagnostic image',
-                max_bytes=1024 * 1024, io_root=destination)
-            assert image_proof['size'] == len(raw) and image_proof['sha256'] == hashlib.sha256(raw).hexdigest()
-            session['image'] = {'scope': image_scope, 'file_proof': image_proof, 'path': image_path.name, 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest(),
-                'content_type': captured['contentType'], 'capture_transaction_id': session['capture']['transaction_id'],
-                'command_transaction_id': session['command']['transaction_id'], 'session_id': session['id'],
-                'visual_review': 'unobserved; image/schema success grants no business credit'}
+            if operator_enabled:
+                operator_wait(session)
+                fields, image_scope = [], {'kind': 'main-ui', 'phase': 'after-operator',
+                    'marker_certifies_values': False}
+            session['capture'], session['image'] = capture_image(session, fields, image_scope,
+                session['name'].lower() + '.png')
+            if operator_enabled:
+                session['operator_selected_after'] = bounded_call(['selected'])
+                if not exact_selected(session['operator_selected_after'], session):
+                    block_operator('Exact Minigun selection changed during operator observation')
         report['complete'] = True
     except Exception as exc:
         report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:2048]})
     finally:
-        report['public_call_count'], report['total_reply_bytes'] = len(report['requests']), total
-        temporary = path.with_suffix('.tmp')
-        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-        temporary.replace(path)
+        publish()
     assert report['complete'], report['errors']
 
 

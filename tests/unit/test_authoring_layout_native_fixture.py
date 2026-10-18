@@ -448,3 +448,130 @@ def test_soundcaster_missing_unique_view_records_main_ui_without_extra_command(o
     assert writes == [('ak.wwise.ui.commands.execute', {'command': 'Inspect',
         'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']}), ('ak.wwise.ui.captureScreen', {})]
     assert len([row for row in batch.receipts[nodeid] if row['argv'][0] == 'preview-from-draft']) == 2
+
+
+def _soundcaster_operator_owner(owned_authoring, tmp_path, monkeypatch):
+    from pathlib import Path
+    native, batch, call, client, png, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
+    runtime = batch.node_runtimes[nodeid]
+    runtime.runner_environment['WWISE_SOUNDCASTER_OPERATOR_OBSERVATION'] = '1'
+    destination = Path(runtime.runner_environment['WWISE_EVIDENCE_DIR'])
+    parameters = {'{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}': ('Engine_Load', 1, 0.69),
+        '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}': ('RPM', 1000, 716)}
+    original = client.call
+    def parameter_call(uri, args=None, options=None):
+        if uri.endswith('getPropertyAndReferenceNames') and args.get('object') in parameters:
+            client.calls.append((uri, args, options))
+            return {'return': ['SimulationValue']}
+        if uri.endswith('getPropertyInfo') and args.get('object') in parameters:
+            client.calls.append((uri, args, options))
+            assert args['property'] == 'SimulationValue'
+            return {'type': 'Real64', 'default': 50}
+        if uri.endswith('object.get'):
+            ids = args.get('from', {}).get('id', [])
+            if 'waql' in args:
+                ids = [identity for identity in parameters if identity in args['waql']]
+            if len(ids) == 1 and ids[0] in parameters:
+                client.calls.append((uri, args, options))
+                identity = ids[0]
+                name, before, after = parameters[identity]
+                inspected = any(row[0] == 'ak.wwise.ui.commands.execute' for row in client.calls)
+                return {'return': [{'id': identity, 'name': name, 'type': 'GameParameter',
+                    'path': '\\Game Parameters\\Car Engine\\' + name,
+                    '@SimulationValue': after if inspected else before}]}
+        return original(uri, args, options)
+    client.call = parameter_call
+    return native, batch, call, client, png, nodeid, destination, parameters
+
+
+def test_soundcaster_operator_resume_retains_images_and_scalar_hypothesis_without_credit(owned_authoring, tmp_path, monkeypatch):
+    from pathlib import Path
+    native, batch, call, client, png, nodeid, destination, parameters = _soundcaster_operator_owner(owned_authoring, tmp_path, monkeypatch)
+    sleeps = []
+    monkeypatch.setattr(native, '_operator_monotonic', lambda: 0, raising=False)
+    def resume(seconds):
+        sleeps.append(seconds)
+        ready = json.loads((destination / 'operator-ready.json').read_text())
+        assert ready['timeout_seconds'] == 180 and ready['host'] == batch.info
+        assert ready['owner_root'] == str(batch.runtime.owned_root)
+        assert ready['sandbox_project'] == str(batch.runtime.sandbox.sandbox_project)
+        assert ready['launch_pid'] == batch.launch_pid
+        assert ready['selected']['id'] == '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'
+        assert (destination / ready['pre_image']['path']).read_bytes() == png
+        assert len(ready['saved_value_checklist']) == 33
+        assert {(row['name'], row['value']) for row in ready['saved_value_checklist'] if row['kind'] == 'RTPC'} >= {('Engine_Load', '0.69'), ('RPM', '716')}
+        marker = {'gate_id': ready['gate_id'], 'decision': 'resume',
+            'host_session_id': ready['host']['sessionId'], 'host_process_id': ready['host']['processId'],
+            'sandbox_project': ready['sandbox_project'], 'owned_app_identified': True,
+            'action': 'rtpc-show-all-only'}
+        Path(ready['marker_path']).write_text(json.dumps(marker))
+    monkeypatch.setattr(native, '_operator_sleep', resume, raising=False)
+    native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
+    report = json.loads((destination / 'soundcaster-frontend-diagnostic.json').read_text())
+    assert report['operator']['status'] == 'resumed' and sleeps == [0.25]
+    assert report['operator']['marker_certifies_values'] is False
+    assert report['complete'] and report['business_preservation_verified'] is False
+    assert report['runtime_session_values_observed'] is False and report['limits']['image_count'] == 2
+    session = report['sessions'][0]
+    assert session['operator_selected_after']['objects'][0]['id'] == session['id']
+    assert session['pre_operator_image']['scope']['kind'] == session['image']['scope']['kind'] == 'main-ui'
+    assert session['pre_operator_image']['path'] != session['image']['path']
+    assert (destination / session['image']['path']).read_bytes() == png
+    for phase, expected in [('before', [1, 1000]), ('after', [0.69, 716])]:
+        observations = session['simulation_values'][phase]
+        assert [row['objects'][0]['properties']['SimulationValue'] for row in observations] == expected
+        assert [row['objects'][0]['id'] for row in observations] == list(parameters)
+    writes = [(uri, args) for uri, args, _ in client.calls if uri in
+        {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
+    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'Inspect', 'objects': [session['id']]}),
+        ('ak.wwise.ui.captureScreen', {}), ('ak.wwise.ui.captureScreen', {})]
+    batch._archive_observations()
+    root = Path(json.loads(Path(batch.observation_artifacts[nodeid]['path']).read_text())['artifacts']['native-evidence']['path'])
+    for name in ['operator-ready.json', 'operator-resume.json', 'soundcaster-frontend-diagnostic.json',
+            session['pre_operator_image']['path'], session['image']['path']]:
+        assert (root / name).read_bytes() == (destination / name).read_bytes()
+    target = tmp_path / 'operator-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    batch._append([{'nodeid': nodeid, 'outcome': 'PASS'}], phase='prepared', outcome='PENDING')
+    category = json.loads(target.read_text())['categories'][0]
+    assert category['status'] == 'blocked' and category['business_preservation_verified'] is False
+
+
+
+def test_soundcaster_operator_timeout_retains_pre_image_without_another_ui_write(owned_authoring, tmp_path, monkeypatch):
+    from pathlib import Path
+    native, batch, call, client, png, nodeid, destination, _ = _soundcaster_operator_owner(owned_authoring, tmp_path, monkeypatch)
+    clock, sleeps = [0.0], []
+    monkeypatch.setattr(native, '_operator_monotonic', lambda: clock[0])
+    def expire(seconds):
+        sleeps.append(seconds)
+        ready = json.loads((destination / 'operator-ready.json').read_text())
+        assert ready['deadline_monotonic'] == 180.0
+        assert ready['timeout_seconds'] == 180
+        assert (destination / ready['pre_image']['path']).read_bytes() == png
+        clock[0] += seconds
+    monkeypatch.setattr(native, '_operator_sleep', expire)
+    with pytest.raises(pytest.skip.Exception, match='fixed 180-second deadline'):
+        native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
+    report = json.loads((destination / 'soundcaster-frontend-diagnostic.json').read_text())
+    assert not report['complete'] and report['operator']['status'] == 'blocked'
+    assert report['business_preservation_verified'] is False and not report['errors']
+    assert sum(sleeps) == 180 and len(sleeps) == 720
+    session = report['sessions'][0]
+    assert 'image' not in session and 'capture' not in session
+    assert 'operator_selected_after' not in session
+    assert (destination / session['pre_operator_image']['path']).read_bytes() == png
+    assert not (destination / 'operator-resume.json').exists()
+    writes = [(uri, args) for uri, args, _ in client.calls if uri in
+        {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
+    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'Inspect', 'objects': [session['id']]}),
+        ('ak.wwise.ui.captureScreen', {})]
+    batch._archive_observations()
+    root = Path(json.loads(Path(batch.observation_artifacts[nodeid]['path']).read_text())['artifacts']['native-evidence']['path'])
+    assert (root / 'operator-ready.json').read_bytes() == (destination / 'operator-ready.json').read_bytes()
+    assert (root / session['pre_operator_image']['path']).read_bytes() == png
+    target = tmp_path / 'operator-timeout-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    batch._append([{'nodeid': nodeid, 'outcome': 'SKIP'}], phase='prepared', outcome='PENDING')
+    category = json.loads(target.read_text())['categories'][0]
+    assert category['status'] == 'blocked' and category['business_preservation_verified'] is False
