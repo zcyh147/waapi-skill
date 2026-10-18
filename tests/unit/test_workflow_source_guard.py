@@ -94,6 +94,9 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
             if fault == 'wrong-value': selected['@Bypass'] = not selected['@Bypass']
             if fault == 'spare-value': spare['@Render'] = True
             if fault == 'effect-notes': task.objects[selected['@Effect']['id']]['notes'] = 'Not requested'
+            if fault == 'effect-owner': task.objects[selected['@Effect']['id']]['owner'] = {'id': FIRST}
+            if fault == 'effect-parent': task.objects[selected['@Effect']['id']]['parent'] = {'id': selected['id']}
+            if fault == 'slot-parent-null': selected['parent'] = None
             if fault == 'rename-path' and len(writes) == 5: selected['path'] += 'Unexpected'
             return {'objects': result}
         if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
@@ -179,6 +182,22 @@ def test_existing_effect_slot_collector_rejects_unrequested_or_failed_effect(tmp
     assert [cmd[0] for cmd in commands].count('verify') == expected_verifies
     assert not any(phase['effect_verified'] for phase in receipt['transactions'][3:] if fault != 'rename-path')
     assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize('fault', ['effect-owner', 'effect-parent', 'slot-parent-null'])
+def test_existing_effect_slot_collector_preserves_native_immediate_owner_and_unavailable_parent(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, '2025.1', fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    receipt = json.loads(Path(runtime.category_results[-1]['observation_path']).read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['failure']['type'] == 'AssertionError'
+    assert len(writes) == 4 and [command[0] for command in commands].count('verify') == 4
+    assert receipt['transactions'][-1]['effect_verified'] is False
+    for slot, effect in zip(receipt['baseline']['slots'], receipt['baseline']['effects'], strict=True):
+        assert effect['owner']['id'] == slot['id']
+        assert 'parent' not in slot and 'parent' not in effect
+        assert 'parent' in slot['unavailable_fields'] and 'parent' in effect['unavailable_fields']
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1'])
