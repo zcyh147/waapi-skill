@@ -239,6 +239,7 @@ OBJECT_SET_IMPORT_VERSIONS = frozenset(
 )
 OBJECT_SET_IMPORT_READBACK_FIELDS = (
     "id",
+    "classId",
     "name",
     "type",
     "path",
@@ -4960,7 +4961,7 @@ def _prepare_object_create(
                     merge_options,
                 )
             )
-            if len(merge_rows) != 1:
+            if (len(merge_rows) != 1 or not _object_spec_row_matches(merge_rows[0], node_specs[0], collisions[0]["id"])):
                 raise OperationContractError(
                     "INVALID_READBACK",
                     "The merged object.create list member must resolve exactly once.",
@@ -4983,7 +4984,11 @@ def _prepare_object_create(
                     if len(candidates) > 1:
                         raise OperationContractError("AMBIGUOUS_IDENTITY", "A merged list descendant name is not unique.")
                     if candidates:
-                        if not _object_type_matches(candidates[0].get("type"), spec):
+                        candidate_id = candidates[0]["id"]
+                        candidates = _read_object_id_rows(candidate_id, fields=_object_spec_return_fields(spec), read=read)
+                        if (len(candidates) != 1 or not _same_identity(candidates[0].get("id"), candidate_id)
+                                or not _object_type_matches(candidates[0].get("type"), spec,
+                                actual_class_id=candidates[0].get("classId"))):
                             raise OperationContractError("INVALID_TARGET_TYPE", "A merged list descendant has another live type.")
                         spec["preexisting_id"] = candidates[0]["id"]
                         spec["pre_state"] = candidates[0]
@@ -4996,7 +5001,7 @@ def _prepare_object_create(
                         fields = _object_spec_return_fields(spec)
                         options = {"return": fields, **({"platform": platform} if platform else {})}
                         observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [spec["preexisting_id"]]}}, options))
-                        if len(observed) != 1 or not _same_identity(observed[0].get("id"), spec["preexisting_id"]):
+                        if len(observed) != 1 or not _object_spec_row_matches(observed[0], spec, spec["preexisting_id"]):
                             raise OperationContractError("INVALID_READBACK", "Merged list descendant lost its exact identity.")
                         spec["pre_state"] = observed[0]
                         merge_field_snapshots.append({"object_id": spec["preexisting_id"], "fields": fields, "platform": platform, "rows": observed})
@@ -5993,7 +5998,24 @@ def _prepare_object_set(
             )
         if lists:
             _require_object_list_owner(target)
+        class_rows = _read_object_id_rows(target.object, fields=(*IDENTITY_RETURN_FIELDS, "classId"), read=read)
+        if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), target.object)
+                or any(not _native_snapshot_equal(class_rows[0].get(key), target.row.get(key))
+                       for key in ("id", "name", "type", "path"))):
+            raise OperationContractError("INVALID_READBACK", "Existing graph target class requires its exact bound identity.")
+        target_class = class_rows[0].get("classId")
+        _require_object_class_id(target_class)
+        class_types = [row for row in type_catalog if row.class_id == target_class]
+        if len(class_types) != 1:
+            raise OperationContractError("INVALID_OBJECT_TYPE", "Existing graph target class must resolve to one live getTypes row.")
+        def type_matches(row):
+            return _ordinary_object_type_matches(target.row.get("type"),
+                {"requested_type": row.type, "canonical_type": row.name})
+        if any(type_matches(row) for row in type_catalog) and not type_matches(class_types[0]):
+            raise OperationContractError("INVALID_TARGET_TYPE", "Existing ordinary native type contradicts its live class metadata.")
         target_spec: dict[str, Any] = {
+            "class_id": target_class,
+            "class_metadata": class_types[0].as_dict(),
             "request_path": f"$.objects[{index}]",
             "parent_request_path": None,
             "existing_target": True,
@@ -6033,6 +6055,7 @@ def _prepare_object_set(
                 ) from exc
             trusted_import, import_spec = _prepare_object_set_import(
                 row_import,
+                version=request.version,
                 canonical_type=target.row.get("type"),
                 type_catalog=type_catalog,
                 file_proofs=object_set_file_proofs,
@@ -6240,6 +6263,7 @@ def _prepare_object_set(
             if node.import_arg is not None:
                 trusted_import, import_spec = _prepare_object_set_import(
                     node.import_arg,
+                    version=request.version,
                     canonical_type=canonical_types[node.request_path],
                     type_catalog=type_catalog,
                     file_proofs=object_set_file_proofs,
@@ -6523,6 +6547,7 @@ def _prepare_object_set(
                 if node.import_arg is not None:
                     trusted_import, import_spec = _prepare_object_set_import(
                         node.import_arg,
+                        version=request.version,
                         canonical_type=canonical_types[node.request_path],
                         type_catalog=type_catalog,
                         file_proofs=object_set_file_proofs,
@@ -6649,7 +6674,7 @@ def _prepare_object_set(
                             existing_options,
                         )
                     )
-                    if len(existing_rows) != 1:
+                    if len(existing_rows) != 1 or not _object_spec_row_matches(existing_rows[0], root_spec, collisions[0]["id"]):
                         raise OperationContractError(
                             "INVALID_READBACK",
                             "A merged object-list member must resolve exactly once.",
@@ -6786,7 +6811,7 @@ def _prepare_object_set(
                             fields = _object_spec_return_fields(spec)
                             options = {"return": fields, **({"platform": spec["platform"]} if spec.get("platform") else {})}
                             observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [collisions[0]["id"]]}}, options))
-                            if len(observed) != 1 or not _same_identity(observed[0].get("id"), collisions[0]["id"]):
+                            if len(observed) != 1 or not _object_spec_row_matches(observed[0], spec, collisions[0]["id"]):
                                 raise OperationContractError("INVALID_READBACK", "Merged nested member lost its exact identity.")
                             field_snapshots.append({"object_id": collisions[0]["id"], "fields": fields, "platform": spec.get("platform"), "rows": observed})
                             spec["pre_state"] = observed[0]
@@ -6799,6 +6824,7 @@ def _prepare_object_set(
         snapshot_fields = _dedupe_fields(
             [
                 *IDENTITY_RETURN_FIELDS,
+                "classId",
                 *(row["name"] for row in target_spec["properties"]),
                 *(row["name"] for row in target_spec["references"]),
             ]
@@ -6809,8 +6835,8 @@ def _prepare_object_set(
             snapshot_options["platform"] = platform
         snapshot_result = read(OBJECT_GET_URI, snapshot_args, snapshot_options)
         snapshot_rows = _rows(snapshot_result)
-        if len(snapshot_rows) != 1:
-            raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve exactly once.")
+        if len(snapshot_rows) != 1 or not _object_spec_row_matches(snapshot_rows[0], target_spec, target.object):
+            raise OperationContractError("INVALID_READBACK", "object.set pre-state target must resolve once with its exact identity and class.")
         field_snapshots.append(
             {
                 "object_id": target.object,
@@ -7655,6 +7681,7 @@ def _resolve_object_type(
             details={"requested": requested, "matches": [row.as_dict() for row in matches]},
         )
     row = matches[0]
+    _require_object_class_id(row.class_id)
     forbidden = {
         "workunit",
         "effect",
@@ -7700,6 +7727,7 @@ def _resolve_object_set_import_type(
             },
         )
     row = matches[0]
+    _require_object_class_id(row.class_id)
     return row
 
 
@@ -8000,6 +8028,7 @@ def _resolve_graph_node_type(node, *, catalog, version):
     matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == "Effect"]
     if len(matches) != 1:
         raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph Effect requires one fresh exact plugin class")
+    _require_object_class_id(matches[0].class_id)
     return matches[0]
 
 
@@ -8082,6 +8111,7 @@ def _prepare_object_node_specs(
             "requested_type": node.type,
             "canonical_type": canonical_type,
             "class_id": type_info.class_id,
+            "class_metadata": type_info.as_dict(),
             "notes_supplied": node.notes is not None,
             "requested_notes": node.notes,
             "properties": [],
@@ -8360,9 +8390,22 @@ def _prepare_object_node_specs(
     return specs
 
 
+def _resolve_import_audio_source_class(version, *, catalog):
+    from .metadata_catalog import ObjectTypeCatalogStore
+    pinned = ObjectTypeCatalogStore().load(version).by_name(
+        "AudioSource" if version == "2021.1" else "AudioFileSource")
+    matches = [row for row in catalog if pinned is not None
+        and row.class_id == pinned.class_id and row.name == pinned.name and row.type == pinned.type]
+    if len(matches) != 1 or len([row for row in catalog if pinned is not None and row.class_id == pinned.class_id]) != 1:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "Imported AudioFileSource requires its version-pinned semantic class and one matching live getTypes row.")
+    _require_object_class_id(matches[0].class_id)
+    return matches[0]
+
+
 def _prepare_object_set_import(
     descriptor: ObjectImportDescriptor,
     *,
+    version: str,
     canonical_type: Any,
     type_catalog: Sequence[ObjectTypeMetadataRecord],
     file_proofs: list[dict[str, Any]],
@@ -8379,6 +8422,8 @@ def _prepare_object_set_import(
                 "canonical_type": canonical_type,
             },
         )
+    source_type = _resolve_import_audio_source_class(version, catalog=type_catalog)
+    class_metadata = [source_type.as_dict()]
     dispatch_files: list[dict[str, Any]] = []
     source_specs: list[dict[str, Any]] = []
     source_keys: set[tuple[tuple[str, ...], str, str, str]] = set()
@@ -8476,6 +8521,7 @@ def _prepare_object_set_import(
             dispatch_row["objectType"] = type_info.name
             source["requested_object_type"] = type_info.name
             source["requested_object_type_class_id"] = type_info.class_id
+            class_metadata.append(type_info.as_dict())
         source_key = (
             source_identity,
             str(dispatch_row.get("language", "")).casefold(),
@@ -8503,6 +8549,8 @@ def _prepare_object_set_import(
     }
     return dispatch, {
         "sources": source_specs,
+        "class_metadata": class_metadata,
+        "audio_source_class_id": source_type.class_id,
         "canonical_type": canonical_type,
         "readback_contract": (
             "copied Originals paths are located from the imported target and "
@@ -8791,13 +8839,27 @@ def _append_association_condition(requirements, *, source, owner, property_name,
 
 
 def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
-    """Reuse sealed class field/default facts at both transaction phases."""
+    """Revalidate selected class identities and field/default facts once per phase."""
     if not isinstance(pre_state, Mapping):
         return []
     nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
     if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
         nodes.append(pre_state["plugin_creation_guard"])
     assertions, seen = [], set()
+    class_bindings = [node["class_metadata"] for node in nodes if "class_metadata" in node]
+    class_bindings.extend(pre_state.get("import_guard", {}).get("class_metadata", []))
+    for node in nodes:
+        if isinstance(node.get("import"), Mapping):
+            class_bindings.extend(node["import"].get("class_metadata", []))
+    if class_bindings:
+        actual_classes = [row.as_dict() for row in _read_object_type_catalog(read)]
+        expected_classes = {canonical_json_bytes(row): row for row in class_bindings}
+        assertions.append({"name": "selected object classes still match live getTypes metadata",
+            "passed": all([actual for actual in actual_classes if actual.get("classId") == row.get("classId")] == [row]
+                for row in expected_classes.values()),
+            "evidence": {"expected": list(expected_classes.values()),
+                "actual": [row for row in actual_classes if row.get("classId") in
+                    {expected.get("classId") for expected in expected_classes.values()}]}})
     for node in nodes:
         for evidence in node.get("new_object_default_evidence", []):
             scope = evidence["class_scope"]
@@ -9506,18 +9568,43 @@ def _object_type_token(value: Any) -> str:
     return "".join(character for character in str(value).casefold() if character.isalnum())
 
 
+def _require_object_class_id(value: Any) -> None:
+    if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
+        raise OperationContractError("INVALID_READBACK", "Object class identity must be a live unsigned 32-bit integer.")
+
+
+def _object_class_matches(actual: Any, expected: Any) -> bool:
+    return (type(actual) is int and type(expected) is int
+        and 0 <= expected <= 0xFFFFFFFF and actual == expected)
+
+
 def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_id: Any = None) -> bool:
     class_proof = spec.get("documented_list_element_class", spec.get("documented_list_owner_class", spec.get("planned_reference_target_class", spec.get("structural_class_id"))))
+    expected_class = class_proof if class_proof is not None else spec.get("class_id")
+    if not (_object_class_matches(actual_class_id, expected_class)
+            and isinstance(actual, str) and bool(actual)):
+        return False
     if class_proof is not None:
-        return (isinstance(actual, str) and bool(actual)
-            and isinstance(actual_class_id, int) and not isinstance(actual_class_id, bool)
-            and actual_class_id == class_proof)
+        return True
+    return _ordinary_object_type_matches(actual, spec)
+
+
+def _object_spec_row_matches(row: Mapping[str, Any], spec: Mapping[str, Any], object_id: str) -> bool:
+    return (_same_identity(row.get("id"), object_id)
+        and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")))
+
+
+def _ordinary_object_type_matches(actual: Any, spec: Mapping[str, Any]) -> bool:
+    if not isinstance(actual, str) or not actual:
+        return False
     token = _object_type_token(actual)
-    return token in {
-        _object_type_token(spec.get("requested_type")),
-        _object_type_token(spec.get("canonical_type")),
-        "propertycontainer" if _object_type_token(spec.get("canonical_type")) == "actormixer" else "",
-    }
+    expected = {_object_type_token(value) for value in (spec.get("requested_type"), spec.get("canonical_type"))
+        if isinstance(value, str) and _object_type_token(value)}
+    if not token:
+        return False
+    if expected & {"actormixer", "propertycontainer"}:
+        expected.update({"actormixer", "propertycontainer"})
+    return token in expected
 
 
 def _child_path(parent_path: Any, name: Any, *, field: str) -> str:
@@ -10222,7 +10309,7 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
-            *(("classId",) if "documented_list_element_class" in spec or "documented_list_owner_class" in spec or "planned_reference_target_class" in spec or "structural_class_id" in spec else ()),
+            "classId",
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}
@@ -12636,6 +12723,11 @@ def _prepare_import_dynamic_fields(
             )
         target["metadata_object_type"] = type_info.name
         target["metadata_class_id"] = type_info.class_id
+        target["class_metadata"] = [type_info.as_dict()]
+        if target.get("media_expected") is True:
+            source_type = _resolve_import_audio_source_class(request.version, catalog=type_catalog)
+            target["audio_source_class_id"] = source_type.class_id
+            target["class_metadata"].append(source_type.as_dict())
 
         raw_properties = target.get("requested_properties", [])
         raw_references = target.get("requested_references", [])
@@ -12847,7 +12939,7 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, An
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
-        {"return": ["id", "name", "type", "path", "parent", "audioSource:language"]},
+        {"return": ["id", "name", "type", "classId", "path", "parent", "audioSource:language"]},
     ))
     if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
         raise OperationContractError("LOCALIZED_SOURCE_LIMIT_EXCEEDED", "Voice source discovery exceeded its bounded child limit.")
@@ -12880,7 +12972,7 @@ def _existing_sfx_source_snapshot(owner_id: str, *, version: str, read: ReadCall
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
-        {"return": ["id", "name", "type", "path", "parent",
+        {"return": ["id", "name", "type", "classId", "path", "parent",
                     "originalWavFilePath" if version == "2021.1" else "originalFilePath", "audioSource:language"]},
     ))
     if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
@@ -12922,6 +13014,8 @@ def _normalize_existing_sfx_imports(
         if len(matching) != 1 or (source_id is not None and not _same_identity(matching[0].get("id"), source_id)):
             raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "Existing SFX media must resolve to its one exact active AudioFileSource.")
         source = matching[0]
+        if not _object_class_matches(source.get("classId"), target.get("audio_source_class_id")):
+            raise OperationContractError("INVALID_READBACK", "Existing SFX source class differs from its sealed live semantic class.")
         source_id = source["id"]
         language = source.get("audioSource:language")
         if not isinstance(language, Mapping) or language.get("name") != "SFX":
@@ -13512,9 +13606,9 @@ def _prepare_closed_import_plan(
             if not _valid_object_id(existing_id):
                 raise OperationContractError("INVALID_READBACK", "Existing import target lacks a canonical GUID.")
             requested_type = target.get("requested_object_type")
-            if isinstance(requested_type, str) and not _import_object_type_matches(
-                rows[0].get("type"), requested_type
-            ):
+            if (not _object_class_matches(rows[0].get("classId"), target.get("metadata_class_id"))
+                    or isinstance(requested_type, str) and not _import_object_type_matches(
+                        rows[0].get("type"), requested_type)):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "An existing import target does not match the requested object type.",
@@ -13772,6 +13866,7 @@ def _prepare_closed_import_plan(
                     or source_row.get("path") != expected_source_path
                     or _object_type_token(source_row.get("type"))
                     != "audiofilesource"
+                    or not _object_class_matches(source_row.get("classId"), target.get("audio_source_class_id"))
                 ):
                     raise OperationContractError(
                         "INVALID_READBACK",
@@ -13901,6 +13996,10 @@ def _prepare_closed_import_plan(
                                  "candidate_count": len(matching_sources)},
                     )
                 localized_active_source = matching_sources[0]["id"] if matching_sources else None
+                if any(_object_type_token(source.get("type")) == "audiofilesource"
+                        and not _object_class_matches(source.get("classId"), target.get("audio_source_class_id"))
+                        for source in snapshot["rows"]):
+                    raise OperationContractError("INVALID_READBACK", "Existing localized source class differs from live semantic metadata.")
                 target["localized_source_snapshot"] = snapshot
                 target["localized_audio_file_source_id"] = localized_active_source
                 # Console 2021/2022 reuse the language source through the typed
@@ -14156,6 +14255,7 @@ def _prepare_closed_import_plan(
         }
     guard = {
         "source_operation": source_operation,
+        "class_metadata": [row for target in targets for row in target.get("class_metadata", [])],
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
@@ -14312,7 +14412,7 @@ def _import_target_return_fields(
     *,
     version: str,
 ) -> list[str]:
-    fields = [*IDENTITY_RETURN_FIELDS]
+    fields = [*IDENTITY_RETURN_FIELDS, "classId"]
     # Wwise 2021.1 rejects the otherwise useful ``activeSource`` and
     # ``originalFilePath`` accessors on the imported Sound object.  Its import
     # result still returns the created AudioFileSource, so the verifier binds
@@ -14352,6 +14452,7 @@ def _import_target_return_fields(
 def _import_audio_source_return_fields(*, version: str) -> list[str]:
     fields = [
         "id",
+        "classId",
         "name",
         "type",
         "path",
@@ -19470,7 +19571,8 @@ def verify_prepared_operation(
             check(
                 f"{request_path} reflected type matches the live-resolved request type",
                 _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")),
-                {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type")},
+                {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type"),
+                    "expected_class": spec.get("class_id"), "actual_class": row.get("classId")},
             )
             returned_name = result_node.name if result_node is not None else None
             effective_conflict = spec.get(
@@ -19761,6 +19863,11 @@ def verify_prepared_operation(
                             }
                         )
                         language_rows.extend(_rows(descendant_result))
+                    for source_row in language_rows:
+                        if _object_type_token(source_row.get("type")) == "audiofilesource":
+                            check(f"{request_path} imported source class matches the sealed live class",
+                                _object_class_matches(source_row.get("classId"), import_spec.get("audio_source_class_id") if isinstance(import_spec, Mapping) else None),
+                                {"expected": import_spec.get("audio_source_class_id") if isinstance(import_spec, Mapping) else None, "actual": source_row.get("classId"), "id": source_row.get("id")})
                     grouped_candidates[read_language] = language_rows
 
                 candidate_rows: list[dict[str, Any]] = []
@@ -20034,6 +20141,7 @@ def verify_prepared_operation(
                                 for candidate in ancestor_chain
                                 if _object_type_token(candidate.get("type"))
                                 == _object_type_token(requested_source_type)
+                                and _object_class_matches(candidate.get("classId"), raw_source.get("requested_object_type_class_id"))
                                 and _import_created_name_matches(
                                     candidate.get("name"),
                                     expected_object_name,
@@ -20061,7 +20169,8 @@ def verify_prepared_operation(
                                 _object_type_token(requested_source_type) == "sound"
                                 and _object_type_token(source_target.get("type")) == "sound"
                                 and _same_identity(source_target.get("id"), object_id)
-                                and _object_type_matches(source_target.get("type"), spec)
+                                and _object_type_matches(source_target.get("type"), spec, actual_class_id=source_target.get("classId"))
+                                and _object_class_matches(source_target.get("classId"), raw_source.get("requested_object_type_class_id"))
                                 and source_target.get("name") == row.get("name")
                                 and isinstance(source_target.get("path"), str)
                                 and bool(source_target.get("path"))
@@ -21845,8 +21954,10 @@ def verify_prepared_operation(
                 expected_type = target.get("requested_object_type", "Sound")
                 check(
                     f"{label} reflected type matches the request",
-                    _import_object_type_matches(live_row.get("type"), expected_type),
-                    {"expected": expected_type, "actual": live_row.get("type")},
+                    _import_object_type_matches(live_row.get("type"), expected_type)
+                    and _object_class_matches(live_row.get("classId"), target.get("metadata_class_id")),
+                    {"expected": expected_type, "actual": live_row.get("type"),
+                        "expected_class": target.get("metadata_class_id"), "actual_class": live_row.get("classId")},
                 )
                 for property_spec in target.get("validated_properties", []):
                     property_name = property_spec.get("name")
@@ -21952,6 +22063,9 @@ def verify_prepared_operation(
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
                         if media_expected:
+                            check(f"{label} actual AudioFileSource class matches live metadata",
+                                _object_class_matches(audio_source_row.get("classId"), target.get("audio_source_class_id")),
+                                {"expected": target.get("audio_source_class_id"), "actual": audio_source_row.get("classId")})
                             check(f"{label} actual AudioFileSource belongs to the verified target",
                                   _object_type_token(audio_source_row.get("type")) == "audiofilesource"
                                   and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),

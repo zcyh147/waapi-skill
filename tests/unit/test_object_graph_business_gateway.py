@@ -2641,11 +2641,11 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, 
     from tests.unit.test_object_native_surface import _project_info
 
     root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
-    parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+    parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit", "classId": 3,
               "path": rf"\{root}\Default Work Unit"}
     container_import = verification_case == "container-import"
     if container_import:
-        parent.update(name="Weather", notes="", type="PropertyContainer" if version == "2025.1" else "ActorMixer",
+        parent.update(name="Weather", notes="", classId=1, type="PropertyContainer" if version == "2025.1" else "ActorMixer",
                       path=parent["path"] + r"\Weather")
     project = _project(tmp_path)
     project_root = Path(project["path"]).parent
@@ -2655,16 +2655,20 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, 
     calls = []
     executed = False
     copied = project_root / "Originals" / "SFX" / "Inline.wav"
-    sound = {"id": SECOND_ACTION_ID, "name": "Rain", "type": "Sound", "notes": "",
+    sound = {"id": SECOND_ACTION_ID, "name": "Rain", "type": "Sound", "classId": 2, "notes": "",
              "path": parent["path"] + r"\Rain", "parent": {"id": PARENT_ID},
              "activeSource": {"id": THIRD_ACTION_ID}, "originalFilePath": str(copied)}
-    source = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource", "notes": "",
+    source = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource", "classId": 16, "notes": "",
               "path": sound["path"] + r"\Inline", "parent": {"id": SECOND_ACTION_ID},
               "audioSource:language": {"id": CONTROL_ID, "name": "SFX"}, "originalFilePath": str(copied)}
     if container_import:
         sound.update(name="Inline", path=parent["path"] + r"\Inline")
         source["path"] = sound["path"] + r"\Inline"
-    if verification_case == "wrong-active-source":
+    if verification_case == "wrong-target-class":
+        sound["classId"] = 16
+    elif verification_case == "wrong-source-class":
+        source["classId"] = 2
+    elif verification_case == "wrong-active-source":
         sound["activeSource"] = {"id": CONTROL_ID}
     elif verification_case == "wrong-parent":
         source["parent"] = {"id": CONTROL_ID}
@@ -2683,6 +2687,8 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, 
                 return {"return": [
                     {"classId": 1, "name": "PropertyContainer" if version == "2025.1" else "ActorMixer", "type": "WObject"},
                     {"classId": 2, "name": "Sound", "type": "Sound"},
+                    {"classId": 3, "name": "WorkUnit", "type": "WObject"},
+                    {"classId": 16, "name": "AudioFileSource", "type": "WObject"},
                 ]}
             if uri == "ak.wwise.core.object.get":
                 if args == {"waql": "from type Project take 1"}:
