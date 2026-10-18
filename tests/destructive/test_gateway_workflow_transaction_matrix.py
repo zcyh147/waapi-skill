@@ -7204,8 +7204,8 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
             if tsv:
                 location = _bind_business_object(gateway, draft, role='import_location', object_id=parent['id'])
                 table = runtime.sandbox.sandbox_path / (prefix + '.tsv')
-                table.write_text('Object Path\tObject Type\tNotes\tProperty[IsVoice]\tProperty[Volume]\tProperty[OverrideEffect]\tReference[Effect0]\tReference[Effect1]\tProperty[RenderEffect1]\n'
-                    + '<Sound>' + name + '\tSound\tKeep legacy ' + name + '\tfalse\t-9\ttrue\t'
+                table.write_text('Object Path\tObject Type\tNotes\tProperty[Volume]\tProperty[OverrideEffect]\tReference[Effect0]\tReference[Effect1]\tProperty[RenderEffect1]\n'
+                    + '<Sound SFX>' + name + '\tSound SFX\tKeep legacy ' + name + '\t-9\ttrue\t'
                     + targets[0]['id'] + '\t' + targets[1]['id'] + '\ttrue\n', encoding='utf-8', newline='\n')
                 table_before = table.read_bytes(); phase['table'] = {'path': str(table), 'sha256': hashlib.sha256(table_before).hexdigest()}
                 _update_business_draft(gateway, draft, 'draft-declare-artifact-plan',

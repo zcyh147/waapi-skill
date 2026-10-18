@@ -3883,11 +3883,14 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
             task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append(deepcopy(args))
             results = []
             for record in csv.DictReader(Path(args['importFile']).read_text().splitlines(), delimiter='\t'):
-                name = record['Object Path'].removeprefix('<Sound>')
+                assert record['Object Type'] == 'Sound SFX' and record['Object Path'].startswith('<Sound SFX>'), record
+                assert 'Property[IsVoice]' not in record
+                name = record['Object Path'].removeprefix('<Sound SFX>')
                 identity = '{' + str(uuid.uuid4()).upper() + '}'
                 row = {'id': identity, 'name': name, 'type': 'Sound', 'classId': 65552,
                     'path': task.objects[SECOND]['path'] + '\\' + name, 'parent': {'id': SECOND},
                     'notes': record['Notes'], **{'@' + token: deepcopy(info['default']) for token, info in task.metadata.items()}}
+                row['@IsVoice'] = False  # documented Sound SFX construction kind
                 for key, value in record.items():
                     if key.startswith('Property['):
                         token = key[9:-1]; row['@' + token] = float(value) if token == 'Volume' else value == 'true'
