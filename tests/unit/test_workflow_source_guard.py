@@ -32,12 +32,14 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None):
     root, target, source = ("{" + str(uuid.UUID(int=value)) + "}" for value in (3, 5, 6))
     task.types = [{"name": name, "classId": value, "type": "WObject"} for name, value in (
         ("WorkUnit", 1638416), ("Bus", 1376272), ("AuxBus", 3997712))]
+    parent_path = (r"\Busses\Default Work Unit" if version == "2025.1"
+                   else r"\Master-Mixer Hierarchy\Default Work Unit")
     task.objects = {parent: {"id": parent, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
-        "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep parent"}}
+        "path": parent_path, "parent": None, "notes": "Keep parent"}}
     commands, writes = [], []
     independent_read = False
     original = task.call
-    base = r"\Master-Mixer Hierarchy\Default Work Unit\WAAPI_RESULT_REFERENCE_TEST"
+    base = parent_path + r"\WAAPI_RESULT_REFERENCE_TEST"
 
     def call(uri, args=None, options=None):
         if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):

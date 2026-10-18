@@ -4455,7 +4455,7 @@ def _collect_new_result_scalar_reference_acceptance(
         assert uuid_value.int != 0, rows[0]
         return rows[0]
 
-    segments = ("Master-Mixer Hierarchy", "Default Work Unit")
+    segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
     field_meaning = "User-Defined Auxiliary Send 0"
     try:
         draft = _start_business_draft(gateway, operation)
