@@ -48,7 +48,7 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
             assert args == {'parent': SECOND, 'type': 'Sound', 'name': 'WAAPI_SLOT_TEST',
                 'notes': 'Keep sound', 'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
             task.objects[FIRST] = {'id': FIRST, 'name': args['name'], 'type': 'Sound', 'classId': 65552,
-                'path': path + '\\' + args['name'], 'parent': {'id': SECOND}, 'notes': args['notes'], '@Effects': []}
+                'path': path + '\\' + args['name'], 'parent': {'id': SECOND}, 'notes': args['notes'], '@IsVoice': False, '@Effects': []}
             return {'id': FIRST, 'name': args['name']}
         if uri.endswith('object.set'):
             task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
