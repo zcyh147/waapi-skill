@@ -521,3 +521,27 @@ def test_owner_capacity_counts_only_actual_new_pairs_for_the_selected_mode(tmp_p
     code, checked = task.step('draft-check')
     assert code == 0, checked
     assert not writes  # Construction/preflight proof, not an effect acceptance.
+
+
+def test_graph_rtpc_accepts_live_proven_omitted_empty_owner_list(tmp_path):
+    task, writes = rtpc_task(tmp_path)
+    original = task.call
+    proof_calls = []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql') == f'from object "{FIRST}" select @RTPC take 1':
+            proof_calls.append((deepcopy(args), deepcopy(options)))
+            return {'return': []}
+        result = original(uri, args, options)
+        if (uri.endswith('object.get') and options.get('return') == ['id', '@RTPC']
+                and args == {'from': {'id': [FIRST]}} and not task.objects[FIRST]['@RTPC']):
+            return {'return': [{'id': FIRST}]}
+        return result
+    task.call = call
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert len(writes) == 1 and proof_calls
+    assert all(options == {'return': ['id']} for _args, options in proof_calls)

@@ -2839,3 +2839,25 @@ def test_rtpc_graph_collector_selects_observed_fields_beyond_first_draft_page(tm
     owner = receipt['effects'][0]['independent_effect']['owner']['id']
     assert len(receipt['metadata'][owner]['names']) == 111
     assert receipt['documented_list']['field_kind'] == 'list'
+
+
+@pytest.mark.parametrize('failed_effect', [False, True])
+def test_rtpc_graph_collector_categories_survive_existing_exact_finalizer(tmp_path, workflow, monkeypatch, failed_effect):
+    runtime, _commands, _writes, _task = _rtpc_graph_runtime(tmp_path / 'collector', workflow,
+        version='2023.1', exclusive=False, fault='wrong-pair' if failed_effect else None)
+    if failed_effect:
+        with pytest.raises(AssertionError):
+            workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    else:
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    fixture, events, records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
+    fixture_runtime = next(fixture)
+    fixture_runtime.category_results.extend(runtime.category_results)
+    with pytest.raises(StopIteration):
+        next(fixture)
+    assert records[-1]['invocation']['phase'] == 'final'
+    retained = records[-1]['categories']
+    phases = [row for row in retained if row['category'].startswith('rtpc-graph-')]
+    assert phases and all(row['verifier_strength'] for row in phases)
+    assert any(row['status'] == ('FAIL' if failed_effect else 'blocked') for row in phases)
+    assert events.index('shutdown') < events.index('record:final')
