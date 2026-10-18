@@ -3285,6 +3285,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return the request, prepared change summary, guard fingerprints, and event-chain summary without raw artifact internals",
     )
 
+    transaction_show.add_argument('--none-state-outcome', choices=('eligible-bindings', 'actual-additions'),
+        help='Read fixed bounded offline pages of disclosed media-ID None-state relationships or observed additions; never mutation authority')
+    transaction_show.add_argument('--outcome-artifact-hash', help='Copy the immutable artifact hash from the generated outcome continuation')
+    transaction_show.add_argument('--outcome-event-hash', help='Copy the exact verification_recorded event hash for observed additions')
+    transaction_show.add_argument('--outcome-page', help='Copy the exact Gateway-owned None-state outcome page cursor')
+
     confirm = subparsers.add_parser(
         "confirm",
         help="Bind explicit confirmation to one immutable preview without connecting to Wwise",
@@ -3817,7 +3823,8 @@ def _execute_gateway_unconstrained(
             )
             and transaction_verify_cleanup_projection_safe(payload.get("cleanup"))
         ):
-            payload = project_successful_transaction_verify_payload(payload)
+            payload = project_successful_transaction_verify_payload(
+                payload, state_dir=resolve_transaction_state_directory(args, env=env))
         if (
             args.command == "query-object"
             and not original_file_reference_match_requested(args)
@@ -10511,9 +10518,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "state": record.state.value,
                 "artifact_hash": preview.artifact_hash,
             }
+            if args.none_state_outcome is not None:
+                if args.summary_only:
+                    raise GatewayInputError('A None-state outcome detail page cannot be combined with --summary-only')
+                payload.update(transaction_none_state_outcome_payload(snapshot, args, envelope=payload,
+                    state_dir=resolve_transaction_state_directory(args, env=env)))
+                # This fixed read-only view never falls through to confirm/execute.
+                if gateway_json_document_size(payload) > 32 * 1024:
+                    raise GatewayResultShapeError('The complete outcome page and continuation exceed their fixed output bound')
+                return payload
+            if args.outcome_artifact_hash or args.outcome_event_hash or args.outcome_page:
+                raise GatewayInputError('Outcome hash/page options require --none-state-outcome')
             if args.summary_only:
                 try:
-                    payload.update(transaction_show_summary(preview.artifact, events))
+                    payload.update(transaction_show_summary(preview.artifact, events,
+                        state_dir=resolve_transaction_state_directory(args, env=env)))
                 except GatewayResultShapeError as exc:
                     exc.details.update(
                         {
@@ -20813,6 +20832,7 @@ def create_transaction_preview(
         review = transaction_show_summary(
             artifact,
             store.read_events(transaction_id),
+            state_dir=store.state_dir,
         )
     except GatewayResultShapeError as exc:
         exc.details.update(
@@ -20992,7 +21012,7 @@ def _resume_reserved_transaction_preview(
         )
     cleanup = transaction_cleanup_payload(prepared, phase="preview")
     events = store.read_events(transaction_id)
-    review = transaction_show_summary(artifact, events)
+    review = transaction_show_summary(artifact, events, state_dir=store.state_dir)
     agent_result = transaction_agent_result(
         request=require_mapping(artifact.get("request"), "transaction request"),
         transaction_id=transaction_id,
@@ -25229,6 +25249,10 @@ def successful_verification_result_summary(value: Mapping[str, Any]) -> dict[str
         "readbacks_canonical_sha256": canonical_sha256(readbacks),
         "canonical_sha256": canonical_sha256(value),
         "full_evidence_in_stdout": False,
+        **({'optional_none_state_materialization': [dict(row) for row in readbacks
+            if isinstance(row, Mapping) and row.get('kind') == 'optional-none-custom-state-materialization']}
+            if any(isinstance(row, Mapping) and row.get('kind') == 'optional-none-custom-state-materialization'
+                for row in readbacks) else {}),
     }
 
 
@@ -25435,7 +25459,7 @@ def transaction_verify_terminal_budget(request: Any) -> int:
 
 
 def project_successful_transaction_verify_payload(
-    payload: Mapping[str, Any],
+    payload: Mapping[str, Any], *, state_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Bound one terminal verify success without altering agent_result.
 
@@ -25450,6 +25474,15 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
+    materializations = verification_summary.get('optional_none_state_materialization')
+    if materializations is not None and gateway_json_document_size(materializations) > 4096:
+        verification_summary['optional_none_state_materialization'] = {
+            'actual_addition_count': sum(len(row['actual_additions']) for row in materializations),
+            'actual_additions_complete': False, 'canonical_sha256': canonical_sha256(materializations),
+            'remaining_model_preserved': all(row.get('remaining_model_preserved') is True for row in materializations),
+            'exact_additions_path': 'events[event_type=verification_recorded].details.verification.readbacks[kind=optional-none-custom-state-materialization].actual_additions',
+            'detail': none_state_actual_continuation(payload, verification, state_dir=state_dir),
+        }
     stdout_budget = transaction_verify_terminal_budget(agent_result.get("request"))
     projected = dict(payload)
     projected.pop("agent_result", None)
@@ -30929,9 +30962,89 @@ def transaction_cleanup_payload(
     )
 
 
+def none_state_outcome_continuation(transaction_id, artifact_hash, view, *, state_dir=None, event_hash=None, page=None):
+    argv = ['transaction-show', transaction_id, '--none-state-outcome', view,
+        '--outcome-artifact-hash', artifact_hash]
+    if event_hash is not None:
+        argv += ['--outcome-event-hash', event_hash]
+    if page is not None:
+        argv += ['--outcome-page', page]
+    return transaction_next_command('transaction-show', argv, state_dir=state_dir)
+
+
+def none_state_actual_continuation(payload, verification, *, state_dir):
+    if state_dir is None:
+        raise GatewayResultShapeError('Observed None-state additions lack their exact owned transaction store')
+    snapshot = TransactionStore(state_dir).load_snapshot(payload['transaction_id'])
+    if snapshot.preview.artifact_hash != payload['artifact_hash']:
+        raise GatewayResultShapeError('Observed None-state additions do not match their immutable artifact')
+    events = [event for event in snapshot.events if event.get('event_type') == 'verification_recorded'
+        and canonical_sha256(event.get('details', {}).get('verification')) == canonical_sha256(verification)]
+    if not events:
+        raise GatewayResultShapeError('Observed None-state additions lack their exact recorded verification event')
+    return none_state_outcome_continuation(payload['transaction_id'], payload['artifact_hash'],
+        'actual-additions', state_dir=state_dir, event_hash=events[-1]['event_hash'])
+
+
+def transaction_none_state_outcome_payload(snapshot, args, *, state_dir, envelope):
+    from wwise_waapi.console_media_ids import none_state_outcome_page
+    artifact = snapshot.preview.artifact
+    prepared = artifact.get('prepared_operation', {})
+    effect = prepared.get('pre_state', {}).get('cli_project_effect', {})
+    expected = effect.get('model_before', {}).get('optional_none_state_materialization')
+    if (effect.get('uri') != 'ak.wwise.cli.moveMediaIdsToSingleFile'
+            or prepared.get('dispatch', {}).get('uri') != effect.get('uri') or not isinstance(expected, Mapping)):
+        raise GatewayInputError('This transaction has no disclosed move-to-single-file None-state outcome')
+    if args.outcome_artifact_hash != snapshot.preview.artifact_hash:
+        raise GatewayInputError('Copy the exact immutable artifact hash from the outcome continuation')
+    view = args.none_state_outcome
+    scope = {'transaction_id': args.transaction_id, 'artifact_hash': snapshot.preview.artifact_hash,
+        'view': view, 'verification_event_hash': None}
+    if view == 'eligible-bindings':
+        if args.outcome_event_hash is not None:
+            raise GatewayInputError('Eligible Preview bindings do not accept a verification event hash')
+        value = {'eligible_bindings': expected['eligible_bindings'], 'source': expected['source'],
+            'force_save_scope': expected['force_save_scope'], 'inevitable': expected['inevitable']}
+        total = len(expected['eligible_bindings'])
+    else:
+        events = [event for event in snapshot.events if event.get('event_type') == 'verification_recorded'
+            and event.get('event_hash') == args.outcome_event_hash]
+        if len(events) != 1:
+            raise GatewayInputError('Actual additions require the exact verification_recorded event hash')
+        verification = events[0].get('details', {}).get('verification', {})
+        observations = verification.get('readbacks', [])
+        observed = [row for row in observations if isinstance(row, Mapping)
+            and row.get('kind') == 'optional-none-custom-state-materialization']
+        if (verification.get('contract') != 'waapi-skill.operation-verification/v1'
+                or verification.get('operation') != prepared.get('operation') or len(observed) != 1
+                or not isinstance(observed[0].get('actual_additions'), list)
+                or observed[0].get('recognized_additions_complete') is not True
+                or not isinstance(observed[0].get('actual_additions_complete'), bool)
+                or observed[0].get('actual_addition_count') != len(observed[0]['actual_additions'])
+                or observed[0].get('source') != expected.get('source')):
+            raise GatewayInputError('The exact verification event has no complete typed observation of this None-state outcome')
+        scope['verification_event_hash'] = events[0]['event_hash']
+        value = dict(observed[0])
+        total = len(value['actual_additions'])
+    for page_size in range(64, 0, -1):
+        try:
+            page = none_state_outcome_page(value, scope=scope, total_count=total,
+                cursor=args.outcome_page, max_entries=page_size)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        result = {'none_state_outcome': page}
+        if page['next_page'] is not None:
+            result['next_command'] = none_state_outcome_continuation(args.transaction_id, snapshot.preview.artifact_hash,
+                view, state_dir=state_dir, event_hash=scope['verification_event_hash'], page=page['next_page'])
+        if gateway_json_document_size({**envelope, **result}) <= 32 * 1024:
+            return result
+    raise GatewayResultShapeError('The outcome continuation cannot fit its fixed public result bound')
+
+
 def transaction_show_summary(
     artifact: Any,
     events: Sequence[Mapping[str, Any]],
+    *, state_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     """Return a bounded review projection of one immutable transaction preview.
 
@@ -31017,6 +31130,24 @@ def transaction_show_summary(
         if isinstance(history_binding, Mapping):
             from wwise_waapi.edit_history_business import history_summary
             derived_notice["history_action"] = history_summary(history_binding)
+
+    optional_none = prepared.get('pre_state', {}).get('cli_project_effect', {}).get(
+        'model_before', {}).get('optional_none_state_materialization')
+    if optional_none is not None:
+        from wwise_waapi.console_media_ids import none_state_notice
+        notice = none_state_notice(optional_none)
+        if gateway_json_document_size(notice) > 2048:
+            notice.pop('eligible_groups')
+            notice.pop('outcome', None)
+            notice['source_build'] = notice.pop('source')['installed_build']
+            notice['relationships_complete'] = False
+            transaction_id = next((event.get('transaction_id') for event in events if event.get('transaction_id')), None)
+            if transaction_id is None:
+                raise GatewayResultShapeError('Optional saved-state materialization review lacks its transaction identity')
+            notice['detail'] = none_state_outcome_continuation(transaction_id, canonical_sha256(artifact),
+                'eligible-bindings', state_dir=state_dir)
+            notice['review_required'] = True
+        derived_notice['optional_none_state_materialization'] = notice
 
     # ``transaction-show --summary-only`` predates the bounded projections.
     # Preserve that committed public shape exactly for ordinary transactions;
@@ -31132,6 +31263,14 @@ def transaction_show_summary(
             "event_count": len(event_rows),
             "events": event_rows,
         }
+        if optional_none is not None and derived_notice['optional_none_state_materialization'].get('relationships_complete') is False:
+            # Exact None relationships have their own bounded reader. Avoid
+            # repeating empty role headers and unrelated snapshot statistics.
+            if not prepared.get('resolved_roles'):
+                result['preview_summary']['resolved_roles'] = {}
+            result['preview_summary']['pre_state'] = {
+                'canonical_sha256': canonical_sha256(prepared.get('pre_state')),
+                'full_state_sealed': True}
         observed = stabilize_transaction_summary_size(result)
         observed_by_variant[detail_level] = observed
         if observed <= TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES:

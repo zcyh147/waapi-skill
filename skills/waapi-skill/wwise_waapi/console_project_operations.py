@@ -354,7 +354,8 @@ def prepare_cli_project_effect(uri, args, audit, version):
         return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
             'mapping_path': mapping, 'mapping_before': mapping_before,
             'project_before': _saved_project_snapshot(path, root, version),
-            'model_before': _model_snapshot(path, root, exclude_media_storage=True)}
+            'model_before': _model_snapshot(path, root, exclude_media_storage=True,
+                none_state_version=version if uri == 'ak.wwise.cli.moveMediaIdsToSingleFile' else None)}
     if uri == 'ak.wwise.cli.migrate':
         import re
         from .operation_soundbank import SoundBankContractError
@@ -433,7 +434,25 @@ def inspect_cli_project_effect(effect):
     if effect['uri'] in _MEDIA_ID_URIS:
         from .operation_soundbank import SoundBankContractError, prove_artifact_path
         old_model = effect['model_before']
-        model = _model_snapshot(effect['path'], effect['io_root'], exclude_media_storage=True)
+        model = _model_snapshot(effect['path'], effect['io_root'], exclude_media_storage=True,
+            none_state_expected=old_model.get('optional_none_state_materialization'))
+        remainder = model.get('none_state_remainder', model)
+        remaining_preserved = (model['root_identity'] == old_model['root_identity']
+            and old_model['anchors'] == remainder['anchors']
+            and {key: row['preserved_model_sha256'] for key, row in remainder['files'].items()}
+             == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()})
+        none_observations = []
+        if 'none_state_remainder' in model:
+            none_observations = [{'kind': 'optional-none-custom-state-materialization',
+                'actual_additions': model['none_state_additions'], 'actual_addition_count': len(model['none_state_additions']),
+                'actual_additions_complete': remaining_preserved,
+                'recognized_additions_complete': True, 'remaining_model_preserved': remaining_preserved,
+                'actual_addition_count_scope': 'recognized_empty_None_saved_records; unexpected_differences_fail_preservation',
+                'source': old_model['optional_none_state_materialization']['source'],
+                'freshness_proof': ('canonical_GUID_occurs_only_at_new_definition_in_complete_observed_model_and_strict_old_remainder_preserved'
+                    if remaining_preserved else 'not_established_for_complete_difference; recognized_candidates_have_unique_GUID_occurrences'),
+                'added_saved_model_identities_observed': bool(model['none_state_additions']) and remaining_preserved,
+                'observation_scope': 'saved_project_and_bounded_Work_Unit_XML; live_object_creation_not_observed'}]
         project = _saved_project_snapshot(effect['path'], effect['io_root'], effect['version'])
         mapping = prove_artifact_path(effect['mapping_path'], io_root=effect['io_root'],
             field='media ID mapping', must_exist=False, expect_directory=False)
@@ -466,14 +485,12 @@ def inspect_cli_project_effect(effect):
         return {'observations': [{'kind': 'cli-media-id-artifacts', 'mapping_file': mapping,
             'saved_model_files': len(model['files']), 'work_unit_media_id_count_before': source_count,
             'work_unit_media_id_count_after': sum(rows['count'] for rows in model['media_ids'].values()),
-            'unresolved': unresolved}], 'checks': [
+            'unresolved': unresolved}, *none_observations], 'checks': [
             {'name': 'Project identity, platforms and languages were preserved during media ID maintenance',
                 'passed': project == effect['project_before']},
-            {'name': 'Model content outside the requested media ID storage fields was preserved',
-                'passed': model['root_identity'] == old_model['root_identity']
-                    and old_model['anchors'] == model['anchors']
-                    and {key: row['preserved_model_sha256'] for key, row in model['files'].items()}
-                     == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}, *mapping_checks],
+            {'name': 'Remaining model preserved outside media storage and explicitly reported optional None CustomState additions'
+                    if none_observations else 'Model content outside the requested media ID storage fields was preserved',
+                'passed': remaining_preserved}, *mapping_checks],
             'unresolved': unresolved}
     if effect['uri'] == 'ak.wwise.cli.migrate':
         before = effect['project_before']
@@ -700,9 +717,20 @@ def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_med
                         for child in retained]
                     return [node.tag, sorted([*node.attrib.items(), ('Value', value.text or '')]), '',
                         [child for child in children if child is not None]]
+    children = list(node)
+    if (node.tag == 'PluginInnerObjectList' and not node.attrib and not (node.text or '').strip()
+            and all(child.tag == 'List' and set(child.attrib) == {'Name'} and child.get('Name')
+                and not (child.text or '').strip() and not (child.tail or '').strip()
+                and all(member.tag == 'PluginInnerObject' and not (member.tail or '').strip() for member in child)
+                for child in children)
+            and len({child.get('Name') for child in children}) == len(children)):
+        # HostObjectStore.h (all five pinned SDKs): list-name enumeration is
+        # arbitrary across project loads. Each named list is an indexed vector;
+        # canonicalize only the outer names, retaining every inner member.
+        children.sort(key=lambda child: child.get('Name'))
     excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
     return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
-        (node.text if node.text and node.text.strip() else ''), [value for child in node
+        (node.text if node.text and node.text.strip() else ''), [value for child in children
             if (value := _xml_value(child, excluded_platform=excluded_platform, exclude_media_storage=exclude_media_storage,
                 _path=(*_path, node.tag))) is not None]]
 
@@ -737,7 +765,8 @@ def _project_model_paths(project_path, root):
     return sorted(files)
 
 
-def _model_snapshot(project_path, root, *, excluded_platform=None, selected_platforms=(), exclude_media_storage=False):
+def _model_snapshot(project_path, root, *, excluded_platform=None, selected_platforms=(), exclude_media_storage=False,
+        none_state_version=None, none_state_expected=None):
     import hashlib
     import json
     import os
@@ -751,9 +780,16 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     summary = {'files': {}, 'platform_settings': {name: {} for name in selected_platforms}, 'anchors': {}, 'media_ids': {}}
     media_rows, media_sources, media_unresolved, media_mode = [], [], set(), None
     total_bytes = 0
+    documents = {}
     for path in sorted(files):
         prove_artifact_path(path, io_root=root, field='project model', must_exist=True, expect_directory=False)
         document, proof = _read_xml_artifact(path, root)
+        total_bytes += proof['size']
+        if total_bytes > MAX_MODEL_BYTES:
+            raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its total byte observation budget')
+        relative = str(Path(path).relative_to(root))
+        if none_state_version is not None or none_state_expected is not None:
+            documents[relative] = (document, proof)
         if exclude_media_storage:
             from .console_media_ids import work_unit_records, project_storage_mode
             rows, descriptors, unresolved = work_unit_records(document)
@@ -765,10 +801,6 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
                     media_mode = project_storage_mode(document)
                 except ValueError:
                     media_unresolved.add('project_media_storage_mode')
-        total_bytes += proof['size']
-        if total_bytes > MAX_MODEL_BYTES:
-            raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its total byte observation budget')
-        relative = str(Path(path).relative_to(root))
         summary['files'][relative] = {'proof': proof,
             'preserved_model_sha256': digest(_xml_value(document, excluded_platform=excluded_platform, document_root=True, exclude_media_storage=exclude_media_storage)),
             'wwise_version': document.get('WwiseVersion')}
@@ -800,6 +832,23 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
         from .console_media_ids import compact_records
         summary.update(media_mapping=compact_records(media_rows), media_sources=compact_records(media_sources), media_mapping_unresolved=sorted(media_unresolved),
             media_storage_mode=media_mode)
+    if none_state_version is not None:
+        from .console_media_ids import none_state_eligibility
+        summary['optional_none_state_materialization'] = none_state_eligibility(
+            {key: row[0] for key, row in documents.items()}, none_state_version)
+    if none_state_expected is not None:
+        from .console_media_ids import project_none_state_additions
+        summary['none_state_additions'] = project_none_state_additions(
+            {key: row[0] for key, row in documents.items()}, none_state_expected)
+        remaining = {'files': {}, 'anchors': {}}
+        for relative, (document, _) in documents.items():
+            remaining['files'][relative] = {'preserved_model_sha256': digest(_xml_value(document,
+                excluded_platform=excluded_platform, document_root=True, exclude_media_storage=exclude_media_storage))}
+            rows = [[node.tag, node.get('ID').upper(), node.get('Name')] for node in document.iter()
+                if node.get('ID', '').startswith('{') and node.tag not in {'ObjectRef', 'MediaID', 'Platform'}]
+            if rows:
+                remaining['anchors'][relative] = {'count': len(rows), 'sha256': digest(sorted(rows, key=repr))}
+        summary['none_state_remainder'] = remaining
     for values in summary['platform_settings'].values():
         for rows in values.values():
             rows.sort()

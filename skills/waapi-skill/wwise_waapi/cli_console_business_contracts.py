@@ -757,12 +757,28 @@ def cli_console_business_contract_data(
         **({'effect_verification': {
             'mapping_file': 'owned_project_name_mediaid_stable_bounded_bytes_if_present',
             'mapping_container_format': 'five_version_observed_Wwise_MediaIDs_XML; unknown_container_remains_unverified',
-            'work_units': 'bounded_saved_MediaIDList_observation_and_preservation_outside_media_storage',
+            'work_units': ('bounded_saved_MediaIDList_observation; disclosed_optional_empty_None_CustomState_additions; strict_remaining_model'
+                if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile'
+                else 'bounded_saved_MediaIDList_observation_and_preservation_outside_media_storage'),
             'central_mapping_record_representation': (
                 'exact_source_GUID_language_ID_and_name_file_and_all_media_ID_attributes; no_remaining_Work_Unit_IDs; exact_project_storage_mode'
                 if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile'
                 else 'parsed_mapping_available; transfer_or_refresh_semantics_still_require_independent_effect_proof'),
             'source_kinds': ['AudioFileSource', 'MidiFileSource', 'PluginMediaSource'],
+            **({'optional_saved_none_state_materialization': {
+                'force_save_scope': 'all_project_work_units',
+                'preview': 'exact_source_proven_saved_owner_group_unique_None_state_bindings',
+                'outcome': 'may_persist_zero_or_one_fresh_empty_CustomState_record_per_binding; actual_saved_GUIDs_and_ShortIDs_reported',
+                'preservation': 'every_old_identity_value_order_and_all_remaining_model_content',
+                'source': 'resources/semantic/' + version + '/none_state_materialization.json',
+                'inevitable': False,
+                'detail': {'command': 'transaction-show',
+                    'fixed_views': ['eligible-bindings', 'actual-additions'],
+                    'selector': '--none-state-outcome', 'artifact_binding': '--outcome-artifact-hash',
+                    'actual_event_binding': '--outcome-event-hash', 'page': '--outcome-page',
+                    'continuation': 'copy_exact_generated_command; offline_read_only; no_confirmation_or_execution',
+                    'limits': {'entries_per_page': 64, 'detail_bytes': 16384, 'gateway_page_bytes': 32768}},
+            }} if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile' else {}),
             'generated_platform_hashes': 'bounded_observation_only; not_conversion_correctness_proof',
             'post_terminal_native_calls': 'none',
         }} if operation in {'ak.wwise.cli.moveMediaIdsToSingleFile', 'ak.wwise.cli.moveMediaIdsToWorkUnits',

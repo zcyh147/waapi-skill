@@ -1421,6 +1421,12 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     ('2025.1', 'PluginMediaSource', 'plugin-conflicting-encodings'),
     ('2025.1', 'PluginMediaSource', 'plugin-value-list'),
     *[(version, 'AudioFileSource', 'serialization') for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[(version, 'AudioFileSource', 'plugin-lists-reorder')
+      for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[('2021.1', 'AudioFileSource', 'plugin-lists-' + fault) for fault in
+      ['effect-owner', 'inner-order', 'value', 'id', 'type', 'member-loss', 'list-loss',
+       'duplicate', 'unnamed', 'list-attribute', 'container-attribute', 'list-text',
+       'container-text', 'unknown-member', 'unknown-container', 'unknown-unchanged']],
     *[('2021.1', 'AudioFileSource', change) for change in
       ['serialization-rtpc', 'serialization-rtpc-change', 'serialization-rtpc-remove']],
     *[('2022.1', 'AudioFileSource', change) for change in
@@ -1502,6 +1508,25 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                 if change and (change.startswith('bus-') or change == 'other-empty-reference'):
                     owner = tree.find('.//Bus' if change.startswith('bus-') else './/Sound')
                     owner.remove(owner.find('ReferenceList'))
+                if change and change.startswith('plugin-lists-'):
+                    lists = tree.find('.//PluginInnerObjectList')
+                    if lists is None:
+                        lists = tree.find('.//UnrecognizedObjectList')
+                    if change != 'plugin-lists-unknown-unchanged':
+                        lists[:] = list(reversed(lists))
+                    engine = lists.find('List[@Name="EngineSimulationControlData"]')
+                    if change == 'plugin-lists-inner-order':
+                        engine[:] = list(reversed(engine))
+                    elif change == 'plugin-lists-value':
+                        engine.find('.//Property').set('Value', '0.5')
+                    elif change == 'plugin-lists-id':
+                        engine[0].set('ID', '{BBBBBBBB-BBBB-CCCC-DDDD-EEEEEEEEEEEE}')
+                    elif change == 'plugin-lists-type':
+                        engine[0].set('PluginID', '418')
+                    elif change == 'plugin-lists-member-loss':
+                        engine.remove(engine[0])
+                    elif change == 'plugin-lists-list-loss':
+                        lists.remove(engine)
                 tree.write(self.unit)
                 tree = ET.parse(self.project_file)
                 if change != 'mode-unchanged':
@@ -1539,6 +1564,36 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     else:
         ET.SubElement(source, 'Language').text = 'SFX'
         ET.SubElement(source, 'AudioFile' if source_kind == 'AudioFileSource' else 'MidiFile').text = 'Keep.wav'
+    if change and change.startswith('plugin-lists-'):
+        plugin = ET.SubElement(tree.find('.//Sound/ChildrenList'), 'SourcePlugin',
+            Name='Chevrolet Camaro SS', ID='{29975930-6548-4A1B-BEE0-7AA549180D4F}',
+            PluginName='CrankcaseAudio REV', CompanyID='261', PluginID='416')
+        plugin.append(ET.fromstring('''<PluginInnerObjectList>
+<List Name="EngineSimulationControlData">
+<PluginInnerObject Name="" ID="{3A157243-6760-4CF8-B34C-310207907AEC}" PluginName="EngineSimulationControlData" CompanyID="261" PluginID="417"><PropertyList><Property Name="ClutchRPMSpike" Type="Real32" Value="0.66"/></PropertyList></PluginInnerObject>
+<PluginInnerObject Name="" ID="{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}" PluginName="EngineSimulationControlData" CompanyID="261" PluginID="417"><PropertyList><Property Name="ClutchRPMSpike" Type="Real32" Value="0.77"/></PropertyList></PluginInnerObject>
+</List>
+<List Name="AccelDecelModelControlData"><PluginInnerObject Name="" ID="{CE8AB2CE-EA04-4B32-A673-7ED205ECADDC}" PluginName="AccelDecelModelControlData" CompanyID="261" PluginID="418"><PropertyList><Property Name="Acceleration" Type="Real32" Value="2"/></PropertyList></PluginInnerObject></List>
+</PluginInnerObjectList>'''))
+        lists = plugin.find('PluginInnerObjectList')
+        if change == 'plugin-lists-effect-owner':
+            plugin.tag = 'Effect'
+        elif change == 'plugin-lists-duplicate':
+            lists[1].set('Name', lists[0].get('Name'))
+        elif change == 'plugin-lists-unnamed':
+            del lists[0].attrib['Name']
+        elif change == 'plugin-lists-list-attribute':
+            lists[0].set('Unestablished', 'x')
+        elif change == 'plugin-lists-container-attribute':
+            lists.set('Unestablished', 'x')
+        elif change == 'plugin-lists-list-text':
+            lists[0].text = 'unestablished'
+        elif change == 'plugin-lists-container-text':
+            lists.text = 'unestablished'
+        elif change == 'plugin-lists-unknown-member':
+            lists[0][0].tag = 'UnrecognizedInnerObject'
+        elif change in {'plugin-lists-unknown-container', 'plugin-lists-unknown-unchanged'}:
+            lists.tag = 'UnrecognizedObjectList'
     if change and change.startswith('serialization'):
         ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='PlainScalar', Type='Real32', Value='22.7')
         if change.startswith('serialization-rtpc'):
@@ -1577,7 +1632,8 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'serialization-rtpc', 'bus-empty-reference'}:
+    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization', 'serialization-rtpc', 'bus-empty-reference',
+            'plugin-lists-reorder', 'plugin-lists-effect-owner', 'plugin-lists-unknown-unchanged'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         if change == 'serialization-value':
@@ -1777,3 +1833,642 @@ def test_console_verification_summary_distinguishes_process_result_and_effects(t
         assert code != 0 and payload['verified'] is False
         assert 'reported errors' in message and 'partial effects' in message
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+class NoneStateMediaTask(CliProjectTask):
+    """The saved native shape: four tracks, three old overrides, one group None."""
+    group_id = '{AF599241-DE64-4286-BB8B-B0260EE20B80}'
+    none_id = '{4BA09D62-D59B-4880-A78C-8BECE7D7899F}'
+    states = [('a_Stealth', '{10000000-0000-0000-0000-000000000001}'),
+              ('b_Stress', '{10000000-0000-0000-0000-000000000002}'),
+              ('c_Fight', '{10000000-0000-0000-0000-000000000003}')]
+
+    def __init__(self, path, version, change=None, owner_count=4, owner_name_bytes=0):
+        self.change = change
+        self.owner_count = owner_count
+        super().__init__(path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile')
+        self.unit = saved_fixture_project(self)
+        tree = ET.parse(self.unit)
+        source = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'ChildrenList'),
+            'AudioFileSource', Name='Keep', ID='{33333333-3333-3333-3333-333333333333}')
+        ET.SubElement(source, 'Language').text = 'SFX'
+        ET.SubElement(source, 'AudioFile').text = 'Keep.wav'
+        ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
+        children = tree.find('.//WorkUnit/ChildrenList')
+        for index in range(owner_count):
+            track = ET.SubElement(children, 'MusicTrack', Name='Track ' + str(index) + 'x' * owner_name_bytes,
+                ID='{20000000-0000-0000-0000-%012X}' % index)
+            info = ET.SubElement(track, 'StateInfo')
+            group = ET.SubElement(ET.SubElement(info, 'StateGroupList'), 'StateGroupInfo')
+            ET.SubElement(group, 'StateGroupRef', Name='Music_inGame', ID=self.group_id)
+            custom = ET.SubElement(info, 'CustomStateList')
+            for number, (name, state_id) in enumerate(self.states):
+                row = ET.SubElement(custom, 'CustomState')
+                ET.SubElement(row, 'StateRef', Name=name, ID=state_id)
+                inner = ET.SubElement(row, 'CustomState', Name='',
+                    ID='{30000000-0000-0000-%04X-%012X}' % (index, number), ShortID=str(number + 1))
+                ET.SubElement(ET.SubElement(inner, 'PropertyList'), 'Property', Name='Volume', Type='Real64', Value=str(-number))
+        tree.write(self.unit)
+        self.state_unit = self.project_file.parent / 'States' / 'States.wwu'
+        self.state_unit.parent.mkdir()
+        doc = ET.Element('WwiseDocument', Type='WorkUnit', WwiseVersion='v' + version + '.0')
+        unit = ET.SubElement(ET.SubElement(doc, 'States'), 'WorkUnit', Name='States',
+            ID='{40000000-0000-0000-0000-000000000000}')
+        group = ET.SubElement(ET.SubElement(unit, 'ChildrenList'), 'StateGroup', Name='Music_inGame', ID=self.group_id)
+        children = ET.SubElement(group, 'ChildrenList')
+        for name, state_id in [('None', self.none_id), *self.states]:
+            ET.SubElement(children, 'State', Name=name, ID=state_id)
+        if change == 'before-group-duplicate':
+            unit.find('ChildrenList').append(deepcopy(group))
+        elif change == 'before-none-duplicate':
+            children.append(deepcopy(children[0]))
+        elif change == 'before-none-hidden-payload':
+            ET.SubElement(children[0], 'PropertyList')
+        elif change == 'before-none-wrong-class':
+            children[0].tag = 'CustomState'
+        ET.ElementTree(doc).write(self.state_unit)
+        tree = ET.parse(self.unit)
+        for track in tree.findall('.//MusicTrack'):
+            info = track.find('StateInfo')
+            if change == 'before-unknown-owner':
+                track.tag = 'UnprovedOwner'
+            elif change == 'before-duplicate-subscription':
+                groups = info.find('StateGroupList')
+                groups.append(deepcopy(groups[0]))
+            elif change == 'before-unknown-info':
+                ET.SubElement(info, 'UnknownPayload')
+            elif change == 'before-hidden-state-properties':
+                ET.SubElement(ET.SubElement(info, 'StatePropertyList'), 'UnprovedPayload')
+            elif change == 'before-hidden-old-custom-state':
+                ET.SubElement(info.find('./CustomStateList/CustomState/CustomState'), 'UnprovedPayload')
+            elif change == 'before-group-ref-name':
+                info.find('.//StateGroupRef').set('Name', 'Other')
+            elif change == 'before-group-ref-hidden':
+                ET.SubElement(info.find('.//StateGroupRef'), 'Hidden')
+            elif change == 'before-group-ref-work-unit':
+                info.find('.//StateGroupRef').set('WorkUnitID', '{99999999-0000-0000-0000-000000000000}')
+            elif change == 'missing-list':
+                info.remove(info.find('CustomStateList'))
+            elif change == 'bare-none-ref':
+                ET.SubElement(ET.SubElement(info.find('CustomStateList'), 'CustomState'),
+                    'StateRef', Name='None', ID=self.none_id)
+            elif change == 'source-owner-ActorMixer':
+                track.tag = 'ActorMixer'
+            elif change == 'source-owner-PropertyContainer':
+                track.tag = 'PropertyContainer'
+            elif change == 'source-owner-EffectSlot':
+                track.tag = 'EffectSlot'
+            if change in {'group-info-object', 'group-info-object-hidden'}:
+                nested = ET.SubElement(info.find('./StateGroupList/StateGroupInfo'), 'StateGroupInfo',
+                    Name='', ID=track.get('ID').replace('20000000', '60000000'), ShortID='1')
+                if change == 'group-info-object-hidden':
+                    ET.SubElement(nested, 'UnprovedPayload')
+            if version != '2025.1':
+                info.find('./StateGroupList/StateGroupInfo').set('MusicSyncType', '2')
+        if change == 'unrelated-plugin':
+            plugin = ET.SubElement(tree.find('.//Sound/ChildrenList'), 'SourcePlugin',
+                Name='REV', ID='{70000000-0000-0000-0000-000000000000}')
+            ET.SubElement(plugin, 'PluginData')
+        elif change == 'unrelated-soundcaster':
+            session = ET.SubElement(ET.SubElement(tree.getroot(), 'SoundcasterSessions'), 'SoundcasterSession',
+                Name='Preserved session', ID='{80000000-0000-0000-0000-000000000000}', ShowAll='true')
+            for tag in ('RTPCValueList', 'CurrentStateList', 'CurrentSwitchList'):
+                ET.SubElement(session, tag)
+        tree.write(self.unit)
+
+    def run(self, *argv):
+        code, payload = super().run(*argv)
+        if argv[0] == 'preview-from-draft':
+            self.public_preview = deepcopy(payload)
+        return code, payload
+
+    def call(self, uri, args=None, options=None):
+        if uri == self.operation:
+            self.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs"><MediaIDInfo><MediaIDs>
+<Language ID="393239870" Name="SFX"><File Name="Keep.wav"><WObject ID="{33333333-3333-3333-3333-333333333333}"><MediaID ID="123456"/></WObject></File></Language>
+</MediaIDs></MediaIDInfo></WwiseDocument>''')
+            tree = ET.parse(self.unit)
+            source = tree.find('.//AudioFileSource')
+            source.remove(source.find('MediaIDList'))
+            if self.change == 'missing-list':
+                for info in tree.findall('.//StateInfo'):
+                    ET.SubElement(info, 'CustomStateList')
+            for index, custom in enumerate(tree.findall('.//StateInfo/CustomStateList')):
+                if self.change == 'no-additions':
+                    continue
+                row = (next(n for n in custom if n.find('StateRef').get('Name') == 'None')
+                    if self.change == 'bare-none-ref' else ET.Element('CustomState'))
+                if self.change != 'bare-none-ref':
+                    ET.SubElement(row, 'StateRef', Name='None', ID=self.none_id)
+                ET.SubElement(row, 'CustomState', Name='',
+                    ID='{50000000-0000-0000-0000-%012X}' % index, ShortID='1')
+                if self.change != 'bare-none-ref':
+                    custom.insert(1, row)
+            first = tree.find('.//StateInfo/CustomStateList')
+            added = next((n for n in first if n.find('StateRef').get('Name') == 'None'), None) if first is not None else None
+            if added is not None:
+                inner = added.find('CustomState')
+                if self.change == 'wrong-state':
+                    added.find('StateRef').set('ID', self.states[0][1])
+                elif self.change == 'wrong-state-name':
+                    added.find('StateRef').set('Name', 'Different')
+                elif self.change == 'wrong-work-unit':
+                    added.find('StateRef').set('WorkUnitID', 'broken')
+                elif self.change == 'wrong-class':
+                    inner.tag = 'Sound'
+                elif self.change == 'nonempty':
+                    ET.SubElement(inner, 'PropertyList')
+                elif self.change == 'hidden-attribute':
+                    inner.set('Unproved', 'x')
+                elif self.change == 'hidden-text':
+                    added.text = 'hidden'
+                elif self.change == 'duplicate-new':
+                    first.append(deepcopy(added))
+                elif self.change == 'invalid-guid':
+                    inner.set('ID', 'broken')
+                elif self.change == 'zero-guid':
+                    inner.set('ID', '{00000000-0000-0000-0000-000000000000}')
+                elif self.change == 'old-guid':
+                    inner.set('ID', first[0].find('CustomState').get('ID'))
+                elif self.change == 'invalid-short-id':
+                    inner.set('ShortID', '4294967296')
+                elif self.change == 'no-short-id':
+                    del inner.attrib['ShortID']
+                elif self.change == 'new-external-reference':
+                    states = ET.parse(self.state_unit)
+                    ET.SubElement(states.getroot(), 'ObjectRef', Name='', ID=inner.get('ID').lower())
+                    states.write(self.state_unit)
+                elif self.change == 'old-state-change':
+                    first[0].find('.//Property').set('Value', '12')
+                elif self.change == 'old-state-order':
+                    first[:] = list(reversed(first))
+                elif self.change == 'old-state-loss':
+                    first.remove(first[0])
+                elif self.change == 'wrong-owner':
+                    tree.find('.//MusicTrack').set('ID', '{99999999-0000-0000-0000-000000000001}')
+                elif self.change == 'wrong-group':
+                    tree.find('.//StateGroupRef').set('ID', '{99999999-0000-0000-0000-000000000002}')
+                elif self.change == 'unrelated-plugin':
+                    ET.SubElement(tree.find('.//SourcePlugin/PluginData'), 'Added').text = 'native changed cached data'
+                elif self.change == 'unrelated-soundcaster':
+                    session = tree.find('.//SoundcasterSession')
+                    for tag in ('RTPCValueList', 'CurrentStateList', 'CurrentSwitchList'):
+                        session.remove(session.find(tag))
+            tree.write(self.unit)
+            project = ET.parse(self.project_file)
+            ET.SubElement(project.find('./ProjectInfo/Project/PropertyList'), 'Property',
+                Name='MediaIDsInSingleFile', Type='bool', Value='True')
+            project.write(self.project_file)
+            if self.change == 'unknown-mapping':
+                self.project_file.with_suffix('.mediaid').write_text('<UnestablishedMapping/>')
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_media_single_discloses_and_reports_optional_none_state_objects(tmp_path, version):
+    task = NoneStateMediaTask(tmp_path, version)
+    tx = task.execute_plan()
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    prepared = shown['artifact']['prepared_operation']
+    outcome = prepared['semantic_preview']['envelope']['metadata']['optional_none_state_materialization']
+    assert outcome['may_materialize_saved_internal_records'] is True
+    assert outcome['inevitable'] is False
+    assert outcome['force_save_scope'] == 'all_project_work_units'
+    assert outcome['source']['version'] == version
+    assert outcome['eligible_binding_count'] == 4
+    assert task.public_preview['preview_summary']['optional_none_state_materialization'] == outcome
+    assert outcome['relationships_complete'] is True
+    assert {row['none_state']['id'] for row in outcome['eligible_groups']} == {task.none_id}
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    observations = payload['verification'].get('readbacks',
+        payload['verification'].get('optional_none_state_materialization', []))
+    if isinstance(observations, dict):
+        assert observations['actual_additions_complete'] is False
+        observed, count, _, _ = collect_none_state_pages(task, observations['detail'])
+        assert count == 4
+    else:
+        observed = next(row for row in observations
+            if row.get('kind') == 'optional-none-custom-state-materialization')
+    assert len(observed['actual_additions']) == 4
+    assert observed['remaining_model_preserved'] is True
+    assert {row['object']['id'] for row in observed['actual_additions']} == {
+        '{50000000-0000-0000-0000-%012X}' % index for index in range(4)}
+    # ShortID 1 also occurs in old CustomStates. It is not globally unique.
+    assert {row['object']['short_id'] for row in observed['actual_additions']} == {'1'}
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('change', ['wrong-state', 'wrong-state-name', 'wrong-work-unit', 'wrong-class',
+    'nonempty', 'hidden-attribute', 'hidden-text', 'duplicate-new', 'invalid-guid', 'zero-guid',
+    'old-guid', 'invalid-short-id', 'new-external-reference', 'old-state-change', 'old-state-order',
+    'old-state-loss', 'wrong-owner', 'wrong-group', 'unrelated-plugin', 'unrelated-soundcaster',
+    'before-group-duplicate', 'before-none-duplicate', 'before-none-hidden-payload', 'before-none-wrong-class',
+    'before-unknown-owner', 'before-duplicate-subscription', 'before-unknown-info', 'before-group-ref-name',
+    'before-group-ref-hidden', 'before-group-ref-work-unit',
+    'before-hidden-state-properties', 'before-hidden-old-custom-state'])
+def test_media_single_none_outcome_never_masks_unproved_model_change(tmp_path, change):
+    task = NoneStateMediaTask(tmp_path, '2024.1' if change in {'unrelated-plugin', 'unrelated-soundcaster'} else '2023.1', change)
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    assert payload['verified'] is False
+    assert any(not row['passed'] for row in payload['verification']['assertions'])
+    code, repeated = task.run('execute', tx)
+    assert code != 0, repeated
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('change', ['no-additions', 'no-short-id', 'missing-list', 'bare-none-ref'])
+def test_media_single_none_optional_source_shapes_preserve_exact_remaining_model(tmp_path, version, change):
+    task = NoneStateMediaTask(tmp_path, version, change)
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    verification = next(event['details']['verification'] for event in shown['events']
+        if event['event_type'] == 'verification_recorded')
+    observed = next(row for row in verification['readbacks']
+        if row.get('kind') == 'optional-none-custom-state-materialization')
+    assert observed['actual_addition_count'] == (0 if change == 'no-additions' else 4)
+    assert observed['actual_additions_complete'] is True
+    assert observed['remaining_model_preserved'] is True
+    if change == 'missing-list':
+        assert all(row['created_custom_state_list'] for row in observed['actual_additions'])
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('owner', ['ActorMixer', 'PropertyContainer', 'EffectSlot'])
+def test_media_single_none_owner_classes_follow_matching_source_lane(tmp_path, version, owner):
+    allowed = ((owner == 'ActorMixer' and version != '2025.1')
+        or (owner == 'PropertyContainer' and version == '2025.1')
+        or (owner == 'EffectSlot' and version not in {'2021.1', '2022.1'}))
+    task = NoneStateMediaTask(tmp_path, version, 'source-owner-' + owner)
+    tx = task.execute_plan()
+    notice = task.public_preview['preview_summary']['optional_none_state_materialization']
+    assert notice['eligible_binding_count'] == (4 if allowed else 0)
+    code, payload = task.run('verify', tx)
+    assert (code == 0 and payload['verified'] is True) is allowed, payload
+
+
+def collect_none_state_pages(task, command):
+    """Follow only the produced fixed read continuations and reconstruct JSON."""
+    calls_before = deepcopy(task.calls)
+    entries, offset, scope, value_sha, total = [], 0, None, None, None
+    for _ in range(1000):
+        code, payload = task.run(*command['gateway_argv'])
+        assert code == 0, payload
+        assert 'confirmation' not in payload and 'authorization' not in payload
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= 32768
+        page = payload['none_state_outcome']
+        assert page['mutation_authority'] is False and len(page['entries']) <= 64
+        assert page['offset'] == offset
+        if scope is None:
+            scope, value_sha, total = page['scope'], page['value_sha256'], page['total_count']
+        assert page['scope'] == scope and page['value_sha256'] == value_sha and page['total_count'] == total
+        entries.extend(page['entries'])
+        offset += len(page['entries'])
+        if page['complete']:
+            assert page['remaining_entries'] == 0 and page['next_page'] is None
+            assert 'next_command' not in payload
+            break
+        command = payload['next_command']
+        assert command['command'] == 'transaction-show'
+        assert '--none-state-outcome' in command['gateway_argv'] and '--outcome-page' in command['gateway_argv']
+        assert command['full_argv'][3:5] == ['--state-dir', str(task.path / 'state')]
+    else:
+        pytest.fail('Bounded outcome pages did not terminate')
+    # Independently reconstruct the existing lossless pointer/string format.
+    root = None
+    for row in entries:
+        parts = [part.replace('~1', '/').replace('~0', '~') for part in row['pointer'].split('/')[1:]]
+        parent = root
+        for part in parts[:-1]:
+            parent = parent[int(part)] if isinstance(parent, list) else parent[part]
+        key = (int(parts[-1]) if isinstance(parent, list) else parts[-1]) if parts else None
+        if row['kind'] == 'object':
+            value = {}
+        elif row['kind'] == 'array':
+            value = [None] * row['length']
+        elif row['kind'] == 'string-fragment':
+            previous = parent[key] if row['offset'] else ''
+            assert len(previous) == row['offset']
+            value = previous + row['value']
+        else:
+            value = row['value']
+        if parts:
+            parent[key] = value
+        else:
+            root = value
+    from wwise_waapi.canonical import canonical_json_bytes
+    import hashlib
+    assert hashlib.sha256(canonical_json_bytes(root)).hexdigest() == value_sha
+    assert task.calls == calls_before
+    return root, total, scope, entries
+
+
+def test_media_single_large_none_disclosures_offer_complete_public_detail(tmp_path, monkeypatch):
+    from tests.unit.test_field_interface_closure_gateway import gateway
+    captured = []
+    original = gateway.project_successful_transaction_verify_payload
+    def protect_agent_result(payload, **kwargs):
+        before = deepcopy(payload['agent_result'])
+        before_bytes = json.dumps(payload['agent_result'], ensure_ascii=False, separators=(',', ':')).encode()
+        projected = original(payload, **kwargs)
+        assert projected['agent_result'] == before
+        assert json.dumps(projected['agent_result'], ensure_ascii=False, separators=(',', ':')).encode() == before_bytes
+        assert list(projected)[-1] == 'agent_result'
+        captured.append(True)
+        return projected
+    monkeypatch.setattr(gateway, 'project_successful_transaction_verify_payload', protect_agent_result)
+    task = NoneStateMediaTask(tmp_path, '2023.1', owner_count=30)
+    tx = task.execute_plan()
+    notice = task.public_preview['preview_summary']['optional_none_state_materialization']
+    assert notice['eligible_binding_count'] == 30 and notice['relationships_complete'] is False
+    eligible, count, scope, _ = collect_none_state_pages(task, notice['detail'])
+    assert count == 30 and scope['verification_event_hash'] is None
+    assert {row['owner']['id'] for row in eligible['eligible_bindings']} == {
+        '{20000000-0000-0000-0000-%012X}' % index for index in range(30)}
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    notice = payload['verification']['optional_none_state_materialization']
+    assert notice['actual_addition_count'] == 30 and notice['actual_additions_complete'] is False
+    observed, count, scope, _ = collect_none_state_pages(task, notice['detail'])
+    assert count == 30 and scope['verification_event_hash'] is not None
+    assert observed['actual_additions_complete'] is True
+    assert {row['object']['id'] for row in observed['actual_additions']} == {
+        '{50000000-0000-0000-0000-%012X}' % index for index in range(30)}
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+    assert captured == [True]
+
+
+def test_media_single_none_outcome_offline_pages_bind_exact_artifact_and_journal(tmp_path):
+    task = NoneStateMediaTask(tmp_path, '2023.1', owner_count=4, owner_name_bytes=2200)
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file))
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx, artifact_hash = preview['transaction_id'], preview['artifact_hash']
+    notice = preview['preview_summary']['optional_none_state_materialization']
+    eligible, count, scope, entries = collect_none_state_pages(task, notice['detail'])
+    assert count == 4 and scope['artifact_hash'] == artifact_hash
+    assert any(row['kind'] == 'string-fragment' for row in entries)
+    assert [row['owner']['name'] for row in eligible['eligible_bindings']] == [
+        'Track ' + str(index) + 'x' * 2200 for index in range(4)]
+    assert not any(row[0] == task.operation for row in task.calls)
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    expected = shown['artifact']['prepared_operation']['pre_state']['cli_project_effect']['model_before'][
+        'optional_none_state_materialization']
+    assert eligible['eligible_bindings'] == expected['eligible_bindings']
+    assert eligible['source'] == expected['source']
+    # The fixed view has no mutation continuation, even while awaiting confirmation.
+    for args in [[], ['--outcome-artifact-hash', '0' * 64]]:
+        code, bad = task.run('transaction-show', tx, '--none-state-outcome', 'eligible-bindings', *args)
+        assert code != 0 and 'confirmation' not in bad, bad
+    code, payload = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, payload
+    code, payload = task.run('execute', tx)
+    assert code == 0, payload
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    actual_command = payload['verification']['optional_none_state_materialization']['detail']
+    actual, count, _, _ = collect_none_state_pages(task, actual_command)
+    assert count == 4 and len(actual['actual_additions']) == 4
+    code, first = task.run(*notice['detail']['gateway_argv'])
+    assert code == 0 and first['none_state_outcome']['next_page'], first
+    cursor = first['none_state_outcome']['next_page']
+    base = notice['detail']['gateway_argv']
+    for argv in [base + ['--outcome-page', cursor[:-1] + ('0' if cursor[-1] != '0' else '1')],
+                 base + ['--summary-only'],
+                 actual_command['gateway_argv'] + ['--outcome-page', cursor],
+                 ['transaction-show', tx, '--none-state-outcome', 'actual-additions',
+                  '--outcome-artifact-hash', artifact_hash, '--outcome-event-hash', '0' * 64]]:
+        code, bad = task.run(*argv)
+        assert code != 0 and 'confirmation' not in bad, bad
+    code, shown = task.run('transaction-show', tx)
+    event = next(event for event in shown['events'] if event['event_type'] != 'verification_recorded')
+    code, bad = task.run('transaction-show', tx, '--none-state-outcome', 'actual-additions',
+        '--outcome-artifact-hash', artifact_hash, '--outcome-event-hash', event['event_hash'])
+    assert code != 0, bad
+    # A cursor from another exact transaction cannot select this transaction's rows.
+    other_path = tmp_path / 'other'
+    other_path.mkdir()
+    other = NoneStateMediaTask(other_path, '2023.1', owner_count=4, owner_name_bytes=2200)
+    other_tx = other.execute_plan()
+    other_base = other.public_preview['preview_summary']['optional_none_state_materialization']['detail']['gateway_argv']
+    code, bad = other.run(*other_base, '--outcome-page', cursor)
+    assert code != 0, bad
+
+
+@pytest.mark.parametrize('owner_count', [0, 1])
+def test_media_single_none_outcome_empty_and_last_pages_are_complete_read_only(tmp_path, owner_count):
+    task = NoneStateMediaTask(tmp_path, '2023.1', 'no-additions', owner_count=owner_count)
+    tx = task.execute_plan()
+    code, page = task.run('transaction-show', tx, '--none-state-outcome', 'eligible-bindings',
+        '--outcome-artifact-hash', task.public_preview['artifact_hash'])
+    assert code == 0, page
+    assert page['none_state_outcome']['complete'] is True
+    assert page['none_state_outcome']['total_count'] == owner_count
+    assert 'next_command' not in page and 'confirmation' not in page
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    code, shown = task.run('transaction-show', tx)
+    event = next(event for event in shown['events'] if event['event_type'] == 'verification_recorded')
+    code, actual = task.run('transaction-show', tx, '--none-state-outcome', 'actual-additions',
+        '--outcome-artifact-hash', task.public_preview['artifact_hash'], '--outcome-event-hash', event['event_hash'])
+    assert code == 0 and actual['none_state_outcome']['total_count'] == 0, actual
+    assert actual['none_state_outcome']['complete'] is True and 'next_command' not in actual
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_media_single_schema_discloses_fixed_outcome_detail_route(tmp_path, version):
+    task = CliProjectTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    code, schema = task.run('request-schema', task.operation)
+    assert code == 0, schema
+    effect = schema['business_adapter']['effect_verification']['optional_saved_none_state_materialization']
+    assert effect['detail']['fixed_views'] == ['eligible-bindings', 'actual-additions']
+    assert effect['source'] == 'resources/semantic/' + version + '/none_state_materialization.json'
+    assert effect['inevitable'] is False
+
+
+@pytest.mark.parametrize('boundary', ['unknown-mapping', 'native-error'])
+def test_media_single_none_outcome_retains_weak_and_native_error_boundaries(tmp_path, boundary):
+    task = NoneStateMediaTask(tmp_path, '2023.1', boundary)
+    if boundary == 'native-error':
+        task.outcome = 1
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is False, payload
+    assert payload['state'] == ('verification_failed' if boundary == 'native-error' else 'result_schema_checked')
+    assert (code != 0) is (boundary == 'native-error')
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    event = next(row for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    observed = [row for row in event['details']['verification']['readbacks']
+        if row.get('kind') == 'optional-none-custom-state-materialization']
+    if boundary == 'native-error':
+        assert not observed
+        process = next(row for row in event['details']['verification']['readbacks'] if row.get('kind') == 'cli-process-outcome')
+        assert process['partial_effects_possible'] is True
+        code, page = task.run('transaction-show', tx, '--none-state-outcome', 'actual-additions',
+            '--outcome-artifact-hash', shown['artifact_hash'], '--outcome-event-hash', event['event_hash'])
+        assert code != 0, page
+    else:
+        assert observed[0]['actual_addition_count'] == 4 and observed[0]['remaining_model_preserved'] is True
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def test_media_single_none_eligible_binding_drift_stops_before_dispatch(tmp_path):
+    task = NoneStateMediaTask(tmp_path, '2023.1')
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file))
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, payload = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, payload
+    tree = ET.parse(task.state_unit)
+    tree.find('.//State[@Name="None"]').set('ID', '{99999999-0000-0000-0000-000000000003}')
+    tree.write(task.state_unit)
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert not any(row[0] == task.operation for row in task.calls)
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_media_single_none_state_group_info_object_follows_exact_source_shape(tmp_path, version):
+    task = NoneStateMediaTask(tmp_path, version, 'group-info-object')
+    tx = task.execute_plan()
+    notice = task.public_preview['preview_summary']['optional_none_state_materialization']
+    assert notice['eligible_binding_count'] == (4 if version == '2025.1' else 0)
+    code, payload = task.run('verify', tx)
+    assert (code == 0 and payload['verified'] is True) is (version == '2025.1'), payload
+
+
+def test_media_single_none_group_info_object_hidden_payload_is_not_eligible(tmp_path):
+    task = NoneStateMediaTask(tmp_path, '2025.1', 'group-info-object-hidden')
+    tx = task.execute_plan()
+    assert task.public_preview['preview_summary']['optional_none_state_materialization']['eligible_binding_count'] == 0
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['verified'] is False, payload
+
+
+def test_media_single_none_materialization_preserves_exact_native_2023_saved_state_shapes(tmp_path):
+    # Offline source: retained933 before-image Music.wwu SHA256
+    # 8d756edd197dfa12ac5e67101d0a735b79edd4113fc69fe312424d55d6edcd4d.
+    # These are saved-model shapes, not a new native execution or PASS receipt.
+    task = NoneStateMediaTask(tmp_path, '2023.1')
+    bindings = [({'Name': 'Stealth', 'ID': '{9861812D-295E-47DC-BB84-803555479814}', 'ShortID': '904240640'},
+      '<StateInfo><StateGroupList><StateGroupInfo><StateGroupRef Name="Music_inGame" '
+      'ID="{AF599241-DE64-4286-BB8B-B0260EE20B80}" '
+      '/></StateGroupInfo></StateGroupList><CustomStateList><CustomState><StateRef Name="c_Fight" '
+      'ID="{20A3B196-D22F-42F7-8592-A37A3E5B467A}" /><CustomState Name="Custom State" '
+      'ID="{4C10E9EB-9AC1-4134-93D8-5EF9364E4E06}" ShortID="315654336"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState><CustomState><StateRef Name="b_Stress" '
+      'ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><CustomState Name="Custom State" '
+      'ID="{14476B77-B4F8-46AD-94A0-F4B77E3AE06E}" ShortID="798376448"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState><CustomState><StateRef Name="a_Stealth" '
+      'ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><CustomState Name="" '
+      'ID="{D1694BCE-4CF8-4523-A305-9FBCE115A4A5}" ShortID="826896996" '
+      '/></CustomState></CustomStateList></StateInfo>'),
+     ({'Name': 'Stress', 'ID': '{D80292EF-1987-4266-BE2E-F014E5B502C7}', 'ShortID': '740093312'},
+      '<StateInfo><StateGroupList><StateGroupInfo><StateGroupRef Name="Music_inGame" '
+      'ID="{AF599241-DE64-4286-BB8B-B0260EE20B80}" '
+      '/></StateGroupInfo></StateGroupList><CustomStateList><CustomState><StateRef Name="c_Fight" '
+      'ID="{20A3B196-D22F-42F7-8592-A37A3E5B467A}" /><CustomState Name="Custom State" '
+      'ID="{7E6166E0-3BE3-4CE7-B8B8-F121790D6760}" ShortID="291287712"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState><CustomState><StateRef Name="b_Stress" '
+      'ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><CustomState Name="" '
+      'ID="{B04BC407-C16D-4F40-A43A-E3146FCBD454}" ShortID="526775693" '
+      '/></CustomState><CustomState><StateRef Name="a_Stealth" '
+      'ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><CustomState Name="Custom State" '
+      'ID="{8A9370DF-4DE2-4A95-897A-9B09DA0C1576}" ShortID="791280512"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState></CustomStateList></StateInfo>'),
+     ({'Name': 'Stealth', 'ID': '{9DFD6677-5C7D-4928-969D-15DAB99D0A13}', 'ShortID': '683160055'},
+      '<StateInfo><StateGroupList><StateGroupInfo><StateGroupRef Name="Music_inGame" '
+      'ID="{AF599241-DE64-4286-BB8B-B0260EE20B80}" '
+      '/></StateGroupInfo></StateGroupList><CustomStateList><CustomState><StateRef Name="c_Fight" '
+      'ID="{20A3B196-D22F-42F7-8592-A37A3E5B467A}" /><CustomState Name="Custom State" '
+      'ID="{8C7A076C-D063-4A1C-90E2-B255EE58FCDB}" ShortID="969400522"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState><CustomState><StateRef Name="b_Stress" '
+      'ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><CustomState Name="Custom State" '
+      'ID="{A31D2C06-93F0-4B6F-849B-24319F8AC9DD}" ShortID="278624134"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState><CustomState><StateRef Name="a_Stealth" '
+      'ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><CustomState Name="" '
+      'ID="{26E60B22-7DC6-40F8-A871-76F31339288D}" ShortID="11996196" '
+      '/></CustomState></CustomStateList></StateInfo>'),
+     ({'Name': 'Stress', 'ID': '{517CE370-E59A-4B43-816C-E6156D8C71B1}', 'ShortID': '722825636'},
+      '<StateInfo><StateGroupList><StateGroupInfo><StateGroupRef Name="Music_inGame" '
+      'ID="{AF599241-DE64-4286-BB8B-B0260EE20B80}" '
+      '/></StateGroupInfo></StateGroupList><CustomStateList><CustomState><StateRef Name="c_Fight" '
+      'ID="{20A3B196-D22F-42F7-8592-A37A3E5B467A}" /><CustomState Name="Custom State" '
+      'ID="{220040B4-E4CB-4D3C-B5FD-702BAA6231BA}" ShortID="119466417"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState><CustomState><StateRef Name="b_Stress" '
+      'ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><CustomState Name="" '
+      'ID="{6DAFE3FC-6723-4268-AB25-23DB2AB01CD7}" ShortID="307726341" '
+      '/></CustomState><CustomState><StateRef Name="a_Stealth" '
+      'ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><CustomState Name="Custom State" '
+      'ID="{C5103B10-17BF-46EB-AA29-57CB328AC250}" ShortID="660986203"><PropertyList><Property '
+      'Name="Volume" Type="Real64" Value="-96.3" '
+      '/></PropertyList></CustomState></CustomState></CustomStateList></StateInfo>')]
+    tree = ET.parse(task.unit)
+    for track, (attrs, state_info) in zip(tree.findall('.//MusicTrack'), bindings):
+        track.attrib = attrs
+        track.remove(track.find('StateInfo'))
+        track.append(ET.fromstring(state_info))
+    tree.write(task.unit)
+    tree = ET.parse(task.state_unit)
+    parent = tree.find('.//WorkUnit/ChildrenList')
+    parent.remove(parent.find('StateGroup'))
+    parent.append(ET.fromstring('<StateGroup Name="Music_inGame" ID="{AF599241-DE64-4286-BB8B-B0260EE20B80}"><PropertyList><Property Name="DefaultTransitionTime" Type="Real64" Value="2" /></PropertyList><ChildrenList><State Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}" /><State Name="a_Stealth" ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><State Name="b_Stress" ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><State Name="c_Fight" ID="{20A3B196-D22F-42F7-8592-A37A3E5B467A}" /></ChildrenList><TransitionList><Transition><StartState Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}" /><EndState Name="a_Stealth" ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><Time>0</Time><IsShared>false</IsShared></Transition><Transition><StartState Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}" /><EndState Name="b_Stress" ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><Time>0</Time><IsShared>false</IsShared></Transition><Transition><StartState Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}" /><EndState Name="c_Fight" ID="{20A3B196-D22F-42F7-8592-A37A3E5B467A}" /><Time>0</Time><IsShared>false</IsShared></Transition><Transition><StartState Name="b_Stress" ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><EndState Name="a_Stealth" ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><Time>2.5</Time><IsShared>false</IsShared></Transition><Transition><StartState Name="a_Stealth" ID="{43C6702F-3A30-4D5C-B16D-C862BE5989EF}" /><EndState Name="b_Stress" ID="{885FDC4C-AE0A-4B71-A9FB-82FBAE4A3270}" /><Time>2.5</Time><IsShared>false</IsShared></Transition></TransitionList></StateGroup>'))
+    tree.write(task.state_unit)
+    tx = task.execute_plan()
+    assert task.public_preview['preview_summary']['optional_none_state_materialization']['eligible_binding_count'] == 4
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    event = next(row for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    outcome = next(row for row in event['details']['verification']['readbacks']
+        if row.get('kind') == 'optional-none-custom-state-materialization')
+    assert outcome['actual_addition_count'] == 4 and outcome['remaining_model_preserved'] is True
+    assert {row['owner']['id'] for row in outcome['actual_additions']} == {attrs['ID'] for attrs, _ in bindings}
+
+
+def test_media_single_none_failed_remainder_never_claims_complete_difference_accounting(tmp_path):
+    task = NoneStateMediaTask(tmp_path, '2023.1', 'wrong-class')
+    tx = task.execute_plan()
+    code, failed = task.run('verify', tx)
+    assert code != 0 and failed['verified'] is False, failed
+    outcome = next(row for row in failed['verification']['readbacks']
+        if row.get('kind') == 'optional-none-custom-state-materialization')
+    assert outcome['actual_additions_complete'] is False
+    assert outcome['recognized_additions_complete'] is True
+    assert outcome['actual_addition_count'] == 3 and outcome['remaining_model_preserved'] is False
+    assert outcome['added_saved_model_identities_observed'] is False
+    assert outcome['freshness_proof'].startswith('not_established')
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    event = next(row for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    command = {'gateway_argv': ['transaction-show', tx, '--none-state-outcome', 'actual-additions',
+        '--outcome-artifact-hash', shown['artifact_hash'], '--outcome-event-hash', event['event_hash']]}
+    exact, count, _, _ = collect_none_state_pages(task, command)
+    assert count == 3 and exact == outcome
+    assert exact['actual_additions_complete'] is False and exact['remaining_model_preserved'] is False

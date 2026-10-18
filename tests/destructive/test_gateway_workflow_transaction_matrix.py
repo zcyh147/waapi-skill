@@ -39,7 +39,7 @@ from tests.destructive.support.category_evidence import (  # pyright: ignore[rep
     current_evidence_platform,
     exact_git_candidate,
 )
-from tests.destructive.support.console_file_observation import observe_console_file  # noqa: E402
+from tests.destructive.support.console_file_observation import observe_console_file, ConsoleModelImageIndex  # noqa: E402
 from tests.destructive.support.exact_real_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     finalize_exact_real_evidence,
 )
@@ -289,6 +289,8 @@ def _update_business_draft(
 def _complete_business_draft(
     runtime: _WorkflowSandboxRuntime,
     draft: _BusinessDraft,
+    *,
+    inspect_preview=None,
 ) -> dict[str, Mapping[str, Any]]:
     _update_business_draft(runtime, draft, "draft-check", live=True)
     preview = _update_business_draft(
@@ -298,6 +300,8 @@ def _complete_business_draft(
         live=True,
     )
     transaction_id = _required_string(preview, "transaction_id")
+    if inspect_preview is not None:
+        inspect_preview(preview)
     shown = runtime.gateway(
         ["transaction-show", transaction_id, "--summary-only"],
         live=False,
@@ -2130,7 +2134,7 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
         "category": ("cli-media-id-migrated-project" if migrate_before_capture
                      else "cli-media-id-file-format-observation"), "status": "FAIL",
         "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
-        "baseline_setup": ("public_gateway_save_then_migrate_then_reopen_before_capture" if migrate_before_capture
+        "baseline_setup": ("public_gateway_save_then_migrate_then_reopen_then_save_before_capture" if migrate_before_capture
                            else "public_gateway_project_save_before_capture"),
     }
     runtime.category_results.append(observation)
@@ -2167,35 +2171,75 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
             observation[setup_stage].update(status="complete", transaction_id=reopened["verify"]["transaction_id"],
                 state=reopened["verify"]["state"], business_state_verified=reopened["verify"]["verification"]["business_state_verified"],
                 verification=reopened["verify"]["verification"], responses=reopened)
+            # Reopening can materialize newly loaded in-memory objects. Save that
+            # loaded state before any disk-authority baseline or media Preview.
+            setup_stage = "setup_reopen_save"
+            observation[setup_stage] = {"status": "preparing",
+                "coverage_credit": "none; baseline preparation only"}
+            saved = _save_sandbox_project(runtime)
+            observation[setup_stage].update(status="complete", transaction_id=saved["verify"]["transaction_id"],
+                state=saved["verify"]["state"],
+                business_state_verified=saved["verify"]["verification"]["business_state_verified"], responses=saved)
         except AssertionError as exc:
             observation[setup_stage]["status"] = "FAIL"
             observation[setup_stage]["failure"] = (exc.args[0] if exc.args and isinstance(exc.args[0], Mapping) else str(exc))
             raise
     assert not mapping.exists(), "This case requires the original Work Unit storage fixture"
-    work_units = sorted(project.parent.rglob("*.wwu"))
-    assert len(work_units) <= 512
+    image_root = runtime.state_dir.parent / ("cli-media-id-images-" + uuid.uuid4().hex)
+    image_root.mkdir(parents=True, exist_ok=False)
+    images = observation["model_images"] = {"root": str(image_root), "before": {}, "after": {},
+        "business_effect_verified": False}
+    before = ConsoleModelImageIndex(root=image_root, project=project, phase="before", link=images["before"])
     sample = sample_observation = None
-    expected = []
-    total_bytes = 0
-    for path in work_units:
-        candidate = observe_console_file(path, io_root=project.parent)
-        raw = base64.b64decode(candidate["content_base64"], validate=True)
-        total_bytes += len(raw)
-        assert total_bytes <= 256 * 1024 * 1024
-        for owner in ET.fromstring(raw).iter():
-            for media in owner.findall("./MediaIDList/MediaID"):
-                assert owner.get("ID") and media.get("ID")
-                expected.append([owner.attrib["ID"].upper(), media.attrib["ID"]])
-                assert len(expected) <= 100000
-                if sample is None:
-                    sample, sample_observation = path, candidate
-    assert sample is not None, "A media-ID-free project cannot establish migration effects"
+    expected, work_units = [], []
+    path = project
+    try:
+        before.save(project, observe_console_file(project, io_root=project.parent))
+        for path in project.parent.rglob("*"):
+            if not path.name.casefold().endswith(".wwu"):
+                continue
+            work_units.append(path)
+            assert len(work_units) <= before.MAX_WORK_UNITS, "Console model Work Unit count exceeded"
+        work_units.sort()
+        for path in work_units:
+            candidate = observe_console_file(path, io_root=project.parent)
+            raw = before.save(path, candidate)
+            for owner in ET.fromstring(raw).iter():
+                for media in owner.findall("./MediaIDList/MediaID"):
+                    assert owner.get("ID") and media.get("ID")
+                    expected.append([owner.attrib["ID"].upper(), media.attrib["ID"]])
+                    assert len(expected) <= 100000
+                    if sample is None:
+                        sample, sample_observation = path, candidate
+        assert sample is not None, "A media-ID-free project cannot establish migration effects"
+        before.finish()
+    except Exception as exc:
+        before.error(path, exc)
+        try:
+            before.finish()
+        except Exception as retention_error:
+            images["before"].update(complete=False, finalization_error=str(retention_error)[:2048])
+        raise
     observation.update(source_work_unit=sample_observation, baseline_media_pairs=sorted(expected))
     try:
         draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
         _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
             ["--value", "project_file", str(project)], live=True)
-        result = _complete_business_draft(runtime, draft)
+        def bind_retained_baseline(preview):
+            transaction_id = _required_string(preview, "transaction_id")
+            stored = TransactionStore(runtime.state_dir).load_preview(transaction_id)
+            prepared = stored.artifact["prepared_operation"]
+            effect = prepared["pre_state"]["cli_project_effect"]
+            files = {Path(relative).as_posix(): row for relative, row in effect["model_before"]["files"].items()}
+            observation["transaction_id"] = transaction_id
+            images["preview_binding"] = {"transaction_id": transaction_id,
+                "artifact_hash": stored.artifact_hash, "matches_before_images": False}
+            assert (prepared["dispatch"]["uri"] == "ak.wwise.cli.moveMediaIdsToSingleFile"
+                and images["before"]["complete"] and set(files) == set(before.files)
+                and all(row["status"] == "captured" and row["file_proof"] == files[relative]["proof"]
+                    for relative, row in before.files.items())), "MEDIA_BASELINE_PREVIEW_MISMATCH"
+            images["preview_binding"]["matches_before_images"] = True
+        result = _complete_business_draft(runtime, draft, inspect_preview=bind_retained_baseline)
         observation["transaction_id"] = result["verify"]["transaction_id"]
         captured = observe_console_file(mapping, io_root=project.parent)
         document = ET.fromstring(base64.b64decode(captured["content_base64"], validate=True))
@@ -2203,13 +2247,39 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
             for owner in document.findall("./MediaIDInfo/MediaIDs/Language/File/WObject")
             for media in owner.findall("MediaID")]
         assert sorted(actual) == sorted(expected), "Saved source/media multiset differs from central mapping"
-        for path in work_units:
-            captured_unit = observe_console_file(path, io_root=project.parent)
-            tree = ET.fromstring(base64.b64decode(captured_unit["content_base64"], validate=True))
-            assert not tree.findall(".//MediaIDList/MediaID"), path
         observation["status"] = "PASS"
     finally:
         capture_errors = []
+        after = None
+        try:
+            after = ConsoleModelImageIndex(root=image_root, project=project, phase="after", link=images["after"])
+            after_paths = set(work_units)
+            try:
+                for path in project.parent.rglob("*"):
+                    if not path.name.casefold().endswith(".wwu"):
+                        continue
+                    after_paths.add(path)
+                    assert len(after_paths) <= after.MAX_WORK_UNITS, "Console after-image path count exceeded"
+            except Exception as exc:
+                after.error(None, exc)
+                capture_errors.append("after_enumeration")
+            for path in [project, *sorted(after_paths)[:after.MAX_WORK_UNITS]]:
+                try:
+                    candidate = observe_console_file(path, io_root=project.parent)
+                    raw = after.save(path, candidate)
+                    if path != project and ET.fromstring(raw).findall(".//MediaIDList/MediaID"):
+                        capture_errors.append("work_unit_media_ids_remain:" + path.relative_to(project.parent).as_posix())
+                except Exception as exc:
+                    after.error(path, exc)
+                    capture_errors.append("after_capture:" + path.relative_to(project.parent).as_posix())
+            after.finish()
+        except Exception as exc:
+            if after is not None:
+                after.error(None, exc)
+            images["after"].update(complete=False, finalization_error=str(exc)[:2048])
+            capture_errors.append("after_finalization")
+        if capture_errors:
+            observation["status"] = "FAIL"
         # Preserve diagnostic bytes even when Gateway verification rejects the
         # result. This is local artifact capture, never another native attempt.
         for key, path in (("mapping_file", mapping), ("source_work_unit_after", sample)):
@@ -3664,7 +3734,7 @@ def test_rtpc_empty_create_update_delete_recreate_across_selected_version(
             _delete_if_present_via_transaction(runtime, control_id)
 
 
-def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
+def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> dict[str, Mapping[str, Any]]:
     """Persist prior sandbox mutations before a file-authority operation."""
 
     api = "ak.wwise.core.project.save"
@@ -3689,7 +3759,7 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
         assert saved["verify"]["state"] == (
             TransactionState.RESULT_SCHEMA_CHECKED.value
         ), saved
-        return
+        return saved
 
     continuation = schema.get("continuation")
     assert isinstance(continuation, Mapping), schema
@@ -3723,6 +3793,8 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
         TransactionState.VERIFIED.value,
         TransactionState.RESULT_SCHEMA_CHECKED.value,
     }, verified
+
+    return {"preview": preview, "execute": executed, "verify": verified}
 
 
 def _create_object(

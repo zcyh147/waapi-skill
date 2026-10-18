@@ -9787,6 +9787,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 effect = prepare_cli_project_effect(api, call_args, execution_contract['io_audit'], request.version)
                 if effect is not None:
                     metadata['cli_project_effect'] = effect
+                    optional_none = effect.get('model_before', {}).get('optional_none_state_materialization')
+                    if optional_none is not None:
+                        from dataclasses import replace
+                        from .console_media_ids import none_state_notice
+                        preview = replace(preview, envelope=replace(preview.envelope, metadata={
+                            **dict(preview.envelope.metadata), 'optional_none_state_materialization': none_state_notice(optional_none)}))
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api in PROJECT_CREATE_URIS:

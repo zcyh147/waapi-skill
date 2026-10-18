@@ -1587,17 +1587,39 @@ def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_
     assert any(row["reason"] == expected for row in observed["boundaries"])
 
 
-@pytest.mark.parametrize("version,migrated,wrong_open", [("2025.1", False, False), ("2023.1", True, False),
-    ("2024.1", True, False), ("2025.1", True, False), ("2023.1", True, True)])
-@pytest.mark.parametrize("wrong_media", [False, True])
-def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, wrong_media, version, migrated, wrong_open):
+@pytest.mark.parametrize("wrong_media,version,migrated,wrong_open", [
+    *[pytest.param(wrong_media, version, migrated, wrong_open,
+        id=f"{wrong_media}-{version}-{migrated}-{wrong_open}")
+      for wrong_media in (False, True) for version, migrated, wrong_open in
+      [("2025.1", False, False), ("2023.1", True, False), ("2024.1", True, False),
+       ("2025.1", True, False), ("2023.1", True, True)]],
+    *[pytest.param(fault, "2023.1", True, False, id=f"{fault}-2023.1-True-False")
+      for fault in ("preservation", "lost", "new", "after-write", "wrong-media-after-write", "before-write", "preview-drift", "uppercase-before", "uppercase-after", "reopen-materialization", "reopen-save-failure")],
+    *[pytest.param("reopen-materialization", version, True, False, id=f"reopen-materialization-{version}-True-False")
+      for version in ("2024.1", "2025.1")],
+    *[pytest.param(fault, "2025.1", False, False, id=f"{fault}-2025.1-False-False")
+      for fault in ("overflow", "uppercase-overflow")],
+])
+def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, monkeypatch, wrong_media, version, migrated, wrong_open):
     from xml.etree import ElementTree as ET
     from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, saved_fixture_project, WaapiRequestFailed, OPEN
 
     class Client(CliProjectTask):
         def __init__(self, *args):
             self.loaded, self.reopened, self.absence_errors = True, False, []
+            self.pending_reopened_state = False
             super().__init__(*args)
+
+        def materialize_reopened_state(self):
+            if self.pending_reopened_state:
+                tree = ET.parse(self.other_unit)
+                track = ET.SubElement(tree.find(".//WorkUnit/ChildrenList"), "MusicTrack", Name="Stealth",
+                    ID="{9861812D-295E-47DC-BB84-803555479814}")
+                states = ET.SubElement(ET.SubElement(track, "StateInfo"), "CustomStateList")
+                states.append(ET.fromstring('''<CustomState><StateRef Name="None" ID="{4BA09D62-D59B-4880-A78C-8BECE7D7899F}"/>
+<CustomState Name="" ID="{B5549C79-F061-49C0-8A64-21B5617FDCDF}" ShortID="824120204"/></CustomState>'''))
+                tree.write(self.other_unit)
+                self.pending_reopened_state = False
 
         def call(self, uri, args=None, options=None):
             if not self.loaded and (uri.endswith('getProjectInfo') or (
@@ -1617,9 +1639,16 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                 assert not self.loaded and args == {'path': str(self.project_file)}
                 self.loaded = True
                 self.reopened = True
+                self.pending_reopened_state = wrong_media == "reopen-materialization"
                 return {}
             if uri.endswith("project.save"):
                 self.calls.append((uri, args, options))
+                if self.reopened:
+                    assert "model_images" not in runtime.category_results[-1]
+                    assert not media_previews and not any(call[0] == self.operation for call in self.calls)
+                    if wrong_media == "reopen-save-failure":
+                        raise RuntimeError("Injected reopened project save failure")
+                self.materialize_reopened_state()
                 tree = ET.parse(self.unit)
                 tree.find(".//MediaID").set("ID", "123456")
                 tree.write(self.unit)
@@ -1632,10 +1661,11 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                 self.loaded = False
                 return {"result": 0}
             if uri == self.operation:
+                self.materialize_reopened_state()
                 self.project_file.with_suffix(".mediaid").write_text('''<WwiseDocument Type="MediaIDs">
 <MediaIDInfo><MediaIDs><Language ID="393239870" Name="SFX"><File Name="Keep.wav">
 <WObject ID="{33333333-3333-3333-3333-333333333333}"><MediaID ID="123456"/></WObject>
-</File></Language></MediaIDs></MediaIDInfo></WwiseDocument>'''.replace("123456", "654321" if wrong_media else "123456"))
+</File></Language></MediaIDs></MediaIDInfo></WwiseDocument>'''.replace("123456", "654321" if wrong_media is True or wrong_media == "wrong-media-after-write" else "123456"))
                 tree = ET.parse(self.unit)
                 source = tree.find(".//AudioFileSource")
                 source.remove(source.find("MediaIDList"))
@@ -1644,6 +1674,13 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                 ET.SubElement(tree.find("./ProjectInfo/Project/PropertyList"), "Property",
                               Name="MediaIDsInSingleFile", Type="bool", Value="True")
                 tree.write(self.project_file)
+                if wrong_media == "preservation":
+                    self.other_unit.write_bytes(self.other_unit.read_bytes().replace(b"-6", b"-9"))
+                elif wrong_media == "lost":
+                    self.other_unit.unlink()
+                elif wrong_media in {"new", "uppercase-after"}:
+                    name = "Created.WWU" if wrong_media == "uppercase-after" else "Created.wwu"
+                    (self.other_unit.parent / name).write_bytes(self.other_unit.read_bytes())
             return super().call(uri, args, options)
 
     # Native migrate leaves the same Console instance alive with no active project.
@@ -1656,21 +1693,60 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
     ET.SubElement(source, "AudioFile").text = "Keep.wav"
     ET.SubElement(ET.SubElement(source, "MediaIDList"), "MediaID", ID="111")
     tree.write(client.unit)
-    commands = []
+    client.other_unit = client.unit.with_name("Other Work Unit.WWU" if wrong_media == "uppercase-before" else "Other Work Unit.wwu")
+    other = ET.parse(client.unit)
+    for node in other.iter():
+        if node.get("ID"):
+            node.set("ID", node.get("ID").replace("1", "7").replace("2", "8").replace("3", "9"))
+    other.find(".//Sound").remove(other.find(".//Sound/ChildrenList"))
+    other.write(client.other_unit)
+    if wrong_media in {"overflow", "uppercase-overflow"}:
+        for number in range(511):
+            extension = "WWU" if wrong_media == "uppercase-overflow" else "wwu"
+            (client.unit.parent / f"Extra-{number}.{extension}").write_bytes(client.other_unit.read_bytes())
+    if wrong_media in {"before-write", "after-write", "wrong-media-after-write"}:
+        original_open = os.open
+        phase = "before" if wrong_media == "before-write" else "after"
+        def failing_open(path, flags, *args, **kwargs):
+            if (flags & os.O_WRONLY and f"/{phase}/files/" in Path(path).as_posix()
+                    and Path(path).name == client.other_unit.name):
+                raise OSError("Injected owned evidence image write failure")
+            return original_open(path, flags, *args, **kwargs)
+        monkeypatch.setattr(os, "open", failing_open)
+    commands, media_previews = [], []
 
     def gateway(command, *, live):
         commands.append(list(command))
+        if (wrong_media == "preview-drift" and command[:2] == ["draft-start", client.operation]
+                and runtime.category_results[-1].get("model_images")):
+            client.other_unit.write_bytes(client.other_unit.read_bytes().replace(b"-6", b"-9"))
         code, payload = client.run(*command)
         assert code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        if command[0] == "preview-from-draft":
+            shown_code, shown = client.run("transaction-show", payload["transaction_id"])
+            assert shown_code == 0, shown
+            prepared = shown["artifact"]["prepared_operation"]
+            if prepared["dispatch"]["uri"] == client.operation:
+                link = runtime.category_results[-1]["model_images"]["before"]
+                index = json.loads(Path(link["index_path"]).read_text())
+                assert link["complete"] and index["complete"]
+                model = {Path(relative).as_posix(): row for relative, row in
+                    prepared["pre_state"]["cli_project_effect"]["model_before"]["files"].items()}
+                assert set(index["files"]) == set(model)
+                matches = all(row["sha256"] == model[relative]["proof"]["sha256"]
+                    and row["size"] == model[relative]["proof"]["size"] for relative, row in index["files"].items())
+                assert matches is (wrong_media != "preview-drift")
+                media_previews.append(payload["transaction_id"])
         return payload
 
-    runtime = SimpleNamespace(gateway=gateway, version=version, category_results=[],
+    runtime = SimpleNamespace(gateway=gateway, version=version, category_results=[], state_dir=tmp_path / "state",
         sandbox=SimpleNamespace(sandbox_project=client.project_file),
         restart=lambda: pytest.fail('Collector must reopen the same Console instance without a host restart'))
     collect = (workflow.test_cli_console_media_id_migrated_project_acceptance if migrated
                else workflow.test_cli_console_media_id_file_observation)
-    if wrong_media or wrong_open:
-        with pytest.raises(AssertionError):
+    expects_failure = wrong_media not in {False, "uppercase-before", "reopen-materialization"} or wrong_open
+    if expects_failure:
+        with pytest.raises(OSError if wrong_media == "before-write" else AssertionError) as failure:
             collect(runtime)
     else:
         collect(runtime)
@@ -1679,6 +1755,7 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         assert category['status'] == 'FAIL' and 'baseline_media_pairs' not in category
         assert category['setup_migration']['status'] == 'complete'
         assert category['setup_reopen']['status'] == 'FAIL'
+        assert 'setup_reopen_save' not in category
         # The existing runtime gateway asserts with the complete serialized
         # failure; pytest may append its assertion rendering to that diagnostic.
         assert 'verification_failed' in str(category['setup_reopen']['failure'])
@@ -1687,15 +1764,88 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         assert not any(uri == client.operation for uri, _, _ in client.calls)
         assert [uri for uri, _, _ in client.calls].count(OPEN) == 1
         return
-    assert category["status"] == ("FAIL" if wrong_media else "PASS")
+    assert category["status"] == ("FAIL" if expects_failure else "PASS")
+    if wrong_media == "reopen-save-failure":
+        assert category['setup_migration']['status'] == category['setup_reopen']['status'] == 'complete'
+        saved = category['setup_reopen_save']
+        assert saved['status'] == 'FAIL' and saved['coverage_credit'] == 'none; baseline preparation only'
+        assert 'Injected reopened project save failure' in str(saved['failure'])
+        assert 'model_images' not in category and 'baseline_media_pairs' not in category
+        assert not media_previews and not any(uri == client.operation for uri, _, _ in client.calls)
+        writes = [uri for uri, _, _ in client.calls if uri.endswith('project.save') or uri in {'ak.wwise.cli.migrate', OPEN}]
+        assert writes == ['ak.wwise.core.project.save', 'ak.wwise.cli.migrate', OPEN, 'ak.wwise.core.project.save']
+        assert sum(command[0] == 'execute' for command in commands) == 4
+        return
+    if wrong_media == "preview-drift":
+        assert "MEDIA_BASELINE_PREVIEW_MISMATCH" in str(failure.value)
+        assert len(media_previews) == 1 and not any(uri == client.operation for uri, _, _ in client.calls)
+        assert category["model_images"]["preview_binding"]["matches_before_images"] is False
+        indexes = [json.loads(Path(category["model_images"][phase]["index_path"]).read_text()) for phase in ("before", "after")]
+        key = "Actor-Mixer Hierarchy/Other Work Unit.wwu"
+        assert all(index["complete"] for index in indexes)
+        assert indexes[0]["files"][key]["sha256"] != indexes[1]["files"][key]["sha256"]
+        return
+    if wrong_media in {"before-write", "overflow", "uppercase-overflow"}:
+        before = category["model_images"]["before"]
+        index = json.loads(Path(before["index_path"]).read_text())
+        assert before["complete"] is False and index["complete"] is False
+        assert index["errors"] and client.project_file.name in index["files"]
+        assert not media_previews and not any(uri == client.operation for uri, _, _ in client.calls)
+        assert not category["model_images"]["after"]
+        return
+    assert len(media_previews) == 1
+    binding = category["model_images"]["preview_binding"]
+    assert binding["transaction_id"] == media_previews[0] and binding["matches_before_images"] is True
+    assert len(binding["artifact_hash"]) == 64
+    if wrong_media == "wrong-media-after-write":
+        assert 'verification_failed' in str(failure.value)
+        assert 'after_capture:' not in str(failure.value)
     assert category["mapping_file"]["content_base64"]
     assert category["source_work_unit_after"]["content_base64"]
+    import hashlib
+    image_indexes = {}
+    for phase in ("before", "after"):
+        link = category["model_images"][phase]
+        index_raw = Path(link["index_path"]).read_bytes()
+        assert hashlib.sha256(index_raw).hexdigest() == link["sha256"]
+        index = json.loads(index_raw)
+        incomplete = phase == "after" and wrong_media in {"lost", "after-write", "wrong-media-after-write"}
+        assert index["complete"] is not incomplete
+        other_name = "Other Work Unit.WWU" if wrong_media == "uppercase-before" else "Other Work Unit.wwu"
+        expected_paths = {client.project_file.name, "Actor-Mixer Hierarchy/Default Work Unit.wwu", f"Actor-Mixer Hierarchy/{other_name}"}
+        if phase == "after" and wrong_media in {"new", "uppercase-after"}:
+            expected_paths.add("Actor-Mixer Hierarchy/Created.WWU" if wrong_media == "uppercase-after" else "Actor-Mixer Hierarchy/Created.wwu")
+        assert set(index["files"]) == expected_paths
+        for relative, row in index["files"].items():
+            if row["status"] != "captured":
+                assert incomplete and relative.endswith("Other Work Unit.wwu")
+                assert row["status"] == ("missing" if wrong_media == "lost" else "capture_error")
+                continue
+            raw = (Path(category["model_images"]["root"]) / row["artifact_path"]).read_bytes()
+            assert hashlib.sha256(raw).hexdigest() == row["sha256"] == row["file_proof"]["sha256"]
+            assert len(raw) == row["size"]
+            if phase == "after":
+                assert raw == (client.project_file.parent / relative).read_bytes()
+            assert "content_base64" not in row
+        image_indexes[phase] = index
+    assert image_indexes["before"]["files"][client.project_file.name]["sha256"] != image_indexes["after"]["files"][client.project_file.name]["sha256"]
+    if wrong_media == "reopen-materialization":
+        for phase in ("before", "after"):
+            row = image_indexes[phase]["files"]["Actor-Mixer Hierarchy/Other Work Unit.wwu"]
+            document = ET.parse(Path(category["model_images"]["root"]) / row["artifact_path"])
+            state = document.find('.//MusicTrack/StateInfo/CustomStateList/CustomState')
+            assert state.find("StateRef").attrib == {"Name": "None", "ID": "{4BA09D62-D59B-4880-A78C-8BECE7D7899F}"}
+            assert state.find("CustomState").attrib == {"Name": "", "ID": "{B5549C79-F061-49C0-8A64-21B5617FDCDF}", "ShortID": "824120204"}
+        assert client.pending_reopened_state is False
+    if wrong_media == "preservation":
+        key = "Actor-Mixer Hierarchy/Other Work Unit.wwu"
+        assert image_indexes["before"]["files"][key]["sha256"] != image_indexes["after"]["files"][key]["sha256"]
     assert category["baseline_media_pairs"] == [["{33333333-3333-3333-3333-333333333333}", "123456"]]
     writes = [uri for uri, _, _ in client.calls if uri.endswith("project.save") or uri in {client.operation, "ak.wwise.cli.migrate", OPEN}]
-    assert writes == ["ak.wwise.core.project.save", *(["ak.wwise.cli.migrate", OPEN] if migrated else []), client.operation]
-    assert sum(command[0] == "execute" for command in commands) == (4 if migrated else 2)
+    assert writes == ["ak.wwise.core.project.save", *(["ak.wwise.cli.migrate", OPEN, "ak.wwise.core.project.save"] if migrated else []), client.operation]
+    assert sum(command[0] == "execute" for command in commands) == (5 if migrated else 2)
     if migrated:
-        assert category["baseline_setup"] == "public_gateway_save_then_migrate_then_reopen_before_capture"
+        assert category["baseline_setup"] == "public_gateway_save_then_migrate_then_reopen_then_save_before_capture"
         assert category["setup_migration"]["state"] == "result_schema_checked"
         assert category["setup_migration"]["business_state_verified"] is False
         assert client.absence_errors and all(error.uri == 'ak.wwise.no_project_loaded' for error in client.absence_errors)
@@ -1709,6 +1859,11 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
         dispatch = shown['artifact']['prepared_operation']['dispatch']
         assert dispatch == {'uri': OPEN, 'args': {'path': str(client.project_file)}, 'options': {}}
         assert reopened['verification']['business_state_verified'] is True
+        saved = category['setup_reopen_save']
+        assert saved['status'] == 'complete' and saved['coverage_credit'] == 'none; baseline preparation only'
+        assert saved['state'] == 'result_schema_checked' and saved['business_state_verified'] is False
+        assert set(saved['responses']) == {'preview', 'execute', 'verify'}
+        assert saved['transaction_id'] not in {reopened['transaction_id'], media_previews[0]}
         assert '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}' in json.dumps(reopened['verification'])
         assert str(client.project_file) in json.dumps(reopened['verification'])
     else:
