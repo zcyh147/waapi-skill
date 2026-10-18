@@ -41,6 +41,15 @@ class ScriptedReader:
         return self.responses[uri].popleft()
 
 
+def _rtpc_volume_info():
+    # Independent stable metadata observations for prepare/execute/verify guards.
+    return {
+        "name": "Volume",
+        "type": "Real32",
+        "supports": {"randomizer": True, "rtpc": "Additive", "unlink": True},
+    }
+
+
 def _request(
     operation: str,
     arguments: Mapping[str, Any],
@@ -351,6 +360,7 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
         prepared,
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getPropertyInfo": [_rtpc_volume_info()],
                 "ak.wwise.core.object.get": [
                     {
                         "return": [
@@ -373,6 +383,7 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
     actual = _rtpc_row(points=points, notes="Distance curve")
     verify_reader = ScriptedReader(
         {
+            "ak.wwise.core.object.getPropertyInfo": [_rtpc_volume_info()],
             "ak.wwise.core.object.get": [
                 _rtpc_owner_result(actual),
                 {"return": [actual]},
@@ -386,6 +397,7 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
     )
     assert verified.ok
     assert verify_reader.calls == [
+        ("ak.wwise.core.object.getPropertyInfo", {"object": OBJECT_ID, "property": "Volume"}, {}),
         (
             "ak.wwise.core.object.get",
             {"from": {"id": [OBJECT_ID]}},
@@ -483,6 +495,7 @@ def test_live_proven_missing_empty_rtpc_field_is_normalized_through_prepare_guar
         prepared,
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getPropertyInfo": [_rtpc_volume_info()],
                 "ak.wwise.core.object.get": [
                     {
                         "return": [
@@ -511,7 +524,10 @@ def test_live_proven_missing_empty_rtpc_field_is_normalized_through_prepare_guar
         prepared,
         execution_result={"result": {}},
         read_call=ScriptedReader(
-            {"ak.wwise.core.object.get": [_missing_rtpc_owner_result(), {"return": []}]}
+            {
+                "ak.wwise.core.object.getPropertyInfo": [_rtpc_volume_info()],
+                "ak.wwise.core.object.get": [_missing_rtpc_owner_result(), {"return": []}],
+            }
         ),
     )
     assert verified.ok is False
@@ -734,6 +750,7 @@ def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
         execution_result={"result": {}},
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getPropertyInfo": [_rtpc_volume_info()],
                 "ak.wwise.core.object.get": [
                     _rtpc_owner_result(_rtpc_row(points=points)),
                     {"return": [_rtpc_row(points=points)]},

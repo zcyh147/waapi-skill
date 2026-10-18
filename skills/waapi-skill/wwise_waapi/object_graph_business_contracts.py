@@ -32,6 +32,17 @@ ACTION_CREATION_BOUNDARY = {
     "existing_object_edits": "supported_through_object_set_or_metadata_operations",
 }
 
+RTPC_PROPERTY_CARDINALITY = {
+    "metadata_source": "selected_owner_property_supports.rtpc",
+    "Exclusive": "at_most_one_RTPC_per_property_regardless_of_ControlInput",
+    "Additive": "distinct_ControlInput_pairs_remain_allowed_within_the_list_bounds",
+    "Multiplicative": "distinct_ControlInput_pairs_remain_allowed_within_the_list_bounds",
+    "same_pair_update": "retain_the_exact_existing_RTPC_GUID",
+    "different_input_append": "cannot_remove_an_unrequested_existing_Exclusive_pair",
+    "replace_all": "explicit_complete_list_replacement_still_obeys_each_Exclusive_property_limit",
+}
+
+
 _SUPPORTED_VERSIONS = {
     "object.create": SUPPORTED_WWISE_VERSIONS,
     "object.createPlugin": ("2022.1", "2023.1", "2024.1", "2025.1"),
@@ -184,6 +195,7 @@ def object_graph_business_contract_data(
                     "Exp3",
                 ],
                 "point_limit": 256,
+                "property_cardinality": dict(RTPC_PROPERTY_CARDINALITY),
             },
             "gateway_derivations": [
                 "native_property_token",
@@ -293,6 +305,7 @@ def object_graph_business_contract_data(
                 "property": "object_scoped_Field_Handle_for_existing_owner;_matching_class_Field_Handle_for_planned_owner",
                 "control_input": "bound_GameParameter_MIDI_or_Modulator_handle",
                 "identity": "unique_property_and_ControlInput_pair;_never_empty_name_matching",
+                "property_cardinality": dict(RTPC_PROPERTY_CARDINALITY),
                 "mode_values": ["add-only", "add-or-update"], "default_mode": "add-or-update",
                 "existing_pair_update": "exact_actual_RTPC_GUID_row_in_same_object_set;_no_name_merge",
                 "replace_all": "complete_selected_list_contains_only_declared_pairs;_old_pairs_are_removed",
