@@ -602,6 +602,7 @@ class HeadlessLifecycle:
         started_at = time.monotonic()
         deadline = time.monotonic() + self.timeouts.readiness
         last_error: BaseException | None = None
+        pending_host_info: dict[str, Any] | None = None
         while time.monotonic() < deadline:
             returncode = self._poll()
             if returncode is not None:
@@ -611,6 +612,8 @@ class HeadlessLifecycle:
                     duration=time.monotonic() - started_at,
                     last_error=last_error,
                 )
+                if pending_host_info is not None:
+                    diagnostics['observed_host_info'] = pending_host_info
                 raise EarlyProcessExit(self._failure_message("WwiseConsole exited before WAAPI readiness", diagnostics), diagnostics)
             try:
                 observed = self._probe_once()
@@ -619,6 +622,15 @@ class HeadlessLifecycle:
                 time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
                 continue
             if self.host_kind == 'wwise-authoring':
+                if type(observed) is dict and not observed:
+                    # The client can return {} before any host identity exists.
+                    # Poll only this exact empty shape within the same deadline;
+                    # nonempty malformed data and proved mismatches fail below.
+                    pending_host_info = {'result_type': 'dict', 'classification': 'identity_pending',
+                                         'client_result': _get_info_diagnostic(observed)}
+                    last_error = None
+                    time.sleep(min(self.timeouts.probe_interval, max(0.0, deadline - time.monotonic())))
+                    continue
                 version = observed.get('version', {}) if isinstance(observed, dict) else {}
                 parts = tuple(version.get(key) for key in ('year', 'major', 'minor', 'build')) if isinstance(version, dict) else ()
                 build = '.'.join(str(value) for value in parts) if len(parts) == 4 and all(type(value) is int for value in parts) else None
@@ -646,6 +658,8 @@ class HeadlessLifecycle:
             duration=time.monotonic() - started_at,
             last_error=last_error,
         )
+        if pending_host_info is not None:
+            diagnostics['observed_host_info'] = pending_host_info
         self.shutdown(suppress_errors=True)
         raise ReadinessTimeout(self._failure_message("WAAPI readiness timed out", diagnostics), diagnostics)
 
