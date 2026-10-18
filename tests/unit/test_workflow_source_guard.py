@@ -118,6 +118,34 @@ def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None):
     return runtime, commands, writes, task
 
 
+def test_old_root_bus_send_acceptance_uses_distinct_root_sources(tmp_path, workflow):
+    runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, '2021.1')
+    category = workflow._collect_existing_bus_send_acceptance(runtime,
+        root_name='WAAPI_EXISTING_SEND_TEST', root_sources=True)
+    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    assert category['status'] == 'PASS'
+    assert receipt['setup_coverage_credit'] is False
+    assert receipt['business_effect_verified'] is True
+    baseline, parent = receipt['baseline'], receipt['placement_parent']
+    assert parent['type'] == 'WorkUnit' and parent['class_id'] == 1638416
+    assert len({row['id'] for row in baseline.values()}) == 4
+    for role in ('root', 'source', 'batch_source'):
+        assert baseline[role]['type'] == 'Bus' and baseline[role]['class_id'] == 1376272
+        assert baseline[role]['parent']['id'] == parent['id']
+        assert baseline[role]['path'] == parent['path'] + '\\' + baseline[role]['name']
+    assert baseline['target']['type'] == 'AuxBus' and baseline['target']['class_id'] == 3997712
+    assert baseline['target']['parent']['id'] == baseline['root']['id']
+    assert [uri.rsplit('.', 1)[1] for uri, _ in writes] == ['create'] * 3 + ['setReference', 'setProperty', 'create']
+    assert [cmd[0] for cmd in commands].count('execute') == 6
+    assert [cmd[0] for cmd in commands].count('verify') == 6
+    assert 'OverrideUserAuxSends' not in json.dumps(writes)
+    assert receipt['transactions'][-1]['expected_existing_merge'] == baseline['batch_source']
+    assert writes[-1][1]['parent'] == parent['id']
+    assert writes[-1][1]['type'] == 'Bus'
+    assert len(receipt['calls']) <= 192
+    assert (runtime.state_dir / 'existing-bus-send-acceptance.json').stat().st_size <= 8 * 1024 * 1024
+
+
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
 def test_existing_bus_send_acceptance_uses_three_exact_public_mutations(tmp_path, workflow, version):
     runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version)
