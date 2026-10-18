@@ -2848,6 +2848,11 @@ def test_rtpc_graph_collector_categories_survive_existing_exact_finalizer(tmp_pa
     if failed_effect:
         with pytest.raises(AssertionError):
             workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+        receipt = json.loads((runtime.state_dir / 'rtpc-graph-acceptance.json').read_text())
+        phase = next(row for row in receipt['effects'] if row['phase'] == 'exact_update_and_append')
+        assert phase['execute']['exit_code'] == phase['verify']['exit_code'] == 0
+        assert phase['verify']['payload']['verification']['business_state_verified'] is True
+        assert phase['effect_verified'] is False and len(_writes) == 3
     else:
         workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
     (tmp_path / 'lifecycle').mkdir()
