@@ -714,6 +714,15 @@ def test_rtpc_replacement_binds_exact_pairs_when_accessor_reverses_native_result
     owner, control = task.bind(FIRST), task.bind(ROOT)
     code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
     assert code == 0, configured
+    # The native collector selects the documented List source before declaring
+    # RTPC pairs; that source guard is what activates ordered List verification.
+    code, listed = task.step('draft-discover-fields', '--object-handle', owner,
+        '--field-source', 'documented-lists', '--list')
+    assert code == 0, listed
+    selected, = [row for row in listed['agent_result']['items'] if row['name'] == 'RTPC']
+    code, disclosed = task.step('draft-discover-fields', '--object-handle', owner,
+        '--field-source', 'documented-lists', '--selection', selected['selection'])
+    assert code == 0, disclosed
     for token in ('Volume', 'Pitch'):
         declare_rtpc(task, owner, control, token, token.lower())
     original, writes = task.call, []
