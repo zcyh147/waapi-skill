@@ -5,6 +5,22 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R32 native components
+
+Voice creation at `b560eaab` passed the exact collector separately on macOS
+Console 2021.1–2025.1: **1 passed** per version in 10.90s, 5.60s, 5.85s, 5.92s
+and 6.89s. Ordinary root/nested effects apply to all five; the third object.set
+effect applies only to 2022–2025. Each original category seals its observation
+file hash. All source hash/mtime/tree and 1,882 tracked-file checks passed,
+sandboxes were deleted and no owned process remained. No media, Windows or
+Fresh evidence is implied.
+
+At `98c1f74f`, one 2025 Render clearing diagnostic passed (14.33s), observing
+both flags cleared by one first-slot setter. Its category remains diagnostic-only
+and blocked for business acceptance. Source hash/mtime/tree and 1,881 tracked
+files were unchanged; sandbox deletion and process cleanup passed. Other
+versions and the successor suffix planner are not certified by this result.
+
 ## 2026-10-18 full-coverage R31 native component
 
 At fixed `5e22e208`, the existing anonymous EffectSlot construction case passed

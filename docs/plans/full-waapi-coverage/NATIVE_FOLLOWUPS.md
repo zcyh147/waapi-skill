@@ -299,3 +299,29 @@ configuration step just to pass the case. The original 22-call receipt is in the
 authoring worktree's `created-history-807f33e7-2025-r1`. Source hashes, mtime/tree
 and 1,881 tracked files were unchanged, processes were cleaned and the failed
 sandbox was quarantined. No history effect acceptance follows from setup.
+
+## R32 empty Voice creation and Render clearing observation
+
+Fixed `b560eaab1c9dc1ce8d912f0c8084fcea2d466731` passed the Voice collector
+once on each macOS Console 2021.1–2025.1: 10.90s, 5.60s, 5.85s, 5.92s and
+6.89s. Each version proves ordinary root and nested Voice creation; 2022–2025
+also prove empty Voice through object.set. Independent reads require actual
+Boolean IsVoice=true, exact GUID/class/parent/name/notes and requested Volume.
+These are 14 separately previewed effects across five lifecycles, with no
+localized-media or Source-language claim. All source hashes/mtime/tree and
+1,882 tracked files stayed unchanged, sandboxes were deleted and owned processes
+ended. Original receipts under the short-ID worktree's
+`voice-creation-b560eaab-{2021,2022,2023,2024,2025}-r1` have their exact byte
+hashes in the final category records. Root's ignored five-version summary is
+only an index to those originals.
+
+The separate `98c1f74f` 2025 Render diagnostic observed **true,true →
+false,false** after one named setProperty call clearing the first slot. All
+other disclosed slot fields, identities, order, references and metadata stayed
+unchanged. The diagnostic test passed (14.33s, 113 public calls), but its category
+remains blocked/diagnostic-only with business_effect_verified=false: this is
+evidence for the missing suffix planner, not acceptance of that planner.
+Source hashes/mtime/tree and 1,881 tracked files stayed unchanged; the sandbox
+was deleted and processes ended. The original is in the query worktree's
+`render-suffix-98c1f74f-2025-r1`. Other modern versions and legacy scalar layout
+still need their own evidence before this behavior is generalized.

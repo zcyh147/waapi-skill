@@ -1144,3 +1144,21 @@ its repair retains the original combined request and compacts repeated summary
 identity fields without raising limits. Sound Voice creation also exposed an
 unconditional Skill rejection and generic Boolean/metadata verification defects;
 those repairs are in progress. No new ticket is closed.
+
+## R32 Voice component and history-reference repair
+
+Empty Voice creation at `b560eaab` now has matching real macOS evidence on all
+five versions: ordinary root and nested creation everywhere, plus object.set
+creation on 2022–2025. The shared semantic compiler derives IsVoice=true, and
+independent exact-GUID reads prove the actual Boolean state. Generic Boolean
+comparison and before/after class metadata guards were repaired alongside it.
+These exact component results await integration; they do not complete localized
+media, every creation condition or the parent tickets.
+
+The five-field history case preserves the actual Attenuation conditions and
+derived OverridePositioning. Deep raw metadata exposed a Draft depth limit and
+then a verify-summary limit. The repair keeps an owned, hash-bound original
+receipt reference in Draft and request, with the complete proof in the immutable
+prepared operation and journal. It must retain original source event/context
+checks and current store authority; no global limits or proof strength are to be
+relaxed. This repair and its required native acceptance remain in progress.
