@@ -239,6 +239,7 @@ OBJECT_SET_IMPORT_VERSIONS = frozenset(
 )
 OBJECT_SET_IMPORT_READBACK_FIELDS = (
     "id",
+    "classId",
     "name",
     "type",
     "path",
@@ -6047,6 +6048,7 @@ def _prepare_object_set(
                 ) from exc
             trusted_import, import_spec = _prepare_object_set_import(
                 row_import,
+                version=request.version,
                 canonical_type=target.row.get("type"),
                 type_catalog=type_catalog,
                 file_proofs=object_set_file_proofs,
@@ -6254,6 +6256,7 @@ def _prepare_object_set(
             if node.import_arg is not None:
                 trusted_import, import_spec = _prepare_object_set_import(
                     node.import_arg,
+                version=request.version,
                     canonical_type=canonical_types[node.request_path],
                     type_catalog=type_catalog,
                     file_proofs=object_set_file_proofs,
@@ -6537,6 +6540,7 @@ def _prepare_object_set(
                 if node.import_arg is not None:
                     trusted_import, import_spec = _prepare_object_set_import(
                         node.import_arg,
+                version=request.version,
                         canonical_type=canonical_types[node.request_path],
                         type_catalog=type_catalog,
                         file_proofs=object_set_file_proofs,
@@ -8379,9 +8383,22 @@ def _prepare_object_node_specs(
     return specs
 
 
+def _resolve_import_audio_source_class(version, *, catalog):
+    from .metadata_catalog import ObjectTypeCatalogLoader
+    pinned = ObjectTypeCatalogLoader().load(version).by_name(
+        "AudioSource" if version == "2021.1" else "AudioFileSource")
+    matches = [row for row in catalog if pinned is not None
+        and row.class_id == pinned.class_id and row.name == pinned.name and row.type == pinned.type]
+    if len(matches) != 1 or len([row for row in catalog if pinned is not None and row.class_id == pinned.class_id]) != 1:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "Imported AudioFileSource requires its version-pinned semantic class and one matching live getTypes row.")
+    _require_object_class_id(matches[0].class_id)
+    return matches[0]
+
+
 def _prepare_object_set_import(
     descriptor: ObjectImportDescriptor,
     *,
+    version: str,
     canonical_type: Any,
     type_catalog: Sequence[ObjectTypeMetadataRecord],
     file_proofs: list[dict[str, Any]],
@@ -8398,6 +8415,8 @@ def _prepare_object_set_import(
                 "canonical_type": canonical_type,
             },
         )
+    source_type = _resolve_import_audio_source_class(version, catalog=type_catalog)
+    class_metadata = [source_type.as_dict()]
     dispatch_files: list[dict[str, Any]] = []
     source_specs: list[dict[str, Any]] = []
     source_keys: set[tuple[tuple[str, ...], str, str, str]] = set()
@@ -8495,6 +8514,7 @@ def _prepare_object_set_import(
             dispatch_row["objectType"] = type_info.name
             source["requested_object_type"] = type_info.name
             source["requested_object_type_class_id"] = type_info.class_id
+            class_metadata.append(type_info.as_dict())
         source_key = (
             source_identity,
             str(dispatch_row.get("language", "")).casefold(),
@@ -8522,6 +8542,8 @@ def _prepare_object_set_import(
     }
     return dispatch, {
         "sources": source_specs,
+        "class_metadata": class_metadata,
+        "audio_source_class_id": source_type.class_id,
         "canonical_type": canonical_type,
         "readback_contract": (
             "copied Originals paths are located from the imported target and "
@@ -12681,6 +12703,11 @@ def _prepare_import_dynamic_fields(
             )
         target["metadata_object_type"] = type_info.name
         target["metadata_class_id"] = type_info.class_id
+        target["class_metadata"] = [type_info.as_dict()]
+        if target.get("media_expected") is True:
+            source_type = _resolve_import_audio_source_class(request.version, catalog=type_catalog)
+            target["audio_source_class_id"] = source_type.class_id
+            target["class_metadata"].append(source_type.as_dict())
 
         raw_properties = target.get("requested_properties", [])
         raw_references = target.get("requested_references", [])
@@ -12892,7 +12919,7 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, An
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
-        {"return": ["id", "name", "type", "path", "parent", "audioSource:language"]},
+        {"return": ["id", "name", "type", "classId", "path", "parent", "audioSource:language"]},
     ))
     if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
         raise OperationContractError("LOCALIZED_SOURCE_LIMIT_EXCEEDED", "Voice source discovery exceeded its bounded child limit.")
@@ -12925,7 +12952,7 @@ def _existing_sfx_source_snapshot(owner_id: str, *, version: str, read: ReadCall
     rows = _rows(read(
         OBJECT_GET_URI,
         {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
-        {"return": ["id", "name", "type", "path", "parent",
+        {"return": ["id", "name", "type", "classId", "path", "parent",
                     "originalWavFilePath" if version == "2021.1" else "originalFilePath", "audioSource:language"]},
     ))
     if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
@@ -13557,9 +13584,9 @@ def _prepare_closed_import_plan(
             if not _valid_object_id(existing_id):
                 raise OperationContractError("INVALID_READBACK", "Existing import target lacks a canonical GUID.")
             requested_type = target.get("requested_object_type")
-            if isinstance(requested_type, str) and not _import_object_type_matches(
-                rows[0].get("type"), requested_type
-            ):
+            if (not _object_class_matches(rows[0].get("classId"), target.get("metadata_class_id"))
+                    or isinstance(requested_type, str) and not _import_object_type_matches(
+                        rows[0].get("type"), requested_type)) :
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "An existing import target does not match the requested object type.",
@@ -13817,6 +13844,7 @@ def _prepare_closed_import_plan(
                     or source_row.get("path") != expected_source_path
                     or _object_type_token(source_row.get("type"))
                     != "audiofilesource"
+                    or not _object_class_matches(source_row.get("classId"), target.get("audio_source_class_id"))
                 ):
                     raise OperationContractError(
                         "INVALID_READBACK",
@@ -14201,6 +14229,7 @@ def _prepare_closed_import_plan(
         }
     guard = {
         "source_operation": source_operation,
+        "class_metadata": [row for target in targets for row in target.get("class_metadata", [])],
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
@@ -14357,7 +14386,7 @@ def _import_target_return_fields(
     *,
     version: str,
 ) -> list[str]:
-    fields = [*IDENTITY_RETURN_FIELDS]
+    fields = [*IDENTITY_RETURN_FIELDS, "classId"]
     # Wwise 2021.1 rejects the otherwise useful ``activeSource`` and
     # ``originalFilePath`` accessors on the imported Sound object.  Its import
     # result still returns the created AudioFileSource, so the verifier binds
@@ -14397,6 +14426,7 @@ def _import_target_return_fields(
 def _import_audio_source_return_fields(*, version: str) -> list[str]:
     fields = [
         "id",
+        "classId",
         "name",
         "type",
         "path",
@@ -19806,6 +19836,11 @@ def verify_prepared_operation(
                             }
                         )
                         language_rows.extend(_rows(descendant_result))
+                    for source_row in language_rows:
+                        if _object_type_token(source_row.get("type")) == "audiofilesource":
+                            check(f"{request_path} imported source class matches the sealed live class",
+                                _object_class_matches(source_row.get("classId"), import_spec.get("audio_source_class_id") if isinstance(import_spec, Mapping) else None),
+                                {"expected": import_spec.get("audio_source_class_id") if isinstance(import_spec, Mapping) else None, "actual": source_row.get("classId"), "id": source_row.get("id")})
                     grouped_candidates[read_language] = language_rows
 
                 candidate_rows: list[dict[str, Any]] = []
@@ -20079,6 +20114,7 @@ def verify_prepared_operation(
                                 for candidate in ancestor_chain
                                 if _object_type_token(candidate.get("type"))
                                 == _object_type_token(requested_source_type)
+                                and _object_class_matches(candidate.get("classId"), raw_source.get("requested_object_type_class_id"))
                                 and _import_created_name_matches(
                                     candidate.get("name"),
                                     expected_object_name,
@@ -20106,7 +20142,8 @@ def verify_prepared_operation(
                                 _object_type_token(requested_source_type) == "sound"
                                 and _object_type_token(source_target.get("type")) == "sound"
                                 and _same_identity(source_target.get("id"), object_id)
-                                and _object_type_matches(source_target.get("type"), spec)
+                                and _object_type_matches(source_target.get("type"), spec, actual_class_id=source_target.get("classId"))
+                                and _object_class_matches(source_target.get("classId"), raw_source.get("requested_object_type_class_id"))
                                 and source_target.get("name") == row.get("name")
                                 and isinstance(source_target.get("path"), str)
                                 and bool(source_target.get("path"))
@@ -21890,8 +21927,10 @@ def verify_prepared_operation(
                 expected_type = target.get("requested_object_type", "Sound")
                 check(
                     f"{label} reflected type matches the request",
-                    _import_object_type_matches(live_row.get("type"), expected_type),
-                    {"expected": expected_type, "actual": live_row.get("type")},
+                    _import_object_type_matches(live_row.get("type"), expected_type)
+                    and _object_class_matches(live_row.get("classId"), target.get("metadata_class_id")),
+                    {"expected": expected_type, "actual": live_row.get("type"),
+                        "expected_class": target.get("metadata_class_id"), "actual_class": live_row.get("classId")},
                 )
                 for property_spec in target.get("validated_properties", []):
                     property_name = property_spec.get("name")
@@ -21997,6 +22036,9 @@ def verify_prepared_operation(
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
                         if media_expected:
+                            check(f"{label} actual AudioFileSource class matches live metadata",
+                                _object_class_matches(audio_source_row.get("classId"), target.get("audio_source_class_id")),
+                                {"expected": target.get("audio_source_class_id"), "actual": audio_source_row.get("classId")})
                             check(f"{label} actual AudioFileSource belongs to the verified target",
                                   _object_type_token(audio_source_row.get("type")) == "audiofilesource"
                                   and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
