@@ -4022,8 +4022,12 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
         assert receipt['source_class_discovery'] == {'name': 'AudioSource', 'class_id': 16}
         assert all(row['independent_source']['type'] == 'AudioFileSource' and row['independent_source']['class_id'] == 16 for row in effects[:2])
         relation_calls = [call for call in receipt['calls'] if '--relationship' in call['argv']]
-        assert relation_calls and all('--language' in call['argv'] and 'SFX' in call['argv'] for call in relation_calls)
+        assert relation_calls and all('--language' in call['argv'] and 'SFX' in call['argv']
+            and call['argv'][call['argv'].index('--relationship') + 1] == 'children'
+            and call['argv'][call['argv'].index('--max-results') + 1] == '100' for call in relation_calls)
         for row in effects[:2]:
+            assert row['source_selection']['generic_active_source_mapping'] is False
+            assert row['source_selection']['children'] == [row['source_selection']['selected']]
             assert row['source_selection']['selected']['id'] == row['independent_source']['id']
             assert row['source_selection']['sound_file']['original_file_path'] == row['independent_source']['original_file_path']
         assert category['read_view_scope'] == 'current_default_view_only_unobserved_platform_identity'
@@ -4080,7 +4084,7 @@ def test_legacy_import_render_collector_rejects_live_source_move_after_gateway_v
 
 
 @pytest.mark.parametrize('fault', ['selected-source-guid', 'independent-source-parent', 'partial-source',
-    'ambiguous-source', 'source-media-mismatch'])
+    'ambiguous-source', 'empty-source', 'source-media-mismatch'])
 def test_legacy_2021_source_oracle_stops_after_verified_import_on_mismatched_selection(tmp_path, workflow, fault):
     runtime, commands, writes = _legacy_import_render_runtime(tmp_path, workflow, '2021.1', fault=fault)
     with pytest.raises(AssertionError):

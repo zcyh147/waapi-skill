@@ -7200,8 +7200,20 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
                 else: assert value is None or isinstance(value, Mapping) and uuid.UUID(value['id']).int == 0, row
             return row
         def selected_source(owner):
+            children = None
             if runtime.version == '2021.1':
-                selected = one(['--exact-id', owner['id'], '--relationship', 'active-source', '--language', 'SFX'])
+                result = gateway.gateway(['query-object', '--exact-id', owner['id'], '--relationship', 'children',
+                    '--max-results', '100', '--language', 'SFX', *projection], live=True)
+                children = result.get('objects')
+                assert isinstance(children, list) and result.get('count') == len(children) < 100, result
+                assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+                assert len({row['id'] for row in children}) == len(children), children
+                for child in children:
+                    assert isinstance(child.get('type'), str) and type(child.get('class_id')) is int and guid(child.get('parent')) == owner['id'], child
+                    assert (child['type'] == 'AudioFileSource') == (child['class_id'] == classes['AudioFileSource']), child
+                candidates = [child for child in children if child['type'] == 'AudioFileSource']
+                assert len(candidates) == 1, children
+                selected = candidates[0]
                 source_id = selected['id']
             else:
                 selected = one(['--exact-id', owner['id'], '--include', 'active-source'])
@@ -7211,6 +7223,9 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
             assert source['type'] == 'AudioFileSource' and source['class_id'] == classes['AudioFileSource'] and guid(source.get('parent')) == owner['id'], source
             assert isinstance(source.get('source_language'), Mapping) and source['source_language'].get('name') == 'SFX', source
             selection = {'selected': selected}
+            if children is not None:
+                selection.update(children=children, scope='complete_unique_source_child_and_matching_sound_wav',
+                    generic_active_source_mapping=False)
             if runtime.version == '2021.1':
                 for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes'):
                     assert (key in selected) == (key in source) and selected.get(key) == source.get(key), (selected, source)

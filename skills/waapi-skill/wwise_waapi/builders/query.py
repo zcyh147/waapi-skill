@@ -24,7 +24,7 @@ from wwise_waapi.builders.schema import SemanticSchemaValidator  # pyright: igno
 from wwise_waapi.builders.source_notes import SemanticSourceNoteChecker  # pyright: ignore[reportMissingImports]
 
 
-SUPPORTED_SELECTS = ("descendants", "ancestors", "referencesTo", "children", "parent", "activeSource")
+SUPPORTED_SELECTS = ("descendants", "ancestors", "referencesTo", "children", "parent")
 SUPPORTED_OPERATORS = ("=", "!=", "<", "<=", ">", ">=", ":")
 MAX_QUERY_TAKE = 1000
 MAX_QUERY_RETURN_SCOPE_BYTES = 512
@@ -164,9 +164,6 @@ def build_object_get_query(
     else:
         source = _source_clause(path=path, object_id=object_id, type=type, search=search, query=query)
     clauses = [source]
-    if select is not None and "activeSource" in ((select,) if isinstance(select, str) else select) and version != "2021.1":
-        raise SemanticValidationError(SemanticErrorCode.SEMANTIC_SCHEMA_MISMATCH,
-            "The closed activeSource relationship is established only for Wwise 2021.1.")
     clauses.extend(_select_clauses(select))
     predicate_clause = _where_clause(where)
     if predicate_clause:

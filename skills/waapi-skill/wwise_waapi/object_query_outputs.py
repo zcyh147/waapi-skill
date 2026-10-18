@@ -140,8 +140,8 @@ def available_query_outputs(version: str) -> dict[str, tuple[str, str]]:
                if name in LEGACY_OUTPUTS or binding[0] in properties}
     if version == "2021.1":
         # The pinned 2021 object.get return contract uses the older WAV accessor.
-        # activeSource is documented as a WAQL object expression, not a return
-        # accessor; its separate closed relationship preserves that distinction.
+        # The pinned Console rejects activeSource as a return accessor and as
+        # a traversal despite SDK documentation. Do not advertise either form.
         outputs["original-file-path"] = ("originalWavFilePath", "original_file_path")
         outputs.pop("active-source")
     return outputs
@@ -160,9 +160,10 @@ def query_output_detail(version: str, name: str) -> dict[str, Any]:
         "native_definition": {"version": version, "document": "waapi_definitions.json",
                               "pointer": "/definitions/objectReturn/properties/" + native} if schema else None,
         "presence": "optional; unavailable_fields preserves absence and explicit null stays null",
-        **({"alternative": {"relationship": "active-source", "source": "one exact Sound GUID or path",
-                             "gateway_option": "--relationship active-source", "version": "2021.1",
-                             "result": "selected source identity; then read that exact GUID"}}
+        **({"alternative": {"relationship": "children", "source": "one exact Sound GUID or path",
+                             "guidance": "use --relationship children with an explicit result bound for source discovery; generic active-source mapping for this Console remains unresolved",
+                             "version": "2021.1", "active_selection_proof": False,
+                             "scope": "child discovery alone does not certify which source is active"}}
            if version == "2021.1" and name == "active-source" else {}),
     }
 

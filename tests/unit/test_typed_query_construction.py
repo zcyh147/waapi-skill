@@ -1368,7 +1368,7 @@ def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_p
             assert expected in options["return"]
             if version == "2021.1":
                 assert not {"originalFilePath", "activeSource"} & set(options["return"])
-                assert args["waql"] == f'from object "{sound}" select activeSource take 1'
+                assert args["waql"] == f'from object "{sound}" select children take 100'
                 row = {"id": source, "name": "Audio", "type": "AudioFileSource", "path": r"\Sound\Audio"}
             else:
                 assert args["waql"] == f'from object "{sound}"'
@@ -1377,7 +1377,7 @@ def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_p
             return {"return": [row]}
     env, client = _env(tmp_path, version), Client(version)
     argv = ["query-object", "--exact-id", sound, "--language", "SFX", "--include", "original-file-path"]
-    argv += ["--relationship", "active-source"] if version == "2021.1" else ["--include", "active-source"]
+    argv += ["--relationship", "children", "--max-results", "100"] if version == "2021.1" else ["--include", "active-source"]
     code, result = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
     assert code == 0, result
     assert result["objects"][0]["original_file_path"] == "/owned/Originals/SFX/Audio.wav"
@@ -1387,22 +1387,20 @@ def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_p
         code, schema = gateway.execute_gateway(["query-schema", "--output", "active-source"], env=env)
         detail = schema["business_output"]
         assert code == 0 and detail["available"] is False
-        assert detail["alternative"]["relationship"] == "active-source"
+        assert detail["alternative"]["relationship"] == "children"
+        assert detail["alternative"]["active_selection_proof"] is False
         before = len(client.calls)
         code, error = gateway.execute_gateway(["query-object", "--exact-id", sound, "--include", "active-source"],
             env=env, client_factory=lambda _: client)
-        assert code != 0 and "--relationship active-source" in error["message"]
+        assert code != 0 and "remains unresolved" in error["message"]
         assert len(client.calls) == before
         code, detail = gateway.execute_gateway(["query-schema", "--output", "original-file-path"], env=env)
         assert code == 0 and detail["business_output"]["native_definition"]["pointer"].endswith("/originalWavFilePath")
-        for suffix in (["--max-results", "2"], ["--relationship", "parent"]):
-            code, error = gateway.execute_gateway(["query-object", "--exact-id", sound,
-                "--relationship", "active-source", *suffix], env=env, client_factory=lambda _: client)
-            assert code != 0 and len(client.calls) == before
+        code, schema = gateway.execute_gateway(["query-schema"], env=env)
+        assert code == 0 and "active-source" not in schema["relationships"]
+        with pytest.raises(SystemExit):
+            gateway.build_parser().parse_args(["query-object", "--exact-id", sound, "--relationship", "active-source"])
+        assert len(client.calls) == before
     else:
         code, schema = gateway.execute_gateway(["query-schema"], env=env)
         assert code == 0 and "active-source" not in schema["relationships"]
-        before = len(client.calls)
-        code, error = gateway.execute_gateway(["query-object", "--exact-id", sound,
-            "--relationship", "active-source"], env=env, client_factory=lambda _: client)
-        assert code != 0 and len(client.calls) == before
