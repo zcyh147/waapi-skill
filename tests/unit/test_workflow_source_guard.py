@@ -20,7 +20,7 @@ def workflow(monkeypatch):
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
 
 
-def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None):
+def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, noisy_fields=False):
     """The real public Gateway above an exact, independently mutated native tree."""
     from copy import deepcopy
     import uuid
@@ -40,13 +40,36 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None):
     independent_read = False
     original = task.call
     base = parent_path + r"\WAAPI_RESULT_REFERENCE_TEST"
+    # Exact names from the owned 2025 receipt; target metadata below stays a unit fixture.
+    task.reference_field_names = [
+        'Attenuation', '3DPosition', '3DSpatialization', 'AttenuationDistanceScaling',
+        'BusChannelConfig', 'BusVolume', 'BypassEffect', 'CenterPercentage',
+        'Color', 'EnableAttenuation', 'EnableDiffraction', 'GameAuxSendHPF',
+        'GameAuxSendDSF', 'GameAuxSendLPF', 'GameAuxSendVolume', 'Highpass',
+        'HoldEmitterPositionOrientation', 'HoldListenerOrientation', 'ListenerRelativeRouting', 'Lowpass',
+        'OutputBusHighpass', 'OutputBusDualshelf', 'OutputBusLowpass', 'OutputBusVolume',
+        'OverrideColor', 'Pitch', 'ReflectionsVolume', 'SpeakerPanning',
+        'SpeakerPanning3DSpatializationMix', 'UseGameAuxSends', 'UserAuxSendHPF0', 'UserAuxSendHPF1',
+        'UserAuxSendHPF2', 'UserAuxSendHPF3', 'UserAuxSendLPF0', 'UserAuxSendLPF1',
+        'UserAuxSendLPF2', 'UserAuxSendLPF3', 'UserAuxSendVolume0', 'UserAuxSendVolume1',
+        'UserAuxSendVolume2', 'UserAuxSendVolume3', 'Volume', 'ReflectionsAuxSend',
+        'UserAuxSend0', 'UserAuxSend1', 'UserAuxSend2', 'UserAuxSend3',
+    ] if noisy_fields else ["UserAuxSend0"]
 
     def call(uri, args=None, options=None):
         if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args.get("classId") == 3997712 or args.get("object") == source, args
             if uri.endswith("getPropertyAndReferenceNames"):
-                return {"return": ["UserAuxSend0"]}
+                return {"return": task.reference_field_names}
+            if args["property"].startswith(("UserAuxSendHPF", "UserAuxSendLPF")):
+                name = args["property"]
+                band, index = ("HPF" if "HPF" in name else "LPF"), name[-1]
+                return {"name": name, "type": "int16", "default": 0,
+                    "display": {"name": "User-Defined Auxiliary " + band + " " + index},
+                    "restriction": {"type": "range", "min": 0, "max": 100},
+                    "dependencies": [{"action": "Show", "context": "Self", "type": "isMasterBus", "value": False},
+                        {"action": "Enable", "context": "Self", "property": "OverrideUserAuxSends", "type": "override"}]}
             assert args["property"] == "UserAuxSend0", args
             return {"name": "UserAuxSend0", "type": "Reference", "display": {"name": "User-Defined Auxiliary Send 0"},
                 "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
@@ -108,6 +131,68 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None):
             env=runtime.env, client_factory=lambda _url: task)
     runtime.raw_gateway = raw
     return runtime, commands, writes, task
+
+
+def test_new_result_reference_acceptance_selects_exact_listed_reference_amid_native_neighbours(tmp_path, workflow):
+    runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", noisy_fields=True)
+    category = workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    assert category["status"] == "PASS", category
+    assert len(writes) == 1
+    discovery = [command for command in commands if command[0] == "draft-discover-fields"]
+    assert "--list" in discovery[0] and "--selection" in discovery[1], discovery
+    assert not any("--meaning" in command for command in discovery)
+    assert {args["property"] for uri, args, _ in task.calls if uri.endswith("getPropertyInfo")} == {"UserAuxSend0"}
+    exact_read = next(command for command in commands if command[0] == "query-object" and "--include-field" in command)
+    assert exact_read[exact_read.index("--include-field") + 1] == "UserAuxSend0"
+
+
+def test_new_result_reference_acceptance_copies_opaque_field_list_page(tmp_path, workflow):
+    runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", noisy_fields=True)
+    # Synthetic preceding names force a second real Gateway page; their metadata is never requested.
+    task.reference_field_names = [f"AA_Field{index:02}" for index in range(70)] + task.reference_field_names
+    raw = runtime.raw_gateway
+    pages = []
+
+    def capture(command):
+        code, payload = raw(command)
+        if command[0] == "draft-discover-fields" and "--list" in command:
+            pages.append(payload["agent_result"])
+        return code, payload
+
+    runtime.raw_gateway = capture
+    category = workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    assert category["status"] == "PASS" and len(writes) == 1, category
+    listed_commands = [command for command in commands if command[0] == "draft-discover-fields" and "--list" in command]
+    assert len(listed_commands) == len(pages) == 2
+    assert pages[0]["complete"] is False and pages[1]["complete"] is True
+    assert listed_commands[1][listed_commands[1].index("--page") + 1] == pages[0]["next_page"]
+    assert {args["property"] for uri, args, _ in task.calls if uri.endswith("getPropertyInfo")} == {"UserAuxSend0"}
+
+
+@pytest.mark.parametrize("fault", ("missing-target", "selection-drift"))
+def test_new_result_reference_acceptance_rejects_unavailable_exact_selection_without_write(tmp_path, workflow, fault):
+    runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", noisy_fields=True)
+    raw = runtime.raw_gateway
+    if fault == "missing-target":
+        task.reference_field_names.remove("UserAuxSend0")
+
+    def drift(command):
+        if command[0] == "draft-discover-fields" and "--selection" in command:
+            task.reference_field_names.remove("UserAuxSend0")
+        return raw(command)
+
+    runtime.raw_gateway = drift
+    with pytest.raises(AssertionError):
+        workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    category, = runtime.category_results
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "FAIL" and receipt["native_outcome"] == "not_executed", receipt
+    assert receipt["business_effect_verified"] is False
+    assert not writes and not any(command[0] == "execute" for command in commands)
+    assert not any(uri.endswith("getPropertyInfo") for uri, _args, _options in task.calls)
+    if fault == "selection-drift":
+        assert receipt["calls"][-1]["exit_code"] != 0
+        assert receipt["calls"][-1]["payload"]["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED"
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))

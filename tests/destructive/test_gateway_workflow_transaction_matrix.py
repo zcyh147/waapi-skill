@@ -4456,15 +4456,36 @@ def _collect_new_result_scalar_reference_acceptance(
         return rows[0]
 
     segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
-    field_meaning = "User-Defined Auxiliary Send 0"
     try:
         draft = _start_business_draft(gateway, operation)
         parent_handle = _bind_business_object(gateway, draft, path_segments=segments)
         types = {name: _discover_business_type(gateway, draft, meaning=name, role="object", expected_label=name)
             for name in ("Bus", "AuxBus")}
+        # Browse names before binding: the human display meaning also matches HPF/LPF fields.
+        page = None
+        seen_pages = set()
+        selected_field = None
+        for _ in range(4):
+            listed = _update_business_draft(gateway, draft, "draft-discover-fields",
+                ["--type-handle", types["AuxBus"], "--list", "--page-size", "64",
+                    *(["--page", page] if page is not None else [])], live=True)
+            listing = listed["agent_result"]
+            matches = [field for field in listing["fields"] if field.get("name") == "UserAuxSend0"]
+            assert len(matches) <= 1, listing
+            if matches:
+                selected_field = matches[0]
+                break
+            if listing.get("complete") is True:
+                break
+            # --page is the public opaque continuation; never derive its contents or offset.
+            page = _required_string(listing, "next_page")
+            assert page not in seen_pages, "repeated field-list page"
+            seen_pages.add(page)
+        assert selected_field is not None, "UserAuxSend0 was not disclosed within four field-list pages"
+        field_name = _required_string(selected_field, "name")
         discovered = _update_business_draft(gateway, draft, "draft-discover-fields",
-            ["--type-handle", types["AuxBus"], "--meaning", field_meaning], live=True)
-        field_handle = discovered_business_field_handle(discovered, field_meaning)
+            ["--type-handle", types["AuxBus"], "--selection", _required_string(selected_field, "selection")], live=True)
+        field_handle = discovered_business_field_handle(discovered, field_name)
         root = _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "root",
             "--parent-handle", parent_handle, "--name", root_name, "--kind", types["Bus"]], live=False)
         root_handle = declared_business_object_handle(root, "root")
@@ -4499,7 +4520,7 @@ def _collect_new_result_scalar_reference_acceptance(
             path_segments = (*segments, root_name, *child_segments)
             found = exact_row(["query-object", *(value for segment in path_segments for value in ("--path-segment", segment))])
             exact = exact_row(["query-object", "--exact-id", found["id"], "--include", "class-id", "--include", "parent",
-                *(["--include-field", field_meaning] if name == "source" else [])])
+                *(["--include-field", field_name] if name == "source" else [])])
             assert all(found.get(key) == exact.get(key) for key in ("id", "name", "type", "path")), (found, exact)
             receipt["independent_" + name] = exact
             independently_found[name] = exact
