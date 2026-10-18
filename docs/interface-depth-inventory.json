@@ -37900,6 +37900,47 @@
     {
       "model_values": [
         {
+          "channel": "business_declaration",
+          "name": "layout_handle",
+          "path": [
+            "business",
+            "layout_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "reset_scope",
+          "path": [
+            "business",
+            "reset_scope"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "business_declaration",
+          "name": "reset_layout_handles",
+          "path": [
+            "business",
+            "reset_layout_handles"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "284a15ed323214863c252c1a111c8d0dcfe38b28cec322f4905411d96638112f"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "abort-on-load-issues",
           "path": [
@@ -174405,9 +174446,9 @@
   "historical_baseline": {
     "construction_coverage_is_depth_evidence": false,
     "contract": "waapi-skill.typed-request-surface/v1",
-    "total_lanes": 896
+    "total_lanes": 897
   },
-  "inventory_sha256": "11c03529efff28ced89392624793853849bd3f0b82c0e7b520a32e2a1783197c",
+  "inventory_sha256": "14ae8c84363148103665353facc606f2b3a134417f4576e261e4de611d6022ba",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -187093,10 +187134,11 @@
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "f6ee2e9208b4f0d34297df76f76257db252cb9fa08115de2f778ffe52c4557b4",
+      "execution_policy_sha256": "63f8ae73168409b971c19ced1436e4b7350dcb6f661939531f3bee7bcc5d34f9",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
@@ -187116,7 +187158,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "isolated_transaction",
+      "route": "transaction",
       "schema_sha256": "b3dbd4cdaffd5b5bcc77ac9a1492de065b21276320d28f2fb99d462198836747",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2023.1"
@@ -193490,10 +193532,11 @@
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "d070da854d5754c97999a7f098a71868e4ed36686776cb3ebb54d38eecd82a9c",
+      "execution_policy_sha256": "d670fec4dc80dfdacd4804f0ddd53f0ff67ba250edf675573450ecb47cece6ca",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
@@ -193513,7 +193556,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "isolated_transaction",
+      "route": "transaction",
       "schema_sha256": "d62acc040a7241d58cc3aa5bb096207a90713a42ee4063cb62cd45cceef3ace9",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2024.1"
@@ -200887,10 +200930,11 @@
       "classification": "generic-core-remaining",
       "construction_shape": "inline",
       "continuation_commands": [
-        "request-schema"
+        "request-schema",
+        "core-call"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "c4f7473cf3c789e39bfa681b2bbdf46188e14a04c92a71adcd3dfc5a97d916f5",
+      "execution_policy_sha256": "371cd41f8b9c68d67b24b70765b148c0d43c713d16f164a86acda46387188603",
       "field_contract_sha256": "bb9f35bf35e3f05f3309fac5ec4cfd8639ec84cabf86b5a95988b12a20412a54",
       "host": "wwise-console",
       "item_type": "function",
@@ -200910,7 +200954,7 @@
         "wire_type": "gateway_owned"
       },
       "owner_issue": null,
-      "route": "isolated_transaction",
+      "route": "transaction",
       "schema_sha256": "d62acc040a7241d58cc3aa5bb096207a90713a42ee4063cb62cd45cceef3ace9",
       "uri": "ak.wwise.core.sourceControl.getStatus",
       "version": "2025.1"
@@ -202506,6 +202550,39 @@
       "route": "managed_transaction",
       "schema_sha256": "2487a853cb9188aea76e59f1dd8f5dfb6821081dcf39896d8952c9bf40ad7509",
       "uri": "ak.wwise.ui.layout.removeLayout",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_business",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "e2b46967c963e7f1cbe01d2468096265aa64836834d970a2836f33407230e2c8",
+      "field_contract_sha256": "284a15ed323214863c252c1a111c8d0dcfe38b28cec322f4905411d96638112f",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "5dd712e76fe57bc00c997c95aa7d97b8dccc753713fa328a762becb5f32fbfd5",
+      "uri": "ak.wwise.ui.layout.resetLayouts",
       "version": "2025.1"
     },
     {
@@ -208437,19 +208514,19 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "8a5a4dd5f42dabe59f167fe889f4d6fa102683a575a1cf448b7740120296b2c6",
+    "gateway_parser_sha256": "d2a3dd67210863e8fff9ff656aef14a38d803a8fd9d8013fbc46ae5cbbaaef8d",
     "operation_contract_sha256": "c5165c25b612525fa840da15709d7cc5fea6de8345f82c6c82fae2511a7d7f34",
-    "public_continuation_sha256": "284e37dfe7f982ad079d2020316e54035f0541a721cb1dc08c62963da4497dd0",
-    "typed_request_surface_sha256": "667ce63d93b3a38f1d14d7348ae82fe728e731f24021ec868c687f2a2a5b87c7"
+    "public_continuation_sha256": "9dc64f4b2d3b2c30d8fd73de30c1ce13772a8e969c04770da2b9b96226a657f2",
+    "typed_request_surface_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150"
   },
   "summary": {
     "migration_ticket_families": 2,
     "native_dispositions": {
       "already_deep": 710,
-      "migration_required": 47,
+      "migration_required": 48,
       "prohibited_boundary": 139
     },
-    "native_lanes": 896,
+    "native_lanes": 897,
     "operation_dispositions": {
       "already_deep": 148,
       "prohibited_boundary": 5
@@ -208461,7 +208538,7 @@
     {
       "github_issue": 188,
       "id": "authoring-layout-partial",
-      "row_count": 29,
+      "row_count": 30,
       "rows": [
         "2024.1|function|ak.wwise.ui.layout.dockView",
         "2024.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
@@ -208489,11 +208566,12 @@
         "2025.1|function|ak.wwise.ui.layout.getViewTypes",
         "2025.1|function|ak.wwise.ui.layout.moveSplitter",
         "2025.1|function|ak.wwise.ui.layout.removeLayout",
+        "2025.1|function|ak.wwise.ui.layout.resetLayouts",
         "2025.1|function|ak.wwise.ui.layout.setLayout",
         "2025.1|function|ak.wwise.ui.layout.switchLayout",
         "2025.1|function|ak.wwise.ui.layout.undockView"
       ],
-      "rows_sha256": "9bfa4f48145a623a247b7341ab5175fea236f26aa9f729115afd50806e4e312f",
+      "rows_sha256": "ce35bc537d44419f735e74285ed52659c3483e1037dde5d085013e198be98c28",
       "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence.",
       "title": "Complete ordinary Authoring layout business contracts and evidence"
     },

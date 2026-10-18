@@ -64,10 +64,10 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 736,
+        "function_lanes": 737,
         "topic_lanes": 160,
-        "total_lanes": 896,
-        "unique_function_uris": 192,
+        "total_lanes": 897,
+        "unique_function_uris": 193,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -478,8 +478,8 @@ def test_closed_layout_business_lanes_retain_exact_native_request_definition_obl
     result = build_typed_request_surface(root=RESOURCE_ROOT)
     rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business'
             and row['uri'].startswith('ak.wwise.ui.layout.')]
-    assert len(rows) == 15
-    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView', 'undockView', 'dockView', 'moveSplitter'}
+    assert len(rows) == 16
+    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView', 'undockView', 'dockView', 'moveSplitter', 'resetLayouts'}
     assert {row['version'] for row in rows if row['uri'].endswith('.closeView')} == {'2025.1'}
     assert result['unresolved_references'] == []
     for row in rows:

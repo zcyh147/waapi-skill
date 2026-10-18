@@ -19,12 +19,12 @@
         "special_unique_uris": 52
       },
       "wwise-authoring-ui": {
-        "function_rows": 736,
-        "unique_function_uris": 192,
+        "function_rows": 737,
+        "unique_function_uris": 193,
         "generic_reflected_rows": 458,
         "generic_reflected_unique_uris": 116,
-        "special_rows": 278,
-        "special_unique_uris": 76
+        "special_rows": 279,
+        "special_unique_uris": 77
       }
     },
     "reviewed_generic_restrictions": {
@@ -100,6 +100,7 @@
       "ak.wwise.ui.layout.getViewTypes",
       "ak.wwise.ui.layout.moveSplitter",
       "ak.wwise.ui.layout.removeLayout",
+      "ak.wwise.ui.layout.resetLayouts",
       "ak.wwise.ui.layout.setLayout",
       "ak.wwise.ui.layout.switchLayout",
       "ak.wwise.ui.layout.undockView",

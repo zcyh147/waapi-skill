@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "667ce63d93b3a38f1d14d7348ae82fe728e731f24021ec868c687f2a2a5b87c7",
+  "inventory_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -17572,31 +17572,31 @@
       "definition_graph_sha256": "dcbd1cc56ba2680898f123966f74db81cf693ed3ce9f03339f89751a18ef536f",
       "execution_policy": {
         "accepted_authorization_modes": [
-          "explicit_confirmation",
-          "policy_authorization"
+          "explicit_confirmation"
         ],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
-        "effect": "external",
+        "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "isolated_transaction-result-schema",
+        "program_case": "transaction-result-schema",
         "project_guard_mode": "invariant",
         "requires_authorization": true,
         "result_limit_bytes": 1048576,
-        "route": "isolated_transaction",
-        "timeout_seconds": 120.0,
+        "route": "transaction",
+        "timeout_seconds": 30.0,
         "uri": "ak.wwise.core.sourceControl.getStatus",
         "verification_strategy": "result_schema",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "f6ee2e9208b4f0d34297df76f76257db252cb9fa08115de2f778ffe52c4557b4",
+      "execution_policy_sha256": "63f8ae73168409b971c19ced1436e4b7350dcb6f661939531f3bee7bcc5d34f9",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -26428,31 +26428,31 @@
       "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
       "execution_policy": {
         "accepted_authorization_modes": [
-          "explicit_confirmation",
-          "policy_authorization"
+          "explicit_confirmation"
         ],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
-        "effect": "external",
+        "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "isolated_transaction-result-schema",
+        "program_case": "transaction-result-schema",
         "project_guard_mode": "invariant",
         "requires_authorization": true,
         "result_limit_bytes": 1048576,
-        "route": "isolated_transaction",
-        "timeout_seconds": 120.0,
+        "route": "transaction",
+        "timeout_seconds": 30.0,
         "uri": "ak.wwise.core.sourceControl.getStatus",
         "verification_strategy": "result_schema",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "d070da854d5754c97999a7f098a71868e4ed36686776cb3ebb54d38eecd82a9c",
+      "execution_policy_sha256": "d670fec4dc80dfdacd4804f0ddd53f0ff67ba250edf675573450ecb47cece6ca",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -43347,31 +43347,31 @@
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {
         "accepted_authorization_modes": [
-          "explicit_confirmation",
-          "policy_authorization"
+          "explicit_confirmation"
         ],
         "companion_uris": [],
         "contract": "waapi-skill.public-execution-contract/v2",
-        "effect": "external",
+        "effect": "read",
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "request-schema"
+          "request-schema",
+          "core-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
         "post_execution_project_guard_policy": "revalidate",
-        "program_case": "isolated_transaction-result-schema",
+        "program_case": "transaction-result-schema",
         "project_guard_mode": "invariant",
         "requires_authorization": true,
         "result_limit_bytes": 1048576,
-        "route": "isolated_transaction",
-        "timeout_seconds": 120.0,
+        "route": "transaction",
+        "timeout_seconds": 30.0,
         "uri": "ak.wwise.core.sourceControl.getStatus",
         "verification_strategy": "result_schema",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "c4f7473cf3c789e39bfa681b2bbdf46188e14a04c92a71adcd3dfc5a97d916f5",
+      "execution_policy_sha256": "371cd41f8b9c68d67b24b70765b148c0d43c713d16f164a86acda46387188603",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 3,
@@ -46373,6 +46373,172 @@
       ],
       "schema_sha256": "2487a853cb9188aea76e59f1dd8f5dfb6821081dcf39896d8952c9bf40ad7509",
       "uri": "ak.wwise.ui.layout.removeLayout",
+      "version": "2025.1"
+    },
+    {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
+            "layout_handle": "scoped_layout_handle",
+            "reset_layout_handles": "ordered_scoped_layout_handles",
+            "reset_scope": "enum:native_omission,empty_selection,selected_layouts"
+          },
+          "input_forms": {
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "reset_layout_handles": {
+              "gateway_flag": "--reset-layout-handle",
+              "shape": "repeatable_scalar"
+            },
+            "reset_scope": {
+              "gateway_flag": "--reset-scope",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [
+            "reset_layout_handles"
+          ],
+          "public_fields": [
+            "layout_handle",
+            "reset_scope",
+            "reset_layout_handles"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "reset_scope"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "ordered native names only from selected handles",
+          "native omission or empty-array envelope from explicit scope",
+          "independent bounded post-reset observations with no certified default-state oracle"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.resetLayouts",
+        "responsibility_split": {
+          "agent": [
+            "choose the exact native selection form and any discovered layout handles"
+          ],
+          "gateway": [
+            "bind live session and exact selected layouts",
+            "freeze and revalidate the live name catalog",
+            "preserve omission, empty and ordered repeated selections",
+            "reset once after authorization",
+            "observe layouts without claiming defaults were certified"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "selection_discovery": {
+          "anchor_role": "layout_handle binds the live instance; it does not add that layout to the reset selection",
+          "catalog_scope": "factory layout names; this is not an enumeration of all temporary layouts",
+          "certify_each_choice": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "names"
+          ]
+        },
+        "selection_semantics": {
+          "empty_selection": "send native layouts: []",
+          "native_omission": "omit native layouts",
+          "resource_boundary": "at most 32 selected handle entries; larger native lists remain an implementation obligation",
+          "selected_layouts": "send exact discovered names in supplied order, preserving repeats",
+          "unspecified_native_scope": "Matching native schema/docs do not define the omission/empty scope; neither is labelled all or none."
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.resetLayouts"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "boundary": "default-state oracle and omission/empty effect semantics remain unproved under #188",
+          "business_state_verified": false,
+          "kind": "authoring-layout-reset-observation",
+          "observation": "bounded current/name/selected layout readbacks"
+        },
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.resetLayouts",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "e2b46967c963e7f1cbe01d2468096265aa64836834d970a2836f33407230e2c8",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 0,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "5dd712e76fe57bc00c997c95aa7d97b8dccc753713fa328a762becb5f32fbfd5",
+      "uri": "ak.wwise.ui.layout.resetLayouts",
       "version": "2025.1"
     },
     {
@@ -56682,10 +56848,10 @@
     }
   },
   "totals": {
-    "function_lanes": 736,
+    "function_lanes": 737,
     "topic_lanes": 160,
-    "total_lanes": 896,
-    "unique_function_uris": 192,
+    "total_lanes": 897,
+    "unique_function_uris": 193,
     "unique_topic_uris": 35
   },
   "unknown_schema_keywords": [],
