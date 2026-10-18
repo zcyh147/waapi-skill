@@ -2852,13 +2852,18 @@ def test_rtpc_graph_collector_categories_survive_existing_exact_finalizer(tmp_pa
         workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
     (tmp_path / 'lifecycle').mkdir()
     fixture, events, records = _fixture_run(tmp_path / 'lifecycle', workflow, monkeypatch)
+    from tests.destructive.support import category_evidence
+    target = tmp_path / 'category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    monkeypatch.setattr(exact_real_evidence, 'append_category_evidence', category_evidence.append_category_evidence)
     fixture_runtime = next(fixture)
     fixture_runtime.category_results.extend(runtime.category_results)
     with pytest.raises(StopIteration):
         next(fixture)
-    assert records[-1]['invocation']['phase'] == 'final'
-    retained = records[-1]['categories']
+    retained_rows = [json.loads(line) for line in target.read_text().splitlines()]
+    assert retained_rows[-1]['invocation']['phase'] == 'final'
+    retained = retained_rows[-1]['categories']
     phases = [row for row in retained if row['category'].startswith('rtpc-graph-')]
     assert phases and all(row['verifier_strength'] for row in phases)
     assert any(row['status'] == ('FAIL' if failed_effect else 'blocked') for row in phases)
-    assert events.index('shutdown') < events.index('record:final')
+    assert events.index('shutdown') < events.index('release')
