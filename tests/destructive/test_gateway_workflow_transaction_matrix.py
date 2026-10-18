@@ -2423,7 +2423,13 @@ def test_host_ui_debug_business_schema_read(
 def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
     """Retain four exact native observations; do not certify a signal algorithm."""
     from wwise_waapi.operation_soundbank import capture_file_proof
-    assert runtime.version == '2025.1', 'This first Tone characterization tranche is2025.1 only'
+    from wwise_waapi.native_catalog import load_native_catalog
+    assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Tone is absent from the pinned older routes'
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    assert 'ak.wwise.debug.generateToneWAV' in catalog['functions']
+    assert 'ak.wwise.debug.generateToneWAV' in catalog['schemas']
+    catalog_identity = {'host': 'wwise-console', 'version': runtime.version,
+        'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']}
     output = runtime.state_dir / 'tone-stationary-characterization.json'
     assert not output.exists(), 'Never overwrite an original Tone characterization'
     runtime.state_dir.mkdir(parents=True, exist_ok=True)
@@ -2444,7 +2450,7 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         'observation_path': str(output), 'reason': 'collection incomplete'}
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.tone-stationary-characterization/v1',
-        'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'phases': [],
+        'candidate': runtime.candidate, 'version': runtime.version, 'native_catalog': catalog_identity, 'calls': [], 'phases': [],
         'native_evidence': [], 'collection_complete': False, 'business_effect_verified': False,
         'coverage_credit': 'none; characterization only', 'config_sha256': config_hash,
         'source_project': str(runtime.sandbox.source_project),
@@ -2520,7 +2526,8 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         receipt['get_info'] = info_evidence['result']
         assert receipt['get_info']['isCommandLine'] is True, 'Characterization requires WwiseConsole'
         version = receipt['get_info']['version']
-        assert tuple(version[k] for k in ('year', 'major', 'minor', 'build')) == (2025, 1, 7, 9143), version
+        assert tuple(version[k] for k in ('year', 'major', 'minor', 'build')) == tuple(
+            int(part) for part in catalog_identity['build'].split('.')), version
         gateway.gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'], live=False)
         for depth, level in [('int16', 0), ('int16', -6), ('float32', 0), ('float32', -6)]:
             phase = {'name': depth + '-' + str(abs(level)) + 'db', 'bit_depth': depth, 'sustain_db': level,
@@ -2589,7 +2596,7 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
 
 @pytest.mark.live
 @pytest.mark.destructive
-def test_stationary_tone_2025_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+def test_stationary_tone_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     category = _collect_stationary_tone_characterization(workflow_sandbox_runtime)
     assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
 
