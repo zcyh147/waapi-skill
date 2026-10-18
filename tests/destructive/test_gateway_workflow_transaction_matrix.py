@@ -4638,18 +4638,19 @@ def _collect_existing_bus_send_acceptance(
         value = row["references"]["UserAuxSend0"]
         return value.get("id") if isinstance(value, Mapping) else value
 
-    def select(draft, owner, token):
+    def select(draft, owner, token, *, kind=None):
         page = None
         seen = set()
+        scope = ["--type-handle", kind] if kind is not None else ["--object-handle", owner]
         for _ in range(4):
             listed = _update_business_draft(gateway, draft, "draft-discover-fields",
-                ["--object-handle", owner, "--list", "--page-size", "64",
+                [*scope, "--list", "--page-size", "64",
                     *(["--page", page] if page is not None else [])], live=True)["agent_result"]
             matches = [row for row in listed["fields"] if row.get("name") == token]
             assert len(matches) <= 1, listed
             if matches:
                 selected = _update_business_draft(gateway, draft, "draft-discover-fields",
-                    ["--object-handle", owner, "--selection", _required_string(matches[0], "selection")], live=True)
+                    [*scope, "--selection", _required_string(matches[0], "selection")], live=True)
                 return discovered_business_field_handle(selected, token)
             if listed.get("complete") is True:
                 break
@@ -4658,7 +4659,7 @@ def _collect_existing_bus_send_acceptance(
             seen.add(page)
         raise AssertionError(f"{token} not disclosed within four exact field-list pages")
 
-    def complete(draft, label):
+    def complete(draft, label, *, existing_merge=None):
         phase: dict[str, Any] = {"phase": label, "native_outcome": "not_executed", "effect_verified": False}
         receipt["transactions"].append(phase)
         _update_business_draft(gateway, draft, "draft-check", live=True)
@@ -4666,7 +4667,26 @@ def _collect_existing_bus_send_acceptance(
         identity = _required_string(preview, "transaction_id")
         phase.update(transaction_id=identity, artifact_hash=preview["artifact_hash"])
         shown = gateway.gateway(["transaction-show", identity], live=False)
-        phase["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+        prepared = shown["artifact"]["prepared_operation"]
+        phase["compiled_native_request"] = prepared["dispatch"]
+        if existing_merge is not None:
+            phase["expected_existing_merge"] = existing_merge
+            nodes = prepared["verification_plan"]["nodes"]
+            assert len(nodes) == 1 and nodes[0]["preexisting_id"] == existing_merge["id"], nodes
+            node = nodes[0]
+            assert node["class_id"] == existing_merge["class_id"] and node["canonical_type"] == existing_merge["type"], node
+            assert all(node["pre_state"].get(field) == existing_merge.get(field)
+                for field in ("id", "name", "type", "path", "parent", "notes")), (node, existing_merge)
+            assert node["pre_state"]["classId"] == existing_merge["class_id"], node
+            before = node["pre_state"]
+            for token in ("UserAuxSend0", "UserAuxSendVolume0"):
+                assert token in before or "@" + token in before, node
+                value = before.get(token, before.get("@" + token))
+                assert ((value.get("id") if isinstance(value, Mapping) else value) == reference_id(existing_merge)
+                    if token == "UserAuxSend0" else value == existing_merge["properties"][token]), (node, existing_merge)
+            args = prepared["dispatch"]["args"]
+            assert args["parent"] == existing_merge["parent"]["id"] and args["name"] == existing_merge["name"], args
+            assert args["type"] == existing_merge["type"] and args["onNameConflict"] == "merge", args
         gateway.gateway(["confirm", identity, "--confirmation-token", shown["confirmation"]["token"]], live=False)
         phase["native_outcome"] = "indeterminate"
         code, executed = gateway.raw_gateway(["execute", identity])
@@ -4712,21 +4732,22 @@ def _collect_existing_bus_send_acceptance(
         setup_phase["effect_verified"] = True
         expected = json.loads(json.dumps(baseline))
         phases = [("standalone_reference", "object.setReference", "source", {"UserAuxSend0": "target"}),
-            ("standalone_scalar", "object.setProperty", "source", {"UserAuxSendVolume0": -9})]
-        if runtime.version != "2021.1":
-            phases.append(("samebatch_reference_scalar", "object.set", "batch_source", {"UserAuxSend0": "target", "UserAuxSendVolume0": -12}))
-        else:
-            receipt["remaining"] = [{"phase": "samebatch_reference_scalar", "status": "pending",
-                "candidate": "object.create/on_name_conflict=merge", "effect_credit": False,
-                "reason": "object.set is absent in this version; closed create-merge still requires actual existing-source Field Handle/applicability binding instead of prospective defaults"}]
+            ("standalone_scalar", "object.setProperty", "source", {"UserAuxSendVolume0": -9}),
+            ("samebatch_reference_scalar", "object.create" if runtime.version == "2021.1" else "object.set",
+                "batch_source", {"UserAuxSend0": "target", "UserAuxSendVolume0": -12})]
         for label, operation, role, values in phases:
             draft = _start_business_draft(gateway, operation)
             owner = _bind_business_object(gateway, draft, object_id=baseline[role]["id"])
+            kind = None
+            if operation == "object.create":
+                kind = _discover_business_type(gateway, draft, meaning="AuxBus", role="object", expected_label="AuxBus")
+                parent = _bind_business_object(gateway, draft, object_id=baseline["root"]["id"])
+                _update_business_draft(gateway, draft, "draft-business-configure", ["--name-conflict", "merge"], live=False)
             fields = []
             for token, value in values.items():
-                field = select(draft, owner, token)
+                field = select(draft, owner, token, kind=kind)
                 bound = _bind_business_object(gateway, draft, object_id=baseline["target"]["id"]) if token == "UserAuxSend0" else str(value)
-                if operation == "object.set":
+                if operation in {"object.set", "object.create"}:
                     fields.extend(("--field-value", field, bound))
                 else:
                     _update_business_draft(gateway, draft, "draft-declare-field-change", ["--object-handle", owner,
@@ -4734,7 +4755,10 @@ def _collect_existing_bus_send_acceptance(
             if operation == "object.set":
                 _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "source",
                     "--object-handle", owner, *fields], live=False)
-            phase = complete(draft, label)
+            elif operation == "object.create":
+                _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "source",
+                    "--parent-handle", parent, "--name", baseline[role]["name"], "--kind", kind, *fields], live=False)
+            phase = complete(draft, label, existing_merge=baseline[role] if operation == "object.create" else None)
             for token, value in values.items():
                 expected[role]["references" if token == "UserAuxSend0" else "properties"][token] = (
                     {"id": baseline["target"]["id"]} if token == "UserAuxSend0" else value)
@@ -4748,8 +4772,8 @@ def _collect_existing_bus_send_acceptance(
                     assert row["properties"]["UserAuxSendVolume0"] == expected[key]["properties"]["UserAuxSendVolume0"], (label, key, row, expected[key])
             phase["effect_verified"] = True
         receipt["completed_mutation_phases"] = [phase[0] for phase in phases]
-        receipt["business_effect_verified"] = not receipt.get("remaining")
-        category["status"] = "incomplete" if receipt.get("remaining") else "PASS"
+        receipt["business_effect_verified"] = True
+        category["status"] = "PASS"
         return category
     except Exception as exc:
         receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)}
