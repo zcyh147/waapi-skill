@@ -5,6 +5,21 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-18 full-coverage R27 checkpoint
+
+Central `cb35b9d7` recorded **824 passed / 1 failed** (27.28s). The shared-schema
+wording repair preserves unrelated operation contracts; its exact failed check
+plus five integration checks passed on `b06dfe1c`: **6 passed** (5.92s). Source
+stayed unchanged and owned processes ended in both runs. The Program roster now
+contains 258 entries; no new full Program or Non-live result is claimed.
+
+Separate earlier `8e9b9f17` completed one read-only 2021 RTPC identity/metadata
+diagnostic: **1 passed** (9.52s), ten public calls, source unchanged, sandbox
+removed and owned processes ended. Its business category remains blocked;
+existing identity/metadata does not establish RTPC construction or effects.
+No Fresh or Windows run is added. See the
+[implementation checkpoint](../docs/plans/full-waapi-coverage/IMPLEMENTATION.md#twenty-seventh-integration-checkpoint).
+
 ## 2026-10-18 full-coverage R26 checkpoint
 
 Frozen `3c3423eb` passed central preflight **825 tests** (27.22s) and a separate

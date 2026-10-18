@@ -20,6 +20,172 @@ def workflow(monkeypatch):
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
 
 
+def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
+    """Real public Gateway; native fake keeps actual anonymous slots and local Effects."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND
+
+    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    task.types = [{'name': name, 'classId': value, 'type': kind} for name, value, kind in (
+        ('Sound', 65552, 'WObject'), ('WorkUnit', 1638416, 'WObject'),
+        ('EffectSlot', 5505040, 'WObject'), ('Wwise Gain', 9109507, 'Effect'))]
+    path = ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + '\\Default Work Unit'
+    task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 1638416, 'path': path, 'parent': None, 'notes': 'Keep parent'}}
+    task.metadata = {'Effect': {'name': 'Effect', 'type': '', 'default': None,
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}}
+    for name in ('Bypass', 'Render'):
+        task.metadata[name] = {'name': name, 'type': 'bool', 'default': False,
+            'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': 'Effect',
+                'conditions': [{'referenceIsSet': True}]}]}
+    original = task.call
+    writes, commands = [], []
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['property'] in ('Bypass', 'Render') and task.objects[args['object']]['@Effect']['id'] in task.objects, args
+            return {'return': True}
+        if uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
+            assert args == {'parent': SECOND, 'type': 'Sound', 'name': 'WAAPI_SLOT_TEST',
+                'notes': 'Keep sound', 'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
+            task.objects[FIRST] = {'id': FIRST, 'name': args['name'], 'type': 'Sound', 'classId': 65552,
+                'path': path + '\\' + args['name'], 'parent': {'id': SECOND}, 'notes': args['notes'], '@IsVoice': False, '@Effects': []}
+            return {'id': FIRST, 'name': args['name']}
+        if uri.endswith('object.set'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
+            rows = args['objects']
+            if '@Effects' in rows[0]:
+                index = len(task.objects[FIRST]['@Effects'])
+                node = rows[0]['@Effects'][0]
+                assert node['type'] == 'EffectSlot' and node['name'] == '', args
+                plugin = node['@Effect']
+                assert plugin['type'] == 'Effect' and plugin['classId'] == 9109507, args
+                slot, effect = ('{' + str(uuid.UUID(int=value)).upper() + '}' for value in (11 + index, 21 + index))
+                task.objects[slot] = {'id': slot, 'name': '', 'type': 'EffectSlot', 'classId': 5505040,
+                    'path': '\\opaque-slot-' + str(index), 'owner': {'id': FIRST}, 'notes': '',
+                    '@Effect': {'id': effect}, '@Bypass': False, '@Render': False,
+                    **({'parent': {'id': FIRST}} if index == 0 else {})}
+                task.objects[effect] = {'id': effect, 'name': plugin['name'], 'type': 'Effect', 'classId': 9109507,
+                    'path': '\\opaque-local-effect-' + str(index), 'owner': {'id': FIRST}, 'parent': {'id': slot},
+                    'notes': plugin['notes'], '@Gain': 0}
+                task.objects[FIRST]['@Effects'].append({'id': slot})
+                return {'objects': [{'id': FIRST, 'name': task.objects[FIRST]['name'], '@Effects': [
+                    {'id': slot, 'name': '', '@Effect': {'id': effect, 'name': plugin['name']}}]}]}
+            if fault == 'native-error':
+                raise RuntimeError('Actual selected slot write refused; no retry')
+            result = []
+            for row in rows:
+                target = task.objects[row['object']]
+                if 'name' in row:
+                    assert row['object'] == FIRST, row
+                    target.update(name=row['name'], path=path + '\\' + row['name'])
+                if '@Bypass' in row:
+                    assert set(row) == {'object', '@Bypass'} and target['type'] == 'EffectSlot', row
+                    target['@Bypass'] = row['@Bypass']
+                result.append({'id': target['id'], 'name': target['name']})
+            slot_ids = [entry['id'] for entry in task.objects[FIRST]['@Effects']]
+            selected, spare = (task.objects[value] for value in slot_ids)
+            if fault == 'wrong-reference': selected['@Effect'] = deepcopy(spare['@Effect'])
+            if fault == 'wrong-owner': selected['owner'] = {'id': SECOND}
+            if fault == 'wrong-class': selected['classId'] = 1441808
+            if fault == 'wrong-order': task.objects[FIRST]['@Effects'].reverse()
+            if fault == 'wrong-value': selected['@Bypass'] = not selected['@Bypass']
+            if fault == 'spare-value': spare['@Render'] = True
+            if fault == 'effect-notes': task.objects[selected['@Effect']['id']]['notes'] = 'Not requested'
+            if fault == 'rename-path' and len(writes) == 5: selected['path'] += 'Unexpected'
+            return {'objects': result}
+        if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            expression = args.get('waql', '')
+            if expression:
+                assert expression.startswith('from object "'), expression
+                identity = expression.split('"')[1]
+                rows = [row for row in task.objects.values() if identity in (row['id'], row['path'])]
+                if 'select @Effects' in expression:
+                    assert len(rows) == 1, expression
+                    rows = [task.objects[member['id']] for member in rows[0]['@Effects']]
+            elif 'id' in args.get('from', {}):
+                rows = [task.objects[value] for value in args['from']['id'] if value in task.objects]
+            else:
+                rows = [row for row in task.objects.values() if row['path'] in args['from']['path']]
+            for transform in args.get('transform', []):
+                assert len(rows) == 1, args
+                source = rows[0]
+                token = transform['select'][0]
+                if token == 'children':
+                    rows = [row for row in task.objects.values() if row.get('parent') == {'id': source['id']}]
+                elif token == '@Effects':
+                    rows = [task.objects[member['id']] for member in source['@Effects']]
+                else:
+                    raise AssertionError(args)
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and (args.get('classId') == 9109507 or task.objects.get(args.get('object'), {}).get('type') == 'Effect'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': ['Gain']} if uri.endswith('getPropertyAndReferenceNames') else {'name': 'Gain', 'type': 'Real64', 'default': 0}
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='fixture-candidate', category_results=[])
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: task)
+        if fault == 'prestate-owner' and command[0] == 'transaction-show' and len(writes) == 3:
+            first = task.objects[FIRST]['@Effects'][0]['id']
+            task.objects[first]['owner'] = {'id': SECOND}
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, version)
+    category = workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    assert category['status'] == 'PASS'
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['business_effect_verified'] is True and receipt['inline_list_merge_verified'] is False
+    assert receipt['setup_coverage_credit'] is False
+    assert len(writes) == 5 and [cmd[0] for cmd in commands].count('verify') == 5
+    assert [row['name'] for row in receipt['baseline']['slots']] == ['', '']
+    assert len({row['id'] for row in receipt['baseline']['slots']}) == 2
+    assert [phase['phase'] for phase in receipt['transactions'][-2:]] == ['exact_member_bypass', 'owner_rename_and_exact_member_bypass']
+    assert receipt['transactions'][-1]['independent_effect']['owner']['name'] == 'WAAPI_SLOT_TEST_Renamed'
+    assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize('fault', ['wrong-reference', 'wrong-owner', 'wrong-class', 'wrong-order',
+    'wrong-value', 'spare-value', 'effect-notes', 'rename-path', 'prestate-owner', 'native-error'])
+def test_existing_effect_slot_collector_rejects_unrequested_or_failed_effect(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, '2025.1', fault=fault)
+    with pytest.raises((AssertionError, KeyError)):
+        workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['business_effect_verified'] is False
+    assert receipt['inline_list_merge_verified'] is False and receipt['failure']
+    assert len(writes) == (3 if fault == 'prestate-owner' else 5 if fault == 'rename-path' else 4)
+    # A rejected prestate never confirms/executes the requested effect. A refused
+    # native write is never followed by verify or a retry of that write.
+    expected_verifies = 3 if fault in ('prestate-owner', 'native-error') else 5 if fault == 'rename-path' else 4
+    assert [cmd[0] for cmd in commands].count('verify') == expected_verifies
+    assert not any(phase['effect_verified'] for phase in receipt['transactions'][3:] if fault != 'rename-path')
+    assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+def test_existing_effect_slot_collector_keeps_legacy_scalar_boundary(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, version)
+    with pytest.raises(AssertionError, match='legacy scalar'):
+        workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    assert commands == [] and writes == []
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+
+
 def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_sources=False):
     """Actual Gateway parsing/dispatch; fake native state honors each exact request."""
     from copy import deepcopy
@@ -2251,3 +2417,175 @@ def test_reference_enabled_probe_uses_actual_gateway_and_never_writes(tmp_path, 
         assert receipt['enabled_response']['payload']['call']['waapi_error_uri'] == 'ak.wwise.invalid_arguments'
     else:
         assert receipt['observed_enabled'] is (outcome == 'true')
+
+
+def _rtpc_2021_representation_runtime(tmp_path, workflow, *, fault=None):
+    """Actual public Gateway; internal-class facts below are synthetic protocol data."""
+    from copy import deepcopy
+    import re
+    from tests.unit.test_metadata_discovery_gateway import (
+        FakeClient, _gateway_env, _live_info, _project_row, GET_INFO_URI, OBJECT_GET_URI,
+        GET_TYPES_URI, GET_NAMES_URI, GET_PROPERTY_INFO_URI,
+    )
+    sound = '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'
+    rtpc = '{A809A571-6012-42BE-A00D-D8E7C89D1248}'
+    curve = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    objects = {
+        sound: {'id': sound, 'name': 'Outside_Idle_1000', 'type': 'Sound',
+            'path': r'\Actor-Mixer Hierarchy\Car Engine\Outside_Idle_1000', 'classId': 65552,
+            'parent': None, 'owner': None},
+        # No native2021 class ID or path claim: this is injected boundary data.
+        rtpc: {'id': rtpc, 'name': '', 'type': 'RTPC', 'path': '', 'classId': 424242,
+            'parent': None, 'owner': {'id': sound}},
+        curve: {'id': curve, 'name': '', 'type': 'Curve', 'path': '', 'classId': 917520,
+            'parent': None, 'owner': {'id': rtpc}},
+    }
+    if fault == 'omission':
+        objects[rtpc].pop('classId')
+        objects[rtpc].pop('owner')
+    fields = {sound: ['Volume'], rtpc: ['Curve', 'ControlInput', 'PropertyName']}
+    if fault == 'many-details':
+        fields[rtpc] = ['Curve'] + [f'ControlInput{n}' for n in range(8)]
+    if fault == 'pages':
+        fields[rtpc] = [f'Unrelated{n:03}' for n in range(257)]
+    if fault == 'no-curve-disclosure':
+        fields[rtpc] = ['ControlInput']
+    env = _gateway_env(tmp_path, version='2021.1')
+    config = Path(env['WAAPI_SKILL_CONFIG_PATH'])
+    settings = json.loads(config.read_text());settings['project_modification_policy'] = 'read_only'
+    config.write_text(json.dumps(settings))
+    evidence = Path(env['WWISE_EVIDENCE_DIR']);evidence.mkdir()
+    dispatches, commands = [], []
+    def get(args, options):
+        dispatches.append((deepcopy(args), deepcopy(options)))
+        expression = args.get('waql', '')
+        if expression == 'from type Project take 1':
+            return {'return': [_project_row(tmp_path)]}
+        match = re.fullmatch(r'from object "(\{[A-Fa-f0-9-]+\})"(?: select @Curve)?(?: take \d+)?', expression)
+        if match:
+            identity = match[1]
+            if identity == rtpc and fault == 'missing':
+                return {'return': []}
+            selected = [objects[curve if 'select @Curve' in expression else identity]]
+        else:
+            assert args.keys() == {'from'} and args['from'].keys() == {'id'}, args
+            selected = [objects[identity] for identity in args['from']['id']]
+        return {'return': [{key: deepcopy(row[key]) for key in options['return'] if key in row} for row in selected]}
+    def names(args, _options):
+        if fault == 'names-error' and args['object'] == rtpc:
+            class WaapiRequestFailed(Exception):
+                uri = 'ak.wwise.invalid_arguments'
+                kwargs = {'message': 'Exact internal metadata refused; original detail',
+                    'details': {'object': rtpc, 'original': None}}
+            raise WaapiRequestFailed('Exact internal metadata refused; original detail')
+        return {'return': fields[args['object']]}
+    def info(args, _options):
+        assert args['property'] in fields[args['object']]
+        if args['property'] == 'Curve':
+            # Preserve metadata name/type omission; reference restriction is explicit.
+            return {'restriction': {'type': 'reference', 'restrictions': [{'type': ['Curve']}]},
+                'nativeOptionalNull': None}
+        return {'type': 'string', 'nativeOptionalNull': None}
+    live_info = _live_info('2021.1')
+    live_info['version']['minor'] = 14
+    client = FakeClient({GET_INFO_URI: live_info, OBJECT_GET_URI: get,
+        GET_TYPES_URI: {'return': [{'name': 'Sound', 'classId': 65552, 'type': 'WObject'}]},
+        GET_NAMES_URI: names, GET_PROPERTY_INFO_URI: info})
+    runtime = SimpleNamespace(version='2021.1', candidate='synthetic-program-control',
+        state_dir=tmp_path / 'state', env=env, category_results=[], port=31337,
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(command):
+        commands.append(list(command))
+        return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=env, client_factory=lambda _url: client)
+    runtime.raw_gateway = raw
+    return runtime, commands, client, dispatches, objects
+
+
+@pytest.mark.parametrize('fault', [None, 'missing', 'names-error'])
+def test_rtpc_2021_representation_probe_uses_public_scope_and_retains_boundaries(tmp_path, workflow, fault):
+    runtime, commands, client, dispatches, objects = _rtpc_2021_representation_runtime(tmp_path, workflow, fault=fault)
+    workflow.test_gateway_2021_rtpc_representation_diagnostic(runtime)
+    result, = runtime.category_results
+    receipt = json.loads(Path(result['observation_path']).read_text())
+    assert result['status'] == 'blocked' and result['diagnostic_only'] is True
+    assert receipt['collection_complete'] is True
+    assert receipt['mutation_authority'] is receipt['business_effect_verified'] is False
+    assert receipt['native_absence_proven'] is False
+    assert receipt['version'] == '2021.1' and receipt['source']['sdk_build'] == '2021.1.14.8108'
+    assert all(command[0] in {'config-show', 'status', 'query-schema', 'query-object', 'metadata'} for command in commands)
+    assert {uri for uri, _args, _options in client.calls} <= {
+        'ak.wwise.core.getInfo', 'ak.wwise.core.object.get', 'ak.wwise.core.object.getTypes',
+        'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
+    rtpc = receipt['objects'][1]
+    assert rtpc['requested_id'] == '{A809A571-6012-42BE-A00D-D8E7C89D1248}'
+    if fault == 'missing':
+        assert rtpc['identity_rows'] == [] and rtpc['names_complete'] is False
+        assert any(row['reason'] == 'exact_internal_identity_not_observed' for row in receipt['boundaries'])
+    elif fault == 'names-error':
+        failed = [call for call in receipt['calls'] if call['exit_code'] != 0]
+        assert len(failed) == 1 and failed[0]['payload']['error_code'] == 'LIVE_METADATA_READ_FAILED'
+        assert failed[0]['payload']['details']['uri'] == 'ak.wwise.core.object.getPropertyAndReferenceNames'
+        assert any(row['reason'] == 'public_read_rejected' for row in receipt['boundaries'])
+        assert rtpc['names_complete'] is False
+    else:
+        assert rtpc['identity_rows'][0]['class_id'] == 424242
+        assert rtpc['names_complete'] is True and rtpc['field_names'] == ['ControlInput', 'Curve', 'PropertyName']
+        detail = next(row for row in receipt['field_details'] if row['disclosed_field'] == 'Curve')
+        metadata = detail['pages'][0]['metadata']
+        assert 'name' not in metadata and 'type' not in metadata and metadata['nativeOptionalNull'] is None
+        assert len(receipt['relationship_reads']) == 2
+        assert any('select @Curve' in args.get('waql', '') for args, _ in dispatches)
+    assert not any('curve-points' in command or any('RTPCList' in item for item in command) for command in commands)
+
+
+@pytest.mark.parametrize('fault', ['many-details', 'no-curve-disclosure', 'pages', 'omission'])
+def test_rtpc_2021_representation_probe_keeps_discovery_and_observation_bounds(tmp_path, workflow, fault):
+    runtime, commands, client, _dispatches, _objects = _rtpc_2021_representation_runtime(tmp_path, workflow, fault=fault)
+    if fault == 'pages':
+        with pytest.raises(AssertionError, match='four pages'):
+            workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    else:
+        workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    result, = runtime.category_results
+    report = json.loads(Path(result['observation_path']).read_text())
+    assert len(commands) <= 32
+    assert len(report['field_details']) <= 6 and len(report['relationship_reads']) <= 2
+    assert all(uri in {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get', 'ak.wwise.core.object.getTypes',
+        'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
+        for uri, _args, _options in client.calls)
+    if fault == 'pages':
+        assert result['status'] == 'FAIL' and report['collection_complete'] is False
+        assert len(report['objects'][1]['field_names']) == 256 and report['objects'][1]['names_complete'] is False
+        assert 'four pages' in report['failure']['message']
+    else:
+        assert result['status'] == 'blocked' and report['collection_complete'] is True
+        if fault == 'many-details':
+            assert len(report['objects'][1]['field_names']) == 9 and report['objects'][1]['names_complete'] is True
+            assert len(report['field_details']) == 6 and report['detail_limit_reached'] is True
+        elif fault == 'no-curve-disclosure':
+            assert not any('--advanced-waql' in command for command in commands)
+            assert [row['stage'] for row in report['relationship_reads']] == ['returned-RTPC-owner']
+        elif fault == 'omission':
+            assert 'class_id' not in report['objects'][1]['identity_rows'][0]
+            assert any(row['reason'] == 'identity_output_omitted' and row['field'] == 'class_id' for row in report['boundaries'])
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_rtpc_2021_representation_probe_does_not_apply_source_identity_to_other_versions(tmp_path, workflow, version):
+    runtime, commands, _client, _dispatches, _objects = _rtpc_2021_representation_runtime(tmp_path, workflow)
+    runtime.version = version
+    with pytest.raises(AssertionError, match='pinned'):
+        workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    assert commands == [] and runtime.category_results == []
+
+
+def test_rtpc_2021_representation_probe_stops_before_source_reads_on_wrong_build(tmp_path, workflow):
+    runtime, commands, client, _dispatches, _objects = _rtpc_2021_representation_runtime(tmp_path, workflow)
+    client.responses['ak.wwise.core.getInfo']['version']['build'] = 8109
+    with pytest.raises(AssertionError, match='build'):
+        workflow._collect_2021_rtpc_representation_diagnostic(runtime)
+    report = json.loads(Path(runtime.category_results[0]['observation_path']).read_text())
+    assert report['collection_complete'] is False and report['runtime_version_observed']['build'] == 8109
+    assert not any(command[0] in {'query-object', 'metadata'} for command in commands)
+    assert runtime.category_results[0]['status'] == 'FAIL'
