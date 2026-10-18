@@ -250,3 +250,144 @@ def test_media_diagnostic_owner_selects_only_one_matching_2024_node(tmp_path, mo
         with pytest.raises(pytest.UsageError):
             authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
         assert events == []
+
+
+def _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch):
+    """Use the real node/archive/category owner with only its native boundary fake."""
+    import base64
+    from dataclasses import replace
+    from pathlib import Path
+    import shutil
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.sandbox_fixture import hash_project
+    native, _, _, client, _, _ = _media_diagnostic_host(tmp_path, monkeypatch)
+    owner = owned_authoring
+    runtime = owner.runtime
+    for directory in ('Soundcaster Sessions', 'States', 'Switches'):
+        shutil.copytree(Path(__file__).resolve().parents[1] / '_org/2024.1' / directory,
+                        runtime.sandbox.source_root / directory)
+        shutil.copytree(runtime.sandbox.source_root / directory, runtime.sandbox.sandbox_path / directory)
+    proof = hash_project(runtime.sandbox.source_root, preferred_strategy='full')
+    runtime.sandbox.metadata.source_hash = proof
+    runtime.sandbox.metadata.wwise_version = '2024.1'
+    owner.version = '2024.1'
+    owner.runtime = replace(runtime, version='2024.1', source_hash_before=proof)
+    owner.runtime.lifecycle.ready_result = client.responses['ak.wwise.core.getInfo']
+    client.responses['ak.wwise.core.getProjectInfo']['path'] = str(runtime.sandbox.sandbox_project)
+    png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=')
+    # Retain the valid image; a CRC-valid ancillary chunk forces execute's
+    # existing 24KiB digest projection without another image dependency.
+    import struct
+    import zlib
+    chunk = b'tEXt' + b'Comment\x00' + b'x' * (24 * 1024)
+    png = png[:-12] + struct.pack('>I', len(chunk) - 4) + chunk + struct.pack('>I', zlib.crc32(chunk)) + png[-12:]
+    offset = 8
+    while offset < len(png):
+        length = struct.unpack('>I', png[offset:offset + 4])[0]
+        payload = png[offset + 4:offset + 8 + length]
+        assert zlib.crc32(payload) == struct.unpack('>I', png[offset + 8 + length:offset + 12 + length])[0]
+        offset += length + 12
+    assert offset == len(png)
+    client.responses.update({'ak.wwise.ui.commands.getCommands': {'commands': ['ShowSoundcaster']},
+        'ak.wwise.ui.commands.execute': {},
+        'ak.wwise.ui.captureScreen': {'contentType': 'image/png', 'contentBase64': base64.b64encode(png).decode()}})
+    def factory(*, skill_source, runtime, version, receipts):
+        env = gateway_env(runtime.owned_root)
+        env['WWISE_EVIDENCE_DIR'] = runtime.runner_environment['WWISE_EVIDENCE_DIR']
+        def call(argv):
+            code, payload = gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'setup-state'), *argv],
+                env=env, client_factory=lambda _: client)
+            receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
+            assert code == 0, payload
+            return payload
+        return call
+    monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
+    nodeid = ('tests/destructive/test_authoring_ui_business_live.py::'
+              'test_authoring_2024_soundcaster_frontend_image_diagnostic')
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[nodeid])
+    call = batch.node_gateway(nodeid)
+    return native, batch, call, client, png, nodeid
+
+
+def test_soundcaster_images_are_archived_without_business_preservation_credit(owned_authoring, tmp_path, monkeypatch):
+    from pathlib import Path
+    from tests.destructive.support import authoring_batch
+    native, batch, call, client, png, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
+    native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
+    report_path = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR']) / 'soundcaster-frontend-diagnostic.json'
+    report = json.loads(report_path.read_text())
+    assert report['complete'] is True
+    assert report['runtime_session_values_observed'] is False and report['business_preservation_verified'] is False
+    assert report['coverage_credit'] == 'none; diagnostic observation only'
+    assert report['source']['binding_counts'] == {'RTPC': 72, 'State': 16, 'Switch': 12}
+    assert [row['name'] for row in report['sessions']] == ['Minigun', 'Music']
+    for row in report['sessions']:
+        assert (report_path.parent / row['image']['path']).read_bytes() == png
+        assert row['command']['state'] == row['capture']['state'] == 'result_schema_checked'
+    writes = [(uri, args) for uri, args, _ in client.calls if uri in
+        {'ak.wwise.ui.commands.execute', 'ak.wwise.ui.captureScreen'}]
+    assert writes == [('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster', 'objects': ['{1C5BA931-9550-4DC8-B1C7-13689B8AE813}']}),
+        ('ak.wwise.ui.captureScreen', {}),
+        ('ak.wwise.ui.commands.execute', {'command': 'ShowSoundcaster', 'objects': ['{F4B8069C-3C15-4157-B570-8A41AB2463C2}']}),
+        ('ak.wwise.ui.captureScreen', {})]
+    receipts = batch.receipts[nodeid]
+    captures = [row for row in receipts if row['argv'][0] == 'execute'
+        and row['payload']['stdout_projection']['full_dispatch_result_in_stdout'] is False]
+    assert len(captures) == 2
+    image_txs = {row['capture']['transaction_id'] for row in report['sessions']}
+    reads = [row for row in receipts if row['argv'][0] == 'transaction-show'
+             and row['argv'][1] in image_txs and row['payload']['state'] == 'result_schema_checked']
+    assert len(reads) == 2 and {row['argv'][1] for row in reads} == image_txs
+    assert len({row['payload']['transaction_id'] for row in receipts if row['argv'][0] == 'preview-from-draft'}) == 4
+    assert all(row['payload']['verification']['business_state_verified'] is False
+               for row in receipts if row['argv'][0] == 'verify')
+    target = tmp_path / 'image-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle
+    from wwise_waapi.headless import CleanupReport, HeadlessLifecycle
+    def shutdown(process, sandbox, **kwargs):
+        process.process = None
+        process.cleanup_report = CleanupReport(launch_pid=1234, wine_prefix=None, process_exited=True)
+        sandbox.metadata.process_cleanup_result = 'cleaned'
+        sandbox.metadata.process_cleanup_details = {'residual_processes': []}
+    monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
+    monkeypatch.setattr(authoring_batch, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
+    item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})
+    batch.prepare_stop([item])
+    item._waapi_phase_reports['teardown'] = 'passed'
+    assert batch.finalize([item], terminal=True)['outcome'] == 'PASS'
+    assert not batch.runtime.sandbox.sandbox_path.exists()
+    archived = batch.observation_artifacts[nodeid]
+    archive = json.loads(Path(archived['path']).read_text())
+    root = Path(archive['artifacts']['native-evidence']['path'])
+    assert json.loads((root / report_path.name).read_text()) == report
+    assert all((root / row['image']['path']).read_bytes() == png for row in report['sessions'])
+    final = json.loads(target.read_text().splitlines()[-1])
+    assert final['invocation']['phase'] == 'final' and final['invocation']['outcome'] == 'PASS'
+    categories = [json.loads(line)['categories'][0] for line in target.read_text().splitlines()]
+    assert categories and all(row['category'] == 'soundcaster-frontend-diagnostic' and row['status'] == 'blocked'
+        and row['business_preservation_verified'] is False for row in categories)
+
+
+def test_soundcaster_wrong_second_identity_stops_before_all_ui_writes(owned_authoring, tmp_path, monkeypatch):
+    from pathlib import Path
+    native, batch, call, client, _, nodeid = _soundcaster_image_owner(owned_authoring, tmp_path, monkeypatch)
+    music = '{F4B8069C-3C15-4157-B570-8A41AB2463C2}'
+    client.rows[music]['name'] = 'Different session'
+    with pytest.raises(AssertionError, match='identity/class changed'):
+        native.test_authoring_2024_soundcaster_frontend_image_diagnostic((batch, call))
+    destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
+    report = json.loads((destination / 'soundcaster-frontend-diagnostic.json').read_text())
+    assert report['complete'] is False and report['errors']
+    assert report['business_preservation_verified'] is False and report['runtime_session_values_observed'] is False
+    assert not list(destination.glob('*.png'))
+    assert not any(uri.startswith('ak.wwise.ui.commands.') or uri == 'ak.wwise.ui.captureScreen'
+                   for uri, _, _ in client.calls)
+    assert [row['argv'][0] for row in batch.receipts[nodeid]][2:] == ['query-object', 'query-object']
+    target = tmp_path / 'failed-image-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'failed'})
+    batch.prepare_stop([item])
+    rows = [json.loads(line)['categories'][0] for line in target.read_text().splitlines()]
+    assert rows and all(row['status'] == 'FAIL' and row['business_preservation_verified'] is False for row in rows)
