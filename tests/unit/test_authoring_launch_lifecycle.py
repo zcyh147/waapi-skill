@@ -234,6 +234,80 @@ def test_authoring_readiness_rejects_wrong_host_or_build_without_retry(tmp_path,
     assert process.terminated
 
 
+@pytest.mark.parametrize('observed', [
+    {},
+    {'uri': 'ak.wwise.test_refusal', 'message': 'Fixture error envelope', 'details': {'code': 7}},
+    {'result': {'isCommandLine': False, 'version': {'year': 2024, 'major': 1, 'minor': 13, 'build': 9056}}},
+    {'isCommandLine': 0, 'version': {'year': '2024', 'major': 1, 'minor': 13, 'build': 9056}},
+])
+def test_authoring_readiness_preserves_client_response_without_retry(monkeypatch, observed):
+    from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
+    calls = []
+    client = FakeClient(calls, result=observed)
+    lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+        waapi_client_factory=lambda _: client)
+    process = FakeProcess()
+    lifecycle.process = process
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    with pytest.raises(HeadlessLifecycleError, match='Authoring.*host/build') as failure:
+        lifecycle.wait_ready()
+    captured = failure.value.diagnostics['observed_host_info']['client_result']
+    assert captured['boundary'] == 'waapi-client.call'
+    assert captured['uri'] == 'ak.wwise.core.getInfo'
+    assert captured['value'] == observed
+    assert captured['value_present'] is True
+    assert captured['complete'] is True
+    assert captured['omitted'] == {}
+    assert calls == ['ak.wwise.core.getInfo']
+    assert client.disconnected and process.terminated
+    assert lifecycle.ready_result is None
+
+
+def test_authoring_readiness_diagnostic_bounds_hostile_and_oversized_response(monkeypatch):
+    import json
+    from tests.unit.test_headless_lifecycle import FakeClient, FakeProcess
+
+    class Hostile(dict):
+        def items(self):
+            pytest.fail('Do not iterate a custom mapping')
+        def __iter__(self):
+            pytest.fail('Do not iterate a custom mapping')
+        def __repr__(self):
+            pytest.fail('Do not render a custom object')
+
+    cycle = []
+    cycle.append(cycle)
+    observed = {'': None, 'false': False, 'hostile': Hostile(), 'cycle': cycle,
+        'deep': [[[[[True]]]]], 'oversized': '雨' * 1025,
+        'key' * 1025: 1, 'escaped': ['"\\' * 256] * 32,
+        'many': [dict.fromkeys([str(i) for i in range(32)], True)] * 32}
+    calls = []
+    client = FakeClient(calls, result=observed)
+    lifecycle = HeadlessLifecycle(host_kind='wwise-authoring', authoring_build='2024.1.13.9056', port=8080,
+        waapi_client_factory=lambda _: client)
+    process = FakeProcess()
+    lifecycle.process = process
+    monkeypatch.setattr(HeadlessLifecycle, '_terminate', lambda self, value: value.terminate())
+    monkeypatch.setattr(HeadlessLifecycle, '_cleanup_detached_waapi_servers', lambda self: [])
+    with pytest.raises(HeadlessLifecycleError, match='Authoring.*host/build') as failure:
+        lifecycle.wait_ready()
+    captured = failure.value.diagnostics['observed_host_info']['client_result']
+    assert len(json.dumps(captured).encode('utf-8')) <= 8192
+    assert captured['complete'] is False
+    assert captured['value'][''] is None and captured['value']['false'] is False
+    assert 'hostile' not in captured['value'] and 'oversized' not in captured['value']
+    assert 'key' not in captured['value']
+    assert captured['omitted']['non_json_type'] == 1
+    assert captured['omitted']['cycle'] == 1
+    assert captured['omitted']['depth'] > 0
+    assert captured['omitted']['string_bytes'] == 1
+    assert captured['omitted']['key_bytes'] == 1
+    assert captured['omitted']['bytes'] > 0
+    assert calls == ['ak.wwise.core.getInfo']
+    assert client.disconnected and process.terminated and lifecycle.ready_result is None
+
+
 @pytest.mark.parametrize('invalid', ['project-alias', 'unowned-project', 'existing-prefix', 'bundle-build', 'port', 'extra-args', 'windows', 'winepath-absent', 'winepath-alias', 'winepath-directory', 'prefix-drift'])
 def test_authoring_ownership_rejects_invalid_context_before_any_tool_or_process(tmp_path, monkeypatch, invalid):
     facts = _bundle(tmp_path)
