@@ -33,14 +33,13 @@ references. No main merge is authorized.
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
   [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
-- Current work advances #180/#181 documented list-field discovery and the
-  remaining #192 source-control branches. The #178 prospective group/default
-  implementation is integrated in R17 staging; its targeted five-version native
-  results are recorded below. Root owns decisions,
-  integration, broad-gate triage and native scheduling. All functional tickets
-  retain their remaining implementation and native obligations; these partial
-  checkpoints do not establish whole-ticket completion. Every newly created
-  subagent uses `fork_turns="none"` and only the necessary task context.
+- Current work covers remaining new-object conditions and graph effects
+  (#178/#180), Console project/artifact behavior (#184), Authoring layout
+  semantics (#188), bounded diagnostics (#193), and exact evidence attachments.
+  Root owns integration, native scheduling and final acceptance. Only #175/#176
+  are closed; partial implementation and passing individual cases do not close
+  the other tickets. Every new subagent uses `fork_turns="none"` with only the
+  necessary task context.
 - Read-only object/plugin condition research is retained for #177/#178/#179.
   It includes integer enums/ranges, parent contexts, reference requirements,
   visibility, Uint16 plugin conditions and expanded 2025 EQ conditions. Installed
@@ -792,6 +791,48 @@ repairs do not resolve the third product gap; its implementation remains #180.
 The migrated media setup still needs its public Console-open continuation and
 matching native proof. No Fresh, final broad-gate PASS, ticket closure or main
 merge is claimed.
+
+## Twenty-third integration checkpoint
+
+R23 tested code candidate `49de1610` combines complete bounded exception keys
+`17a3797f`, exact native field selection `49b176e1`, and the closed 2025 Authoring
+reset route `40dc03e9`. Review reproduced a further error-envelope failure:
+a 5,001-digit integer metadata key raised during formatting and discarded all
+optional metadata. `110b0cf7` omits only that unformattable key with the existing
+explicit marker. Original public RED passed separately after the narrow repair.
+
+Reset preserves native omission, empty and ordered repeated selections. It
+revalidates the live instance, actual selections and catalog, follows all three
+policies and executes once. Its bounded post-observations are deliberately
+schema-only: independent default-state effects and preservation remain required
+under #188. The source catalog establishes this exact URI only for 2025.1.
+
+Actual generated scope is **897 version rows / 228 unique URIs / 515 registry
+contracts / 32,978 public schema branches / 251 Program entries**. Exactly 17
+original reset obligations change from missing implementation to unresolved.
+All 272,313 native IDs, shapes, owners, requirements and evidence remain intact;
+there are 272,197 unresolved and 116 approved exclusions, with no new verified
+credit. Three pre-existing getStatus policy snapshots now reflect their already
+implemented read route. All serial generation and check modes completed.
+
+On frozen `49de1610`, the single central preflight passed **825 in 28.68 seconds**;
+the deduplicated cross-focus passed **29 in 95.07 seconds**. Both preserved all
+1,857 tracked hashes and left no owned processes. `6713c636` only joins the
+published documentation ancestry and has the identical tree; no test replay or
+new acceptance identity is inferred. R22 hosted run `39082237238` independently
+passed **825 in 53.76 seconds** on published `09c73a72`.
+
+Separate pending work remains outside R23: `0d8d496a` narrowly normalizes empty
+Bus ReferenceList serialization, with 16 focused passes and a matching 2022
+native media PASS (11.25 seconds). Source hashes/mtime/tree were unchanged,
+PASS sandbox removed and processes cleaned. The separate migrated-media fixture
+at `185355a8` now uses a public reopen transaction, but matching 2023 native
+execution failed before dispatch: Wine path adaptation required an open-project
+anchor even though this operation starts from no project. Original failure and
+quarantine remain; the runtime repair stays #184. New Bus/AuxBus condition code
+`5341f545` has 51 focused passes but still needs actual controller metadata and
+same-graph native effects. None of these results closes a ticket or transfers
+native credit to R23.
 
 ## Standing completion rules
 
