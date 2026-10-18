@@ -949,6 +949,48 @@ def test_legacy_tab_structure_import_seals_original_file_and_full_owner_prefix(t
     assert row['@RenderEffect0'] is row['@RenderEffect1'] is True
 
 
+@pytest.mark.parametrize('header', ['Property[IsVoice]', '@IsVoice'], ids=['property', 'at'])
+def test_2022_tab_sound_isvoice_assignment_is_rejected_before_preview(tmp_path, header):
+    task, writes = legacy_render_import_task(tmp_path, '2022.1', 'audio.importTabDelimited')
+    code, bound = task.step('draft-bind-object', '--role', 'import_location', '--object-id', SECOND)
+    assert code == 0, bound
+    table = tmp_path / 'sound.tsv'
+    table.write_text('Object Path\tObject Type\t' + header + '\n<Sound>Tabbed\tSound\tfalse\n')
+    original = table.read_bytes()
+    code, declared = task.step('draft-declare-artifact-plan', '--table-file', str(table),
+        '--location-handle', bound['bound_object']['handle'], '--language', 'SFX')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'TAB_PROPERTY_NOT_MODIFIABLE', rejected
+    assert rejected['details']['version'] == '2022.1'
+    assert rejected['details']['row'] == 2
+    assert rejected['details']['header'] == header
+    assert rejected['details']['property'] == 'IsVoice'
+    assert 'Sound SFX' in rejected['message'] and 'Sound Voice' in rejected['message']
+    assert table.read_bytes() == original and writes == []
+
+
+def test_2022_tab_sound_sfx_constructor_keeps_writable_property_and_original_file(tmp_path):
+    task, writes = legacy_render_import_task(tmp_path, '2022.1', 'audio.importTabDelimited')
+    task.metadata['IsLoopingEnabled'] = {'name': 'IsLoopingEnabled', 'type': 'bool', 'default': False}
+    code, bound = task.step('draft-bind-object', '--role', 'import_location', '--object-id', SECOND)
+    assert code == 0, bound
+    table = tmp_path / 'sound.tsv'
+    table.write_text('Object Path\tObject Type\tProperty[IsLoopingEnabled]\n'
+        '<Sound SFX>Tabbed\tSound SFX\ttrue\n')
+    original = table.read_bytes()
+    code, declared = task.step('draft-declare-artifact-plan', '--table-file', str(table),
+        '--location-handle', bound['bound_object']['handle'], '--language', 'SFX')
+    assert code == 0, declared
+    tx, shown = task.preview()
+    assert writes == [] and table.read_bytes() == original
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert table.read_bytes() == original and len(writes) == 1
+    row = next(row for row in task.objects.values() if row['name'] == 'Tabbed')
+    assert row['@IsVoice'] is False and row['@IsLoopingEnabled'] is True
+
+
 @pytest.mark.parametrize('fault', ['missing-reference', 'explicit-prefix-false', 'explicit-override-false'])
 def test_legacy_import_render_rejects_real_prerequisite_or_intent_conflict_before_write(tmp_path, fault):
     task, writes = legacy_render_import_task(tmp_path)

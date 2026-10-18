@@ -5,6 +5,30 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## Soundcaster image observation — #184
+
+The single owned 2024.1.13.9056 attempt on `493b0d35` completed 36 public
+Gateway calls and four separately previewed transactions: ShowSoundcaster and
+captureScreen once per exact Minigun/Music session. Each reached result-schema
+checked, which does not prove selected-session state. Both 44,084-byte PNGs
+have SHA-256 `ffcecf2cca14d46e3db31371e426dae5bbf9c3e3168fd6d5fc0b324737dbc3cf`.
+Independent image review shows Project Explorer and a blank main editor, with
+no session name or values. Whether a floating view opened remains unobserved.
+
+The test body passed in 54.13s; the final outcome is BLOCKED because the immediate
+post-teardown bind check failed. Source full hash/mtime and tracked files were
+unchanged, and owned processes ended. A separate later bind found port 8080 free;
+it does not change that original outcome. Evidence is in the short-id worktree
+under `.waapi-skill-state/full-coverage/soundcaster-frontend-493b0d35-2024-r1`,
+including archived images and `root-image-review.json`. The original quarantined
+sandbox is retained and must not be reused.
+
+The next implementation uses bounded public current-layout/type/instance reads
+to discover an exact unique instantiated view before targeted capture, and
+reuses the existing bounded port-release wait. No guessed view/channel, alternate
+command, retry, media operation or preservation claim is authorized by these
+observations. Matching native acceptance remains required after review.
+
 ## Created-field history: current exact results — #192 / #178
 
 The reviewed 2022 constructor compatibility at staging `5acc4054` now passes
