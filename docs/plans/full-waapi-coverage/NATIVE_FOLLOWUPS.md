@@ -67,6 +67,30 @@ The request's existing-reference counterpart passed. A compatible construction
 must retain the public null intent, all other fields and independent null-state
 verification; removing the case is not a repair.
 
+## Legacy import Render: two effects verified, TSV still open — #180 / #182
+
+On macOS 2022.1, the first collector at `88673436` stopped before any write
+(6.32s): it incorrectly compared the display label `Effect 0` to the exact
+metadata token `Effect0`. Test-only `838b7442` binds the issued selection to
+`metadata.name` and uses the existing Field Handle reader instead.
+
+The corrected collector on `838b7442` verified setup and both ordinary import
+effects: adding media with Render to an existing Sound, and creating a new Sound
+with media, real Effect references and Render. Independent checks confirmed the
+complete owner chain, actual Source ownership, media bytes and retained targets.
+The full case still **failed (11.59s)** at its final TSV structure import:
+Wwise rejected the fixture's `Property[IsVoice]` column as not modifiable.
+That transaction remains indeterminate; it was not verified or replayed.
+
+Original roots in the native-conditions worktree are
+`legacy-import-render-88673436-2022-r1` and
+`legacy-import-render-838b7442-2022-r1`. Both preserve source full hashes,
+mtime/tree and 1,883 tracked files; owned processes ended and failed sandboxes
+were quarantined. The two verified phases do not establish full-case, 2021,
+TSV-media or cross-platform acceptance. The TSV fixture must express its SFX
+type through a source-backed legal construction while retaining the IsVoice=false
+and all Render/reference/media preservation checks.
+
 ## Inline WAV without Base64 padding — #182 / #180
 
 The pinned 2023.1–2025.1 definition
