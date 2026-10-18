@@ -20,6 +20,136 @@ def workflow(monkeypatch):
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
 
 
+def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
+    """Real public Gateway; native fake keeps actual anonymous slots and local Effects."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND
+
+    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    task.types = [{'name': name, 'classId': value, 'type': kind} for name, value, kind in (
+        ('Sound', 65552, 'WObject'), ('WorkUnit', 1638416, 'WObject'),
+        ('EffectSlot', 5505040, 'WObject'), ('Wwise Gain', 9109507, 'Effect'))]
+    path = ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + '\\Default Work Unit'
+    task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 1638416, 'path': path, 'parent': None, 'notes': 'Keep parent'}}
+    task.metadata = {'Effect': {'name': 'Effect', 'type': '', 'default': None,
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}}
+    for name in ('Bypass', 'Render'):
+        task.metadata[name] = {'name': name, 'type': 'bool', 'default': False,
+            'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': 'Effect',
+                'conditions': [{'referenceIsSet': True}]}]}
+    original = task.call
+    writes, commands = [], []
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
+            assert args == {'parent': SECOND, 'type': 'Sound', 'name': 'WAAPI_SLOT_TEST',
+                'notes': 'Keep sound', 'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
+            task.objects[FIRST] = {'id': FIRST, 'name': args['name'], 'type': 'Sound', 'classId': 65552,
+                'path': path + '\\' + args['name'], 'parent': {'id': SECOND}, 'notes': args['notes'], '@Effects': []}
+            return {'id': FIRST, 'name': args['name']}
+        if uri.endswith('object.set'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args)))
+            rows = args['objects']
+            if '@Effects' in rows[0]:
+                index = len(task.objects[FIRST]['@Effects'])
+                node = rows[0]['@Effects'][0]
+                assert node['type'] == 'EffectSlot' and node['name'] == '', args
+                plugin = node['@Effect']
+                assert plugin['type'] == 'Effect' and plugin['classId'] == 9109507, args
+                slot, effect = ('{' + str(uuid.UUID(int=value)).upper() + '}' for value in (11 + index, 21 + index))
+                task.objects[slot] = {'id': slot, 'name': '', 'type': 'EffectSlot', 'classId': 5505040,
+                    'path': '\\opaque-slot-' + str(index), 'owner': {'id': FIRST}, 'notes': '',
+                    '@Effect': {'id': effect}, '@Bypass': False, '@Render': False,
+                    **({'parent': {'id': FIRST}} if index == 0 else {})}
+                task.objects[effect] = {'id': effect, 'name': plugin['name'], 'type': 'Effect', 'classId': 9109507,
+                    'path': '\\opaque-local-effect-' + str(index), 'owner': {'id': FIRST}, 'parent': {'id': slot},
+                    'notes': plugin['notes']}
+                task.objects[FIRST]['@Effects'].append({'id': slot})
+                return {'objects': [{'id': FIRST, 'name': task.objects[FIRST]['name'], '@Effects': [
+                    {'id': slot, 'name': '', '@Effect': {'id': effect, 'name': plugin['name']}}]}]}
+            if fault == 'native-error':
+                raise RuntimeError('Actual selected slot write refused; no retry')
+            result = []
+            for row in rows:
+                target = task.objects[row['object']]
+                if 'name' in row:
+                    assert row['object'] == FIRST, row
+                    target.update(name=row['name'], path=path + '\\' + row['name'])
+                if '@Bypass' in row:
+                    assert set(row) == {'object', '@Bypass'} and target['type'] == 'EffectSlot', row
+                    target['@Bypass'] = row['@Bypass']
+                result.append({'id': target['id'], 'name': target['name']})
+            slot_ids = [entry['id'] for entry in task.objects[FIRST]['@Effects']]
+            selected, spare = (task.objects[value] for value in slot_ids)
+            if fault == 'wrong-reference': selected['@Effect'] = deepcopy(spare['@Effect'])
+            if fault == 'wrong-owner': selected['owner'] = {'id': SECOND}
+            if fault == 'wrong-class': selected['classId'] = 1441808
+            if fault == 'wrong-order': task.objects[FIRST]['@Effects'].reverse()
+            if fault == 'wrong-value': selected['@Bypass'] = not selected['@Bypass']
+            if fault == 'spare-value': spare['@Render'] = True
+            if fault == 'effect-notes': task.objects[selected['@Effect']['id']]['notes'] = 'Not requested'
+            if fault == 'rename-path' and len(writes) == 5: selected['path'] += 'Unexpected'
+            return {'objects': result}
+        if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            expression = args.get('waql', '')
+            if expression:
+                assert expression.startswith('from object "'), expression
+                identity = expression.split('"')[1]
+                rows = [row for row in task.objects.values() if identity in (row['id'], row['path'])]
+                if 'select @Effects' in expression:
+                    assert len(rows) == 1, expression
+                    rows = [task.objects[member['id']] for member in rows[0]['@Effects']]
+            elif 'id' in args.get('from', {}):
+                rows = [task.objects[value] for value in args['from']['id'] if value in task.objects]
+            else:
+                rows = [row for row in task.objects.values() if row['path'] in args['from']['path']]
+            for transform in args.get('transform', []):
+                assert len(rows) == 1, args
+                source = rows[0]
+                token = transform['select'][0]
+                if token == 'children':
+                    rows = [row for row in task.objects.values() if row.get('parent') == {'id': source['id']}]
+                elif token == '@Effects':
+                    rows = [task.objects[member['id']] for member in source['@Effects']]
+                else:
+                    raise AssertionError(args)
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='fixture-candidate', category_results=[])
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: task)
+        if fault == 'prestate-owner' and command[0] == 'transaction-show' and len(writes) == 3:
+            first = task.objects[FIRST]['@Effects'][0]['id']
+            task.objects[first]['owner'] = {'id': SECOND}
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path, workflow):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, '2025.1')
+    category = workflow._collect_existing_effect_slot_merge_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    assert category['status'] == 'PASS'
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['business_effect_verified'] is True and receipt['inline_list_merge_verified'] is False
+    assert receipt['setup_coverage_credit'] is False
+    assert len(writes) == 5 and [cmd[0] for cmd in commands].count('verify') == 5
+    assert [row['name'] for row in receipt['baseline']['slots']] == ['', '']
+    assert len({row['id'] for row in receipt['baseline']['slots']}) == 2
+    assert [phase['phase'] for phase in receipt['transactions'][-2:]] == ['exact_member_bypass', 'owner_rename_and_exact_member_bypass']
+    assert receipt['transactions'][-1]['independent_effect']['owner']['name'] == 'WAAPI_SLOT_TEST_Renamed'
+    assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
 def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_sources=False):
     """Actual Gateway parsing/dispatch; fake native state honors each exact request."""
     from copy import deepcopy
