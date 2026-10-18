@@ -3288,9 +3288,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     transaction_show.add_argument('--none-state-outcome', choices=('eligible-bindings', 'actual-additions'),
         help='Read fixed bounded offline pages of disclosed media-ID None-state relationships or observed additions; never mutation authority')
+    transaction_show.add_argument('--history-view', choices=('expectation', 'verification'),
+        help='Read immutable stored history expectation or exact recorded verification in bounded lossless pages; copy generated hash/page continuation, no mutation authority')
     transaction_show.add_argument('--outcome-artifact-hash', help='Copy the immutable artifact hash from the generated outcome continuation')
-    transaction_show.add_argument('--outcome-event-hash', help='Copy the exact verification_recorded event hash for observed additions')
-    transaction_show.add_argument('--outcome-page', help='Copy the exact Gateway-owned None-state outcome page cursor')
+    transaction_show.add_argument('--outcome-event-hash', help='Copy the exact verification_recorded event hash for the selected recorded outcome')
+    transaction_show.add_argument('--outcome-page', help='Copy the exact Gateway-owned outcome or history-view page cursor')
 
     confirm = subparsers.add_parser(
         "confirm",
@@ -10535,6 +10537,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "state": record.state.value,
                 "artifact_hash": preview.artifact_hash,
             }
+            if args.history_view is not None:
+                if args.summary_only or args.none_state_outcome is not None:
+                    raise GatewayInputError('History detail pages cannot be combined with summary or None-state views')
+                payload.update(transaction_history_view_payload(snapshot, args, envelope=payload,
+                    state_dir=resolve_transaction_state_directory(args, env=env)))
+                # Strictly read-only: no confirmation/execute continuation fallthrough.
+                return payload
             if args.none_state_outcome is not None:
                 if args.summary_only:
                     raise GatewayInputError('A None-state outcome detail page cannot be combined with --summary-only')
@@ -10545,7 +10554,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     raise GatewayResultShapeError('The complete outcome page and continuation exceed their fixed output bound')
                 return payload
             if args.outcome_artifact_hash or args.outcome_event_hash or args.outcome_page:
-                raise GatewayInputError('Outcome hash/page options require --none-state-outcome')
+                raise GatewayInputError('Outcome hash/page options require --none-state-outcome or --history-view')
             if args.summary_only:
                 try:
                     payload.update(transaction_show_summary(preview.artifact, events,
@@ -25520,6 +25529,11 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
+    history_arguments = agent_result.get('request', {}).get('arguments', {})
+    if (verification.get('verification_strength') == 'scoped_history_effect_readback'
+            or history_arguments.get('api') in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}
+            and history_arguments.get('history_binding') is not None):
+        verification_summary['history_detail'] = history_verification_continuation(payload, verification, state_dir=state_dir)
     materializations = verification_summary.get('optional_none_state_materialization')
     if materializations is not None and gateway_json_document_size(materializations) > 4096:
         verification_summary['optional_none_state_materialization'] = {
@@ -31109,6 +31123,108 @@ def transaction_none_state_outcome_payload(snapshot, args, *, state_dir, envelop
     raise GatewayResultShapeError('The outcome continuation cannot fit its fixed public result bound')
 
 
+def history_view_continuation(transaction_id, artifact_hash, view, *, state_dir, event_hash=None, page=None):
+    argv = ['transaction-show', transaction_id, '--history-view', view, '--outcome-artifact-hash', artifact_hash]
+    if event_hash is not None:
+        argv += ['--outcome-event-hash', event_hash]
+    if page is not None:
+        argv += ['--outcome-page', page]
+    return transaction_next_command('transaction-show', argv, state_dir=state_dir)
+
+
+def stored_history_binding(artifact, *, state_dir):
+    """Inspect only this sealed snapshot; never resolve a source journal anew."""
+    from wwise_waapi.edit_history_business import REFERENCE_CONTRACT, CONTRACT, MAX_BINDING_BYTES, MAX_OBSERVATIONS
+    from wwise_waapi.edit_history_contracts import HISTORY_VERSIONS
+    prepared = artifact.get('prepared_operation', {})
+    plan = prepared.get('verification_plan', {})
+    binding = prepared.get('pre_state', {}).get('history_binding')
+    request = artifact.get('request', {})
+    reference = request.get('arguments', {}).get('history_binding', {})
+    if (plan.get('kind') not in {'history-scoped-effect', 'history-result-schema-only'}
+            or not isinstance(binding, Mapping) or binding.get('contract') != CONTRACT
+            or binding.get('uri') not in HISTORY_VERSIONS or binding.get('version') not in HISTORY_VERSIONS[binding['uri']]
+            or plan.get('uri') != binding['uri'] or plan.get('version') != binding['version']
+            or prepared.get('dispatch', {}).get('uri') != binding['uri']
+            or request.get('version') != binding['version'] or request.get('arguments', {}).get('api') != binding['uri']
+            or canonical_sha256(plan.get('history_binding')) != canonical_sha256(binding)
+            or reference.get('contract') != REFERENCE_CONTRACT or reference.get('binding_sha256') != canonical_sha256(binding)
+            or reference.get('owner_state_sha256') != canonical_sha256(str(TransactionStore(state_dir).state_dir))
+            or not isinstance(binding.get('observations'), list) or len(binding['observations']) > MAX_OBSERVATIONS
+            or len(canonical_json_bytes(binding)) > MAX_BINDING_BYTES):
+        raise GatewayInputError('This store/artifact has no exact sealed history expectation view')
+    return binding, plan
+
+
+def transaction_history_view_payload(snapshot, args, *, state_dir, envelope):
+    from wwise_waapi.metadata_detail import immutable_detail_page
+    binding, plan = stored_history_binding(snapshot.preview.artifact, state_dir=state_dir)
+    if args.outcome_artifact_hash != snapshot.preview.artifact_hash:
+        raise GatewayInputError('Copy the exact immutable artifact hash from the history continuation')
+    scope = {'store_sha256': canonical_sha256(str(TransactionStore(state_dir).state_dir)),
+        'transaction_id': args.transaction_id, 'artifact_hash': snapshot.preview.artifact_hash,
+        'view': args.history_view, 'verification_event_hash': None,
+        'count_kind': 'expectation_observations' if args.history_view == 'expectation' else 'verification_assertions'}
+    if args.history_view == 'expectation':
+        if args.outcome_event_hash is not None:
+            raise GatewayInputError('History expectations do not accept a verification event hash')
+        value, total = binding, len(binding['observations'])
+    else:
+        events = [event for event in snapshot.events if event.get('event_type') == 'verification_recorded'
+            and event.get('event_hash') == args.outcome_event_hash]
+        if len(events) != 1:
+            raise GatewayInputError('History verification requires the exact verification_recorded event hash')
+        value = events[0].get('details', {}).get('verification', {})
+        strength = 'scoped_history_effect_readback' if plan['kind'] == 'history-scoped-effect' else 'result_schema_only'
+        if (value.get('contract') != 'waapi-skill.operation-verification/v1'
+                or value.get('operation') != snapshot.preview.artifact['prepared_operation']['operation']
+                or value.get('verification_strength') != strength or not isinstance(value.get('assertions'), list)
+                or not isinstance(value.get('readbacks'), list)):
+            raise GatewayInputError('The exact event has no typed verification of this history action')
+        if plan['kind'] == 'history-scoped-effect':
+            evidence = [row.get('evidence', {}) for row in value['assertions'] if isinstance(row, Mapping)]
+            observed = [row for row in evidence if isinstance(row, Mapping)
+                and row.get('scope') == 'owned_receipt_observation_only'
+                and row.get('stack_head_observed') is False and row.get('outside_scope_preservation_observed') is False
+                and type(row.get('matches')) is bool and isinstance(row.get('checks'), list)
+                and isinstance(row.get('readbacks'), list)]
+            incomplete = [row for row in evidence if isinstance(row, Mapping)
+                and isinstance(row.get('error'), str) and row.get('stack_head_observed') is False]
+            if len(observed) != 1 and not (value.get('ok') is False
+                    and value.get('status') == 'verification_failed' and len(incomplete) == 1):
+                raise GatewayInputError('The recorded event lacks its typed scoped history outcome or explicit incomplete-readback failure')
+        total = len(value['assertions'])
+        scope['verification_event_hash'] = events[0]['event_hash']
+    for size in range(64, 0, -1):
+        try:
+            page = immutable_detail_page(value, scope=scope, total_count=total, cursor=args.outcome_page, max_entries=size,
+                contract='waapi-skill.transaction-history-view-page/v1', prefix='hv1', label='History view')
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        result = {'history_view': page}
+        if page['next_page'] is not None:
+            result['next_command'] = history_view_continuation(args.transaction_id, snapshot.preview.artifact_hash,
+                args.history_view, state_dir=state_dir, event_hash=scope['verification_event_hash'], page=page['next_page'])
+        if gateway_json_document_size({**envelope, **result}) <= 32 * 1024:
+            return result
+    raise GatewayResultShapeError('The history detail page and continuation exceed their fixed output bound')
+
+
+def history_verification_continuation(payload, verification, *, state_dir):
+    if state_dir is None:
+        raise GatewayResultShapeError('History verification detail requires its exact owning transaction store')
+    snapshot = TransactionStore(state_dir).load_snapshot(payload['transaction_id'])
+    stored_history_binding(snapshot.preview.artifact, state_dir=state_dir)
+    if snapshot.preview.artifact_hash != payload['artifact_hash']:
+        raise GatewayResultShapeError('History verification differs from its immutable artifact')
+    events = [row for row in snapshot.events if row.get('event_type') == 'verification_recorded'
+        and canonical_sha256(row.get('details', {}).get('verification')) == canonical_sha256(verification)]
+    if len(events) != 1:
+        raise GatewayResultShapeError('History detail requires its exact recorded verification')
+    return history_view_continuation(payload['transaction_id'], payload['artifact_hash'], 'verification',
+        state_dir=state_dir, event_hash=events[0]['event_hash'])
+
+
 def transaction_show_summary(
     artifact: Any,
     events: Sequence[Mapping[str, Any]],
@@ -31197,7 +31313,19 @@ def transaction_show_summary(
         history_binding = prepared.get("pre_state", {}).get("history_binding")
         if isinstance(history_binding, Mapping):
             from wwise_waapi.edit_history_business import history_summary
-            derived_notice["history_action"] = history_summary(history_binding)
+            notice = history_summary(history_binding)
+            if len(canonical_json_bytes(notice)) > 2048:
+                transaction_id = next((event.get('transaction_id') for event in events if event.get('transaction_id')), None)
+                if transaction_id is None or state_dir is None:
+                    raise GatewayResultShapeError('History detail lacks its immutable transaction/store binding')
+                notice.pop('expected_observations')
+                notice.update(observations_complete=False, observation_count=len(history_binding['observations']),
+                    field_count=sum(row.get('kind') not in {'creation_presence', 'existing_render_chain'}
+                        for row in history_binding['observations']),
+                    object_count=len({row.get('object_before', row.get('object', {})).get('id', row.get('object_id'))
+                        for row in history_binding['observations']}),
+                    detail=history_view_continuation(transaction_id, canonical_sha256(artifact), 'expectation', state_dir=state_dir))
+            derived_notice["history_action"] = notice
 
     optional_none = prepared.get('pre_state', {}).get('cli_project_effect', {}).get(
         'model_before', {}).get('optional_none_state_materialization')
@@ -31335,7 +31463,8 @@ def transaction_show_summary(
             # The complete history identities are in history_action and its sealed
             # request. An empty role map needs no repeated shape/digest headers.
             result["preview_summary"]["resolved_roles"] = {}
-        if optional_none is not None and derived_notice['optional_none_state_materialization'].get('relationships_complete') is False:
+        if (optional_none is not None and derived_notice['optional_none_state_materialization'].get('relationships_complete') is False
+                or derived_notice.get('history_action', {}).get('observations_complete') is False):
             # Exact None relationships have their own bounded reader. Avoid
             # repeating empty role headers and unrelated snapshot statistics.
             if not prepared.get('resolved_roles'):
@@ -31343,6 +31472,13 @@ def transaction_show_summary(
             result['preview_summary']['pre_state'] = {
                 'canonical_sha256': canonical_sha256(prepared.get('pre_state')),
                 'full_state_sealed': True}
+        if derived_notice.get('history_action', {}).get('observations_complete') is False:
+            # Detailed statistics repeat the full proof already linked by the
+            # fixed history reader; retain its exact kind/URI/version/hash once.
+            plan = prepared.get('verification_plan', {})
+            result['preview_summary']['verification_plan'] = {
+                **{key: plan.get(key) for key in ('kind', 'uri', 'version')},
+                'history_binding_sha256': canonical_sha256(plan.get('history_binding'))}
         observed = stabilize_transaction_summary_size(result)
         observed_by_variant[detail_level] = observed
         if observed <= TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES:

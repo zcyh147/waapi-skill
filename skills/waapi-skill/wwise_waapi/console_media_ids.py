@@ -409,38 +409,7 @@ def none_state_notice(expected):
 
 
 def none_state_outcome_page(value, *, scope, total_count, cursor=None, max_entries=64):
-    """Fixed read-only lossless detail page over one already sealed local value."""
-    from .canonical import canonical_json_bytes
-    from .metadata_detail import detail_entries
-    from .metadata_discovery import MetadataDiscoveryError, _require_result_size
-    value_sha = hashlib.sha256(canonical_json_bytes(value)).hexdigest()
-    rows = detail_entries(value)
-    def locator(offset):
-        digest = hashlib.sha256(canonical_json_bytes([scope, value_sha, offset])).hexdigest()
-        return 'nso1.' + str(offset) + '.' + digest
-    offset = 0
-    if cursor is not None:
-        try:
-            _, raw_offset, _ = cursor.split('.')
-            offset = int(raw_offset)
-            valid = (str(offset) == raw_offset and 0 <= offset < len(rows)
-                and cursor == locator(offset))
-        except (ValueError, AttributeError, TypeError):
-            valid = False
-        if not valid:
-            raise ValueError('None-state outcome page does not match this immutable transaction, artifact, view, event and value')
-    end = min(len(rows), offset + min(64, max_entries))
-    while True:
-        result = {'contract': 'waapi-skill.transaction-none-state-outcome-page/v1',
-            'scope': scope, 'value_sha256': value_sha, 'total_count': total_count,
-            'entries': rows[offset:end], 'entries_encoding': 'lossless_JSON_pointer_entries_with_string_fragments',
-            'offset': offset, 'total_entries': len(rows), 'remaining_entries': len(rows) - end,
-            'complete': end == len(rows), 'next_page': locator(end) if end < len(rows) else None,
-            'mutation_authority': False, 'limits': {'page_entries': 64, 'page_bytes': 16 * 1024}}
-        try:
-            _require_result_size(result, maximum_bytes=16 * 1024, pretty=True)
-            return result
-        except MetadataDiscoveryError:
-            if end <= offset + 1:
-                raise ValueError('None-state outcome entry cannot fit the existing bounded detail projection')
-            end -= 1
+    """Keep the existing fixed outcome contract over the shared immutable reader."""
+    from .metadata_detail import immutable_detail_page
+    return immutable_detail_page(value, scope=scope, total_count=total_count, cursor=cursor, max_entries=max_entries,
+        contract="waapi-skill.transaction-none-state-outcome-page/v1", prefix="nso1", label="None-state outcome")
