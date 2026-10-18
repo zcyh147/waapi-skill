@@ -3196,6 +3196,7 @@ def _voice_creation_runtime(tmp_path, workflow, version='2025.1', *, fault=None)
 
 @pytest.mark.parametrize('version', ['2021.1', '2025.1'])
 def test_voice_creation_collector_uses_public_gateway_and_actual_category_writer(tmp_path, workflow, monkeypatch, version):
+    import hashlib
     from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
     runtime, commands, writes = _voice_creation_runtime(tmp_path, workflow, version)
     category = workflow._collect_voice_creation_acceptance(runtime, prefix='WAAPI_VOICE_TEST')
@@ -3225,6 +3226,7 @@ def test_voice_creation_collector_uses_public_gateway_and_actual_category_writer
     record = json.loads(output.read_text())
     assert record['contract'] == 'waapi-skill.host-category-evidence/v3' and record['categories'] == runtime.category_results
     assert len(record['transactions']) == expected and all(row['state'] == 'verified' for row in record['transactions'])
+    assert record['categories'][0]['observation_sha256'] == hashlib.sha256(Path(category['observation_path']).read_bytes()).hexdigest()
 
 
 @pytest.mark.parametrize('fault', ['numeric-flag', 'missing-nested-child'])

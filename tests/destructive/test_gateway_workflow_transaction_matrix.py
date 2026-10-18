@@ -6466,6 +6466,7 @@ def _collect_voice_creation_acceptance(runtime: _WorkflowSandboxRuntime, *, pref
         assert len(body) <= 4 * 1024 * 1024, 'Voice receipt byte bound exceeded'
         output.parent.mkdir(parents=True, exist_ok=True)
         temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
     class ReceiptGateway:
         def raw_gateway(self, argv):
             assert len(receipt['calls']) < 96, 'Voice public call bound exceeded'
