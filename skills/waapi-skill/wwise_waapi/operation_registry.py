@@ -7885,8 +7885,8 @@ def _prepare_object_node_specs(
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
                 structural_proof = None
-                # The older user-send source group lacks the later Show rule;
-                # absent-override applicability still requires non-master placement.
+                # Retain a structural snapshot when available. Its necessity
+                # is determined by the exact versioned source dependencies.
                 if any((is_master_bus_visibility_dependency(item) and item["value"] is False)
                        or (type_info.name in {"Bus", "AuxBus"} and item == {"type": "override", "action": "Enable",
                            "context": "Self", "property": "OverrideUserAuxSends"})
@@ -7895,6 +7895,7 @@ def _prepare_object_node_specs(
                         nodes=nodes, resolve_type=lambda name: _resolve_object_type(name, catalog=type_catalog),
                         root_parent=root_parent, root_collection=root_collection, read=read)
                 evidence = class_default_evidence(
+                    version=version,
                     structural_bus_proof=structural_proof,
                     infos=tuple(property_info_by_name.values()),
                     scope={"classId": type_info.class_id}, read_call=read,
@@ -7924,7 +7925,10 @@ def _prepare_object_node_specs(
     for spec in specs:
         for evidence in spec.get("new_object_default_evidence", []):
             proofs = [rule["proof"] for rule in evidence.get("structural_visibility", [])]
-            proofs.extend(rule["structural_proof"] for rule in evidence.get("override_applicability", []))
+            for rule in evidence.get("override_applicability", []):
+                structural_classes[spec["request_path"]] = rule["class_id"]
+                if rule["structural_proof"] is not None:
+                    proofs.append(rule["structural_proof"])
             for proof in proofs:
                 structural_classes[proof["request_path"]] = proof["class_id"]
                 if "request_path" in proof["parent"]:

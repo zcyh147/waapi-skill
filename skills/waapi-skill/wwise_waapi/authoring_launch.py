@@ -79,10 +79,10 @@ class OwnedMacAuthoringContext:
         installed_link = self.prefix / 'drive_c/Program Files/Audiokinetic' / ('Wwise ' + self.build)
         if not installed_link.is_symlink() or installed_link.resolve(strict=True) != self.installed:
             raise AuthoringLaunchError('Owned Authoring installation link does not match the pinned installation')
-        native = self._run([str(self.cx / 'bin/winepath'), '-w', str(self.project)], timeout=10).strip()
+        native = self._run([str(self.cx / 'bin/wine'), str(self.cx / 'lib/wine/x86_64-windows/winepath.exe'), '-w', str(self.project)], timeout=10).strip()
         if len(native.splitlines()) != 1 or not PureWindowsPath(native).is_absolute():
             raise AuthoringLaunchError('Owned Authoring native project mapping is invalid')
-        roundtrip = self._run([str(self.cx / 'bin/winepath'), '-u', native], timeout=10).strip()
+        roundtrip = self._run([str(self.cx / 'bin/wine'), str(self.cx / 'lib/wine/x86_64-windows/winepath.exe'), '-u', native], timeout=10).strip()
         if len(roundtrip.splitlines()) != 1 or _real(Path(roundtrip), directory=False) != self.project:
             raise AuthoringLaunchError('Owned Authoring project path roundtrip differs from the sandbox')
         command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
@@ -117,8 +117,14 @@ def owned_mac_authoring_context(*, console: Path, project: Path | None, owned_ro
     if any(path_is_link_or_reparse(path) for path in prefix.parents if path.exists()):
         raise AuthoringLaunchError('Authoring private prefix contains an aliased parent')
     cx = bundle / 'Contents/SharedSupport/Wwise2019x64'
-    for name in ('wine', 'winepath', 'wineprefixcreate', 'wineloader64', 'wineserver'):
+    for name in ('wine', 'wineprefixcreate', 'wineloader64', 'wineserver'):
         _executable(cx / 'bin' / name)
+    # The matching CrossOver bundles ship this as a Windows program, not
+    # a host bin/winepath command. Use the same selected Wine and private prefix.
+    try:
+        _executable(_real(cx / 'lib/wine/x86_64-windows/winepath.exe', directory=False))
+    except OSError as exc:
+        raise AuthoringLaunchError('Required bundled winepath.exe is unavailable') from exc
     _executable(bundle / 'Contents/SharedSupport/Wwise/bin/wwise_prepare')
     installed = (MACOS_AUTHORING_INSTALL_ROOT / ('Wwise ' + build)).resolve(strict=True)
     if not (installed / 'Authoring/x64/Release/bin/Wwise.exe').is_file():

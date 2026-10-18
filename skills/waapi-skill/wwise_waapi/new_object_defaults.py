@@ -79,7 +79,7 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
                 continue
             if context != "Self":
                 raise NewObjectDefaultError("Related-object conditions require verified object-scoped configuration.")
-            if kind == "override" and (structural_bus_proof is not None or (discovery and version is not None)):
+            if kind == "override" and (structural_bus_proof is not None or version is not None):
                 from .override_applicability import prove_absent_override
                 try:
                     proof = prove_absent_override(version=structural_bus_proof["version"] if structural_bus_proof else version, class_id=scope.get("classId"),

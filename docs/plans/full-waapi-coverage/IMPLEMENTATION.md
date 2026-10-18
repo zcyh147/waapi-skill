@@ -917,6 +917,43 @@ retained, and the 2024 loss of non-default Soundcaster session values remains a
 separate investigation. Old-version root Bus conditions and existing List
 collision conditions remain same-parent implementation work. No ticket closes.
 
+## Twenty-sixth integration checkpoint
+
+R26 code `3c3423eb` binds older root Bus applicability to each version's actual
+source predicates and resolves existing owned List members before evaluating
+conditions. Merged members preserve their actual GUID, class, owner and opaque
+path; compatible reference read projections retain all guarded fields. Old-root
+and ordinary Bus witnesses have distinct receipts. The owned Mac Authoring
+launcher now uses the actual bundled Wine path helper and distinguishes a
+filesystem-only preflight failure from process cleanup.
+
+The frozen candidate passed one central preflight (825 tests, 27.22s) and eight
+cross-feature tests (7.89s), separately. Both retained all 1,876 tracked files
+and zero owned processes. The Program roster contains 257 entries; public scope
+remains 897 version rows / 228 URIs / 515 contracts / 32,978 branches. No new
+full Program, Non-live, Fresh or native-Windows acceptance is claimed.
+
+The first reviewed exact evidence requirement is now committed. One existing
+2025.1 moveSingle program capture passed on this same candidate (1 test, 1.13s).
+The existing full-product evaluator and identical reproducibility check both
+returned expected exit 2: 116 approved exclusions, one implemented-but-unverified
+row, and 272,196 unresolved rows. That exact row has program proof but no current
+native attachment. Literal captured argv and all original obligations remain
+intact. The default unbound inventory still reports 272,197 unresolved rows;
+the explicitly selected capture overlay is the evidence-bearing result. Capture
+and input hashes are retained in query-worktree ignored directory
+`.waapi-skill-state/full-coverage/media-id-exact-r26-3c3423eb-r1/`.
+
+Two isolated 2024 Authoring diagnostic attempts produced no business evidence.
+Candidate `a79ef03b` failed before launch because the expected path helper was
+absent. Fixed `f4abca75` launched the owned application but timed out waiting for
+WAAPI after 60 seconds; cleanup completed and source hashes/mtime remained
+unchanged. The Mac was independently reported locked, so visible startup-window
+diagnosis awaits unlocking; lock state is not asserted as the timeout's cause.
+Original roots remain frozen. Media/session preservation, native Bus/List
+effects, unnamed RTPC graph construction and all other in-scope gaps remain
+same-parent work. No ticket closes at this checkpoint.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.

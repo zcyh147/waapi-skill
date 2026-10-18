@@ -1,12 +1,14 @@
 """Exercise future native fixture calls through the public Gateway with a fake host."""
 from types import SimpleNamespace
 import importlib
+import json
 
 import pytest
 
 from tests.support.gateway_config import set_gateway_config
 from tests.unit.test_authoring_layout_mutation_gateway import LayoutClient, URI
 from tests.unit.test_waapi_gateway import gateway_env, waapi_gateway as gateway
+from tests.unit.test_authoring_batch_adapter import owned_authoring, _install_public_gateway
 
 
 @pytest.mark.parametrize('version', ['2024.1', '2025.1'])
@@ -54,3 +56,197 @@ def test_owned_view_fixture_proves_creation_reuse_and_applicable_close(tmp_path,
     creates = [args for uri, args, _ in client.calls if uri == URI + 'getOrCreateView']
     assert creates == [{'name': 'ProjectExplorer', 'posX': 17, 'posY': 29}, {'name': 'ProjectExplorer'}]
     assert len([uri for uri, _, _ in client.calls if uri == URI + 'closeView']) == (1 if version == '2025.1' else 0)
+
+
+def _media_diagnostic_host(tmp_path, monkeypatch, *, names=None, fail_names=False):
+    from copy import deepcopy
+    for key in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'):
+        monkeypatch.setenv(key, '1')
+    native = importlib.import_module('tests.destructive.test_authoring_ui_business_live')
+    sessions = {
+        '{9C02096E-8E29-4029-9D49-778F85015C87}': 'MIDI',
+        '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}': 'Minigun',
+        '{F4B8069C-3C15-4157-B570-8A41AB2463C2}': 'Music',
+    }
+    rev = '{29975930-6548-4A1B-BEE0-7AA549180D4F}'
+    class Client(LayoutClient):
+        def __init__(self):
+            super().__init__(tmp_path, version='2024.1')
+            self.responses['ak.wwise.core.getInfo']['version'].update(minor=13, build=9056, schema=123)
+            self.rows = {identity: {'id': identity, 'name': name, 'type': 'SoundcasterSession',
+                'path': '\\Soundcaster Sessions\\' + name, 'classId': 1703952}
+                for identity, name in sessions.items()}
+            self.rows[rev] = {'id': rev, 'name': 'Chevrolet Camaro SS', 'type': 'SourcePlugin',
+                'path': '\\Actor-Mixer Hierarchy\\Car Engine\\Chevrolet Camaro SS',
+                'classId': 27267154, 'pluginName': 'CrankcaseAudio REV'}
+        def call(self, uri, args=None, options=None):
+            if uri.endswith('object.get'):
+                self.calls.append((uri, args, options))
+                ids = args.get('from', {}).get('id', [])
+                if 'waql' in args:
+                    ids = [value for value in self.rows if value in args['waql']]
+                if ids:
+                    return {'return': [deepcopy(self.rows[value]) for value in ids]}
+                return {'return': [{'id': '{11111111-1111-1111-1111-111111111111}',
+                    'name': 'Sandbox', 'type': 'Project', 'path': '\\',
+                    'filePath': str(tmp_path / 'project' / 'Sandbox.wproj')}]}
+            if uri.endswith('getPropertyAndReferenceNames'):
+                self.calls.append((uri, args, options))
+                if fail_names:
+                    raise RuntimeError('diagnostic names read failed')
+                # A fake-disclosed relevant name exercises selection, without
+                # claiming that this field exists in native Soundcaster metadata.
+                return {'return': names if names is not None else ['Color', 'CurrentStateList']}
+            if uri.endswith('getPropertyInfo'):
+                self.calls.append((uri, args, options))
+                assert args['property'] == 'CurrentStateList'
+                return {'default': None, 'supports': {'unlink': False}}
+            if uri.endswith('getTypes'):
+                self.calls.append((uri, args, options))
+                return {'return': [{'name': 'CrankcaseAudio REV', 'type': 'Source', 'classId': 27267154}]}
+            if uri == 'ak.wwise.core.log.get':
+                self.calls.append((uri, args, options))
+                return {'items': [{'message': 'Retained diagnostic warning', 'severity': 'Warning'}]}
+            return super().call(uri, args, options)
+    client = Client()
+    project = tmp_path / 'project' / 'Sandbox.wproj'
+    settings = project.with_name('Sandbox.testuser.wsettings')
+    settings.write_text('<WwiseDocument Type="UserProjectSettings"><UserProjectSettingsInfo>'
+        '<UserProjectSettings><PropertyList>'
+        '<Property Name="RTPC\\GameParameterSimValue\\{F8E0D6FA-52B7-40EB-B9A1-AEB6B9FD6B86}" Type="Real64" Value="50"/>'
+        '<Property Name="UnrelatedPrivateSetting" Type="string" Value="must-not-be-retained"/>'
+        '</PropertyList></UserProjectSettings></UserProjectSettingsInfo></WwiseDocument>')
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version='2024.1', project_modification_policy='read_only')
+    runtime = SimpleNamespace(version='2024.1', owned_root=tmp_path,
+        sandbox=SimpleNamespace(sandbox_project=project))
+    node_runtime = SimpleNamespace(runner_environment={'WWISE_EVIDENCE_DIR': str(tmp_path / 'native-evidence')})
+    nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_2024_media_preservation_metadata_diagnostic'
+    batch = SimpleNamespace(runtime=runtime, info=client.responses['ak.wwise.core.getInfo'],
+        node_runtimes={nodeid: node_runtime})
+    receipts = []
+    def call(argv):
+        code, payload = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), *argv],
+            env=env, client_factory=lambda _: client)
+        receipts.append((argv, code, payload))
+        assert code == 0, payload
+        return payload
+    return native, batch, call, client, receipts, tmp_path / 'native-evidence' / 'media-preservation-diagnostic.json'
+
+
+def test_owned_media_diagnostic_uses_public_scoped_reads_and_whitelisted_settings(tmp_path, monkeypatch):
+    native, batch, call, client, receipts, path = _media_diagnostic_host(tmp_path, monkeypatch)
+    native.test_authoring_2024_media_preservation_metadata_diagnostic((batch, call))
+    report = json.loads(path.read_text())
+    assert report['business_preservation_verified'] is False
+    assert report['coverage_credit'] == 'none; diagnostic observation only'
+    assert report['complete'] is True
+    assert [row['name'] for row in report['sessions']] == ['MIDI', 'Minigun', 'Music']
+    assert all(row['field_names'] == ['Color', 'CurrentStateList'] for row in report['sessions'])
+    assert len(report['field_details']) == 3
+    for detail in report['field_details']:
+        assert 'name' not in detail['metadata'] and 'type' not in detail['metadata']
+        assert detail['metadata']['default'] is None
+    assert len(report['settings']['before']['files'][0]['fields']) == 1
+    assert report['settings']['before'] == report['settings']['after']
+    assert 'must-not-be-retained' not in path.read_text()
+    assert {args['channel'] for uri, args, _ in client.calls if uri == 'ak.wwise.core.log.get'} == {'projectLoad', 'general'}
+    assert all(argv[0] in {'query-object', 'metadata', 'core-call'} for argv, _, _ in receipts)
+    assert not any('moveMedia' in uri or 'set' in uri or 'create' in uri or 'capture' in uri for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('failure', ['identity-drift', 'names-error', 'names-overflow', 'settings-link', 'settings-byte-bound'])
+def test_owned_media_diagnostic_retains_incomplete_observations_without_retry(tmp_path, monkeypatch, failure):
+    names = [f'OrdinaryField{i:03}' for i in range(300)] if failure == 'names-overflow' else None
+    native, batch, call, client, receipts, path = _media_diagnostic_host(
+        tmp_path, monkeypatch, names=names, fail_names=failure == 'names-error')
+    settings = tmp_path / 'project' / 'Sandbox.testuser.wsettings'
+    if failure == 'settings-link':
+        settings.unlink()
+        settings.symlink_to(tmp_path / 'private-settings')
+        (tmp_path / 'private-settings').write_text('never-read-or-retain-this-private-content')
+    if failure == 'settings-byte-bound':
+        settings.write_bytes(b'x' * (1024 * 1024 + 1))
+    if failure == 'identity-drift':
+        client.rows['{9C02096E-8E29-4029-9D49-778F85015C87}']['name'] = 'Foreign session'
+    with pytest.raises(AssertionError):
+        native.test_authoring_2024_media_preservation_metadata_diagnostic((batch, call))
+    report = json.loads(path.read_text())
+    assert report['complete'] is False and report['errors']
+    assert report['business_preservation_verified'] is False
+    assert 'never-read-or-retain-this-private-content' not in path.read_text()
+    if failure.startswith('names-'):
+        assert report['settings']['after']['complete'] is True
+        assert len([argv for argv, _, _ in receipts if argv[:2] == ['metadata', 'list']]) == (4 if failure == 'names-overflow' else 1)
+    elif failure == 'identity-drift':
+        assert len(receipts) == 1 and receipts[0][0][0] == 'query-object'
+        assert report['settings']['after']['complete'] is True
+    else:
+        assert receipts == []
+    assert not any(uri.endswith('getPropertyInfo') for uri, _, _ in client.calls)
+
+
+def test_owned_media_diagnostic_caps_relevant_details_after_complete_names(tmp_path, monkeypatch):
+    native, batch, call, client, receipts, path = _media_diagnostic_host(tmp_path, monkeypatch,
+        names=['CurrentStateList', 'CurrentStateOther', 'CurrentStateThird'])
+    # This case exercises the cap, rather than a metadata-shape expectation.
+    original = client.call
+    def call_native(uri, args=None, options=None):
+        if uri.endswith('getPropertyInfo'):
+            client.calls.append((uri, args, options))
+            return {'default': None}
+        return original(uri, args, options)
+    client.call = call_native
+    native.test_authoring_2024_media_preservation_metadata_diagnostic((batch, call))
+    report = json.loads(path.read_text())
+    assert report['complete'] is True and report['detail_limit_reached'] is True
+    assert len(report['field_details']) == 6
+    assert len([row for row in client.calls if row[0].endswith('getPropertyInfo')]) == 6
+    assert all(row['names_complete'] and len(row['field_names']) == 3 for row in report['sessions'])
+
+
+def test_media_diagnostic_owned_batch_category_cannot_grant_business_credit(owned_authoring, tmp_path, monkeypatch):
+    from tests.destructive.support import authoring_batch
+    from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle
+    from wwise_waapi.headless import CleanupReport, HeadlessLifecycle
+    nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_2024_media_preservation_metadata_diagnostic'
+    def shutdown(process, sandbox, **kwargs):
+        process.process = None
+        process.cleanup_report = CleanupReport(launch_pid=1234, wine_prefix=None, process_exited=True)
+        sandbox.metadata.process_cleanup_result = 'cleaned'
+        sandbox.metadata.process_cleanup_details = {'residual_processes': []}
+    monkeypatch.setattr(lifecycle, 'shutdown_sandboxed_wwise', shutdown)
+    monkeypatch.setattr(authoring_batch, 'assert_port_free', lambda *_: None)
+    monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(12345, 'fake pytest process')])
+    target = tmp_path / 'category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(target))
+    _install_public_gateway(monkeypatch, owned_authoring)
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=[nodeid])
+    batch.node_gateway(nodeid)
+    item = SimpleNamespace(nodeid=nodeid, _waapi_phase_reports={'setup': 'passed', 'call': 'passed'})
+    batch.prepare_stop([item])
+    item._waapi_phase_reports['teardown'] = 'passed'
+    assert batch.finalize([item], terminal=True)['outcome'] == 'PASS'
+    rows = [json.loads(line)['categories'][0] for line in target.read_text().splitlines()]
+    assert all(row['category'] == 'media-preservation-diagnostic' and row['status'] == 'blocked' for row in rows)
+    assert all(row['business_preservation_verified'] is False and row['coverage_credit'] == 'none; diagnostic observation only' for row in rows)
+
+
+@pytest.mark.parametrize('version,extra_node', [('2024.1', False), ('2025.1', False), ('2024.1', True)])
+def test_media_diagnostic_owner_selects_only_one_matching_2024_node(tmp_path, monkeypatch, version, extra_node):
+    from tests.destructive.support import authoring_batch
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('WWISE_VERSION', version)
+    nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_authoring_2024_media_preservation_metadata_diagnostic'
+    config = _config(tmp_path)
+    config.args = [nodeid, *([NODE] if extra_node else [])]
+    items = [SimpleNamespace(nodeid=value) for value in config.args]
+    if version == '2024.1' and not extra_node:
+        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert [kind for kind, _ in events] == ['construct', 'start', 'install']
+        assert events[0][1]['host_kind'] == 'wwise-authoring'
+    else:
+        with pytest.raises(pytest.UsageError):
+            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert events == []
