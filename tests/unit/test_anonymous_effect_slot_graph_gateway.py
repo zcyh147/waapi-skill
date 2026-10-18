@@ -517,3 +517,13 @@ def test_anonymous_nondefault_conflict_policy_is_explicitly_pending_before_dispa
     code, checked = task.step('draft-check')
     assert code == 2 and 'ANONYMOUS_LIST_CONFLICT_UNRESOLVED' in json.dumps(checked), checked
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+
+
+def test_explicit_render_false_before_later_true_is_rejected_before_any_write(tmp_path):
+    task = anonymous_task(tmp_path)
+    # Literal nativee2 request: first(Bypasstrue,Renderfalse), then
+    # second(Bypassfalse,Rendertrue). Native silently forces first Rendertrue.
+    declare_slots(task)
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'EFFECT_RENDER_CHAIN_CONFLICT', checked
+    assert not any(uri.endswith(('object.set', 'setProperty', 'object.create')) for uri, _, _ in task.calls)
