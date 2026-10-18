@@ -1780,9 +1780,11 @@ def _is_boolean_override_terminal(info):
 
 def _new_class_field_evidence(registry, info, live_scope, read_call):
     from .new_object_defaults import class_default_evidence, NewObjectDefaultError
-    names = {row["name"] for row in registry.as_dict()["types"]
-             if row["class_id"] == live_scope.get("classId")}
-    if len(names) != 1:
+    # Semantic-kind browsing need not have issued a Type Handle. The exact
+    # connected class inventory, not prior discovery order, certifies scope.
+    rows = parse_get_types_result(read_call(GET_TYPES_URI, {}, {}))
+    matches = [row for row in rows if row.class_id == live_scope.get("classId")]
+    if len(matches) != 1:
         return None
     try:
         return class_default_evidence(infos=(info,), scope=live_scope,

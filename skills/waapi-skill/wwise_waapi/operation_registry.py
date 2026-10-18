@@ -12672,11 +12672,10 @@ def _prepare_import_dynamic_fields(
                 }
             )
 
-        from .effect_render_conditions import require_import_adapter, EffectRenderConditionError
-        try:
-            require_import_adapter(version=request.version, class_id=type_info.class_id, properties=property_specs)
-        except EffectRenderConditionError as exc:
-            raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
+        from .effect_render_conditions import legacy_import_owner
+        legacy_render = legacy_import_owner(version=request.version, class_id=type_info.class_id, properties=property_specs)
+        if legacy_render:
+            target["legacy_effect_render"] = True
         reference_specs: list[dict[str, Any]] = []
         derived_properties: dict[str, Any] = {}
         for reference_index, descriptor in enumerate(reference_requests):
@@ -12698,7 +12697,7 @@ def _prepare_import_dynamic_fields(
             seen_fields.add(key)
             info = property_info(type_info.class_id, name)
             _require_object_reference_metadata(info)
-            activation_properties = _apply_reference_activation_dependencies(
+            activation_properties = () if legacy_render else _apply_reference_activation_dependencies(
                 info,
                 read=read,
                 class_id=type_info.class_id,
@@ -12949,6 +12948,8 @@ def _materialize_audio_import_dynamic_rows(
                 )
             dynamic_fields[f"@{name}"] = spec.get("value")
         for spec in references:
+            if spec.get("condition_guard"):
+                continue
             name = spec.get("name")
             target_id = spec.get("target_id")
             if (
@@ -13923,6 +13924,12 @@ def _prepare_closed_import_plan(
             targets, dispatch_args, originals_context, version=request.version, read=read,
         )
         plan = {**dict(plan), "dispatch_args": dispatch_args}
+    from .effect_render_conditions import prepare_import, EffectRenderConditionError
+    try:
+        render_state = prepare_import(targets, version=request.version, operation=source_operation,
+            import_operation=import_operation, read=read)
+    except EffectRenderConditionError as exc:
+        raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
     native_row_mapping: list[dict[str, Any]] = []
     if source_operation == "audio.import":
         dispatch_args, native_row_mapping = _materialize_audio_import_dynamic_rows(
@@ -14004,6 +14011,7 @@ def _prepare_closed_import_plan(
             "caller_expected_rows_accepted": False,
             "source_control_policy": source_control_policy,
             "preflight_consumed_fields": preflight_consumed_fields,
+            **({"effect_render_read_view": render_state["field_read_platform"]} if render_state else {}),
             **(
                 {"native_row_mapping": native_row_mapping}
                 if native_row_mapping
@@ -14121,7 +14129,7 @@ def _prepare_closed_import_plan(
         "irreversible": import_operation == "replaceExisting",
         "created_guid_source": "execution_result.result.objects",
     }
-    state = {"closed_import_plan": _json_mapping(plan), "import_guard": guard}
+    state = {"closed_import_plan": _json_mapping(plan), "import_guard": guard, **render_state}
     return preview, roles, state, verification, cleanup
 
 
@@ -21847,9 +21855,8 @@ def verify_prepared_operation(
                             },
                         )
                 if active_source_id is not None:
-                    source_fields = _import_audio_source_return_fields(version=version)
+                    source_fields = _dedupe_fields([*_import_audio_source_return_fields(version=version), "parent"])
                     if music_media or omitted_sound_source:
-                        source_fields.append("parent")
                         if version == "2021.1":
                             source_fields.append("originalWavFilePath")
                     source_rows = read_object(
@@ -21860,6 +21867,11 @@ def verify_prepared_operation(
                     check(f"{label} active Audio Source resolves once", len(source_rows) == 1, source_rows)
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
+                        if media_expected:
+                            check(f"{label} actual AudioFileSource belongs to the verified target",
+                                  _object_type_token(audio_source_row.get("type")) == "audiofilesource"
+                                  and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                  {"target_id": live_id, "source": audio_source_row})
                         if target.get("existing_sfx_source_id") is not None:
                             check(f"{label} reimport preserves the bound SFX source GUID",
                                   _same_identity(audio_source_row.get("id"), target["existing_sfx_source_id"]),

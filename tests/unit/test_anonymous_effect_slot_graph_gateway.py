@@ -782,37 +782,269 @@ def test_omitted_bypass_default_is_independently_verified_without_native_rewrite
     assert (code == 0 and verified.get('verified') is True) == (not wrong_default), verified
 
 
-def test_legacy_import_owner_render_fields_are_explicit_unfinished_chain_boundary(tmp_path):
-    import wave
-    task, _ = list_task(tmp_path, version='2022.1', operation='audio.import')
-    task.metadata['IsVoice'] = {'name': 'IsVoice', 'type': 'bool', 'default': False}
-    task.metadata['RenderEffect0'] = {'name': 'RenderEffect0', 'type': 'bool', 'default': False,
-        'dependencies': [{'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': 'Effect0',
-            'conditions': [{'referenceIsSet': True}]}]}
-    task.metadata['Effect0'] = {'name': 'Effect0', 'type': '', 'default': None,
-        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
-    task.objects[FIRST].update({'@IsVoice': False, '@RenderEffect0': False, '@Effect0': {'id': EFFECT}})
+def test_legacy_import_object_scoped_render_uses_the_actual_owner_adapter(tmp_path):
+    task, writes = legacy_render_import_task(tmp_path)
     prior = task.call
     def enabled(uri, args=None, options=None):
         if uri.endswith('isPropertyEnabled'):
-            task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            return {'return': True}
+            return {'return': True}  # fixture-only enabled-state observation
         return prior(uri, args, options)
     task.call = enabled
     target = task.bind(FIRST)
-    code, found = task.step('draft-discover-fields', '--object-handle', target, '--meaning', 'RenderEffect0')
+    field = select_field(task, owner=target, token='RenderEffect0')
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'sound', '--object-handle', target,
+        '--field-value', field, 'true')
+    assert code == 0, declared
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
+
+
+def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.import', *, media=False):
+    """Literal old WObjects grammar; metadata/defaults are fixtures pending native acceptance."""
+    import re
+    import uuid
+    task, _ = list_task(tmp_path, version=version, operation=operation)
+    task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    task.metadata = {'IsVoice': {'name': 'IsVoice', 'type': 'bool', 'default': False},
+        'Volume': {'name': 'Volume', 'type': 'Real64', 'default': 0},
+        'OverrideEffect': {'name': 'OverrideEffect', 'type': 'bool', 'default': False,
+            'dependencies': [{'type': 'override', 'action': 'Enable', 'context': 'Self', 'property': 'OverrideEffect'}]}}
+    override = {'type': 'override', 'action': 'Enable', 'context': 'Self', 'property': 'OverrideEffect'}
+    for i in range(4):
+        reference = f'Effect{i}'
+        task.metadata[reference] = {'name': reference, 'type': '', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}, 'dependencies': [override]}
+        for prefix in ('Render', 'Bypass'):
+            field = f'{prefix}Effect{i}'
+            task.metadata[field] = {'name': field, 'type': 'bool', 'default': False, 'dependencies': [override,
+                {'type': 'reference', 'action': 'Enable', 'context': 'Self', 'property': reference,
+                    'conditions': [{'referenceIsSet': True}]}]}
+        task.objects[FIRST].update({f'@{reference}': {'id': EFFECT} if i < 2 else None,
+            f'@RenderEffect{i}': False, f'@BypassEffect{i}': False})
+    task.objects[FIRST].update({'@IsVoice': False, '@OverrideEffect': False, '@Volume': -7.0})
+    for identity in (ROOT, CHILD): task.objects.pop(identity)
+    task.objects[FIRST].pop('@Effects')
+    prior, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith(('audio.import', 'audio.importTabDelimited')):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append(deepcopy(args))
+            nodes = args.get('imports')
+            if nodes is None:
+                import csv
+                from pathlib import Path
+                nodes = []
+                for record in csv.DictReader(Path(args['importFile']).read_text().splitlines(), delimiter='\t'):
+                    node = {'objectPath': task.objects[args['importLocation']]['path'] + '\\' + record['Object Path']}
+                    for name, value in record.items():
+                        if name.startswith(('Property[', 'Reference[')) and value:
+                            token = name[name.index('[') + 1:-1]
+                            node['@' + token] = value == 'true' if name.startswith('Property[') else value
+                    nodes.append(node)
+            results = []
+            for node in nodes:
+                path = re.sub(r'<[^>]+>', '', node['objectPath'])
+                if 'audioFile' in node:
+                    import shutil
+                    from pathlib import Path
+                    assert media and not any(key.startswith('@') for key in node), node
+                    owner_path, name = path.rsplit('\\', 1)
+                    owner = next(row for row in task.objects.values() if row['path'] == owner_path)
+                    copied = task.project_file.parent / 'Originals' / 'SFX' / Path(node['audioFile']).name
+                    copied.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(node['audioFile'], copied)
+                    identity = '{' + str(uuid.uuid4()).upper() + '}'
+                    source = {'id': identity, 'name': name, 'type': 'AudioFileSource', 'parent': {'id': owner['id']},
+                        'path': path, 'notes': node.get('audioSourceNotes', ''), 'originalFilePath': str(copied),
+                        'audioSource:language': {'id': EFFECT_PARENT, 'name': 'SFX'}}
+                    task.objects[identity] = source
+                    owner.update(activeSource={'id': identity}, originalFilePath=str(copied))
+                    results.append(deepcopy(source)); continue
+                assert 'audioFileBase64' not in node, node
+                found = [row for row in task.objects.values() if row['path'] == path]
+                if found: row = found[0]
+                else:
+                    identity = '{' + str(uuid.uuid4()).upper() + '}'
+                    row = {'id': identity, 'name': path.rsplit('\\', 1)[1], 'type': 'Sound', 'classId': 65552,
+                        'path': path, 'parent': {'id': SECOND}, 'notes': '',
+                        **{'@' + name: deepcopy(info['default']) for name, info in task.metadata.items()}}
+                    task.objects[identity] = row
+                row.update({key: deepcopy(value) for key, value in node.items() if key.startswith('@')})
+                if 'notes' in node: row['notes'] = node['notes']
+                rendered = [i for i in range(4) if node.get(f'@RenderEffect{i}') is True]
+                for i in range(max(rendered, default=-1)): row[f'@RenderEffect{i}'] = True
+                results.append(deepcopy(row))
+            return {'objects': results}
+        if uri.endswith('getProjectInfo') and version == '2022.1':
+            result = prior(uri, args, options)
+            if media:
+                from tests.unit.test_object_native_surface import _project_info
+                result = {**_project_info(task.project_file.parent, language='SFX'), **result}
+                platform = {**result['platforms'][0], 'id': EFFECT_PARENT, 'name': 'Windows'}
+            else:
+                platform = {'id': EFFECT_PARENT, 'name': 'Windows'}
+            return {**result, 'platforms': [platform], 'currentPlatformId': EFFECT_PARENT}
+        return prior(uri, args, options)
+    task.call = call
+    return task, writes
+
+
+def legacy_import_field(task, name):
+    code, listed = task.step('draft-discover-fields', '--semantic-kind', 'sound-sfx', '--list', '--page-size', '64')
+    assert code == 0, listed
+    choice = next(row for row in listed['agent_result']['fields'] if row['name'] == name)
+    code, found = task.step('draft-discover-fields', '--semantic-kind', 'sound-sfx', '--selection', choice['selection'])
     assert code == 0, found
-    field = found['meaning_results'][0]['candidates'][0]['handle']
-    media = tmp_path / 'render-input.wav'
-    with wave.open(str(media), 'wb') as output:
-        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000); output.writeframes(b'\0\0' * 8)
-    code, declared = task.step('draft-declare-existing', '--declaration-id', 'sound', '--object-handle', target, '--field', 'media_file', str(media), '--field-value', field, 'true')
+    return found['meaning_results'][0]['candidates'][0]['handle']
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+@pytest.mark.parametrize('existing', [False, True])
+def test_legacy_import_render_binds_new_or_actual_owner_and_verifies_prefix(tmp_path, existing, version):
+    task, writes = legacy_render_import_task(tmp_path, version)
+    parent = task.bind(SECOND)
+    target = task.bind(FIRST) if existing else None
+    render = legacy_import_field(task, 'RenderEffect1')
+    effect = task.bind(EFFECT)
+    refs = [(legacy_import_field(task, f'Effect{i}'), effect) for i in range(2)] if not existing else []
+    argv = ['--object-handle', target] if existing else ['--parent-handle', parent, '--name', 'New Sound', '--kind', 'sound-sfx']
+    code, declared = task.step('draft-declare-existing' if existing else 'draft-declare-new', '--declaration-id', 'sound', *argv,
+        '--field', 'volume_db', '-9', '--field-value', render, 'true',
+        *(arg for field, value in refs for arg in ('--field-value', field, value)))
+    assert code == 0, declared
+    tx, shown = task.preview()
+    native = shown['artifact']['prepared_operation']['dispatch']['args']['imports'][0]
+    assert native['@RenderEffect1'] is True and native['@RenderEffect0'] is True and native['@OverrideEffect'] is True
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert len(writes) == 1
+    row = next(row for row in task.objects.values() if row['path'] == re_path(existing))
+    assert row['@RenderEffect0'] is row['@RenderEffect1'] is True
+    assert row['@BypassEffect0'] is row['@BypassEffect1'] is False
+    assert row['@Volume'] == -9
+
+
+def re_path(existing):
+    return r'\Actor-Mixer Hierarchy\Default Work Unit' + '\\' + ('Sender' if existing else 'New Sound')
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+def test_legacy_tab_structure_import_seals_original_file_and_full_owner_prefix(tmp_path, version):
+    task, writes = legacy_render_import_task(tmp_path, version, 'audio.importTabDelimited')
+    code, bound = task.step('draft-bind-object', '--role', 'import_location', '--object-id', SECOND)
+    assert code == 0, bound
+    table = tmp_path / 'render.tsv'
+    table.write_text('Object Path\tObject Type\tProperty[OverrideEffect]\tReference[Effect0]\tReference[Effect1]\tProperty[RenderEffect1]\n'
+        + '<Sound>Tabbed\tSound\ttrue\t' + EFFECT + '\t' + EFFECT + '\ttrue\n')
+    before = table.read_bytes()
+    code, declared = task.step('draft-declare-artifact-plan', '--table-file', str(table),
+        '--location-handle', bound['bound_object']['handle'], '--language', 'SFX')
+    assert code == 0, declared
+    tx, shown = task.preview()
+    assert shown['artifact']['prepared_operation']['dispatch']['uri'].endswith('audio.importTabDelimited')
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert table.read_bytes() == before and len(writes) == 1
+    row = next(row for row in task.objects.values() if row['name'] == 'Tabbed')
+    assert row['@RenderEffect0'] is row['@RenderEffect1'] is True
+
+
+@pytest.mark.parametrize('fault', ['missing-reference', 'explicit-prefix-false', 'explicit-override-false'])
+def test_legacy_import_render_rejects_real_prerequisite_or_intent_conflict_before_write(tmp_path, fault):
+    task, writes = legacy_render_import_task(tmp_path)
+    parent, effect = task.bind(SECOND), task.bind(EFFECT)
+    fields = {name: legacy_import_field(task, name) for name in ('RenderEffect0', 'RenderEffect1', 'Effect0', 'Effect1', 'OverrideEffect')}
+    values = {'RenderEffect1': 'true', 'Effect0': effect, 'Effect1': effect}
+    if fault == 'missing-reference': values.pop('Effect1')
+    if fault == 'explicit-prefix-false': values['RenderEffect0'] = 'false'
+    if fault == 'explicit-override-false': values['OverrideEffect'] = 'false'
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'sound', '--parent-handle', parent,
+        '--kind', 'sound-sfx', '--name', 'New Sound',
+        *(arg for name, value in values.items() for arg in ('--field-value', fields[name], value)))
     assert code == 0, declared
     code, rejected = task.step('draft-check')
-    assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_IMPORT_CHAIN_PENDING', rejected
-    assert rejected['details']['mutation_dispatched'] is False
-    assert 'audio.importTabDelimited' in rejected['details']['remaining_obligation']
-    assert not any(uri.endswith('audio.import') for uri, _, _ in task.calls)
+    assert code == 2 and rejected['error_code'] in {'REFERENCE_ACTIVATION_REQUIRED', 'NEW_OBJECT_DEPENDENCY_CONFLICT', 'EFFECT_RENDER_CHAIN_CONFLICT'}, rejected
+    assert not writes
+
+
+@pytest.mark.parametrize('fault', ['owner-class-before', 'metadata-before', 'target-notes-before',
+    'ignored-prefix', 'reset-bypass', 'wrong-new-class', 'target-notes-after', 'metadata-after'])
+def test_legacy_import_render_guards_actual_chain_and_independent_poststate(tmp_path, fault):
+    task, writes = legacy_render_import_task(tmp_path)
+    existing = fault == 'owner-class-before'
+    parent = task.bind(FIRST if existing else SECOND)
+    effect = task.bind(EFFECT)
+    values = {legacy_import_field(task, name): value for name, value in [('RenderEffect1', 'true'), ('Effect0', effect), ('Effect1', effect)]}
+    args = ['--object-handle', parent] if existing else ['--parent-handle', parent, '--kind', 'sound-sfx', '--name', 'New Sound']
+    code, declared = task.step('draft-declare-existing' if existing else 'draft-declare-new', '--declaration-id', 'sound', *args,
+        *(arg for field, value in values.items() for arg in ('--field-value', field, value)))
+    assert code == 0, declared
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if fault == 'owner-class-before': task.objects[FIRST]['classId'] = 1638416
+    elif fault == 'metadata-before': task.metadata['RenderEffect0']['default'] = 0
+    elif fault == 'target-notes-before': task.objects[EFFECT]['notes'] = 'Unrequested drift'
+    code, executed = task.run('execute', tx)
+    if fault.endswith('before'):
+        assert code == 2 and not writes, executed
+        return
+    assert code == 0 and len(writes) == 1, executed
+    row = next(row for row in task.objects.values() if row['name'] == 'New Sound')
+    if fault == 'ignored-prefix': row['@RenderEffect0'] = False
+    elif fault == 'reset-bypass': row['@BypassEffect0'] = True
+    elif fault == 'wrong-new-class': row['classId'] = 1638416
+    elif fault == 'target-notes-after': task.objects[EFFECT]['notes'] = 'Unrequested reset'
+    elif fault == 'metadata-after': task.metadata['RenderEffect0']['default'] = 0
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, json.dumps(verified)
+    code, _ = task.run('execute', tx)
+    assert code == 2 and len(writes) == 1
+
+
+@pytest.mark.parametrize('existing,fault', [(False, None), (True, None), (False, 'wrong-result-guid'),
+    (False, 'fields-on-source'), (True, 'wrong-live-source-parent')])
+def test_legacy_import_render_with_media_keeps_fields_on_owner_and_proves_result_guids(tmp_path, existing, fault):
+    import wave
+    task, writes = legacy_render_import_task(tmp_path, media=True)
+    parent = task.bind(FIRST if existing else SECOND)
+    effect = task.bind(EFFECT)
+    values = {legacy_import_field(task, name): value for name, value in [('RenderEffect1', 'true'), ('Effect0', effect), ('Effect1', effect)]}
+    media_file = tmp_path / 'render-input.wav'
+    with wave.open(str(media_file), 'wb') as output:
+        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000); output.writeframes(b'\0\0' * 8)
+    args = ['--object-handle', parent] if existing else ['--parent-handle', parent, '--kind', 'sound-sfx', '--name', 'New Sound']
+    code, declared = task.step('draft-declare-existing' if existing else 'draft-declare-new', '--declaration-id', 'sound', *args,
+        '--field', 'media_file', str(media_file), '--field', 'volume_db', '-9',
+        *(arg for field, value in values.items() for arg in ('--field-value', field, value)))
+    assert code == 0, declared
+    prior = task.call
+    def call(uri, args=None, options=None):
+        result = prior(uri, args, options)
+        if uri.endswith('audio.import') and fault == 'wrong-result-guid':
+            result['objects'][0]['id'] = EFFECT_PARENT
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    native = shown['artifact']['prepared_operation']['dispatch']['args']['imports']
+    assert len(native) == 2 and '@RenderEffect0' in native[0] and 'audioFile' not in native[0]
+    assert 'audioFile' in native[1] and '<AudioFileSource>render-input' in native[1]['objectPath']
+    assert not any(key.startswith('@') for key in native[1]), native
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    assert code == 0 and len(writes) == 1, executed
+    owner = next(row for row in task.objects.values() if row['path'] == re_path(existing))
+    source = task.objects[owner['activeSource']['id']]
+    if fault == 'fields-on-source':
+        owner['@RenderEffect0'] = owner['@RenderEffect1'] = False
+        source['@RenderEffect0'] = source['@RenderEffect1'] = True
+    elif fault == 'wrong-live-source-parent':
+        source['parent'] = {'id': EFFECT_PARENT}
+    code, verified = task.run('verify', tx)
+    assert code == (2 if fault else 0) and (verified.get('verified') is True) is (fault is None), json.dumps(verified)
+    code, _ = task.run('execute', tx)
+    assert code == 2 and len(writes) == 1
 
 
 @pytest.mark.parametrize('version,operation,fault', [

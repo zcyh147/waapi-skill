@@ -273,6 +273,8 @@ def prepare_legacy(specs, native_nodes, *, version, read):
                     raise r.OperationContractError("INVALID_METADATA", "Legacy render/bypass state must be Boolean")
                 if identity and not r._has_field(before[0], field):
                     raise r.OperationContractError("INVALID_READBACK", "Legacy chain projection is incomplete")
+                if not identity and field.startswith("Bypass") and type(info.raw.get("default")) is not bool:
+                    raise r.OperationContractError("INVALID_METADATA", "New legacy Bypass state needs its actual Boolean class default")
                 if field.startswith("Render"):
                     value = r._field_value(before[0], field) if identity else info.raw.get("default")
                     if type(value) is not bool:
@@ -343,7 +345,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                 if (after_write and chain["mode"] == "replaceAll" and field["scope"].get("object_id") in chain["before_order"]):
                     continue  # sealed old GUIDs must be deleted by the replacement verifier
                 info = r._read_property_info(read, **field["scope"], name=field["field"])
-                passed = passed and dict(info.raw) == field["raw"] and info.as_dict() == field["normalized"]
+                passed = passed and r._native_snapshot_equal(dict(info.raw), field["raw"]) and r._native_snapshot_equal(info.as_dict(), field["normalized"])
             for snapshot in chain["snapshots"]:
                 if after_write and chain["mode"] == "replaceAll":
                     continue  # ordinary replacement verification proves deletion
@@ -354,17 +356,36 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                     for name, value in snapshot["after_changes"].items():
                         expected[name if name in expected else "@" + name] = value
                 selected = {name: r._reference_identity(r._field_value(expected, name)) for name in
-                    ([f"Effect{i}" for i in range(4)] if legacy else ["Effect"]) if r._has_field(expected, name)}
+                    (chain.get("reference_fields", [f"Effect{i}" for i in range(4)]) if legacy else ["Effect"]) if r._has_field(expected, name)}
                 strip = lambda row: {key: value for key, value in row.items() if key.lstrip("@") not in selected}
                 passed = passed and len(actual) == 1 and r._native_snapshot_equal([strip(expected)], [strip(row) for row in actual]) and all(
                     r._reference_requirement_matches(actual[0], name, value) for name, value in selected.items())
+            construction = chain.get("construction")
+            if after_write and construction:
+                rows = r._read_object_path_rows(construction["path"], fields=construction["fields"], read=read, platform=chain["platform"])
+                if len(rows) != 1 or not r._valid_object_id(rows[0].get("id")):
+                    raise ValueError("New import Render owner must resolve by its one exact declared path")
+                identity = rows[0]["id"]
+                actual = r._read_object_id_rows(identity, fields=construction["fields"], read=read, platform=chain["platform"])
+                parents = r._read_object_path_rows(construction["parent_path"], fields=r.IDENTITY_RETURN_FIELDS, read=read)
+                passed = passed and len(actual) == len(parents) == 1 and r._native_snapshot_equal(actual, rows)
+                if passed:
+                    row = actual[0]
+                    passed = (row.get("classId") == construction["class_id"] and row.get("type") == construction["type"]
+                        and r._same_identity(r._reference_identity(row.get("parent")), parents[0].get("id")))
+                    for name, value in construction["expected"].items():
+                        passed = passed and r._has_field(row, name) and (
+                            r._reference_requirement_matches(row, name, value) if name in construction["reference_fields"] else
+                            r._typed_value_equal(r._field_value(row, name), value, construction["metadata_types"][name]))
             for target in chain.get("targets", []):
                 actual = r._read_object_id_rows(target["before"]["id"], fields=target["fields"], read=read, platform=chain["platform"])
                 expected = target["before"]
                 if after_write:
                     expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
                 passed = passed and r._native_snapshot_equal(actual, [expected])
-            evidence = {"source_matches": source_match, "chain": chain}
+            target_conditions = r._reference_target_condition_assertions(chain, read=read, after_write=after_write)
+            passed = passed and all(item["passed"] for item in target_conditions)
+            evidence = {"source_matches": source_match, "chain": chain, "target_conditions": target_conditions}
         except (r.OperationContractError, ValueError, KeyError, TypeError) as exc:
             passed, evidence = False, {"error": str(exc)}
         assertions.append({"name": "Effect Render chain metadata and complete stored state match prepared intent", "passed": bool(passed), "evidence": evidence})
@@ -387,3 +408,132 @@ def require_import_adapter(*, version, class_id, properties):
             details={"fields": selected, "source_member": matches[0]["source_member"], "mutation_dispatched": False,
                 "remaining_obligation": "audio.import and audio.importTabDelimited owner Render chain observations",
                 "separate_supported_operation": "object.setProperty"})
+
+
+def legacy_import_owner(*, version, class_id, properties):
+    if version not in {"2021.1", "2022.1"} or not any(
+            row["name"] in {f"RenderEffect{i}" for i in range(4)} for row in properties):
+        return False
+    from .documented_list_fields import load_catalog
+    return any(row["class_id"] == class_id and row["name"] == "Sound"
+        and all(f"Effect{i}" in row["scalar_references"] for i in range(4)) for row in load_catalog(version)["classes"])
+
+
+def prepare_import(targets, *, version, operation, import_operation, read):
+    """Adapt complete closed import occurrences to the shared owner-chain planner."""
+    from . import operation_registry as r
+    selected = [target for target in targets if target.get("legacy_effect_render")]
+    if not selected:
+        return {}
+    from .edit_history_business import capture_field_read_platform
+    view = capture_field_read_platform(version, None, read=read)
+    platform = view.get("platform_id") if view["status"] == "certified" else None
+    specs, native = [], {}
+    for index, target in enumerate(selected):
+        path = f"$.imports[{index}]"
+        identity = target.get("preexisting_id") if import_operation == "useExisting" else None
+        spec = {"request_path": path, "class_id": target["metadata_class_id"],
+            "properties": target.setdefault("validated_properties", []),
+            "references": target.setdefault("validated_references", []), "platform": platform}
+        if identity:
+            spec["target_id"] = identity
+        specs.append(spec); native[path] = {}
+    chains = prepare_legacy(specs, native, version=version, read=read)
+    if len(chains) != len(selected):
+        raise r.OperationContractError("EFFECT_RENDER_CHAIN_UNPROVED", "Every legacy import owner requires its exact documented class chain")
+    for target, spec, chain in zip(selected, specs, chains, strict=True):
+        identity = spec.get("target_id")
+        if identity and (chain["slot_type"]["classId"] != target["metadata_class_id"]
+                or chain["snapshots"][0]["before"].get("path") != target["canonical_target_path"]):
+            raise r.OperationContractError("INVALID_READBACK", "Import Render owner class/path does not match its exact target")
+        infos, cache = {}, {}
+        scope = {"object_id": identity} if identity else {"class_id": target["metadata_class_id"]}
+        properties, references = spec["properties"], spec["references"]
+        desired = {row["name"].casefold(): row["target_id"] for row in references}
+        for row in [*properties, *references]:
+            info = r._read_property_info_cached(read, cache=cache, **scope, name=row["name"])
+            infos[info.name.casefold()] = info
+            if row in properties:
+                r._require_object_property_value(info, row["value"])
+                row["metadata_type"] = info.type
+            else:
+                r._require_object_reference_metadata(info)
+                resolved = r._resolve_identity({"kind": "id", "value": row["target_id"]}, role="import Effect target", read=read)
+                conditions = []
+                r._require_reference_target_allowed(info, resolved, source_id=identity, read=read, platform=platform,
+                    desired_references=desired, conditions=conditions, property_info_cache=cache, wwise_version=version)
+                if conditions:
+                    spec.setdefault("reference_target_conditions", []).extend(conditions)
+        derived, required = {}, {}
+        if identity:
+            for info in tuple(infos.values()):
+                r._apply_reference_activation_dependencies(info, read=read, object_id=identity,
+                    property_specs=properties, property_info_by_name=infos, derived_properties=derived,
+                    request_path=spec["request_path"], property_info_cache=cache,
+                    _condition_sources=tuple(infos.values()), reference_requirements=required,
+                    desired_references=desired, platform=platform, wwise_version=version)
+            for name, value in required.items():
+                if name.casefold() not in desired:
+                    references.append({"name": name, "target_id": value, "condition_guard": True})
+        else:
+            from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+            try:
+                evidence = class_default_evidence(infos=tuple(infos.values()), scope={"classId": target["metadata_class_id"]},
+                    read_call=read, supplied_values={row["name"]: row["value"] for row in properties},
+                    supplied_references={row["name"]: row["target_id"] for row in references},
+                    validate_scalar=r._require_object_property_value, version=version)
+            except NewObjectDefaultError as exc:
+                raise r.OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+            for name, value in evidence["derived_properties"].items():
+                properties.append({"name": name, "value": value, "metadata_type": evidence["metadata"][name]["type"], "derived": True})
+            for name in evidence["metadata"]:
+                infos[name.casefold()] = r._read_property_info_cached(read, cache=cache, **scope, name=name)
+        # TSV input is immutable. Prefix coupling needs no extra column; other
+        # activation writes require actual explicit user columns already admitted.
+        if operation == "audio.importTabDelimited":
+            supplied = {row["name"] for row in target.get("requested_dynamic_fields", [])}
+            missing = [row["name"] for row in properties if row["name"] not in supplied
+                and row.get("condition_source") != "effect-render-prefix"]
+            if missing:
+                raise r.OperationContractError("TAB_REFERENCE_DEPENDENCY_REQUIRES_COLUMN",
+                    "The table requires explicit activation columns", details={"missing_properties": missing})
+        for info in infos.values():
+            chain["metadata"].append({"scope": scope, "field": info.name, "raw": dict(info.raw), "normalized": info.as_dict()})
+        chain["reference_target_conditions"] = spec.get("reference_target_conditions", [])
+        chain["reference_fields"] = list(dict.fromkeys([*[f"Effect{i}" for i in range(4)],
+            *(info.name for info in infos.values() if r._metadata_is_reference(info))]))
+        if identity:
+            snapshot = chain["snapshots"][0]
+            fields = r._dedupe_fields([*snapshot["fields"], *(info.name for info in infos.values())])
+            rows = r._read_object_id_rows(identity, fields=fields, read=read, platform=platform)
+            if len(rows) != 1 or any(not r._has_field(rows[0], info.name) for info in infos.values()):
+                raise r.OperationContractError("INVALID_READBACK", "Import owner condition snapshot is incomplete")
+            snapshot.update(fields=fields, before=rows[0])
+            snapshot["after_changes"].update({row["name"]: row["value"] for row in properties})
+            snapshot["after_changes"].update({row["name"]: row["target_id"] for row in references})
+        else:
+            metadata_types = {item["field"]: item["normalized"]["type"] for item in chain["metadata"]}
+            reference_fields = chain["reference_fields"]
+            expected = {item["field"]: item["raw"]["default"] for item in chain["metadata"] if "default" in item["raw"]}
+            expected.update({row["name"]: row["value"] for row in properties})
+            expected.update({row["name"]: row["target_id"] for row in references})
+            chain["construction"] = {"path": target["canonical_target_path"], "class_id": target["metadata_class_id"],
+                "type": target["metadata_object_type"], "parent_path": target["canonical_target_path"].rpartition("\\")[0],
+                "fields": r._dedupe_fields([*r.IDENTITY_RETURN_FIELDS, "classId", "parent", *expected]),
+                "expected": expected, "reference_fields": reference_fields, "metadata_types": metadata_types}
+        target_ids = {row["target_id"] for row in references if row.get("target_id") is not None}
+        if identity:
+            for i in range(4):
+                value = r._field_value(chain["snapshots"][0]["before"], f"Effect{i}")
+                if not r._reference_value_is_null(value):
+                    target_ids.add(r._reference_identity(value))
+        chain["targets"] = []
+        for target_id in target_ids:
+            fields = [*r.OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
+            rows = r._read_object_id_rows(target_id, fields=fields, read=read, platform=platform)
+            if len(rows) != 1 or not r._same_identity(rows[0].get("id"), target_id):
+                raise r.OperationContractError("INVALID_READBACK", "Import Effect target must independently resolve once")
+            chain["targets"].append({"fields": fields, "before": rows[0]})
+    if sum(4 + len(chain["targets"]) for chain in chains) > r.OBJECT_LIST_MAX_SUBTREE_NODES:
+        raise r.OperationContractError("LIST_SNAPSHOT_LIMIT_EXCEEDED", "Import Render chain observations exceed the shared bound")
+    return {"effect_render_chains": chains, "field_read_platform": view}
