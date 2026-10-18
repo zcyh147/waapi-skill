@@ -155,10 +155,26 @@ def test_planned_sound_owns_two_new_anonymous_slots(tmp_path):
     assert len(writes) == 1
 
 
-@pytest.mark.parametrize("fault", [None, "wrong-reference"])
-def test_anonymous_slot_references_same_graph_new_independent_shareset(tmp_path, fault):
+@pytest.mark.parametrize("parent_kind,fault", [
+    ("WorkUnit", None), ("WorkUnit", "wrong-reference"),
+    *[("Folder", fault) for fault in [None, "wrong-reference", "folder-class-drift",
+        "folder-catalog-drift", "folder-ancestor-notes", "folder-ancestor-owner", "folder-parent"]],
+])
+def test_anonymous_slot_references_same_graph_new_independent_shareset(tmp_path, fault, parent_kind):
     task = anonymous_task(tmp_path)
-    parent = task.bind(EFFECT_PARENT)
+    parent_id = EFFECT_PARENT
+    if parent_kind == "Folder":
+        parent_id = '{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}'
+        task.types.append({'name': 'Folder', 'classId': 131088, 'type': 'WObject'})
+        ancestor = '{CFCFCFCF-CFCF-CFCF-CFCF-CFCFCFCFCFCF}'
+        task.objects[ancestor] = {'id': ancestor, 'name': 'Library', 'type': 'Folder',
+            'classId': 131088, 'path': task.objects[EFFECT_PARENT]['path'] + r'\Library',
+            'parent': {'id': EFFECT_PARENT}, 'notes': 'Keep independent ancestor'}
+        task.objects[parent_id] = {'id': parent_id, 'name': 'ShareSets', 'type': 'Folder',
+            'classId': 131088, 'path': task.objects[ancestor]['path'] + r'\ShareSets',
+            'parent': {'id': ancestor}, 'notes': 'Keep Folder'}
+    new_path = task.objects[parent_id]['path'] + r'\New ShareSet'
+    parent = task.bind(parent_id)
     code, found = task.step('draft-discover-types', '--role', 'effect', '--meaning', 'Wwise Meter')
     assert code == 0, found
     kind = found['type_candidates'][0]['handle']
@@ -169,10 +185,10 @@ def test_anonymous_slot_references_same_graph_new_independent_shareset(tmp_path,
     declare_slots(task, targets=[effect_handle, EFFECT_B])
     tx, shown = task.preview()
     native = shown['artifact']['prepared_operation']['dispatch']['args']
-    assert native['objects'][0] == {'object': EFFECT_PARENT, 'children': [
+    assert native['objects'][0] == {'object': parent_id, 'children': [
         {'type': 'Effect', 'name': 'New ShareSet', 'classId': 8454147}]}
     assert native['objects'][1]['object'] == FIRST
-    assert native['objects'][1]['@Effects'][0]['@Effect'] == r'\Effects\Default Work Unit\New ShareSet'
+    assert native['objects'][1]['@Effects'][0]['@Effect'] == new_path
 
     new_effect = '{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}'
     original, writes = task.call, []
@@ -181,18 +197,30 @@ def test_anonymous_slot_references_same_graph_new_independent_shareset(tmp_path,
             writes.append(deepcopy(args))
             assert args == native
             task.objects[new_effect] = {'id': new_effect, 'name': 'New ShareSet', 'type': 'Effect',
-                'classId': 8454147, 'path': r'\Effects\Default Work Unit\New ShareSet',
-                'parent': {'id': EFFECT_PARENT}, 'notes': ''}
+                'classId': 8454147, 'path': new_path,
+                'parent': {'id': parent_id}, 'notes': ''}
             for identity, effect, bypass, render in [(SLOT_A, new_effect, True, False), (SLOT_B, EFFECT_B, False, True)]:
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject',
                     'classId': 5505040, 'path': r'\Opaque ' + identity, 'owner': {'id': FIRST}, 'notes': '',
                     '@Effect': {'id': EFFECT if fault == 'wrong-reference' else effect}, '@Bypass': bypass, '@Render': render}
             task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
+            if fault == 'folder-ancestor-notes': task.objects[ancestor]['notes'] = 'Unexpected reset'
+            if fault == 'folder-ancestor-owner': task.objects[ancestor]['owner'] = {'id': FIRST}
+            if fault == 'folder-parent': task.objects[parent_id]['parent'] = {'id': EFFECT_PARENT}
             return {'objects': [
                 {'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]},
-                {'id': EFFECT_PARENT, 'name': 'Default Work Unit', 'children': [{'id': new_effect, 'name': 'New ShareSet'}]}]}
+                {'id': parent_id, 'name': task.objects[parent_id]['name'], 'children': [{'id': new_effect, 'name': 'New ShareSet'}]}]}
         return original(uri, args, options)
     task.call = call
+    if fault in {'folder-class-drift', 'folder-catalog-drift'}:
+        if fault == 'folder-class-drift': task.objects[ancestor]['classId'] = 1638416
+        else: task.types[-1]['type'] = 'DifferentBaseClass'
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and rejected.get('executed') is not True, rejected
+        assert not writes
+        return
     code, verified = task.finish(tx, shown)
     assert code == (2 if fault else 0), json.dumps(verified)
     assert (verified.get('verified') is True) == (fault is None), verified

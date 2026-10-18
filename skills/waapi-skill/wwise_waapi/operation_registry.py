@@ -2630,7 +2630,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Source plug-ins are create-only children of Sound or Voice targets",
             "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
             "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
-            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation",
+            "independent ShareSets verify parent/class/name/fields and sibling preservation; Effect placement additionally admits a fresh source-proven Folder beneath an Effects Work Unit, while Sink and Metadata require their matching Work Unit",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
         ),
@@ -5360,6 +5360,7 @@ def _read_plugin_prestate(
     target_id: str,
     descriptor: PluginCreationDescriptor,
     read: ReadCall,
+    target_type: str | None = None,
 ) -> dict[str, Any]:
     catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
     plugins = [row for row in catalog if row.class_id == descriptor.class_id
@@ -5385,7 +5386,9 @@ def _read_plugin_prestate(
         if len({value.casefold() for value in ids}) != len(ids):
             raise OperationContractError("INVALID_READBACK", "ShareSet children contain duplicate identities.")
         return {"kind": "shareset_children", "uri": OBJECT_GET_URI, "args": args, "options": options,
-                "rows": normalized, "plugin_type": plugin_type, "preexisting_plugin_ids": ids}
+                "rows": normalized, "plugin_type": plugin_type, "preexisting_plugin_ids": ids,
+                **({"effect_shareset_placement": _observe_effect_shareset_placement(target_id, catalog=catalog, read=read, platform=descriptor.platform)}
+                   if descriptor.kind == "effect" and target_type == "Folder" else {})}
 
     if descriptor.kind == "source":
         fields = ("id", "name", "type", "parent")
@@ -5628,6 +5631,7 @@ def _prepare_object_create_plugin(
         target_id=target.object,
         descriptor=descriptor,
         read=read,
+        target_type=target_type,
     )
     fixed_effects = (
         plugin_prestate.get("fixed_effects")
@@ -7795,42 +7799,91 @@ def _capture_anonymous_member_state(members, *, read, platform, preserve):
     return snapshots
 
 
-def _observe_independent_effect_ancestry(effect, *, catalog, read, platform):
-    """Bind an existing ShareSet, rather than reuse a creation destination rule.
+def _observe_effect_shareset_placement(object_id, *, catalog, read, platform):
+    """Fresh bounded owning closure, shared by Effect creation and references.
 
-    All pinned SampleProject Effects/Factory Effects Work Units contain Effect
-    children below Folder nodes. Exact fresh parent GUIDs/classes prove this
-    hierarchy; an opaque owner-local Effect is not made independent by its path.
+    All five pinned SampleProject Effects/Factory Effects.wwu files place
+    independent Effects below Folder nodes. Fresh exact classes and GUID parent
+    edges must close at the actual Effects WorkUnit; a path alone is insufficient.
     """
-    if len([row for row in catalog if row.class_id == effect.get("classId") and row.type == "Effect"]) != 1:
-        raise OperationContractError("INVALID_REFERENCE_TARGET", "Selected Effect needs one fresh exact plugin class")
     fields = [*OBJECT_LIST_SNAPSHOT_FIELDS, "classId"]
-    rows, seen, current = [], set(), effect
-    for depth in range(DEFAULT_MAX_DEPTH + 1):
-        identity = current.get("id")
-        if not _valid_object_id(identity) or _identity_key(identity) in seen:
-            raise OperationContractError("INVALID_READBACK", "Independent ShareSet ancestry needs unique exact GUIDs")
-        seen.add(_identity_key(identity))
-        rows.append(current)
-        if "owner" in current and not _reference_value_is_null(current["owner"]):
-            if depth == 0 and _valid_object_id(_reference_identity(current["owner"])):
-                raise OperationContractError("LOCAL_EFFECT_REUSE_UNRESOLVED", "Existing owner-local Effect reuse is not proved by ShareSet construction authority; its actual owner cannot be silently replaced")
-            raise OperationContractError("INVALID_READBACK", "Independent ShareSet ancestry has non-null or malformed ownership")
-        if depth:
-            matches = [row for row in catalog if row.class_id == current.get("classId") and row.name in {"WorkUnit", "Folder"}]
-            if len(matches) != 1:
-                raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestors require their fresh WorkUnit or Folder classes")
-            path = current.get("path")
-            if not isinstance(path, str) or not path.startswith("\\Effects\\"):
-                raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestry must remain in the actual Effects hierarchy")
-            if matches[0].name == "WorkUnit":
-                return rows
-        parent_id = _reference_identity(current.get("parent"))
-        parent = _read_object_id_rows(parent_id, fields=fields, read=read, platform=platform) if _valid_object_id(parent_id) else []
-        if len(parent) != 1 or not _same_identity(parent[0].get("id"), parent_id):
-            raise OperationContractError("INVALID_READBACK", "ShareSet parent must resolve once by its actual GUID")
-        current = parent[0]
-    raise OperationContractError("INVALID_REFERENCE_TARGET", "ShareSet ancestry exceeds the graph depth bound")
+    rows, classes, seen = [], {}, set()
+    for _ in range(DEFAULT_MAX_DEPTH + 1):
+        if not _valid_object_id(object_id) or _identity_key(object_id) in seen:
+            raise OperationContractError("INVALID_READBACK", "Effect ShareSet ancestry needs unique exact GUIDs")
+        seen.add(_identity_key(object_id))
+        actual = _read_object_id_rows(object_id, fields=fields, read=read, platform=platform)
+        if len(actual) != 1 or not _same_identity(actual[0].get("id"), object_id):
+            raise OperationContractError("INVALID_READBACK", "Effect ShareSet parent must resolve once by its actual GUID")
+        row = actual[0]
+        matches = [item for item in catalog if type(row.get("classId")) is int
+            and item.class_id == row["classId"] and item.name in {"WorkUnit", "Folder"}]
+        if len(matches) != 1 or row.get("type") != matches[0].name:
+            raise OperationContractError("INVALID_SHARESET_TARGET", "Effect ShareSet ancestors require matching actual type and fresh exact Folder or WorkUnit class")
+        if "owner" in row and not _reference_value_is_null(row["owner"]):
+            raise OperationContractError("INVALID_SHARESET_TARGET", "Independent ShareSet placement cannot have an owner")
+        if not isinstance(row.get("path"), str) or not row["path"].startswith("\\Effects\\"):
+            raise OperationContractError("INVALID_SHARESET_TARGET", "Effect ShareSet ancestry must remain in the actual Effects hierarchy")
+        rows.append(row)
+        classes[matches[0].class_id] = matches[0].as_dict()
+        if matches[0].name == "WorkUnit":
+            return {"rows": rows, "classes": [classes[key] for key in sorted(classes)], "platform": platform}
+        object_id = _reference_identity(row.get("parent"))
+    raise OperationContractError("INVALID_SHARESET_TARGET", "Effect ShareSet ancestry exceeds the graph depth bound")
+
+
+def _observe_independent_effect_ancestry(effect, *, catalog, read, platform):
+    """Bind an existing independent Effect using the same owning placement closure."""
+    if len([row for row in catalog if type(effect.get("classId")) is int
+            and row.class_id == effect["classId"] and row.type == "Effect"]) != 1:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "Selected Effect needs one fresh exact plugin class")
+    if "owner" in effect and not _reference_value_is_null(effect["owner"]):
+        if _valid_object_id(_reference_identity(effect["owner"])):
+            raise OperationContractError("LOCAL_EFFECT_REUSE_UNRESOLVED", "Existing owner-local Effect reuse is not proved by ShareSet construction authority; its actual owner cannot be silently replaced")
+        raise OperationContractError("INVALID_READBACK", "Independent Effect has malformed ownership")
+    placement = _observe_effect_shareset_placement(_reference_identity(effect.get("parent")),
+        catalog=catalog, read=read, platform=platform)
+    if any(_same_identity(row["id"], effect["id"]) for row in placement["rows"]):
+        raise OperationContractError("INVALID_READBACK", "Independent Effect ancestry cannot contain the Effect itself")
+    return [effect, *placement["rows"]]
+
+
+def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False):
+    """Reobserve only sealed Folder construction placements within this phase."""
+    if not isinstance(pre_state, Mapping):
+        return []
+    nodes = pre_state.get("object_set_nodes", [])
+    placements = [node["effect_shareset_placement"] for node in nodes if "effect_shareset_placement" in node]
+    plugin_guard = pre_state.get("plugin_creation_guard")
+    plugin = plugin_guard.get("snapshot", {}) if isinstance(plugin_guard, Mapping) else {}
+    # Standalone preparation already replays its complete placement snapshot in
+    # the existing plugin guard before execution; avoid observing it twice.
+    if after_write and "effect_shareset_placement" in plugin:
+        placements.append(plugin["effect_shareset_placement"])
+    if not placements:
+        return []
+    catalog, cache, assertions = _read_object_type_catalog(read), {}, []
+    from .object_graph_paths import expected_snapshot
+    renamed = {}
+    def read_renamed(object_id):
+        if object_id not in renamed:
+            rows = _read_object_id_rows(object_id, fields=IDENTITY_RETURN_FIELDS, read=read)
+            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id):
+                raise OperationContractError("INVALID_READBACK", "Renamed ShareSet ancestor must resolve by exact GUID")
+            renamed[object_id] = rows[0]
+        return renamed[object_id]
+    for expected in placements:
+        object_id = expected["rows"][0]["id"]
+        key = (_identity_key(object_id), expected["platform"])
+        if key not in cache:
+            cache[key] = _observe_effect_shareset_placement(object_id, catalog=catalog, read=read, platform=expected["platform"])
+        actual = cache[key]
+        expected_rows = ([expected_snapshot(row, edits=nodes, read_row=read_renamed) for row in expected["rows"]]
+            if after_write else expected["rows"])
+        assertions.append({"name": "Effect ShareSet Folder ancestry and class proof preserved" if after_write else "Effect ShareSet Folder ancestry and class proof unchanged",
+            "passed": actual["classes"] == expected["classes"] and _native_snapshot_equal(actual["rows"], expected_rows),
+            "evidence": {"expected": {**expected, "rows": expected_rows}, "actual": actual}})
+    return assertions
 
 
 def _resolve_graph_node_type(node, *, catalog, version):
@@ -7872,6 +7925,7 @@ def _prepare_object_node_specs(
     node_paths = {node.request_path for node in nodes}
     rtpc_snapshots = {} if rtpc_snapshots is None else rtpc_snapshots
     merge_guards = [] if merge_guards is None else merge_guards
+    shareset_placements = {}
     for node in nodes:
         requested_type_token = _object_type_token(node.type)
         uses_2025_actor_mixer_alias = (
@@ -8151,8 +8205,14 @@ def _prepare_object_node_specs(
         if node.plugin is not None:
             if node.plugin.placement == "shareset":
                 if node.parent_request_path in node_paths or root_parent is None:
-                    raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require the exact bound Effects Work Unit")
+                    raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require an exact bound Effects Work Unit or Folder")
                 validate_plugin_target(node.plugin, target_type=root_parent.row["type"], target_path=root_parent.row["path"])
+                if root_parent.row["type"] == "Folder":
+                    key = (_identity_key(root_parent.object), platform)
+                    if key not in shareset_placements:
+                        shareset_placements[key] = _observe_effect_shareset_placement(root_parent.object,
+                            catalog=type_catalog, read=read, platform=platform)
+                    spec["effect_shareset_placement"] = shareset_placements[key]
             else:
                 parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
                 if node.collection != "Effect" or parent_spec is None or not parent_spec.get("anonymous_list_member"):
@@ -15852,6 +15912,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
+    assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call))
     from .edit_history_business import observe_field_read_platform
     platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
     if platform_observation is not None:
@@ -16155,6 +16216,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             target_id=target_id,
             descriptor=descriptor,
             read=plugin_guard_read,
+            target_type=target_type,
         )
         assertions.extend(
             [
@@ -17520,6 +17582,7 @@ def verify_prepared_operation(
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True))
+    assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call, after_write=True))
     from .edit_history_business import observe_field_read_platform
     platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
     if platform_observation is not None:

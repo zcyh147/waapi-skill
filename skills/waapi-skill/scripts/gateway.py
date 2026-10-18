@@ -28631,7 +28631,7 @@ def _business_next_action_binding(
                         "semantics": business_contract["declaration"]["anonymous_list_member"],
                         "local_plugin": {"parent": "new_slot_result_handle", "kind": "selected_effect_Type_Handle",
                             "name": "user_requested_plugin_name", "plugin_placement": "owner"},
-                        "new_shareset": {"parent": "bound_Effects_WorkUnit_Handle", "kind": "selected_effect_Type_Handle",
+                        "new_shareset": {"parent": "bound_Effects_WorkUnit_or_source_proven_Folder_Handle", "kind": "selected_effect_Type_Handle",
                             "name": "user_requested_ShareSet_name", "plugin_placement": "shareset"},
                     },
                     "append": [
