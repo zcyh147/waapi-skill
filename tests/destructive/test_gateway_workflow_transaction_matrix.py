@@ -2134,7 +2134,7 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
         "category": ("cli-media-id-migrated-project" if migrate_before_capture
                      else "cli-media-id-file-format-observation"), "status": "FAIL",
         "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
-        "baseline_setup": ("public_gateway_save_then_migrate_then_reopen_before_capture" if migrate_before_capture
+        "baseline_setup": ("public_gateway_save_then_migrate_then_reopen_then_save_before_capture" if migrate_before_capture
                            else "public_gateway_project_save_before_capture"),
     }
     runtime.category_results.append(observation)
@@ -2171,6 +2171,15 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
             observation[setup_stage].update(status="complete", transaction_id=reopened["verify"]["transaction_id"],
                 state=reopened["verify"]["state"], business_state_verified=reopened["verify"]["verification"]["business_state_verified"],
                 verification=reopened["verify"]["verification"], responses=reopened)
+            # Reopening can materialize newly loaded in-memory objects. Save that
+            # loaded state before any disk-authority baseline or media Preview.
+            setup_stage = "setup_reopen_save"
+            observation[setup_stage] = {"status": "preparing",
+                "coverage_credit": "none; baseline preparation only"}
+            saved = _save_sandbox_project(runtime)
+            observation[setup_stage].update(status="complete", transaction_id=saved["verify"]["transaction_id"],
+                state=saved["verify"]["state"],
+                business_state_verified=saved["verify"]["verification"]["business_state_verified"], responses=saved)
         except AssertionError as exc:
             observation[setup_stage]["status"] = "FAIL"
             observation[setup_stage]["failure"] = (exc.args[0] if exc.args and isinstance(exc.args[0], Mapping) else str(exc))
@@ -3725,7 +3734,7 @@ def test_rtpc_empty_create_update_delete_recreate_across_selected_version(
             _delete_if_present_via_transaction(runtime, control_id)
 
 
-def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
+def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> dict[str, Mapping[str, Any]]:
     """Persist prior sandbox mutations before a file-authority operation."""
 
     api = "ak.wwise.core.project.save"
@@ -3750,7 +3759,7 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
         assert saved["verify"]["state"] == (
             TransactionState.RESULT_SCHEMA_CHECKED.value
         ), saved
-        return
+        return saved
 
     continuation = schema.get("continuation")
     assert isinstance(continuation, Mapping), schema
@@ -3784,6 +3793,8 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
         TransactionState.VERIFIED.value,
         TransactionState.RESULT_SCHEMA_CHECKED.value,
     }, verified
+
+    return {"preview": preview, "execute": executed, "verify": verified}
 
 
 def _create_object(
