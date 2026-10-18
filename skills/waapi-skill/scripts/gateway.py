@@ -284,7 +284,7 @@ from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.audio_import_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
 )
-from wwise_waapi.console_project_operations import CLI_PROJECT_FILE_URIS
+from wwise_waapi.console_project_operations import CLI_PROJECT_FILE_URIS, CONSOLE_PROJECT_LOAD_URIS, exact_console_project_absence
 from wwise_waapi.cli_console_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CLI_CONSOLE_BUSINESS_OPERATIONS,
     cli_console_business_catalog_rows,
@@ -11238,15 +11238,21 @@ def attest_draft_live_connection(
 ) -> Any:
     if getattr(args, "draft_id", None) is None:
         return None
-    return OperationDraftStore(
+    store = OperationDraftStore(
         resolve_transaction_state_directory(args, env=env)
-    ).attest_connection(
+    )
+    record = store.inspect(args.draft_id, task_authority=args.task_authority)
+    live = {
+        "version": dict(require_mapping(live_info.get("version"), "getInfo version")),
+        "project_id": project.get("id") if project is not None else None,
+    }
+    if record.operation in CONSOLE_PROJECT_LOAD_URIS:
+        live["console_runtime"] = {key: live_info.get(key)
+            for key in ("isCommandLine", "sessionId", "processId", "processPath")}
+    return store.attest_connection(
         args.draft_id, task_authority=args.task_authority,
         configuration=selected_connection_binding(env),
-        live={
-            "version": dict(require_mapping(live_info.get("version"), "getInfo version")),
-            "project_id": project.get("id") if project is not None else None,
-        },
+        live=live,
     )
 
 
@@ -16715,6 +16721,8 @@ def dispatch_operation_draft_check(
         connection=connection,
         version=detected_version,
         allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+        no_project_operation=request_payload.get("arguments", {}).get("api") if request_payload.get("operation") == "waapi.call" else None,
+        live_info=live_info,
     )
     attest_draft_live_connection(
         args, env=env, live_info=live_info, project=project,
@@ -18032,6 +18040,7 @@ def dispatch_business_cli_console_plan(
         detected_version=detected_version,
         live_info=live_info,
         dispatcher=dispatcher,
+        allow_no_project=pending.operation in CONSOLE_PROJECT_LOAD_URIS,
     )
     adapter = business_adapter(binding.record.operation)
     if adapter.family != "cli-console-business" or not adapter.accepts_update_command(
@@ -18900,6 +18909,8 @@ def _open_business_binding(
         connection=connection,
         version=detected_version,
         allow_none=allow_no_project,
+        no_project_operation=record.operation,
+        live_info=live_info,
     )
     record = attest_draft_live_connection(
         args, env=env, live_info=live_info, project=project,
@@ -20562,6 +20573,8 @@ def create_transaction_preview(
         connection=connection,
         version=detected_version,
         allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+        no_project_operation=canonical_request.get("arguments", {}).get("api") if canonical_request.get("operation") == "waapi.call" else None,
+        live_info=live_info,
     )
     attest_draft_live_connection(
         args, env=env, live_info=live_info, project=project,
@@ -21214,6 +21227,8 @@ def _dispatch_transaction_command_with_execution_lease(
             connection=connection,
             version=detected_version,
             allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+            no_project_operation=request_payload.get("arguments", {}).get("api") if request_payload.get("operation") == "waapi.call" else None,
+            live_info=live_info,
         )
         current_guard = build_project_guard(
             endpoint=common["endpoint"],
@@ -22300,6 +22315,8 @@ def _dispatch_transaction_command_with_execution_lease(
                     connection=connection,
                     version=detected_version,
                     allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+                    no_project_operation=request_payload.get("arguments", {}).get("api") if request_payload.get("operation") == "waapi.call" else None,
+                    live_info=live_info,
                 )
                 current_guard = build_project_guard(
                     endpoint=common["endpoint"],
@@ -22421,6 +22438,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     guard_validation=guard_validation,
                     project_call=project_call,
                     project_creation=(request_payload.get('arguments', {}).get('api') in {'ak.wwise.console.project.create', 'ak.wwise.ui.project.create'}),
+                    project_opening=(request_payload.get('arguments', {}).get('api') == 'ak.wwise.console.project.open'),
                 )
         except Exception as exc:  # noqa: BLE001 - read-only verification may be retried manually
             return verification_deferred_payload(
@@ -31526,6 +31544,7 @@ def strengthen_project_transition_verification(
     guard_validation: Mapping[str, Any],
     project_call: Mapping[str, Any],
     project_creation: bool = False,
+    project_opening: bool = False,
 ) -> VerificationResult:
     """Combine the transition with any independently observed creation effect."""
 
@@ -31548,11 +31567,11 @@ def strengthen_project_transition_verification(
     }
     assertions = [*verification.assertions, assertion]
     business_verified = True
-    if project_creation:
+    if project_creation or project_opening:
         artifacts = [row for row in verification.readbacks
-            if row.get('kind') in {'console-created-project-artifact', 'authoring-created-project-artifact'}]
+            if row.get('kind') in {'console-created-project-artifact', 'authoring-created-project-artifact', 'console-open-project-identity'}]
         if len(artifacts) != 1:
-            raise GatewayInputError('Project creation requires its independent saved artifact observation')
+            raise GatewayInputError('Project transition requires its independent saved identity observation')
         saved = artifacts[0]['project']
         actual = transition.get('actual', {})
         identity_matches = (_canonical_guid(saved.get('id')) and _canonical_guid(actual.get('id'))
@@ -31560,14 +31579,14 @@ def strengthen_project_transition_verification(
             and saved.get('name') == actual.get('name'))
         assertions.append({'name': 'Saved project identity matches the observed open project',
             'passed': identity_matches, 'evidence': {'saved': saved, 'live': actual}})
-        business_verified = verification.business_state_verified and identity_matches
+        business_verified = identity_matches and (project_opening or verification.business_state_verified)
     passed = all(row.get('passed') is True for row in assertions)
     return VerificationResult(
         operation=verification.operation,
         status=('verification_failed' if not passed else 'verified' if business_verified else 'result_schema_checked'),
         assertions=tuple(assertions),
         readbacks=(*verification.readbacks, readback),
-        message=('The returned WAAPI payload and live project transition postcondition both passed.' if not project_creation else
+        message=('The returned WAAPI payload and live project transition postcondition both passed.' if not (project_creation or project_opening) else
             'Saved artifact identity does not match the observed project.' if not passed else
             'The returned WAAPI payload and requested project transition/effect checks passed.' if business_verified else
             'The project transition passed; requested artifact semantics remain explicitly unresolved.'),
@@ -31582,12 +31601,12 @@ def current_project(
     connection: GatewayConnection,
     version: str,
     allow_none: bool = False,
+    no_project_operation: str | None = None,
+    live_info: Mapping[str, Any] | None = None,
 ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any]]:
     if allow_none:
-        # A successful bounded object query with zero Project rows is the only
-        # accepted no-project observation.  WAAPI errors and malformed payloads
-        # stay failures because their cross-version no-project shape is not a
-        # safe contract to guess.
+        # Zero rows prove absence. Console open/create additionally admit the
+        # exact native no-project error below, bound to this live runtime.
         project_call = dispatch(
             dispatcher,
             OBJECT_GET_URI,
@@ -31597,6 +31616,14 @@ def current_project(
             options={"return": ["id", "name", "type", "path", "filePath"]},
         )
         if project_call.get("ok") is not True:
+            # Console open/create are also legal when object.get itself requires
+            # a project. Only the exact native getProjectInfo absence result can
+            # certify this branch, bound to this invocation's Console runtime.
+            if no_project_operation in CONSOLE_PROJECT_LOAD_URIS:
+                absence_call = dispatch(dispatcher, GET_PROJECT_INFO_URI,
+                    connection=connection, version=version)
+                if exact_console_project_absence(absence_call, version, live_info):
+                    return None, {**absence_call, "prior_project_probe": dispatch_call_summary(project_call)}
             raise GatewayInputError(
                 "Project transition probe failed; refusing to infer that no project is open"
             )

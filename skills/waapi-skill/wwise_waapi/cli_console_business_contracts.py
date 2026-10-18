@@ -708,6 +708,18 @@ def cli_console_business_contract_data(
                 'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
         }} if operation == 'ak.wwise.console.project.create' else {}),
         **({'effect_verification': {
+            'input_binding': 'bounded_saved_WPROJ_GUID_name_and_exact_file_proof_revalidated_before_dispatch',
+            'live_effect': 'exact_requested_project_path_and_saved_GUID_name_match',
+            'older_project_input': 'permitted_under_declared_migration_policy_without_assuming_migration_success',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH},
+        }} if operation == 'ak.wwise.console.project.open' else {}),
+        **({'project_start_state': {
+            'loaded_project': 'optional',
+            'absence_evidence': 'successful_bounded_Project_query_zero_rows_or_exact_native_no_project_loaded_with_attested_Console_runtime',
+            'binding': 'selected_configuration_and_Wwise_session_process_version_remain_exact',
+        }} if operation in {'ak.wwise.console.project.open', 'ak.wwise.console.project.create'} else {}),
+        **({'effect_verification': {
             'saved_project': 'bounded_UTF8_WPROJ_without_post_terminal_native_calls',
             'requested_fields': ['exact_destination_project_name', 'platforms'],
             'language_default': 'not_inferred_from_Console_create',

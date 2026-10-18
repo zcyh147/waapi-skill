@@ -14,6 +14,290 @@ from tests.unit.test_field_interface_closure_gateway import FieldTask
 
 VERSIONS = ('2023.1', '2024.1', '2025.1')
 CREATE = 'ak.wwise.console.project.create'
+OPEN = 'ak.wwise.console.project.open'
+
+
+class WaapiRequestFailed(Exception):
+    """Literal shape observed in the owned 2023 no-project native receipt."""
+    def __init__(self, procedure, uri='ak.wwise.no_project_loaded'):
+        self.uri = uri
+        self.kwargs = {'details': {'procedureUri': procedure}, 'message': 'No project is loaded.'}
+        super().__init__('native structured project absence')
+
+
+class NoProjectConsoleTask(FieldTask):
+    def __init__(self, path, version, operation=CREATE, *, absence='native-error'):
+        self.created_file = path / 'Created' / 'Created.wproj'
+        self.created_file.parent.mkdir()
+        self.opened, self.absence, self.operation = False, absence, operation
+        self.info_overrides, self.effect = {}, 'exact'
+        self.expected_args = {'path': str(self.created_file)}
+        super().__init__(path, version, operation)
+        if operation == OPEN:
+            ConsoleProjectTask.write_created_project(self, {})
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith('getInfo'):
+            return {**super().call(uri, args, options), **self.info_overrides}
+        if uri.endswith('getProjectInfo') or (uri.endswith('object.get') and args == {'waql': 'from type Project take 2'}):
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if not self.opened:
+                if uri.endswith('object.get') and self.absence == 'empty-query':
+                    return {'return': []}
+                error = WaapiRequestFailed(uri)
+                if uri.endswith('getProjectInfo'):
+                    if self.absence == 'transport':
+                        raise ConnectionError('ak.wwise.no_project_loaded in a transport message is not native absence')
+                    if self.absence == 'timeout':
+                        raise TimeoutError('ak.wwise.no_project_loaded')
+                    if self.absence == 'timeout-with-native-attributes':
+                        timeout = TimeoutError('unobserved native result')
+                        timeout.uri, timeout.kwargs = error.uri, error.kwargs
+                        raise timeout
+                    if self.absence == 'message-only':
+                        raise RuntimeError('ak.wwise.no_project_loaded')
+                    if self.absence == 'wrong-uri':
+                        error.uri = 'ak.wwise.invalid_arguments'
+                    if self.absence == 'wrong-procedure':
+                        error.kwargs['details']['procedureUri'] = 'ak.wwise.core.object.get'
+                    if self.absence == 'malformed-details':
+                        error.kwargs['details'] = []
+                raise error
+            row = {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'Created',
+                'type': 'Project', 'path': '\\', 'filePath': str(self.created_file)}
+            if self.effect == 'wrong-guid':
+                row['id'] = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
+            if self.effect == 'wrong-name':
+                row['name'] = 'Other'
+            if self.effect == 'wrong-path':
+                row['filePath'] = str(self.created_file.parent / 'Other.wproj')
+            if uri.endswith('getProjectInfo'):
+                return {'id': row['id'], 'name': row['name'], 'path': row['filePath']}
+            return {'return': [row]}
+        if uri == self.operation:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args == self.expected_args, args
+            assert not self.opened
+            if self.effect == 'native-error':
+                raise WaapiRequestFailed(uri, 'ak.wwise.invalid_arguments')
+            if self.effect == 'indeterminate':
+                raise TimeoutError('native response was not observed')
+            if self.operation == CREATE:
+                ConsoleProjectTask.write_created_project(self, args)
+            self.opened = self.effect != 'stay-none'
+            return {}
+        return super().call(uri, args, options)
+
+
+def test_console_project_create_from_exact_native_no_project_reaches_verified_once(tmp_path):
+    task = NoProjectConsoleTask(tmp_path, '2023.1')
+    tx, code, executed = execute_console_creation(task)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([call for call in task.calls if call[0] == CREATE]) == 1
+
+
+def test_console_project_open_checks_saved_target_identity_after_no_project(tmp_path):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', OPEN)
+    task.effect = 'wrong-guid'
+    tx, code, executed = execute_console_creation(task)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([call for call in task.calls if call[0] == OPEN]) == 1
+
+
+@pytest.mark.parametrize('change', [{'sessionId': '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'}, {'processId': 43}])
+def test_console_no_project_declaration_retains_its_original_runtime_before_check(tmp_path, change):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', OPEN)
+    code, declared = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file))
+    assert code == 0, declared
+    task.info_overrides.update(change)
+    code, rejected = task.step('draft-check')
+    assert code == 2, rejected
+    assert not any(call[0] == OPEN for call in task.calls)
+
+
+def _console_load_preview(task, *, policy='ask_before_changes', extra=()):
+    code, configured = task.run('config-set', '--project-modification-policy', policy)
+    assert code == 0, configured
+    code, declared = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file), *extra)
+    assert code == 0, declared
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    if policy == 'read_only':
+        assert code == 2 and 'read_only' in json.dumps(preview), preview
+        return preview
+    assert code == 0, preview
+    return preview
+
+
+def _authorize_console_load(task, preview):
+    tx = preview['transaction_id']
+    if preview['state'] == 'awaiting_confirmation':
+        code, shown = task.run('transaction-show', tx)
+        assert code == 0, shown
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+    return tx
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('operation', [CREATE, OPEN])
+@pytest.mark.parametrize('absence', ['native-error', 'empty-query'])
+def test_console_project_load_from_none_uses_closed_versioned_route_once(tmp_path, version, operation, absence):
+    task = NoProjectConsoleTask(tmp_path, version, operation, absence=absence)
+    code, schema = task.run('request-schema', operation)
+    assert code == 0 and schema['business_adapter']['project_start_state']['loaded_project'] == 'optional', schema
+    preview = _console_load_preview(task)
+    from wwise_waapi.transactions import TransactionStore
+    artifact = TransactionStore(tmp_path / 'state').load_preview(preview['transaction_id']).artifact
+    assert artifact['project_guard']['project'] == {'state': 'none'}, artifact
+    assert artifact['project_guard']['project_guard_mode'] == 'transition_to_path'
+    tx = _authorize_console_load(task, preview)
+    code, executed = task.run('execute', tx)
+    assert code == 0 and executed['automatic_retry'] is False, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert [call[0] for call in task.calls].count(operation) == 1
+    if absence == 'native-error':
+        assert any(call[0].endswith('getProjectInfo') for call in task.calls)
+    else:
+        assert not any(call[0].endswith('getProjectInfo') for call in task.calls)
+
+
+@pytest.mark.parametrize('operation', [CREATE, OPEN])
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_console_project_load_from_none_keeps_three_modification_policies(tmp_path, operation, policy):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', operation)
+    preview = _console_load_preview(task, policy=policy)
+    assert not any(call[0] == operation for call in task.calls)
+    if policy == 'read_only':
+        return
+    if policy == 'ask_before_changes':
+        code, unconfirmed = task.run('execute', preview['transaction_id'])
+        assert code == 2 and unconfirmed.get('executed') is not True, unconfirmed
+    tx = _authorize_console_load(task, preview)
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert [call[0] for call in task.calls].count(operation) == 1
+
+
+@pytest.mark.parametrize('absence', ['transport', 'timeout', 'message-only', 'wrong-uri', 'wrong-procedure', 'malformed-details'])
+def test_console_native_absence_never_infers_none_from_other_failures(tmp_path, absence):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', OPEN, absence=absence)
+    code, rejected = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file))
+    assert code == 2, rejected
+    assert not any(call[0] == OPEN for call in task.calls)
+
+
+@pytest.mark.parametrize('change', [{'sessionId': None}, {'processId': True}, {'processPath': ''}])
+def test_console_native_absence_requires_current_proved_runtime(tmp_path, change):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', OPEN)
+    task.info_overrides.update(change)
+    code, rejected = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file))
+    assert code == 2, rejected
+    assert not any(call[0] == OPEN for call in task.calls)
+
+
+@pytest.mark.parametrize('operation', [CREATE, OPEN])
+@pytest.mark.parametrize('drift', ['config', 'session', 'host', 'version', 'project-appears', 'target-file'])
+def test_console_load_revalidates_none_runtime_configuration_and_target_before_write(tmp_path, operation, drift):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', operation)
+    tx = _authorize_console_load(task, _console_load_preview(task))
+    if drift == 'config':
+        code, configured = task.run('config-set', '--waapi-port', '31338')
+        assert code == 0, configured
+    elif drift == 'session':
+        task.info_overrides['sessionId'] = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    elif drift == 'host':
+        task.info_overrides['isCommandLine'] = False
+    elif drift == 'version':
+        info = task.call('ak.wwise.core.getInfo')
+        task.info_overrides['version'] = {**info['version'], 'year': 2024}
+    elif drift == 'project-appears':
+        task.opened = True
+    else:
+        task.created_file.write_bytes(b'Unreviewed target-file replacement')
+    before = task.created_file.read_bytes() if task.created_file.exists() else None
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert not any(call[0] == operation for call in task.calls)
+    assert (task.created_file.read_bytes() if task.created_file.exists() else None) == before
+
+
+@pytest.mark.parametrize('operation', [CREATE, OPEN])
+@pytest.mark.parametrize('effect', ['wrong-guid', 'wrong-name', 'wrong-path', 'stay-none', 'native-error', 'indeterminate'])
+def test_console_load_never_verifies_wrong_project_or_replays_terminal_write(tmp_path, operation, effect):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', operation)
+    task.effect = effect
+    tx = _authorize_console_load(task, _console_load_preview(task))
+    code, executed = task.run('execute', tx)
+    if effect in {'native-error', 'indeterminate'}:
+        assert code == 2 and executed['automatic_retry'] is False, executed
+        assert executed['state'] in {'execution_failed', 'indeterminate'}, executed
+    else:
+        assert code == 0, executed
+        code, verified = task.run('verify', tx)
+        assert code == 2 and verified.get('verified') is not True, verified
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert [call[0] for call in task.calls].count(operation) == 1
+
+
+def test_console_open_identity_binding_preserves_explicit_migration_of_an_older_project(tmp_path):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', OPEN)
+    task.created_file.write_text(task.created_file.read_text().replace('v2025.1.0', 'v2021.1.0').replace('SchemaVersion="133"', 'SchemaVersion="103"'))
+    task.expected_args['onMigrationRequired'] = 'migrate'
+    preview = _console_load_preview(task, extra=('--value', 'migration_policy', 'migrate'))
+    tx = _authorize_console_load(task, preview)
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+
+
+@pytest.mark.parametrize('operation,version', [(operation, version) for operation in (CREATE, OPEN) for version in ('2021.1', '2022.1')])
+def test_console_load_is_not_invented_in_older_unreflected_versions(tmp_path, operation, version):
+    task = FieldTask(tmp_path, version, 'object.create')
+    code, rejected = task.run('request-schema', operation)
+    assert code == 2, rejected
+    assert not task.calls
+
+
+def test_console_native_absence_does_not_relax_other_cli_project_requirements(tmp_path):
+    operation = 'ak.wwise.cli.verify'
+    task = NoProjectConsoleTask(tmp_path, '2025.1', operation)
+    code, rejected = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file))
+    assert code == 2, rejected
+    assert not any(call[0] == operation for call in task.calls)
+    assert not any(call[0].endswith('object.get') for call in task.calls)
+
+
+@pytest.mark.parametrize('operation', [CREATE, OPEN])
+def test_console_no_project_load_rejects_an_authoring_host_before_declaration(tmp_path, operation):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', operation)
+    task.info_overrides['isCommandLine'] = False
+    code, rejected = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file))
+    assert code == 2 and rejected['error_code'] == 'COMMAND_LINE_HOST_REQUIRED', rejected
+    assert not any(call[0] == operation for call in task.calls)
+
+
+def test_console_native_absence_rejects_timeout_even_with_native_error_attributes(tmp_path):
+    task = NoProjectConsoleTask(tmp_path, '2025.1', OPEN, absence='timeout-with-native-attributes')
+    code, rejected = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.created_file))
+    assert code == 2, rejected
+    assert not any(call[0] == OPEN for call in task.calls)
 
 
 class ConsoleProjectTask(FieldTask):

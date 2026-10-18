@@ -19,12 +19,40 @@ CONSOLE_PROJECT_URIS = frozenset({
     'ak.wwise.console.project.open',
     'ak.wwise.console.project.close',
 })
+CONSOLE_PROJECT_LOAD_URIS = frozenset({
+    'ak.wwise.console.project.create', 'ak.wwise.console.project.open',
+})
 PROJECT_FILE_URIS = CLI_PROJECT_FILE_URIS | CONSOLE_PROJECT_URIS
 _MEDIA_ID_URIS = frozenset({
     'ak.wwise.cli.moveMediaIdsToSingleFile',
     'ak.wwise.cli.moveMediaIdsToWorkUnits',
     'ak.wwise.cli.updateMediaIdsInSingleFile',
 })
+
+
+def exact_console_project_absence(call: Mapping[str, Any], version: str, live_info: Mapping[str, Any] | None) -> bool:
+    """Recognize the owned native error, never a transport error or message match."""
+    import re
+    if version not in {'2023.1', '2024.1', '2025.1'} or not isinstance(live_info, Mapping):
+        return False
+    details = call.get('waapi_error_details')
+    native = details.get('details') if isinstance(details, Mapping) else None
+    runtime = live_info.get('version')
+    session = live_info.get('sessionId')
+    return bool(call.get('ok') is False and call.get('api') == 'ak.wwise.core.getProjectInfo'
+        and call.get('version') == version and call.get('failure_origin') == 'exception'
+        and call.get('error_code') == 'WaapiRequestFailed'
+        and call.get('waapi_error_uri') == 'ak.wwise.no_project_loaded'
+        and isinstance(native, Mapping) and native.get('procedureUri') == 'ak.wwise.core.getProjectInfo'
+        and live_info.get('isCommandLine') is True
+        and isinstance(session, str) and re.fullmatch(r'\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', session)
+        and session != '{00000000-0000-0000-0000-000000000000}'
+        and type(live_info.get('processId')) is int and live_info['processId'] > 0
+        and isinstance(live_info.get('processPath'), str) and bool(live_info['processPath'].strip())
+        and isinstance(runtime, Mapping) and type(runtime.get('year')) is int and runtime['year'] == int(version[:4])
+        and type(runtime.get('major')) is int and runtime['major'] == 1
+        and type(runtime.get('build')) is int and runtime['build'] > 0
+        and isinstance(runtime.get('displayName'), str) and bool(runtime['displayName']))
 
 
 def observe_cli_project_outcome(uri: str, version: str, result: Any) -> dict[str, Any]:
@@ -146,23 +174,14 @@ def validate_console_project_creation(plan, args, audit, version, *, uri=CONSOLE
         raise SoundBankContractError('FILE_CHANGED', 'Project destination or its isolated path changed after Preview')
 
 
-def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
-    """Read the bounded saved project; no endpoint calls or inferred native classes.
-
-    ProjectInfo/Project, Platforms, LanguageList and DefaultLanguage are the
-    explicit format in the matching five-lane packaged SDK project samples.
-    Source-format evidence is separate from native execution/effect evidence.
-    """
+def _read_saved_project_document(path: str, root: str):
+    """One bounded regular-file/XML observer shared by create and open."""
     import hashlib
     import os
     import re
     from xml.etree import ElementTree as ET
-    from .operation_soundbank import (
-        SoundBankContractError, capture_file_proof, open_regular_artifact_file, prove_artifact_path,
-    )
+    from .operation_soundbank import SoundBankContractError, capture_file_proof, open_regular_artifact_file, prove_artifact_path
 
-    path, root = plan['path'], plan['io_root']
-    observed_root = _created_project_root_identity(plan)
     target = prove_artifact_path(path, io_root=root, field='created project', must_exist=False, expect_directory=False)
     if not target['exists']:
         raise SoundBankContractError('MISSING_ARTIFACT', 'Requested saved project artifact is missing')
@@ -194,6 +213,56 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
                 else:
                     depth -= 1
         parser.close()
+        if document is None or document.tag != 'WwiseDocument' or document.get('Type') != 'Project':
+            raise ValueError('Saved artifact does not identify a Wwise project')
+        projects = document.findall('./ProjectInfo/Project')
+        if len(document.findall('ProjectInfo')) != 1 or len(projects) != 1:
+            raise ValueError('Saved project must contain exactly one ProjectInfo/Project')
+        project = projects[0]
+        if not re.fullmatch(r'\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', project.get('ID', '')) or not project.get('Name'):
+            raise ValueError('Saved project lacks its explicit GUID/name identity')
+        return proof, document, project
+    except SoundBankContractError:
+        raise
+    except (UnicodeError, ValueError, ET.ParseError) as exc:
+        raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
+
+
+def prepare_console_project_open(args: Mapping[str, Any], audit: Mapping[str, Any], version: str) -> dict[str, Any]:
+    from .operation_soundbank import SoundBankContractError
+    paths = [row for row in audit['paths'] if row['json_path'] == '$.args.path']
+    if len(paths) != 1:
+        raise SoundBankContractError('INVALID_PATH', 'Console open requires its exact isolated project input')
+    path, root = paths[0]['resolved_path'], audit['io_root']
+    proof, _document, project = _read_saved_project_document(path, root)
+    # Opening can migrate an older project. Its GUID/name remain the selected
+    # identity; requiring the input's engine version to equal the host is wrong.
+    return {'kind': 'console-project-open', 'uri': 'ak.wwise.console.project.open', 'version': version,
+        'args': dict(args), 'path': path, 'io_root': root, 'file_proof': proof,
+        'project': {'id': project.get('ID'), 'name': project.get('Name')}}
+
+
+def validate_console_project_open(plan, args, audit, version):
+    from .operation_soundbank import SoundBankContractError
+    if dict(plan) != prepare_console_project_open(args, audit, version):
+        raise SoundBankContractError('FILE_CHANGED', 'Selected project input identity or bytes changed after Preview')
+
+
+def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
+    """Read the bounded saved project; no endpoint calls or inferred native classes.
+
+    ProjectInfo/Project, Platforms, LanguageList and DefaultLanguage are the
+    explicit format in the matching five-lane packaged SDK project samples.
+    Source-format evidence is separate from native execution/effect evidence.
+    """
+    import re
+    from xml.etree import ElementTree as ET
+    from .operation_soundbank import SoundBankContractError
+
+    path, root = plan['path'], plan['io_root']
+    observed_root = _created_project_root_identity(plan)
+    proof, document, project = _read_saved_project_document(path, root)
+    try:
         if (document is None or document.tag != 'WwiseDocument' or document.get('Type') != 'Project'
                 or not document.get('WwiseVersion', '').startswith('v' + plan['version'] + '.')
                 or not document.get('SchemaVersion', '').isdigit()

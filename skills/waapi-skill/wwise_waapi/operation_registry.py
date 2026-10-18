@@ -29,7 +29,7 @@ from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
-from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
 from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
 from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
@@ -9770,6 +9770,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version, uri=api)
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == 'ak.wwise.console.project.open':
+            try:
+                verification = prepare_console_project_open(call_args, execution_contract['io_audit'], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == TONE_URI:
             try:
                 verification = prepare_tone_verification(call_args, execution_contract['io_audit'], request.version)
@@ -14736,6 +14741,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version, uri=api)
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api == 'ak.wwise.console.project.open':
+            try:
+                validate_console_project_open(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == TONE_URI:
             plan = prepared.get('verification_plan', {})
             try:
@@ -17131,6 +17141,14 @@ def verify_prepared_operation(
             verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
             readbacks.append(observed)
             check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
+    elif kind == 'console-project-open':
+        check_result_schema(plan['uri'], plan['version'])
+        readbacks.append({'kind': 'console-open-project-identity', 'project': dict(plan['project']),
+            'file_proof': dict(plan['file_proof'])})
+        # The Gateway must additionally observe the live path/GUID/name transition.
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'saved_project_input_identity'
     elif kind in {'console-project-create', 'authoring-project-create'}:
         business_state_verified = False
         check_result_schema(plan['uri'], plan['version'])
