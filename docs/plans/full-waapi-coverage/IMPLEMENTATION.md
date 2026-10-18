@@ -18,6 +18,19 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Staging `5acc4054` passes the 2022 null-source diagnostic and original complete
+  created-field history case on real macOS Console. Successor `a3b70b45` passes
+  all three 2021 legacy import effects with a complete unique-source-child
+  oracle; generic active-source mapping remains #181 work. Separate `3b8f88ba`
+  passes the 2024 Authoring startup/metadata diagnostic using automation mode
+  and bounded waiting for absent client identity. Exact host/build validation
+  remains mandatory. The scoped existing-Render history checkpoint `a834891f`
+  has passed focused program checks and Root runtime review; native history
+  proof and the larger remaining history branches are still pending. See
+  NATIVE_FOLLOWUPS.md for original candidates, runs and scope. These fixed
+  components are queued for integration; ticket and final-gate status is
+  unchanged.
+
 - Draft integration PR: [#196](https://github.com/zcyh147/waapi-skill/pull/196).
 - #175 is complete and closed. Integration candidate `faa704ff` passed the fixed
   five-version Program gate: **7014 passed, 3 native-Windows-only skips**, exit 0,

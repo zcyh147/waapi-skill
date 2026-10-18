@@ -7,6 +7,24 @@ and existing obligations remain in SPEC.md and LEDGER.md.
 
 ## Created-field history: current exact results — #192 / #178
 
+The reviewed 2022 constructor compatibility at staging `5acc4054` now passes
+both the separate null-source diagnostic (**9.83s**) and the original complete
+creation/history case (**7.95s**). The public request still asks for null
+Attenuation and all four scalar/controller fields. Only the redundant native
+null assignment is omitted after proving the new Sound's actual null class
+default and satisfied conditions. Independent reads confirm class 65552, parent,
+all requested fields and a present null reference; both existing-reference and
+null-reference creation/undo sequences pass. This proves the exercised 2022
+placement/platform, not every nested or inherited context.
+
+Original roots in the native-conditions worktree are
+`null-source-only-5acc4054-2022-r1` and `created-history-5acc4054-2022-r1`.
+Both preserved source full hash/mtime/tree and 1,883 tracked files, deleted the
+passing sandbox and left no owned process. Earlier failed transactions/dumps
+remain unchanged. The generic actual-class verifier gap for unmarked ordinary
+creation nodes remains separate required work; this targeted constructor now
+uses the existing strict class observer.
+
 Fixed `854d28aa0b570733280fd77729d108d8bcde3788` passed the existing
 `test_created_leaf_fields_history_receipt_native_acceptance` on macOS Console
 2023.1, 2024.1 and 2025.1 (16.31s, 10.00s and 19.71s). Both original cases
@@ -36,6 +54,141 @@ test; never replay the failed root or drop the null-reference case.
 The 2021 pinned catalog has no standalone undo/redo route. These tests grant no
 graph/List restoration, arbitrary history-stack selection, GUI or whole-ticket
 acceptance. Earlier `807f33e7` failure evidence remains unchanged.
+
+The next exact 2022.1 run on `09bec56f` failed again (16.54s), after the same
+existing-reference creation/undo passed. The repaired Gateway correctly stopped
+the null-reference creation at `WAAPI_RESPONSE_MISSING`, persisted an
+indeterminate outcome, and did not verify or replay it. This run's new
+pre-teardown diagnostic observed the owned launch process already exited with
+code 5 and retained the explicit Wwise crash message. This proves a native crash
+for this run; it does not retroactively supply missing exit evidence to `51906536`
+or isolate whether null creation or the preceding undo caused the crash.
+
+Original root in the native-conditions worktree:
+`.waapi-skill-state/full-coverage/created-history-09bec56f-2022-r1`.
+The reported dump was copied without deleting the original; its SHA-256 is
+`d5cbf95196f4deb34e90a9f095c40f932b409892e126c7df9eb21acbf417ada1`.
+Source hash/mtime/tree and 1,883 tracked files remained unchanged, owned processes
+ended, and the failed sandbox was quarantined. The original acceptance case
+remains unchanged; a separate null-source-only diagnostic will isolate the
+preceding-undo factor without dropping any requested field.
+
+That separate diagnostic on `88673436` also failed (16.44s). It performed fresh
+setup and the same five-field null-source creation, with no preceding or later
+undo. The pre-teardown snapshot again observed exit code 5 and the Wwise crash
+message. Its original root is `null-source-only-88673436-2022-r1`; dump SHA-256
+is `d41a5b2495885c7492ea81e491dd7e77da502cf9d1c458ccd228ae873f6a6384`.
+Source integrity and cleanup checks passed; the failed sandbox is quarantined.
+This rules out a preceding undo as a necessary trigger for this request. It
+does not establish that every null reference or every 2022 creation is broken.
+The request's existing-reference counterpart passed. A compatible construction
+must retain the public null intent, all other fields and independent null-state
+verification; removing the case is not a repair.
+
+## Legacy import Render: two effects verified, TSV still open — #180 / #182
+
+Successor `a3b70b45` passed the complete 2021 collector in **17.16s**. It uses
+the existing complete children query, requires exactly one actual AudioFileSource
+with matching GUID/class/parent/SFX language, and compares the Sound and Source
+WAV paths plus copied bytes. All three original import effects and preservation
+checks pass. The prior attempted `select activeSource` mapping at `76eb4d7c`
+also failed on the matching native Console despite its SDK documentation; that
+experimental public relationship was removed. Generic multi-source active
+selection remains required #181 work, separate from this one-source fixture.
+
+Original root: `legacy-import-render-a3b70b45-2021-r1` in the native-conditions
+worktree. Source full hash/mtime/tree and 1,883 tracked files stayed unchanged,
+the passing sandbox was deleted and no owned process remained. The earlier
+failed roots are retained unchanged. TSV-media and read-only TSV property
+admission obligations remain open despite this structure-only TSV PASS.
+
+The 2021 collector at staging `5acc4054` saved the sandbox through normal public
+transactions before language-bound imports. Setup and the first media/Render
+transaction passed Gateway verification, but the independent check then failed:
+the public `active-source` projection compiled to `activeSource`, which the
+matching 2021 server rejected as an unknown accessor. The whole case is **FAIL
+(12.65s)**, not a completed import acceptance. This adds a versioned public query
+mapping/admission obligation under #181 and requires a supported independent
+Source-selection oracle; removing that assertion is not a repair.
+
+Root: `legacy-import-render-5acc4054-2021-r1` in the native-conditions worktree.
+Source hash/mtime/tree and 1,883 tracked files remained unchanged, owned processes
+ended, and the failed sandbox was quarantined. Three planned public saves are
+prerequisites without effect coverage credit; only the first was reached here.
+
+## Authoring startup: observed EULA and automation experiment — #184 / #188
+
+On root candidate `1d58f5fa`, the user observed and personally accepted the
+2024.1.13.9056 EULA in the fresh owned Authoring environment. The lifecycle then
+received a dictionary without the required `getInfo` version/host fields and
+rejected it. This is not proof that the actual launched build was wrong.
+
+At the user's request, a separate fresh run supplied only the child environment
+`AK_AUTOMATION_MODE=1`. Installed Wwise executable strings support this startup
+experiment; SDK documentation establishes that automation mode auto-accepts EULA,
+project-load and related dialogs. No user preference was copied or global setting
+changed. The new run reached the same malformed response after **3.85s**, versus
+**58.93s** in the manually observed run, without another manual click. It still
+failed the host/build guard and grants no Authoring business acceptance.
+
+Original roots are `authoring-metadata-1d58f5fa-user-observation-r1` and
+`authoring-metadata-1d58f5fa-automation-r1` under the root coordination directory.
+Both preserved source full hash/mtime and 1,883 tracked files and cleaned owned
+processes. Existing diagnostics retained only response types; a bounded snapshot
+of the already-returned client value is needed before another meaningful attempt.
+Do not weaken the host/build guard or infer raw transport data from this record.
+
+The bounded diagnostic at `9d88c7e2` established an actual empty client result;
+`93138143` then observed the client's documented `None` failure result. Final
+successor `3b8f88ba` treats only these two absent-identity values as pending
+inside the existing readiness deadline. Nonempty malformed results and explicit
+wrong host/build still stop immediately. Its fresh 2024 automation-mode run
+passed **1 diagnostic test in 47.68s**, including exact host/build/project
+readiness. Source full hash/mtime and 1,883 tracked files stayed unchanged,
+the sandbox was deleted and owned processes ended. Original root in the
+short-id worktree: `authoring-metadata-3b8f88ba-automation-r1`. This resolves
+the observed startup obstacle and supplies the requested metadata diagnostic;
+it does not certify all Authoring mutations or project-format preservation.
+
+## Earlier legacy import evidence
+
+On macOS 2022.1, the first collector at `88673436` stopped before any write
+(6.32s): it incorrectly compared the display label `Effect 0` to the exact
+metadata token `Effect0`. Test-only `838b7442` binds the issued selection to
+`metadata.name` and uses the existing Field Handle reader instead.
+
+The corrected collector on `838b7442` verified setup and both ordinary import
+effects: adding media with Render to an existing Sound, and creating a new Sound
+with media, real Effect references and Render. Independent checks confirmed the
+complete owner chain, actual Source ownership, media bytes and retained targets.
+The full case still **failed (11.59s)** at its final TSV structure import:
+Wwise rejected the fixture's `Property[IsVoice]` column as not modifiable.
+That transaction remains indeterminate; it was not verified or replayed.
+
+Original roots in the native-conditions worktree are
+`legacy-import-render-88673436-2022-r1` and
+`legacy-import-render-838b7442-2022-r1`. Both preserve source full hashes,
+mtime/tree and 1,883 tracked files; owned processes ended and failed sandboxes
+were quarantined. The two verified phases do not establish full-case, 2021,
+TSV-media or cross-platform acceptance. The TSV fixture must express its SFX
+type through a source-backed legal construction while retaining the IsVoice=false
+and all Render/reference/media preservation checks.
+
+Test-only `39f41a55` uses the documented `<Sound SFX>` / `Object Type=Sound SFX`
+construction and retains the actual IsVoice=false assertion. Its full matching
+2022.1 collector passed in **13.99s**: all three effects and preservation checks
+passed, source integrity and 1,883 tracked files were unchanged, the sandbox was
+deleted and no owned process remained. The exact root is
+`legacy-import-render-39f41a55-2022-r1`; earlier failed roots remain unchanged.
+
+The matching 2021.1 run at that candidate stopped before any write (10.66s).
+Its live class catalog exposes `AudioSource`, class 16, while the collector
+searched for the later catalog label `AudioFileSource`. Pinned 2021 SDK
+`wwiseobject_audiosource.html` confirms AudioSource / class 16. The correction
+must distinguish the versioned catalog label from the actual imported object's
+type and retain exact class, GUID, parent and media verification. This 2021
+failure grants no import acceptance; source integrity and cleanup passed and
+its sandbox is quarantined in `legacy-import-render-39f41a55-2021-r1`.
 
 ## Inline WAV without Base64 padding — #182 / #180
 
