@@ -210,6 +210,8 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
             "before": old, "after": new, "platform": platform, "field_kind": "reference",
             "metadata_type": info.get("type"), "field_info": dict(info)}]
     if plan.get("kind") == "same-guid-property":
+        if any(chain.get("derived") for chain in state.get("effect_render_chains", [])):
+            raise ValueError("Render chain side effects require a complete multi-field history observation; a single-field receipt cannot certify them")
         identity = _identity(state.get("object"))
         field, platform, metadata_type = plan.get("field"), _receipt_platform(plan, state), plan.get("metadata_type")
         field_before, info = state.get("field_before", {}), state.get("field_info", {})
@@ -238,6 +240,8 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
     prepared = snapshot.preview.artifact["prepared_operation"]
     plan = prepared.get("verification_plan", {})
+    if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
+        raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":
         return _receipt_observations(prepared)
     # This first presence observer has one ordinary new child, never an

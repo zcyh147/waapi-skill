@@ -5167,7 +5167,7 @@ def _prepare_object_create(
             "source": "execution_result.id",
             "irreversible_preexisting_changes": conflict == "merge",
         }
-    state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}
+    state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs, "effect_render_chains": effect_render_chains}
     condition_guards = [spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec]
     if condition_guards:
         state["condition_metadata_guards"] = condition_guards
@@ -11105,6 +11105,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
         }
         if request.operation == "object.setProperty":
+            from .effect_render_conditions import prepare_property, EffectRenderConditionError
+            try:
+                metadata["effect_render_chains"] = prepare_property(object_id=source.object, field=field_value,
+                    value=arguments["value"], version=request.version, platform=observation_platform, read=read)
+            except EffectRenderConditionError as exc:
+                raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
             preview = PropertyReferenceBuilder(version=request.version).set_property(
                 object=source,
                 property=field_value,

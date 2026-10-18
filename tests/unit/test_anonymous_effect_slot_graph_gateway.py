@@ -542,3 +542,68 @@ def test_omitted_new_predecessor_render_is_derived_in_preview(tmp_path):
     chain = prepared['pre_state']['effect_render_chains'][0]
     assert chain['derived'][0]['after'] is True
     assert 'Bypass takes precedence' in chain['bypass_policy']
+
+
+@pytest.mark.parametrize('fault', [None, 'ignored-derived', 'metadata-drift', 'member-drift'])
+def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path, fault):
+    task = anonymous_task(tmp_path)
+    declare_slots(task, renders=(None, 'true'))
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            slots = args['objects'][0]['@Effects']
+            assert slots[0]['@Render'] is True and slots[1]['@Render'] is True
+            for identity, source in zip([SLOT_A, SLOT_B], slots):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject',
+                    'classId': 5505040, 'owner': {'id': FIRST}, 'path': r'\Opaque ' + identity,
+                    'notes': '', '@Effect': {'id': source['@Effect']}, '@Bypass': source['@Bypass'], '@Render': source['@Render']}
+            for identity in [ROOT, CHILD]:
+                task.objects[identity]['@Render'] = fault != 'ignored-derived'
+            task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_A, 'name': ''}, {'id': SLOT_B, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert [row['key'] for row in chain['derived']] == [ROOT, CHILD, '$.objects[0].lists[0].objects[0]']
+    if fault in {'metadata-drift', 'member-drift'}:
+        if fault == 'metadata-drift': task.metadata['Render']['default'] = True
+        else: task.objects[FIRST]['@Effects'].reverse()
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, failed = task.run('execute', tx)
+        assert code == 2 and writes == [], failed
+    else:
+        code, verified = task.finish(tx, shown)
+        assert (code == 0 and verified.get('verified') is True) == (fault is None), verified
+        assert len(writes) == 1
+        assert task.objects[SLOT_A]['@Bypass'] is True and task.objects[SLOT_B]['@Bypass'] is False
+
+
+@pytest.mark.parametrize('operation', ['object.setProperty', 'object.set'])
+def test_exact_existing_slot_render_uses_same_chain_preview_and_readback(tmp_path, operation):
+    task, _ = list_task(tmp_path, operation=operation)
+    target = task.bind(CHILD)
+    render = select_field(task, owner=target, token='Render')
+    if operation == 'object.setProperty':
+        code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+            '--field-handle', render, '--business-value', 'true')
+    else:
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'slot', '--object-handle', target,
+            '--field-value', render, 'true')
+    assert code == 0, declared
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith(('object.set', 'object.setProperty')):
+            writes.append(deepcopy(args))
+            task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+            return {'objects': [{'id': CHILD, 'name': 'Spare'}]} if operation == 'object.set' else {}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert chain['derived'] == [{'key': ROOT, 'before': False, 'after': True}]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
