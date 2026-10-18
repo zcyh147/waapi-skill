@@ -20,6 +20,162 @@ def workflow(monkeypatch):
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
 
 
+def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None):
+    """Actual Gateway parsing/dispatch; fake native state honors each exact request."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_existing_bus_override_applicability_gateway import existing_task
+    from tests.unit.test_object_graph_owned_choices_gateway import CHILD
+
+    task, _mutations = existing_task(tmp_path, version=version,
+        operation='object.create' if version == '2021.1' else 'object.set')
+    parent = deepcopy(task.objects[CHILD])
+    parent['path'] = ('\\Busses' if version == '2025.1' else '\\Master-Mixer Hierarchy') + '\\Default Work Unit'
+    parent['parent'] = None
+    task.objects = {CHILD: parent}
+    original = task.call
+    writes, commands = [], []
+    independent_read = False
+    ids = {name: '{' + str(uuid.UUID(int=index)).upper() + '}' for index, name in enumerate(
+        ('WAAPI_EXISTING_SEND_TEST', 'Destination', 'Sender', 'BatchSender'), 11)}
+
+    def call(uri, args=None, options=None):
+        if uri.endswith(('object.create', 'object.set', 'setReference', 'setProperty')):
+            writes.append((uri, deepcopy(args)))
+            if len(writes) > 1 and fault == 'native-error':
+                raise RuntimeError('Existing-source write refused; never retry')
+        if uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if len(writes) == 4:
+                assert version == '2021.1', args
+                assert args == {'parent': ids['WAAPI_EXISTING_SEND_TEST'], 'type': 'AuxBus', 'name': 'BatchSender',
+                    '@UserAuxSend0': ids['Destination'], '@UserAuxSendVolume0': -12,
+                    'onNameConflict': 'merge', 'autoAddToSourceControl': False}, args
+                task.objects[ids['BatchSender']].update({'@UserAuxSend0': {'id': args['@UserAuxSend0']},
+                    '@UserAuxSendVolume0': args['@UserAuxSendVolume0']})
+                return {'id': ids['Sender'] if fault == 'merge-wrong-guid' else ids['BatchSender'], 'name': 'BatchSender'}
+            assert args == {'parent': CHILD, 'type': 'Bus', 'name': 'WAAPI_EXISTING_SEND_TEST',
+                'notes': 'Keep routing', 'children': [
+                    {'type': 'AuxBus', 'name': name, 'notes': 'Keep ' + name}
+                    for name in ('Destination', 'Sender', 'BatchSender')],
+                'onNameConflict': 'fail', 'autoAddToSourceControl': False}, args
+            def create(node, owner):
+                identity = ids[node['name']]
+                task.objects[identity] = {'id': identity, 'name': node['name'], 'type': node['type'],
+                    'classId': 1376272 if node['type'] == 'Bus' else 3997712,
+                    'path': task.objects[owner]['path'] + '\\' + node['name'], 'parent': {'id': owner},
+                    'notes': node['notes'], '@UserAuxSend0': None, '@UserAuxSendVolume0': 0}
+                return {'id': identity, 'name': node['name'],
+                    'children': [create(child, identity) for child in node.get('children', [])]}
+            return create(args, CHILD)
+        if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            identity = args['waql'].split('"')[1]
+            rows = [row for row in task.objects.values() if identity in {row['id'], row['path']}]
+            projected = [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]
+            if independent_read and len(writes) > 1 and fault == 'independent-guid':
+                for row in projected:
+                    if row.get('id') == ids['Sender'] and 'UserAuxSend0' in row:
+                        row['UserAuxSend0'] = {'id': ids['WAAPI_EXISTING_SEND_TEST']}
+            if independent_read and len(writes) == 3 and fault == 'independent-value':
+                for row in projected:
+                    if row.get('id') == ids['Sender'] and '@UserAuxSendVolume0' in row:
+                        row['@UserAuxSendVolume0'] = -4
+            return {'return': projected}
+        result = original(uri, args, options)
+        if len(writes) > 1 and uri.endswith(('object.set', 'setReference', 'setProperty')):
+            source = task.objects[args['objects'][0]['object'] if 'objects' in args else args['object']]
+            if fault == 'wrong-guid': source['@UserAuxSend0'] = {'id': ids['WAAPI_EXISTING_SEND_TEST']}
+            if fault == 'wrong-value': source['@UserAuxSendVolume0'] = -1
+            if fault == 'notes': source['notes'] = 'Not requested'
+            if fault == 'parent': source['parent'] = {'id': CHILD}
+            if fault == 'batch-wrong-guid' and len(writes) == 4:
+                source['@UserAuxSend0'] = {'id': ids['Sender']}
+            if fault == 'scalar-effect' and len(writes) == 3:
+                source['@UserAuxSendVolume0'] = -4
+        return result
+
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='fixture-candidate', category_results=[])
+    def raw(command):
+        nonlocal independent_read
+        commands.append(list(command))
+        independent_read = command[0] == 'query-object'
+        if fault == 'merge-target-drift' and command[:2] == ['draft-start', 'object.create'] and len(writes) == 3:
+            original_source = task.objects[ids['BatchSender']]
+            replacement = deepcopy(original_source)
+            replacement['id'] = '{99999999-9999-9999-9999-999999999999}'
+            original_source['name'] = 'MovedBatchSender'
+            original_source['path'] += 'Moved'
+            task.objects[replacement['id']] = replacement
+        if fault == 'merge-state-drift' and command[:2] == ['draft-start', 'object.create'] and len(writes) == 3:
+            task.objects[ids['BatchSender']]['@UserAuxSend0'] = {'id': ids['Destination']}
+        return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: task)
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_existing_bus_send_acceptance_uses_three_exact_public_mutations(tmp_path, workflow, version):
+    runtime, commands, writes, task = _existing_bus_send_runtime(tmp_path, workflow, version)
+    category = workflow._collect_existing_bus_send_acceptance(runtime, root_name='WAAPI_EXISTING_SEND_TEST')
+    assert category['status'] == 'PASS', category
+    assert [uri.rsplit('.', 1)[1] for uri, _ in writes] == ['create', 'setReference', 'setProperty', 'create' if version == '2021.1' else 'set']
+    assert [cmd[0] for cmd in commands].count('execute') == 4
+    assert [cmd[0] for cmd in commands].count('verify') == 4
+    assert 'OverrideUserAuxSends' not in json.dumps(writes)
+    assert writes[1][1]['value'] == next(row['id'] for row in task.objects.values() if row['name'] == 'Destination')
+    assert writes[2][1]['value'] == -9
+    assert (writes[3][1] if version == '2021.1' else writes[3][1]['objects'][0])['@UserAuxSendVolume0'] == -12
+
+
+@pytest.mark.parametrize('fault', ['wrong-guid', 'wrong-value', 'notes', 'parent', 'independent-guid', 'batch-wrong-guid', 'native-error', 'scalar-effect', 'independent-value'])
+def test_existing_bus_send_acceptance_rejects_wrong_effect_and_never_retries(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, '2025.1', fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_existing_bus_send_acceptance(runtime, root_name='WAAPI_EXISTING_SEND_TEST')
+    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False
+    assert len(writes) == (4 if fault == 'batch-wrong-guid' else 3 if fault in {'scalar-effect', 'independent-value'} else 2)
+    assert [cmd[0] for cmd in commands].count('execute') == len(writes)
+    if fault == 'native-error':
+        assert [cmd[0] for cmd in commands].count('verify') == 1
+        assert receipt['transactions'][-1]['native_outcome'] == 'indeterminate'
+
+
+def test_existing_bus_send_2021_uses_one_guarded_merge_for_third_effect(tmp_path, workflow):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, '2021.1')
+    category = workflow._collect_existing_bus_send_acceptance(runtime, root_name='WAAPI_EXISTING_SEND_TEST')
+    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    assert category['status'] == 'PASS'
+    assert receipt['business_effect_verified'] is True
+    assert [phase['effect_verified'] for phase in receipt['transactions']] == [True] * 4
+    assert receipt['completed_mutation_phases'] == ['standalone_reference', 'standalone_scalar', 'samebatch_reference_scalar']
+    assert receipt['transactions'][-1]['expected_existing_merge'] == receipt['baseline']['batch_source']
+    assert [uri.rsplit('.', 1)[1] for uri, _ in writes] == ['create', 'setReference', 'setProperty', 'create']
+    assert writes[-1][1]['onNameConflict'] == 'merge'
+    assert [cmd[0] for cmd in commands].count('execute') == 4
+
+
+@pytest.mark.parametrize('fault', ['merge-target-drift', 'merge-state-drift', 'merge-wrong-guid'])
+def test_existing_bus_send_2021_never_mutates_replacement_or_accepts_wrong_returned_guid(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _existing_bus_send_runtime(tmp_path, workflow, '2021.1', fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_existing_bus_send_acceptance(runtime, root_name='WAAPI_EXISTING_SEND_TEST')
+    receipt = json.loads((runtime.state_dir / 'existing-bus-send-acceptance.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False
+    assert len(writes) == (4 if fault == 'merge-wrong-guid' else 3)
+    assert [cmd[0] for cmd in commands].count('execute') == len(writes)
+    if fault != 'merge-wrong-guid':
+        assert receipt['transactions'][-1]['native_outcome'] == 'not_executed'
+        assert [cmd[0] for cmd in commands].count('confirm') == 3
+
+
 def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, noisy_fields=False, native_conditions=False):
     """The real public Gateway above an exact, independently mutated native tree."""
     from copy import deepcopy

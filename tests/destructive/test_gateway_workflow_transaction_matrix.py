@@ -4639,6 +4639,230 @@ def _collect_new_result_scalar_reference_acceptance(
         persist()
 
 
+def _collect_existing_bus_send_acceptance(
+    runtime: _WorkflowSandboxRuntime, *, root_name: str,
+) -> dict[str, Any]:
+    """Existing-source writes in one owned lifecycle, with independent effect reads."""
+    output = runtime.state_dir / "existing-bus-send-acceptance.json"
+    category = {"category": "existing-bus-user-send", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_exact_identity_parent_reference_scalar_and_notes",
+        "observation_path": str(output)}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {"candidate": runtime.candidate, "version": runtime.version,
+        "calls": [], "transactions": [], "business_effect_verified": False,
+        "setup_coverage_credit": False,
+        "lifecycle_acceptance": "Requires this node's final host-category-evidence/v3 PASS; no cleanup or source-integrity credit before finalization."}
+
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024, "existing user-send receipt byte bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix(".tmp")
+        temporary.write_bytes(body)
+        temporary.replace(output)
+
+    class ReceiptGateway:
+        def raw_gateway(self, command):
+            assert len(receipt["calls"]) < 192, "existing user-send public call bound exceeded"
+            row = {"argv": list(command)}
+            receipt["calls"].append(row)
+            try:
+                code, payload = runtime.raw_gateway(command)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row["exception"] = {"type": type(exc).__name__, "message": str(exc)}
+                raise
+            finally:
+                persist()
+
+        def gateway(self, command, *, live):
+            code, payload = self.raw_gateway(command)
+            assert code == 0 and payload.get("ok") is True, payload
+            return payload
+
+    gateway = ReceiptGateway()
+    segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
+    names = {"root": root_name, "target": "Destination", "source": "Sender", "batch_source": "BatchSender"}
+
+    def exact(command):
+        payload = gateway.gateway(command, live=True)
+        rows = payload.get("objects")
+        assert payload.get("count") == 1 and isinstance(rows, list) and len(rows) == 1, payload
+        row = rows[0]
+        assert isinstance(row, Mapping) and uuid.UUID(_required_string(row, "id")).int != 0, payload
+        return row
+
+    def read(identity, role):
+        row = exact(["query-object", "--exact-id", identity, "--include", "class-id", "--include", "parent",
+            "--include", "notes", *(["--include-field", "UserAuxSend0", "--include-field", "UserAuxSendVolume0"]
+                if role in {"source", "batch_source"} else [])])
+        assert type(row.get("class_id")) is int and row["class_id"] == (1376272 if role == "root" else 3997712), row
+        assert row["type"] == ("Bus" if role == "root" else "AuxBus"), row
+        assert isinstance(row.get("notes"), str), row
+        if role in {"source", "batch_source"}:
+            assert "UserAuxSend0" in row.get("references", {}), row
+            value = row.get("properties", {}).get("UserAuxSendVolume0")
+            assert type(value) in {int, float} and math.isfinite(value), row
+        return row
+
+    def reference_id(row):
+        value = row["references"]["UserAuxSend0"]
+        return value.get("id") if isinstance(value, Mapping) else value
+
+    def select(draft, owner, token, *, kind=None):
+        page = None
+        seen = set()
+        scope = ["--type-handle", kind] if kind is not None else ["--object-handle", owner]
+        for _ in range(4):
+            listed = _update_business_draft(gateway, draft, "draft-discover-fields",
+                [*scope, "--list", "--page-size", "64",
+                    *(["--page", page] if page is not None else [])], live=True)["agent_result"]
+            matches = [row for row in listed["fields"] if row.get("name") == token]
+            assert len(matches) <= 1, listed
+            if matches:
+                selected = _update_business_draft(gateway, draft, "draft-discover-fields",
+                    [*scope, "--selection", _required_string(matches[0], "selection")], live=True)
+                return discovered_business_field_handle(selected, token)
+            if listed.get("complete") is True:
+                break
+            page = _required_string(listed, "next_page")
+            assert page not in seen, "repeated field-list page"
+            seen.add(page)
+        raise AssertionError(f"{token} not disclosed within four exact field-list pages")
+
+    def complete(draft, label, *, existing_merge=None):
+        phase: dict[str, Any] = {"phase": label, "native_outcome": "not_executed", "effect_verified": False}
+        receipt["transactions"].append(phase)
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        identity = _required_string(preview, "transaction_id")
+        phase.update(transaction_id=identity, artifact_hash=preview["artifact_hash"])
+        shown = gateway.gateway(["transaction-show", identity], live=False)
+        prepared = shown["artifact"]["prepared_operation"]
+        phase["compiled_native_request"] = prepared["dispatch"]
+        if existing_merge is not None:
+            phase["expected_existing_merge"] = existing_merge
+            nodes = prepared["verification_plan"]["nodes"]
+            assert len(nodes) == 1 and nodes[0]["preexisting_id"] == existing_merge["id"], nodes
+            node = nodes[0]
+            assert node["class_id"] == existing_merge["class_id"] and node["canonical_type"] == existing_merge["type"], node
+            assert all(node["pre_state"].get(field) == existing_merge.get(field)
+                for field in ("id", "name", "type", "path", "parent", "notes")), (node, existing_merge)
+            assert node["pre_state"]["classId"] == existing_merge["class_id"], node
+            before = node["pre_state"]
+            for token in ("UserAuxSend0", "UserAuxSendVolume0"):
+                assert token in before or "@" + token in before, node
+                value = before.get(token, before.get("@" + token))
+                assert ((value.get("id") if isinstance(value, Mapping) else value) == reference_id(existing_merge)
+                    if token == "UserAuxSend0" else value == existing_merge["properties"][token]), (node, existing_merge)
+            args = prepared["dispatch"]["args"]
+            assert args["parent"] == existing_merge["parent"]["id"] and args["name"] == existing_merge["name"], args
+            assert args["type"] == existing_merge["type"] and args["onNameConflict"] == "merge", args
+        gateway.gateway(["confirm", identity, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        phase["native_outcome"] = "indeterminate"
+        code, executed = gateway.raw_gateway(["execute", identity])
+        phase["execute"] = {"exit_code": code, "payload": executed}
+        if code != 0 or executed.get("ok") is not True:
+            phase["native_outcome"] = "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+            raise AssertionError(f"{label} failed; no verification or retry: {executed}")
+        assert executed.get("state") == "executed_unverified" and executed.get("automatic_retry") is False, executed
+        phase["native_outcome"] = "accepted"
+        code, verified = gateway.raw_gateway(["verify", identity])
+        phase["verify"] = {"exit_code": code, "payload": verified}
+        assert code == 0 and verified.get("state") == "verified" and verified.get("verified") is True, verified
+        assert verified.get("verification", {}).get("business_state_verified") is True, verified
+        return phase
+
+    try:
+        setup = _start_business_draft(gateway, "object.create")
+        parent = _bind_business_object(gateway, setup, path_segments=segments)
+        types = {name: _discover_business_type(gateway, setup, meaning=name, role="object", expected_label=name)
+            for name in ("Bus", "AuxBus")}
+        root = _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", "root",
+            "--parent-handle", parent, "--name", root_name, "--kind", types["Bus"], "--field", "notes", "Keep routing"], live=False)
+        root_handle = declared_business_object_handle(root, "root")
+        for role in ("target", "source", "batch_source"):
+            _update_business_draft(gateway, setup, "draft-declare-new", ["--declaration-id", role,
+                "--parent-handle", root_handle, "--name", names[role], "--kind", types["AuxBus"],
+                "--field", "notes", "Keep " + names[role]], live=False)
+        setup_phase = complete(setup, "setup_no_coverage_credit")
+        baseline = {}
+        for role, name in names.items():
+            path = (*segments, root_name, *([] if role == "root" else [name]))
+            found = exact(["query-object", *(arg for segment in path for arg in ("--path-segment", segment))])
+            row = read(found["id"], role)
+            assert all(found.get(key) == row.get(key) for key in ("id", "name", "type", "path")), (found, row)
+            baseline[role] = row
+        assert len({row["id"] for row in baseline.values()}) == 4, baseline
+        for role in ("target", "source", "batch_source"):
+            assert baseline[role].get("parent", {}).get("id") == baseline["root"]["id"], baseline
+            assert baseline[role]["path"] == baseline["root"]["path"] + "\\" + names[role], baseline
+        for role in ("source", "batch_source"):
+            assert reference_id(baseline[role]) is None, baseline[role]
+        receipt["baseline"] = baseline
+        setup_phase["effect_verified"] = True
+        expected = json.loads(json.dumps(baseline))
+        phases = [("standalone_reference", "object.setReference", "source", {"UserAuxSend0": "target"}),
+            ("standalone_scalar", "object.setProperty", "source", {"UserAuxSendVolume0": -9}),
+            ("samebatch_reference_scalar", "object.create" if runtime.version == "2021.1" else "object.set",
+                "batch_source", {"UserAuxSend0": "target", "UserAuxSendVolume0": -12})]
+        for label, operation, role, values in phases:
+            draft = _start_business_draft(gateway, operation)
+            owner = _bind_business_object(gateway, draft, object_id=baseline[role]["id"])
+            kind = None
+            if operation == "object.create":
+                kind = _discover_business_type(gateway, draft, meaning="AuxBus", role="object", expected_label="AuxBus")
+                parent = _bind_business_object(gateway, draft, object_id=baseline["root"]["id"])
+                _update_business_draft(gateway, draft, "draft-business-configure", ["--name-conflict", "merge"], live=False)
+            fields = []
+            for token, value in values.items():
+                field = select(draft, owner, token, kind=kind)
+                bound = _bind_business_object(gateway, draft, object_id=baseline["target"]["id"]) if token == "UserAuxSend0" else str(value)
+                if operation in {"object.set", "object.create"}:
+                    fields.extend(("--field-value", field, bound))
+                else:
+                    _update_business_draft(gateway, draft, "draft-declare-field-change", ["--object-handle", owner,
+                        "--field-handle", field, "--target-handle" if token == "UserAuxSend0" else "--business-value", bound], live=False)
+            if operation == "object.set":
+                _update_business_draft(gateway, draft, "draft-declare-existing", ["--declaration-id", "source",
+                    "--object-handle", owner, *fields], live=False)
+            elif operation == "object.create":
+                _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "source",
+                    "--parent-handle", parent, "--name", baseline[role]["name"], "--kind", kind, *fields], live=False)
+            phase = complete(draft, label, existing_merge=baseline[role] if operation == "object.create" else None)
+            for token, value in values.items():
+                expected[role]["references" if token == "UserAuxSend0" else "properties"][token] = (
+                    {"id": baseline["target"]["id"]} if token == "UserAuxSend0" else value)
+            observed = {key: read(row["id"], key) for key, row in baseline.items()}
+            phase["independent_effect"] = observed
+            for key, row in observed.items():
+                for field in ("id", "name", "type", "path", "class_id", "parent", "notes"):
+                    assert row.get(field) == expected[key].get(field), (label, key, field, expected[key], row)
+                if key in {"source", "batch_source"}:
+                    assert reference_id(row) == reference_id(expected[key]), (label, key, row, expected[key])
+                    assert row["properties"]["UserAuxSendVolume0"] == expected[key]["properties"]["UserAuxSendVolume0"], (label, key, row, expected[key])
+            phase["effect_verified"] = True
+        receipt["completed_mutation_phases"] = [phase[0] for phase in phases]
+        receipt["business_effect_verified"] = True
+        category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_existing_bus_send_reference_scalar_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """One lifecycle; each legal phase independently previewed and executed once."""
+    category = _collect_existing_bus_send_acceptance(workflow_sandbox_runtime,
+        root_name="WAAPI_EXISTING_SEND_" + uuid.uuid4().hex[:12])
+    assert category["status"] == "PASS", category
+
+
 @pytest.mark.live
 @pytest.mark.destructive
 def test_same_graph_new_result_scalar_reference_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
