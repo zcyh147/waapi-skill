@@ -4984,9 +4984,11 @@ def _prepare_object_create(
                     if len(candidates) > 1:
                         raise OperationContractError("AMBIGUOUS_IDENTITY", "A merged list descendant name is not unique.")
                     if candidates:
-                        candidates = _read_object_id_rows(candidates[0]["id"], fields=_object_spec_return_fields(spec), read=read)
-                        if len(candidates) != 1 or not _object_type_matches(candidates[0].get("type"), spec,
-                                actual_class_id=candidates[0].get("classId")):
+                        candidate_id = candidates[0]["id"]
+                        candidates = _read_object_id_rows(candidate_id, fields=_object_spec_return_fields(spec), read=read)
+                        if (len(candidates) != 1 or not _same_identity(candidates[0].get("id"), candidate_id)
+                                or not _object_type_matches(candidates[0].get("type"), spec,
+                                actual_class_id=candidates[0].get("classId"))):
                             raise OperationContractError("INVALID_TARGET_TYPE", "A merged list descendant has another live type.")
                         spec["preexisting_id"] = candidates[0]["id"]
                         spec["pre_state"] = candidates[0]
@@ -19551,7 +19553,8 @@ def verify_prepared_operation(
             check(
                 f"{request_path} reflected type matches the live-resolved request type",
                 _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")),
-                {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type")},
+                {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type"),
+                    "expected_class": spec.get("class_id"), "actual_class": row.get("classId")},
             )
             returned_name = result_node.name if result_node is not None else None
             effective_conflict = spec.get(

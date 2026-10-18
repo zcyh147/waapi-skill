@@ -102,6 +102,7 @@ def test_ordinary_merge_collision_requires_actual_class_before_dispatch(tmp_path
     task = class_task(tmp_path)
     task.objects[CHILD] = {'id': CHILD, 'name': 'Rain', 'type': 'Sound', 'classId': 1 if fault == 'wrong-at-preview' else 2,
         'path': task.objects[SECOND]['path'] + r'\Rain', 'parent': {'id': SECOND}, 'notes': 'Keep'}
+    task.bind(SECOND)
     code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
     assert code == 0, configured
     declare_sound(task)
