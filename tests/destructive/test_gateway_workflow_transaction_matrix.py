@@ -5311,7 +5311,7 @@ def test_read_only_reference_enabled_native_metadata_observation(workflow_sandbo
     assert category['status'] == 'PASS', category
 
 
-def _collect_existing_effect_slot_merge_acceptance(runtime: _WorkflowSandboxRuntime, *, sound_name: str) -> dict[str, Any]:
+def _collect_existing_effect_slot_exact_member_acceptance(runtime: _WorkflowSandboxRuntime, *, sound_name: str) -> dict[str, Any]:
     """Exact-ID anonymous-member edits; never inline List name-merge acceptance."""
     output = runtime.state_dir / "existing-effect-slot-exact-member-acceptance.json"
     category = {"category": "existing-effect-slot-exact-member", "status": "FAIL",
@@ -5556,6 +5556,6 @@ def test_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime: 
     """Shared setup, two exact-ID edits; no anonymous inline List merge credit."""
     if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
         pytest.skip('2021–2022 scalar EffectN fields remain a separate witness')
-    category = _collect_existing_effect_slot_merge_acceptance(workflow_sandbox_runtime,
+    category = _collect_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime,
         sound_name='WAAPI_SLOT_' + uuid.uuid4().hex[:12])
     assert category['status'] == 'PASS', category

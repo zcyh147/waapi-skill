@@ -142,9 +142,10 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
     return runtime, commands, writes, task
 
 
-def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path, workflow):
-    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, '2025.1')
-    category = workflow._collect_existing_effect_slot_merge_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, version)
+    category = workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
     assert category['status'] == 'PASS'
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert receipt['business_effect_verified'] is True and receipt['inline_list_merge_verified'] is False
@@ -155,6 +156,34 @@ def test_existing_effect_slot_collector_uses_anonymous_exact_guid_edits(tmp_path
     assert [phase['phase'] for phase in receipt['transactions'][-2:]] == ['exact_member_bypass', 'owner_rename_and_exact_member_bypass']
     assert receipt['transactions'][-1]['independent_effect']['owner']['name'] == 'WAAPI_SLOT_TEST_Renamed'
     assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize('fault', ['wrong-reference', 'wrong-owner', 'wrong-class', 'wrong-order',
+    'wrong-value', 'spare-value', 'effect-notes', 'rename-path', 'prestate-owner', 'native-error'])
+def test_existing_effect_slot_collector_rejects_unrequested_or_failed_effect(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, '2025.1', fault=fault)
+    with pytest.raises((AssertionError, KeyError)):
+        workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['business_effect_verified'] is False
+    assert receipt['inline_list_merge_verified'] is False and receipt['failure']
+    assert len(writes) == (3 if fault == 'prestate-owner' else 5 if fault == 'rename-path' else 4)
+    # A rejected prestate never confirms/executes the requested effect. A refused
+    # native write is never followed by verify or a retry of that write.
+    expected_verifies = 3 if fault in ('prestate-owner', 'native-error') else 5 if fault == 'rename-path' else 4
+    assert [cmd[0] for cmd in commands].count('verify') == expected_verifies
+    assert not any(phase['effect_verified'] for phase in receipt['transactions'][3:] if fault != 'rename-path')
+    assert len(receipt['calls']) <= 192 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+def test_existing_effect_slot_collector_keeps_legacy_scalar_boundary(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _effect_slot_merge_runtime(tmp_path, workflow, version)
+    with pytest.raises(AssertionError, match='legacy scalar'):
+        workflow._collect_existing_effect_slot_exact_member_acceptance(runtime, sound_name='WAAPI_SLOT_TEST')
+    assert commands == [] and writes == []
+    assert runtime.category_results[-1]['status'] == 'FAIL'
 
 
 def _existing_bus_send_runtime(tmp_path, workflow, version, *, fault=None, root_sources=False):
