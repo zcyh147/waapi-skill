@@ -2562,21 +2562,28 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         final_status = gateway.gateway(['status'], live=True)
         assert final_status['wwise'] == status['wwise'], 'Tone host context changed during characterization'
         assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Tone diagnostic configuration changed'
-        receipt['collection_complete'] = True
-        category.update(status='blocked', reason='four native files collected; signal/level oracle and other host/version evidence remain unfinished')
     except Exception as exc:
         receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
         raise
     finally:
-        paths = sorted(set(native_root.glob('*.json')) - prior_native)
-        assert len(paths) <= receipt['limits']['native_files'], 'Tone native evidence count bound exceeded'
-        total = 0
-        for index, path in enumerate(paths):
-            observed = observe_console_file(path, io_root=native_root)
-            raw = base64.b64decode(observed['content_base64'], validate=True)
-            total += len(raw); assert total <= receipt['limits']['native_bytes'], 'Tone native evidence byte bound exceeded'
-            receipt['native_evidence'].append({'native_path': str(path), **archive('native-' + str(index) + '.json', raw)})
-        persist()
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - prior_native)
+            assert len(paths) <= receipt['limits']['native_files'], 'Tone native evidence count bound exceeded'
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'], 'Tone native evidence byte bound exceeded'
+                receipt['native_evidence'].append({'native_path': str(path), **archive('native-' + str(index) + '.json', raw)})
+        except Exception as exc:
+            receipt['archive_failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            category.update(status='FAIL', reason='native evidence archive incomplete')
+            raise
+        finally:
+            persist()
+    receipt['collection_complete'] = True
+    category.update(status='blocked', reason='four native files collected; signal/level oracle and other host/version evidence remain unfinished')
+    persist()
     return category
 
 
