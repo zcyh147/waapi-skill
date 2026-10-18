@@ -1478,6 +1478,8 @@ def test_standalone_history_discovery_is_versioned_and_discloses_global_scope_an
     assert set(declaration["optional_fields"]) == {"expectation_receipt"}
     assert declaration["history"]["history_scope"]["choices"] == ["latest_project_history"]
     assert declaration["history"]["expectation_receipt"]["native_entry_selection"] is False
+    assert any("materialized_scalars_and_existing_reference_or_null" in item
+        for item in declaration["history"]["expectation_receipt"]["initial_observers"])
     assert declaration["history"]["stack_head_observed"] is False
 
 
@@ -2108,15 +2110,62 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
     assert not any(row[0] == "ak.wwise.core.object.setReference" for row in client.calls)
 
 
-def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed"):
+def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes", source_notes="observed",
+    created_fields=False, reference=None, observer="complete", prepared_only=False, platform=None):
     from copy import deepcopy
-    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD, ROOT
     task = OwnedGraphTask(tmp_path, version, "object.create")
+    if created_fields or reference:
+        task.metadata.update(IsLoopingEnabled={"name": "IsLoopingEnabled", "type": "bool", "default": False},
+            IsLoopingInfinite={"name": "IsLoopingInfinite", "type": "bool", "default": False},
+            Volume={"name": "Volume", "type": "Real32", "restriction": {"type": "range", "min": -96, "max": 6}})
+        original_source_fields = task.call
+        task.current_platform = "{44444444-4444-4444-4444-444444444444}"
+        task.platform_rows = [{"id": "{44444444-4444-4444-4444-444444444444}", "name": "Windows"},
+            {"id": "{55555555-5555-5555-5555-555555555555}", "name": "Mac"}]
+        def source_fields(uri, args=None, options=None):
+            if uri.endswith("getPropertyInfo") and args.get("object") in task.objects and observer == "metadata-error":
+                raise RuntimeError("fixture optional created-field metadata read failed")
+            result = original_source_fields(uri, args, options)
+            if uri.endswith("getPropertyInfo") and args.get("object") in task.objects and observer == "reference-metadata-omission":
+                result = {key: value for key, value in result.items() if key not in {"name", "type"}}
+            elif uri.endswith("getPropertyInfo") and args.get("object") in task.objects:
+                if observer == "wrong-metadata-name": result = {**result, "name": "OtherField"}
+                elif observer == "unknown-metadata-type": result = {**result, "type": "UncertifiedScalar"}
+            if uri.endswith("getProjectInfo") and observer != "no-platform":
+                result.update(currentPlatformId=task.current_platform, platforms=task.platform_rows)
+            if uri.endswith("object.create"):
+                task.objects[result["id"]]["classId"] = 2
+            return result
+        task.call = source_fields
+    if reference:
+        task.objects[ROOT] = {"id": ROOT, "name": "Rain attenuation", "type": "Attenuation",
+            "path": r"\Attenuations\Default Work Unit\Rain attenuation", "notes": "Keep target"}
+        task.types.append({"classId": 655376, "name": "Attenuation", "type": "WObject"})
+        task.metadata["Attenuation"] = {"name": "Attenuation", "type": "Reference",
+            "restriction": {"type": "reference", "restrictions": [{"type": ["Attenuation"]}]}}
     parent = task.bind(SECOND)
+    if platform is not None:
+        code, configured = task.step("draft-business-configure", "--platform", platform)
+        assert code == 0, configured
+    values = []
+    if created_fields:
+        code, fields = task.step("draft-discover-fields", "--semantic-kind", "sound-sfx", "--meaning", "Volume")
+        assert code == 0, fields
+        values = ["--field", "loop", "infinite", "--field-value", fields["meaning_results"][0]["candidates"][0]["handle"], "-6.0"]
+    if reference:
+        target = task.bind(ROOT)
+        code, fields = task.step("draft-discover-fields", "--semantic-kind", "sound-sfx", "--meaning", "Attenuation")
+        assert code == 0, fields
+        values.extend(["--field-value", fields["meaning_results"][0]["candidates"][0]["handle"],
+            "null" if reference == "null" else target])
     code, declared = task.step("draft-declare-new", "--declaration-id", "leaf", "--parent-handle", parent,
-        "--kind", "sound-sfx", "--name", "Rain", *([] if notes is None else ["--field", "notes", notes]))
+        "--kind", "sound-sfx", "--name", "Rain",
+        *([] if notes is None else ["--field", "notes", notes]), *values)
     assert code == 0, declared
     source, shown = task.preview()
+    if prepared_only:
+        return task, source, shown
     if source_notes != "observed":
         source_call = task.call
         def source_boundary(uri, args=None, options=None):
@@ -2156,7 +2205,7 @@ def _created_leaf_history_preview(task, source, direction="undo"):
     code, phase = task.run("draft-declare-core-plan", draft, "--task-authority", authority,
         "--expected-revision", str(revision), "--value", "history_scope", "latest_project_history",
         "--value", "expectation_receipt", source)
-    assert code == 0, phase
+    assert code == 0, json.dumps(phase)
     for command in ("draft-check", "preview-from-draft"):
         code, result = task.run(command, draft, "--task-authority", authority,
             "--expected-revision", str(phase["draft"]["revision"]))
@@ -2181,6 +2230,212 @@ def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_
     assert verified["verification_strength"] == "scoped_history_effect_readback"
     assert created["id"] not in task.objects
     assert [row[1:] for row in task.calls if row[0] == "ak.wwise.core.undo.undo"] == [({}, {})]
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+def test_created_leaf_history_restores_semantic_and_explicit_scalar_fields(tmp_path, version):
+    task, source, created = _created_leaf_history_case(tmp_path, version=version, created_fields=True)
+    assert created["@IsLoopingEnabled"] is True and created["@IsLoopingInfinite"] is True and created["@Volume"] == -6.0
+    for direction in (["undo"] if version == "2022.1" else ["undo", "redo"]):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+        assert verified["verification_strength"] == "scoped_history_effect_readback"
+        assert list(verified)[-1] == "agent_result" and verified["agent_result"]["result"] == {}
+    if version != "2022.1":
+        assert task.objects[created["id"]] == created
+    assert len([call for call in task.calls if call[0].endswith("object.create")]) == 1
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("reference", ["existing", "null"])
+def test_created_leaf_history_restores_existing_reference_or_explicit_null(tmp_path, reference, version):
+    task, source, created = _created_leaf_history_case(tmp_path, version=version, reference=reference)
+    assert created["@Attenuation"] == (None if reference == "null" else "{33333333-3333-3333-3333-333333333333}")
+    for direction in (["undo"] if version == "2022.1" else ["undo", "redo"]):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        code, verified = task.run("verify", tx)
+        assert code == 0 and verified["verified"] is True, verified
+    if version != "2022.1":
+        assert task.objects[created["id"]] == created
+
+
+def test_created_reference_history_revalidates_its_existing_target_role(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, reference="existing")
+    tx = _created_leaf_history_preview(task, source)
+    task.objects["{33333333-3333-3333-3333-333333333333}"]["name"] = "Changed target"
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(call[0].startswith("ak.wwise.core.undo.") for call in task.calls)
+
+
+def test_created_reference_metadata_omission_is_bound_from_exact_source_names(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, reference="existing", observer="reference-metadata-omission")
+    tx = _created_leaf_history_preview(task, source)
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    binding = shown["artifact"]["request"]["arguments"]["history_binding"]
+    field = next(item for item in binding["observations"] if item.get("kind") == "creation_field")
+    assert field["field_info"]["name"] is None and field["field_info"]["type"] is None
+    assert field["field_info"]["field_binding"]["token"] == "Attenuation"
+    assert "name" not in field["field_info"]["raw"] and "type" not in field["field_info"]["raw"]
+    assert task.run("execute", tx)[0] == 0
+    assert task.run("verify", tx)[0] == 0
+
+
+def test_created_fields_history_rejects_native_metadata_omission_to_null_before_dispatch(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True)
+    assert "default" not in task.metadata["Volume"]
+    tx = _created_leaf_history_preview(task, source)
+    task.metadata["Volume"]["default"] = None
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(call[0].startswith("ak.wwise.core.undo.") for call in task.calls)
+    assert '"default": null' in json.dumps(rejected)
+
+
+def test_created_fields_review_is_compact_and_full_source_metadata_remains_available(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True)
+    tx = _created_leaf_history_preview(task, source)
+    code, compact = task.run("transaction-show", tx, "--summary-only")
+    assert code == 0, compact
+    presence, = compact["preview_summary"]["history_action"]["expected_observations"]
+    fields = presence["fields"]
+    assert {item["field"] for item in fields} == {"IsLoopingEnabled", "IsLoopingInfinite", "Volume"}
+    assert all(item["metadata_bound"] is True and "field_info" not in item for item in fields)
+    code, full = task.run("transaction-show", tx)
+    assert code == 0, full
+    raw = full["artifact"]["request"]["arguments"]["history_binding"]["observations"]
+    assert all(item["field_info"]["type"] for item in raw if item.get("kind") == "creation_field")
+    volume = next(item["field_info"] for item in raw if item.get("field") == "Volume")
+    assert volume["default"] is None and "default" not in volume["raw"]
+    assert volume["raw"] == task.metadata["Volume"]
+    assert compact.get("agent_result") == full.get("agent_result")
+
+
+@pytest.mark.parametrize("budget", ["observations", "bytes"])
+def test_created_fields_history_keeps_combined_observation_and_proof_bounds(tmp_path, monkeypatch, budget):
+    from wwise_waapi import edit_history_business
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True)
+    monkeypatch.setattr(edit_history_business, "MAX_OBSERVATIONS" if budget == "observations" else "MAX_BINDING_BYTES",
+        3 if budget == "observations" else 1024)
+    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, started
+    code, rejected = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2, rejected
+    assert "bound" in rejected["message"]
+    assert not any(call[0].startswith("ak.wwise.core.undo.") for call in task.calls)
+
+
+def test_created_fields_2021_keeps_source_creation_and_exact_native_history_boundary(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, version="2021.1", created_fields=True)
+    assert task.run("transaction-show", source)[1]["state"] == "verified"
+    code, rejected = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 2, rejected
+    assert not any(call[0].startswith("ak.wwise.core.undo.") for call in task.calls)
+
+
+def test_created_history_keeps_original_guid_view_after_current_platform_changes(tmp_path):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True)
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    for direction in ("undo", "redo"):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        assert task.run("verify", tx)[0] == 0
+    field_reads = [options for uri, args, options in task.calls if uri.endswith("object.get")
+        and ({"Volume", "@Volume"} & set(options.get("return", [])))]
+    assert field_reads and all(options["platform"] == "{44444444-4444-4444-4444-444444444444}" for options in field_reads)
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+@pytest.mark.parametrize("platform", ["Windows", "{44444444-4444-4444-4444-444444444444}"])
+def test_created_fields_named_and_guid_platform_keep_native_intent_and_frozen_history_view(tmp_path, version, platform):
+    task, source, _created = _created_leaf_history_case(tmp_path, version=version, created_fields=True, platform=platform)
+    native = next(args for uri, args, _options in task.calls if uri.endswith("object.create"))
+    assert native["platform"] == platform
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    task.platform_rows[0]["name"], task.platform_rows[1]["name"] = "Old Windows", "Windows"
+    for direction in (["undo"] if version == "2022.1" else ["undo", "redo"]):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run("execute", tx)[0] == 0
+        assert task.run("verify", tx)[0] == 0
+
+
+@pytest.mark.parametrize("stage", ["prewrite", "readback"])
+def test_created_fields_named_platform_drift_blocks_source_before_dispatch(tmp_path, stage):
+    task, source, shown = _created_leaf_history_case(tmp_path, created_fields=True, platform="Windows", prepared_only=True)
+    assert task.run("confirm", source, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    if stage == "readback":
+        assert task.run("execute", source)[0] == 0
+    task.platform_rows[0]["name"], task.platform_rows[1]["name"] = "Old Windows", "Windows"
+    code, rejected = task.run("execute" if stage == "prewrite" else "verify", source)
+    assert code == 2, rejected
+    assert len([call for call in task.calls if call[0].endswith("object.create")]) == int(stage == "readback")
+
+
+@pytest.mark.parametrize("observer", ["no-platform", "metadata-error", "wrong-metadata-name", "unknown-metadata-type"])
+def test_created_fields_optional_observation_does_not_block_source_creation(tmp_path, observer):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True, observer=observer)
+    code, full = task.run("transaction-show", source)
+    assert code == 0 and full["state"] == "verified", full
+    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, started
+    code, rejected = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2, rejected
+    assert len([call for call in task.calls if call[0].endswith("object.create")]) == 1
+    assert not any(call[0].startswith("ak.wwise.core.undo.") for call in task.calls)
+    if observer == "metadata-error":
+        assert "fixture optional created-field metadata read failed" in json.dumps(full)
+
+
+@pytest.mark.parametrize("stage", ["prewrite", "readback"])
+def test_created_fields_source_platform_drift_blocks_creation_before_dispatch(tmp_path, stage):
+    task, source, shown = _created_leaf_history_case(tmp_path, created_fields=True, prepared_only=True)
+    assert task.run("confirm", source, "--confirmation-token", shown["confirmation"]["token"])[0] == 0
+    if stage == "readback":
+        assert task.run("execute", source)[0] == 0
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    code, rejected = task.run("execute" if stage == "prewrite" else "verify", source)
+    assert code == 2, rejected
+    assert len([call for call in task.calls if call[0].endswith("object.create")]) == int(stage == "readback")
+
+
+@pytest.mark.parametrize("corruption", ["scalar-type", "derived-value", "missing-field", "class", "metadata", "reference", "null-missing", "read-error"])
+def test_created_fields_redo_never_passes_wrong_or_unobserved_restoration(tmp_path, corruption):
+    reference = "null" if corruption == "null-missing" else "existing" if corruption == "reference" else None
+    task, source, created = _created_leaf_history_case(tmp_path, created_fields=reference is None, reference=reference)
+    undo = _created_leaf_history_preview(task, source)
+    assert task.run("execute", undo)[0] == 0
+    assert task.run("verify", undo)[0] == 0
+    redo = _created_leaf_history_preview(task, source, "redo")
+    assert task.run("execute", redo)[0] == 0
+    row = task.objects[created["id"]]
+    if corruption == "scalar-type": row["@Volume"] = True
+    elif corruption == "derived-value": row["@IsLoopingInfinite"] = False
+    elif corruption == "missing-field": row.pop("@Volume")
+    elif corruption == "class": row["classId"] = 999
+    elif corruption == "metadata": task.metadata["Volume"]["type"] = "int32"
+    elif corruption == "reference": row["@Attenuation"] = None
+    elif corruption == "null-missing": row.pop("@Attenuation")
+    else:
+        original = task.call
+        def read_error(uri, args=None, options=None):
+            if uri.endswith("object.get") and args.get("from") == {"id": [created["id"]]}:
+                raise RuntimeError("fixture history created-field read failed")
+            return original(uri, args, options)
+        task.call = read_error
+    code, verified = task.run("verify", redo)
+    assert code == 2 and verified.get("verified") is not True, json.dumps(verified)
+    assert len([call for call in task.calls if call[0].endswith("object.create")]) == 1
+    assert len([call for call in task.calls if call[0].endswith("undo.redo")]) == 1
+    if corruption == "read-error":
+        assert "fixture history created-field read failed" in json.dumps(verified)
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
@@ -2291,3 +2546,47 @@ def test_created_leaf_history_requires_source_notes_observation_even_when_source
         "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
     assert code == 2 and "actual notes are incomplete" in json.dumps(rejected), rejected
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+
+
+@pytest.mark.parametrize('reference', ['existing', 'null'])
+def test_created_fields_combined_receipt_review_keeps_complete_root_fields_and_exact_proof(tmp_path, reference):
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True, reference=reference)
+    tx = _created_leaf_history_preview(task, source)
+    code, compact = task.run('transaction-show', tx, '--summary-only')
+    assert code == 0, compact
+    observations = compact['preview_summary']['history_action']['expected_observations']
+    presence, = observations
+    assert presence['kind'] == 'creation_presence' and presence['before'] is False and presence['after'] is True
+    assert {row['field'] for row in presence['fields']} == {'IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'Attenuation'}
+    assert all(row['metadata_bound'] is True and 'field_info' not in row for row in presence['fields'])
+    code, full = task.run('transaction-show', tx)
+    assert code == 0, full
+    sealed = full['artifact']['request']['arguments']['history_binding']['observations']
+    field_rows = [row for row in sealed if row['kind'] == 'creation_field']
+    assert len(field_rows) == 4 and all('raw' in row['field_info'] for row in field_rows)
+    assert all(row['object_id'] == presence['object']['id'] for row in field_rows)
+    compact_fields = [{key: value for key, value in row.items() if key not in {'kind', 'object_id', 'before', 'after', 'field_info'}}
+        for row in field_rows]
+    assert presence['fields'] == [{**row, 'metadata_bound': True} for row in compact_fields]
+    assert task.run('execute', tx)[0] == 0
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert list(verified)[-1] == 'agent_result' and verified['agent_result']['result'] == {}
+
+
+@pytest.mark.parametrize('corruption', ['missing', 'duplicate', 'other-root'])
+def test_created_fields_compact_review_cannot_weaken_immutable_field_proof(tmp_path, corruption):
+    from copy import deepcopy
+    task, source, _created = _created_leaf_history_case(tmp_path, created_fields=True, reference='existing')
+    tx = _created_leaf_history_preview(task, source)
+    path = tmp_path / 'state' / 'transactions' / tx / 'preview.json'
+    document = json.loads(path.read_text())
+    observations = document['artifact']['request']['arguments']['history_binding']['observations']
+    field = next(item for item in observations if item['kind'] == 'creation_field')
+    if corruption == 'missing': observations.remove(field)
+    elif corruption == 'duplicate': observations.append(deepcopy(field))
+    else: field['object_id'] = '{33333333-3333-3333-3333-333333333333}'
+    path.write_text(json.dumps(document), encoding='utf-8')
+    code, rejected = task.run('execute', tx)
+    assert code == 2, rejected
+    assert not any(call[0].startswith('ak.wwise.core.undo.') for call in task.calls)

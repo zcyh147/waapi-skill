@@ -75,6 +75,8 @@ def _reference_value(value: Any) -> str | None:
 def capture_field_read_platform(version: str, selector: str | None, *, read: Callable[..., Any]) -> dict[str, Any]:
     """Certify object.get's original view; never infer a mutation's omission meaning."""
     proof = {"contract": "waapi-skill.field-read-platform/v1", "version": version, "selector": selector}
+    if isinstance(selector, str) and _GUID.fullmatch(selector) and selector != "{00000000-0000-0000-0000-000000000000}":
+        return {**proof, "status": "certified", "platform_id": selector.upper(), "source": "explicit_object_get_platform_GUID"}
     if version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
         return {**proof, "status": "unobserved", "reason": "no_pinned_current_platform_observer_in_this_lane"}
     from .operation_registry import OperationContractError
@@ -254,10 +256,20 @@ def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
     node = nodes[0]
     if (not isinstance(node, Mapping) or node.get("request_path") != "$" or node.get("parent_request_path") is not None
         or node.get("collection") != "children" or node.get("existing_target") is not False
-        or node.get("preexisting_id") is not None or node.get("properties") != [] or node.get("references") != []
-        or node.get("platform") is not None or node.get("requested_language") is not None):
+        or node.get("preexisting_id") is not None or node.get("requested_language") is not None):
         raise ValueError("Creation history lacks a supported ordinary leaf observation")
-    from .creation_observations import verified_created_root_identity
+    from .creation_observations import verified_created_root_identity, ordinary_creation_fields
+    materialized_fields = ordinary_creation_fields(node)
+    if materialized_fields is None:
+        raise ValueError("Creation history field union requires its own complete observation")
+    if len(materialized_fields) + 1 > MAX_OBSERVATIONS or len({item["name"] for item in materialized_fields}) != len(materialized_fields):
+        raise ValueError("Creation history fields exceed their combined bound or contain duplicate tokens")
+    view = prepared.get("pre_state", {}).get("field_read_platform", {})
+    platform = None
+    if materialized_fields:
+        if view.get("status") != "certified" or not _GUID.fullmatch(str(view.get("platform_id"))):
+            raise ValueError("Creation receipt original read platform is not certified")
+        platform = view["platform_id"]
     from .operation_object import flatten_create_result
     verification = next(event["details"]["verification"] for event in reversed(snapshot.events)
         if event.get("event_type") == "verification_recorded")
@@ -277,7 +289,8 @@ def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
     reads = [row for row in verification.get("readbacks", []) if isinstance(row, Mapping)
         and row.get("uri") == GET and row.get("args") == {"from": {"id": [identity["id"]]}}
         and isinstance(row.get("options"), Mapping) and set(row["options"].get("return", [])) >= set(fields)
-        and not set(row["options"]) - {"return"} and "error" not in row]
+        and not set(row["options"]) - {"return", "platform"}
+        and row["options"].get("platform") == platform and "error" not in row]
     if len(reads) != 1:
         raise ValueError("Creation history requires one independent complete root readback")
     rows = reads[0].get("result", {}).get("return")
@@ -288,15 +301,83 @@ def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
         or _reference_value(row.get("parent")) != str(plan.get("parent_id")).upper()
         or "parent" not in row or (node.get("notes_supplied") is True and row["notes"] != node.get("requested_notes"))):
         raise ValueError("Creation history source identity, parent or actual notes are incomplete")
-    return [{"kind": "creation_presence", "object": identity, "parent_id": str(plan["parent_id"]).upper(),
-        "notes": row["notes"], "before": False, "after": True}]
+    observation = {"kind": "creation_presence", "object": identity, "parent_id": str(plan["parent_id"]).upper(),
+        "notes": row["notes"], "before": False, "after": True}
+    if materialized_fields:
+        if type(row.get("classId")) is not int or row["classId"] != node.get("class_id"):
+            raise ValueError("Creation history requires the exact independently observed class ID")
+        retained = [item for item in verification.get("readbacks", [])
+            if item.get("role") == "created-root-history-field-metadata"]
+        names_rows = [item for item in retained if item.get("uri") == NAMES and item.get("args") == {"object": identity["id"]}]
+        if len(names_rows) != 1 or "result" not in names_rows[0]:
+            raise ValueError("Creation history requires complete source object-scoped field names")
+        names = [item.name for item in parse_property_and_reference_names_result(names_rows[0]["result"])]
+        captured = []
+        from .operation_registry import _has_field, _field_value
+        for field in materialized_fields:
+            token = field["name"]
+            matches = [item for item in retained if item.get("uri") == INFO
+                and item.get("args") == {"object": identity["id"], "property": token}]
+            if len(matches) != 1 or "result" not in matches[0]:
+                raise ValueError("Creation history requires exact source object-scoped field metadata")
+            info = bind_get_property_info_result(matches[0]["result"], field_token=token, available_names=names)
+            if info.name != token:
+                raise ValueError("Creation history source metadata names a different field")
+            if not _has_field(row, token):
+                raise ValueError("Creation history source field projection is missing")
+            actual = _field_value(row, token)
+            target_identity = None
+            if field["kind"] == "scalar":
+                if info.type != field.get("metadata_type") or not _scalar_matches(actual, field["value"], info.type):
+                    raise ValueError("Creation history source scalar does not match its exact metadata/value")
+            else:
+                if not ((info.type or "").casefold() in {"reference", "objectreference"}
+                        or str(info.restriction.get("type", "")).casefold() == "reference"
+                        or info.supports.get("reference") is True):
+                    raise ValueError("Creation history source metadata does not certify a Reference")
+                actual = _reference_value(actual)
+                if actual != _reference_value(field["target_id"]):
+                    raise ValueError("Creation history source reference differs from its verified outcome")
+                if actual is not None:
+                    targets = [_identity(role["row"]) for role in prepared.get("resolved_roles", {}).values()
+                        if isinstance(role, Mapping) and str(role.get("object")).upper() == actual]
+                    if not targets or any(target != targets[0] for target in targets):
+                        raise ValueError("Creation reference requires its exact source existing-target role")
+                    target_identity = targets[0]
+            captured.append({"field": token, "field_kind": field["kind"], "value": actual,
+                "metadata_type": info.type, "field_info": info.as_dict(include_raw=True),
+                **({"reference_target": target_identity} if target_identity is not None else {})})
+        observation.update(platform=platform, class_id=row["classId"])
+        return [observation, *({"kind": "creation_field", "object_id": identity["id"], "before": False, "after": True,
+            **item} for item in captured)]
+    return [observation]
 
 
 def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable[..., Any]) -> dict[str, Any]:
     identity = expected["object"]
     observations = []
+    targets = {item["reference_target"]["id"]: item["reference_target"]
+        for item in expected.get("fields", []) if "reference_target" in item}
+    if targets:
+        result = read(GET, {"from": {"id": list(targets)}}, {"return": list(IDENTITY)})
+        rows = result.get("return") if isinstance(result, Mapping) else None
+        if not isinstance(rows, list) or len(rows) != len(targets):
+            raise ValueError("Created-reference history targets require complete exact identity readback")
+        actual = [_identity(row) for row in rows]
+        observations.append(len({row["id"] for row in actual}) == len(targets)
+            and all(targets.get(row["id"]) == row for row in actual))
+    fields = expected.get("fields", []) if present else []
+    if fields:
+        names = [item.name for item in parse_property_and_reference_names_result(read(NAMES, {"object": identity["id"]}, {}))]
+        for field in fields:
+            info = bind_get_property_info_result(read(INFO, {"object": identity["id"], "property": field["field"]}, {}),
+                field_token=field["field"], available_names=names)
+            if info.name != field["field"] or not lifecycle_snapshot_equal(info.as_dict(include_raw=True), field["field_info"]):
+                raise ValueError("Created-object history field metadata changed")
     for selector in ({"id": [identity["id"]]}, {"path": [identity["path"]]}):
-        result = read(GET, {"from": selector}, {"return": [*IDENTITY, "parent", "notes"]})
+        result = read(GET, {"from": selector}, {"return": [*IDENTITY, "parent", "notes",
+            *(["classId", *(item["field"] for item in fields)] if fields else [])],
+            **({"platform": expected["platform"]} if fields else {})})
         if not isinstance(result, Mapping) or set(result) != {"return"} or not isinstance(result["return"], list):
             raise ValueError("History presence read requires a complete exact-selector result")
         rows = result["return"]
@@ -309,6 +390,14 @@ def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable
                 raise ValueError("History presence read lacks parent or notes projection")
             matches = (actual == identity and _reference_value(row["parent"]) == expected["parent_id"]
                 and row["notes"] == expected["notes"])
+            if fields:
+                from .operation_registry import _has_field, _field_value
+                matches = matches and type(row.get("classId")) is int and row["classId"] == expected["class_id"]
+                for field in fields:
+                    value = _field_value(row, field["field"])
+                    matches = matches and _has_field(row, field["field"]) and (
+                        _reference_value(value) == field["value"] if field["field_kind"] == "reference"
+                        else _scalar_matches(value, field["value"], field["metadata_type"]))
         else:
             matches = False
         observations.append((len(rows) == 1 and matches) if present else not rows)
@@ -402,7 +491,11 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
         metadata_cache = {}
         for expected in observations:
             if expected.get("kind") == "creation_presence":
-                checks.append(_observe_presence(expected, expected[side], retained_read))
+                fields = [item for item in observations if item.get("kind") == "creation_field"
+                    and item["object_id"] == expected["object"]["id"]]
+                checks.append(_observe_presence({**expected, "fields": fields}, expected[side], retained_read))
+                continue
+            if expected.get("kind") == "creation_field":
                 continue
             groups.setdefault(expected.get("platform"), []).append(expected)
             if "field_info" in expected:
@@ -453,6 +546,20 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
 
 def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
     receipt = binding["source_receipt"]
+    observations = []
+    for row in binding["observations"]:
+        if row.get("kind") == "creation_field":
+            continue
+        compact = {**{key: value for key, value in row.items() if key != "field_info"},
+            **({"metadata_bound": True} if "field_info" in row else {})}
+        if row.get("kind") == "creation_presence":
+            fields = [field for field in binding["observations"] if field.get("kind") == "creation_field"
+                and field["object_id"] == row["object"]["id"]]
+            if fields:
+                compact["fields"] = [{**{key: value for key, value in field.items()
+                    if key not in {"kind", "object_id", "before", "after", "field_info"}},
+                    "metadata_bound": True} for field in fields]
+        observations.append(compact)
     return {"scope": "latest_project_history", "action": binding["uri"].rsplit(".", 1)[-1],
         "expectation_receipt": receipt["transaction_id"] if receipt else None,
         "effect_expectation": "owned_receipt_scoped_state" if receipt else "none",
@@ -460,5 +567,4 @@ def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
         "verification_boundary": "owned_receipt_scoped_state_only" if receipt else "result_schema_only; effect_and_preservation_unobserved",
         "stack_head_observed": False, "outside_scope_preservation_observed": False,
         "automatic_retry": False, "automatic_compensation": False,
-        "expected_observations": [{**{key: value for key, value in row.items() if key != "field_info"},
-            **({"metadata_bound": True} if "field_info" in row else {})} for row in binding["observations"]]}
+        "expected_observations": observations}

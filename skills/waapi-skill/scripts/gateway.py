@@ -31322,6 +31322,10 @@ def transaction_show_summary(
             "event_count": len(event_rows),
             "events": event_rows,
         }
+        if "history_action" in derived_notice and prepared.get("resolved_roles") == {}:
+            # The complete history identities are in history_action and its sealed
+            # request. An empty role map needs no repeated shape/digest headers.
+            result["preview_summary"]["resolved_roles"] = {}
         if optional_none is not None and derived_notice['optional_none_state_materialization'].get('relationships_complete') is False:
             # Exact None relationships have their own bounded reader. Avoid
             # repeating empty role headers and unrelated snapshot statistics.

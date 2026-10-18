@@ -6595,3 +6595,185 @@ def _collect_voice_creation_acceptance(runtime: _WorkflowSandboxRuntime, *, pref
 def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     category = _collect_voice_creation_acceptance(workflow_sandbox_runtime, prefix='WAAPI_VOICE_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
+
+
+def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
+    """Ordinary created fields, then latest-project undo/redo with the owned receipt."""
+    assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No pinned native history route in 2021.1'
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    output = runtime.state_dir / 'created-fields-history-acceptance.json'
+    category = {'category': 'created-fields-history-acceptance', 'status': 'FAIL',
+        'observation_path': str(output), 'verifier_strength': 'owned_source_receipt_plus_independent_created_fields_absence_and_restoration'}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint, 'calls': [], 'setup': [], 'effects': [],
+        'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False,
+        'stack_head_observed': False, 'outside_scope_preservation_observed': False,
+        'preserved_target_scope': 'exact_identity_class_parent_and_notes',
+        'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 16 * 1024 * 1024, 'Created history receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 256, 'Created history public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint, payload
+                assert payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    fields = ('IsLoopingEnabled', 'IsLoopingInfinite', 'Volume', 'Attenuation')
+    def query(selector, *, sound=False):
+        payload = gateway.gateway(['query-object', *selector, *projection, *(['--platform', platform] if sound else []),
+            *(arg for field in (fields if sound else ()) for arg in ('--include-field', field))], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and payload.get('count') == len(rows) <= 1, payload
+        assert payload.get('limit_reached') is not True and payload.get('projection_complete') is not False, payload
+        assert payload.get('status') != 'partial', payload
+        return rows
+    def exact(identity, *, sound=False):
+        rows = query(['--exact-id', identity], sound=sound)
+        assert len(rows) == 1 and rows[0]['id'] == identity and type(rows[0].get('class_id')) is int, rows
+        return rows[0]
+    def by_path(segments, *, sound=False):
+        return query([arg for segment in segments for arg in ('--path-segment', segment)], sound=sound)
+    def complete(draft, label, *, setup=False, expected_root=None):
+        phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
+        receipt['setup' if setup else 'effects'].append(phase)
+        phase_category = {'category': 'created-fields-history-' + label, 'status': 'FAIL',
+            'observation_path': str(output), 'setup_coverage_credit': False,
+            'verifier_strength': 'verified_setup_no_created_history_effect_credit' if setup else 'scoped_history_and_independent_state_readback'}
+        runtime.category_results.append(phase_category)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'])
+        if expected_root is not None:
+            binding = shown['artifact']['request']['arguments']['history_binding']
+            observed_fields = [row for row in binding['observations'] if row.get('kind') == 'creation_field']
+            assert len(observed_fields) == 4 and {row['field'] for row in observed_fields} == set(fields), binding
+            assert {row['object_id'] for row in observed_fields} == {expected_root}, binding
+            assert all(isinstance(row['field_info'].get('raw'), Mapping) for row in observed_fields), binding
+            root, = [row for row in binding['observations'] if row['kind'] == 'creation_presence']
+            assert root['object']['id'] == expected_root and root['platform'] == platform, binding
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        executed = gateway.gateway(['execute', identity], live=True)
+        phase['execute'] = executed; phase['native_outcome'] = 'accepted'
+        verified = gateway.gateway(['verify', identity], live=True); phase['verify'] = verified
+        assert executed.get('automatic_retry') is False and verified.get('verified') is True, (executed, verified)
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+        if not setup and label.endswith(('-undo', '-redo')):
+            assert verified['verification_strength'] == 'scoped_history_effect_readback', verified
+        return phase, phase_category
+    def admit(phase, phase_category, observation):
+        phase['independent_effect'] = observation; phase['effect_verified'] = True; phase_category['status'] = 'PASS'
+    def history(source_id, direction):
+        draft = _start_business_draft(gateway, 'ak.wwise.core.undo.' + direction)
+        _update_business_draft(gateway, draft, 'draft-declare-core-plan', ['--value', 'history_scope', 'latest_project_history',
+            '--value', 'expectation_receipt', source_id], live=True)
+        return draft
+    try:
+        status = gateway.gateway(['status'], live=True)
+        assert status.get('wwise', {}).get('isCommandLine') is True, status
+        platform = status.get('project', {}).get('currentPlatformId')
+        assert isinstance(platform, str) and uuid.UUID(platform).int != 0, status
+        receipt['host_and_project'] = status
+        actor_segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == '2025.1' else ACTOR_MIXER_PARENT_SEGMENTS
+        parent_rows = by_path(actor_segments)
+        assert len(parent_rows) == 1 and exact(parent_rows[0]['id']) == parent_rows[0], parent_rows
+        parent = parent_rows[0]
+        setup = _start_business_draft(gateway, 'object.create')
+        attenuation_parent = _bind_business_object(gateway, setup, path_segments=('Attenuations', 'Default Work Unit'))
+        attenuation_type = _discover_business_type(gateway, setup, meaning='Attenuation', role='object', expected_label='Attenuation')
+        _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'target', '--parent-handle', attenuation_parent,
+            '--kind', attenuation_type, '--name', name + '_Target', '--field', 'notes', 'Preserve history reference target'], live=False)
+        phase, setup_category = complete(setup, 'setup-target', setup=True)
+        target_id = _created_object_id(phase['execute'])
+        target = exact(target_id)
+        assert target['type'] == 'Attenuation' and target['name'] == name + '_Target', target
+        phase['independent_setup'] = target; setup_category['status'] = 'PASS'
+        for case in ('existing', 'null'):
+            source_name = name + '_' + case
+            source_segments = (*actor_segments, source_name)
+            draft = _start_business_draft(gateway, 'object.create')
+            parent_handle = _bind_business_object(gateway, draft, object_id=parent['id'])
+            target_handle = _bind_business_object(gateway, draft, object_id=target_id)
+            _update_business_draft(gateway, draft, 'draft-business-configure', ['--platform', platform], live=False)
+            handles = {}
+            for token in ('Volume', 'Attenuation'):
+                disclosed = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                    ['--semantic-kind', 'sound-sfx', '--meaning', token], live=True)
+                handles[token] = discovered_business_field_handle(disclosed, token)
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'source', '--parent-handle', parent_handle,
+                '--kind', 'sound-sfx', '--name', source_name, '--field', 'notes', 'Created history ' + case,
+                '--field', 'loop', 'infinite', '--field-value', handles['Volume'], '-6.0',
+                '--field-value', handles['Attenuation'], target_handle if case == 'existing' else 'null'], live=False)
+            phase, phase_category = complete(draft, case + '-source')
+            source_id, created_id = phase['transaction_id'], _created_object_id(phase['execute'])
+            original = exact(created_id, sound=True)
+            props = original.get('properties', {})
+            assert original['type'] == 'Sound' and original['name'] == source_name, original
+            assert original['path'] == '\\' + '\\'.join(source_segments), original
+            assert original.get('notes') == 'Created history ' + case and original.get('parent', {}).get('id') == parent['id'], original
+            assert original['class_id'] == phase['immutable_preview']['prepared_operation']['pre_state']['object_create_nodes'][0]['class_id'], original
+            assert props.get('IsLoopingEnabled') is True and props.get('IsLoopingInfinite') is True, original
+            assert type(props.get('Volume')) in (int, float) and props['Volume'] == -6.0, original
+            assert 'Attenuation' in original.get('references', {}), original
+            reference = original['references']['Attenuation']
+            reference_id = reference.get('id') if isinstance(reference, Mapping) else reference
+            if isinstance(reference, Mapping):
+                assert 'id' in reference and not set(reference) - {'id', 'name', 'type', 'path'}, original
+                assert all(isinstance(value, str) for value in reference.values()), original
+            explicit_null = reference is None or (isinstance(reference_id, str)
+                and reference_id == '{00000000-0000-0000-0000-000000000000}')
+            assert (explicit_null if case == 'null' else isinstance(reference_id, str)
+                and uuid.UUID(reference_id) == uuid.UUID(target_id)), original
+            assert exact(target_id) == target and exact(parent['id']) == parent, 'Source changed its target or parent'
+            admit(phase, phase_category, original)
+            phase, phase_category = complete(history(source_id, 'undo'), case + '-undo', expected_root=created_id)
+            absence = {'id': query(['--exact-id', created_id]), 'path': by_path(source_segments), 'target': exact(target_id)}
+            assert absence['id'] == absence['path'] == [] and absence['target'] == target, absence
+            admit(phase, phase_category, absence)
+            if runtime.version != '2022.1':
+                phase, phase_category = complete(history(source_id, 'redo'), case + '-redo', expected_root=created_id)
+                restored = exact(created_id, sound=True)
+                assert json.dumps(restored, sort_keys=True) == json.dumps(original, sort_keys=True), (original, restored)
+                assert by_path(source_segments, sound=True) == [restored] and exact(target_id) == target, restored
+                assert exact(parent['id']) == parent, 'History changed its original parent'
+                admit(phase, phase_category, restored)
+        receipt.update(complete=True, business_effect_verified=True)
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_created_leaf_fields_history_receipt_native_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """2022 undo; 2023–25 undo/redo; no GUI or native stack-entry ID claim."""
+    assert workflow_sandbox_runtime.version != '2021.1', '2021.1 has no pinned standalone undo/redo route'
+    category = _collect_created_leaf_fields_history_acceptance(workflow_sandbox_runtime,
+        name='WAAPI_HISTORY_' + uuid.uuid4().hex[:12])
+    assert category['status'] == 'PASS', category
