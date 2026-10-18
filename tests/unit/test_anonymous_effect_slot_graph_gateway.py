@@ -26,7 +26,7 @@ def anonymous_task(tmp_path, version='2025.1'):
     return task
 
 
-def declare_slots(task, *, owner=None, owner_kind=None, targets=None):
+def declare_slots(task, *, owner=None, owner_kind=None, targets=None, renders=("false", "true")):
     owner = task.bind(FIRST) if owner is None else owner
     scope = ["--object-handle", owner] if owner_kind is None else ["--type-handle", owner_kind]
     code, listed = task.step('draft-discover-fields', *scope,
@@ -42,12 +42,12 @@ def declare_slots(task, *, owner=None, owner_kind=None, targets=None):
     kind = found['type_candidates'][0]['handle']
     fields = {name: select_field(task, kind=kind, token=name) for name in ['Effect', 'Bypass', 'Render']}
     targets = [EFFECT, EFFECT_B] if targets is None else targets
-    for name, target, bypass, render in [('first', targets[0], 'true', 'false'), ('second', targets[1], 'false', 'true')]:
+    for name, target, bypass, render in [('first', targets[0], 'true', renders[0]), ('second', targets[1], 'false', renders[1])]:
         handle = target if target.startswith('bnh1-') else task.bind(target)
         code, declared = task.step('draft-declare-new', '--declaration-id', name, '--parent-handle', owner,
             '--kind', kind, '--field', 'object_list', effects,
             '--field-value', fields['Effect'], handle, '--field-value', fields['Bypass'], bypass,
-            '--field-value', fields['Render'], render)
+            *(['--field-value', fields['Render'], render] if render is not None else []))
         assert code == 0, declared
     return owner
 
@@ -527,3 +527,18 @@ def test_explicit_render_false_before_later_true_is_rejected_before_any_write(tm
     code, checked = task.step('draft-check')
     assert code == 2 and checked['error_code'] == 'EFFECT_RENDER_CHAIN_CONFLICT', checked
     assert not any(uri.endswith(('object.set', 'setProperty', 'object.create')) for uri, _, _ in task.calls)
+
+
+def test_omitted_new_predecessor_render_is_derived_in_preview(tmp_path):
+    task = anonymous_task(tmp_path)
+    declare_slots(task, renders=(None, 'true'))
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    _, shown = task.preview()
+    prepared = shown['artifact']['prepared_operation']
+    slots = prepared['dispatch']['args']['objects'][0]['@Effects']
+    assert slots[0]['@Render'] is True
+    assert slots[0]['@Bypass'] is True  # Bypass precedence never rewrites stored intent.
+    chain = prepared['pre_state']['effect_render_chains'][0]
+    assert chain['derived'][0]['after'] is True
+    assert 'Bypass takes precedence' in chain['bypass_policy']
