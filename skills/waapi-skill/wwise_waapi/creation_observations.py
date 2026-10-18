@@ -91,6 +91,15 @@ def require_compound_creation_scope(calls):
     for index, child in enumerate(prepared):
         plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
         kind = plan.get('kind')
+        chains = state.get('effect_render_chains', [])
+        covered = {}
+        for chain in chains:
+            # Arity only. Actual source observations are still required before
+            # any receipt can certify the fields or the preservation image.
+            known_count += 1 + sum(len(snapshot.get('after_changes', {})) for snapshot in chain.get('snapshots', []))
+            for item in chain.get('metadata', []):
+                key = (str(item['scope'].get('object_id')).upper(), chain.get('platform'))
+                covered.setdefault(key, set()).add(item['field'])
         if kind == 'object-create-graph':
             nodes, paths = ordinary_creation_graph(plan, state, max_observations=MAX_OBSERVATIONS)
             graphs.append((index, paths))
@@ -109,9 +118,14 @@ def require_compound_creation_scope(calls):
                         raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
                             'Compound graph ancestry needs the exact renamed object path.')
                     renames.append((index, next(iter(paths))))
-                if not state.get('effect_render_chains'):
-                    known_count += (int(node.get('requested_name') != node.get('original_name'))
-                        + int(bool(node.get('notes_supplied'))) + len(node.get('properties', [])) + len(node.get('references', [])))
+                proofs = [proof for proof in state.get('existing_field_observations', [])
+                    if proof.get('request_path') == node.get('request_path')]
+                view = proofs[0].get('field_read_platform', {}).get('platform_id') if len(proofs) == 1 else None
+                excluded = covered.get((str(node.get('target_id')).upper(), view), set())
+                fields = ({'name'} if node.get('requested_name') != node.get('original_name') else set())
+                fields.update({'notes'} if node.get('notes_supplied') else ())
+                fields.update(item['name'] for key in ('properties', 'references') for item in node.get(key, []))
+                known_count += len(fields - excluded)
     if not graphs:
         return
     if known_count > MAX_OBSERVATIONS:

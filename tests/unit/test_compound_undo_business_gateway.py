@@ -3769,6 +3769,9 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
             "--field", "notes", "Compound companion notes")[0] == 0
     elif companion == "object.setName":
         assert task.step("draft-declare-object-change", "--new-name", "Renamed parent")[0] == 0
+    elif companion == "object.create":
+        assert task.step("draft-declare-new", "--declaration-id", "companion", "--parent-handle", owner,
+            "--kind", "sound-sfx", "--name", "History root")[0] == 0
     else:
         assert task.step("draft-declare-object-change", "--notes", "Compound companion notes")[0] == 0
     assert task.step("draft-check")[0] == 0
@@ -4350,3 +4353,13 @@ def test_compound_created_graph_cannot_borrow_another_child_observation_tag(tmp_
     _rewrite_created_graph_verification(task, source, wrong_child)
     rejected = _reject_created_graph_receipt(task, source)
     assert 'typed child index' in rejected['message']
+
+
+def test_compound_created_graph_complete_bound_includes_existing_render_observations(tmp_path, monkeypatch):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    from wwise_waapi import edit_history_business
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    monkeypatch.setattr(edit_history_business, 'MAX_OBSERVATIONS', 3)
+    _compound_from_graph_task(task, notes_id=SECOND, companion='object.create',
+        expected_error='UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED')
+    assert not any(row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.undo.beginGroup'} for row in task.calls)
