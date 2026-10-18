@@ -5,6 +5,25 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-19 actual class and compound history integration
+
+Fixed `a047bf0d` passed **5 selected tests in 7.71s**: the cross-platform
+Program roster, the 2022 null-constructor/history compatibility case, compound
+created-field history on 2022/2025, and compound object.set Render plus notes.
+All 1,886 tracked files and HEAD remained unchanged; the owned process group
+was empty. Four serial inventory generation/check commands exited zero.
+The actual Program roster is 263 unique entries after adding the public generic
+class controls. All 272,313 native obligation identities, semantics, requirements
+and historical evidence remain unchanged.
+
+Component evidence remains separate: `90d7a483` passed only the four new
+2021–2024 ordinary class parameters (4 passed, 1.22s), retaining the earlier
+2025 result without rerunning it. Compound successor `92e816bc` passed five
+typed child-ownership controls and three compatibility checks in separate
+runs. These are program results, not native acceptance or a combined full-suite
+pass. No local preflight, broad gate, Wwise or Fresh run was added for this
+integration; final Program/Non-live and native acceptance remain outstanding.
+
 ## 2026-10-18 object-dump and immutable history-page integration
 
 Fixed `841ae9b2` passed **3 selected tests in 2.98s**: large external dump

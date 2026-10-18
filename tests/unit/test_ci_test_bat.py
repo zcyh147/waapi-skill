@@ -352,7 +352,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 262
+    assert len(nodes) == 263
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_branch_evidence_readers.py"
     assert {
@@ -401,6 +401,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_object_graph_owned_choices_gateway.py",
         "tests/unit/test_object_lifecycle_replace_gateway.py",
         "tests/unit/test_object_inline_curve_gateway.py",
+        "tests/unit/test_generic_object_class_gateway.py",
     }.issubset(nodes)
     assert len(nodes) == len(set(nodes))
     assert "tests/unit/test_typed_gateway_input.py" in nodes

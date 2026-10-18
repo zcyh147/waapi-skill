@@ -18,6 +18,17 @@ references. No main merge is authorized.
 
 ## Active work
 
+- Integration `a047bf0d` makes actual class identity mandatory for ordinary
+  create/set/merge and import verification, preserving documented aliases and
+  stronger opaque-class proofs. Compound history now associates each child's
+  actual execution and verification with its parent receipt using typed indices
+  and hashes, including ordinary leaf creation, existing fields and Render
+  effects. Five selected shared-path tests passed in **7.71s**; all 1,886
+  tracked files remained unchanged and no owned process remained. The Program
+  roster now contains 263 unique entries. Four serial inventory commands passed
+  without changing native obligations or historical evidence. Richer graph/List
+  restoration, session preservation and final broad acceptance remain open.
+
 - Integration `841ae9b2` adds immutable history expectation/verification pages
   and repairs object-dump validation that incorrectly applied an XML node cap
   to valid JSON. The existing file/depth and public reply limits remain in
