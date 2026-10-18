@@ -8826,10 +8826,11 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
         actual_classes = [row.as_dict() for row in _read_object_type_catalog(read)]
         expected_classes = {canonical_json_bytes(row): row for row in class_bindings}
         assertions.append({"name": "selected object classes still match live getTypes metadata",
-            "passed": all(actual_classes.count(row) == 1 for row in expected_classes.values()),
+            "passed": all([actual for actual in actual_classes if actual.get("classId") == row.get("classId")] == [row]
+                for row in expected_classes.values()),
             "evidence": {"expected": list(expected_classes.values()),
-                "actual": [row for row in actual_classes if row.get("class_id") in
-                    {expected.get("class_id") for expected in expected_classes.values()}]}})
+                "actual": [row for row in actual_classes if row.get("classId") in
+                    {expected.get("classId") for expected in expected_classes.values()}]}})
     for node in nodes:
         for evidence in node.get("new_object_default_evidence", []):
             scope = evidence["class_scope"]

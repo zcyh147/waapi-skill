@@ -95,3 +95,48 @@ def test_existing_graph_root_class_is_bound_before_write_and_verified(tmp_path, 
     code, result = task.run('verify', tx)
     assert code == (0 if phase == 'unchanged' else 2), json.dumps(result)
     assert (result.get('verified') is True) is (phase == 'unchanged')
+
+
+@pytest.mark.parametrize('fault', ['wrong-at-preview', 'drift-before-write'])
+def test_ordinary_merge_collision_requires_actual_class_before_dispatch(tmp_path, fault):
+    task = class_task(tmp_path)
+    task.objects[CHILD] = {'id': CHILD, 'name': 'Rain', 'type': 'Sound', 'classId': 1 if fault == 'wrong-at-preview' else 2,
+        'path': task.objects[SECOND]['path'] + r'\Rain', 'parent': {'id': SECOND}, 'notes': 'Keep'}
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, configured
+    declare_sound(task)
+    if fault == 'wrong-at-preview':
+        code, result = task.step('draft-check')
+        assert code == 2, result
+    else:
+        tx, shown = task.preview()
+        code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, result
+        task.objects[CHILD]['classId'] = 1
+        code, result = task.run('execute', tx)
+        assert code == 2, result
+    assert not any(uri.endswith('object.create') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('phase', ['unchanged-alias', 'before-write', 'after-write'])
+def test_class_catalogue_binding_preserves_actor_alias_and_rejects_drift(tmp_path, phase):
+    task = class_task(tmp_path)
+    parent = task.bind(SECOND)
+    code, result = task.step('draft-declare-new', '--declaration-id', 'layers',
+        '--parent-handle', parent, '--kind', 'actor-mixer', '--name', 'Layers')
+    assert code == 0, result
+    tx, shown = task.preview()
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, result
+    if phase == 'before-write':
+        task.types[0]['classId'] = 4
+    code, result = task.run('execute', tx)
+    if phase == 'before-write':
+        assert code == 2 and not any(uri.endswith('object.create') for uri, _, _ in task.calls), result
+        return
+    assert code == 0, result
+    if phase == 'after-write':
+        task.types[0]['classId'] = 4
+    code, result = task.run('verify', tx)
+    assert code == (0 if phase == 'unchanged-alias' else 2), result
+    assert task.objects[ROOT]['type'] == 'PropertyContainer'
