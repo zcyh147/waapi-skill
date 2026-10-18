@@ -4104,3 +4104,109 @@ def test_legacy_2021_source_oracle_stops_after_verified_import_on_mismatched_sel
         assert children_calls[0]['exit_code'] == 0 and children_calls[0]['payload']['ok'] is True
         reason = 'source_child_page_incomplete' if fault == 'partial-source' else 'source_child_cardinality'
         assert reason in receipt['failure']['message']
+
+
+def _soundcaster_dump_runtime(tmp_path, workflow, *, wrong_session=False):
+    """Real Gateway and source XML; the JSON representation is deliberately fixture-only."""
+    import shutil
+    from tests.unit.test_console_project_alternatives_gateway import CliProjectTask
+    task = CliProjectTask(tmp_path, '2024.1', 'ak.wwise.cli.dumpObjects')
+    source = Path(__file__).resolve().parents[1] / '_org' / '2024.1'
+    for directory in ('Soundcaster Sessions', 'Game Parameters', 'States', 'Switches'):
+        shutil.copytree(source / directory, task.project_file.parent / directory)
+    ids = ['{9C02096E-8E29-4029-9D49-778F85015C87}', '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}',
+           '{F4B8069C-3C15-4157-B570-8A41AB2463C2}']
+    original = task.call
+    writes, commands = [], []
+    def call(uri, args=None, options=None):
+        if uri == task.operation:
+            writes.append(dict(args))
+            assert args['content'] == 'propertyset' and 'no-session' not in args
+            # No inference about actual Wwise dump shape follows from this fixture.
+            rows = [{'id': identity, 'name': name, 'coincidental_value': 0.69}
+                for identity, name in zip(ids, ['MIDI', 'Minigun', 'Music'])]
+            if wrong_session:
+                rows[1]['id'] = '{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}'
+            Path(args['output']).write_text(json.dumps({'fixture_only': rows}), encoding='utf-8')
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version='2024.1', candidate='a' * 40, category_results=[],
+        state_dir=tmp_path / 'state', env=task.env,
+        sandbox=SimpleNamespace(sandbox_project=task.project_file, sandbox_root=tmp_path),
+        lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'), port=31337)
+    def raw(argv):
+        commands.append(list(argv))
+        return workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *argv],
+            env=runtime.env, client_factory=lambda _: task)
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, ids
+
+
+def test_soundcaster_dump_observation_uses_gateway_and_actual_category_writer(tmp_path, workflow, monkeypatch):
+    import hashlib
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes, ids = _soundcaster_dump_runtime(tmp_path, workflow)
+    category = workflow._collect_soundcaster_dump_observation(runtime)
+    receipt_path = Path(category['observation_path'])
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt['collection_complete'] is True and receipt['saved_model_preserved'] is True
+    assert category['status'] == 'blocked' and receipt['business_preservation_verified'] is False
+    assert receipt['session_values_observed'] is False and receipt['semantic_absence_proven'] is False
+    assert [row['id'] for row in receipt['source_sessions']] == ids
+    assert all(receipt['guid_occurrence_counts'][identity] > 0 for identity in ids)
+    minigun = receipt['source_sessions'][1]
+    assert next(row for row in minigun['rtpc'] if row['target_name'] == 'Engine_Load')['value_text'] == '0.69'
+    assert receipt['source_binding_count'] == 100
+    assert len(writes) == 1 and [row[0] for row in commands].count('execute') == 1
+    assert [row[0] for row in commands].count('verify') == 1
+    assert receipt['transaction']['verify_state'] == 'result_schema_checked'
+    assert Path(receipt['dump_artifact']['archive_path']).read_bytes() == Path(writes[0]['output']).read_bytes()
+    output = tmp_path / 'soundcaster-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::soundcaster_dump_diagnostic'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results, source={'fixture_only': True},
+        residual_state={'sandbox': 'deleted'}, invocation={'selected_test_nodeids': [node],
+            'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert record['categories'][0]['status'] == 'blocked'
+    assert record['categories'][0]['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert len(record['transactions']) == 1 and record['transactions'][0]['state'] == 'result_schema_checked'
+
+
+def test_soundcaster_dump_wrong_guid_cannot_certify_same_named_session_values(tmp_path, workflow, monkeypatch):
+    import hashlib
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes, ids = _soundcaster_dump_runtime(tmp_path, workflow, wrong_session=True)
+    category = workflow._collect_soundcaster_dump_observation(runtime)
+    receipt_path = Path(category['observation_path'])
+    receipt = json.loads(receipt_path.read_text())
+    assert len(writes) == 1 and [row[0] for row in commands].count('execute') == 1
+    assert receipt['transaction']['execute_state'] == 'executed_unverified'
+    assert receipt['transaction']['verify_state'] == 'result_schema_checked'
+    assert receipt['transaction']['business_state_verified'] is False
+    assert receipt['collection_complete'] and receipt['saved_model_preserved']
+    assert receipt['missing_session_guid_tokens'] == [ids[1]]
+    assert receipt['guid_occurrence_counts'][ids[1]] == 0
+    native = json.loads(Path(receipt['dump_artifact']['archive_path']).read_text())
+    assert native['fixture_only'][1]['name'] == 'Minigun'
+    assert native['fixture_only'][1]['coincidental_value'] == 0.69
+    assert not any(row['id'] == ids[1] for row in receipt['session_guid_occurrences'])
+    assert receipt['session_values_observed'] is receipt['business_preservation_verified'] is False
+    assert receipt['semantic_absence_proven'] is False and category['status'] == 'blocked'
+    output = tmp_path / 'soundcaster-wrong-guid-category.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::soundcaster_wrong_guid_diagnostic'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results, source={'fixture_only': True},
+        residual_state={'sandbox': 'deleted'}, invocation={'selected_test_nodeids': [node],
+            'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['categories'][0]['status'] == 'blocked'
+    assert record['categories'][0]['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert len(record['transactions']) == 1 and record['transactions'][0]['state'] == 'result_schema_checked'

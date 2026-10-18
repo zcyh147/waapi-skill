@@ -7333,3 +7333,253 @@ def test_legacy_import_render_acceptance(workflow_sandbox_runtime: _WorkflowSand
     assert workflow_sandbox_runtime.version in {'2021.1', '2022.1'}, 'Legacy owner Render applies only to 2021/2022'
     category = _collect_legacy_import_render_acceptance(workflow_sandbox_runtime, prefix='WAAPI_LEGACY_IMPORT_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
+
+
+def _collect_soundcaster_dump_observation(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe one closed dump; token occurrences never certify session values."""
+    from wwise_waapi.operation_soundbank import capture_file_proof
+    assert runtime.version == '2024.1', 'This source-bound diagnostic is only for the retained 2024 fixture'
+    sessions = [('MIDI', '{9C02096E-8E29-4029-9D49-778F85015C87}'),
+        ('Minigun', '{1C5BA931-9550-4DC8-B1C7-13689B8AE813}'),
+        ('Music', '{F4B8069C-3C15-4157-B570-8A41AB2463C2}')]
+    project = runtime.sandbox.sandbox_project
+    output = runtime.state_dir / 'soundcaster-dump-observation.json'
+    artifacts = runtime.state_dir / 'soundcaster-dump-artifacts'
+    artifacts.mkdir(parents=True, exist_ok=False)
+    model_root = artifacts / 'model'; model_root.mkdir()
+    dump_root = project.parent / ('soundcaster-dump-' + uuid.uuid4().hex)
+    dump_root.mkdir(exist_ok=False)
+    dump_file = dump_root / 'objects.json'
+    category = {'category': 'soundcaster-dump-diagnostic', 'status': 'FAIL',
+        'verifier_strength': 'diagnostic_artifact_and_exact_guid_occurrences_only_no_session_value_or_business_credit',
+        'coverage_credit': 'none', 'observation_path': str(output)}
+    runtime.category_results.append(category)
+    receipt = {'contract': 'waapi-skill.soundcaster-dump-diagnostic/v1', 'candidate': runtime.candidate,
+        'version': runtime.version, 'calls': [], 'collection_complete': False, 'transaction': {},
+        'business_preservation_verified': False, 'session_values_observed': False, 'semantic_absence_proven': False,
+        'media_operation_executed': False, 'saved_model_preserved': None, 'model_images': {},
+        'limits': {'public_calls': 12, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
+            'report_bytes': 128 * 1024, 'dump_bytes': 8 * 1024 * 1024, 'json_nodes': 32768,
+            'json_depth': 64, 'source_bindings': 128, 'session_occurrence_paths': 32}}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= receipt['limits']['report_bytes'], 'Dump diagnostic report byte bound exceeded'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    def archive(path, raw):
+        prove_artifact_path(path, io_root=artifacts, field='dump diagnostic archive', must_exist=False, expect_directory=False)
+        descriptor = os.open(path, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        proof = capture_file_proof(path, field='dump diagnostic archive', max_bytes=8 * 1024 * 1024, io_root=artifacts)
+        assert proof['sha256'] == hashlib.sha256(raw).hexdigest() and proof['size'] == len(raw), proof
+        return proof
+    class Gateway:
+        def gateway(self, argv, *, live):
+            assert len(receipt['calls']) < 12, 'Dump diagnostic public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            if argv[0] == 'execute': receipt['transaction']['execution_attempted'] = True
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                assert len(body) <= 256 * 1024, 'Dump diagnostic reply byte bound exceeded'
+                receipt['total_reply_bytes'] = receipt.get('total_reply_bytes', 0) + len(body)
+                assert receipt['total_reply_bytes'] <= 2 * 1024 * 1024, 'Dump diagnostic total reply bound exceeded'
+                path = artifacts / ('reply-' + str(len(receipt['calls'])) + '.json')
+                proof = archive(path, body)
+                row.update(exit_code=code, reply_path=str(path), reply_sha256=proof['sha256'], reply_bytes=len(body))
+                if payload.get('transaction_id'): receipt['transaction']['id'] = payload['transaction_id']
+                assert code == 0 and payload.get('ok') is True, payload
+                if live:
+                    assert payload.get('detected_version') == runtime.version, payload
+                    assert payload.get('endpoint') == {'host': runtime.lifecycle.host, 'port': runtime.port,
+                        'url': runtime.lifecycle.waapi_url}, payload
+                return payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+    gateway = Gateway()
+    def guid(value):
+        assert isinstance(value, str) and len(value) in (36, 38), value
+        parsed = uuid.UUID(value)
+        assert parsed.int != 0, value
+        return '{' + str(parsed).upper() + '}'
+    def model(phase, *, parse=False):
+        link = receipt['model_images'][phase] = {}
+        index = ConsoleModelImageIndex(root=model_root, project=project, phase=phase, link=link)
+        paths, pending, entries = [project], [(project.parent, 0)], 0
+        definitions, selected = {}, {}
+        try:
+            while pending:
+                directory, depth = pending.pop()
+                assert depth <= 64, 'Saved model directory depth bound exceeded'
+                with os.scandir(directory) as children:
+                    for entry in children:
+                        entries += 1
+                        assert entries <= 4096, 'Saved model directory entry bound exceeded'
+                        path = Path(entry.path)
+                        assert not path_is_link_or_reparse(path), path
+                        if entry.is_dir(follow_symlinks=False): pending.append((path, depth + 1))
+                        elif path.name.casefold().endswith('.wwu'):
+                            paths.append(path)
+                            assert len(paths) <= 513, 'Saved model Work Unit bound exceeded'
+            for path in sorted(paths):
+                raw = index.save(path, observe_console_file(path, io_root=project.parent))
+                if not parse: continue
+                assert b'<!DOCTYPE' not in raw.upper(), 'Unexpected XML document type'
+                tree = ET.fromstring(raw)
+                stack, count = [(tree, None, 0)], 0
+                while stack:
+                    node, group, depth = stack.pop(); count += 1
+                    assert count <= 32768 and depth <= 64, 'Saved XML node/depth bound exceeded'
+                    if node.tag in {'StateGroup', 'SwitchGroup'}: group = (node.tag, guid(node.get('ID')))
+                    if node.tag in {'GameParameter', 'State', 'Switch', 'StateGroup', 'SwitchGroup'}:
+                        identity = guid(node.get('ID'))
+                        assert identity not in definitions, ('Duplicate source definition', identity)
+                        definitions[identity] = {'type': node.tag, 'name': node.get('Name'),
+                            'group_id': group[1] if group and node.tag in {'State', 'Switch'} else None}
+                    if node.tag == 'SoundcasterSession' and node.get('ID', '').upper() in dict(sessions).values():
+                        identity = guid(node.get('ID'))
+                        assert identity not in selected, ('Duplicate source session', identity)
+                        selected[identity] = (node, path.relative_to(project.parent).as_posix())
+                    stack.extend((child, group, depth + 1) for child in reversed(list(node)))
+            index.finish()
+            return index, definitions, selected
+        except Exception as exc:
+            index.error(None, exc)
+            raise
+    def source_oracle(definitions, selected):
+        assert set(selected) == {identity for _, identity in sessions}, 'Source session identities missing or ambiguous'
+        result, binding_count = [], 0
+        for name, identity in sessions:
+            node, relative = selected[identity]
+            assert node.get('Name') == name, (name, node.attrib)
+            row = {'id': identity, 'name': name, 'source_file': relative, 'rtpc': [], 'states': [], 'switches': [], 'show_all': {}}
+            for tag, field, member, reference, kind in (
+                ('RTPCValueList', 'rtpc', 'RTPCValue', 'GameParameterRef', 'GameParameter'),
+                ('CurrentStateList', 'states', 'CurrentStateRef', None, 'State'),
+                ('CurrentSwitchList', 'switches', 'CurrentSwitchRef', None, 'Switch')):
+                lists = node.findall(tag)
+                assert len(lists) == 1 and lists[0].get('ShowAll') in {'true', 'false'}, (identity, tag)
+                row['show_all'][field] = lists[0].get('ShowAll')
+                seen = set()
+                for item in lists[0]:
+                    assert item.tag == member, item.tag
+                    target = item.find(reference) if reference else item
+                    target_id = guid(target.get('ID'))
+                    assert target_id not in seen, ('Duplicate saved selection', target_id)
+                    seen.add(target_id)
+                    definition = definitions[target_id]
+                    assert definition['type'] == kind and definition['name'] == target.get('Name'), (target.attrib, definition)
+                    value = {'target_id': target_id, 'target_name': definition['name']}
+                    if reference:
+                        values = item.findall('Value')
+                        assert len(values) == 1 and len(values[0].text or '') <= 64, item.attrib
+                        value['value_text'] = values[0].text
+                        assert math.isfinite(float(value['value_text'])), value
+                    else:
+                        group_id = definition['group_id']
+                        assert group_id in definitions and definitions[group_id]['type'] == kind + 'Group', definition
+                        value['group_id'] = group_id
+                    row[field].append(value); binding_count += 1
+                    assert binding_count <= 128, 'Source saved-value binding bound exceeded'
+            result.append(row)
+        assert binding_count > 0, 'Fixture must contain real stored selections'
+        receipt['source_binding_count'] = binding_count
+        return result
+    def retain_dump():
+        captured = observe_console_file(dump_file, io_root=dump_root)
+        raw = base64.b64decode(captured['content_base64'], validate=True)
+        archived = artifacts / 'native-objects.json'
+        proof = archive(archived, raw)
+        receipt['dump_artifact'] = {'native_path': str(dump_file), 'native_file_proof': captured['file_proof'],
+            'archive_path': str(archived), 'archive_proof': proof, 'semantic_schema': 'unobserved'}
+        return raw
+    try:
+        before, definitions, selected = model('before', parse=True)
+        receipt['source_sessions'] = source_oracle(definitions, selected)
+        persist()
+        draft = _start_business_draft(gateway, 'ak.wwise.cli.dumpObjects')
+        _update_business_draft(gateway, draft, 'draft-declare-cli-console-plan', [
+            '--value', 'project_file', str(project), '--value', 'output_file', str(dump_file),
+            '--value', 'content', 'property_sets', '--toggle', 'include_session_objects', 'enable'], live=True)
+        transaction = _complete_core_result_schema_draft(gateway, draft)
+        receipt['transaction'].update(id=transaction['preview']['transaction_id'],
+            execute_state=transaction['execute']['state'], verify_state=transaction['verify']['state'],
+            business_state_verified=transaction['verify']['verification']['business_state_verified'])
+        raw = retain_dump()
+        def pairs(rows):
+            result = {}
+            for key, value in rows:
+                assert key not in result, 'Duplicate dump JSON key'
+                result[key] = value
+            return result
+        def nonfinite(value):
+            raise ValueError('Nonfinite dump JSON number: ' + value)
+        dumped = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=pairs, parse_constant=nonfinite)
+        targets = {identity for _, identity in sessions}
+        for row in receipt['source_sessions']:
+            for field in ('rtpc', 'states', 'switches'):
+                for binding in row[field]:
+                    targets.add(binding['target_id'])
+                    if 'group_id' in binding: targets.add(binding['group_id'])
+        counts = receipt['guid_occurrence_counts'] = {identity: 0 for identity in sorted(targets)}
+        occurrences = receipt['session_guid_occurrences'] = []
+        receipt['occurrence_paths_complete'] = True
+        session_ids = {identity for _, identity in sessions}
+        stack, nodes = [(dumped, [], 0)], 0
+        def observe(value, path, location):
+            if type(value) is not str or len(value) not in (36, 38): return
+            try: identity = guid(value)
+            except (ValueError, AssertionError): return
+            if identity not in counts: return
+            counts[identity] += 1
+            if identity in session_ids:
+                if len(occurrences) < 32 and len(json.dumps(path).encode('utf-8')) <= 2048:
+                    occurrences.append({'id': identity, 'json_path_segments': path, 'match_in': location,
+                        'interpretation': 'token_occurrence_only_not_session_or_value_binding'})
+                else: receipt['occurrence_paths_complete'] = False
+        while stack:
+            item, path, depth = stack.pop(); nodes += 1
+            assert nodes <= 32768 and depth <= 64, 'Dump JSON node/depth observation bound exceeded'
+            if isinstance(item, dict):
+                for key, value in reversed(list(item.items())):
+                    child_path = [*path, key]
+                    observe(key, child_path, 'key')
+                    stack.append((value, child_path, depth + 1))
+            elif isinstance(item, list):
+                stack.extend((child, [*path, index], depth + 1) for index, child in reversed(list(enumerate(item))))
+            else: observe(item, path, 'value')
+        receipt['dump_json_nodes'] = nodes
+        receipt['missing_session_guid_tokens'] = [identity for _, identity in sessions if not counts[identity]]
+        after, _, _ = model('after')
+        receipt['saved_model_preserved'] = (set(before.files) == set(after.files) and all(
+            row['file_proof'] == after.files[name]['file_proof'] for name, row in before.files.items()))
+        assert receipt['saved_model_preserved'], 'Dump changed saved project/Work Unit identities or bytes'
+        receipt['collection_complete'] = True
+        category['status'] = 'blocked'
+        category['reason'] = 'Diagnostic only; native session/value representation requires independent review'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            if dump_file.exists() and 'dump_artifact' not in receipt: retain_dump()
+            if receipt['model_images'].get('before', {}).get('complete') and 'after' not in receipt['model_images']:
+                model('after')
+        except Exception as exc:
+            receipt['finalization_error'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_soundcaster_dump_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_soundcaster_dump_observation(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked', category
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['collection_complete'] and receipt['saved_model_preserved'], receipt
+    assert receipt['session_values_observed'] is receipt['business_preservation_verified'] is False
