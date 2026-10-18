@@ -4767,6 +4767,7 @@ def _prepare_object_create(
         version=request.version,
     )
     type_catalog = _read_object_type_catalog(read)
+    render_native_nodes: dict[str, dict[str, Any]] = {}
     from .planned_references import prepare_result_context
     result_context = prepare_result_context(arguments.get("graph_result_bindings", []), normalized.nodes,
         {"$": (parent, requested_conflict)}, resolve_type=lambda node: _resolve_graph_node_type(node, catalog=type_catalog, version=request.version), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
@@ -5066,8 +5067,15 @@ def _prepare_object_create(
         canonical_types=canonical_types,
         resolved_references=resolved_references,
         derived_properties=derived_properties,
+        native_nodes=render_native_nodes,
         prepared_names=result_context["prepared_names"] if result_context else None,
     )
+    from .effect_render_conditions import prepare_graph, EffectRenderConditionError
+    try:
+        effect_render_chains = prepare_graph(node_specs, render_native_nodes, version=request.version, read=read,
+            root_parent=parent, root_collection=list_name)
+    except EffectRenderConditionError as exc:
+        raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
     dispatch_args = {
         "parent": parent.object,
         **trusted_root,
@@ -5762,6 +5770,7 @@ def _prepare_object_set(
             "object.set auto_add_to_source_control must be a JSON boolean.",
         )
     type_catalog = _read_object_type_catalog(read)
+    render_native_nodes: dict[str, dict[str, Any]] = {}
     roles: dict[str, ResolvedObject] = {}
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
@@ -5917,6 +5926,7 @@ def _prepare_object_set(
             "references": [],
         }
         trusted: dict[str, Any] = {"object": target.object}
+        render_native_nodes[target_spec["request_path"]] = trusted
         if "import" in item:
             if request.version not in OBJECT_SET_IMPORT_VERSIONS:
                 raise OperationContractError(
@@ -6162,6 +6172,7 @@ def _prepare_object_set(
                     canonical_types=canonical_types,
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
+                    native_nodes=render_native_nodes,
                     materialized_imports=materialized_imports,
                     prepared_names=result_context["prepared_names"] if result_context else None,
                     rtpc_updates={spec["request_path"]: spec for spec in child_specs if spec.get("rtpc_update")},
@@ -6573,6 +6584,7 @@ def _prepare_object_set(
                     canonical_types=canonical_types,
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
+                    native_nodes=render_native_nodes,
                     materialized_imports=materialized_imports,
                     prepared_names=result_context["prepared_names"] if result_context else None,
                     rtpc_updates={spec["request_path"]: spec for spec in prepared_specs if spec.get("rtpc_update")},
@@ -6776,9 +6788,9 @@ def _prepare_object_set(
                 raise OperationContractError("INVALID_READBACK", "One selected ShareSet requires one unchanged preparation snapshot")
             if not matching:
                 field_snapshots.append(snapshot)
-    from .effect_render_conditions import reject_explicit_graph_conflicts, EffectRenderConditionError
+    from .effect_render_conditions import prepare_graph, EffectRenderConditionError
     try:
-        reject_explicit_graph_conflicts(node_specs)
+        effect_render_chains = prepare_graph(node_specs, render_native_nodes, version=request.version, read=read)
     except EffectRenderConditionError as exc:
         raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
     _validate_graph_rtpc_capacity(node_specs, version=request.version)
@@ -6938,6 +6950,7 @@ def _prepare_object_set(
     state: dict[str, Any] = {
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
+        "effect_render_chains": effect_render_chains,
         "graph_rtpc_guards": [spec for spec in node_specs if spec.get("rtpc_binding")],
     }
     if result_context:
@@ -8718,6 +8731,10 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
     if isinstance(pre_state, Mapping) and pre_state.get("documented_planned_reference_guards"):
         from .documented_list_fields import planned_reference_guard_assertions
         assertions.extend(planned_reference_guard_assertions(pre_state["documented_planned_reference_guards"], read=read))
+    if isinstance(pre_state, Mapping) and pre_state.get("effect_render_chains"):
+        from .effect_render_conditions import chain_assertions
+        assertions.extend(chain_assertions(pre_state["effect_render_chains"], read=read, after_write=after_write,
+            edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", []))))
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
@@ -9271,6 +9288,7 @@ def _materialize_canonical_object_node(
     rtpc_updates: Mapping[str, Mapping[str, Any]] | None = None,
     rtpc_update_rows: list[dict[str, Any]] | None = None,
     plugin_materializations: Mapping[str, Mapping[str, Any]] | None = None,
+    native_nodes: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
@@ -9297,6 +9315,8 @@ def _materialize_canonical_object_node(
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
 
     def apply(current: ObjectNodeDescriptor, row: dict[str, Any]) -> None:
+        if native_nodes is not None:
+            native_nodes[current.request_path] = row
         row["type"] = canonical_types[current.request_path]
         if current.plugin is not None:
             payload = (plugin_materializations or {}).get(current.request_path)
@@ -20407,6 +20427,11 @@ def verify_prepared_operation(
                 continue
             from .object_graph_paths import expected_snapshot
             expected = expected_snapshot(snapshot["rows"][0], edits=specs, read_row=read_renamed_owner)
+            for chain in pre_state.get("effect_render_chains", []):
+                for member in chain["snapshots"]:
+                    if _same_identity(member["object_id"], snapshot["object_id"]):
+                        for name, value in member["after_changes"].items():
+                            expected["@" + name] = value
             selected_references = {}
             observed_fields = {field.lstrip("@") for field in snapshot["fields"]}
             for name in snapshot.get("reference_fields", []):
