@@ -5865,11 +5865,6 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False, 'metadata': {},
         'exclusive': {'status': 'pending', 'reason': 'No legal active source-backed Exclusive field proved'},
         'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
-    if null_source_only_diagnostic:
-        receipt.update(diagnostic_only=True, history_acceptance_credit=False,
-            scope='fresh_setup_then_full_null_source_creation_without_undo_or_redo')
-        category.update(diagnostic_only=True, history_acceptance_credit=False,
-            verifier_strength='diagnostic_full_null_source_stored_fields_without_history_acceptance_credit')
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(body) <= 16 * 1024 * 1024, 'RTPC graph receipt byte bound exceeded'
@@ -6002,8 +5997,6 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             'setup_coverage_credit': False,
             'verifier_strength': ('gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'
                 if effect else 'gateway_verified_setup_only_no_effect_coverage_credit')}
-        if null_source_only_diagnostic:
-            phase_category.update(diagnostic_only=True, history_acceptance_credit=False)
         runtime.category_results.append(phase_category)
         _update_business_draft(gateway, draft, 'draft-check', live=True)
         preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
@@ -6790,6 +6783,11 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         'stack_head_observed': False, 'outside_scope_preservation_observed': False,
         'preserved_target_scope': 'exact_identity_class_parent_and_notes',
         'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    if null_source_only_diagnostic:
+        receipt.update(diagnostic_only=True, history_acceptance_credit=False,
+            scope='fresh_setup_then_full_null_source_creation_without_undo_or_redo')
+        category.update(diagnostic_only=True, history_acceptance_credit=False,
+            verifier_strength='diagnostic_full_null_source_stored_fields_without_history_acceptance_credit')
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(body) <= 16 * 1024 * 1024, 'Created history receipt byte bound exceeded'
@@ -6840,6 +6838,8 @@ def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRun
         phase_category = {'category': 'created-fields-history-' + label, 'status': 'FAIL',
             'observation_path': str(output), 'setup_coverage_credit': False,
             'verifier_strength': 'verified_setup_no_created_history_effect_credit' if setup else 'scoped_history_and_independent_state_readback'}
+        if null_source_only_diagnostic:
+            phase_category.update(diagnostic_only=True, history_acceptance_credit=False)
         runtime.category_results.append(phase_category)
         _update_business_draft(gateway, draft, 'draft-check', live=True)
         preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
