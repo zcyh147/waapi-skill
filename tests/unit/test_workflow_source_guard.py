@@ -66,7 +66,7 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
                     **({'parent': {'id': FIRST}} if index == 0 else {})}
                 task.objects[effect] = {'id': effect, 'name': plugin['name'], 'type': 'Effect', 'classId': 9109507,
                     'path': '\\opaque-local-effect-' + str(index), 'owner': {'id': FIRST}, 'parent': {'id': slot},
-                    'notes': plugin['notes']}
+                    'notes': plugin['notes'], '@Gain': 0}
                 task.objects[FIRST]['@Effects'].append({'id': slot})
                 return {'objects': [{'id': FIRST, 'name': task.objects[FIRST]['name'], '@Effects': [
                     {'id': slot, 'name': '', '@Effect': {'id': effect, 'name': plugin['name']}}]}]}
@@ -119,6 +119,9 @@ def _effect_slot_merge_runtime(tmp_path, workflow, version, *, fault=None):
                     raise AssertionError(args)
             return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
                 if key in row or '@' + key in row} for row in rows]}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and (args.get('classId') == 9109507 or task.objects.get(args.get('object'), {}).get('type') == 'Effect'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': ['Gain']} if uri.endswith('getPropertyAndReferenceNames') else {'name': 'Gain', 'type': 'Real64', 'default': 0}
         return original(uri, args, options)
     task.call = call
     runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,

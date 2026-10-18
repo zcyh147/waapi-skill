@@ -5309,3 +5309,253 @@ def test_read_only_reference_enabled_native_metadata_observation(workflow_sandbo
     if category['status'] == 'blocked':
         pytest.skip(f'Existing reference observation blocked; receipt retained: {category}')
     assert category['status'] == 'PASS', category
+
+
+def _collect_existing_effect_slot_merge_acceptance(runtime: _WorkflowSandboxRuntime, *, sound_name: str) -> dict[str, Any]:
+    """Exact-ID anonymous-member edits; never inline List name-merge acceptance."""
+    output = runtime.state_dir / "existing-effect-slot-exact-member-acceptance.json"
+    category = {"category": "existing-effect-slot-exact-member", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_ordered_membership_class_owner_reference_and_scalar_reads",
+        "observation_path": str(output)}
+    runtime.category_results.append(category)
+    receipt = {"candidate": runtime.candidate, "version": runtime.version, "calls": [], "transactions": [],
+        "setup_coverage_credit": False, "business_effect_verified": False, "inline_list_merge_verified": False,
+        "inline_list_boundary": "Anonymous List construction and ambiguous empty-name collision merging remain separate unfinished branches",
+        "lifecycle_acceptance": "Requires the existing host-category-evidence/v3 finalizer; no source/cleanup acceptance before teardown"}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 8 * 1024 * 1024, 'EffectSlot receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+    class ReceiptGateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 192, 'EffectSlot public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+    gateway = ReceiptGateway()
+    def query(argv, *, count=None):
+        result = gateway.gateway(['query-object', *argv], live=True)
+        rows = result.get('objects')
+        assert isinstance(rows, list) and result.get('projection_complete') is not False, result
+        assert result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        if count is not None:
+            assert result.get('count') == len(rows) == count, result
+        assert len(rows) <= 3 and len({row['id'] for row in rows}) == len(rows), rows
+        for row in rows:
+            assert uuid.UUID(row['id']).int != 0 and isinstance(row.get('path'), str), row
+        return rows
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def exact(identity, fields=()):
+        row = query(['--exact-id', identity, *projection,
+            *(arg for field in fields for arg in ('--include-field', field))], count=1)[0]
+        assert row['id'] == identity and type(row.get('class_id')) is int, row
+        return row
+    def members(owner, *, count):
+        return query(['--advanced-waql', f'from object "{owner}" select @Effects', '--max-results', '3', *projection], count=count)
+    def field_names(identity, required=()):
+        page, names, selected = None, [], []
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page is not None else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field.get('name')
+                assert isinstance(name, str) and name not in names, result
+                names.append(name)
+                if not required or name in required:
+                    selected.append((name, field['selection']))
+            if result['complete'] is True:
+                assert len(names) == result['total_count'], result
+                break
+            next_page = _required_string(result, 'next_page')
+            assert next_page != page, result
+            page = next_page
+        else:
+            raise AssertionError('EffectSlot metadata exceeds four pages')
+        assert set(required).issubset(names), (identity, required, names)
+        assert len(selected) <= 8, 'Private effect metadata exceeds eight-field preservation bound'
+        details = []
+        for name, selection in selected:
+            result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+            assert result.get('complete') is True, result
+            details.append({'name': name, 'detail': result})
+        receipt.setdefault('metadata', {})[identity] = {'names': names, 'details': details}
+        return [name for name, _ in selected]
+    def reference(row):
+        value = row.get('references', {}).get('Effect')
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, row
+        return identity
+    def snapshot(owner, known, effect_fields):
+        sound = exact(owner)
+        assert sound['type'] == 'Sound' and sound['class_id'] == 65552, sound
+        rows = members(owner, count=2)
+        assert [row['id'] for row in rows] == known, (known, rows)
+        slots, effects = [], []
+        for listed in rows:
+            row = exact(listed['id'], ('Effect', 'Bypass', 'Render'))
+            assert all((key in row) == (key in listed) and row.get(key) == listed.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes')), (listed, row)
+            assert row['name'] == '' and row['class_id'] == 5505040, row
+            assert row.get('owner', {}).get('id') == owner, row
+            assert all(type(row.get('properties', {}).get(token)) is bool for token in ('Bypass', 'Render')), row
+            identity = reference(row)
+            effect = exact(identity, effect_fields[identity])
+            assert effect['type'] == 'Effect' and effect.get('owner', {}).get('id') == owner, effect
+            assert effect.get('parent', {}).get('id') == row['id'], effect
+            slots.append(row); effects.append(effect)
+        assert len({row['id'] for row in [sound, *slots, *effects]}) == 5, (slots, effects)
+        return {'owner': sound, 'slots': slots, 'effects': effects}
+    def complete(draft, label, *, before=None, known=None, effect_fields=None, value=None, renamed=None):
+        phase = {'phase': label, 'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        prepared = shown['artifact']['prepared_operation']
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'], compiled_native_request=prepared['dispatch'])
+        if before is not None:
+            selected = before['slots'][0]
+            nodes = prepared['verification_plan']['nodes']
+            node = next(row for row in nodes if row.get('target_id') == selected['id'])
+            assert node['existing_target'] is True and node['pre_state']['id'] == selected['id'], node
+            assert node['pre_state']['name'] == '' and node['pre_state']['path'] == selected['path'], node
+            assert any(row.get('name') == 'Effect' and row.get('condition_guard') is True
+                and row.get('target_id') == reference(selected) for row in node['references']), node
+            args = prepared['dispatch']['args']
+            assert prepared['dispatch']['uri'] == 'ak.wwise.core.object.set', prepared
+            expected = [{'object': selected['id'], '@Bypass': value}]
+            if renamed is not None:
+                expected.insert(0, {'object': before['owner']['id'], 'name': renamed})
+            assert args['objects'] == expected, args
+            assert '@Effects' not in json.dumps(args) and '@Effect"' not in json.dumps(args), args
+            # Collector-owned independent prestate, not an invented durable
+            # membership seal inside the generic exact-ID transaction artifact.
+            phase['collector_prestate'] = snapshot(before['owner']['id'], known, effect_fields)
+            assert phase['collector_prestate'] == before, (before, phase['collector_prestate'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('ok') is True, executed
+        assert executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
+        assert verified.get('verification', {}).get('business_state_verified') is True, verified
+        return phase
+    try:
+        assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Modern anonymous-slot witness excludes no legacy scalar outcome'
+        gateway.gateway(['query-schema', '--advanced'], live=False)
+        types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'EffectSlot', '--meaning', 'Wwise Gain', '--page-size', '64'], live=True)['agent_result']
+        assert types.get('complete') is True, types
+        classes = {}
+        for name in ('Sound', 'EffectSlot', 'Wwise Gain'):
+            matches = [row for row in types['types'] if row.get('name') == name]
+            assert len(matches) == 1 and type(matches[0].get('classId')) is int, matches
+            classes[name] = matches[0]['classId']
+        assert classes['Sound'] == 65552 and classes['EffectSlot'] == 5505040, classes
+        receipt['live_classes'] = classes
+        segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        setup = _start_business_draft(gateway, 'object.create')
+        parent = _bind_business_object(gateway, setup, path_segments=segments)
+        kind = _discover_business_type(gateway, setup, meaning='Sound', role='object', expected_label='Sound')
+        _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'sound', '--parent-handle', parent,
+            '--name', sound_name, '--kind', kind, '--field', 'notes', 'Keep sound'], live=False)
+        complete(setup, 'setup_sound_no_credit')
+        found = query([*(arg for segment in (*segments, sound_name) for arg in ('--path-segment', segment))], count=1)[0]
+        owner = found['id']
+        assert members(owner, count=0) == []
+        known = []
+        for index in range(2):
+            setup = _start_business_draft(gateway, 'object.createPlugin')
+            target = _bind_business_object(gateway, setup, object_id=owner)
+            plugin = _discover_business_type(gateway, setup, meaning='Wwise Gain', role='effect', expected_label='Wwise Gain')
+            _update_business_draft(gateway, setup, 'draft-declare-existing', ['--declaration-id', 'gain', '--object-handle', target,
+                '--field', 'plugin_role', 'effect', '--field', 'plugin_placement', 'owner',
+                '--field', 'plugin_name', f'Gain{index}', '--field', 'plugin_type_handle', plugin,
+                '--field', 'notes', f'Keep effect{index}'], live=False)
+            complete(setup, f'setup_effect_{index}_no_credit')
+            rows = members(owner, count=index + 1)
+            assert [row['id'] for row in rows[:index]] == known, rows
+            added = set(row['id'] for row in rows) - set(known)
+            assert len(added) == 1, rows
+            known.append(added.pop())
+        effect_fields = {}
+        for identity in known:
+            field_names(identity, ('Effect', 'Bypass', 'Render'))
+            slot = exact(identity, ('Effect', 'Bypass', 'Render'))
+            effect_id = reference(slot)
+            effect_fields[effect_id] = field_names(effect_id)
+        before = snapshot(owner, known, effect_fields)
+        receipt['baseline'] = before
+        assert all(row['properties']['Bypass'] is False for row in before['slots']), before
+        assert all(row['class_id'] == classes['Wwise Gain'] for row in before['effects']), before
+        for label, value, renamed in [('exact_member_bypass', True, None),
+                ('owner_rename_and_exact_member_bypass', False, sound_name + '_Renamed')]:
+            # Always rebind the second phase to a fresh post-first observation.
+            fresh = snapshot(owner, known, effect_fields)
+            assert fresh == before, (before, fresh)
+            draft = _start_business_draft(gateway, 'object.set')
+            if renamed is not None:
+                target = _bind_business_object(gateway, draft, object_id=owner)
+                _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'owner',
+                    '--object-handle', target, '--field', 'new_name', renamed], live=False)
+            target = _bind_business_object(gateway, draft, object_id=known[0])
+            listed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target, '--list'], live=True)['agent_result']
+            selected = [row for row in listed['fields'] if row.get('name') == 'Bypass']
+            assert len(selected) == 1, listed
+            field = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+                '--selection', selected[0]['selection']], live=True)
+            handle = discovered_business_field_handle(field, 'Bypass')
+            _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'slot',
+                '--object-handle', target, '--field-value', handle, 'true' if value else 'false'], live=False)
+            phase = complete(draft, label, before=fresh, known=known, effect_fields=effect_fields, value=value, renamed=renamed)
+            expected = json.loads(json.dumps(fresh))
+            if renamed is not None:
+                old_path = fresh['owner']['path']; new_path = old_path.rsplit('\\', 1)[0] + '\\' + renamed
+                def renamed_observation(item):
+                    if isinstance(item, dict):
+                        result = {key: renamed_observation(child) for key, child in item.items()}
+                        if item.get('id') == owner and 'name' in item: result['name'] = renamed
+                        if isinstance(item.get('path'), str) and (item['path'] == old_path or item['path'].startswith(old_path + '\\')):
+                            result['path'] = new_path + item['path'][len(old_path):]
+                        return result
+                    return [renamed_observation(child) for child in item] if isinstance(item, list) else item
+                expected = renamed_observation(expected)
+            expected['slots'][0]['properties']['Bypass'] = value
+            observed = snapshot(owner, known, effect_fields)
+            phase['independent_effect'] = observed
+            assert observed == expected, (label, expected, observed)
+            phase['effect_verified'] = True
+            before = observed
+        receipt['business_effect_verified'] = True
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Shared setup, two exact-ID edits; no anonymous inline List merge credit."""
+    if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
+        pytest.skip('2021–2022 scalar EffectN fields remain a separate witness')
+    category = _collect_existing_effect_slot_merge_acceptance(workflow_sandbox_runtime,
+        sound_name='WAAPI_SLOT_' + uuid.uuid4().hex[:12])
+    assert category['status'] == 'PASS', category
