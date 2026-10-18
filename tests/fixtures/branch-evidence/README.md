@@ -9,3 +9,21 @@ source context. The historical code is never imported or executed. Positive
 reader compatibility uses that context; the changed current Gateway is a
 separate stale-equivalence negative. This fixture grants no forward evidence
 reuse or product coverage.
+
+
+`product/move-single-r26-2025.1/` contains four byte-identical originals from the
+existing 2025.1 moveSingle public program capture on Git candidate
+`3c3423ebf8a0ed8232df4ec7769e7095eb869d2b`. The committed evidence index seals
+these originals and the separate `product/move-single-r26-2025.1.bindings.json`
+projection. That projection changes only the original program artifact locator;
+its hash, exact argv, candidate, source dependencies and assertions are retained.
+Historical absolute paths are inert data, never executed or opened by the audit.
+The program receipt has no nested artifact descriptors consumed by the reader.
+
+This entry supplies a real partial product mapping, not current proof: original
+program evidence is stale against changed relevant sources; native evidence is
+absent. No original PASS is regraded or inherited, no equivalence is invented,
+and no source seal is narrowed. The relative descriptor and common bundle base
+allow default and explicit audit inputs to evaluate without the original
+workstation's ignored files. Adding other producer evidence requires reviewing
+its full reader artifact closure before a portable attachment is selected.

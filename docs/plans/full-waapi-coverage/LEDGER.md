@@ -105,8 +105,8 @@ hash checked.
 with a `branches` map keyed by exact obligation ID. Each reviewed row pins
 `native_shape_sha256`, a nonempty `reason`, and `categories` containing program
 plus whichever of native, live_metadata and fresh apply. A missing or stale
-policy remains unresolved. The committed policy is intentionally empty while
-functional owners establish mappings. There is no implicit native campaign for
+policy remains unresolved. The committed policy currently has one exact 2025.1 Console moveSingle
+result-shape requirement; other policies remain unestablished. There is no implicit native campaign for
 every scalar. `additional_requirements` can add evidence requirements. A sealed
 controlled scope explicitly requires program only.
 
@@ -526,11 +526,41 @@ Evaluate the complete product ledger using the maintainer CLI with explicit
 `--output <capture>/product-ledger.json` and `--require-complete`. Repeat the
 identical command with `--check` for reproducibility. This overlay keeps every
 product obligation; it is not a controlled-scope acceptance. Exit 2 is expected
-while required evidence or other branches remain incomplete. The default
-unbound inventory remains an inventory, not the evidence-bearing overlay.
+while required evidence or other branches remain incomplete. At that R26 checkpoint the default
+unbound inventory remained an inventory, not the evidence-bearing overlay.
 
 Retain the exact command and input hashes alongside the overlay so a reviewer
 can reproduce the evaluated result. Missing or stale artifacts stay missing;
 only the existing strict readers may grant evidence credit. Attach native
 evidence only after an independently reviewed matching run. Whole-file source
 equivalence and literal argv equality remain unchanged.
+
+
+## Portable default evidence inputs (#195)
+
+Ordinary audit generation and `--check` now select the reviewed
+`docs/branch-coverage-evidence-index.json`. The first entry imports exact R26
+moveSingle program/binding/requirement/capture bytes under the existing
+`tests/fixtures/branch-evidence/product/` tree. A separately sealed projection
+changes only the program artifact locator to a relative bundle path. Original
+argv, candidates, source seals, assertions and results are unchanged and never
+executed. The imported program has no nested reader artifact dependencies.
+
+This is partial accounting: its historical program proof is stale for current
+sources and no native attachment exists. Neither the index nor a historical
+PASS grants current verification, descendant credit or completion. Missing or
+malformed selected inputs fail explicitly; unlisted obligations remain visible.
+Duplicate exact bindings and projection changes beyond the locator are rejected.
+The existing committed program-plus-native requirement remains unchanged. An
+explicit override that omits a policy row leaves that branch unresolved in the
+existing evaluator; the imported historical policy is provenance and never
+fills the missing row. A conflicting present policy is rejected.
+
+`--bindings FILE` remains the explicit maintainer override; `--binding-index FILE`
+selects a reviewed alternative portable index and cannot be combined with
+explicit bindings or controlled scope. Both modes use the same evaluator;
+relative evidence descriptors resolve against their binding bundle base.
+Index/document integrity is sealed separately from candidate source identity,
+preventing a receipt/index self-reference. New selection logic lives in the
+already source-sealed audit module. Temporary output/check receipts validate
+this component; committed inventory regeneration belongs to integration.
