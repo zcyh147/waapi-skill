@@ -6256,7 +6256,7 @@ def _prepare_object_set(
             if node.import_arg is not None:
                 trusted_import, import_spec = _prepare_object_set_import(
                     node.import_arg,
-                version=request.version,
+                    version=request.version,
                     canonical_type=canonical_types[node.request_path],
                     type_catalog=type_catalog,
                     file_proofs=object_set_file_proofs,
@@ -6540,7 +6540,7 @@ def _prepare_object_set(
                 if node.import_arg is not None:
                     trusted_import, import_spec = _prepare_object_set_import(
                         node.import_arg,
-                version=request.version,
+                    version=request.version,
                         canonical_type=canonical_types[node.request_path],
                         type_catalog=type_catalog,
                         file_proofs=object_set_file_proofs,
@@ -8384,8 +8384,8 @@ def _prepare_object_node_specs(
 
 
 def _resolve_import_audio_source_class(version, *, catalog):
-    from .metadata_catalog import ObjectTypeCatalogLoader
-    pinned = ObjectTypeCatalogLoader().load(version).by_name(
+    from .metadata_catalog import ObjectTypeCatalogStore
+    pinned = ObjectTypeCatalogStore().load(version).by_name(
         "AudioSource" if version == "2021.1" else "AudioFileSource")
     matches = [row for row in catalog if pinned is not None
         and row.class_id == pinned.class_id and row.name == pinned.name and row.type == pinned.type]
