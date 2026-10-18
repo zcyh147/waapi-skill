@@ -4129,7 +4129,7 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     task = OwnedGraphTask(tmp_path, version, 'object.create')
@@ -4145,6 +4145,12 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         from tests.unit.test_object_graph_owned_choices_gateway import ROOT
         task.objects[ROOT] = {'id': ROOT, 'name': 'External', 'type': 'AuxBus', 'classId': 3997712,
             'path': task.objects[SECOND]['path'] + r'\External', 'parent': {'id': SECOND}, 'notes': 'Keep external'}
+        if external_ancestor_only:
+            from tests.unit.test_object_graph_owned_choices_gateway import PROJECT_GROUP
+            task.objects[PROJECT_GROUP] = {'id': PROJECT_GROUP, 'name': 'External buses', 'type': 'WorkUnit',
+                'classId': 1638416, 'path': r'\Master-Mixer Hierarchy\External buses', 'parent': None, 'notes': 'Keep external unit'}
+            task.objects[ROOT].update(path=r'\Master-Mixer Hierarchy\External buses\External', parent={'id': PROJECT_GROUP})
+
     ids = {'Routing': '{66666666-6666-6666-6666-666666666666}',
         'Destination': '{77777777-7777-7777-7777-777777777777}', 'Sender': '{88888888-8888-8888-8888-888888888888}'}
     platform = '{44444444-4444-4444-4444-444444444444}'
@@ -4196,7 +4202,11 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     if compound:
         _install_created_graph_rename_client(task)
         assert task.step('draft-check')[0] == 0
-        source, before, after = _compound_from_graph_task(task, notes_id=SECOND, companion='object.setName', creation_first=creation_first)
+        source, before, after = _compound_from_graph_task(task, notes_id=PROJECT_GROUP if external_ancestor_only else SECOND, companion='object.setName', creation_first=creation_first)
+        if external_ancestor_only:
+            assert after[SECOND] == before[SECOND]
+            assert after[ROOT] == {**before[ROOT], 'path': r'\Master-Mixer Hierarchy\Renamed parent\External'}
+            assert after[ids['Sender']]['path'] == r'\Master-Mixer Hierarchy\Default Work Unit\Routing\Sender'
     else:
         source, shown = task.preview()
         code, verified = task.finish(source, shown)
@@ -4688,3 +4698,8 @@ def test_created_graph_history_stale_renamed_parent_stops_before_native_action(t
     code, rejected = task.run('execute', tx)
     assert code == 2, rejected
     assert not any(row[0] in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'} for row in task.calls)
+
+
+def test_created_graph_external_reference_ancestor_rename_activates_independent_target_history(tmp_path):
+    _exercise_created_graph_internal_reference_history(tmp_path, '2025.1', compound=True,
+        external=True, external_ancestor_only=True)

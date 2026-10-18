@@ -164,9 +164,10 @@ def prepare_compound_path_context(calls, *, read):
     edits = compound_rename_edits(calls)
     graphs = [call['prepared_operation'] for call in calls
         if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph']
-    if not edits or not any(any(child['resolved_roles']['parent']['row']['path'] == node['pre_state']['path']
-            or child['resolved_roles']['parent']['row']['path'].startswith(node['pre_state']['path'] + '\\')
-            for node in edits) for child in graphs):
+    if not edits or not any(any(isinstance(role.get('row'), dict)
+            and (role['row']['path'] == node['pre_state']['path']
+                or role['row']['path'].startswith(node['pre_state']['path'] + '\\'))
+            for node in edits) for child in graphs for role in child.get('resolved_roles', {}).values()):
         return None
     identities = {}
     def collect(value):
