@@ -3735,3 +3735,180 @@ def test_render_suffix_diagnostic_modern_version_public_routes(tmp_path, workflo
     assert receipt['transactions'][-1]['compiled_native_request']['args'] == {
         'object': receipt['suffix_before']['ordered_ids'][0], 'property': 'Render', 'value': False}
     assert len(receipt['calls']) < 256 and Path(category['observation_path']).stat().st_size < 8 * 1024 * 1024
+
+
+def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault=None):
+    """Real Gateway, literal legacy metadata and native import/media state only."""
+    from copy import deepcopy
+    from tests.unit.test_anonymous_effect_slot_graph_gateway import legacy_render_import_task
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT, EFFECT_PARENT
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND, ROOT
+    task, writes = legacy_render_import_task(tmp_path, version, media=True)
+    task.objects.pop(FIRST)
+    if version == '2021.1':
+        import xml.etree.ElementTree as ET
+        from tests.unit.test_operation_registry_import_verifier import WWISE_2021_PROJECT
+        tree = ET.parse(WWISE_2021_PROJECT)
+        project = tree.find('./ProjectInfo/Project')
+        project.set('Name', 'Fixture'); project.set('ID', '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}')
+        tree.write(task.project_file, encoding='utf-8', xml_declaration=True)
+        (task.project_file.parent / 'Originals').mkdir()
+    folder = '{2990944C-71B4-45DD-B79B-286A4FC9A8BF}'
+    other = '{83E0619D-B89C-4190-9D6E-A353DE39D1E4}'
+    task.types += [{'name': 'Folder', 'classId': 131088, 'type': 'WObject'},
+        {'name': 'Wwise Delay', 'classId': 6946819, 'type': 'Effect'},
+        {'name': 'AudioFileSource', 'classId': 16, 'type': 'WObject'}]
+    task.objects[EFFECT_PARENT].update(name='Factory Effects', path=r'\Effects\Factory Effects')
+    task.objects[folder] = {'id': folder, 'name': 'Delay', 'type': 'Folder', 'classId': 131088,
+        'path': r'\Effects\Factory Effects\Delay', 'parent': {'id': EFFECT_PARENT}, 'notes': 'Keep Delay'}
+    for identity, name in ((EFFECT, 'Echo'), (other, 'The_Slap')):
+        task.objects[identity] = {'id': identity, 'name': name, 'type': 'Effect', 'classId': 6946819,
+            'path': task.objects[folder]['path'] + '\\' + name, 'parent': {'id': folder},
+            'notes': 'Keep ' + name, '@DelayTime': 0.25, '@WetDryMix': 16.5}
+    # Literal fixture-only Effect metadata, not claimed as native observation.
+    effect_metadata = {name: {'name': name, 'type': 'Real32'} for name in ('DelayTime', 'WetDryMix')}
+    original, commands = task.call, []
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')):
+            obj = task.objects.get(args.get('object'), {})
+            if obj.get('type') == 'Effect' or args.get('classId') == 6946819:
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': list(effect_metadata)} if uri.endswith('getPropertyAndReferenceNames') else effect_metadata[args['property']]
+        if uri.endswith('object.get') and args.get('waql') in {'from type Project take 1', 'from type Project take 2'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'Fixture', 'type': 'Project',
+                'path': '\\', 'filePath': str(task.project_file), 'workunitIsDirty': False}]}
+        if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
+            import re
+            expression = args['waql']
+            match = re.fullmatch(r'from object "([^"]+)"(?: take 1)?', expression)
+            assert match, expression
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            rows = [row for row in task.objects.values() if match[1] in (row['id'], row['path'])]
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        if uri.endswith('audio.importTabDelimited'):
+            import csv
+            import uuid
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append(deepcopy(args))
+            results = []
+            for record in csv.DictReader(Path(args['importFile']).read_text().splitlines(), delimiter='\t'):
+                name = record['Object Path'].removeprefix('<Sound>')
+                identity = '{' + str(uuid.uuid4()).upper() + '}'
+                row = {'id': identity, 'name': name, 'type': 'Sound', 'classId': 65552,
+                    'path': task.objects[SECOND]['path'] + '\\' + name, 'parent': {'id': SECOND},
+                    'notes': record['Notes'], **{'@' + token: deepcopy(info['default']) for token, info in task.metadata.items()}}
+                for key, value in record.items():
+                    if key.startswith('Property['):
+                        token = key[9:-1]; row['@' + token] = float(value) if token == 'Volume' else value == 'true'
+                    elif key.startswith('Reference['): row['@' + key[10:-1]] = value
+                for i in range(4):
+                    if row.get('@RenderEffect' + str(i)) is True:
+                        for j in range(i): row['@RenderEffect' + str(j)] = True
+                task.objects[identity] = row; results.append(deepcopy(row))
+            return {'objects': results}
+        result = original(uri, args, options)
+        if uri.endswith('audio.import'):
+            for node in args['imports']:
+                if 'audioFile' in node:
+                    source_path = node['objectPath'].replace('<AudioFileSource>', '')
+                    for row in task.objects.values():
+                        if row['path'] == source_path: row['notes'] = node.get('notes', '')
+                    for row in result['objects']:
+                        if row['path'] == source_path: row['notes'] = node.get('notes', '')
+        if uri.endswith(('audio.import', 'audio.importTabDelimited')):
+            for row in task.objects.values():
+                if row['type'] == 'AudioFileSource':
+                    row['classId'] = 16
+                if version == '2021.1' and 'originalFilePath' in row:
+                    row['sound:originalWavFilePath'] = row['originalFilePath']
+        return result
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='a' * 40, category_results=[], port=31337,
+        sandbox=SimpleNamespace(sandbox_path=task.project_file.parent, sandbox_project=task.project_file),
+        lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _: task)
+        if command[0] == 'verify' and payload.get('verified') is True and len(writes) == 2 and fault == 'independent-source-parent':
+            source = next(row for row in task.objects.values() if row['type'] == 'AudioFileSource')
+            source['parent'] = {'id': EFFECT_PARENT}
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2021.1'])
+def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_path, workflow, monkeypatch, version):
+    import hashlib
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes = _legacy_import_render_runtime(tmp_path, workflow, version)
+    category = workflow._collect_legacy_import_render_acceptance(runtime, prefix='WAAPI_LEGACY_IMPORT_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and receipt['business_effect_verified'] is True
+    assert receipt['setup_coverage_credit'] is False and receipt['tsv_media_verified'] is False
+    assert len(writes) == 4 and [row[0] for row in commands].count('execute') == 4
+    assert [row[0] for row in commands].count('verify') == 4
+    effects = [row for row in receipt['transactions'] if not row['setup']]
+    assert len(effects) == 3 and all(row['effect_verified'] for row in effects)
+    assert all(row['verify']['payload']['verified'] is True for row in effects)
+    assert [row['phase'] for row in effects] == ['existing_media_render', 'new_media_refs_render', 'immutable_tsv_structure_render']
+    assert all(row['independent_owner']['properties']['RenderEffect0'] is True for row in effects)
+    assert all(row['independent_owner']['properties']['RenderEffect1'] is True for row in effects)
+    for row in effects[:2]:
+        assert row['independent_source']['parent']['id'] == row['independent_owner']['id']
+        assert row['media']['copied_sha256'] == row['media']['input_sha256']
+        nodes = row['compiled_native_request']['args']['imports']
+        assert len(nodes) == 2 and '@RenderEffect1' in nodes[0]
+        assert not any(key.startswith('@') for key in nodes[1])
+    if version == '2021.1':
+        assert category['read_view_scope'] == 'current_default_view_only_unobserved_platform_identity'
+        assert all(row['read_view']['status'] == 'unobserved' for row in effects)
+    else:
+        assert all(row['read_view']['status'] == 'certified' for row in effects)
+    output = tmp_path / 'legacy-import-category-writer.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::legacy_import_render'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True}, residual_state={'sandbox': 'deleted'},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3' and record['categories'] == runtime.category_results
+    assert len(record['transactions']) == 4 and all(row['state'] == 'verified' for row in record['transactions'])
+    assert record['categories'][0]['observation_sha256'] == hashlib.sha256(Path(category['observation_path']).read_bytes()).hexdigest()
+
+
+def test_legacy_import_render_collector_rejects_live_source_move_after_gateway_verified(tmp_path, workflow, monkeypatch):
+    import hashlib
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, commands, writes = _legacy_import_render_runtime(tmp_path, workflow, fault='independent-source-parent')
+    with pytest.raises(AssertionError):
+        workflow._collect_legacy_import_render_acceptance(runtime, prefix='WAAPI_LEGACY_IMPORT_TEST')
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    phase = receipt['transactions'][-1]
+    assert phase['phase'] == 'existing_media_render' and phase['execute']['payload']['state'] == 'executed_unverified'
+    assert phase['verify']['payload']['verified'] is True and phase['verify']['payload']['verification']['business_state_verified'] is True
+    assert phase['effect_verified'] is False and receipt['business_effect_verified'] is False and receipt['failure']
+    assert len(writes) == 2 and [row[0] for row in commands].count('execute') == 2
+    assert [row[0] for row in commands].count('verify') == 2
+    assert phase['independent_source']['parent']['id'] != phase['independent_owner']['id']
+    output = tmp_path / 'legacy-import-failure-writer.jsonl'
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', str(output))
+    node = 'fixture::legacy_import_source_failure'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results, source={'fixture_only': True},
+        residual_state={'sandbox': 'retained'}, invocation={'selected_test_nodeids': [node],
+            'node_outcomes': [{'nodeid': node, 'outcome': 'FAIL'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'FAIL'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(output.read_text())
+    assert record['categories'][0]['status'] == 'FAIL' and record['invocation']['outcome'] == 'FAIL'
+    assert len(record['transactions']) == 2 and all(row['state'] == 'verified' for row in record['transactions'])
+    assert record['categories'][0]['observation_sha256'] == hashlib.sha256(Path(category['observation_path']).read_bytes()).hexdigest()
