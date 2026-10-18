@@ -6370,7 +6370,7 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             details[name] = facts
         return {'names': names, 'details': details}
     def observe_suffix():
-        assert runtime.version == '2025.1', 'First suffix diagnostic is pinned2025 only'
+        assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Modern suffix diagnostic excludes legacy EffectN lanes'
         target_ids = [row['id'] for row in targets]
         listed = members(sound['id'])
         assert len(listed) == 2 and len({row['id'] for row in listed}) == 2, listed
@@ -6451,7 +6451,6 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         return category
     try:
         assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Anonymous modern List witness gives no2021/22 credit'
-        if render_suffix_diagnostic: assert runtime.version == '2025.1', 'Suffix diagnostic is pinned2025 only'
         gateway.gateway(['query-schema', '--advanced'], live=False)
         result = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'Folder', '--meaning', 'WorkUnit',
             '--meaning', 'EffectSlot', '--meaning', 'Wwise Gain', '--page-size', '64'], live=True)['agent_result']
@@ -6577,8 +6576,8 @@ def _collect_effect_render_suffix_observation(runtime: _WorkflowSandboxRuntime, 
 @pytest.mark.live
 @pytest.mark.destructive
 def test_effect_render_suffix_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
-    if workflow_sandbox_runtime.version != '2025.1':
-        pytest.skip('Stored suffix observation begins with2025 only; no cross-version inference')
+    if workflow_sandbox_runtime.version not in {'2023.1', '2024.1', '2025.1'}:
+        pytest.skip('Stored suffix observation excludes legacy EffectN lanes; each modern version requires its own observation')
     category = _collect_effect_render_suffix_observation(workflow_sandbox_runtime, prefix='WAAPI_SUFFIX_' + uuid.uuid4().hex[:10])
     assert category.get('diagnostic_complete') is True, category
     # A diagnosed native error response remains a failed attempt with a retained
