@@ -12,6 +12,7 @@ from .business_declarations import (
     BusinessHandleRegistry,
     ExistingObjectTarget,
     NewDescendantTarget,
+    OwnedRtpcTarget,
     business_repair,
     repair_at_draft_revision,
     resolve_semantic_kind,
@@ -67,7 +68,7 @@ _NATIVE_FIELDS = frozenset(
 class BusinessDeclaration:
     declaration_id: str
     result_handle: str
-    target: NewDescendantTarget | ExistingObjectTarget
+    target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget
     fields: Mapping[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
@@ -79,6 +80,8 @@ class BusinessDeclaration:
                 "kind": self.target.kind,
             }
             if isinstance(self.target, NewDescendantTarget)
+            else {"form": "owned-rtpc", "owner_handle": self.target.owner_handle}
+            if isinstance(self.target, OwnedRtpcTarget)
             else {
                 "form": "existing-object",
                 "object_handle": self.target.object_handle,
@@ -199,6 +202,11 @@ class BusinessDeclarationSession:
             fields=fields,
             replace=False,
         )
+
+    def with_rtpc_declaration(self, *, declaration_id: str, owner_handle: str,
+                              fields: Mapping[str, Any]) -> "BusinessDeclarationSession":
+        return self._with_declaration(declaration_id=declaration_id,
+            target=OwnedRtpcTarget(owner_handle), fields=fields, replace=False)
 
     def with_existing_declaration(
         self,
@@ -520,7 +528,7 @@ class BusinessDeclarationSession:
         self,
         *,
         declaration_id: str,
-        target: NewDescendantTarget | ExistingObjectTarget,
+        target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget,
         fields: Mapping[str, Any],
         replace: bool,
     ) -> "BusinessDeclarationSession":
@@ -640,7 +648,7 @@ def _validate_target(
     handles: BusinessHandleRegistry,
     planned_parent_handles: set[str] | None = None,
     draft_revision: int | None = None,
-) -> NewDescendantTarget | ExistingObjectTarget:
+) -> NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget:
     if isinstance(target, NewDescendantTarget):
         missing = [
             field
@@ -687,6 +695,13 @@ def _validate_target(
                 exc,
                 draft_revision=0 if draft_revision is None else draft_revision,
             ) from exc
+        return target
+    if isinstance(target, OwnedRtpcTarget):
+        if handles.context.wwise_version == "2021.1":
+            raise business_repair("UNSUPPORTED_VERSION", field="rtpc",
+                action="RTPC graph construction authority remains unresolved for this version")
+        if target.owner_handle not in (planned_parent_handles or set()):
+            handles.resolve_object(target.owner_handle)
         return target
     if isinstance(target, ExistingObjectTarget):
         try:
@@ -788,11 +803,13 @@ def _declaration_from_dict(
         "name",
         "kind",
     }:
-        target: NewDescendantTarget | ExistingObjectTarget = NewDescendantTarget(
+        target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget = NewDescendantTarget(
             parent_handle=str(target_payload.get("parent_handle")),
             name=str(target_payload.get("name")),
             kind=str(target_payload.get("kind")),
         )
+    elif form == "owned-rtpc" and set(target_payload) == {"form", "owner_handle"}:
+        target = OwnedRtpcTarget(str(target_payload.get("owner_handle")))
     elif form == "existing-object" and set(target_payload) == {
         "form",
         "object_handle",
@@ -828,12 +845,17 @@ def _declaration_from_dict(
 
 def _planned_result_handle(
     declaration_id: str,
-    target: NewDescendantTarget | ExistingObjectTarget,
+    target: NewDescendantTarget | OwnedRtpcTarget | ExistingObjectTarget,
     *,
     context: BusinessContext,
 ) -> str:
     if isinstance(target, ExistingObjectTarget):
         return target.object_handle
+    if isinstance(target, OwnedRtpcTarget):
+        digest = canonical_sha256({"contract": "waapi-skill.planned-object-handle/v1",
+            "context": context.as_binding_dict(), "declaration_id": declaration_id,
+            "form": "owned-rtpc", "owner_handle": target.owner_handle})
+        return f"bnh1-{digest[:32]}"
     digest = canonical_sha256(
         {
             "contract": "waapi-skill.planned-object-handle/v1",

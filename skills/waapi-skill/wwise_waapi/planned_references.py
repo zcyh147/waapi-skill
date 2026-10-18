@@ -55,8 +55,13 @@ def graph_result_bindings(roots, result_handles):
                 visit(child, f"{path}.lists[{index}].objects[{offset}]")
     for node, path in roots:
         visit(node, path)
-    if not targets:
-        return []
+    if not targets and not any("rtpc" in node for node, _ in roots):
+        # Nested unnamed outcomes also require stable result bindings.
+        def has_rtpc(node):
+            return "rtpc" in node or any(has_rtpc(child) for child in node.get("children", [])) or any(
+                has_rtpc(child) for descriptor in node.get("lists", []) for child in descriptor["objects"])
+        if not any(has_rtpc(node) for node, _ in roots):
+            return []
     if targets - {row["result_handle"] for row in bindings}:
         raise ValueError("Every planned reference target must belong to this compiled graph")
     return bindings
@@ -153,6 +158,15 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             parent_native_path, parent_identity = parent["path"], parent["result_handle"]
         else:
             parent_native_path, parent_identity = root_path(prefix, root), root[0].object
+        if node.rtpc is not None:
+            if path in selected:
+                raise ObjectOperationContractError("PLANNED_REFERENCE_TARGET_UNAVAILABLE", "Unnamed RTPC result has no source-proven native reference expression")
+            info = resolve_type(node.type)
+            fact = {"result_handle": paths[path], "request_path": path, "path": None, "name": "",
+                "type": info.name, "class_id": info.class_id, "parent_identity": parent_identity,
+                "relation": "owner", "rtpc_property": node.rtpc.property}
+            facts[path] = fact
+            return fact
         name, native_path, rows = node.name, parent_native_path.rstrip("\\") + "\\" + node.name, []
         if path in ancestors:
             reserved = {other.name.casefold() for other in nodes if other.request_path != path
@@ -171,7 +185,7 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
         return fact
     for path in paths:
         resolve(path)
-    if len({row["path"].casefold() for row in facts.values()}) != len(facts):
+    if len({row["path"].casefold() for row in facts.values() if row["path"] is not None}) != sum(row["path"] is not None for row in facts.values()):
         raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Planned reference paths must name distinct new occurrences")
     return {"handles": handles, "facts": facts, "target_paths": sorted(selected), "bound_paths": sorted(ancestors),
         "path_snapshots": snapshots, "prepared_names": names, "renames": renames, "root_paths": root_paths,

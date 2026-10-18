@@ -15,6 +15,7 @@ already-resolved reference identities.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import dataclass
@@ -330,8 +331,12 @@ class ObjectNodeDescriptor:
     children: tuple[ObjectNodeDescriptor, ...]
     lists: tuple[ObjectListDescriptor, ...] = ()
     collection: str = "children"
+    rtpc: RtpcDescriptor | None = None
+    rtpc_mode: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        if self.rtpc is not None:
+            return {"rtpc": self.rtpc.as_dict(), "rtpc_mode": self.rtpc_mode}
         result: dict[str, Any] = {"type": self.type, "name": self.name}
         if self.notes is not None:
             result["notes"] = self.notes
@@ -537,6 +542,7 @@ def normalize_object_forest(
     allow_platform: bool = False,
     allow_language: bool = False,
     allow_import: bool = False,
+    root_collection: str = "children",
 ) -> NormalizedObjectForest:
     """Normalize sibling roots under one shared node/size budget."""
 
@@ -565,6 +571,7 @@ def normalize_object_forest(
             request_path=f"{base_path}[{index}]",
             parent_path=None,
             depth=1,
+            collection=root_collection,
         )
         for index, item in enumerate(payload)
     )
@@ -627,6 +634,7 @@ def normalize_object_lists(
             allow_platform=allow_platform,
             allow_language=allow_language,
             allow_import=allow_import,
+            root_collection=name,
         )
         total_nodes += len(forest.nodes)
         if total_nodes > limits.max_nodes:
@@ -1029,6 +1037,9 @@ def materialize_waapi_node(
         )
 
     def build(current: ObjectNodeDescriptor) -> dict[str, Any]:
+        if current.rtpc is not None:
+            return materialize_waapi_rtpc(current.rtpc,
+                resolved_control_input=resolved[current.references[0].request_path])
         result: dict[str, Any] = {"type": current.type, "name": current.name}
         if current.notes is not None:
             result["notes"] = current.notes
@@ -1280,6 +1291,19 @@ class _NormalizationState:
                 details={"path": request_path, "count": self.node_count, "limit": self.limits.max_nodes},
             )
         mapping = _mapping(payload, path=request_path)
+        if "rtpc" in mapping:
+            _exact_fields(mapping, required={"rtpc"}, optional={"rtpc_mode"}, path=request_path)
+            if collection != "RTPC" or not self.allow_platform:
+                raise ObjectOperationContractError("INVALID_RTPC_PLACEMENT", "An RTPC descriptor belongs only to an object.set RTPC List")
+            mode = mapping.get("rtpc_mode", "add_or_replace")
+            if mode not in {"add", "add_or_replace"}:
+                raise ObjectOperationContractError("INVALID_ARGUMENT", "RTPC mode must be add or add_or_replace")
+            descriptor = normalize_rtpc_descriptors([mapping["rtpc"]], request_path=request_path + ".rtpc", max_rtpcs=1)[0]
+            properties = (ObjectPropertyDescriptor(request_path + ".properties[0]", "PropertyName", descriptor.property),)
+            references = (ObjectReferenceDescriptor(request_path + ".references[0]", "ControlInput", descriptor.control_input),
+                ObjectReferenceDescriptor(request_path + ".references[1]", "Curve", ObjectCurveDescriptor(descriptor.points)))
+            return ObjectNodeDescriptor(request_path, parent_path, "RTPC", "", descriptor.notes,
+                None, None, None, properties, references, (), collection="RTPC", rtpc=descriptor, rtpc_mode=mode)
         allowed_fields = (
             OBJECT_SET_NODE_FIELDS
             if self.allow_platform or self.allow_language or self.allow_import
@@ -1996,7 +2020,8 @@ def _reject_duplicate_sibling_names(nodes: Sequence[ObjectNodeDescriptor], *, pa
     seen: dict[str, str] = {}
     duplicates: list[str] = []
     for node in nodes:
-        key = node.name.casefold()
+        key = ("rtpc:" + json.dumps([node.rtpc.property, node.rtpc.control_input.as_dict()], sort_keys=True)
+               if node.rtpc is not None else node.name.casefold())
         if key in seen:
             duplicates.append(node.name)
         else:

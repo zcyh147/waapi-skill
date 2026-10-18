@@ -152,3 +152,24 @@ Original results, final lifecycle records and observations remain in the query
 worktree's ignored `native-5d7213cb-r1/summary.json`; summary/handoff and small
 terminal receipts are also archived under `integration-partials-r18`. No native
 ledger state, Windows/Fresh acceptance or ticket closure follows from this run.
+
+
+## Exact 2021 RTPC identity observation — #180
+
+The read-only `8e9b9f17` observation on 2021.1.14.8108 resolves saved RTPC
+`{A809A571-6012-42BE-A00D-D8E7C89D1248}` as type RTPC, class 1441808, empty
+name and an opaque Voice Pitch/RPM display path. Its owner is the independently
+read Sound `{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}`. Complete names inventories
+contain 111 Sound fields and only Color, ControlInput, OverrideColor for RTPC.
+ControlInput detail has an empty type and empty restriction; Curve and
+PropertyName were not disclosed. Missing parent on RTPC and missing owner on
+Sound remain omissions, not null values.
+
+Ten public calls completed with source hash/mtime/tree unchanged and owned
+cleanup. Original report and hash summary live in the authoring worktree's
+`.waapi-skill-state/full-coverage/rtpc-2021-representation-8e9b9f17-r1/`. The
+collection test passes only its diagnostic protocol; its business category is
+blocked. This settles existing identity/class/owner observation, not creation,
+ControlInput mutation applicability, owner-list token, arbitrary Curve-point
+construction, or native absence. No further launch is needed to rediscover
+these same facts.

@@ -954,6 +954,46 @@ Original roots remain frozen. Media/session preservation, native Bus/List
 effects, unnamed RTPC graph construction and all other in-scope gaps remain
 same-parent work. No ticket closes at this checkpoint.
 
+## Twenty-seventh integration checkpoint
+
+R27 code `b06dfe1c` exposes unnamed RTPC declarations inside object.set on
+2022.1–2025.1. It binds existing entries by property/control-input pair and GUID,
+handles existing and planned owners, retains unrelated curves, checks the
+aggregate 128-entry owner limit before execution, and reads one complete owner
+snapshot per phase. The public schema and continuation disclose all ten accepted
+point shapes and terminal normalization. Anonymous EffectSlot exact-GUID effect
+witnesses and the 2021 representation diagnostic reuse the existing lifecycle.
+They do not complete generic anonymous List construction/name-collision work.
+
+Original central `cb35b9d7` recorded 824 passed / 1 failed in 27.28s. The sole
+failure found five object.create description strings changed through a shared
+schema constant. The repair localizes the new RTPC description to object.set;
+all 149 unrelated operation contracts and their existing goldens remain intact.
+The exact failed check plus five integration cases passed on `b06dfe1c` (6 tests,
+5.92s). Both runs retained 1,877 unchanged tracked files and zero owned processes.
+The central failure is not relabelled a pass. Program roster: 258; public scope:
+897 version rows / 228 URIs / 515 contracts / 32,978 branches. The default native
+ledger still retains 272,313 obligations, 116 exclusions and 272,197 unresolved
+rows. R26's explicit program overlay remains evidence for its own candidate.
+
+On exact earlier diagnostic candidate `8e9b9f17`, one 2021.1.14.8108 Console
+observation completed (1 test, 9.52s; 10 public calls). The saved RTPC GUID resolves
+to an empty-name RTPC, class 1441808, with its actual Sound owner. Its complete
+field list contains only Color, ControlInput and OverrideColor; Curve and
+PropertyName were not disclosed. ControlInput metadata has an empty type and
+no reference restriction. No construction/write authority or native-absence
+claim follows. Source hashes/mtime/tree stayed unchanged, the sandbox was
+removed and owned processes ended. This is diagnostic evidence, not native
+business acceptance of R27.
+
+The next same-parent repair addresses Exclusive RTPC properties: two different
+control inputs must not silently remove an existing exclusive binding or reach
+native dispatch with an invalid aggregate outcome. Additive/Multiplicative and
+same-pair update behavior remain distinct. Reference-based history expectations,
+original platform-view binding, anonymous List construction, actual native
+effects and pending Authoring GUI diagnosis also remain open. No ticket closes;
+no full gate, Fresh or Windows acceptance is added.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
