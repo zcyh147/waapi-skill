@@ -16180,7 +16180,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 read=read_call,
                 platform=platform,
                 context=f"object-graph-list[{index}]",
-                version=version,
+                version=prepared.get("version"),
             )
             actual = _normalize_object_list_snapshot(
                 list_rows,
