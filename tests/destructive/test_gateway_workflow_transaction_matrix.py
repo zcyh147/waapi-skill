@@ -6310,7 +6310,7 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         assert code == 0 and verified.get('verified') is True and verified.get('state') == 'verified', verified
         assert verified.get('verification', {}).get('business_state_verified') is True, verified
         return phase
-    def slot_snapshot(owner, expected_targets, *, old=(), observing_suffix=False):
+    def slot_snapshot(owner, expected_targets, *, old=(), observing_suffix=False, field_names=None):
         sound = exact(owner)
         assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'], sound
         listed = members(owner)
@@ -6320,7 +6320,11 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         assert not set(row['id'] for row in fresh).intersection(old), listed
         slots = []
         for index, candidate in enumerate(fresh):
-            row = exact(candidate['id'], ('Effect', 'Bypass', 'Render'))
+            names = field_names[candidate['id']] if field_names is not None else ('Effect', 'Bypass', 'Render')
+            row = exact(candidate['id'], names)
+            if field_names is not None:
+                observed = set(row.get('properties', {})) | set(row.get('references', {}))
+                assert set(names) <= observed, (names, row)
             assert row['name'] == '' and row['type'] == 'EffectSlot' and row['class_id'] == classes['EffectSlot'], row
             assert guid(row.get('owner')) == owner, row
             assert 'parent' not in row and 'parent' in row.get('unavailable_fields', []), row
@@ -6349,14 +6353,14 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
                 name = field.get('name')
                 assert isinstance(name, str) and name not in names, result
                 names.append(name)
-                if name in {'Effect', 'Bypass', 'Render'}: selected.append((name, field['selection']))
+                selected.append((name, field['selection']))
             if result.get('complete') is True:
-                assert len(names) == result['total_count'] and len(names) <= 64, result
+                assert len(names) == result['total_count'] and len(names) <= 8, result
                 break
             next_page = _required_string(result, 'next_page'); assert next_page != page, result
             page = next_page
         else: raise AssertionError('Suffix metadata exceeds four pages')
-        assert {name for name, _ in selected} == {'Effect', 'Bypass', 'Render'}, names
+        assert {'Effect', 'Bypass', 'Render'} <= set(names), names
         details = {}
         for name, selection in selected:
             result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
@@ -6364,14 +6368,18 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             facts = result.get('metadata', result.get('entries'))
             assert isinstance(facts, (dict, list)), result
             details[name] = facts
-        return details
+        return {'names': names, 'details': details}
     def observe_suffix():
         assert runtime.version == '2025.1', 'First suffix diagnostic is pinned2025 only'
         target_ids = [row['id'] for row in targets]
-        before = slot_snapshot(sound['id'], target_ids)
-        receipt['suffix_before'] = before
-        metadata = {row['id']: suffix_metadata(row['id']) for row in before['slots']}
+        listed = members(sound['id'])
+        assert len(listed) == 2 and len({row['id'] for row in listed}) == 2, listed
+        metadata = {row['id']: suffix_metadata(row['id']) for row in listed}
         receipt['suffix_metadata_before'] = metadata
+        field_names = {identity: proof['names'] for identity, proof in metadata.items()}
+        before = slot_snapshot(sound['id'], target_ids, field_names=field_names)
+        assert before['ordered_ids'] == [row['id'] for row in listed], (listed, before)
+        receipt['suffix_before'] = before
         draft = _start_business_draft(gateway, 'object.setProperty')
         first_id = before['ordered_ids'][0]
         bound = _bind_business_object(gateway, draft, object_id=first_id)
@@ -6424,7 +6432,7 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         assert code == 0 and verified.get('state') == 'verified' and verified.get('verified') is True, verified
         # The e2 single-field verifier says nothing about the later flag. Its
         # original result is retained, while this independent oracle checks it.
-        after = slot_snapshot(sound['id'], target_ids, observing_suffix=True)
+        after = slot_snapshot(sound['id'], target_ids, observing_suffix=True, field_names=field_names)
         receipt['suffix_after'] = after
         assert after['ordered_ids'] == before['ordered_ids'] and after['owner'] == before['owner'], (before, after)
         assert after['slots'][0]['properties']['Render'] is False, after
