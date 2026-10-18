@@ -39,21 +39,22 @@ def expected_snapshot(snapshot, *, edits, read_row):
     row = dict(snapshot)
     segments = row['path'].split('\\')
     for node in edits:
-        if node.get('existing_target') is not True or not isinstance(node.get('pre_state'), dict):
+        if (node.get('existing_target') is not True and node.get('preexisting_id') is None) or not isinstance(node.get('pre_state'), dict):
             continue
         before = node['pre_state']
-        same = node['target_id'].casefold() == row['id'].casefold()
+        target_id = node.get('target_id', node.get('preexisting_id'))
+        same = target_id.casefold() == row['id'].casefold()
         if same and node.get('notes_supplied') is True:
             row['notes'] = node['requested_notes']
         name = node.get('requested_name')
         old_path = before.get('path')
-        if name == node.get('original_name'):
+        if name == node.get('original_name', before.get('name')):
             continue
         if not isinstance(old_path, str):
             raise ValueError('A requested rename lacks its original path')
         if not (snapshot['path'] == old_path or snapshot['path'].startswith(old_path + '\\')):
             continue
-        actual = read_row(node['target_id'])
+        actual = read_row(target_id)
         actual_name = actual.get('name')
         if (not isinstance(name, str) or not isinstance(actual_name, str) or not actual_name or '\\' in actual_name
                 or not (actual_name == name or (node.get('on_name_conflict') == 'rename' and actual_name.startswith(name)))):
@@ -63,7 +64,7 @@ def expected_snapshot(snapshot, *, edits, read_row):
             row['name'] = actual_name
         reference = row.get('parent')
         if (isinstance(reference, dict) and isinstance(reference.get('id'), str)
-                and reference['id'].casefold() == node['target_id'].casefold() and 'name' in reference):
+                and reference['id'].casefold() == target_id.casefold() and 'name' in reference):
             # Native identity references may also project the parent label. Only
             # that exact renamed parent may change it; keep its GUID and every
             # other projected field subject to the ordinary preservation check.

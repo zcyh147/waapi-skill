@@ -4774,6 +4774,8 @@ def _prepare_object_create(
         identity_cache=identity_cache,
         property_info_cache=property_info_cache,
         result_context=result_context,
+        merge_existing=requested_conflict == "merge" and list_name is None,
+        platform=platform,
     )
     for index, spec in enumerate(node_specs):
         spec["platform"] = platform
@@ -4932,7 +4934,7 @@ def _prepare_object_create(
                     "object.create merge path must resolve to at most one object.",
                     details={"path": expected_path, "rows": rows},
                 )
-            if rows and not _object_type_matches(rows[0].get("type"), spec):
+            if rows and not _object_type_matches(rows[0].get("type"), spec, actual_class_id=rows[0].get("classId")):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "object.create merge collision has a different live object type.",
@@ -4942,6 +4944,11 @@ def _prepare_object_create(
             spec["expected_path"] = expected_path
             if rows:
                 spec["preexisting_id"] = rows[0].get("id")
+                spec["pre_state"] = rows[0]
+                children_before = _read_direct_children(spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                spec["preexisting_children"] = children_before
+                merge_children_snapshots.append({"object_id": spec["preexisting_id"],
+                    "fields": list(IDENTITY_RETURN_FIELDS), "rows": children_before})
     elif conflict == "rename":
         assert isinstance(root_path, str)
         rows = _read_object_path_rows(root_path, fields=IDENTITY_RETURN_FIELDS, read=read)
@@ -5138,6 +5145,12 @@ def _prepare_object_create(
             "irreversible_preexisting_changes": conflict == "merge",
         }
     state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}
+    condition_guards = [spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec]
+    if condition_guards:
+        state["condition_metadata_guards"] = condition_guards
+    related = [item for spec in node_specs for item in spec.get("related_conditions", [])]
+    if related:
+        state["related_conditions"] = related
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
@@ -7478,6 +7491,8 @@ def _prepare_object_node_specs(
     ],
     list_bindings: Sequence[Mapping[str, Any]] = (),
     result_context: Mapping[str, Any] | None = None,
+    merge_existing: bool = False,
+    platform: str | None = None,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     for node in nodes:
@@ -7544,13 +7559,39 @@ def _prepare_object_node_specs(
             spec["platform"] = node.platform
         if node.import_arg is not None:
             spec["import_requested"] = True
+        merge_target = None
+        if merge_existing:
+            assert root_parent is not None and root_collection == "children"
+            expected_path = _request_node_expected_path(root_parent.row.get("path"), spec, [*specs, spec])
+            fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId",
+                *(descriptor.name for descriptor in (*node.properties, *node.references))])
+            rows = _read_object_path_rows(expected_path, fields=fields, read=read)
+            if len(rows) > 1:
+                raise OperationContractError("AMBIGUOUS_IDENTITY", "Create-merge collision must resolve at most once.")
+            if rows:
+                row = rows[0]
+                expected_parent = root_parent.object if node.parent_request_path is None else next(
+                    (parent_spec.get("preexisting_id") for parent_spec in specs
+                     if parent_spec["request_path"] == node.parent_request_path), None)
+                if (not _valid_object_id(row.get("id")) or row.get("path") != expected_path
+                        or row.get("name") != node.name or type(row.get("classId")) is not int
+                        or row["classId"] != type_info.class_id
+                        or not _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId"))
+                        or expected_parent is None or not _same_identity(_parent_value(row.get("parent")), expected_parent)):
+                    raise OperationContractError("INVALID_TARGET_TYPE", "Create-merge needs its exact matching existing class, identity and parent.",
+                        details={"path": expected_path, "expected_class_id": type_info.class_id, "actual": row})
+                merge_target = ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"],
+                    resolution="live-exact-create-merge-collision", row=row)
+                roles[f"merge:{node.request_path}"] = merge_target
+                spec.update(preexisting_id=row["id"], pre_state=row, structural_class_id=type_info.class_id)
+        metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
         for descriptor in node.properties:
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
-                class_id=type_info.class_id,
+                **metadata_scope,
                 name=descriptor.name,
             )
             _require_object_property_value(info, descriptor.value)
@@ -7588,7 +7629,7 @@ def _prepare_object_node_specs(
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
-                class_id=type_info.class_id,
+                **metadata_scope,
                 name=descriptor.name,
             )
             _require_object_reference_metadata(info, allow_hierarchy=True)
@@ -7599,7 +7640,7 @@ def _prepare_object_node_specs(
             if isinstance(descriptor.target, ObjectCurveDescriptor):
                 try:
                     value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
-                                                        scope={"classId": type_info.class_id}, types=type_catalog)
+                                                        scope=({"object": merge_target.object} if merge_target else {"classId": type_info.class_id}), types=type_catalog)
                 except (InlineCurveError, MetadataRestrictionError) as exc:
                     raise OperationContractError(exc.error_code, str(exc)) from exc
                 resolved_references[descriptor.request_path] = value
@@ -7628,10 +7669,39 @@ def _prepare_object_node_specs(
             value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
             resolved_references[descriptor.request_path] = value
             spec["references"].append({"name": descriptor.name, "target_id": value})
-        hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id)
+        hierarchy = []
+        if merge_target is None:
+            hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id)
+        else:
+            desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in spec["references"]}
+            for info, targets in reference_targets:
+                for target in targets:
+                    _require_reference_target_allowed(info, target, source_id=merge_target.object, read=read,
+                        platform=platform, desired_references=desired_references, conditions=hierarchy,
+                        property_info_cache=property_info_cache, wwise_version=version)
         if hierarchy:
             spec["reference_target_conditions"] = hierarchy
-        if any(info.dependencies for info in property_info_by_name.values()):
+        if merge_target is not None:
+            requirements, applicability, related = {}, {}, []
+            for info in tuple(property_info_by_name.values()):
+                activators = _apply_reference_activation_dependencies(info, read=read, object_id=merge_target.object,
+                    property_specs=spec["properties"], property_info_by_name=property_info_by_name,
+                    derived_properties=node_derived_properties, request_path=node.request_path,
+                    property_info_cache=property_info_cache, wwise_version=version, override_applicability=applicability,
+                    _condition_sources=tuple(property_info_by_name.values()), reference_requirements=requirements,
+                    desired_references=desired_references, related_conditions=related, platform=platform)
+                for reference in spec["references"]:
+                    if reference["name"] == info.name and activators:
+                        reference["activation_properties"] = list(activators)
+            for name, identity in requirements.items():
+                if name.casefold() not in desired_references:
+                    spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
+            spec["condition_metadata_guard"] = {"object_id": merge_target.object, "platform": platform,
+                "fields": [info.as_dict() for info in property_info_by_name.values()],
+                "override_applicability": [proof for proof in applicability.values() if proof is not None]}
+            if related:
+                spec["related_conditions"] = related
+        elif any(info.dependencies for info in property_info_by_name.values()):
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError, planned_non_master_bus_proof
             try:
                 structural_proof = None
@@ -8170,7 +8240,7 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
             from .override_applicability import proof_current
             try:
                 passed = proof_current(proof, read=read, after_write=after_write,
-                    edits=pre_state.get("object_set_nodes", []) if after_write else ())
+                    edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", [])) if after_write else ())
                 evidence = proof
             except (ValueError, OSError, KeyError, TypeError, OperationContractError) as exc:
                 passed, evidence = False, {"error": str(exc), "proof": proof}
@@ -19415,7 +19485,7 @@ def verify_prepared_operation(
                     raise OperationContractError("INVALID_PREVIEW", "object.set replacement snapshots must be arrays.")
                 replaced_set_rows.extend(rows)
         replaced_set_ids = {_identity_key(row.get("id")) for row in replaced_set_rows if isinstance(row, Mapping) and _valid_object_id(row.get("id"))}
-        if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge" and plan.get("list") is not None):
+        if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge"):
             direct_specs_by_parent: dict[str, list[Mapping[str, Any]]] = {}
             for child_spec in specs:
                 if child_spec.get("collection") not in {None, "children"}:
@@ -19494,7 +19564,7 @@ def verify_prepared_operation(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_child.get(field)))
                          if field in {"id", "parent"} and before_child.get(field) is not None
                          else matches[0].get(field) == before_child.get(field))
-                        for field in ("id", "name", "type", "parent", "notes") if field in before_child
+                        for field in ("id", "name", "type", "parent", "notes", *(["path"] if kind == "object-create-graph" else [])) if field in before_child
                     )
                     check(f"{parent_path} unrequested pre-existing child identity and notes remain unchanged", unchanged,
                           {"before": dict(before_child), "after": matches})
