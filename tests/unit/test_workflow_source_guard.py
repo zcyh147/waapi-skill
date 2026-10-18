@@ -3316,6 +3316,9 @@ def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fau
         'Volume': {'name': 'Volume', 'type': 'Real32', 'restriction': {'type': 'range', 'min': -96, 'max': 6}},
         'Attenuation': {'name': 'Attenuation', 'type': '', 'restriction': {
             'type': 'reference', 'restrictions': [{'type': ['Attenuation']}]}}}
+    if version == '2022.1':
+        # Retained519 native2022 class metadata certifies a PRESENT null default.
+        task.metadata['Attenuation']['default'] = None
     if source_metadata is not None:
         task.metadata.update(deepcopy(source_metadata))
         task.types.extend([{'name': 'Bus', 'classId': 1376272, 'type': 'WObject'},
@@ -3335,8 +3338,8 @@ def _created_fields_history_runtime(tmp_path, workflow, version='2025.1', *, fau
                 'classId': next(item['classId'] for item in task.types if item['name'] == args['type']),
                 'path': task.objects[args['parent']]['path'] + '\\' + args['name'],
                 'parent': {'id': args['parent']}, 'notes': args.get('notes', '')}
-            if args['type'] == 'Sound' and source_metadata is not None:
-                row.update({'@' + key: deepcopy(info['default']) for key, info in source_metadata.items() if 'default' in info})
+            if args['type'] == 'Sound':
+                row.update({'@' + key: deepcopy(info['default']) for key, info in task.metadata.items() if 'default' in info})
             row.update({key: deepcopy(value) for key, value in args.items() if key.startswith('@')})
             if '@Attenuation' in row and row['@Attenuation'] is None:
                 row['@Attenuation'] = deepcopy(null_value)
@@ -3659,10 +3662,10 @@ def test_created_fields_history_collector_preserves_actual_same_call_reference_c
 
 
 def test_null_source_only_diagnostic_uses_fresh_setup_and_same_five_fields_without_history(tmp_path, workflow):
-    # Literal2025 metadata is a labelled source-shaped fixture here, not2022
-    # native metadata credit. The public compiler still uses the2022 lane.
+    from tests.unit.test_compound_undo_business_gateway import _literal_2022_null_creation_metadata
+    # Literal failed2022 condition/default grammar; a pure control, not native acceptance.
     runtime, commands, writes, _task = _created_fields_history_runtime(tmp_path, workflow, version='2022.1',
-        source_metadata=_CREATED_HISTORY_NATIVE_2025_METADATA)
+        source_metadata=_literal_2022_null_creation_metadata())
     category = workflow._collect_created_leaf_fields_history_acceptance(runtime,
         name='WAAPI_NULL_DIAGNOSTIC_TEST', null_source_only_diagnostic=True)
     receipt = json.loads(Path(category['observation_path']).read_text())
@@ -3680,7 +3683,9 @@ def test_null_source_only_diagnostic_uses_fresh_setup_and_same_five_fields_witho
     _uri, native = writes[-1]
     expected_fields = {'IsLoopingEnabled': True, 'IsLoopingInfinite': True, 'Volume': -6.0,
         'OverridePositioning': True, 'Attenuation': None}
-    assert {key: native['@' + key] for key in expected_fields} == expected_fields
+    assert {key: native['@' + key] for key in expected_fields if key != 'Attenuation'} == {
+        key: value for key, value in expected_fields.items() if key != 'Attenuation'}
+    assert '@Attenuation' not in native
     phase, = receipt['effects']
     actual = phase['independent_effect']
     assert {key: actual['properties'][key] for key in expected_fields if key != 'Attenuation'} == {

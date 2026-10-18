@@ -4677,6 +4677,76 @@ def _capture_planned_rename_collision(row, *, read):
     return {"fields": fields, "rows": [{key: item[key] for key in fields if key in item} for item in sorted(rows, key=lambda item: item["id"])]}
 
 
+def _omit_new_sound_null_reference_assignments(*, version, conflict, root_path, list_name,
+                                                node_specs, native_nodes, path_snapshots):
+    """2022 constructor candidate: preserve null intent and rely on a proved null default.
+
+    Existing targets and other native constructors keep their actual assignment.
+    The complete metadata and absent-root snapshots remain normal phase guards.
+    """
+    if version != "2022.1" or conflict != "fail" or list_name is not None:
+        return []
+    nodes = {node["request_path"]: node for node in node_specs}
+    omissions = []
+    for node in node_specs:
+        if node.get("canonical_type") != "Sound" or node.get("class_id") != 65552:
+            continue
+        selected = [item for item in node.get("references", [])
+                    if item.get("name") == "Attenuation" and "target_id" in item and item["target_id"] is None
+                    and not item.get("condition_guard")]
+        if not selected:
+            continue
+        # An absent ordinary root implies all its admitted ordinary descendants
+        # are new too. List/owned/plugin/import paths cannot borrow that premise.
+        current, visited = node, set()
+        new_hierarchy = True
+        while current is not None:
+            path = current["request_path"]
+            if (path in visited or current.get("collection") != "children"
+                    or current.get("existing_target") is not False or current.get("preexisting_id") is not None
+                    or current.get("requested_language") is not None or current.get("import_requested") is True
+                    or "import" in current or "graph_plugin_native" in current):
+                new_hierarchy = False
+                break
+            visited.add(path)
+            parent_path = current.get("parent_request_path")
+            if parent_path is None:
+                new_hierarchy = path == "$"
+                break
+            current = nodes.get(parent_path)
+            if current is None:
+                new_hierarchy = False
+        absent_root = [snapshot for snapshot in path_snapshots
+                       if snapshot.get("path") == root_path and snapshot.get("rows") == []]
+        evidence = [item for item in node.get("new_object_default_evidence", [])
+                    if item.get("class_scope") == {"classId": 65552}]
+        proof = evidence[0] if len(evidence) == 1 else {}
+        metadata = proof.get("metadata", {}).get("Attenuation", {})
+        reference_kind = (metadata.get("restriction", {}).get("type") == "reference"
+                          or str(metadata.get("type", "")).casefold() in {"reference", "objectreference"})
+        resolved_conditions = all(item.get("value_resolved") is True for item in proof.get("requirements", []))
+        if (len(selected) != 1 or not new_hierarchy or len(absent_root) != 1 or not isinstance(root_path, str)
+                or not proof or not reference_kind or proof.get("default_presence", {}).get("Attenuation") is not True
+                or "default" not in metadata or metadata["default"] is not None or not resolved_conditions):
+            raise OperationContractError(
+                "NEW_OBJECT_NULL_DEFAULT_UNPROVEN",
+                "The 2022 Sound null Attenuation constructor requires a present null class default, satisfied conditions and a proved new fail-mode hierarchy.",
+                details={"request_path": node["request_path"], "field": "Attenuation", "mutation_dispatched": False},
+            )
+        native = native_nodes.get(node["request_path"])
+        if not isinstance(native, dict) or "@Attenuation" not in native or native["@Attenuation"] is not None:
+            raise OperationContractError("INVALID_PREVIEW", "Null constructor intent differs from its canonical native assignment.")
+        del native["@Attenuation"]
+        # Reuse the strict actual-class observer: the null-default certificate
+        # belongs to this receiver class, even when native type text is generic.
+        node["structural_class_id"] = 65552
+        node["native_default_reference_omissions"] = ["Attenuation"]
+        omissions.append({"request_path": node["request_path"], "class_id": 65552,
+                          "field": "Attenuation", "reason": "present_null_class_default",
+                          "verification": "present_actual_null_reference_required"})
+    return omissions
+
+
 def _prepare_object_create(
     request: OperationRequest,
     *,
@@ -5074,6 +5144,10 @@ def _prepare_object_create(
         native_nodes=render_native_nodes,
         prepared_names=result_context["prepared_names"] if result_context else None,
     )
+    null_reference_omissions = _omit_new_sound_null_reference_assignments(
+        version=request.version, conflict=conflict, root_path=root_path, list_name=list_name,
+        node_specs=node_specs, native_nodes=render_native_nodes, path_snapshots=path_snapshots,
+    )
     from .effect_render_conditions import prepare_graph, EffectRenderConditionError
     try:
         effect_render_chains = prepare_graph(node_specs, render_native_nodes, version=request.version, read=read,
@@ -5098,6 +5172,7 @@ def _prepare_object_create(
         family="object-mutation",
         metadata={
             "closed_object_tree": True,
+            **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
             "Gateway_rename_choices": result_context["renames"] if result_context else [],
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
