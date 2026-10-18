@@ -3137,3 +3137,38 @@ def test_anonymous_collector_preserves_previous_owner_after_the_planned_graph_ef
     assert len(writes) == 6 and [command[0] for command in commands].count('execute') == 6
     assert receipt['transactions'][-1]['verify']['payload']['verified'] is True
     assert receipt['transactions'][-1]['effect_verified'] is False
+
+
+def _render_suffix_observation_runtime(tmp_path, workflow, *, outcome='cleared'):
+    from copy import deepcopy
+    runtime, commands, writes, task = _anonymous_effect_construction_runtime(tmp_path, workflow)
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith('object.setProperty'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            writes.append(deepcopy(args))
+            slots = [row for row in task.objects.values() if row['type'] == 'EffectSlot']
+            assert len(slots) == 2 and args == {'object': slots[0]['id'], 'property': 'Render', 'value': False}, args
+            assert [row['@Render'] for row in slots] == [True, True], slots
+            slots[0]['@Render'] = False
+            if outcome == 'cleared': slots[1]['@Render'] = False
+            return {}
+        return original(uri, args, options)
+    task.call = call
+    return runtime, commands, writes, task
+
+
+def test_render_suffix_diagnostic_classifies_actual_cleared_chain_without_business_credit(tmp_path, workflow):
+    runtime, commands, writes, _task = _render_suffix_observation_runtime(tmp_path, workflow)
+    category = workflow._collect_effect_render_suffix_observation(runtime, prefix='WAAPI_SUFFIX_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['diagnostic_complete'] is True and receipt['classification'] == 'cleared'
+    assert category['diagnostic_only'] is True and category['status'] == 'blocked'
+    assert receipt['business_effect_verified'] is False
+    assert [row['properties']['Render'] for row in receipt['suffix_before']['slots']] == [True, True]
+    assert [row['properties']['Render'] for row in receipt['suffix_after']['slots']] == [False, False]
+    assert len(writes) == 5 and [command[0] for command in commands].count('execute') == 5
+    assert [command[0] for command in commands].count('verify') == 5
