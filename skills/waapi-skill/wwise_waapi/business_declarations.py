@@ -278,6 +278,11 @@ class NewDescendantTarget:
 
 
 @dataclass(frozen=True, slots=True)
+class OwnedRtpcTarget:
+    owner_handle: str
+
+
+@dataclass(frozen=True, slots=True)
 class ExistingObjectTarget:
     object_handle: str
 

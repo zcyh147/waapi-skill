@@ -1006,6 +1006,17 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         },
     },
 }
+_OBJECT_SET_RTPC_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "object", "required": ["rtpc"], "additionalProperties": False,
+    "properties": {
+        "rtpc": {"type": "object", "required": ["property", "control_input", "points"], "additionalProperties": False, "properties": {
+            "property": {"type": "string", "minLength": 1}, "control_input": IDENTITY_ARGUMENT_SCHEMA,
+            "points": {"type": "array", "minItems": 1, "maxItems": 256, "items": _RTPC_POINT_ARGUMENT_SCHEMA},
+            "notes": {"type": "string"}}},
+        "rtpc_mode": {"type": "string", "enum": ["add", "add_or_replace"], "default": "add_or_replace"},
+    },
+    "description": "Gateway-owned unnamed RTPC semantic descriptor; valid only inside the source-proven RTPC List in 2022.1–2025.1.",
+}
 _OBJECT_LIST_NAME_SCHEMA: Mapping[str, Any] = {
     "type": "string",
     "minLength": 1,
@@ -1013,7 +1024,7 @@ _OBJECT_LIST_NAME_SCHEMA: Mapping[str, Any] = {
     "pattern": r"^[:_a-zA-Z0-9]+$",
     "description": (
         "Canonical Wwise object-list name without the native @ prefix. "
-        "Source/Effect plug-ins and RTPCs remain dedicated operations."
+        "Unnamed RTPC members use their closed typed pair/curve variant; plug-in construction remains dedicated."
     ),
 }
 _OBJECT_LIST_ARGUMENT_SCHEMA: Mapping[str, Any] = {
@@ -1025,7 +1036,7 @@ _OBJECT_LIST_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         "objects": {
             "type": "array",
             "maxItems": 32,
-            "items": _OBJECT_SET_NODE_ARGUMENT_SCHEMA,
+            "items": {"oneOf": [_OBJECT_SET_NODE_ARGUMENT_SCHEMA, _OBJECT_SET_RTPC_NODE_ARGUMENT_SCHEMA]},
             "description": (
                 "Closed recursive object-node DSL. An empty array is meaningful "
                 "only with list_mode=replaceAll, where it clears the reviewed list."
@@ -6113,6 +6124,7 @@ def _prepare_object_set(
             result_context=result_context,
             merge_existing=row_conflict == "merge",
             allow_list_merge=row_list_mode == "append",
+            rtpc_replace_all=row_list_mode == "replaceAll",
             merge_guards=early_merge_guards,
             platform=platform,
         )
@@ -6145,6 +6157,8 @@ def _prepare_object_set(
                     derived_properties=derived_child_properties,
                     materialized_imports=materialized_imports,
                     prepared_names=result_context["prepared_names"] if result_context else None,
+                    rtpc_updates={spec["request_path"]: spec for spec in child_specs if spec.get("rtpc_update")},
+                    rtpc_update_rows=dispatch_objects,
                 )
                 for root in children.roots
             ]
@@ -6382,6 +6396,7 @@ def _prepare_object_set(
                 list_bindings=planned_bindings,
                 result_context=result_context,
                 root_collection=descriptor.name,
+                rtpc_replace_all=row_list_mode == "replaceAll",
                 merge_existing=row_conflict == "merge" and row_list_mode == "append",
                 merge_guards=early_merge_guards,
                 platform=platform,
@@ -6434,8 +6449,15 @@ def _prepare_object_set(
                 list_spec["on_name_conflict"] = row_conflict
                 if is_root:
                     list_spec["parent_request_path"] = target_spec["request_path"]
+            rtpc_pairs = [(spec["rtpc_binding"]["property"].casefold(),
+                _identity_key(next(ref["target_id"] for ref in spec["references"] if ref["name"] == "ControlInput")))
+                for spec in root_specs if spec.get("rtpc_binding")]
+            if len(rtpc_pairs) != len(set(rtpc_pairs)):
+                raise OperationContractError("DUPLICATE_RTPC_PAIR", "An owner may request each exact RTPC pair once.")
             collisions_by_name: dict[str, list[dict[str, Any]]] = {}
             for root_spec in root_specs:
+                if root_spec.get("rtpc_binding"):
+                    continue
                 requested_name = root_spec.get("requested_name")
                 collisions = [
                     row
@@ -6533,9 +6555,16 @@ def _prepare_object_set(
                     derived_properties=derived_child_properties,
                     materialized_imports=materialized_imports,
                     prepared_names=result_context["prepared_names"] if result_context else None,
+                    rtpc_updates={spec["request_path"]: spec for spec in prepared_specs if spec.get("rtpc_update")},
+                    rtpc_update_rows=dispatch_objects,
                 )
                 for root in descriptor.objects
             ]
+            if descriptor.name == "RTPC":
+                trusted["@RTPC"] = [payload for spec, payload in zip(root_specs, trusted["@RTPC"])
+                    if not spec.get("rtpc_update")]
+                if not trusted["@RTPC"] and row_list_mode == "append":
+                    del trusted["@RTPC"]
             list_specs.extend(prepared_specs)
 
         nested_nodes = [*children.nodes, *(node for descriptor in lists for node in descriptor.nodes)]
@@ -6701,7 +6730,8 @@ def _prepare_object_set(
                 "object.set target and child nodes exceed the single bounded result budget.",
                 details={"count": len(node_specs), "limit": DEFAULT_MAX_NODES},
             )
-        dispatch_objects.append(trusted)
+        if set(trusted) != {"object"}:
+            dispatch_objects.append(trusted)
 
     from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
     try:
@@ -6858,6 +6888,7 @@ def _prepare_object_set(
     state: dict[str, Any] = {
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
+        "graph_rtpc_guards": [spec for spec in node_specs if spec.get("rtpc_binding")],
     }
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
@@ -7033,31 +7064,7 @@ def _prepare_object_set_rtpc(
         version=request.version,
         read=read,
     )
-    matches = [
-        row
-        for row in before_rows
-        if row.get("@PropertyName") == descriptor.property
-        and _same_identity(
-            _reference_identity(row.get("@ControlInput")),
-            control.object,
-        )
-    ]
-    if len(matches) > 1:
-        raise OperationContractError(
-            "AMBIGUOUS_RTPC",
-            "More than one RTPC matches the requested property and ControlInput.",
-            details={
-                "property": descriptor.property,
-                "control_input": control.object,
-                "matches": matches,
-            },
-        )
-    if mode == "add" and matches:
-        raise OperationContractError(
-            "TARGET_EXISTS",
-            "object.setRTPC add requires the property/ControlInput pair to be absent.",
-            details={"property": descriptor.property, "control_input": control.object},
-        )
+    matches = _match_rtpc_pair(before_rows, descriptor.property, control.object, mode=mode)
 
     action = "update" if matches else "add"
     if action == "add":
@@ -7156,6 +7163,65 @@ def _prepare_object_set_rtpc(
         verification,
         cleanup,
     )
+
+
+def _match_rtpc_pair(rows, property_name, control_id, *, mode):
+    """The pair, rather than the empty native name, defines RTPC identity."""
+    matches = [row for row in rows if _field_value(row, "PropertyName") == property_name
+        and _same_identity(_reference_identity(_field_value(row, "ControlInput")), control_id)]
+    if len(matches) > 1:
+        raise OperationContractError("AMBIGUOUS_RTPC", "More than one RTPC matches the requested property and ControlInput.",
+            details={"property": property_name, "control_input": control_id, "matches": matches})
+    if mode == "add" and matches:
+        raise OperationContractError("TARGET_EXISTS", "RTPC add requires the property/ControlInput pair to be absent.",
+            details={"property": property_name, "control_input": control_id})
+    return matches
+
+
+def _read_graph_rtpc_rows(owner_id, *, version, class_id, read):
+    rows, _ = _read_rtpc_rows_with_evidence(owner_id, version=version, read=read)
+    complete = []
+    for row in rows:
+        observed = _read_object_id_rows(row["id"], fields=(*RTPC_SNAPSHOT_FIELDS, "classId", "owner"), read=read)
+        if (len(observed) != 1 or any(observed[0].get(key) != value for key, value in row.items())
+                or type(observed[0].get("classId")) is not int or observed[0]["classId"] != class_id
+                or observed[0].get("name") != ""
+                or not _same_identity(_reference_identity(observed[0].get("owner")), owner_id)):
+            raise OperationContractError("INVALID_READBACK", "Every RTPC must retain its exact complete pair/class/owner observation.")
+        complete.append(observed[0])
+    return complete
+
+
+def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read, identity_cache, property_info_cache, replace_all=False):
+    parent = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
+    if parent is not None:
+        owner_id = parent.get("preexisting_id")
+        owner_class = parent["class_id"]
+    elif root_parent is not None:
+        owner_id, owner_class = root_parent.object, None
+    else:
+        raise OperationContractError("INVALID_PREVIEW", "RTPC requires one closed owner occurrence.")
+    scope = {"object_id": owner_id} if owner_id is not None else {"class_id": owner_class}
+    info = _read_property_info_cached(read, cache=property_info_cache, **scope, name=node.rtpc.property)
+    support = info.supports.get("rtpc")
+    if not isinstance(support, str) or support.casefold() == "none":
+        raise OperationContractError("RTPC_UNSUPPORTED", "Live property metadata does not support an RTPC for this field.")
+    spec["rtpc_property_guard"] = {**scope, "property": node.rtpc.property, "metadata": info.as_dict()}
+    control = _resolve_identity(node.rtpc.control_input.as_dict(), role=node.request_path + ".control_input", read=read, identity_cache=identity_cache)
+    if not _is_rtpc_control_input(control.row.get("type")):
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "RTPC ControlInput must have a supported actual type.")
+    if owner_id is None:
+        return None
+    before = _read_graph_rtpc_rows(owner_id, version=version, class_id=spec["class_id"], read=read)
+    spec["rtpc_list_guard"] = {"owner_id": owner_id, "version": version, "class_id": spec["class_id"], "before": before}
+    matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode)
+    if not matches:
+        if not replace_all and len(before) >= RTPC_MAX_LIST_ROWS:
+            raise OperationContractError("RTPC_LIST_LIMIT_EXCEEDED", "Adding an RTPC exceeds the complete-list limit.")
+        return None
+    spec["rtpc_update"] = True
+    row = matches[0]
+    return ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"], resolution="live-exact-rtpc-pair", row=row)
 
 
 def _read_rtpc_rows_with_evidence(
@@ -7600,6 +7666,7 @@ def _prepare_object_node_specs(
     result_context: Mapping[str, Any] | None = None,
     merge_existing: bool = False,
     allow_list_merge: bool = True,
+    rtpc_replace_all: bool = False,
     merge_guards: list[dict[str, Any]] | None = None,
     platform: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -7670,14 +7737,20 @@ def _prepare_object_node_specs(
             spec["platform"] = node.platform
         if node.import_arg is not None:
             spec["import_requested"] = True
+        if node.rtpc is not None:
+            spec["rtpc_binding"] = {"property": node.rtpc.property, "mode": node.rtpc_mode}
         merge_target = None
-        if merge_existing:
+        if node.rtpc is not None:
+            merge_target = _resolve_graph_rtpc_target(node, spec, specs, root_parent=root_parent,
+                version=version, read=read, identity_cache=identity_cache, property_info_cache=property_info_cache,
+                replace_all=rtpc_replace_all)
+        elif merge_existing:
             merge_target = _resolve_merge_node_target(node, spec, specs, node_paths=node_paths,
                 root_parent=root_parent, root_collection=root_collection, version=version, read=read,
                 allow_list_merge=allow_list_merge, guards=merge_guards)
-            if merge_target is not None:
-                roles[f"merge:{node.request_path}"] = merge_target
-                spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
+        if merge_target is not None:
+            roles[f"merge:{node.request_path}"] = merge_target
+            spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
                     structural_class_id=type_info.class_id)
         metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
@@ -8882,6 +8955,8 @@ def _materialize_canonical_object_node(
     derived_properties: Mapping[str, Mapping[str, Any]],
     materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
     prepared_names: Mapping[str, str] | None = None,
+    rtpc_updates: Mapping[str, Mapping[str, Any]] | None = None,
+    rtpc_update_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
@@ -8934,11 +9009,23 @@ def _materialize_canonical_object_node(
                     },
                 )
             row[key] = value
+        if current.request_path in (rtpc_updates or {}):
+            if rtpc_update_rows is None:
+                raise OperationContractError("INVALID_PREVIEW", "RTPC updates require the same native batch collector.")
+            spec = rtpc_updates[current.request_path]
+            rtpc_update_rows.append({"object": spec["preexisting_id"], "@Curve": row["@Curve"],
+                **({"notes": row["notes"]} if "notes" in row else {}),
+                **{"@" + name: value for name, value in derived_properties.get(current.request_path, {}).items()}})
         for child, child_row in zip(current.children, row.get("children", []), strict=True):
             apply(child, child_row)
         for descriptor in current.lists:
             for child, child_row in zip(descriptor.objects, row.get("@" + descriptor.name, []), strict=True):
                 apply(child, child_row)
+            key = "@" + descriptor.name
+            row[key] = [child_row for child, child_row in zip(descriptor.objects, row[key], strict=True)
+                if child.request_path not in (rtpc_updates or {})]
+            if not row[key] and descriptor.objects and all(child.request_path in (rtpc_updates or {}) for child in descriptor.objects):
+                del row[key]
 
     apply(node, payload)
     return payload
@@ -15652,6 +15739,18 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             }
         )
 
+    for spec in pre_state.get("graph_rtpc_guards", []):
+        guard = spec["rtpc_property_guard"]
+        scope = {key: guard[key] for key in ("object_id", "class_id") if key in guard}
+        info = _read_property_info(read_call, **scope, name=guard["property"])
+        assertions.append({"name": "RTPC owner property metadata remains unchanged", "passed": info.as_dict() == guard["metadata"],
+            "evidence": {"expected": guard["metadata"], "actual": info.as_dict()}})
+        if spec.get("rtpc_list_guard"):
+            guard = spec["rtpc_list_guard"]
+            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call)
+            assertions.append({"name": "graph complete RTPC list pre-state unchanged", "passed": actual == guard["before"],
+                "evidence": {"expected": guard["before"], "actual": actual}})
+
     rtpc_snapshot = pre_state.get("rtpc_snapshot") if isinstance(pre_state, Mapping) else None
     if isinstance(rtpc_snapshot, Mapping):
         request_payload = prepared.get("request")
@@ -16693,6 +16792,7 @@ def _bind_object_set_result_nodes(
     specs: Sequence[Mapping[str, Any]],
     *,
     on_name_conflict: str,
+    observed_rtpcs: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, ObjectResultNode]:
     """Bind sparse ``object.set`` associations to the sealed request graph.
 
@@ -16721,8 +16821,8 @@ def _bind_object_set_result_nodes(
         parent_path = spec.get("parent_request_path")
         if isinstance(parent_path, str):
             children_by_parent.setdefault(parent_path, []).append(spec)
-        if spec.get("existing_target") is True:
-            target_id = spec.get("target_id")
+        if spec.get("existing_target") is True or spec.get("rtpc_update"):
+            target_id = spec.get("target_id") or spec.get("preexisting_id")
             try:
                 target_key = _identity_key(target_id)
             except OperationContractError as exc:
@@ -16750,7 +16850,15 @@ def _bind_object_set_result_nodes(
     bound: dict[str, ObjectResultNode] = {}
     seen_result_ids: dict[str, str] = {}
 
-    def name_matches(node: ObjectResultNode, spec: Mapping[str, Any]) -> bool:
+    def name_matches(node: ObjectResultNode, spec: Mapping[str, Any], *, owner_id=None) -> bool:
+        if spec.get("rtpc_binding"):
+            actual = (observed_rtpcs or {}).get(node.object, {})
+            control = next((ref.get("target_id") for ref in spec.get("references", []) if ref["name"] == "ControlInput"), None)
+            return (node.name == "" and actual.get("name") == ""
+                and actual.get("classId") == spec["class_id"]
+                and _same_identity(_reference_identity(actual.get("owner")), owner_id)
+                and _field_value(actual, "PropertyName") == spec["rtpc_binding"]["property"]
+                and _same_identity(_reference_identity(_field_value(actual, "ControlInput")), control))
         requested_name = spec.get("requested_name")
         if not isinstance(requested_name, str):
             return False
@@ -16840,7 +16948,7 @@ def _bind_object_set_result_nodes(
             matches = sealed_matches or [
                 candidate
                 for candidate in collection_matches
-                if name_matches(child, candidate)
+                if name_matches(child, candidate, owner_id=node.object)
             ]
             if (
                 not matches
@@ -18672,10 +18780,18 @@ def verify_prepared_operation(
                     payload,
                     allowed_lists=raw_list_names,
                 )
+                observed_rtpcs = {}
+                if any(spec.get("rtpc_binding") for spec in specs):
+                    for result_node in result_nodes:
+                        if result_node.collection == "RTPC":
+                            observations = read_object(object_id=result_node.object,
+                                fields=("id", "name", "type", "path", "classId", "owner", "PropertyName", "ControlInput"))
+                            if len(observations) != 1 or not _same_identity(observations[0].get("id"), result_node.object):
+                                raise ObjectOperationContractError("INVALID_READBACK", "Returned RTPC must resolve by its exact GUID once")
+                            observed_rtpcs[result_node.object] = observations[0]
                 result_by_path = _bind_object_set_result_nodes(
-                    result_nodes,
-                    specs,
-                    on_name_conflict=str(plan.get("on_name_conflict")),
+                    result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),
+                    observed_rtpcs=observed_rtpcs,
                 )
         except ObjectOperationContractError as exc:
             assertion_name = (
@@ -19880,6 +19996,22 @@ def verify_prepared_operation(
                     )
                     check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
                           {"before": dict(before_member), "after": matches})
+        rtpc_guards = [spec for spec in specs if spec.get("rtpc_binding")]
+        for spec in rtpc_guards:
+            guard = spec["rtpc_property_guard"]
+            scope = {key: guard[key] for key in ("object_id", "class_id") if key in guard}
+            current = _read_property_info(read_call, **scope, name=guard["property"])
+            check("RTPC owner property support remains unchanged", current.as_dict() == guard["metadata"], current.as_dict())
+            guard = spec.get("rtpc_list_guard")
+            if not guard or spec.get("list_mode") == "replaceAll":
+                continue
+            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call)
+            requested = {row.get("preexisting_id") for row in rtpc_guards if row.get("rtpc_list_guard", {}).get("owner_id") == guard["owner_id"]}
+            for before in guard["before"]:
+                if before["id"] in requested:
+                    continue
+                matches = [row for row in actual if _same_identity(row["id"], before["id"])]
+                check("unrequested RTPC complete state and curve remain unchanged", matches == [before], {"before": before, "after": matches})
         if kind == "object-set-batch":
             replaced_rows = replaced_set_rows
             if not isinstance(replaced_rows, list):

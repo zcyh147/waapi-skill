@@ -1,0 +1,312 @@
+"""Unnamed RTPC pairs remain typed graph outcomes through the public Gateway."""
+from copy import deepcopy
+import json
+
+import pytest
+
+from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND, ROOT, CHILD
+from tests.unit.test_list_merge_existing_conditions_gateway import select_field
+
+CURVE_A = '{55555555-5555-5555-5555-555555555555}'
+CURVE_B = '{66666666-6666-6666-6666-666666666666}'
+RTPC_B = '{77777777-7777-7777-7777-777777777777}'
+POINTS = [(0, -48), (100, 0)]
+
+
+def rtpc_task(tmp_path, version='2025.1'):
+    task = OwnedGraphTask(tmp_path, version, 'object.set')
+    task.types = [{'name': name, 'classId': value, 'type': 'WObject'} for name, value in
+        [('Sound', 65552), ('GameParameter', 1507344), ('RTPC', 1441808), ('Curve', 917520), ('WorkUnit', 1638416)]]
+    base = r'\Actor-Mixer Hierarchy\Default Work Unit'
+    task.objects = {
+        FIRST: {'id': FIRST, 'name': 'Sender', 'type': 'Sound', 'classId': 65552,
+            'path': base + r'\Sender', 'parent': {'id': SECOND}, 'notes': 'Keep sound', '@RTPC': []},
+        SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
+            'path': base, 'parent': None, 'notes': 'Keep work unit'},
+        ROOT: {'id': ROOT, 'name': 'Intensity', 'type': 'GameParameter', 'classId': 1507344,
+            'path': r'\Game Parameters\Default Work Unit\Intensity', 'parent': {'id': SECOND}, 'notes': 'Keep input'},
+    }
+    # Normalized source-shaped fixtures only; no claim these are native receipts.
+    task.metadata = {
+        'Volume': {'name': 'Volume', 'type': 'Real64', 'default': 0,
+            'supports': {'rtpc': 'Additive'}, 'restriction': {'type': 'range', 'min': -200, 'max': 12}},
+        'Pitch': {'name': 'Pitch', 'type': 'Real64', 'default': 0,
+            'supports': {'rtpc': 'Additive'}, 'restriction': {'type': 'range', 'min': -2400, 'max': 2400}},
+        'PropertyName': {'name': 'PropertyName', 'type': 'string', 'default': ''},
+        'ControlInput': {'name': 'ControlInput', 'type': '',
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['GameParameter']}]}},
+        'Curve': {'name': 'Curve', 'type': '', 'restriction': {'type': 'reference',
+            'restrictions': [{'type': ['Curve']}, 'notNull']}},
+    }
+    original = task.call
+    writes = []
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith('object.set'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            writes.append(deepcopy(args))
+            nodes = args['objects'][0]['@RTPC']
+            assert len(nodes) == 2 and all(node['name'] == '' and node['type'] == 'RTPC' for node in nodes)
+            assert [node['@PropertyName'] for node in nodes] == ['Volume', 'Pitch']
+            for node, identity, curve in zip(nodes, (CHILD, RTPC_B), (CURVE_A, CURVE_B)):
+                task.objects[identity] = {'id': identity, 'name': '', 'type': 'RTPC', 'classId': 1441808,
+                    'path': '\\opaque-' + identity, 'owner': {'id': FIRST}, 'notes': node.get('notes', ''),
+                    '@PropertyName': node['@PropertyName'], '@ControlInput': {'id': node['@ControlInput']},
+                    '@Curve': {'id': curve, 'points': deepcopy(node['@Curve']['points'])}}
+                task.objects[curve] = {'id': curve, 'name': '', 'type': 'Curve', 'classId': 917520,
+                    'path': '\\opaque-curve-' + curve, 'owner': {'id': identity}, 'notes': ''}
+            task.objects[FIRST]['@RTPC'] = [{'id': CHILD}, {'id': RTPC_B}]
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@RTPC': [
+                {'id': CHILD, 'name': ''}, {'id': RTPC_B, 'name': ''}]}]}
+        result = original(uri, args, options)
+        if uri.endswith('object.get'):
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in result['return']]}
+        return result
+    task.call = call
+    return task, writes
+
+
+def declare_rtpc(task, owner, control, token, declaration_id):
+    field = select_field(task, owner=owner, token=token)
+    code, declared = task.step('draft-declare-rtpc', '--declaration-id', declaration_id,
+        '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+        '--mode', 'add-only', '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear')
+    assert code == 0, json.dumps(declared)
+    return declared
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_graph_adds_two_unnamed_rtpc_pairs_in_one_public_transaction(tmp_path, version):
+    task, writes = rtpc_task(tmp_path, version)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    first = declare_rtpc(task, owner, control, 'Volume', 'volume')
+    second = declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    assert first['draft']['declared_object']['result_handle'] != second['draft']['declared_object']['result_handle']
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    if code:
+        (tmp_path / 'rtpc-verification.json').write_text(json.dumps(verified, indent=2))
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1
+    assert task.objects[CHILD]['@PropertyName'] == 'Volume' and task.objects[RTPC_B]['@PropertyName'] == 'Pitch'
+
+
+def seed_pair(task, identity=CHILD, property_name='Volume', curve=CURVE_A):
+    row = {'id': identity, 'name': '', 'type': 'RTPC', 'classId': 1441808,
+        'path': '\\opaque-' + identity, 'owner': {'id': FIRST}, 'notes': 'Keep RTPC',
+        '@PropertyName': property_name, '@ControlInput': {'id': ROOT},
+        '@Curve': {'id': curve, 'points': [{'x': 0, 'y': -12, 'shape': 'Linear'}, {'x': 100, 'y': 0, 'shape': 'Linear'}]}}
+    task.objects[identity] = row
+    task.objects[curve] = {'id': curve, 'name': '', 'type': 'Curve', 'classId': 917520,
+        'path': '\\opaque-curve-' + curve, 'owner': {'id': identity}, 'notes': ''}
+    task.objects[FIRST]['@RTPC'].append({'id': identity})
+    return deepcopy(row)
+
+
+def test_graph_updates_unique_pair_by_actual_guid_and_preserves_other_curve(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    seed_pair(task)
+    unrequested = seed_pair(task, identity=RTPC_B, property_name='Pitch', curve=CURVE_B)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    field = select_field(task, owner=owner, token='Volume')
+    code, declared = task.step('draft-declare-rtpc', '--declaration-id', 'volume',
+        '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+        '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear')
+    assert code == 0, declared
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            assert args['objects'] == [{'object': CHILD, '@Curve': {'type': 'Curve',
+                'points': [{'x': 0, 'y': -48, 'shape': 'Linear'}, {'x': 100, 'y': 0, 'shape': 'Linear'}]}}]
+            task.objects[CHILD]['@Curve']['points'] = deepcopy(args['objects'][0]['@Curve']['points'])
+            return {'objects': []}  # Native field-only associations may be sparse.
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1 and task.objects[RTPC_B] == unrequested
+
+
+def test_graph_places_unnamed_rtpc_below_new_owner_with_class_field(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    parent, control = task.bind(SECOND), task.bind(ROOT)
+    code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Sound')
+    assert code == 0, found
+    kind = found['type_candidates'][0]['handle']
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'new-sound',
+        '--parent-handle', parent, '--name', 'New sound', '--kind', kind)
+    assert code == 0, declared
+    owner = declared['draft']['declared_object']['result_handle']
+    field = select_field(task, kind=kind, token='Volume')
+    code, declared = task.step('draft-declare-rtpc', '--declaration-id', 'volume',
+        '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+        '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear')
+    assert code == 0, declared
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            assert args['objects'][0]['object'] == SECOND
+            sound = args['objects'][0]['children'][0]
+            assert sound['name'] == 'New sound' and sound['type'] == 'Sound'
+            rtpc = sound['@RTPC'][0]
+            assert rtpc['name'] == '' and rtpc['@PropertyName'] == 'Volume'
+            task.objects[CHILD] = {'id': CHILD, 'name': 'New sound', 'type': 'Sound', 'classId': 65552,
+                'path': task.objects[SECOND]['path'] + '\\New sound', 'parent': {'id': SECOND},
+                'notes': '', '@RTPC': [{'id': RTPC_B}]}
+            seed_pair(task, identity=RTPC_B, curve=CURVE_B)
+            task.objects[RTPC_B]['owner'] = {'id': CHILD}
+            task.objects[RTPC_B]['@Curve']['points'] = deepcopy(rtpc['@Curve']['points'])
+            return {'objects': [{'id': SECOND, 'name': 'Default Work Unit', 'children': [
+                {'id': CHILD, 'name': 'New sound', '@RTPC': [{'id': RTPC_B, 'name': ''}]}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1
+
+
+@pytest.mark.parametrize('fault', ['duplicate-pair', 'wrong-class', 'wrong-owner', 'add-collision'])
+def test_graph_pair_binding_rejects_ambiguous_or_invalid_actual_members(tmp_path, fault):
+    task, writes = rtpc_task(tmp_path)
+    seed_pair(task)
+    if fault == 'duplicate-pair':
+        seed_pair(task, identity=RTPC_B, property_name='Volume', curve=CURVE_B)
+    elif fault == 'wrong-class':
+        task.objects[CHILD]['classId'] = 917520
+    elif fault == 'wrong-owner':
+        task.objects[CHILD]['owner'] = {'id': SECOND}
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    field = select_field(task, owner=owner, token='Volume')
+    args = ['--mode', 'add-only'] if fault == 'add-collision' else []
+    code, declared = task.step('draft-declare-rtpc', '--declaration-id', 'volume',
+        '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+        '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear', *args)
+    assert code == 0, declared
+    code, checked = task.step('draft-check')
+    assert code == 2, checked
+    assert not writes
+
+
+@pytest.mark.parametrize('fault', ['list-drift', 'class-drift', 'owner-drift', 'metadata-drift', 'partial-curve'])
+def test_graph_revalidates_complete_pair_state_before_single_write(tmp_path, fault):
+    task, writes = rtpc_task(tmp_path)
+    seed_pair(task, identity=RTPC_B, property_name='Unrequested', curve=CURVE_B)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    tx, shown = task.preview()
+    if fault == 'list-drift':
+        task.objects[FIRST]['@RTPC'] = []
+    elif fault == 'class-drift':
+        task.objects[RTPC_B]['classId'] = 917520
+    elif fault == 'owner-drift':
+        task.objects[RTPC_B]['owner'] = {'id': SECOND}
+    elif fault == 'metadata-drift':
+        task.metadata['Volume']['supports']['rtpc'] = 'None'
+    else:
+        del task.objects[RTPC_B]['@Curve']['points']
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, result = task.run('execute', tx)
+    assert code == 2 and result.get('verified') is not True, result
+    assert not writes
+
+
+def test_graph_does_not_certify_unrequested_curve_corruption(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    seed_pair(task, identity=RTPC_B, property_name='Unrequested', curve=CURVE_B)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            node = args['objects'][0]['@RTPC'][0]
+            seed_pair(task)
+            task.objects[CHILD]['@Curve']['points'] = deepcopy(node['@Curve']['points'])
+            task.objects[RTPC_B]['@Curve']['points'][0]['y'] = -99
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@RTPC': [{'id': CHILD, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, result = task.finish(tx, shown)
+    assert code == 2 and result.get('verified') is not True, result
+    assert len(writes) == 1
+
+
+def test_replace_all_removes_old_pairs_and_does_not_update_them_by_guid(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    seed_pair(task)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    field = select_field(task, owner=owner, token='Volume')
+    code, declared = task.step('draft-declare-rtpc', '--declaration-id', 'new-volume',
+        '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+        '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear')
+    assert code == 0, declared
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            assert args['listMode'] == 'replaceAll' and len(args['objects']) == 1
+            node = args['objects'][0]['@RTPC'][0]
+            assert node['type'] == 'RTPC' and node['name'] == ''
+            del task.objects[CHILD]
+            del task.objects[CURVE_A]
+            task.objects[FIRST]['@RTPC'] = []
+            seed_pair(task, identity=RTPC_B, curve=CURVE_B)
+            task.objects[RTPC_B]['@Curve']['points'] = deepcopy(node['@Curve']['points'])
+            return {'objects': [{'id': FIRST, 'name': 'Sender', '@RTPC': [{'id': RTPC_B, 'name': ''}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1 and CHILD not in task.objects
+
+
+def test_planned_owner_merge_updates_existing_unnamed_pair_in_same_batch(tmp_path):
+    task, _ = rtpc_task(tmp_path)
+    seed_pair(task)
+    parent, control = task.bind(SECOND), task.bind(ROOT)
+    code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Sound')
+    assert code == 0, found
+    kind = found['type_candidates'][0]['handle']
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'merge')
+    assert code == 0, configured
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', parent,
+        '--name', 'Sender', '--kind', kind)
+    assert code == 0, declared
+    owner = declared['draft']['declared_object']['result_handle']
+    field = select_field(task, kind=kind, token='Volume')
+    code, declared = task.step('draft-declare-rtpc', '--declaration-id', 'volume',
+        '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+        '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear')
+    assert code == 0, declared
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            update = next(row for row in args['objects'] if row['object'] == CHILD)
+            assert update == {'object': CHILD, '@Curve': {'type': 'Curve',
+                'points': [{'x': 0, 'y': -48, 'shape': 'Linear'}, {'x': 100, 'y': 0, 'shape': 'Linear'}]}}
+            owner_row = next(row for row in args['objects'] if row['object'] == SECOND)
+            assert owner_row['children'] == [{'type': 'Sound', 'name': 'Sender'}]
+            task.objects[CHILD]['@Curve']['points'] = deepcopy(update['@Curve']['points'])
+            return {'objects': [{'id': SECOND, 'name': 'Default Work Unit', 'children': [{'id': FIRST, 'name': 'Sender'}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    if code:
+        (tmp_path / 'merge-rtpc-verification.json').write_text(json.dumps(verified, indent=2))
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(writes) == 1

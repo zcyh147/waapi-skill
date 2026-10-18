@@ -14,6 +14,7 @@ from .business_declarations import (
     BusinessDeclarationError,
     ExistingObjectTarget,
     NewDescendantTarget,
+    OwnedRtpcTarget,
     business_repair,
     resolve_semantic_kind,
 )
@@ -110,7 +111,7 @@ def _validate_declaration_graph_limits(
         isinstance(row.target, ExistingObjectTarget)
         for row in session.declarations
     )
-    node_count = len(new_rows) + (existing_count if include_existing_targets else 0)
+    node_count = len(new_rows) + sum(isinstance(row.target, OwnedRtpcTarget) for row in session.declarations) + (existing_count if include_existing_targets else 0)
     if node_count > DEFAULT_MAX_NODES:
         raise _repair(
             session,
@@ -860,6 +861,13 @@ def _materialize_create(
 
     node_result_handles = {}
 
+    def compile_rtpc(row):
+        rtpc_args = _materialize_set_rtpc(replace(session, declarations=(row,)), planned_owners=new_by_result)["arguments"]
+        node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
+            "rtpc_mode": rtpc_args["mode"]}
+        node_result_handles[id(node)] = row.result_handle
+        return node
+
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
         fields = dict(row.fields)
@@ -1403,6 +1411,13 @@ def _materialize_set(
 
     node_result_handles = {}
 
+    def compile_rtpc(row):
+        rtpc_args = _materialize_set_rtpc(replace(session, declarations=(row,)), planned_owners=new_by_result)["arguments"]
+        node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
+            "rtpc_mode": rtpc_args["mode"]}
+        node_result_handles[id(node)] = row.result_handle
+        return node
+
     def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
@@ -1427,6 +1442,10 @@ def _materialize_set(
                         descriptor = {"name": child_list, "objects": []}
                         lists.append(descriptor)
                     descriptor["objects"].append(child_node)
+        rtpcs = [item for item in session.declarations if isinstance(item.target, OwnedRtpcTarget)
+            and item.target.owner_handle == row.result_handle]
+        if rtpcs:
+            node.setdefault("lists", []).append({"name": "RTPC", "objects": [compile_rtpc(item) for item in rtpcs]})
         return node, object_list, list_behavior
 
     rows: list[dict[str, Any]] = []
@@ -1473,6 +1492,25 @@ def _materialize_set(
                 existing = {"name": object_list, "objects": []}
                 lists.append(existing)
             existing["objects"].append(node)
+    for declaration in session.declarations:
+        if not isinstance(declaration.target, OwnedRtpcTarget):
+            continue
+        owner_handle = declaration.target.owner_handle
+        if owner_handle in new_by_result:
+            continue
+        owner = session.handles.resolve_object(owner_handle)
+        node = compile_rtpc(declaration)
+        row = rows_by_handle.get(owner_handle)
+        if row is None:
+            row = {"object": {"kind": "id", "value": owner.object_id}}
+            rows_by_handle[owner_handle] = row
+            rows.append(row)
+        lists = row.setdefault("lists", [])
+        descriptor = next((item for item in lists if item["name"] == "RTPC"), None)
+        if descriptor is None:
+            descriptor = {"name": "RTPC", "objects": []}
+            lists.append(descriptor)
+        descriptor["objects"].append(node)
     for row in rows:
         if set(row) <= {"object", "list_mode"}:
             raise _repair(
@@ -1525,7 +1563,7 @@ def _materialize_set(
             # certify arrays. Another class may expose a scalar with this token
             # (Sound.Metadata List versus MetadataSlot.Metadata Reference).
             declared_fields = [session.handles.bound_field(handle)
-                for handle in new_by_result[owner_handle].fields.get("field_values", {})]
+                for handle in (new_by_result[owner_handle].fields.get("field_values", {}) if owner_handle in new_by_result else {})]
             for reference in node.get("references", []):
                 fields = [field for field in declared_fields if field.field_kind == "list"
                     and field.scope_kind == "class" and field.token == reference["name"]]
@@ -1599,6 +1637,7 @@ def _materialize_set(
 
 def _materialize_set_rtpc(
     session: BusinessDeclarationSession,
+    *, planned_owners=None,
 ) -> dict[str, Any]:
     if len(session.declarations) != 1:
         raise _repair(
@@ -1609,13 +1648,8 @@ def _materialize_set_rtpc(
             action="declare exactly one RTPC curve outcome",
         )
     declaration = session.declarations[0]
-    if not isinstance(declaration.target, ExistingObjectTarget):
-        raise _repair(
-            session,
-            "TARGET_FORM_INVALID",
-            field="object_handle",
-            action="bind the exact RTPC owner object",
-        )
+    if not isinstance(declaration.target, (ExistingObjectTarget, OwnedRtpcTarget)):
+        raise _repair(session, "TARGET_FORM_INVALID", field="object_handle", action="bind the exact RTPC owner")
     fields = dict(declaration.fields)
     required = {"control_input_handle", "curve_points", "field_handle"}
     optional = {"mode", "notes"}
@@ -1636,7 +1670,10 @@ def _materialize_set_rtpc(
             field=unexpected[0],
             action="use only the disclosed RTPC business fields",
         )
-    target = session.handles.resolve_object(declaration.target.object_handle)
+    owner_handle = (declaration.target.owner_handle if isinstance(declaration.target, OwnedRtpcTarget)
+        else declaration.target.object_handle)
+    planned = (planned_owners or {}).get(owner_handle)
+    target = None if planned else session.handles.resolve_object(owner_handle)
     control = session.handles.resolve_object(fields["control_input_handle"])
     control_token = "".join(
         character
@@ -1658,11 +1695,13 @@ def _materialize_set_rtpc(
             action="choose a bound Game Parameter, MIDI parameter, or Modulator",
         )
     field = session.handles.bound_field(fields["field_handle"])
-    if (
-        field.scope_kind != "object"
-        or str(field.scope_value).upper() != target.object_id.upper()
-        or field.field_kind != "property"
-    ):
+    if planned:
+        evidence = resolve_planned_list_evidence(session if len(session.declarations) > 1 else replace(session,
+            declarations=(*tuple((planned_owners or {}).values()), *session.declarations)), "RTPC", owner_handle=owner_handle)
+        valid_scope = field.scope_kind == "class" and field.scope_value == evidence["scope"]["class_id"]
+    else:
+        valid_scope = field.scope_kind == "object" and str(field.scope_value).upper() == target.object_id.upper()
+    if not valid_scope or field.field_kind != "property":
         raise _repair(
             session,
             "FIELD_HANDLE_SCOPE_MISMATCH",
@@ -1726,7 +1765,7 @@ def _materialize_set_rtpc(
             action="choose whether an exact existing curve may be updated",
         )
     arguments: dict[str, Any] = {
-        "object": {"kind": "id", "value": target.object_id},
+        "object": {"kind": "id", "value": owner_handle if planned else target.object_id},
         "property": field.token,
         "control_input": {"kind": "id", "value": control.object_id},
         "points": points,
@@ -1742,6 +1781,8 @@ def _materialize_set_rtpc(
                 action="provide exact RTPC notes or omit them",
             )
         arguments["notes"] = notes
+    if isinstance(declaration.target, OwnedRtpcTarget):
+        return {"arguments": arguments}
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -1761,7 +1802,7 @@ def validate_object_graph_draft(operation, session):
     """
     validation = session
     if (operation == "object.set" and session.settings.get("list_behavior") == "replace-all"
-            and not any("object_list" in row.fields or "clear_object_lists" in row.fields for row in session.declarations)):
+            and not any(isinstance(row.target, OwnedRtpcTarget) or "object_list" in row.fields or "clear_object_lists" in row.fields for row in session.declarations)):
         validation = replace(session, settings={**session.settings, "list_behavior": "append"})
     materialize_object_graph_business_request(operation, validation)
 

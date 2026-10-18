@@ -446,6 +446,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     BoundFieldHandle,
     ExistingObjectTarget,
     NewDescendantTarget,
+    OwnedRtpcTarget,
     bind_live_field,
     business_repair,
     normalize_live_object_identity,
@@ -3030,6 +3031,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     _add_business_draft_binding_arguments(draft_declare_rtpc)
+    draft_declare_rtpc.add_argument("--declaration-id")
     draft_declare_rtpc.add_argument("--object-handle", required=True)
     draft_declare_rtpc.add_argument("--field-handle", required=True)
     draft_declare_rtpc.add_argument("--control-input-handle", required=True)
@@ -3043,7 +3045,6 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_rtpc.add_argument(
         "--mode",
         choices=("add-only", "add-or-update"),
-        default="add-or-update",
     )
     draft_declare_rtpc.add_argument("--notes")
 
@@ -17666,18 +17667,23 @@ def dispatch_offline_business_draft_update(
             "control_input_handle": args.control_input_handle,
             "curve_points": points,
             "field_handle": args.field_handle,
-            "mode": args.mode,
+            **({} if args.mode is None else {"mode": args.mode}),
             **({} if args.notes is None else {"notes": args.notes}),
         }
 
         def update(
             current: BusinessDeclarationSession,
         ) -> BusinessDeclarationSession:
-            candidate = current.with_existing_declaration(
-                declaration_id="rtpc",
-                target=ExistingObjectTarget(args.object_handle),
-                fields=fields,
-            )
+            if inspected.operation == "object.set":
+                if args.declaration_id is None:
+                    raise GatewayInputError("Graph RTPC declarations require --declaration-id")
+                candidate = current.with_rtpc_declaration(declaration_id=args.declaration_id,
+                    owner_handle=args.object_handle, fields=fields)
+            else:
+                if args.declaration_id is not None:
+                    raise GatewayInputError("--declaration-id belongs to graph RTPC declarations")
+                candidate = current.with_existing_declaration(
+                    declaration_id="rtpc", target=ExistingObjectTarget(args.object_handle), fields=fields)
             adapter.materialize(candidate)
             return candidate
 
@@ -28613,6 +28619,14 @@ def _business_next_action_binding(
                         "more_outcomes_remain"
                     ),
                 },
+                "declare_rtpc": {
+                    **operation_draft_prefix_copy_binding(declare_rtpc_prefix),
+                    "append": ["--declaration-id", "<task-local-id>", "--object-handle", "<bound-or-planned-owner-handle>",
+                        "--field-handle", "<selected-owner-property-handle>", "--control-input-handle", "<bound-control-input-handle>",
+                        "--point", "<x>", "<y>", "<Wwise-shape>", "[--point <x> <y> <Wwise-shape>]...",
+                        "[--mode add-only|add-or-update]", "[--notes <exact-user-notes>]"],
+                    "semantics": business_contract["rtpc_declaration"],
+                },
                 "declare_new": {
                     **operation_draft_prefix_copy_binding(declare_new_prefix),
                     "append": [
@@ -30199,7 +30213,7 @@ def operation_draft_payload(
         )
         if compact_business_update:
             declared_object: dict[str, str] | None = None
-            if command in {"draft-declare-new", "draft-declare-existing"}:
+            if command in {"draft-declare-new", "draft-declare-existing", "draft-declare-rtpc"}:
                 declarations = draft.get("declarations")
                 if isinstance(declarations, list) and declarations:
                     latest = declarations[-1]
