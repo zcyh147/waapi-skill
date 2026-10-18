@@ -4760,6 +4760,7 @@ def _prepare_object_create(
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
     derived_properties: dict[str, dict[str, Any]] = {}
+    early_merge_guards = []
     node_specs = _prepare_object_node_specs(
         normalized.nodes,
         root_parent=parent,
@@ -4774,7 +4775,8 @@ def _prepare_object_create(
         identity_cache=identity_cache,
         property_info_cache=property_info_cache,
         result_context=result_context,
-        merge_existing=requested_conflict == "merge" and list_name is None,
+        merge_existing=requested_conflict == "merge",
+        merge_guards=early_merge_guards,
         platform=platform,
     )
     for index, spec in enumerate(node_specs):
@@ -4794,7 +4796,7 @@ def _prepare_object_create(
     merge_children_snapshots: list[dict[str, Any]] = []
     replace_subtree_snapshots: list[dict[str, Any]] = []
     list_before: list[dict[str, Any]] = []
-    documented_guards = []
+    documented_guards = list(early_merge_guards)
     if list_name is not None:
         from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
         proof = resolve_live_list_evidence(request.version, parent.object, list_name, read=read)
@@ -4805,7 +4807,7 @@ def _prepare_object_create(
         if proof["declaration"]["unresolved_element_types"] or node_specs[0]["class_id"] not in allowed_classes:
             raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "The requested root class is not proved by this exact List source")
         node_specs[0]["documented_list_element_class"] = node_specs[0]["class_id"]
-        documented_guards.append(observe_list_binding(proof, read=read))
+        _merge_observed_list_guards(documented_guards, [observe_list_binding(proof, read=read)])
         list_before = _normalize_object_list_snapshot(
             _read_object_list(
                 parent.object,
@@ -5723,6 +5725,7 @@ def _prepare_object_set(
     planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
     documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
     planned_guards = []
+    early_merge_guards = []
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     conflict = str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
@@ -6108,6 +6111,10 @@ def _prepare_object_set(
             property_info_cache=property_info_cache,
             list_bindings=planned_bindings,
             result_context=result_context,
+            merge_existing=row_conflict == "merge",
+            allow_list_merge=row_list_mode == "append",
+            merge_guards=early_merge_guards,
+            platform=platform,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
@@ -6373,7 +6380,11 @@ def _prepare_object_set(
                 identity_cache=identity_cache,
                 property_info_cache=property_info_cache,
                 list_bindings=planned_bindings,
-            result_context=result_context,
+                result_context=result_context,
+                root_collection=descriptor.name,
+                merge_existing=row_conflict == "merge" and row_list_mode == "append",
+                merge_guards=early_merge_guards,
+                platform=platform,
             )
             prepared_spec_by_path = {
                 str(spec["request_path"]): spec for spec in prepared_specs
@@ -6879,6 +6890,9 @@ def _prepare_object_set(
         if len(node_specs) + len(curve_guards) > DEFAULT_MAX_NODES:
             raise OperationContractError("NODE_LIMIT_EXCEEDED", "Inline curves and their owners exceed the single bounded node budget.")
         state["inline_curve_guards"] = list({canonical_json_bytes(proof): proof for proof in curve_guards}.values())
+    _merge_observed_list_guards(state.setdefault("documented_list_guards", []), early_merge_guards, planned=planned_guards)
+    condition_metadata_guards.extend(spec["condition_metadata_guard"] for spec in node_specs if "condition_metadata_guard" in spec)
+    related_conditions.extend(item for spec in node_specs for item in spec.get("related_conditions", []))
     if condition_metadata_guards:
         state["condition_metadata_guards"] = condition_metadata_guards
     if related_conditions:
@@ -7472,6 +7486,99 @@ def _prepare_prospective_reference_hierarchy(
     return conditions
 
 
+def _merge_observed_list_guards(
+    guards: list[dict[str, Any]], observations: Sequence[dict[str, Any]], *,
+    planned: Sequence[Mapping[str, Any]] = (),
+) -> None:
+    """One unchanged source/membership observation per exact owner List."""
+    for observation in observations:
+        evidence = observation["evidence"]
+        planned_matches = [guard["before"] for guard in planned if guard.get("before") is not None
+            and guard["before"]["evidence"]["scope"]["scope_value"] == evidence["scope"]["scope_value"]
+            and guard["binding"]["declaration"]["name"] == evidence["declaration"]["name"]]
+        if planned_matches:
+            if len(planned_matches) != 1 or planned_matches[0] != observation:
+                raise OperationContractError("INVALID_READBACK", "Planned List source or membership changed during preparation.")
+            continue
+        matching = [guard for guard in guards
+            if guard["evidence"]["scope"]["scope_value"] == evidence["scope"]["scope_value"]
+            and guard["evidence"]["declaration"]["name"] == evidence["declaration"]["name"]]
+        if matching:
+            if len(matching) != 1 or matching[0] != observation:
+                raise OperationContractError("INVALID_READBACK", "List source or membership changed during preparation.")
+        else:
+            guards.append(observation)
+
+
+def _resolve_merge_node_target(
+    node: ObjectNodeDescriptor, spec: dict[str, Any], specs: Sequence[Mapping[str, Any]], *,
+    node_paths: set[str], root_parent: ResolvedObject | None, root_collection: str,
+    version: str, read: ReadCall, allow_list_merge: bool, guards: list[dict[str, Any]],
+) -> ResolvedObject | None:
+    """Observe one normalized occurrence; compile no node or native mutation."""
+    parent_spec = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
+    if node.parent_request_path in node_paths:
+        if parent_spec is None:
+            raise OperationContractError("INVALID_PREVIEW", "Merge parent must precede its normalized child.")
+        if parent_spec.get("preexisting_id") is None:
+            return None  # A genuinely new owner has no pre-existing members.
+        owner_id, owner_row = parent_spec["preexisting_id"], parent_spec["pre_state"]
+        collection = node.collection
+    else:
+        if root_parent is None:
+            raise OperationContractError("INVALID_PREVIEW", "Merge occurrence lacks its exact live root.")
+        owner_id, owner_row = root_parent.object, root_parent.row
+        collection = root_collection
+    fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId",
+        *(descriptor.name for descriptor in (*node.properties, *node.references))])
+    expected_path = None
+    if collection == "children":
+        expected_path = _child_path(owner_row.get("path"), node.name, field="merge_parent.path")
+        rows = _read_object_path_rows(expected_path, fields=fields, read=read)
+    else:
+        if not allow_list_merge:
+            return None  # Replacement modes never inherit an old member's conditions.
+        from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
+        guard = next((item for item in guards
+            if item["evidence"]["scope"]["scope_value"] == owner_id
+            and item["evidence"]["declaration"]["name"] == collection), None)
+        if guard is None:
+            try:
+                evidence = resolve_live_list_evidence(version, owner_id, collection, read=read)
+                guard = observe_list_binding(evidence, read=read)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
+            guards.append(guard)
+        candidates = [row for row in guard["members"] if row["name"].casefold() == node.name.casefold()]
+        if len(candidates) > 1:
+            raise OperationContractError("AMBIGUOUS_IDENTITY", "Merge List member name must resolve at most once.")
+        if not candidates:
+            return None
+        spec["documented_list_element_class"] = spec["class_id"]
+        fields = _dedupe_fields([*fields, "owner"])
+        rows = _read_object_id_rows(candidates[0]["id"], fields=fields, read=read)
+        if len(rows) != 1 or any(rows[0].get(key) != candidates[0].get(key)
+                for key in ("id", "name", "type", "path", "classId", "owner")):
+            raise OperationContractError("INVALID_READBACK", "Merge member must retain its exact observed membership identity/class/owner.")
+    if len(rows) > 1:
+        raise OperationContractError("AMBIGUOUS_IDENTITY", "Merge collision must resolve at most once.")
+    if not rows:
+        return None
+    row = rows[0]
+    relation = "parent" if collection == "children" else "owner"
+    if (not _valid_object_id(row.get("id")) or row.get("name") != node.name
+            or not isinstance(row.get("path"), str) or not row["path"].startswith("\\")
+            or (expected_path is not None and row["path"] != expected_path)
+            or type(row.get("classId")) is not int or row["classId"] != spec["class_id"]
+            or not _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId"))
+            or not _same_identity(_reference_identity(row.get(relation)), owner_id)):
+        raise OperationContractError("INVALID_TARGET_TYPE", "Merge needs its exact matching existing class, identity and ownership edge.",
+            details={"expected_class_id": spec["class_id"], "relation": relation, "owner_id": owner_id, "actual": row})
+    spec["collection"] = collection
+    return ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"],
+        resolution="live-exact-merge-collision", row=row)
+
+
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
@@ -7492,9 +7599,13 @@ def _prepare_object_node_specs(
     list_bindings: Sequence[Mapping[str, Any]] = (),
     result_context: Mapping[str, Any] | None = None,
     merge_existing: bool = False,
+    allow_list_merge: bool = True,
+    merge_guards: list[dict[str, Any]] | None = None,
     platform: str | None = None,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
+    node_paths = {node.request_path for node in nodes}
+    merge_guards = [] if merge_guards is None else merge_guards
     for node in nodes:
         requested_type_token = _object_type_token(node.type)
         uses_2025_actor_mixer_alias = (
@@ -7561,29 +7672,13 @@ def _prepare_object_node_specs(
             spec["import_requested"] = True
         merge_target = None
         if merge_existing:
-            assert root_parent is not None and root_collection == "children"
-            expected_path = _request_node_expected_path(root_parent.row.get("path"), spec, [*specs, spec])
-            fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId",
-                *(descriptor.name for descriptor in (*node.properties, *node.references))])
-            rows = _read_object_path_rows(expected_path, fields=fields, read=read)
-            if len(rows) > 1:
-                raise OperationContractError("AMBIGUOUS_IDENTITY", "Create-merge collision must resolve at most once.")
-            if rows:
-                row = rows[0]
-                expected_parent = root_parent.object if node.parent_request_path is None else next(
-                    (parent_spec.get("preexisting_id") for parent_spec in specs
-                     if parent_spec["request_path"] == node.parent_request_path), None)
-                if (not _valid_object_id(row.get("id")) or row.get("path") != expected_path
-                        or row.get("name") != node.name or type(row.get("classId")) is not int
-                        or row["classId"] != type_info.class_id
-                        or not _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId"))
-                        or expected_parent is None or not _same_identity(_parent_value(row.get("parent")), expected_parent)):
-                    raise OperationContractError("INVALID_TARGET_TYPE", "Create-merge needs its exact matching existing class, identity and parent.",
-                        details={"path": expected_path, "expected_class_id": type_info.class_id, "actual": row})
-                merge_target = ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"],
-                    resolution="live-exact-create-merge-collision", row=row)
+            merge_target = _resolve_merge_node_target(node, spec, specs, node_paths=node_paths,
+                root_parent=root_parent, root_collection=root_collection, version=version, read=read,
+                allow_list_merge=allow_list_merge, guards=merge_guards)
+            if merge_target is not None:
                 roles[f"merge:{node.request_path}"] = merge_target
-                spec.update(preexisting_id=row["id"], pre_state=row, structural_class_id=type_info.class_id)
+                spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
+                    structural_class_id=type_info.class_id)
         metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
@@ -7696,6 +7791,18 @@ def _prepare_object_node_specs(
             for name, identity in requirements.items():
                 if name.casefold() not in desired_references:
                     spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
+                    if identity is not None and "documented_list_element_class" in spec:
+                        role = f"{node.request_path}.condition_reference:{name}"
+                        target = _resolve_identity({"kind": "id", "value": identity}, role=role,
+                            read=read, identity_cache=identity_cache)
+                        observed = _read_object_id_rows(target.object,
+                            fields=(*IDENTITY_RETURN_FIELDS, "classId", "owner"), read=read)
+                        if (len(observed) != 1 or not _same_identity(observed[0].get("id"), target.object)
+                                or type(observed[0].get("classId")) is not int
+                                or any(observed[0].get(key) != value for key, value in target.row.items())):
+                            raise OperationContractError("INVALID_READBACK", "A retained slot prerequisite needs its exact complete target observation.")
+                        roles[role] = ResolvedObject(identity=target.identity, object=target.object,
+                            resolution=target.resolution, row=observed[0])
             spec["condition_metadata_guard"] = {"object_id": merge_target.object, "platform": platform,
                 "fields": [info.as_dict() for info in property_info_by_name.values()],
                 "override_applicability": [proof for proof in applicability.values() if proof is not None]}
@@ -18512,6 +18619,14 @@ def verify_prepared_operation(
         if not isinstance(raw_specs, list) or not all(isinstance(row, Mapping) for row in raw_specs):
             raise OperationContractError("INVALID_PREVIEW", "Object graph verification nodes are malformed.")
         specs = [dict(row) for row in raw_specs]
+        renamed_owner_rows = {}
+        def read_renamed_owner(object_id):
+            if object_id not in renamed_owner_rows:
+                observations = read_object(object_id=object_id, fields=IDENTITY_RETURN_FIELDS)
+                if len(observations) != 1 or not _same_identity(observations[0].get("id"), object_id):
+                    raise ValueError("Renamed List owner must retain its exact GUID")
+                renamed_owner_rows[object_id] = observations[0]
+            return renamed_owner_rows[object_id]
         verified_import_direct_child_ids: dict[str, set[str]] = {}
         object_set_originals_root: str | None = None
         if kind == "object-set-batch" and any(
@@ -18728,6 +18843,14 @@ def verify_prepared_operation(
                         {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
                     )
             expected_path = spec.get("expected_path")
+            if (spec.get("preexisting_id") is not None and spec.get("collection") not in {None, "children"}
+                    and isinstance(spec.get("pre_state"), Mapping)):
+                from .object_graph_paths import expected_snapshot
+                try:
+                    expected_path = expected_snapshot(dict(spec["pre_state"]), edits=specs,
+                        read_row=read_renamed_owner)["path"]
+                except (ValueError, KeyError, TypeError) as exc:
+                    check(f"{request_path} existing List path intent is bound", False, {"error": str(exc)})
             if isinstance(spec.get("ancestor_rename_path_guard"), Mapping):
                 from .object_graph_paths import verify_ancestor_path_guard
                 try:
@@ -19737,20 +19860,13 @@ def verify_prepared_operation(
                     if _identity_key(before_member["id"]) in requested_ids | replaced_set_ids:
                         continue
                     matches = [row for row in actual_rows if _same_identity(row.get("id"), before_member["id"])]
-                    expected_member_path = before_member.get("path")
-                    owner_before = owner_spec.get("pre_state", {})
-                    owner_after = observed_row_by_path.get(owner_path, {})
-                    if (isinstance(owner_before, Mapping)
-                            and owner_spec.get("requested_name") != owner_before.get("name")
-                            and isinstance(owner_before.get("path"), str)
-                            and isinstance(owner_after.get("path"), str)
-                            and isinstance(expected_member_path, str)
-                            and expected_member_path.startswith(owner_before["path"] + "\\")):
-                        expected_owner_path = owner_before["path"].rsplit("\\", 1)[0] + "\\" + str(owner_after.get("name", ""))
-                        check(f"{owner_path} renamed List owner path follows its verified name",
-                            owner_after["path"] == expected_owner_path,
-                            {"expected": expected_owner_path, "actual": owner_after["path"]})
-                        expected_member_path = owner_after["path"] + expected_member_path[len(owner_before["path"]):]
+                    from .object_graph_paths import expected_snapshot
+                    try:
+                        expected_member_path = expected_snapshot(dict(before_member), edits=specs,
+                            read_row=read_renamed_owner)["path"]
+                    except (ValueError, KeyError, TypeError) as exc:
+                        check(f"{owner_path}.@{list_name} preserved path intent is bound", False, {"error": str(exc)})
+                        expected_member_path = None
                     unchanged = len(matches) == 1 and all(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_member.get(field)))
                          if field in {"id", "parent", "owner"} and before_member.get(field) is not None
