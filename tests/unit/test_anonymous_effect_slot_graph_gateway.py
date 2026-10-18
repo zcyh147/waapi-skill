@@ -791,7 +791,7 @@ def test_legacy_import_object_scoped_render_uses_the_actual_owner_adapter(tmp_pa
     assert len(writes) == 1
 
 
-def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.import'):
+def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.import', *, media=False):
     """Literal old WObjects grammar; metadata/defaults are fixtures pending native acceptance."""
     import re
     import uuid
@@ -834,8 +834,23 @@ def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.impor
                     nodes.append(node)
             results = []
             for node in nodes:
-                assert 'audioFile' not in node and 'audioFileBase64' not in node, node
                 path = re.sub(r'<[^>]+>', '', node['objectPath'])
+                if 'audioFile' in node:
+                    import shutil
+                    from pathlib import Path
+                    assert media and not any(key.startswith('@') for key in node), node
+                    owner_path, name = path.rsplit('\\', 1)
+                    owner = next(row for row in task.objects.values() if row['path'] == owner_path)
+                    copied = task.project_file.parent / 'Originals' / 'SFX' / Path(node['audioFile']).name
+                    copied.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(node['audioFile'], copied)
+                    identity = '{' + str(uuid.uuid4()).upper() + '}'
+                    source = {'id': identity, 'name': name, 'type': 'AudioFileSource', 'parent': {'id': owner['id']},
+                        'path': path, 'notes': node.get('audioSourceNotes', ''), 'originalFilePath': str(copied),
+                        'audioSource:language': {'id': EFFECT_PARENT, 'name': 'SFX'}}
+                    task.objects[identity] = source
+                    owner.update(activeSource={'id': identity}, originalFilePath=str(copied))
+                    results.append(deepcopy(source)); continue
+                assert 'audioFileBase64' not in node, node
                 found = [row for row in task.objects.values() if row['path'] == path]
                 if found: row = found[0]
                 else:
@@ -852,7 +867,13 @@ def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.impor
             return {'objects': results}
         if uri.endswith('getProjectInfo') and version == '2022.1':
             result = prior(uri, args, options)
-            return {**result, 'platforms': [{'id': EFFECT_PARENT, 'name': 'Windows'}], 'currentPlatformId': EFFECT_PARENT}
+            if media:
+                from tests.unit.test_object_native_surface import _project_info
+                result = {**_project_info(task.project_file.parent, language='SFX'), **result}
+                platform = {**result['platforms'][0], 'id': EFFECT_PARENT, 'name': 'Windows'}
+            else:
+                platform = {'id': EFFECT_PARENT, 'name': 'Windows'}
+            return {**result, 'platforms': [platform], 'currentPlatformId': EFFECT_PARENT}
         return prior(uri, args, options)
     task.call = call
     return task, writes
@@ -967,5 +988,50 @@ def test_legacy_import_render_guards_actual_chain_and_independent_poststate(tmp_
     elif fault == 'metadata-after': task.metadata['RenderEffect0']['default'] = 0
     code, verified = task.run('verify', tx)
     assert code == 2 and verified.get('verified') is not True, json.dumps(verified)
+    code, _ = task.run('execute', tx)
+    assert code == 2 and len(writes) == 1
+
+
+@pytest.mark.parametrize('existing,fault', [(False, None), (True, None), (False, 'wrong-result-guid'),
+    (False, 'fields-on-source'), (True, 'wrong-live-source-parent')])
+def test_legacy_import_render_with_media_keeps_fields_on_owner_and_proves_result_guids(tmp_path, existing, fault):
+    import wave
+    task, writes = legacy_render_import_task(tmp_path, media=True)
+    parent = task.bind(FIRST if existing else SECOND)
+    effect = task.bind(EFFECT)
+    values = {legacy_import_field(task, name): value for name, value in [('RenderEffect1', 'true'), ('Effect0', effect), ('Effect1', effect)]}
+    media_file = tmp_path / 'render-input.wav'
+    with wave.open(str(media_file), 'wb') as output:
+        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000); output.writeframes(b'\0\0' * 8)
+    args = ['--object-handle', parent] if existing else ['--parent-handle', parent, '--kind', 'sound-sfx', '--name', 'New Sound']
+    code, declared = task.step('draft-declare-existing' if existing else 'draft-declare-new', '--declaration-id', 'sound', *args,
+        '--field', 'media_file', str(media_file), '--field', 'volume_db', '-9',
+        *(arg for field, value in values.items() for arg in ('--field-value', field, value)))
+    assert code == 0, declared
+    prior = task.call
+    def call(uri, args=None, options=None):
+        result = prior(uri, args, options)
+        if uri.endswith('audio.import') and fault == 'wrong-result-guid':
+            result['objects'][0]['id'] = EFFECT_PARENT
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    native = shown['artifact']['prepared_operation']['dispatch']['args']['imports']
+    assert len(native) == 2 and '@RenderEffect0' in native[0] and 'audioFile' not in native[0]
+    assert 'audioFile' in native[1] and '<AudioFileSource>render-input' in native[1]['objectPath']
+    assert not any(key.startswith('@') for key in native[1]), native
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    assert code == 0 and len(writes) == 1, executed
+    owner = next(row for row in task.objects.values() if row['path'] == re_path(existing))
+    source = task.objects[owner['activeSource']['id']]
+    if fault == 'fields-on-source':
+        owner['@RenderEffect0'] = owner['@RenderEffect1'] = False
+        source['@RenderEffect0'] = source['@RenderEffect1'] = True
+    elif fault == 'wrong-live-source-parent':
+        source['parent'] = {'id': EFFECT_PARENT}
+    code, verified = task.run('verify', tx)
+    assert code == (2 if fault else 0) and (verified.get('verified') is True) is (fault is None), json.dumps(verified)
     code, _ = task.run('execute', tx)
     assert code == 2 and len(writes) == 1

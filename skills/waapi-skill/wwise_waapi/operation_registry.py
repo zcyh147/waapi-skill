@@ -21803,9 +21803,8 @@ def verify_prepared_operation(
                             },
                         )
                 if active_source_id is not None:
-                    source_fields = _import_audio_source_return_fields(version=version)
+                    source_fields = _dedupe_fields([*_import_audio_source_return_fields(version=version), "parent"])
                     if music_media or omitted_sound_source:
-                        source_fields.append("parent")
                         if version == "2021.1":
                             source_fields.append("originalWavFilePath")
                     source_rows = read_object(
@@ -21816,6 +21815,11 @@ def verify_prepared_operation(
                     check(f"{label} active Audio Source resolves once", len(source_rows) == 1, source_rows)
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
+                        if media_expected:
+                            check(f"{label} actual AudioFileSource belongs to the verified target",
+                                  _object_type_token(audio_source_row.get("type")) == "audiofilesource"
+                                  and _same_identity(_reference_identity(audio_source_row.get("parent")), live_id),
+                                  {"target_id": live_id, "source": audio_source_row})
                         if target.get("existing_sfx_source_id") is not None:
                             check(f"{label} reimport preserves the bound SFX source GUID",
                                   _same_identity(audio_source_row.get("id"), target["existing_sfx_source_id"]),
