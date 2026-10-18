@@ -583,7 +583,13 @@ def test_graph_empty_normalization_does_not_authorize_other_list_representations
     code, declared = task.step('draft-clear-object-list', '--declaration-id', 'clear', '--object-handle', owner, '--list-name', list_name)
     assert code == 0, declared
     code, rejected = task.step('draft-check')
-    assert code == 2 and rejected['error_code'] in {'INVALID_READBACK', 'DOCUMENTED_LIST_SELECTION_REQUIRED'}, json.dumps(rejected)
+    assert code == 2, json.dumps(rejected)
+    if list_name == 'Metadata':
+        assert rejected['error_code'] == 'OPERATION_DRAFT_CHECK_FAILED', rejected
+        assert rejected['details']['issues'][0]['error_code'] == 'INVALID_READBACK', rejected
+        assert '@Metadata array' in rejected['details']['issues'][0]['message'], rejected
+    else:
+        assert rejected['error_code'] == 'DOCUMENTED_LIST_SELECTION_REQUIRED', rejected
     assert writes == []
 
 

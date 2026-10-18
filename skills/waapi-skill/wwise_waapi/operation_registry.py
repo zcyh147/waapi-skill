@@ -20074,10 +20074,10 @@ def verify_prepared_operation(
                     object_id = resolved_id_by_path.get(str(list_root_spec.get("request_path")))
                     if _valid_object_id(object_id) and object_id not in expected_order:
                         expected_order.append(object_id)
-                ordered_rows = read_object(object_id=owner_id, fields=("id", "@" + list_name), platform=effective_platform)
-                ordered_members = ordered_rows[0].get("@" + list_name) if len(ordered_rows) == 1 else None
-                actual_order = ([_reference_identity(member) for member in ordered_members]
-                    if isinstance(ordered_members, list) and len(ordered_members) <= OBJECT_LIST_MAX_SUBTREE_NODES else None)
+                # The complete List reader preserves the exact owner accessor
+                # order when resolving member details, including a source-proven
+                # empty omission. Reuse that same bounded observation.
+                actual_order = [row["id"] for row in actual_rows]
                 check(f"{owner_path}.@{list_name} ordered membership matches the reviewed declaration",
                     complete_expected and actual_order == expected_order,
                     {"expected": expected_order, "actual": actual_order})
