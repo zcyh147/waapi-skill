@@ -762,9 +762,26 @@ def require_authoring_launch_proof(
             or proof.get('project') != str(project) or proof.get('roundtrip_project') != str(project)
             or proof.get('build') != build or not isinstance(proof.get('native_project'), str)
             or not proof['native_project'] or lifecycle.host != '127.0.0.1' or lifecycle.port != 8080
-            or len(command) != 5 or Path(command[0]).name != 'wine'
-            or list(command[1:]) != ['start.exe', '/wait', expected_executable, proof['native_project']]):
+            or len(command) != 8 or Path(command[0]).name != 'wine'
+            or list(command[1:]) != ['--bottle', 'Wwise2019x64', '--enable-alt-loader', 'macdrv',
+                '--wait-children', expected_executable, proof['native_project']]):
         raise SandboxFixtureError('Authoring launch did not prove the private project path and fixed command')
+    environment = getattr(lifecycle, 'launch_env', None)
+    resolution = proof.get('bottle_resolution')
+    if not isinstance(environment, Mapping) or not isinstance(resolution, Mapping):
+        raise SandboxFixtureError('Authoring launch did not prove the owned bottle resolution')
+    home = Path(environment.get('HOME', ''))
+    prefix = home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+    managed = Path(command[0]).parent.parent / 'support/Wwise2019x64'
+    expected_environment = {'HOME': str(home), 'WINEPREFIX': str(prefix), 'CX_BOTTLE': 'Wwise2019x64',
+        'CX_BOTTLE_PATH': str(prefix.parent),
+        'CX_MANAGED_BOTTLE_PATH': str(home / 'Library/Application Support/Wwise2019/BuiltinBottles')}
+    if (not home.is_absolute() or resolution.get('name') != 'Wwise2019x64'
+            or resolution.get('private_prefix') != str(prefix) or resolution.get('managed_reference') != str(managed)
+            or resolution.get('configuration') not in (str(prefix / 'cxbottle.conf'), str(managed / 'cxbottle.conf'))
+            or resolution.get('environment') != expected_environment
+            or any(environment.get(key) != value for key, value in expected_environment.items())):
+        raise SandboxFixtureError('Authoring launch did not prove the owned bottle resolution')
     return info
 
 

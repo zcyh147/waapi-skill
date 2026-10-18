@@ -26,7 +26,10 @@ def _bundle(tmp_path, build='2025.1.7.9143'):
     # Matching installed2024/25 bundles ship winepath as a Windows program,
     # without a host bin/winepath executable.
     _executable(cx / 'lib/wine/x86_64-windows/winepath.exe')
-    (cx / 'support').mkdir()
+    managed = cx / 'support/Wwise2019x64'
+    managed.mkdir(parents=True)
+    (managed / 'system.reg').write_text('managed registry')
+    (managed / 'cxbottle.conf').write_text('[Bottle]\n"Updater" = "wineprefixcreate"\n')
 
     _executable(bundle / 'Contents/SharedSupport/Wwise/bin/wwise_prepare')
     installed = tmp_path / 'Library/Application Support/Audiokinetic' / ('Wwise ' + build)
@@ -50,6 +53,17 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     started, preparation = [], []
     process = SimpleNamespace(pid=1234, poll=lambda: None, stdout=None, stderr=None)
     def process_factory(command, **kwargs):
+        # Source-shaped CrossOver selection: a private stub's Updater also
+        # resolves the SAME logical bottle name against the managed directory.
+        env = kwargs['env']
+        bottle = command[command.index('--bottle') + 1]
+        assert '/' not in bottle and bottle == 'Wwise2019x64'
+        private = Path(env['CX_BOTTLE_PATH']) / bottle
+        managed = Path(env['CX_MANAGED_BOTTLE_PATH']) / bottle
+        assert private.resolve() == facts.prefix and (private / 'system.reg').is_file()
+        assert managed.resolve() == facts.cx / 'support/Wwise2019x64'
+        assert (private / 'cxbottle.conf').resolve() == managed.resolve() / 'cxbottle.conf'
+        assert env['WINEPREFIX'] == str(private)
         started.append((command, kwargs))
         return process
     lifecycle = HeadlessLifecycle(console_path=facts.console, project_path=facts.project, port=8080,
@@ -58,7 +72,7 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
                     'CX_ENV': 'WINEPREFIX=/unowned/bottle HOME=/unowned/home', 'WINE_WAIT_CHILD_PIPE': '15',
                     'AK_AUTHORING_ARGS_OVERRIDE': 'unowned.wproj'},
         launch_cwd_path=facts.project.parent, process_factory=process_factory,
-        waapi_client_factory=lambda _: FakeClient([], result={'isCommandLine': False, 'version':
+        waapi_client_factory=lambda _: FakeClient([], result={'displayName': 'Wwise', 'isCommandLine': False, 'version':
             dict(zip(('year', 'major', 'minor', 'build'), map(int, build.split('.'))))}))
     from wwise_waapi import authoring_launch
     monkeypatch.setattr(authoring_launch.sys, 'platform', 'darwin')
@@ -69,6 +83,8 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
         stdout = ''
         if executable == 'wineprefixcreate':
             facts.prefix.mkdir(parents=True)
+            (facts.prefix / 'system.reg').write_text('owned registry')
+            (facts.prefix / 'cxbottle.conf').symlink_to(facts.cx / 'support/Wwise2019x64/cxbottle.conf')
         elif executable == 'wwise_prepare':
             link = facts.prefix / 'drive_c/Program Files/Audiokinetic' / ('Wwise ' + facts.build)
             link.parent.mkdir(parents=True)
@@ -88,7 +104,10 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     command, options = started[0]
     native_executable = {'2024.1.13.9056': 'c:/Program Files/Audiokinetic/Wwise 2024.1.13.9056/Authoring/x64/Release/bin/Wwise.exe',
         '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe'}[build]
-    assert command == [str(facts.cx / 'bin/wine'), 'start.exe', '/wait', native_executable, native_project]
+    # Matching bundled wwise_launcher selects macdrv and waits for descendants.
+    # Bind its bottle explicitly to this owner, never the user's default bottle.
+    assert command == [str(facts.cx / 'bin/wine'), '--bottle', 'Wwise2019x64',
+        '--enable-alt-loader', 'macdrv', '--wait-children', native_executable, native_project]
     assert options['cwd'] == str(facts.project.parent)
     assert options['env']['HOME'] == str(facts.home)
     assert options['env']['WINEPREFIX'] == str(facts.prefix)
@@ -97,7 +116,13 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     assert lifecycle.ready_result['isCommandLine'] is False
     assert lifecycle.launch_project_attestation == {'method': 'owned_winepath_roundtrip',
         'project': str(facts.project), 'native_project': native_project, 'roundtrip_project': str(facts.project),
-        'build': build}
+        'build': build, 'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(facts.prefix),
+            'managed_reference': str(facts.cx / 'support/Wwise2019x64'),
+            'configuration': str(facts.cx / 'support/Wwise2019x64/cxbottle.conf'),
+            'environment': {key: options['env'][key] for key in
+                ('HOME', 'WINEPREFIX', 'CX_BOTTLE', 'CX_BOTTLE_PATH', 'CX_MANAGED_BOTTLE_PATH')}}}
+    from tests.destructive.support.sandbox_fixture import require_authoring_launch_proof
+    require_authoring_launch_proof(lifecycle, project=facts.project, build=build)
     assert [Path(row[0][0]).name for row in preparation] == ['wineprefixcreate', 'wwise_prepare', 'wine', 'wine']
     assert all(row[1]['env']['WINEPREFIX'] == str(facts.prefix) and 0 < row[1]['timeout'] <= 120 for row in preparation)
 
@@ -134,6 +159,56 @@ def test_failed_authoring_preparation_still_uses_the_owners_prefix_cleanup_once(
     before = len(commands)
     lifecycle.shutdown()
     assert len(commands) == before
+
+
+@pytest.mark.parametrize('drift', ['managed-link', 'configuration', 'private-registry', 'private-search', 'managed-search'])
+def test_authoring_bottle_resolution_drift_stops_before_owned_process(tmp_path, monkeypatch, drift):
+    facts = _bundle(tmp_path)
+    from wwise_waapi import authoring_launch
+    import wwise_waapi.headless as headless
+    monkeypatch.setattr(authoring_launch.sys, 'platform', 'darwin')
+    monkeypatch.setattr(authoring_launch, 'MACOS_AUTHORING_INSTALL_ROOT', facts.installed.parent)
+    monkeypatch.setattr(headless, 'assert_port_free', lambda *_: None)
+    native = 'Z:\\owned.wproj'
+    def run(command, **kwargs):
+        name, stdout = Path(command[0]).name, ''
+        if name == 'wineprefixcreate':
+            facts.prefix.mkdir(parents=True)
+            (facts.prefix / 'system.reg').write_text('owned registry')
+            (facts.prefix / 'cxbottle.conf').symlink_to(facts.cx / 'support/Wwise2019x64/cxbottle.conf')
+        elif name == 'wwise_prepare':
+            link = facts.prefix / 'drive_c/Program Files/Audiokinetic' / ('Wwise ' + facts.build)
+            link.parent.mkdir(parents=True)
+            link.symlink_to(facts.installed, target_is_directory=True)
+        elif name == 'wine' and command[-2] == '-w':
+            stdout = native
+        elif name == 'wine' and command[-2] == '-u':
+            stdout = str(facts.project)
+            if drift == 'managed-link':
+                link = facts.home / 'Library/Application Support/Wwise2019/BuiltinBottles'
+                link.unlink()
+                link.symlink_to(tmp_path, target_is_directory=True)
+            elif drift == 'configuration':
+                config = facts.prefix / 'cxbottle.conf'
+                config.unlink()
+                config.symlink_to(_executable(tmp_path / 'foreign.conf'))
+            elif drift == 'private-registry':
+                (facts.prefix / 'system.reg').unlink()
+            else:
+                key = 'CX_BOTTLE_PATH' if drift == 'private-search' else 'CX_MANAGED_BOTTLE_PATH'
+                kwargs['env'][key] = '/unowned/Bottles'
+        elif name == 'ps':
+            stdout = '999 fake pytest process\n'
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr='')
+    monkeypatch.setattr(authoring_launch.subprocess, 'run', run)
+    lifecycle = HeadlessLifecycle(console_path=facts.console, project_path=facts.project, port=8080,
+        host_kind='wwise-authoring', authoring_build=facts.build, authoring_owned_root=facts.owned,
+        launch_env={'HOME': str(facts.home), 'WINEPREFIX': str(facts.prefix)},
+        process_factory=lambda *_a, **_kw: pytest.fail('No process after bottle resolution drift'))
+    with pytest.raises((ValueError, OSError)):
+        lifecycle.launch()
+    assert lifecycle.process is None
+    assert lifecycle.launch_project_attestation is None
 
 
 @pytest.mark.parametrize('mismatch', ['console', 'build', 'field-type'])

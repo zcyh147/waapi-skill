@@ -85,10 +85,34 @@ class OwnedMacAuthoringContext:
         roundtrip = self._run([str(self.cx / 'bin/wine'), str(self.cx / 'lib/wine/x86_64-windows/winepath.exe'), '-u', native], timeout=10).strip()
         if len(roundtrip.splitlines()) != 1 or _real(Path(roundtrip), directory=False) != self.project:
             raise AuthoringLaunchError('Owned Authoring project path roundtrip differs from the sandbox')
-        command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
+        resolution = self._require_bottle_resolution()
+        # A private stub's Updater resolves this same logical name against the
+        # matching managed support. Absolute paths cannot identify that bottle.
+        command = [str(self.cx / 'bin/wine'), '--bottle', resolution['name'],
+            '--enable-alt-loader', 'macdrv', '--wait-children',
             f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe', native]
         return command, {'method': 'owned_winepath_roundtrip', 'project': str(self.project), 'native_project': native,
-                         'roundtrip_project': str(self.project), 'build': self.build}
+                         'roundtrip_project': str(self.project), 'build': self.build, 'bottle_resolution': resolution}
+
+    def _require_bottle_resolution(self) -> dict:
+        builtin = self.home / 'Library/Application Support/Wwise2019/BuiltinBottles'
+        expected = {'HOME': str(self.home), 'WINEPREFIX': str(self.prefix), 'CX_BOTTLE': 'Wwise2019x64',
+            'CX_BOTTLE_PATH': str(self.prefix.parent), 'CX_MANAGED_BOTTLE_PATH': str(builtin)}
+        if any(self.environment.get(key) != value for key, value in expected.items()):
+            raise AuthoringLaunchError('Owned Authoring bottle resolution environment differs')
+        if not builtin.is_symlink() or builtin.resolve(strict=True) != self.cx / 'support':
+            raise AuthoringLaunchError('Owned Authoring managed bottle mapping differs')
+        managed = _real(self.cx / 'support/Wwise2019x64')
+        _real(managed / 'system.reg', directory=False)
+        managed_config = _real(managed / 'cxbottle.conf', directory=False)
+        if _real(self.prefix) != self.prefix:
+            raise AuthoringLaunchError('Owned Authoring private bottle mapping differs')
+        _real(self.prefix / 'system.reg', directory=False)
+        config = (self.prefix / 'cxbottle.conf').resolve(strict=True)
+        if not config.is_file() or (config != managed_config and config != self.prefix / 'cxbottle.conf'):
+            raise AuthoringLaunchError('Owned Authoring bottle configuration is outside its owned or matching managed scope')
+        return {'name': 'Wwise2019x64', 'private_prefix': str(self.prefix), 'managed_reference': str(managed),
+            'configuration': str(config), 'environment': expected}
 
 
 def owned_mac_authoring_context(*, console: Path, project: Path | None, owned_root: Path | None,

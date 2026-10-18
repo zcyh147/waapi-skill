@@ -812,7 +812,7 @@ def test_prepared_receipt_failure_consumes_finish_without_repeating_shutdown(mon
 
 
 @pytest.mark.parametrize('version,build', [('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143')])
-@pytest.mark.parametrize('broken', [None, 'roundtrip', 'native-argv', 'host', 'build'])
+@pytest.mark.parametrize('broken', [None, 'roundtrip', 'native-argv', 'host', 'build', 'bottle-environment', 'bottle-proof'])
 def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proof(monkeypatch, tmp_path, version, build, broken):
     _install_fakes(monkeypatch, tmp_path, version=version)
     root = tmp_path / 'authoring-scenario'
@@ -820,9 +820,20 @@ def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proo
     captured = {}
     def launch(sandbox, env, **kwargs):
         captured.update(kwargs)
+        prefix = home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+        environment = {'HOME': str(home), 'WINEPREFIX': str(prefix), 'CX_BOTTLE': 'Wwise2019x64',
+            'CX_BOTTLE_PATH': str(prefix.parent),
+            'CX_MANAGED_BOTTLE_PATH': str(home / 'Library/Application Support/Wwise2019/BuiltinBottles')}
         native = 'Z:\\private\\SampleProject.wproj'
         proof = {'method': 'owned_winepath_roundtrip', 'project': str(sandbox.sandbox_project),
-                 'native_project': native, 'roundtrip_project': str(sandbox.sandbox_project), 'build': build}
+                 'native_project': native, 'roundtrip_project': str(sandbox.sandbox_project), 'build': build,
+                 'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(prefix),
+                    'managed_reference': '/owned/support/Wwise2019x64',
+                    'configuration': '/owned/support/Wwise2019x64/cxbottle.conf', 'environment': dict(environment)}}
+        if broken == 'bottle-environment':
+            environment['CX_BOTTLE_PATH'] = '/unowned/Bottles'
+        elif broken == 'bottle-proof':
+            proof['bottle_resolution']['managed_reference'] = '/unowned/support/Wwise2019x64'
         if broken == 'roundtrip':
             proof['roundtrip_project'] = str(tmp_path / 'user-project.wproj')
         info = {'isCommandLine': broken == 'host', 'version': {
@@ -830,10 +841,10 @@ def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proo
             'build': int(build.split('.')[3]) + (1 if broken == 'build' else 0), 'displayName': build}}
         return SimpleNamespace(host_kind='wwise-authoring', host='127.0.0.1', port=8080,
             process=SimpleNamespace(pid=424242), ready_result=info,
-            command=['/owned/bin/wine', 'start.exe', '/wait',
+            command=['/owned/bin/wine', '--bottle', 'Wwise2019x64', '--enable-alt-loader', 'macdrv', '--wait-children',
                      f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe',
                      native if broken != 'native-argv' else 'Z:\\user-project.wproj'],
-            launch_cwd=sandbox.sandbox_root, launch_project_attestation=proof, launch_preparation=[])
+            launch_cwd=sandbox.sandbox_root, launch_env=environment, launch_project_attestation=proof, launch_preparation=[])
     monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
     owner = lifecycle_v3.ScenarioLifecycle(scenario_id='authoring-layout-batch', version=version,
         scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, host_kind='wwise-authoring',
