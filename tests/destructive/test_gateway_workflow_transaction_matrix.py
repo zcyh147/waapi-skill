@@ -5786,3 +5786,353 @@ def test_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime: 
     category = _collect_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime,
         sound_name='WAAPI_SLOT_' + uuid.uuid4().hex[:12])
     assert category['status'] == 'PASS', category
+
+
+def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
+    """Five graph effects with independent complete pair/Curve observations."""
+    import math
+    from copy import deepcopy
+    output = runtime.state_dir / 'rtpc-graph-acceptance.json'
+    category = {'category': 'rtpc-graph-acceptance', 'status': 'FAIL', 'observation_path': str(output),
+        'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'}
+    runtime.category_results.append(category)
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'effects': [],
+        'setup_coverage_credit': False, 'business_effect_verified': False, 'complete': False, 'metadata': {},
+        'exclusive': {'status': 'pending', 'reason': 'No legal active source-backed Exclusive field proved'},
+        'lifecycle_acceptance': 'Existing host-category-evidence/v3 finalizer owns source, host and cleanup proof'}
+    def persist():
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(body) <= 16 * 1024 * 1024, 'RTPC graph receipt byte bound exceeded'
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(body).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < 384, 'RTPC graph public call bound exceeded'
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['exception'] = {'type': type(exc).__name__, 'message': str(exc)}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            return payload
+    gateway = Gateway()
+    projection = ['--include', 'class-id', '--include', 'owner', '--include', 'parent', '--include', 'notes']
+    def query(argv, *, count=None):
+        payload = gateway.gateway(['query-object', *argv], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and len(rows) <= 8, payload
+        assert payload.get('limit_reached') is not True and payload.get('projection_complete') is not False, payload
+        assert payload.get('status') != 'partial' and len({row['id'] for row in rows}) == len(rows), payload
+        if count is not None: assert payload.get('count') == len(rows) == count, payload
+        for row in rows:
+            assert uuid.UUID(row['id']).int != 0 and isinstance(row.get('path'), str), row
+        return rows
+    def exact(identity, fields=(), *, curve=False):
+        rows = query(['--exact-id', identity, *projection,
+            *(arg for field in fields for arg in ('--include-field', field)),
+            *(['--include', 'curve-points'] if curve else [])], count=1)
+        assert rows[0]['id'] == identity and type(rows[0].get('class_id')) is int, rows
+        return rows[0]
+    def inventory(identity, wanted):
+        names, choices, page = [], {}, None
+        for _ in range(4):
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in result['fields']:
+                assert isinstance(field.get('name'), str) and field['name'] not in names, result
+                names.append(field['name'])
+                if field['name'] in wanted: choices[field['name']] = field['selection']
+            if result.get('complete') is True:
+                assert len(names) == result['total_count'], result
+                break
+            page = _required_string(result, 'next_page')
+        else: raise AssertionError('RTPC graph names exceed four complete pages')
+        details = {}
+        for token, selection in choices.items():
+            result = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+            assert result.get('complete') is True, result
+            details[token] = {'selection': selection, 'metadata': result['metadata']}
+        receipt['metadata'][identity] = {'names': names, 'details': details}
+        return details
+    def ref(row, token):
+        value = row.get('references', {}).get(token)
+        identity = value.get('id') if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and uuid.UUID(identity).int != 0, (token, row)
+        return identity
+    def membership(owner):
+        return query(['--advanced-waql', f'from object "{owner}" select @RTPC', '--max-results', '8', *projection])
+    def snapshot(owner):
+        if owner not in receipt['metadata']:
+            inventory(owner, tuple(field_details))
+        selected = tuple(receipt['metadata'][owner]['details'])
+        sound = exact(owner, selected)
+        assert set(sound.get('properties', {})) == set(selected), sound
+        assert sound['type'] == 'Sound' and sound['class_id'] == classes['Sound'], sound
+        listed = membership(owner)
+        members = []
+        for candidate in listed:
+            if candidate['id'] not in receipt['metadata']:
+                details = inventory(candidate['id'], ('PropertyName', 'ControlInput', 'Curve'))
+                assert set(details) == {'PropertyName', 'ControlInput', 'Curve'}, details
+            row = exact(candidate['id'], ('PropertyName', 'ControlInput', 'Curve'))
+            assert {key: row[key] for key in candidate} == candidate, (candidate, row)
+            assert row['type'] == 'RTPC' and row['name'] == '' and row['class_id'] == classes['RTPC'], row
+            assert row.get('owner', {}).get('id') == owner, row
+            assert isinstance(row.get('properties', {}).get('PropertyName'), str), row
+            control = ref(row, 'ControlInput')
+            assert control in controls_by_id, row
+            assert exact(control, ('Min', 'Max')) == controls_by_id[control]['object'], row
+            curve_id = ref(row, 'Curve')
+            hopped = query(['--advanced-waql', f'from object "{row["id"]}" select @Curve', '--max-results', '2',
+                *projection, '--include', 'curve-points'], count=1)[0]
+            curve = exact(curve_id, curve=True)
+            assert hopped == curve and curve['id'] == curve_id and curve['type'] == 'Curve', (hopped, curve)
+            # The canonical Curve hop proves the reference, not an invented
+            # immediate owner/parent hierarchy. Preserve actual optional facts.
+            assert curve['class_id'] == classes['Curve'], curve
+            points = curve.get('curve_points')
+            assert isinstance(points, list) and 1 <= len(points) <= 256, curve
+            assert all(set(point) == {'x', 'y', 'shape'} and all(type(point[key]) in (int, float)
+                and math.isfinite(point[key]) for key in ('x', 'y')) for point in points), curve
+            members.append({'object': row, 'curve': curve, 'pair': [row['properties']['PropertyName'], control]})
+        assert len({tuple(row['pair']) for row in members}) == len(members), members
+        return {'owner': sound, 'members': members}
+    def selected_field(draft, token, *, owner=None, kind=None):
+        scope = ['--object-handle', owner] if owner else ['--type-handle', kind]
+        # The token came from the complete source-backed metadata inventory;
+        # do not assume it lies on the first Draft list page.
+        result = _update_business_draft(gateway, draft, 'draft-discover-fields', [*scope, '--meaning', token], live=True)
+        return discovered_business_field_handle(result, token)
+    def declare(draft, owner_handle, token, control_id, points, declaration, *, kind=None):
+        control = _bind_business_object(gateway, draft, object_id=control_id)
+        field = selected_field(draft, token, owner=owner_handle if kind is None else None, kind=kind)
+        _update_business_draft(gateway, draft, 'draft-declare-rtpc', ['--declaration-id', declaration,
+            '--object-handle', owner_handle, '--field-handle', field, '--control-input-handle', control,
+            '--notes', 'Keep ' + declaration,
+            *(arg for point in points for arg in ('--point', str(point['x']), str(point['y']), point['shape']))], live=False)
+    def points(token, control_id, offset):
+        bounds = controls_by_id[control_id]['source_range']
+        restriction = field_details[token]['metadata']['restriction']
+        low, high = restriction.get('min'), restriction.get('max')
+        assert all(type(value) in (int, float) and math.isfinite(value) for value in (low, high)) and low < high, restriction
+        return [{'x': bounds['minimum'], 'y': low + (high - low) * offset, 'shape': 'Linear'},
+            {'x': bounds['maximum'], 'y': low + (high - low) * (offset + 0.25), 'shape': 'Linear'}]
+    def complete(draft, label, *, effect=True):
+        phase = {'phase': label, 'effect_verified': False, 'native_outcome': 'not_executed'}
+        (receipt['effects'] if effect else receipt.setdefault('setup', [])).append(phase)
+        phase_category = {'category': 'rtpc-graph-' + label, 'status': 'FAIL', 'observation_path': str(output),
+            'setup_coverage_credit': False}
+        runtime.category_results.append(phase_category)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        identity = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', identity], live=False)
+        assert shown['artifact']['prepared_operation']['dispatch']['uri'] == 'ak.wwise.core.object.set', shown
+        phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        return phase, phase_category
+    def admit(phase, phase_category, observed):
+        phase['independent_effect'] = observed
+        phase['effect_verified'] = True
+        phase_category['status'] = 'PASS'
+    def check_pairs(observed, expected):
+        assert [row['pair'] for row in observed['members']] == [row['pair'] for row in expected], (expected, observed)
+        for actual, wanted in zip(observed['members'], expected, strict=True):
+            assert actual['curve']['curve_points'] == wanted['points'], (wanted, actual)
+            assert actual['object']['notes'] == wanted['notes'], (wanted, actual)
+    try:
+        assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No fabricated 2021 RTPC graph construction'
+        schema = gateway.gateway(['query-schema', '--output', 'curve-points'], live=False)
+        assert 'curve-points' in json.dumps(schema) and 'points' in json.dumps(schema), schema
+        gateway.gateway(['query-schema', '--advanced'], live=False)
+        reflected = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'GameParameter',
+            '--meaning', 'RTPC', '--meaning', 'Curve', '--page-size', '64'], live=True)['agent_result']
+        assert reflected.get('complete') is True, reflected
+        classes = {}
+        for token in ('Sound', 'GameParameter', 'RTPC', 'Curve'):
+            match, = [row for row in reflected['types'] if row.get('name') == token]
+            assert type(match.get('classId')) is int, match
+            classes[token] = match['classId']
+        receipt['live_classes'] = classes
+        actor_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        input_segments = ('Game Parameters', 'Default Work Unit')
+        setup = _start_business_draft(gateway, 'object.set')
+        actor = _bind_business_object(gateway, setup, path_segments=actor_segments)
+        parameters = _bind_business_object(gateway, setup, path_segments=input_segments)
+        sound_kind = _discover_business_type(gateway, setup, meaning='Sound', role='object', expected_label='Sound')
+        input_kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
+        for declaration, parent, label, kind in [('owner', actor, name, sound_kind),
+                ('input-a', parameters, name + '_A', input_kind), ('input-b', parameters, name + '_B', input_kind)]:
+            _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', declaration,
+                '--parent-handle', parent, '--name', label, '--kind', kind, '--field', 'notes', 'Keep ' + declaration], live=False)
+        setup_phase, setup_category = complete(setup, 'setup_no_credit', effect=False)
+        def by_path(segments):
+            row, = query([*(arg for segment in segments for arg in ('--path-segment', segment)), *projection], count=1)
+            certified = exact(row['id'])
+            assert certified == row, (row, certified)
+            return certified
+        owner = by_path((*actor_segments, name))['id']
+        controls_by_id = {}
+        for suffix in ('_A', '_B'):
+            identity = by_path((*input_segments, name + suffix))['id']
+            details = inventory(identity, ('Min', 'Max'))
+            assert set(details) == {'Min', 'Max'}, details
+            row = exact(identity, ('Min', 'Max'))
+            minimum, maximum = row['properties']['Min'], row['properties']['Max']
+            assert all(type(value) in (int, float) and math.isfinite(value) for value in (minimum, maximum)) and minimum < maximum, row
+            assert row['type'] == 'GameParameter' and row['class_id'] == classes['GameParameter'], row
+            controls_by_id[identity] = {'object': row, 'source_range': {'minimum': minimum, 'maximum': maximum}}
+        receipt['controls'] = list(controls_by_id.values())
+        a, b = controls_by_id
+        field_details = inventory(owner, ('Volume', 'Pitch', 'CenterPercentage'))
+        assert {'Volume', 'Pitch'}.issubset(field_details), field_details
+        assert field_details['Volume']['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative'}, field_details
+        status = gateway.gateway(['status'], live=True)
+        receipt['host_and_project'] = {'wwise': status.get('wwise'), 'project': status.get('project'), 'endpoint': status.get('endpoint')}
+        platform = status.get('project', {}).get('currentPlatformId')
+        assert isinstance(platform, str) and uuid.UUID(platform).int != 0, status
+        def enabled(token):
+            code, payload = gateway.raw_gateway(['metadata', 'property-state', '--exact-id', owner,
+                '--selection', field_details[token]['selection'], '--platform', platform])
+            receipt.setdefault('enabled_observations', []).append({'field': token, 'exit_code': code, 'payload': payload})
+            return code == 0 and payload.get('agent_result', {}).get('enabled') is True
+        assert enabled('Volume'), 'Selected Volume is not observed enabled on the actual current platform'
+        active = {token: enabled(token) for token in ('Pitch', 'CenterPercentage') if token in field_details
+            and field_details[token]['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative', 'Exclusive'}}
+        candidates = [token for token in ('Pitch', 'CenterPercentage') if active.get(token)]
+        assert candidates, 'No second legal source-backed RTPC field observed'
+        second = next((token for token in candidates if field_details[token]['metadata']['supports']['rtpc'] == 'Exclusive'), candidates[0])
+        exclusive_selected = field_details[second]['metadata']['supports']['rtpc'] == 'Exclusive'
+        if exclusive_selected:
+            receipt['exclusive'].update(status='active_selected', field=second, platform=platform,
+                metadata=field_details[second]['metadata'])
+        draft = _start_business_draft(gateway, 'object.set')
+        target = _bind_business_object(gateway, draft, object_id=owner)
+        lists = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+            '--field-source', 'documented-lists', '--list'], live=True)['agent_result']
+        selected_list, = [row for row in lists['items'] if row.get('name') == 'RTPC']
+        assert selected_list.get('field_kind') == 'list' and selected_list.get('element_classes') == [
+            {'name': 'RTPC', 'class_id': classes['RTPC']}], selected_list
+        disclosed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+            '--field-source', 'documented-lists', '--selection', selected_list['selection']], live=True)
+        receipt['documented_list'] = disclosed['meaning_results'][0]['candidates'][0]
+        assert receipt['documented_list']['evidence']['kind'] == 'documented-list', disclosed
+        initial = snapshot(owner)
+        assert initial['members'] == [], initial
+        setup_phase['independent_effect'] = {'owner': initial, 'controls': receipt['controls']}
+        setup_category['status'] = 'PASS'
+        wanted = [{'pair': ['Volume', a], 'points': points('Volume', a, 0.25), 'notes': 'Keep volume-a'},
+            {'pair': [second, a], 'points': points(second, a, 0.25), 'notes': 'Keep second-a'}]
+        for token, control, declaration in [('Volume', a, 'volume-a'), (second, a, 'second-a')]:
+            declare(draft, target, token, control, points(token, control, 0.25), declaration)
+        phase, phase_category = complete(draft, 'two_new_pairs')
+        first = snapshot(owner); check_pairs(first, wanted)
+        assert first['owner'] == initial['owner'], (initial, first)
+        admit(phase, phase_category, first)
+        draft = _start_business_draft(gateway, 'object.set')
+        target = _bind_business_object(gateway, draft, object_id=owner)
+        declare(draft, target, second, a, points(second, a, 0.5), 'second-a')
+        declare(draft, target, 'Volume', b, points('Volume', b, 0.25), 'volume-b')
+        if exclusive_selected:
+            current = gateway.gateway(['status'], live=True)
+            assert current.get('project', {}).get('currentPlatformId') == platform and enabled(second), current
+        phase, phase_category = complete(draft, 'exact_update_and_append')
+        expected_update = first['members'][1]['object']['id']
+        native = phase['compiled_native_request']['args']['objects']
+        assert any(row.get('object') == expected_update and '@Curve' in row for row in native), native
+        wanted[1]['points'] = points(second, a, 0.5)
+        wanted.append({'pair': ['Volume', b], 'points': points('Volume', b, 0.25), 'notes': 'Keep volume-b'})
+        after = snapshot(owner); check_pairs(after, wanted)
+        assert after['owner'] == first['owner'] and after['members'][0] == first['members'][0], (first, after)
+        assert after['members'][1]['object']['id'] == expected_update, after
+        admit(phase, phase_category, after)
+        if exclusive_selected:
+            rejected = _start_business_draft(gateway, 'object.set')
+            target = _bind_business_object(gateway, rejected, object_id=owner)
+            declare(rejected, target, second, b, points(second, b, 0.25), 'exclusive-conflict')
+            code, payload = gateway.raw_gateway(['draft-check', rejected.draft_id, '--task-authority', rejected.task_authority,
+                '--expected-revision', str(rejected.revision)])
+            receipt['exclusive']['rejection'] = {'exit_code': code, 'payload': payload}
+            assert code != 0 and payload.get('error_code') == 'RTPC_EXCLUSIVE_CONFLICT', payload
+            assert snapshot(owner) == after
+            receipt['exclusive']['status'] = 'observed_and_conflict_rejected'
+        else:
+            runtime.category_results.append({'category': 'rtpc-graph-exclusive-cardinality', 'status': 'blocked',
+                'reason': receipt['exclusive']['reason'], 'observation_path': str(output)})
+        nested_name = name + '_Nested'
+        def planned(*, merge, value):
+            draft = _start_business_draft(gateway, 'object.set')
+            parent = _bind_business_object(gateway, draft, path_segments=actor_segments)
+            kind = _discover_business_type(gateway, draft, meaning='Sound', role='object', expected_label='Sound')
+            if merge: _update_business_draft(gateway, draft, 'draft-business-configure', ['--name-conflict', 'merge'], live=False)
+            declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'nested',
+                '--parent-handle', parent, '--name', nested_name, '--kind', kind, '--field', 'notes', 'Keep nested'], live=False)
+            target = declared['draft']['declared_object']['result_handle']
+            declare(draft, target, 'Volume', a, points('Volume', a, value), 'nested-volume', kind=kind)
+            return draft
+        phase, phase_category = complete(planned(merge=False, value=0.25), 'planned_owner')
+        assert phase['compiled_native_request']['args']['onNameConflict'] == 'fail', phase
+        nested_id = by_path((*actor_segments, nested_name))['id']
+        nested = snapshot(nested_id)
+        check_pairs(nested, [{'pair': ['Volume', a], 'points': points('Volume', a, 0.25), 'notes': 'Keep nested-volume'}])
+        admit(phase, phase_category, nested)
+        phase, phase_category = complete(planned(merge=True, value=0.5), 'merged_planned_owner')
+        assert phase['compiled_native_request']['args']['onNameConflict'] == 'merge', phase
+        merged = snapshot(nested_id)
+        check_pairs(merged, [{'pair': ['Volume', a], 'points': points('Volume', a, 0.5), 'notes': 'Keep nested-volume'}])
+        assert merged['owner'] == nested['owner'] and merged['members'][0]['object']['id'] == nested['members'][0]['object']['id'], (nested, merged)
+        assert any(row.get('object') == nested['members'][0]['object']['id'] for row in phase['compiled_native_request']['args']['objects']), phase
+        admit(phase, phase_category, merged)
+        assert snapshot(owner) == after
+        draft = _start_business_draft(gateway, 'object.set')
+        target = _bind_business_object(gateway, draft, object_id=owner)
+        _update_business_draft(gateway, draft, 'draft-business-configure', ['--list-behavior', 'replace-all'], live=False)
+        declare(draft, target, 'Volume', b, points('Volume', b, 0.5), 'replacement')
+        declare(draft, target, second, a, points(second, a, 0.25), 'replacement-second')
+        phase, phase_category = complete(draft, 'replace_all')
+        assert phase['compiled_native_request']['args']['listMode'] == 'replaceAll', phase
+        replaced = snapshot(owner)
+        check_pairs(replaced, [{'pair': ['Volume', b], 'points': points('Volume', b, 0.5), 'notes': 'Keep replacement'},
+            {'pair': [second, a], 'points': points(second, a, 0.25), 'notes': 'Keep replacement-second'}])
+        assert replaced['owner'] == after['owner'] and snapshot(nested_id) == merged, (after, replaced)
+        old_ids = [row['object']['id'] for row in after['members']]
+        assert not set(row['object']['id'] for row in replaced['members']).intersection(old_ids), replaced
+        for identity in old_ids: assert query(['--exact-id', identity], count=0) == []
+        phase['removed_member_ids'] = old_ids
+        admit(phase, phase_category, replaced)
+        receipt['business_effect_verified'] = True
+        receipt['complete'] = True
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)}
+        raise
+    finally:
+        completed_status = category['status']
+        category['status'] = 'FAIL'
+        persist()
+        category['status'] = completed_status
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version == '2021.1':
+        pytest.skip('2021 RTPC construction remains separate; no modern object.set is fabricated')
+    category = _collect_rtpc_graph_acceptance(workflow_sandbox_runtime, name='WAAPI_RTPC_' + uuid.uuid4().hex[:12])
+    assert category['status'] == 'PASS', category

@@ -2589,3 +2589,230 @@ def test_rtpc_2021_representation_probe_stops_before_source_reads_on_wrong_build
     assert report['collection_complete'] is False and report['runtime_version_observed']['build'] == 8109
     assert not any(command[0] in {'query-object', 'metadata'} for command in commands)
     assert runtime.category_results[0]['status'] == 'FAIL'
+
+
+def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exclusive=True):
+    """Actual Gateway; source-shaped native graph state, not native receipts."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_unnamed_rtpc_graph_gateway import rtpc_task
+    task, _ = rtpc_task(tmp_path, version)
+    actor, parameters = ('{' + str(uuid.UUID(int=n)).upper() + '}' for n in (101, 102))
+    actor_path = ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + '\\Default Work Unit'
+    task.objects = {identity: {'id': identity, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+        'classId': 1638416, 'path': path, 'parent': None, 'notes': 'Keep work unit'}
+        for identity, path in [(actor, actor_path), (parameters, r'\Game Parameters\Default Work Unit')]}
+    task.metadata.update({
+        'Min': {'name': 'Min', 'type': 'Real64', 'default': -10},
+        'Max': {'name': 'Max', 'type': 'Real64', 'default': 90},
+        'CenterPercentage': {'name': 'CenterPercentage', 'type': 'int32', 'default': 0,
+            'supports': {'rtpc': 'Exclusive' if exclusive else 'None'},
+            'restriction': {'type': 'range', 'min': 0, 'max': 100}}})
+    fields = {'Sound': ['Volume', 'Pitch', 'CenterPercentage'], 'GameParameter': ['Min', 'Max'],
+        'RTPC': ['PropertyName', 'ControlInput', 'Curve'], 'Curve': [], 'WorkUnit': []}
+    if fault in {'names-overflow', 'paged-sound-fields'}:
+        fields['Sound'] = ['Volume', 'Pitch', 'CenterPercentage'] + [f'Other{i:03}' for i in range(254 if fault == 'names-overflow' else 108)]
+    original, writes, commands = task.call, [], []
+    next_id = 201
+    def allocate():
+        nonlocal next_id
+        next_id += 1
+        return '{' + str(uuid.UUID(int=next_id)).upper() + '}'
+    def create(node, parent, *, owned=False):
+        matches = [row for row in task.objects.values() if row.get('parent') == {'id': parent}
+            and row['name'] == node['name'] and row['type'] == node['type']]
+        if matches and task.conflict != 'merge': raise ValueError('Native name collision requires selected merge')
+        row = matches[0] if matches else None
+        if row is None:
+            identity = allocate()
+            row = {'id': identity, 'name': node['name'], 'type': node['type'],
+                'classId': next(entry['classId'] for entry in task.types if entry['name'] == node['type']),
+                'path': ('\\opaque-' + identity if owned else task.objects[parent]['path'] + '\\' + node['name']),
+                'notes': node.get('notes', ''), **({'owner': {'id': parent}} if owned else {'parent': {'id': parent}})}
+            if node['type'] == 'Sound':
+                row.update({'@RTPC': [], '@Volume': 0, '@Pitch': 0, '@CenterPercentage': 0})
+            if node['type'] == 'GameParameter':
+                row.update({'@Min': -10 if node['name'].endswith('_A') else 20, '@Max': 90 if node['name'].endswith('_A') else 220})
+                if fault == 'invalid-range': row['@Min'] = row['@Max']
+            task.objects[identity] = row
+        return apply(node, row)
+    def apply(node, row):
+        result = {'id': row['id'], 'name': row['name']}
+        if 'notes' in node: row['notes'] = node['notes']
+        if 'children' in node:
+            result['children'] = [create(child, row['id']) for child in node['children']]
+        if '@RTPC' in node:
+            if task.list_mode == 'replaceAll':
+                for old in row['@RTPC']:
+                    curve_id = task.objects[old['id']]['@Curve']['id']
+                    del task.objects[curve_id]; del task.objects[old['id']]
+                row['@RTPC'] = []
+            result['@RTPC'] = []
+            for child in node['@RTPC']:
+                member = create(child, row['id'], owned=True)
+                row['@RTPC'].append({'id': member['id']})
+                result['@RTPC'].append(member)
+        if '@PropertyName' in node: row['@PropertyName'] = node['@PropertyName']
+        if '@ControlInput' in node: row['@ControlInput'] = {'id': node['@ControlInput']}
+        if '@Curve' in node:
+            curve = row.get('@Curve', {}).get('id') or allocate()
+            points = deepcopy(node['@Curve']['points'])
+            row['@Curve'] = {'id': curve, 'points': points}
+            task.objects[curve] = {'id': curve, 'name': '', 'type': 'Curve', 'classId': 917520,
+                'path': '\\opaque-curve-' + curve, 'owner': {'id': row['id']}, 'notes': '', 'points': deepcopy(points)}
+            if fault == 'curve-owner-sound': task.objects[curve]['owner'] = deepcopy(row['owner'])
+            elif fault == 'curve-owner-omitted': task.objects[curve].pop('owner')
+        return result
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith('getProjectInfo'):
+            return {**original(uri, args, options), 'currentPlatformId': '{55555555-5555-5555-5555-555555555555}'}
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if uri.endswith('getPropertyInfo'): return deepcopy(task.metadata[args['property']])
+            kind = task.objects[args['object']]['type'] if 'object' in args else next(t['name'] for t in task.types if t['classId'] == args['classId'])
+            return {'return': fields[kind]}
+        if uri.endswith('object.set'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append(deepcopy(args))
+            task.list_mode = args.get('listMode', 'append')
+            task.conflict = args.get('onNameConflict', 'fail')
+            results = []
+            for node in args['objects']:
+                target = task.objects[node['object']]
+                result = apply(node, target)
+                # Native field-only rows may have no result association.
+                if target['type'] != 'RTPC': results.append(result)
+            return {'objects': results}
+        if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            expression = args.get('waql', '')
+            source = args.get('from', {})
+            if expression:
+                assert expression.startswith('from object "'), expression
+                identity = expression.split('"')[1]
+                rows = [row for row in task.objects.values() if identity in (row['id'], row['path'])]
+                if 'select @RTPC' in expression:
+                    rows = [task.objects[item['id']] for item in rows[0]['@RTPC']]
+                elif 'select @Curve' in expression:
+                    rows = [task.objects[rows[0]['@Curve']['id']]]
+            elif 'id' in source: rows = [task.objects[key] for key in source['id'] if key in task.objects]
+            else: rows = [row for row in task.objects.values() if row['path'] in source['path']]
+            for transform in args.get('transform', []):
+                token = transform['select'][0]
+                if token == 'children': rows = [row for row in task.objects.values() if row.get('parent') == {'id': rows[0]['id']}]
+                elif token == 'descendants': rows = [row for row in task.objects.values() if row['path'].startswith(rows[0]['path'] + '\\')]
+                else: raise AssertionError(transform)
+            return {'return': [{key: deepcopy(row.get(key, row.get('@' + key))) for key in options['return']
+                if key in row or '@' + key in row} for row in rows]}
+        return original(uri, args, options)
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', env=task.env,
+        candidate='fixture-candidate', category_results=[])
+    def raw(command):
+        commands.append(list(command))
+        code, payload = workflow.waapi_gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: task)
+        if fault == 'identity-drift' and command[0] == 'query-object' and '--path-segment' in command and 'WAAPI_RTPC_TEST' in command:
+            created = next(row for row in task.objects.values() if row['name'] == 'WAAPI_RTPC_TEST')
+            created.update(name='Changed between path and exact ID', path=created['path'] + '_Changed')
+        if command[0] == 'verify' and code == 0 and len(writes) == 3 and fault:
+            owner = next(row for row in task.objects.values() if row['name'] == 'WAAPI_RTPC_TEST')
+            members = [task.objects[row['id']] for row in owner['@RTPC']]
+            spare, selected = members[0], members[1]
+            if fault == 'wrong-pair': selected['@ControlInput'] = deepcopy(members[2]['@ControlInput'])
+            elif fault == 'spare-curve':
+                spare['@Curve']['points'][0]['y'] += 1
+                task.objects[spare['@Curve']['id']]['points'] = deepcopy(spare['@Curve']['points'])
+            elif fault == 'owner-property': owner['@Volume'] = 7
+            elif fault == 'spare-curve-owner': task.objects[spare['@Curve']['id']]['owner'] = {'id': parameters}
+            elif fault == 'missing-member': owner['@RTPC'].pop(0)
+            elif fault == 'wrong-owner': selected['owner'] = {'id': parameters}
+        return code, payload
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_rtpc_graph_collector_groups_real_public_effects_and_preserves_spare(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, version)
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    assert category['status'] == 'PASS'
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['business_effect_verified'] is True and receipt['setup_coverage_credit'] is False
+    assert len(writes) == 6 and [cmd[0] for cmd in commands].count('verify') == 6
+    assert len(receipt['effects']) == 5 and all(row['effect_verified'] for row in receipt['effects'])
+    assert receipt['exclusive']['status'] == 'observed_and_conflict_rejected'
+    assert receipt['effects'][1]['independent_effect']['members'][0] == receipt['effects'][0]['independent_effect']['members'][0]
+    assert {row['source_range']['minimum'] for row in receipt['controls']} == {-10, 20}
+
+
+@pytest.mark.parametrize('fault', ['wrong-pair', 'spare-curve', 'missing-member', 'wrong-owner', 'spare-curve-owner', 'owner-property'])
+def test_rtpc_graph_collector_independent_read_rejects_damage_after_gateway_verifies(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    receipt = json.loads((runtime.state_dir / 'rtpc-graph-acceptance.json').read_text())
+    assert runtime.category_results[0]['status'] == 'FAIL' and receipt['business_effect_verified'] is False
+    assert len(writes) == 3 and [cmd[0] for cmd in commands].count('verify') == 3
+    assert receipt['effects'][1]['verify']['payload']['verification']['business_state_verified'] is True
+    assert receipt['effects'][1]['effect_verified'] is False and receipt['failure']
+    assert len(receipt['calls']) <= 384
+
+
+def test_rtpc_graph_collector_records_pending_exclusive_without_manufacturing_witness(tmp_path, workflow):
+    runtime, _commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, exclusive=False)
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and len(writes) == 6
+    assert receipt['exclusive']['status'] == 'pending' and 'rejection' not in receipt['exclusive']
+    pending, = [row for row in runtime.category_results if row['category'] == 'rtpc-graph-exclusive-cardinality']
+    assert pending['status'] == 'blocked'
+
+
+def test_rtpc_graph_collector_never_constructs_2021_modern_graph(tmp_path, workflow):
+    commands, writes = [], []
+    runtime = SimpleNamespace(version='2021.1', state_dir=tmp_path / 'state', candidate='fixture-candidate', category_results=[])
+    runtime.raw_gateway = lambda command: commands.append(command)
+    with pytest.raises(AssertionError, match='No fabricated 2021'):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    assert commands == [] and writes == [] and runtime.category_results[0]['status'] == 'FAIL'
+
+
+@pytest.mark.parametrize('fault', ['names-overflow', 'invalid-range', 'identity-drift'])
+def test_rtpc_graph_collector_discovery_and_range_bounds_prevent_effect_credit(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    receipt = json.loads((runtime.state_dir / 'rtpc-graph-acceptance.json').read_text())
+    assert runtime.category_results[0]['status'] == 'FAIL' and receipt['complete'] is False
+    assert receipt['business_effect_verified'] is False and receipt['effects'] == []
+    assert len(writes) == 1 and [cmd[0] for cmd in commands].count('verify') == 1
+    assert receipt['failure'] and len(receipt['calls']) <= 384
+
+
+@pytest.mark.parametrize('fault', ['curve-owner-sound', 'curve-owner-omitted'])
+def test_rtpc_graph_collector_preserves_observed_curve_owner_and_omission(tmp_path, workflow, fault):
+    runtime, _commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, fault=fault)
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    assert category['status'] == 'PASS' and len(writes) == 6
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    observed = receipt['effects'][0]['independent_effect']
+    curve = observed['members'][0]['curve']
+    if fault == 'curve-owner-omitted': assert 'owner' not in curve
+    else: assert curve['owner']['id'] == observed['owner']['id']
+    assert receipt['effects'][1]['independent_effect']['members'][0]['curve'] == curve
+    assert receipt['complete'] is True
+    assert len(receipt['calls']) <= 384 and Path(category['observation_path']).stat().st_size <= 16 * 1024 * 1024
+
+
+def test_rtpc_graph_collector_selects_observed_fields_beyond_first_draft_page(tmp_path, workflow):
+    runtime, _commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, fault='paged-sound-fields')
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    assert category['status'] == 'PASS' and len(writes) == 6
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    owner = receipt['effects'][0]['independent_effect']['owner']['id']
+    assert len(receipt['metadata'][owner]['names']) == 111
+    assert receipt['documented_list']['field_kind'] == 'list'
