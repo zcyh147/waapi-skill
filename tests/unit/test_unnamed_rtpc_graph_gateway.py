@@ -622,3 +622,36 @@ def test_graph_modern_effects_uses_the_same_source_proven_empty_list_kernel(tmp_
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, json.dumps(verified)
     assert len(writes) == 1 and proofs
+
+
+def _native_shared_control_input_task(tmp_path):
+    task, writes = rtpc_task(tmp_path)
+    # Actual native2025 ControlInput restriction, retained664 dispatcher SHA
+    # ffd75a8dbb1606c1a75c89e2ca1736f53d1737c4528dd3506f0c6cc525a21450.
+    task.metadata['ControlInput'] = {'name': 'ControlInput', 'type': '', 'default': None, 'dependencies': [],
+        'restriction': {'type': 'reference', 'restrictions': [{
+            'type': ['Game Parameter', 'MIDI Parameter', 'Modulator LFO', 'Modulator Envelope', 'Modulator Time'],
+            'sharedOnlyTypes': ['Game Parameter', 'MIDI Parameter']}]}}
+    task.shared_control = True
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql') == f'from object "{ROOT}" where owner = null take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert options == {'return': ['id']}, options
+            return {'return': [{'id': ROOT}] if task.shared_control else []}
+        return original(uri, args, options)
+    task.call = call
+    return task, writes
+
+
+def test_new_rtpc_control_input_uses_actual_class_metadata_and_existing_shared_target(tmp_path):
+    task, writes = _native_shared_control_input_task(tmp_path)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, json.dumps(verified)
+    assert len(writes) == 1
+    native_queries = [args['waql'] for uri, args, _ in task.calls if uri.endswith('object.get') and 'owner = null' in args.get('waql', '')]
+    assert native_queries and set(native_queries) == {f'from object "{ROOT}" where owner = null take 1'}
