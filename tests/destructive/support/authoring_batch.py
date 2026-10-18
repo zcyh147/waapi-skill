@@ -22,6 +22,10 @@ from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from wwise_waapi.filesystem_security import path_is_link_or_reparse
 
 
+MEDIA_PRESERVATION_DIAGNOSTIC_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_authoring_2024_media_preservation_metadata_diagnostic')
+
+
 class AuthoringBatchAdapter:
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_collection_modifyitems(self, items):
@@ -226,9 +230,13 @@ class AuthoringBatchAdapter:
                 pass
         append_category_evidence(repo_root=self.repo_root, candidate=self.candidate, version=runtime.version,
             host={'display_name': self.info['displayName'], 'is_command_line': False, 'version': self.info['version']},
-            categories=[{'category': 'authoring-layout', 'nodeid': row['nodeid'],
-                         'status': 'PASS' if outcome == 'PASS' else 'FAIL' if row['outcome'] == 'FAIL' else 'blocked',
-                         'verifier_strength': 'public_gateway_exact_node_and_post_teardown_owned_proofs',
+            categories=[{'category': ('media-preservation-diagnostic' if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else 'authoring-layout'), 'nodeid': row['nodeid'],
+                         'status': ('FAIL' if row['outcome'] == 'FAIL' else 'blocked') if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else ('PASS' if outcome == 'PASS' else 'FAIL' if row['outcome'] == 'FAIL' else 'blocked'),
+                         'verifier_strength': ('bounded_public_read_only_diagnostic_no_business_effect_proof' if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else 'public_gateway_exact_node_and_post_teardown_owned_proofs'),
+                         **({'business_preservation_verified': False,
+                             'coverage_credit': 'none; diagnostic observation only',
+                             'reason': 'Collected metadata/settings do not prove media maintenance or preservation'}
+                            if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else {}),
                          **({'observation_artifact': self.observation_artifacts[row['nodeid']]}
                             if row['nodeid'] in self.observation_artifacts else {}),
                          **({'batch_finalization': self.batch_seal_descriptor}
@@ -389,6 +397,7 @@ def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path
 # Only nodes that consume this actual owner can enter its native batch. Other
 # families remain explicit integration work until they use the same protocol.
 OWNED_AUTHORING_NODEIDS = (
+    MEDIA_PRESERVATION_DIAGNOSTIC_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
       for variant in ('omitted', 'x-only', 'y-only', 'both')),
@@ -414,6 +423,9 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
     if (os.getenv('WWISE_VERSION') not in {'2024.1', '2025.1'}
             or any(os.getenv(name) != '1' for name in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'))):
         raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
+    if (MEDIA_PRESERVATION_DIAGNOSTIC_NODEID in selected
+            and (selected != (MEDIA_PRESERVATION_DIAGNOSTIC_NODEID,) or os.getenv('WWISE_VERSION') != '2024.1')):
+        raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')
     root = Path(raw_root)
     if (not root.is_absolute() or os.path.lexists(root)
             or any(path_is_link_or_reparse(part) for part in root.parents)
