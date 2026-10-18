@@ -14,6 +14,7 @@ POINTS = [(0, -48), (100, 0)]
 
 
 def rtpc_task(tmp_path, version='2025.1', fault=None):
+    tmp_path.mkdir(parents=True, exist_ok=True)
     task = OwnedGraphTask(tmp_path, version, 'object.set')
     task.types = [{'name': name, 'classId': value, 'type': 'WObject'} for name, value in
         [('Sound', 65552), ('GameParameter', 1507344), ('RTPC', 1441808), ('Curve', 917520), ('WorkUnit', 1638416)]]
@@ -387,3 +388,136 @@ def test_requested_owner_rename_preserves_unrequested_rtpc_suffix_and_curve(tmp_
     assert code == (0 if fault is None else 2), verified
     assert (verified.get('verified') is True) == (fault is None), verified
     assert len(writes) == 1
+
+
+def seed_many_pairs(task, count):
+    from uuid import UUID
+    for index in range(count):
+        seed_pair(task, identity='{' + str(UUID(int=1000 + index)).upper() + '}',
+            property_name='Unrequested' + str(index), curve='{' + str(UUID(int=2000 + index)).upper() + '}')
+
+
+def test_graph_aggregate_new_pairs_cannot_cross_complete_owner_list_cap(tmp_path):
+    task, writes = rtpc_task(tmp_path)
+    # Runtime's retained complete-list cap is128; each of the two new pairs
+    # alone fits below it, while their combined requested effect does not.
+    seed_many_pairs(task, 127)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    code, checked = task.step('draft-check')
+    assert code == 2, checked
+    assert 'RTPC_LIST_LIMIT_EXCEEDED' in json.dumps(checked), checked
+    assert not writes
+
+
+def test_two_pairs_share_one_complete_owner_snapshot_in_each_fresh_phase(tmp_path):
+    task, writes = rtpc_task(tmp_path)
+    seed_many_pairs(task, 12)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    declare_rtpc(task, owner, control, 'Volume', 'volume')
+    declare_rtpc(task, owner, control, 'Pitch', 'pitch')
+    original = task.call
+    def call(uri, args=None, options=None):
+        old_members = deepcopy(task.objects[FIRST]['@RTPC'])
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            task.objects[FIRST]['@RTPC'] = old_members + task.objects[FIRST]['@RTPC']
+        return result
+    task.call = call
+    def phase_snapshot_reads(start):
+        # This is the public RPC projection of the complete Curve/pair snapshot,
+        # distinct from ordinary owner/List identity proof and per-node effect reads.
+        return [args for uri, args, options in task.calls[start:] if uri.endswith('object.get')
+            and options.get('return') == ['id', 'name', 'type', 'path', 'notes', '@PropertyName', '@ControlInput', '@Curve']]
+    def owner_member_class_reads(start):
+        return [args for uri, args, options in task.calls[start:] if uri.endswith('object.get')
+            and '@Curve' in options.get('return', []) and 'classId' in options.get('return', [])
+            and 'owner' in options.get('return', [])]
+    start = len(task.calls)
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    assert len(phase_snapshot_reads(start)) == 1, phase_snapshot_reads(start)
+    assert len(owner_member_class_reads(start)) == 12
+    start = len(task.calls)
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    assert len(phase_snapshot_reads(start)) == 1, phase_snapshot_reads(start)
+    assert len(owner_member_class_reads(start)) == 12
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    start = len(task.calls)
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    assert len(phase_snapshot_reads(start)) == 1, phase_snapshot_reads(start)
+    assert len(owner_member_class_reads(start)) == 12
+    start = len(task.calls)
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(phase_snapshot_reads(start)) == 1, phase_snapshot_reads(start)
+    assert len(owner_member_class_reads(start)) == 14
+    assert len(writes) == 1
+
+
+def test_graph_discloses_all_accepted_curve_shapes_in_schema_and_continuation(tmp_path):
+    expected = {'Constant', 'Linear', 'Log3', 'Log2', 'Log1', 'InvertedSCurve', 'SCurve', 'Exp1', 'Exp2', 'Exp3'}
+    task, _ = rtpc_task(tmp_path / 'schema')
+    code, schema = task.run('operation-schema', 'object.set')
+    assert code == 0, schema
+    def find_contract(value):
+        if isinstance(value, dict):
+            if 'rtpc_declaration' in value:
+                return value['rtpc_declaration']
+            for nested in value.values():
+                found = find_contract(nested)
+                if found is not None:
+                    return found
+        elif isinstance(value, list):
+            for nested in value:
+                found = find_contract(nested)
+                if found is not None:
+                    return found
+    declaration = find_contract(schema)
+    assert set(declaration['points']['point_shapes']) == expected
+    assert declaration['points']['terminal_shape'] == 'gateway_normalized_to_Linear'
+    code, bound = task.step('draft-bind-object', '--object-id', FIRST)
+    assert code == 0, bound
+    points = bound['draft']['next_action_binding']['declare_rtpc']['semantics']['points']
+    assert set(points['point_shapes']) == expected
+    # Every disclosed non-terminal shape must pass the real public parser,
+    # declaration materializer and normalizer, rather than just a schema snapshot.
+    for shape in sorted(expected):
+        candidate, _ = rtpc_task(tmp_path / shape)
+        owner, control = candidate.bind(FIRST), candidate.bind(ROOT)
+        field = select_field(candidate, owner=owner, token='Volume')
+        code, declared = candidate.step('draft-declare-rtpc', '--declaration-id', 'curve',
+            '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+            '--point', '0', '-48', shape, '--point', '100', '0', 'Exp3')
+        assert code == 0, (shape, declared)
+        code, checked = candidate.step('draft-check')
+        assert code == 0, (shape, checked)
+
+
+@pytest.mark.parametrize('mode', ['update-plus-add', 'replace-all'])
+def test_owner_capacity_counts_only_actual_new_pairs_for_the_selected_mode(tmp_path, mode):
+    task, writes = rtpc_task(tmp_path)
+    seed_many_pairs(task, 127)
+    owner, control = task.bind(FIRST), task.bind(ROOT)
+    if mode == 'update-plus-add':
+        first = task.objects[FIRST]['@RTPC'][0]['id']
+        task.objects[first]['@PropertyName'] = 'Volume'
+    else:
+        code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+        assert code == 0, configured
+    for token in ('Volume', 'Pitch'):
+        field = select_field(task, owner=owner, token=token)
+        code, declared = task.step('draft-declare-rtpc', '--declaration-id', token.lower(),
+            '--object-handle', owner, '--field-handle', field, '--control-input-handle', control,
+            '--point', '0', '-48', 'Linear', '--point', '100', '0', 'Linear')
+        assert code == 0, declared
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    assert not writes  # Construction/preflight proof, not an effect acceptance.

@@ -29,6 +29,7 @@ from .operation_object import (
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
     OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+    RTPC_POINT_SHAPES,
     normalize_object_list_name,
     normalize_curve_points,
 )
@@ -79,20 +80,7 @@ _RTPC_FIELDS = frozenset(
         "notes",
     }
 )
-_RTPC_SHAPES = frozenset(
-    {
-        "Constant",
-        "Linear",
-        "Log3",
-        "Log2",
-        "Log1",
-        "InvertedSCurve",
-        "SCurve",
-        "Exp1",
-        "Exp2",
-        "Exp3",
-    }
-)
+_RTPC_SHAPES = RTPC_POINT_SHAPES
 
 
 def _validate_declaration_graph_limits(

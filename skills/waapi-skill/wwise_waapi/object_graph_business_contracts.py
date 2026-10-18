@@ -9,7 +9,7 @@ from typing import Any
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
 from .business_fields import ACTION_DURATION_FIELDS, ACTION_DURATION_SEMANTICS, OBJECT_BUSINESS_FIELD_TYPES
 from .metadata_condition_contracts import existing_field_condition_contract
-from .operation_object import OBJECT_SET_REFERENCE_ARRAY_VERSIONS
+from .operation_object import OBJECT_SET_REFERENCE_ARRAY_VERSIONS, RTPC_POINT_SHAPES
 
 
 OBJECT_GRAPH_BUSINESS_CONTRACT = "waapi-skill.object-graph-business/v1"
@@ -297,7 +297,8 @@ def object_graph_business_contract_data(
                 "existing_pair_update": "exact_actual_RTPC_GUID_row_in_same_object_set;_no_name_merge",
                 "replace_all": "complete_selected_list_contains_only_declared_pairs;_old_pairs_are_removed",
                 "result": "stable_same_Draft_result_handle_bound_to_actual_GUID_class_owner_and_pair",
-                "points": {"fields": ["x", "y", "shape"], "limit": 256, "shape_semantics": "outgoing_segment", "terminal_shape": "Linear"},
+                "points": {"fields": ["x", "y", "shape"], "limit": 256, "shape_semantics": "outgoing_segment",
+                    "point_shapes": sorted(RTPC_POINT_SHAPES), "terminal_shape": "gateway_normalized_to_Linear"},
                 "native_fragments": "forbidden", "unrequested_state": "preserve_other_lists_children_fields_and_append_mode_old_curves",
                 "2021.1": {"status": "unresolved_construction_authority", "tracking_issue": 180},
             },

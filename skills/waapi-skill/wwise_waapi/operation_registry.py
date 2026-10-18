@@ -5737,6 +5737,7 @@ def _prepare_object_set(
     documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
     planned_guards = []
     early_merge_guards = []
+    rtpc_snapshots = {}
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     conflict = str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
@@ -6125,6 +6126,7 @@ def _prepare_object_set(
             merge_existing=row_conflict == "merge",
             allow_list_merge=row_list_mode == "append",
             rtpc_replace_all=row_list_mode == "replaceAll",
+            rtpc_snapshots=rtpc_snapshots,
             merge_guards=early_merge_guards,
             platform=platform,
         )
@@ -6397,6 +6399,7 @@ def _prepare_object_set(
                 result_context=result_context,
                 root_collection=descriptor.name,
                 rtpc_replace_all=row_list_mode == "replaceAll",
+                rtpc_snapshots=rtpc_snapshots,
                 merge_existing=row_conflict == "merge" and row_list_mode == "append",
                 merge_guards=early_merge_guards,
                 platform=platform,
@@ -6733,6 +6736,7 @@ def _prepare_object_set(
         if set(trusted) != {"object"}:
             dispatch_objects.append(trusted)
 
+    _validate_graph_rtpc_capacity(node_specs, version=request.version)
     from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
     try:
         added_ancestors = prepare_ancestor_path_guards(node_specs, read=read)
@@ -7178,7 +7182,10 @@ def _match_rtpc_pair(rows, property_name, control_id, *, mode):
     return matches
 
 
-def _read_graph_rtpc_rows(owner_id, *, version, class_id, read):
+def _read_graph_rtpc_rows(owner_id, *, version, class_id, read, snapshot_cache=None):
+    key = (_identity_key(owner_id), version, class_id)
+    if snapshot_cache is not None and key in snapshot_cache:
+        return snapshot_cache[key]
     rows, _ = _read_rtpc_rows_with_evidence(owner_id, version=version, read=read)
     complete = []
     for row in rows:
@@ -7189,10 +7196,46 @@ def _read_graph_rtpc_rows(owner_id, *, version, class_id, read):
                 or not _same_identity(_reference_identity(observed[0].get("owner")), owner_id)):
             raise OperationContractError("INVALID_READBACK", "Every RTPC must retain its exact complete pair/class/owner observation.")
         complete.append(observed[0])
+    if snapshot_cache is not None:
+        snapshot_cache[key] = complete
     return complete
 
 
-def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read, identity_cache, property_info_cache, replace_all=False):
+def _validate_graph_rtpc_capacity(specs, *, version):
+    """Admit the combined owner outcome, including aliases of an existing owner."""
+    by_path = {spec["request_path"]: spec for spec in specs}
+    owners = {}
+    for spec in specs:
+        if not spec.get("rtpc_binding"):
+            continue
+        guard = spec.get("rtpc_list_guard")
+        parent = by_path.get(spec.get("parent_request_path"), {})
+        owner = (("existing", _identity_key(guard["owner_id"])) if guard is not None else
+            ("planned", spec.get("parent_request_path")))
+        group = owners.setdefault(owner, {"before": guard["before"] if guard else [],
+            "class_id": spec["class_id"], "version": version, "modes": set(), "pairs": set(), "new": 0})
+        if group["class_id"] != spec["class_id"] or (guard and group["before"] != guard["before"]):
+            raise OperationContractError("INVALID_READBACK", "One RTPC owner needs one exact class and complete pre-state.")
+        mode = spec.get("list_mode", parent.get("list_mode", "append"))
+        group["modes"].add(mode)
+        pair = (spec["rtpc_binding"]["property"].casefold(), _identity_key(next(
+            ref["target_id"] for ref in spec["references"] if ref["name"] == "ControlInput")))
+        if pair in group["pairs"]:
+            raise OperationContractError("DUPLICATE_RTPC_PAIR", "One owner may request each exact RTPC pair once across the graph.")
+        group["pairs"].add(pair)
+        group["new"] += spec.get("preexisting_id") is None
+    for owner, group in owners.items():
+        if len(group["modes"]) != 1:
+            raise OperationContractError("OBJECT_SET_LIST_BEHAVIOR_CONFLICT", "One actual RTPC owner cannot mix list modes.")
+        count = (len(group["pairs"]) if group["modes"] == {"replaceAll"} else
+            len(group["before"]) + group["new"])
+        if count > RTPC_MAX_LIST_ROWS:
+            raise OperationContractError("RTPC_LIST_LIMIT_EXCEEDED", "The combined requested RTPC list exceeds the complete-list limit.",
+                details={"owner": list(owner), "before_count": len(group["before"]), "requested_new_count": group["new"],
+                    "expected_count": count, "limit": RTPC_MAX_LIST_ROWS})
+
+
+def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read, identity_cache, property_info_cache, snapshot_cache, replace_all=False):
     parent = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
     if parent is not None:
         owner_id = parent.get("preexisting_id")
@@ -7212,7 +7255,7 @@ def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read,
         raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "RTPC ControlInput must have a supported actual type.")
     if owner_id is None:
         return None
-    before = _read_graph_rtpc_rows(owner_id, version=version, class_id=spec["class_id"], read=read)
+    before = _read_graph_rtpc_rows(owner_id, version=version, class_id=spec["class_id"], read=read, snapshot_cache=snapshot_cache)
     spec["rtpc_list_guard"] = {"owner_id": owner_id, "version": version, "class_id": spec["class_id"], "before": before}
     matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode)
     if not matches:
@@ -7667,11 +7710,13 @@ def _prepare_object_node_specs(
     merge_existing: bool = False,
     allow_list_merge: bool = True,
     rtpc_replace_all: bool = False,
+    rtpc_snapshots: dict | None = None,
     merge_guards: list[dict[str, Any]] | None = None,
     platform: str | None = None,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     node_paths = {node.request_path for node in nodes}
+    rtpc_snapshots = {} if rtpc_snapshots is None else rtpc_snapshots
     merge_guards = [] if merge_guards is None else merge_guards
     for node in nodes:
         requested_type_token = _object_type_token(node.type)
@@ -7743,7 +7788,7 @@ def _prepare_object_node_specs(
         if node.rtpc is not None:
             merge_target = _resolve_graph_rtpc_target(node, spec, specs, root_parent=root_parent,
                 version=version, read=read, identity_cache=identity_cache, property_info_cache=property_info_cache,
-                replace_all=rtpc_replace_all)
+                snapshot_cache=rtpc_snapshots, replace_all=rtpc_replace_all)
         elif merge_existing:
             merge_target = _resolve_merge_node_target(node, spec, specs, node_paths=node_paths,
                 root_parent=root_parent, root_collection=root_collection, version=version, read=read,
@@ -15743,6 +15788,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             }
         )
 
+    rtpc_snapshots, rtpc_expected = {}, {}
     for spec in pre_state.get("graph_rtpc_guards", []):
         guard = spec["rtpc_property_guard"]
         scope = {key: guard[key] for key in ("object_id", "class_id") if key in guard}
@@ -15751,7 +15797,13 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "evidence": {"expected": guard["metadata"], "actual": info.as_dict()}})
         if spec.get("rtpc_list_guard"):
             guard = spec["rtpc_list_guard"]
-            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call)
+            key = (_identity_key(guard["owner_id"]), guard["version"], guard["class_id"])
+            if key in rtpc_expected:
+                if rtpc_expected[key] != guard["before"]:
+                    raise OperationContractError("INVALID_PREVIEW", "One RTPC owner has conflicting sealed snapshots.")
+                continue
+            rtpc_expected[key] = guard["before"]
+            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call, snapshot_cache=rtpc_snapshots)
             assertions.append({"name": "graph complete RTPC list pre-state unchanged", "passed": actual == guard["before"],
                 "evidence": {"expected": guard["before"], "actual": actual}})
 
@@ -20001,6 +20053,7 @@ def verify_prepared_operation(
                     check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
                           {"before": dict(before_member), "after": matches})
         rtpc_guards = [spec for spec in specs if spec.get("rtpc_binding")]
+        rtpc_snapshots, rtpc_verified = {}, set()
         for spec in rtpc_guards:
             guard = spec["rtpc_property_guard"]
             scope = {key: guard[key] for key in ("object_id", "class_id") if key in guard}
@@ -20009,8 +20062,14 @@ def verify_prepared_operation(
             guard = spec.get("rtpc_list_guard")
             if not guard or spec.get("list_mode") == "replaceAll":
                 continue
-            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call)
-            requested = {row.get("preexisting_id") for row in rtpc_guards if row.get("rtpc_list_guard", {}).get("owner_id") == guard["owner_id"]}
+            key = (_identity_key(guard["owner_id"]), guard["version"], guard["class_id"])
+            if key in rtpc_verified:
+                continue
+            rtpc_verified.add(key)
+            actual = _read_graph_rtpc_rows(guard["owner_id"], version=guard["version"], class_id=guard["class_id"], read=read_call, snapshot_cache=rtpc_snapshots)
+            requested = {row.get("preexisting_id") for row in rtpc_guards if row.get("rtpc_list_guard")
+                and (_identity_key(row["rtpc_list_guard"]["owner_id"]), row["rtpc_list_guard"]["version"],
+                    row["rtpc_list_guard"]["class_id"]) == key}
             for before in guard["before"]:
                 if before["id"] in requested:
                     continue
