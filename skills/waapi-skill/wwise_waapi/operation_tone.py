@@ -269,7 +269,7 @@ FLOAT_SUBTYPE = bytes.fromhex("0300000000001000800000aa00389b71")
 
 def _parse_format(fmt: bytes) -> dict[str, Any]:
     tag, channels, rate, byte_rate, alignment, bits = struct.unpack_from("<HHIIHH", fmt)
-    subtype, speaker_mask = tag, None
+    subtype, speaker_mask, valid_bits = tag, None, None
     if len(fmt) != 16:
         if len(fmt) < 18 or struct.unpack_from("<H", fmt, 16)[0] + 18 != len(fmt):
             raise _invalid("Tone WAV format extension length is inconsistent.")
@@ -279,7 +279,11 @@ def _parse_format(fmt: bytes) -> dict[str, Any]:
         valid_bits, speaker_mask = struct.unpack_from("<HI", fmt, 18)
         guid = fmt[24:40]
         subtype = 1 if guid == PCM_SUBTYPE else 3 if guid == FLOAT_SUBTYPE else None
-        if valid_bits != bits or subtype is None:
+        # The retained Console2025.1.7.9143 Tone PCM16/float32 outputs use
+        # zero in this union field. Decode only the explicit supported subtype /
+        # container pair below; preserve zero without inventing a precision claim
+        # or a generic WAV default. Nonzero contradictory widths stay invalid.
+        if valid_bits not in (0, bits) or subtype is None:
             raise _invalid("Tone WAV extensible valid bits or PCM/float subtype is unsupported.")
     if not channels or channels > 64 or not rate or (subtype, bits) not in {(1, 16), (3, 32)}:
         raise _invalid("Tone WAV does not contain bounded PCM16 or IEEE float32 audio.")
@@ -287,7 +291,7 @@ def _parse_format(fmt: bytes) -> dict[str, Any]:
         raise _invalid("Tone WAV block alignment or byte rate is inconsistent.")
     return {"format_tag": tag, "sample_format": "int16" if subtype == 1 else "float32",
         "channels": channels, "sample_rate": rate, "byte_rate": byte_rate,
-        "block_align": alignment, "bits": bits, "speaker_mask": speaker_mask}
+        "block_align": alignment, "bits": bits, "valid_bits": valid_bits, "speaker_mask": speaker_mask}
 
 
 def _check_requested_format(observed: Mapping[str, Any], args: Mapping[str, Any]) -> list[str]:
