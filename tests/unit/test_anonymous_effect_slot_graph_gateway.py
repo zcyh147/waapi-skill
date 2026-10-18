@@ -781,15 +781,22 @@ def test_legacy_import_owner_render_fields_are_explicit_unfinished_chain_boundar
             'conditions': [{'referenceIsSet': True}]}]}
     task.metadata['Effect0'] = {'name': 'Effect0', 'type': '', 'default': None,
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
-    parent = task.bind(SECOND)
-    code, found = task.step('draft-discover-fields', '--semantic-kind', 'sound-sfx', '--meaning', 'RenderEffect0')
+    task.objects[FIRST].update({'@IsVoice': False, '@RenderEffect0': False, '@Effect0': {'id': EFFECT}})
+    prior = task.call
+    def enabled(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return prior(uri, args, options)
+    task.call = enabled
+    target = task.bind(FIRST)
+    code, found = task.step('draft-discover-fields', '--object-handle', target, '--meaning', 'RenderEffect0')
     assert code == 0, found
     field = found['meaning_results'][0]['candidates'][0]['handle']
     media = tmp_path / 'render-input.wav'
     with wave.open(str(media), 'wb') as output:
         output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000); output.writeframes(b'\0\0' * 8)
-    code, declared = task.step('draft-declare-new', '--declaration-id', 'sound', '--parent-handle', parent,
-        '--name', 'New sound', '--kind', 'sound-sfx', '--field', 'media_file', str(media), '--field-value', field, 'true')
+    code, declared = task.step('draft-declare-existing', '--declaration-id', 'sound', '--object-handle', target, '--field', 'media_file', str(media), '--field-value', field, 'true')
     assert code == 0, declared
     code, rejected = task.step('draft-check')
     assert code == 2 and rejected['error_code'] == 'EFFECT_RENDER_IMPORT_CHAIN_PENDING', rejected
