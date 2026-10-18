@@ -861,6 +861,12 @@ def test_render_clear_previews_and_verifies_observed_suffix_without_changing_byp
         assert code == 0 and 'derive_visible_false_for_retained_successors' in json.dumps(schema), schema
     if fault == 'metadata-drift':
         task.metadata['Render']['default'] = True
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and not writes, rejected
+        assert task.objects == before
+        return
     code, verified = task.finish(tx, shown)
     if fault:
         assert code == 2 and verified.get('verified') is not True, verified
