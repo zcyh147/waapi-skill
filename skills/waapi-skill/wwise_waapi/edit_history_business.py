@@ -109,6 +109,14 @@ def capture_field_read_platform(version: str, selector: str | None, *, read: Cal
 
 
 def observe_field_read_platform(pre_state: Mapping[str, Any], *, read: Callable[..., Any]) -> dict[str, Any] | None:
+    existing = pre_state.get("existing_field_observations")
+    if isinstance(existing, list):
+        outcomes = [outcome for proof in existing if proof.get("status") == "certified"
+            if (outcome := observe_field_read_platform(proof, read=read)) is not None]
+        if outcomes:
+            return {"matches": all(item["matches"] for item in outcomes), "views": [
+                {key: value for key, value in item.items() if key != "readbacks"} for item in outcomes],
+                "readbacks": [row for item in outcomes for row in item["readbacks"]]}
     proof = pre_state.get("field_read_platform")
     if not isinstance(proof, Mapping) or proof.get("status") != "certified":
         return None  # An explicit receipt limitation, never a fabricated view.
@@ -243,6 +251,9 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _snapshot_observations(snapshot: Any) -> list[dict[str, Any]]:
     prepared = snapshot.preview.artifact["prepared_operation"]
     plan = prepared.get("verification_plan", {})
+    if plan.get("kind") == "object-set-batch":
+        from .existing_field_observations import receipt_observations
+        return receipt_observations(snapshot)
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
         raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":
@@ -605,13 +616,14 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                         field_token=field, available_names=names)
                     if info.name != field or info.type != expected["metadata_type"]:
                         raise ValueError("History property metadata does not match its exact field/type")
-                    metadata_cache[key] = info.as_dict()
+                    metadata_cache[key] = info.as_dict(include_raw="raw" in expected["field_info"])
                 if not lifecycle_snapshot_equal(metadata_cache[key], expected["field_info"]):
                     raise ValueError("History property metadata changed since the owned receipt")
         for platform, group in groups.items():
             ids = list(dict.fromkeys(row["object_" + side]["id"] for row in group))
             args = {"from": {"id": ids}}
-            options = {"return": list(dict.fromkeys([*IDENTITY, *(row["field"] for row in group)])),
+            options = {"return": list(dict.fromkeys([*IDENTITY,
+                *(["classId"] if any("class_id" in row for row in group) else []), *(row["field"] for row in group)])),
                 **({"platform": platform} if platform is not None else {})}
             result = retained_read(GET, args, options)
             rows = result.get("return") if isinstance(result, Mapping) else None
@@ -634,7 +646,25 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                     _scalar_matches(actual, expected[side], expected["metadata_type"])
                     if "metadata_type" in expected else isinstance(actual, str) and actual == expected[side])
                 checks.append({"object": identity, "field": field, "platform": platform,
-                    "expected": expected[side], "actual": actual, "passed": _identity(row) == identity and equal})
+                    "expected": expected[side], "actual": actual, "passed": _identity(row) == identity and equal
+                    and ("class_id" not in expected or type(row.get("classId")) is int and row["classId"] == expected["class_id"])})
+        targets = {}
+        for expected in observations:
+            for target in expected.get("reference_targets_" + side, []):
+                if target["id"] in targets and not lifecycle_snapshot_equal(targets[target["id"]], target):
+                    raise ValueError("History reference targets disagree about their exact identities")
+                targets[target["id"]] = target
+        if targets:
+            result = retained_read(GET, {"from": {"id": list(targets)}}, {"return": [*IDENTITY, "classId"]})
+            rows = result.get("return") if isinstance(result, Mapping) else None
+            if not isinstance(rows, list) or len(rows) != len(targets) or len({row.get("id") for row in rows}) != len(targets):
+                raise ValueError("History reference targets require complete exact readback")
+            for row in rows:
+                identity = _identity(row)
+                expected = targets.get(identity["id"])
+                checks.append({"object": identity, "field": "reference_target_identity", "expected": expected,
+                    "actual": row, "passed": expected is not None and _identity(expected) == identity
+                    and type(row.get("classId")) is int and row["classId"] == expected["classId"]})
     except ValueError as exc:
         raise HistoryObservationError(str(exc), readbacks) from exc
     return {"scope": "owned_receipt_observation_only", "stack_head_observed": False,
@@ -645,7 +675,24 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
 def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
     receipt = binding["source_receipt"]
     observations = []
+    existing_groups = {}
     for row in binding["observations"]:
+        if row.get("kind") == "existing_field":
+            common = {key: row[key] for key in ("object_before", "object_after", "class_id", "platform")}
+            key = canonical_sha256(common)
+            if key not in existing_groups:
+                existing_groups[key] = {"kind": "existing_fields", **common, "fields": []}
+                observations.append(existing_groups[key])
+            field = {name: value for name, value in row.items()
+                if name not in {"kind", "object_before", "object_after", "class_id", "platform", "field_info"}}
+            if "field_info" in row:
+                field["metadata_bound"] = True
+            if ("reference_targets_before" in field
+                    and lifecycle_snapshot_equal(field["reference_targets_before"], field["reference_targets_after"])):
+                field["reference_targets_before_and_after"] = field.pop("reference_targets_before")
+                del field["reference_targets_after"]
+            existing_groups[key]["fields"].append(field)
+            continue
         if row.get("kind") == "creation_field":
             continue
         compact = {**{key: value for key, value in row.items() if key != "field_info"},

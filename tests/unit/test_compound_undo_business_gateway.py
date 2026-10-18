@@ -2259,6 +2259,195 @@ def test_created_source_missing_acknowledgement_is_indeterminate_and_never_repla
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
 
 
+def _existing_fields_history_case(tmp_path, *, version="2025.1", second=False,
+    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, postread_error=False):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND, CHILD, ROOT
+
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.require_class_projection = True
+    task.types = [{"classId": value, "name": name, "type": "WObject"}
+        for name, value in (("Sound", 65552), ("Attenuation", 655376), ("WorkUnit", 1638416))]
+    task.objects = {
+        SECOND: {"id": SECOND, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit", "notes": "Keep parent"},
+        FIRST: {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "notes": "Keep Rain",
+            "parent": {"id": SECOND}, "@Volume": -3.0, "@Priority": 50, "@Attenuation": {"id": ROOT}},
+        ROOT: {"id": ROOT, "name": "Rain attenuation", "type": "Attenuation", "classId": 655376,
+            "path": r"\Attenuations\Default Work Unit\Rain attenuation", "notes": "Keep target"},
+    }
+    if second:
+        task.objects[CHILD] = {**task.objects[FIRST], "id": CHILD, "name": "Wind", "notes": "Keep Wind",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Wind", "@Volume": -9.0, "@Priority": 70, "@Attenuation": None}
+    task.metadata = {
+        "Volume": {"name": "Volume", "type": "Real64", "default": 0.0,
+            "restriction": {"type": "range", "min": -96, "max": 6}},
+        "Priority": {"name": "Priority", "type": "int16", "default": 50,
+            "restriction": {"type": "range", "min": 0, "max": 100}},
+        "Attenuation": {"name": "Attenuation", "type": "Reference", "restriction": {
+            "type": "reference", "restrictions": [{"type": ["Attenuation"]}]}},
+    }
+    original = task.call
+    task.current_platform = "{44444444-4444-4444-4444-444444444444}"
+    task.history_effect = True
+    before = deepcopy(task.objects)
+    after = None
+
+    def call(uri, args=None, options=None):
+        nonlocal after
+        if uri.endswith("isPropertyEnabled"):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {"return": True}
+        if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if task.history_effect:
+                task.objects = deepcopy(before if uri.endswith(".undo") else after)
+            return {}
+        if (postread_error and after is not None and uri.endswith("object.get")
+                and options.get("return", [])[:7] == ["id", "name", "type", "path", "classId", "parent", "notes"]):
+            raise RuntimeError("optional existing-field history postread unavailable")
+        result = original(uri, args, options)
+        if uri.endswith("getProjectInfo"):
+            result.update(currentPlatformId=task.current_platform, platforms=[
+                {"id": "{44444444-4444-4444-4444-444444444444}", "name": "Windows"},
+                {"id": "{55555555-5555-5555-5555-555555555555}", "name": "Mac"}])
+        if uri.endswith("object.set"):
+            after = deepcopy(task.objects)
+        return result
+
+    task.call = call
+    target = task.bind(ROOT)
+    if platform is not None:
+        code, configured = task.step("draft-business-configure", "--platform", platform)
+        assert code == 0, configured
+    for identity, volume, priority, attenuation in [(FIRST, "-6", "42", "null"),
+            *([(CHILD, "-12", "12", target)] if second else [])]:
+        owner = task.bind(identity)
+        fields = [task.discover(owner, name) for name in ("Volume", "Priority", "Attenuation")]
+        code, declared = task.step("draft-declare-existing", "--declaration-id", "rain" if identity == FIRST else "wind",
+            "--object-handle", owner, "--field-value", fields[0], volume,
+            "--field-value", fields[1], priority, "--field-value", fields[2], attenuation)
+        assert code == 0, declared
+    tx, shown = task.preview()
+    task.source_preview = shown
+    if prepared_only:
+        return task, tx, before, None
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    return task, tx, before, after
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+def test_existing_multi_field_set_receipt_undo_redo_observes_every_scalar_and_null(tmp_path, version):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT
+    task, source, before, after = _existing_fields_history_case(tmp_path, version=version)
+    assert task.objects[FIRST]["@Attenuation"] is None
+    assert task.objects[FIRST]["@Volume"] == -6 and task.objects[FIRST]["@Priority"] == 42
+    undo = _created_leaf_history_preview(task, source)
+    code, executed = task.run("execute", undo)
+    assert code == 0, executed
+    code, verified = task.run("verify", undo)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST] == before[FIRST] and task.objects[ROOT] == before[ROOT]
+    if version == "2022.1":
+        return  # Matching native catalog has undo, no redo URI.
+    redo = _created_leaf_history_preview(task, source, "redo")
+    code, executed = task.run("execute", redo)
+    assert code == 0, executed
+    code, verified = task.run("verify", redo)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST] == after[FIRST] and task.objects[ROOT] == before[ROOT]
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert len([row for row in task.calls if row[0] == "ak.wwise.core.object.set"]) == 1
+
+
+@pytest.mark.parametrize("corruption", ["raw-metadata-extension", "class", "numeric-bool", "missing-field", "reference-target"])
+def test_existing_field_history_rejects_incomplete_or_changed_original_scope_before_write(tmp_path, corruption):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT
+    task, source, _before, _after = _existing_fields_history_case(tmp_path)
+    draft, authority, revision = _created_history_reference_draft(task, source)
+    if corruption == "raw-metadata-extension": task.metadata["Volume"]["nativeExtension"] = None
+    elif corruption == "class": task.objects[FIRST]["classId"] = 65553
+    elif corruption == "numeric-bool": task.objects[FIRST]["@Priority"] = True
+    elif corruption == "missing-field": del task.objects[FIRST]["@Attenuation"]
+    else: task.objects[ROOT]["name"] = "Changed reference target"
+    code, rejected = task.run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(revision))
+    assert code == 2, rejected
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+    assert "readback" in json.dumps(rejected).casefold()
+
+
+def test_existing_field_history_optional_postread_failure_keeps_source_verified(tmp_path):
+    task, source, _before, _after = _existing_fields_history_case(tmp_path, postread_error=True)
+    code, full = task.run("transaction-show", source)
+    assert code == 0 and full["state"] == "verified", full
+    observation = next(event["details"]["verification"] for event in full["events"] if event["event_type"] == "verification_recorded")
+    optional = [row for row in observation["readbacks"] if row.get("role") == "existing-field-history-source-after"]
+    assert len(optional) == 1 and optional[0]["status"] == "unobserved"
+    assert "optional existing-field history postread unavailable" in json.dumps(optional)
+    code, phase = task.run("draft-start", "ak.wwise.core.undo.undo")
+    assert code == 0, phase
+    code, rejected = task.run("draft-declare-core-plan", phase["draft"]["draft_id"],
+        "--task-authority", phase["task_authority"], "--expected-revision", str(phase["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", source)
+    assert code == 2 and "unavailable" in rejected["message"], rejected
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in task.calls)
+
+
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_existing_field_source_keeps_original_certified_read_view_before_write(tmp_path, platform):
+    task, source, _before, _after = _existing_fields_history_case(tmp_path, platform=platform, prepared_only=True)
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    if platform == "Windows":
+        original = task.call
+        def renamed_platform(uri, args=None, options=None):
+            result = original(uri, args, options)
+            if uri.endswith("getProjectInfo"):
+                result["platforms"][0]["name"] = "Old Windows"
+                result["platforms"][1]["name"] = "Windows"
+            return result
+        task.call = renamed_platform
+    assert task.run("confirm", source, "--confirmation-token", task.source_preview["confirmation"]["token"])[0] == 0
+    code, rejected = task.run("execute", source)
+    assert code == 2 and rejected.get("executed") is not True, rejected
+    assert not any(row[0] == "ak.wwise.core.object.set" for row in task.calls)
+
+
+def test_existing_field_history_native_success_does_not_prove_all_fields_restored(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST
+    task, source, before, _after = _existing_fields_history_case(tmp_path)
+    history = _created_leaf_history_preview(task, source)
+    original = task.call
+    def partial_undo(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.undo.undo":
+            task.objects[FIRST]["@Priority"] = True
+        return result
+    task.call = partial_undo
+    assert task.run("execute", history)[0] == 0
+    code, failed = task.run("verify", history)
+    assert code == 2 and failed.get("verified") is False, failed
+    assert task.objects[FIRST]["@Volume"] == before[FIRST]["@Volume"]
+    assert task.objects[FIRST]["@Attenuation"] == before[FIRST]["@Attenuation"]
+    assert '"actual": true' in json.dumps(failed) and '"expected": 50' in json.dumps(failed)
+    assert len([row for row in task.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+
+
+@pytest.mark.parametrize("platform", [None, "Windows"])
+def test_existing_history_uses_frozen_guid_view_after_source_current_platform_changes(tmp_path, platform):
+    task, source, _before, _after = _existing_fields_history_case(tmp_path, platform=platform)
+    task.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    history = _created_leaf_history_preview(task, source)
+    assert task.run("execute", history)[0] == 0
+    before_verify = len(task.calls)
+    code, verified = task.run("verify", history)
+    assert code == 0 and verified["verified"] is True, verified
+    field_reads = [options for uri, _args, options in task.calls[before_verify:]
+        if uri == "ak.wwise.core.object.get" and "Priority" in options.get("return", [])]
+    assert field_reads and all(options["platform"] == "{44444444-4444-4444-4444-444444444444}" for options in field_reads)
+
+
 def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_path):
     task, source, created = _created_leaf_history_case(tmp_path)
     tx = _created_leaf_history_preview(task, source)
