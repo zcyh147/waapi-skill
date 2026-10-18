@@ -2692,10 +2692,11 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
             return {**original(uri, args, options), 'currentPlatformId': '{55555555-5555-5555-5555-555555555555}'}
         if uri.endswith('isPropertyEnabled'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            if fault == 'exclusive-disabled-after-create' and args['property'] == 'CenterPercentage':
+            if fault in {'exclusive-disabled-after-create', 'exclusive-state-read-error'} and args['property'] == 'CenterPercentage':
                 # Literal native28dc transition: the base scalar becomes disabled
                 # once this Exclusive RTPC exists; its Curve remains a distinct edit.
                 controlled = any(row.get('@PropertyName') == 'CenterPercentage' for row in task.objects.values())
+                if controlled and fault == 'exclusive-state-read-error': return {'return': 'unavailable'}
                 return {'return': not controlled}
             return {'return': True}
         if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')):
@@ -2896,3 +2897,16 @@ def test_rtpc_graph_collector_updates_existing_exclusive_curve_after_base_field_
     assert receipt['exclusive']['status'] == 'observed_and_conflict_rejected'
     assert receipt['exclusive']['rejection']['payload']['error_code'] == 'RTPC_EXCLUSIVE_CONFLICT'
     assert receipt['exclusive']['reason'] != 'No legal active source-backed Exclusive field proved'
+
+
+def test_rtpc_graph_collector_stops_before_update_when_base_state_read_fails(tmp_path, workflow):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(
+        tmp_path, workflow, fault='exclusive-state-read-error')
+    with pytest.raises(AssertionError):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST')
+    receipt = json.loads((runtime.state_dir / 'rtpc-graph-acceptance.json').read_text())
+    assert len(writes) == 2  # Setup and first verified effect; no second mutation.
+    assert [command[0] for command in commands].count('verify') == 2
+    assert len(receipt['effects']) == 1 and receipt['complete'] is False
+    assert receipt['enabled_observations'][-1]['exit_code'] != 0
+    assert runtime.category_results[0]['status'] == 'FAIL'

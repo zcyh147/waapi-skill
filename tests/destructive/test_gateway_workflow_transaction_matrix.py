@@ -6023,11 +6023,14 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         receipt['host_and_project'] = {'wwise': status.get('wwise'), 'project': status.get('project'), 'endpoint': status.get('endpoint')}
         platform = status.get('project', {}).get('currentPlatformId')
         assert isinstance(platform, str) and uuid.UUID(platform).int != 0, status
-        def enabled(token):
+        def enabled(token, *, require_observation=False):
             code, payload = gateway.raw_gateway(['metadata', 'property-state', '--exact-id', owner,
                 '--selection', field_details[token]['selection'], '--platform', platform])
             receipt.setdefault('enabled_observations', []).append({'field': token, 'exit_code': code, 'payload': payload})
-            return code == 0 and payload.get('agent_result', {}).get('enabled') is True
+            observed = payload.get('agent_result', {}).get('enabled')
+            if require_observation:
+                assert code == 0 and type(observed) is bool, payload
+            return code == 0 and observed is True
         assert enabled('Volume'), 'Selected Volume is not observed enabled on the actual current platform'
         active = {token: enabled(token) for token in ('Pitch', 'CenterPercentage') if token in field_details
             and field_details[token]['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative', 'Exclusive'}}
@@ -6037,6 +6040,7 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         exclusive_selected = field_details[second]['metadata']['supports']['rtpc'] == 'Exclusive'
         if exclusive_selected:
             receipt['exclusive'].update(status='active_selected', field=second, platform=platform,
+                reason='Actual initially enabled Exclusive field selected; later scalar state is observation only',
                 metadata=field_details[second]['metadata'])
         draft = _start_business_draft(gateway, 'object.set')
         target = _bind_business_object(gateway, draft, object_id=owner)
@@ -6067,7 +6071,12 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         declare(draft, target, 'Volume', b, points('Volume', b, 0.25), 'volume-b')
         if exclusive_selected:
             current = gateway.gateway(['status'], live=True)
-            assert current.get('project', {}).get('currentPlatformId') == platform and enabled(second), current
+            assert current.get('project', {}).get('currentPlatformId') == platform, current
+            # isPropertyEnabled describes the base scalar's dependency state.
+            # Updating this already observed RTPC's Curve is a distinct operation;
+            # its metadata, pair, capacity and execution guards remain Gateway-owned.
+            receipt['exclusive']['base_property_enabled_before_curve_update'] = enabled(
+                second, require_observation=True)
         phase, phase_category = complete(draft, 'exact_update_and_append')
         expected_update = first['members'][1]['object']['id']
         native = phase['compiled_native_request']['args']['objects']
