@@ -1719,7 +1719,8 @@ def test_migrated_media_collector_retains_legacy_owned_fixture_boundary_without_
     runtime = SimpleNamespace(version=version, category_results=[],
         sandbox=SimpleNamespace(sandbox_project=tmp_path / 'Owned.wproj'),
         gateway=lambda *a, **kw: pytest.fail('Legacy preparation must not migrate or synthesize an unavailable open URI'))
-    workflow.test_cli_console_media_id_migrated_project_acceptance(runtime)
+    with pytest.raises(AssertionError, match='legacy_migrated_project_reopen_fixture'):
+        workflow.test_cli_console_media_id_migrated_project_acceptance(runtime)
     category, = runtime.category_results
     assert category['status'] == 'blocked' and category['boundary'] == 'legacy_migrated_project_reopen_fixture'
     assert category['media_effect'] == 'not_executed'

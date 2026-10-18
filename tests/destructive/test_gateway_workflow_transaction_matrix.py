@@ -2139,7 +2139,7 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
             selected_reopen_uri="ak.wwise.console.project.open",
             unassessed_alternative="ak.wwise.ui.project.open is reflected; its Console host eligibility and effect semantics need separate assessment",
             boundary="legacy_migrated_project_reopen_fixture", media_effect="not_executed")
-        return
+        raise AssertionError({"setup_boundary": observation["boundary"], "category": observation})
     _save_sandbox_project(runtime)
     if migrate_before_capture:
         setup_stage = "setup_migration"
