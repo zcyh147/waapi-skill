@@ -3938,6 +3938,11 @@ def test_legacy_import_render_collector_full_public_flow_and_actual_writer(tmp_p
     category = workflow._collect_legacy_import_render_acceptance(runtime, prefix='WAAPI_LEGACY_IMPORT_TEST')
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert category['status'] == 'PASS' and receipt['business_effect_verified'] is True
+    selected = [candidate for call in receipt['calls'] if call['argv'][0] == 'draft-discover-fields'
+        and '--selection' in call['argv'] for result in call.get('payload', {}).get('meaning_results', [])
+        for candidate in result.get('candidates', [])]
+    for token, label in {'Effect0': 'Effect 0', 'RenderEffect1': 'Render Effect 1'}.items():
+        assert any(row['metadata']['name'] == token and row['label'] == label for row in selected)
     assert receipt['setup_coverage_credit'] is False and receipt['tsv_media_verified'] is False
     assert len(writes) == 4 and [row[0] for row in commands].count('execute') == 4
     assert [row[0] for row in commands].count('verify') == 4

@@ -7124,8 +7124,8 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
             selected = _update_business_draft(gateway, draft, 'draft-discover-fields',
                 ['--semantic-kind', 'sound-sfx', '--selection', selection], live=True)
             candidates = selected['meaning_results'][0]['candidates']
-            assert len(candidates) == 1 and candidates[0]['label'] == name, selected
-            handles[name] = candidates[0]['handle']
+            assert len(candidates) == 1 and candidates[0].get('metadata', {}).get('name') == name, selected
+            handles[name] = discovered_business_field_handle(selected, name)
         return handles
     def complete(draft, phase):
         _update_business_draft(gateway, draft, 'draft-check', live=True)
