@@ -3,10 +3,14 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import hashlib
+import math
+import re
 from pathlib import Path
 import sys
 from typing import Mapping
 import uuid
+import xml.etree.ElementTree as ET
 
 import pytest  # pyright: ignore[reportMissingImports]
 
@@ -134,6 +138,166 @@ def test_authoring_layout_owned_view_lifecycle(owned_authoring_layout_node, init
         closed = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
         assert not identities.intersection(row.get('viewID') for row in closed)
     _owned_layout_remove(call, original, name)
+
+
+MEDIA_DIAGNOSTIC_NODE = (__name__.replace('.', '/') +
+    '.py::test_authoring_2024_media_preservation_metadata_diagnostic')
+MEDIA_DIAGNOSTIC_SESSIONS = (
+    ('{9C02096E-8E29-4029-9D49-778F85015C87}', 'MIDI'),
+    ('{1C5BA931-9550-4DC8-B1C7-13689B8AE813}', 'Minigun'),
+    ('{F4B8069C-3C15-4157-B570-8A41AB2463C2}', 'Music'),
+)
+
+
+def _media_diagnostic_settings(project, *, owned_root):
+    """Hash project-local settings, retaining only the observed RTPC whitelist."""
+    from wwise_waapi.operation_soundbank import capture_file_proof, open_regular_artifact_file
+    assert project.resolve(strict=True).is_relative_to(owned_root.resolve(strict=True))
+    files, entries = [], 0
+    for path in project.parent.iterdir():
+        entries += 1
+        assert entries <= 512, 'Owned settings directory exceeds diagnostic entry bound'
+        if not (path.name.casefold().startswith(project.stem.casefold() + '.')
+                and path.suffix.casefold() == '.wsettings'):
+            continue
+        assert len(files) < 4, 'Owned settings file count exceeds diagnostic bound'
+        limit = 1024 * 1024
+        proof = capture_file_proof(path, field='owned diagnostic settings', max_bytes=limit, io_root=owned_root)
+        _, descriptor, before = open_regular_artifact_file(path, field='owned diagnostic settings', io_root=owned_root)
+        with os.fdopen(descriptor, 'rb') as stream:
+            raw = stream.read(limit + 1)
+            after = os.fstat(stream.fileno())
+        assert (len(raw) == proof['size'] and hashlib.sha256(raw).hexdigest() == proof['sha256']
+            and all(getattr(before, key) == getattr(after, key)
+                    for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
+            and capture_file_proof(path, field='owned diagnostic settings', max_bytes=limit, io_root=owned_root) == proof), 'Owned settings changed while observed'
+        assert b'<!DOCTYPE' not in raw.upper() and b'<!ENTITY' not in raw.upper(), 'Settings XML declarations are outside this diagnostic'
+        root = ET.fromstring(raw)
+        assert root.tag == 'WwiseDocument' and root.get('Type') == 'UserProjectSettings'
+        nodes, fields, seen = list(root.iter()), [], set()
+        assert len(nodes) <= 4096, 'Settings XML exceeds diagnostic node bound'
+        for item in nodes:
+            name = item.get('Name', '')
+            if item.tag != 'Property' or not re.fullmatch(
+                    r'RTPC\\GameParameterSimValue\\\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', name):
+                continue
+            assert name.upper() not in seen and len(fields) < 256, 'Duplicate or oversized settings whitelist'
+            seen.add(name.upper())
+            value = item.get('Value')
+            assert item.get('Type') == 'Real64' and value is not None and len(value) <= 128 and math.isfinite(float(value)) and not list(item), 'Unknown RTPC settings shape'
+            fields.append({'name': name, 'type': item.get('Type'), 'value': value})
+        files.append({'relative_path': path.name, 'file_proof': proof, 'fields': fields,
+            'whitelist': 'RTPC\\GameParameterSimValue\\<canonical GUID> only',
+            'unlisted_fields_retained': False})
+    return {'complete': True, 'files': sorted(files, key=lambda row: row['relative_path']),
+        'scope': 'owned project directory only; no global user settings',
+        'state_switch_value_observer': 'not established'}
+
+
+def test_authoring_2024_media_preservation_metadata_diagnostic(owned_authoring_layout_node):
+    """Diagnostic reads only; a successful collection grants no media credit."""
+    batch, call = owned_authoring_layout_node
+    assert batch.runtime.version == '2024.1' and batch.info['version']['build'] == 9056
+    runtime = batch.node_runtimes[MEDIA_DIAGNOSTIC_NODE]
+    destination = Path(runtime.runner_environment['WWISE_EVIDENCE_DIR'])
+    destination.mkdir(parents=True, exist_ok=True)
+    path = destination / 'media-preservation-diagnostic.json'
+    report = {'contract': 'waapi-skill.media-preservation-diagnostic/v1',
+        'complete': False, 'business_preservation_verified': False,
+        'completeness_scope': 'permitted bounded diagnostic reads; not complete Soundcaster runtime state',
+        'runtime_session_values_observed': False, 'media_operation_executed': False,
+        'opaque_plugin_payload': 'not interpreted or modified',
+        'coverage_credit': 'none; diagnostic observation only', 'host': batch.info,
+        'sessions': [], 'field_details': [], 'plugin': {}, 'logs': {}, 'settings': {},
+        'requests': [], 'errors': [], 'detail_limit_reached': False,
+        'limits': {'public_calls': 32, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 2 * 1024 * 1024,
+            'name_pages_per_session': 4, 'names_per_page': 64, 'field_details': 6,
+            'plugin_type_pages': 2, 'log_rows_per_channel': 40,
+            'settings_files': 4, 'settings_file_bytes': 1024 * 1024,
+            'settings_whitelist_rows_per_file': 256}}
+    assert not path.exists() and not path.is_symlink(), 'Diagnostic cannot overwrite an earlier observation'
+    path.write_text(json.dumps(report, ensure_ascii=False) + '\n', encoding='utf-8')
+    total = 0
+    def read(argv):
+        nonlocal total
+        assert len(report['requests']) < 32, 'Public diagnostic call bound exceeded'
+        entry = {'argv': argv}
+        report['requests'].append(entry)
+        payload = call(argv)  # Original replies/errors remain in owner receipts.
+        size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+        total += size
+        assert size <= 256 * 1024 and total <= 2 * 1024 * 1024, 'Public diagnostic byte bound exceeded'
+        entry.update(reply_bytes=size, complete_reply_retained_by_owner=True)
+        return payload
+    project = batch.runtime.sandbox.sandbox_project
+    try:
+        report['settings']['before'] = _media_diagnostic_settings(project, owned_root=batch.runtime.owned_root)
+        for identity, name in MEDIA_DIAGNOSTIC_SESSIONS:
+            result = read(['query-object', '--exact-id', identity, '--include', 'class-id', '--max-results', '1'])
+            rows = result['objects']
+            assert len(rows) == 1 and rows[0]['id'] == identity and rows[0]['name'] == name and rows[0]['type'] == 'SoundcasterSession', 'Exact source session identity changed'
+            session = {'id': identity, 'name': name, 'identity': rows[0], 'field_names': [], 'names_complete': False}
+            report['sessions'].append(session)
+            page, seen_pages, selections = None, set(), []
+            for _ in range(4):
+                argv = ['metadata', 'list', '--exact-id', identity, '--page-size', '64']
+                if page is not None:
+                    argv += ['--page', page]
+                listed = read(argv)['agent_result']
+                for field in listed['fields']:
+                    token = field.get('name')
+                    assert isinstance(token, str) and token not in session['field_names'], 'Incomplete or duplicate disclosed field name'
+                    session['field_names'].append(token)
+                    if any(word in token.casefold() for word in ('rtpc', 'state', 'switch', 'gameparameter')):
+                        selections.append((token, field['selection']))
+                page = listed['next_page']
+                if page is None:
+                    assert listed['complete'] is True and len(session['field_names']) == listed['total_count'], 'Incomplete disclosed field inventory'
+                    session['names_complete'] = True
+                    break
+                assert page not in seen_pages, 'Repeated metadata page'
+                seen_pages.add(page)
+            assert session['names_complete'], 'Metadata inventory exceeds diagnostic page bound; not complete'
+            for token, selection in selections:
+                if len(report['field_details']) == 6:
+                    report['detail_limit_reached'] = True
+                    break
+                detail = read(['metadata', 'detail', '--exact-id', identity, '--selection', selection])['agent_result']
+                report['field_details'].append({'object_id': identity, 'disclosed_field': token, **detail})
+        rev = '{29975930-6548-4A1B-BEE0-7AA549180D4F}'
+        result = read(['query-object', '--exact-id', rev, '--include', 'class-id', '--include', 'plugin-name', '--max-results', '1'])
+        assert len(result['objects']) == 1 and result['objects'][0]['id'] == rev, 'Exact REV source identity changed'
+        report['plugin']['identity'] = result['objects'][0]
+        report['plugin']['types'] = []
+        page = None
+        for _ in range(2):
+            argv = ['metadata', 'types', '--meaning', 'CrankcaseAudio REV', '--page-size', '64']
+            if page is not None:
+                argv += ['--page', page]
+            result = read(argv)['agent_result']
+            report['plugin']['types'].extend(result['types'])
+            page = result['next_page']
+            if page is None:
+                break
+        assert page is None, 'Plugin type discovery exceeds diagnostic page bound'
+        report['plugin']['native_backend_availability_proven'] = False
+        for channel in ('project-load', 'general'):
+            report['logs'][channel] = read(['core-call', 'ak.wwise.core.log.get', '--log-channel', channel, '--max-results', '40'])['agent_result']
+    except Exception as exc:
+        report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:2048],
+            'original_gateway_replies': 'owner receipts and dispatcher evidence'})
+    finally:
+        try:
+            report['settings']['after'] = _media_diagnostic_settings(project, owned_root=batch.runtime.owned_root)
+        except Exception as exc:
+            report['errors'].append({'phase': 'settings_after', 'type': type(exc).__name__, 'message': str(exc)[:2048]})
+        report['complete'] = not report['errors']
+        report['public_call_count'] = len(report['requests'])
+        report['total_reply_bytes'] = total
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        temporary.replace(path)
+    assert report['complete'], report['errors']
 
 
 def _gateway_env(tmp_path: Path, *, version: str) -> dict[str, str]:
