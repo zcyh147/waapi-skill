@@ -1574,14 +1574,37 @@ def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_
     assert any(row["reason"] == expected for row in observed["boundaries"])
 
 
-@pytest.mark.parametrize("migrated", [False, True])
+@pytest.mark.parametrize("version,migrated,wrong_open", [("2025.1", False, False), ("2023.1", True, False),
+    ("2024.1", True, False), ("2025.1", True, False), ("2023.1", True, True)])
 @pytest.mark.parametrize("wrong_media", [False, True])
-def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, wrong_media, migrated):
+def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, wrong_media, version, migrated, wrong_open):
     from xml.etree import ElementTree as ET
-    from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, saved_fixture_project
+    from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, saved_fixture_project, WaapiRequestFailed, OPEN
 
     class Client(CliProjectTask):
+        def __init__(self, *args):
+            self.loaded, self.reopened, self.absence_errors = True, False, []
+            super().__init__(*args)
+
         def call(self, uri, args=None, options=None):
+            if not self.loaded and (uri.endswith('getProjectInfo') or (
+                    uri.endswith('object.get') and args.get('waql', '').startswith('from type Project '))):
+                self.calls.append((uri, args, options))
+                self.absence_errors.append(WaapiRequestFailed(uri))
+                raise self.absence_errors[-1]
+            if uri.endswith('object.get') and args.get('waql') == 'from type Project take 2':
+                self.calls.append((uri, args, options))
+                return {'return': [{'id': ('{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}' if wrong_open and self.reopened
+                    else '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'), 'name': 'Fixture',
+                    'type': 'Project', 'path': '\\', 'filePath': str(self.project_file)}]}
+            if uri.endswith('getProjectInfo') and wrong_open and self.reopened:
+                return {**super().call(uri, args, options), 'id': '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'}
+            if uri == OPEN:
+                self.calls.append((uri, args, options))
+                assert not self.loaded and args == {'path': str(self.project_file)}
+                self.loaded = True
+                self.reopened = True
+                return {}
             if uri.endswith("project.save"):
                 self.calls.append((uri, args, options))
                 tree = ET.parse(self.unit)
@@ -1593,6 +1616,7 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                 tree = ET.parse(self.unit)
                 tree.find('.//Property[@Name="Volume"]/ValueList/Value').text = '-3'
                 tree.write(self.unit)
+                self.loaded = False
                 return {"result": 0}
             if uri == self.operation:
                 self.project_file.with_suffix(".mediaid").write_text('''<WwiseDocument Type="MediaIDs">
@@ -1609,7 +1633,8 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                 tree.write(self.project_file)
             return super().call(uri, args, options)
 
-    client = Client(tmp_path, "2025.1", "ak.wwise.cli.moveMediaIdsToSingleFile")
+    # Native migrate leaves the same Console instance alive with no active project.
+    client = Client(tmp_path, version, "ak.wwise.cli.moveMediaIdsToSingleFile")
     client.unit = saved_fixture_project(client)
     tree = ET.parse(client.unit)
     source = ET.SubElement(ET.SubElement(tree.find(".//Sound"), "ChildrenList"),
@@ -1623,27 +1648,81 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
     def gateway(command, *, live):
         commands.append(list(command))
         code, payload = client.run(*command)
-        assert code == 0, payload
+        assert code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
         return payload
 
-    runtime = SimpleNamespace(gateway=gateway, version="2025.1", category_results=[],
-        sandbox=SimpleNamespace(sandbox_project=client.project_file))
+    runtime = SimpleNamespace(gateway=gateway, version=version, category_results=[],
+        sandbox=SimpleNamespace(sandbox_project=client.project_file),
+        restart=lambda: pytest.fail('Collector must reopen the same Console instance without a host restart'))
     collect = (workflow.test_cli_console_media_id_migrated_project_acceptance if migrated
                else workflow.test_cli_console_media_id_file_observation)
-    if wrong_media:
+    if wrong_media or wrong_open:
         with pytest.raises(AssertionError):
             collect(runtime)
     else:
         collect(runtime)
     category, = runtime.category_results
+    if wrong_open:
+        assert category['status'] == 'FAIL' and 'baseline_media_pairs' not in category
+        assert category['setup_migration']['status'] == 'complete'
+        assert category['setup_reopen']['status'] == 'FAIL'
+        # The existing runtime gateway asserts with the complete serialized
+        # failure; pytest may append its assertion rendering to that diagnostic.
+        assert 'verification_failed' in str(category['setup_reopen']['failure'])
+        assert 'business_state_verified' in str(category['setup_reopen']['failure'])
+        assert category['setup_reopen']['coverage_credit'] == 'none; baseline preparation only'
+        assert not any(uri == client.operation for uri, _, _ in client.calls)
+        assert [uri for uri, _, _ in client.calls].count(OPEN) == 1
+        return
     assert category["status"] == ("FAIL" if wrong_media else "PASS")
     assert category["mapping_file"]["content_base64"]
     assert category["source_work_unit_after"]["content_base64"]
     assert category["baseline_media_pairs"] == [["{33333333-3333-3333-3333-333333333333}", "123456"]]
-    writes = [uri for uri, _, _ in client.calls if uri.endswith("project.save") or uri in {client.operation, "ak.wwise.cli.migrate"}]
-    assert writes == ["ak.wwise.core.project.save", *(["ak.wwise.cli.migrate"] if migrated else []), client.operation]
-    assert sum(command[0] == "execute" for command in commands) == (3 if migrated else 2)
+    writes = [uri for uri, _, _ in client.calls if uri.endswith("project.save") or uri in {client.operation, "ak.wwise.cli.migrate", OPEN}]
+    assert writes == ["ak.wwise.core.project.save", *(["ak.wwise.cli.migrate", OPEN] if migrated else []), client.operation]
+    assert sum(command[0] == "execute" for command in commands) == (4 if migrated else 2)
     if migrated:
-        assert category["baseline_setup"] == "public_gateway_save_then_migrate_before_capture"
+        assert category["baseline_setup"] == "public_gateway_save_then_migrate_then_reopen_before_capture"
         assert category["setup_migration"]["state"] == "result_schema_checked"
         assert category["setup_migration"]["business_state_verified"] is False
+        assert client.absence_errors and all(error.uri == 'ak.wwise.no_project_loaded' for error in client.absence_errors)
+        assert any(error.kwargs['details']['procedureUri'] == 'ak.wwise.core.getProjectInfo' for error in client.absence_errors)
+        reopened = category['setup_reopen']
+        assert reopened['state'] == 'verified' and reopened['business_state_verified'] is True
+        assert reopened['coverage_credit'] == 'none; baseline preparation only'
+        assert reopened['project_file'] == str(client.project_file)
+        code, shown = client.run('transaction-show', reopened['transaction_id'])
+        assert code == 0, shown
+        dispatch = shown['artifact']['prepared_operation']['dispatch']
+        assert dispatch == {'uri': OPEN, 'args': {'path': str(client.project_file)}, 'options': {}}
+        assert reopened['verification']['business_state_verified'] is True
+        assert '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}' in json.dumps(reopened['verification'])
+        assert str(client.project_file) in json.dumps(reopened['verification'])
+    else:
+        assert not client.absence_errors and 'setup_reopen' not in category
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+def test_migrated_media_collector_retains_legacy_owned_fixture_boundary_without_synthesizing_open(tmp_path, workflow, version):
+    from tests.unit.test_waapi_gateway import gateway_env, waapi_gateway as gateway
+    from tests.support.gateway_config import set_gateway_config
+    from wwise_waapi.native_catalog import load_native_catalog
+    operation = 'ak.wwise.console.project.open'
+    native = load_native_catalog(version, 'wwise-console')
+    assert operation not in native['functions']
+    assert 'ak.wwise.ui.project.open' in native['functions']
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    code, schema = gateway.execute_gateway(['request-schema', operation], env=env,
+        client_factory=lambda _: pytest.fail('Absent public Console open discovery must stay offline'))
+    assert code != 0, schema
+    runtime = SimpleNamespace(version=version, category_results=[],
+        sandbox=SimpleNamespace(sandbox_project=tmp_path / 'Owned.wproj'),
+        gateway=lambda *a, **kw: pytest.fail('Legacy preparation must not migrate or synthesize an unavailable open URI'))
+    workflow.test_cli_console_media_id_migrated_project_acceptance(runtime)
+    category, = runtime.category_results
+    assert category['status'] == 'blocked' and category['boundary'] == 'legacy_migrated_project_reopen_fixture'
+    assert category['media_effect'] == 'not_executed'
+    assert category['selected_reopen_uri'] == operation
+    assert 'ak.wwise.ui.project.open' in category['unassessed_alternative']
+    assert 'owned lifecycle fixture work' in category['reason']

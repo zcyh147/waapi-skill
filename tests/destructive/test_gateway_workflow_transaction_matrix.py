@@ -2126,13 +2126,51 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
     """
     project = runtime.sandbox.sandbox_project
     mapping = project.with_suffix(".mediaid")
+    observation = {
+        "category": ("cli-media-id-migrated-project" if migrate_before_capture
+                     else "cli-media-id-file-format-observation"), "status": "FAIL",
+        "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
+        "baseline_setup": ("public_gateway_save_then_migrate_then_reopen_before_capture" if migrate_before_capture
+                           else "public_gateway_project_save_before_capture"),
+    }
+    runtime.category_results.append(observation)
+    if migrate_before_capture and runtime.version not in {"2023.1", "2024.1", "2025.1"}:
+        observation.update(status="blocked", reason="The selected console.project.open route is absent from this pinned lane; migrated-media preparation needs owned lifecycle fixture work",
+            selected_reopen_uri="ak.wwise.console.project.open",
+            unassessed_alternative="ak.wwise.ui.project.open is reflected; its Console host eligibility and effect semantics need separate assessment",
+            boundary="legacy_migrated_project_reopen_fixture", media_effect="not_executed")
+        return
     _save_sandbox_project(runtime)
-    migration = None
     if migrate_before_capture:
-        setup = _start_business_draft(runtime, "ak.wwise.cli.migrate")
-        _update_business_draft(runtime, setup, "draft-declare-cli-console-plan",
-            ["--value", "project_file", str(project)], live=True)
-        migration = _complete_core_result_schema_draft(runtime, setup, allow_verified_setup=True)
+        setup_stage = "setup_migration"
+        try:
+            observation[setup_stage] = {"status": "preparing", "coverage_credit": "none; baseline preparation only"}
+            setup = _start_business_draft(runtime, "ak.wwise.cli.migrate")
+            observation[setup_stage]["draft_id"] = setup.draft_id
+            _update_business_draft(runtime, setup, "draft-declare-cli-console-plan",
+                ["--value", "project_file", str(project)], live=True)
+            migration = _complete_core_result_schema_draft(runtime, setup, allow_verified_setup=True)
+            observation[setup_stage].update(status="complete", transaction_id=migration["verify"]["transaction_id"],
+                state=migration["verify"]["state"],
+                business_state_verified=migration["verify"]["verification"]["business_state_verified"], responses=migration)
+            # Native migrate closes the project without ending this Console
+            # instance. Reopen through a separately authorized public operation;
+            # neither restart nor schema-only setup can certify the live identity.
+            setup_stage = "setup_reopen"
+            observation[setup_stage] = {"status": "preparing", "project_file": str(project),
+                "coverage_credit": "none; baseline preparation only"}
+            reopen = _start_business_draft(runtime, "ak.wwise.console.project.open")
+            observation[setup_stage]["draft_id"] = reopen.draft_id
+            _update_business_draft(runtime, reopen, "draft-declare-cli-console-plan",
+                ["--value", "project_file", str(project)], live=True)
+            reopened = _complete_business_draft(runtime, reopen)
+            observation[setup_stage].update(status="complete", transaction_id=reopened["verify"]["transaction_id"],
+                state=reopened["verify"]["state"], business_state_verified=reopened["verify"]["verification"]["business_state_verified"],
+                verification=reopened["verify"]["verification"], responses=reopened)
+        except AssertionError as exc:
+            observation[setup_stage]["status"] = "FAIL"
+            observation[setup_stage]["failure"] = (exc.args[0] if exc.args and isinstance(exc.args[0], Mapping) else str(exc))
+            raise
     assert not mapping.exists(), "This case requires the original Work Unit storage fixture"
     work_units = sorted(project.parent.rglob("*.wwu"))
     assert len(work_units) <= 512
@@ -2152,23 +2190,7 @@ def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_bef
                 if sample is None:
                     sample, sample_observation = path, candidate
     assert sample is not None, "A media-ID-free project cannot establish migration effects"
-    observation = {
-        "category": ("cli-media-id-migrated-project" if migrate_before_capture
-                     else "cli-media-id-file-format-observation"), "status": "FAIL",
-        "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
-        "source_work_unit": sample_observation,
-        "baseline_media_pairs": sorted(expected),
-        "baseline_setup": ("public_gateway_save_then_migrate_before_capture" if migrate_before_capture
-                           else "public_gateway_project_save_before_capture"),
-    }
-    if migration is not None:
-        observation["setup_migration"] = {
-            "transaction_id": migration["verify"]["transaction_id"],
-            "state": migration["verify"]["state"],
-            "business_state_verified": migration["verify"]["verification"]["business_state_verified"],
-            "coverage_credit": "none; baseline preparation only",
-        }
-    runtime.category_results.append(observation)
+    observation.update(source_work_unit=sample_observation, baseline_media_pairs=sorted(expected))
     try:
         draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
         _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
