@@ -4252,6 +4252,24 @@ def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_p
     assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
 
 
+def test_stationary_tone_diagnostic_late_archive_failure_keeps_incomplete_nonpass_receipt(tmp_path, workflow, monkeypatch):
+    runtime, commands, writes, _ = _stationary_tone_runtime(tmp_path, workflow)
+    original = workflow.os.open
+    def fail_archive(path, flags, *args, **kwargs):
+        if Path(path).name == 'native-0.json':
+            raise OSError('fixture native evidence destination unavailable')
+        return original(path, flags, *args, **kwargs)
+    monkeypatch.setattr(workflow.os, 'open', fail_archive)
+    with pytest.raises(OSError, match='destination unavailable'):
+        workflow._collect_stationary_tone_characterization(runtime)
+    receipt = json.loads((runtime.state_dir / 'tone-stationary-characterization.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['collection_complete'] is False and receipt['business_effect_verified'] is False
+    assert receipt['archive_failure']['type'] == 'OSError'
+    assert len(writes) == 4 and sum(argv[0] == 'execute' for argv in commands) == 4
+    assert all(Path(phase['wav']['archive_path']).is_file() for phase in receipt['phases'])
+
+
 def test_soundcaster_dump_wrong_guid_cannot_certify_same_named_session_values(tmp_path, workflow, monkeypatch):
     import hashlib
     from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
