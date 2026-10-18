@@ -2106,3 +2106,63 @@ def test_optional_history_observer_does_not_bypass_mandatory_project_guard_failu
     assert code == 2 and rejected.get("executed") is not True, rejected
     assert "getProjectInfo" in rejected["message"]
     assert not any(row[0] == "ak.wwise.core.object.setReference" for row in client.calls)
+
+
+def _created_leaf_history_case(tmp_path, *, version="2025.1", notes="Created notes"):
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND, CHILD
+    task = OwnedGraphTask(tmp_path, version, "object.create")
+    parent = task.bind(SECOND)
+    code, declared = task.step("draft-declare-new", "--declaration-id", "leaf", "--parent-handle", parent,
+        "--kind", "sound-sfx", "--name", "Rain", *([] if notes is None else ["--field", "notes", notes]))
+    assert code == 0, declared
+    source, shown = task.preview()
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    created = deepcopy(task.objects[CHILD])
+    original = task.call
+    task.history_effect = True
+    def call(uri, args=None, options=None):
+        if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if task.history_effect:
+                if uri.endswith(".undo"):
+                    task.objects.pop(CHILD, None)
+                else:
+                    task.objects[CHILD] = deepcopy(created)
+            return {}
+        return original(uri, args, options)
+    task.call = call
+    return task, source, created
+
+
+def _created_leaf_history_preview(task, source, direction="undo"):
+    code, phase = task.run("draft-start", "ak.wwise.core.undo." + direction)
+    assert code == 0, phase
+    draft, authority, revision = phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"]
+    code, phase = task.run("draft-declare-core-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(revision), "--value", "history_scope", "latest_project_history",
+        "--value", "expectation_receipt", source)
+    assert code == 0, phase
+    for command in ("draft-check", "preview-from-draft"):
+        code, result = task.run(command, draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]))
+        assert code == 0, result
+    tx = result["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    return tx
+
+
+def test_created_leaf_receipt_observes_undo_presence_through_public_gateway(tmp_path):
+    task, source, created = _created_leaf_history_case(tmp_path)
+    tx = _created_leaf_history_preview(task, source)
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert created["id"] not in task.objects
+    assert [row[1:] for row in task.calls if row[0] == "ak.wwise.core.undo.undo"] == [({}, {})]
