@@ -760,6 +760,39 @@ successors are outside this batch. This merger launched no native/Fresh or full
 Program/Non-live gate; these results do not close any ticket or transfer native
 acceptance to R21.
 
+## Twenty-second integration checkpoint
+
+R22 fixed candidate `81318aea` adds attested Console open/create from the exact
+native no-project state on 2023.1–2025.1. Opening seals the selected saved
+project GUID/name/file proof and verifies the actual live identity and path;
+transport errors never establish project absence. The first Draft declaration
+binds the current runtime even without a loaded project. Other operations and
+2021.1/2022.1 do not inherit this exception.
+
+Original central preflight on `84457fa6` remains **822 passed / 3 failed in
+28.78 seconds**. Three old matrix fixtures supplied nonexistent project files;
+test-only `81318aea` supplies actual saved project proofs. Those exact failures
+and adjacent checks passed **19 in 7.40 seconds**. Separate five-version media
+capture plus the strict evidence reader passed **6 in 38.51 seconds**. All runs
+preserved 1,857 tracked hashes and ended with no owned processes. No unchanged
+whole preflight or broad gate was repeated. R21 hosted preflight on published
+`1914dcdc` independently passed **825 in 54.79 seconds**, run `39080755597`.
+
+Media captures now retain actual public requests, injected native calls and
+setup/call/teardown outcomes. Original native `69d3439d` evidence passes its own
+source context but is rejected as current-native proof because runtime sources
+changed. Default 272,313 obligations, owners and requirements remain unchanged;
+the five exact result-schema attachment rows grant no family-wide completion.
+
+Root native attempts retained three prewrite new-reference failures: `1c4924d6`
+used an old hierarchy alias; `cef6d183` selected neighbouring fields via fuzzy
+discovery; `49b176e1` correctly selected UserAuxSend0 but exposed an unsupported
+new-object class condition. No target write occurred. The first two fixture
+repairs do not resolve the third product gap; its implementation remains #180.
+The migrated media setup still needs its public Console-open continuation and
+matching native proof. No Fresh, final broad-gate PASS, ticket closure or main
+merge is claimed.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
