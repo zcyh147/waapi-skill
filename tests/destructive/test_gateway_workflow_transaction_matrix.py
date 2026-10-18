@@ -2420,6 +2420,180 @@ def test_host_ui_debug_business_schema_read(
     )
 
 
+def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Retain four exact native observations; do not certify a signal algorithm."""
+    from wwise_waapi.operation_soundbank import capture_file_proof
+    assert runtime.version == '2025.1', 'This first Tone characterization tranche is2025.1 only'
+    output = runtime.state_dir / 'tone-stationary-characterization.json'
+    assert not output.exists(), 'Never overwrite an original Tone characterization'
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / 'tone-stationary-artifacts'; artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_native = set(native_root.glob('*.json'))
+    tone_root = runtime.sandbox.sandbox_root / 'tone-stationary-output'; tone_root.mkdir(exist_ok=False)
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    lifecycle_path = runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH')
+    if lifecycle_path is None and sys.platform == 'darwin':
+        lifecycle_path = runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH')
+    lifecycle_path = Path(lifecycle_path).expanduser().resolve(strict=False) if lifecycle_path else (
+        REPO_ROOT / EVIDENCE_ROOT / (current_evidence_platform() + '-category-evidence.jsonl'))
+    category = {'category': 'tone-stationary-characterization', 'status': 'FAIL',
+        'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none; characterization only',
+        'verifier_strength': 'exact_native_file_bytes_and_public_receipts_only; signal_oracle_unimplemented',
+        'observation_path': str(output), 'reason': 'collection incomplete'}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.tone-stationary-characterization/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'phases': [],
+        'native_evidence': [], 'collection_complete': False, 'business_effect_verified': False,
+        'coverage_credit': 'none; characterization only', 'config_sha256': config_hash,
+        'source_project': str(runtime.sandbox.source_project),
+        'endpoint': {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url},
+        'lifecycle_final_reference': {'path': str(lifecycle_path), 'contract': 'waapi-skill.host-category-evidence/v3',
+            'phase': 'final', 'candidate': runtime.candidate, 'category': category['category'],
+            'transaction_ids': [], 'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Requires the matching final category row with all four transaction IDs, source before/after hash/mtime/tree and residual process cleanup; prepared/PENDING is not cleanup success.',
+        'limits': {'calls': 48, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 8 * 1024 * 1024,
+            'wav_files': 4, 'file_bytes': 8 * 1024 * 1024, 'native_files': 512,
+            'native_bytes': 32 * 1024 * 1024, 'archive_bytes': 72 * 1024 * 1024,
+            'receipt_bytes': 256 * 1024}, 'archive_bytes': 0, 'total_reply_bytes': 0}
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Tone receipt exceeds its bound'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    def archive(name, raw):
+        assert len(raw) <= receipt['limits']['file_bytes'], 'Tone archived file exceeds its bound'
+        assert receipt['archive_bytes'] + len(raw) <= receipt['limits']['archive_bytes'], 'Tone archive exceeds its bound'
+        path = artifacts / name
+        prove_artifact_path(path, io_root=artifacts, field='Tone archive', expect_directory=False)
+        descriptor = os.open(path, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+            | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        proof = capture_file_proof(path, field='Tone archive', max_bytes=receipt['limits']['file_bytes'], io_root=artifacts)
+        assert proof['sha256'] == hashlib.sha256(raw).hexdigest() and proof['size'] == len(raw), proof
+        receipt['archive_bytes'] += len(raw)
+        return {'path': str(path), 'sha256': proof['sha256'], 'size': len(raw), 'proof': proof}
+    class Gateway:
+        def call(self, argv, *, live, allow_failure=False):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Tone public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry a Tone execution'
+                attempted.add(argv[1])
+            row: dict[str, Any] = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                assert len(raw) <= receipt['limits']['reply_bytes'], 'Tone reply exceeds its bound'
+                receipt['total_reply_bytes'] += len(raw)
+                assert receipt['total_reply_bytes'] <= receipt['limits']['total_reply_bytes'], 'Tone replies exceed their bound'
+                row.update(exit_code=code, reply=archive('reply-' + str(len(receipt['calls'])) + '.json', raw))
+                if not allow_failure: assert code == 0 and payload.get('ok') is True, payload
+                if live:
+                    assert payload.get('detected_version') == runtime.version, payload
+                    assert payload.get('endpoint') == receipt['endpoint'], payload
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            return self.call(argv, live=live)[1]
+    gateway = Gateway()
+    def capture_wave(phase):
+        if 'wav' in phase: return
+        observed = observe_console_file(Path(phase['output_path']), io_root=tone_root)
+        raw = base64.b64decode(observed['content_base64'], validate=True)
+        copied = archive(phase['name'] + '.wav', raw)
+        phase['wav'] = {'archive_path': copied['path'], 'archive_proof': copied['proof'],
+            'native_file_proof': observed['file_proof'], 'representation': 'uninterpreted_native_file_bytes'}
+        persist()
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        info_observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        info_evidence = json.loads(base64.b64decode(info_observed['content_base64'], validate=True))
+        receipt['get_info'] = info_evidence['result']
+        assert receipt['get_info']['isCommandLine'] is True, 'Characterization requires WwiseConsole'
+        version = receipt['get_info']['version']
+        assert tuple(version[k] for k in ('year', 'major', 'minor', 'build')) == (2025, 1, 7, 9143), version
+        gateway.gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'], live=False)
+        for depth, level in [('int16', 0), ('int16', -6), ('float32', 0), ('float32', -6)]:
+            phase = {'name': depth + '-' + str(abs(level)) + 'db', 'bit_depth': depth, 'sustain_db': level,
+                'output_path': str(tone_root / (depth + '-' + str(abs(level)) + 'db.wav')),
+                'execution_attempted': False, 'signal_verified': False}
+            receipt['phases'].append(phase); persist()
+            try:
+                draft = _start_business_draft(gateway, 'ak.wwise.debug.generateToneWAV')
+                _update_business_draft(gateway, draft, 'draft-declare-host-plan', [
+                    '--value', 'output_file', phase['output_path'], '--value', 'waveform', 'sine',
+                    '--value', 'frequency_hz', '440', '--value', 'channel_layout', '1.0',
+                    '--value', 'bit_depth', depth, '--value', 'sample_rate_hz', '48000',
+                    '--value', 'attack_seconds', '0', '--value', 'sustain_seconds', '0.25',
+                    '--value', 'release_seconds', '0', '--value', 'sustain_db', str(level)], live=True)
+                _update_business_draft(gateway, draft, 'draft-check', live=True)
+                preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+                tx = phase['transaction_id'] = preview['transaction_id']
+                ids = receipt['lifecycle_final_reference']['transaction_ids']
+                assert tx not in ids; ids.append(tx)
+                shown = gateway.gateway(['transaction-show', tx], live=False)
+                phase['preview_transaction'] = receipt['calls'][-1]['reply']
+                gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+                phase['execution_attempted'] = True; persist()
+                executed = gateway.gateway(['execute', tx], live=True)
+                phase['execute_state'] = executed.get('state')
+                assert executed.get('state') == 'executed_unverified', executed
+                capture_wave(phase)  # Retain bytes before a partial/failed verifier can stop the collector.
+                code, verified = gateway.call(['verify', tx], live=True, allow_failure=True)
+                phase['verification'] = {'exit_code': code, 'state': verified.get('state'),
+                    'business_state_verified': verified.get('verification', {}).get('business_state_verified'),
+                    'verification_strength': verified.get('verification_strength')}
+            finally:
+                if phase['execution_attempted'] and 'wav' not in phase and Path(phase['output_path']).exists():
+                    capture_wave(phase)
+                if phase.get('transaction_id'):
+                    gateway.gateway(['transaction-show', phase['transaction_id']], live=False)
+                    phase['transaction'] = receipt['calls'][-1]['reply']
+                persist()
+        final_status = gateway.gateway(['status'], live=True)
+        assert final_status['wwise'] == status['wwise'], 'Tone host context changed during characterization'
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Tone diagnostic configuration changed'
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - prior_native)
+            assert len(paths) <= receipt['limits']['native_files'], 'Tone native evidence count bound exceeded'
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'], 'Tone native evidence byte bound exceeded'
+                receipt['native_evidence'].append({'native_path': str(path), **archive('native-' + str(index) + '.json', raw)})
+        except Exception as exc:
+            receipt['archive_failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+            category.update(status='FAIL', reason='native evidence archive incomplete')
+            raise
+        finally:
+            persist()
+    receipt['collection_complete'] = True
+    category.update(status='blocked', reason='four native files collected; signal/level oracle and other host/version evidence remain unfinished')
+    persist()
+    return category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_stationary_tone_2025_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    category = _collect_stationary_tone_characterization(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
+
+
 @pytest.mark.live
 @pytest.mark.destructive
 def test_host_ui_debug_business_generates_exact_tone_wav(
