@@ -584,6 +584,13 @@ def test_render_prefix_append_verifies_derived_old_and_new_predecessors(tmp_path
 @pytest.mark.parametrize('operation', ['object.setProperty', 'object.set'])
 def test_exact_existing_slot_render_uses_same_chain_preview_and_readback(tmp_path, operation):
     task, _ = list_task(tmp_path, operation=operation)
+    prior = task.call
+    def enabled(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return prior(uri, args, options)
+    task.call = enabled
     target = task.bind(CHILD)
     render = select_field(task, owner=target, token='Render')
     if operation == 'object.setProperty':
@@ -606,4 +613,53 @@ def test_exact_existing_slot_render_uses_same_chain_preview_and_readback(tmp_pat
     assert chain['derived'] == [{'key': ROOT, 'before': False, 'after': True}]
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
+
+
+@pytest.mark.parametrize('version,operation', [('2021.1', 'object.setProperty'), ('2022.1', 'object.setProperty'), ('2022.1', 'object.set')])
+def test_legacy_render_chain_uses_same_prefix_plan_without_changing_bypass(tmp_path, version, operation):
+    task, _ = list_task(tmp_path, version=version, operation=operation)
+    del task.objects[ROOT], task.objects[CHILD], task.objects[FIRST]['@Effects']
+    task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    task.metadata = {}
+    reference_dependency = lambda i: {'type': 'reference', 'action': 'Enable', 'context': 'Self',
+        'property': 'Effect' + str(i), 'conditions': [{'referenceIsSet': True}]}
+    for i in range(4):
+        task.objects[FIRST].update({f'@Effect{i}': {'id': EFFECT}, f'@RenderEffect{i}': False, f'@BypassEffect{i}': i == 0})
+        task.metadata[f'Effect{i}'] = {'name': f'Effect{i}', 'type': '', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Effect']}]}}
+        for prefix in ('Bypass', 'Render'):
+            task.metadata[f'{prefix}Effect{i}'] = {'name': f'{prefix}Effect{i}', 'type': 'bool', 'default': False,
+                'dependencies': [reference_dependency(i)]}
+    original, writes = task.call, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri.endswith(('object.set', 'object.setProperty')):
+            writes.append(deepcopy(args))
+            if operation == 'object.set':
+                assert args['objects'] == [{'object': FIRST, '@RenderEffect1': True, '@RenderEffect0': True}]
+            else:
+                assert args == {'object': FIRST, 'property': 'RenderEffect1', 'value': True}
+            task.objects[FIRST]['@RenderEffect0'] = task.objects[FIRST]['@RenderEffect1'] = True
+            return {'objects': [{'id': FIRST, 'name': 'Sender'}]} if operation == 'object.set' else {}
+        return original(uri, args, options)
+    task.call = call
+    target = task.bind(FIRST)
+    render = select_field(task, owner=target, token='RenderEffect1')
+    if operation == 'object.set':
+        code, declared = task.step('draft-declare-existing', '--declaration-id', 'sound', '--object-handle', target,
+            '--field-value', render, 'true')
+    else:
+        code, declared = task.step('draft-declare-field-change', '--object-handle', target,
+            '--field-handle', render, '--business-value', 'true')
+    assert code == 0, declared
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    chain = shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]
+    assert chain['derived'] == [{'key': 'RenderEffect0', 'before': False, 'after': True}]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[FIRST] == {**before[FIRST], '@RenderEffect0': True, '@RenderEffect1': True}
     assert len(writes) == 1
