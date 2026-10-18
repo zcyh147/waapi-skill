@@ -1134,6 +1134,43 @@ def _fixture_run(tmp_path, workflow, monkeypatch, *, tamper_on_shutdown=False):
     return workflow.workflow_sandbox_runtime.__wrapped__(request, factory), events, records
 
 
+def test_workflow_failure_captures_owned_process_before_cleanup_with_bounded_tails(tmp_path, workflow, monkeypatch):
+    fixture, events, records = _fixture_run(tmp_path, workflow, monkeypatch)
+    runtime = next(fixture)
+    class OwnedProcess:
+        pid = 123456
+        def poll(self):
+            events.append('owned-poll')
+            return 17
+    class Output:
+        def tail(self, stream, max_lines=20):
+            assert max_lines == 20
+            events.append('tail:' + stream)
+            return stream + ':' + '声音' * 6000
+    runtime.lifecycle.process = OwnedProcess()
+    runtime.lifecycle.output = Output()
+    shutdown = workflow.shutdown_sandboxed_wwise
+    def cleanup(*args):
+        path = runtime.state_dir / 'workflow-pre-teardown-process.json'
+        assert path.is_file(), 'pre-teardown diagnostics must exist before cleanup'
+        observed = json.loads(path.read_text())
+        assert observed['owned_launch_pid'] == 123456 and observed['observed_exit_code'] == 17
+        assert observed['process_state'] == 'exited' and observed['phase'] == 'before_owned_shutdown'
+        assert type(observed['captured_at_unix_ns']) is int
+        for stream in ('stdout', 'stderr'):
+            assert 0 < len(observed[stream + '_tail'].encode('utf-8')) <= 4096
+            assert observed[stream + '_truncated'] is True
+        events.append('diagnostic-exists')
+        shutdown(*args)
+    monkeypatch.setattr(workflow, 'shutdown_sandboxed_wwise', cleanup)
+    original = RuntimeError('Original workflow failure remains the verdict')
+    with pytest.raises(RuntimeError) as caught:
+        fixture.throw(original)
+    assert caught.value is original
+    assert events.index('owned-poll') < events.index('diagnostic-exists') < events.index('shutdown') < events.index('release')
+    assert records[-1]['invocation']['outcome'] == 'FAIL'
+
+
 @pytest.mark.parametrize("tamper", (False, True))
 def test_source_full_guard_runs_after_shutdown_and_before_final_pass(tmp_path, workflow, monkeypatch, tamper):
     fixture, events, records = _fixture_run(
