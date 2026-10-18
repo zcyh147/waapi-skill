@@ -6776,6 +6776,11 @@ def _prepare_object_set(
                 raise OperationContractError("INVALID_READBACK", "One selected ShareSet requires one unchanged preparation snapshot")
             if not matching:
                 field_snapshots.append(snapshot)
+    from .effect_render_conditions import reject_explicit_graph_conflicts, EffectRenderConditionError
+    try:
+        reject_explicit_graph_conflicts(node_specs)
+    except EffectRenderConditionError as exc:
+        raise OperationContractError(exc.code, str(exc), details=exc.details) from exc
     _validate_graph_rtpc_capacity(node_specs, version=request.version)
     from .object_graph_paths import prepare_ancestor_path_guards, FIELDS as ANCESTOR_PATH_FIELDS
     try:
