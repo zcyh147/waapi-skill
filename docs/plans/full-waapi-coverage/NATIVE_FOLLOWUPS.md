@@ -91,6 +91,22 @@ TSV-media or cross-platform acceptance. The TSV fixture must express its SFX
 type through a source-backed legal construction while retaining the IsVoice=false
 and all Render/reference/media preservation checks.
 
+Test-only `39f41a55` uses the documented `<Sound SFX>` / `Object Type=Sound SFX`
+construction and retains the actual IsVoice=false assertion. Its full matching
+2022.1 collector passed in **13.99s**: all three effects and preservation checks
+passed, source integrity and 1,883 tracked files were unchanged, the sandbox was
+deleted and no owned process remained. The exact root is
+`legacy-import-render-39f41a55-2022-r1`; earlier failed roots remain unchanged.
+
+The matching 2021.1 run at that candidate stopped before any write (10.66s).
+Its live class catalog exposes `AudioSource`, class 16, while the collector
+searched for the later catalog label `AudioFileSource`. Pinned 2021 SDK
+`wwiseobject_audiosource.html` confirms AudioSource / class 16. The correction
+must distinguish the versioned catalog label from the actual imported object's
+type and retain exact class, GUID, parent and media verification. This 2021
+failure grants no import acceptance; source integrity and cleanup passed and
+its sandbox is quarantined in `legacy-import-render-39f41a55-2021-r1`.
+
 ## Inline WAV without Base64 padding — #182 / #180
 
 The pinned 2023.1–2025.1 definition
