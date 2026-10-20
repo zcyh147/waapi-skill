@@ -5014,6 +5014,123 @@ def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None, version=
     return runtime, commands, writes, selections, task
 
 
+def _ordinary_existing_source_runtime(tmp_path, workflow, *, fault=None):
+    """Use the retained native2025 catalog/Tone fields and established import shape."""
+    from copy import deepcopy
+    import re
+    import uuid
+    from tests.unit.test_sound_voice_creation_gateway import SECOND
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow)
+    runtime.sandbox.sandbox_path = task.project_file.parent
+    sdk = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-sdk-read-fields.json').read_text())
+    for prop in sdk['properties']:
+        name, kind = prop['attributes']['Name'], prop['attributes']['Type']
+        assert name not in task.metadata
+        value = float(prop['default_text']) if kind == 'Real32' else int(prop['default_text'])
+        # This is a read-only boundary projection from SDK declarations, not a
+        # relabelled native capture or authority for a new requested setter.
+        task.metadata[name] = {'name': name, 'type': kind, 'default': value}
+    original = task.call
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith('getPropertyAndReferenceNames') and task.objects.get(args.get('object'), {}).get('type') == 'AudioFileSource':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': []}  # Empty observed names, never a native absence claim.
+        if uri.endswith('audio.import'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append(deepcopy(args))
+            result = []
+            for node in args['imports']:
+                path = re.sub(r'<[^>]+>', '', node['objectPath'])
+                assert node['objectType'] == 'Sound SFX' and node['importLanguage'] == 'SFX'
+                identity = '{' + str(uuid.uuid4()).upper() + '}'
+                source_id = '{' + str(uuid.uuid4()).upper() + '}'
+                row = {'id': identity, 'name': path.rsplit('\\', 1)[1], 'type': 'Sound', 'classId': 65552,
+                    'path': path, 'parent': {'id': SECOND}, 'notes': node.get('notes', ''), '@IsVoice': False,
+                    'originalFilePath': node['audioFile'], 'audioSource:language': {'name': 'SFX'}, 'activeSource': {'id': source_id}}
+                source_name = Path(node['audioFile']).stem
+                task.objects[source_id] = {'id': source_id, 'name': source_name, 'type': 'AudioFileSource', 'classId': 16,
+                    'path': path + '\\' + source_name, 'parent': {'id': identity}, 'notes': '',
+                    'originalFilePath': node['audioFile'], 'audioSource:language': {'name': 'SFX'}}
+                task.objects[identity] = row; result.append(deepcopy(row))
+            return {'objects': result, 'log': [], 'files': [node['audioFile'] for node in args['imports']]}
+        return original(uri, args, options)
+    task.call = call
+    raw = runtime.raw_gateway
+    runtime.original_boundary_calls = []
+    def observe(argv):
+        code, result = raw(argv)
+        runtime.original_boundary_calls.append({'argv': list(argv), 'exit_code': code, 'payload': deepcopy(result)})
+        # Corrupt only after Gateway verification: collector must independently
+        # detect preservation loss, retain that success, and never replay it.
+        if fault == 'retained-file-path' and argv[0] == 'verify' and code == 0 and len(writes) == 3:
+            source, = [row for row in task.objects.values() if row['type'] == 'AudioFileSource']
+            source['originalFilePath'] = '/changed/after-verification.wav'
+        return code, result
+    runtime.raw_gateway = observe
+    return runtime, commands, writes, selections
+
+
+def _assert_source_phase_references(receipt):
+    from wwise_waapi.canonical import canonical_sha256
+    for phase in receipt['phases']:
+        for key, command in [('preview_call', 'transaction-show'), ('transaction_call', 'transaction-show')]:
+            if key not in phase: continue
+            ref = phase[key]; index = ref['call_index']
+            assert type(index) is int and 0 <= index < len(receipt['calls'])
+            call = receipt['calls'][index]
+            assert canonical_sha256(call) == ref['call_canonical_sha256']
+            assert call['argv'] == [command, phase['transaction_id']]
+        for key in ('execute', 'verify'):
+            if key not in phase: continue
+            ref = phase[key]['call']; index = ref['call_index']
+            assert type(index) is int and 0 <= index < len(receipt['calls'])
+            call = receipt['calls'][index]
+            assert canonical_sha256(call) == ref['call_canonical_sha256']
+            assert call['argv'] == [key, phase['transaction_id']] and call['exit_code'] == phase[key]['exit_code']
+        if 'transaction_call' in phase:
+            assert receipt['calls'][phase['preview_call']['call_index']]['payload']['artifact'] == receipt['calls'][phase['transaction_call']['call_index']]['payload']['artifact']
+
+
+def test_ordinary_existing_source_collector_adds_one_source_and_preserves_file_plugin_and_owner(tmp_path, workflow):
+    runtime, commands, writes, selections = _ordinary_existing_source_runtime(tmp_path, workflow)
+    category = workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_EXISTING_SOURCE_TEST', ordinary_existing_source=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and receipt['business_effect_verified'] is True
+    assert len(writes) == 3 and len(receipt['phases']) == 3 and selections == []
+    assert [phase['case'] for phase in receipt['phases']] == ['setup-import', 'setup-retained-tone', 'ordinary-existing-source']
+    assert receipt['before']['owner'] == receipt['after']['owner']
+    retained = {row['id']: row for row in receipt['before']['sources']}
+    assert len(retained) == 2 and {row['type'] for row in retained.values()} == {'AudioFileSource', 'SourcePlugin'}
+    assert all(row == next(after for after in receipt['after']['sources'] if after['id'] == identity) for identity, row in retained.items())
+    assert len(receipt['after']['sources']) == 3 and receipt['new_source']['properties']['StartFreq'] == 440
+    assert len(receipt['calls']) < receipt['limits']['calls'] and Path(category['observation_path']).stat().st_size < 8 * 1024 * 1024
+    source = receipt['phases'][-1]
+    artifact = receipt['calls'][source['preview_call']['call_index']]['payload']['artifact']
+    assert artifact['request']['operation'] == 'object.set' and 'voice_source_staging' not in artifact['request']['arguments']
+    _assert_source_phase_references(receipt)
+    queries = [(call, original) for call, original in zip(receipt['calls'], runtime.original_boundary_calls, strict=True)
+        if call['argv'][0] == 'query-object']
+    assert queries and all(call == original for call, original in queries), 'Collector changed an original Gateway query payload'
+    assert receipt['calls'] == runtime.original_boundary_calls
+    tone = next(row for row in receipt['before']['sources'] if row['type'] == 'SourcePlugin')
+    assert 'properties.WaveGain' in tone['unavailable_fields']  # Absent on a later page; never invented/null-filled.
+    first = next(original for _, original in queries if '--include-field' in original['argv'] and 'AttackTime' in original['argv'])
+    assert 'properties.WaveGain' not in first['payload']['objects'][0]['unavailable_fields']
+
+
+def test_ordinary_existing_source_collector_retains_verified_write_when_independent_file_observation_changes(tmp_path, workflow):
+    runtime, commands, writes, selections = _ordinary_existing_source_runtime(tmp_path, workflow, fault='retained-file-path')
+    with pytest.raises(AssertionError, match='retained Source'):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_EXISTING_SOURCE_TEST', ordinary_existing_source=True)
+    receipt = json.loads((runtime.state_dir / 'ordinary-existing-source-acceptance.json').read_text())
+    assert receipt['business_effect_verified'] is False and len(writes) == 3 and selections == []
+    phase = receipt['phases'][-1]
+    assert receipt['calls'][phase['verify']['call']['call_index']]['payload']['state'] == 'verified'
+    assert [row[0] for row in commands].count('execute') == [row[0] for row in commands].count('verify') == 3
+    assert len({row[1] for row in commands if row[0] == 'execute'}) == 3
+    _assert_source_phase_references(receipt)
+
+
 def test_source_plugin_selection_collector_requires_distinct_guid_change_and_preserves_original_bytes(tmp_path, workflow):
     import hashlib
     runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow)
