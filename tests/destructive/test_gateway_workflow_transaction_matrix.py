@@ -9988,12 +9988,16 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         if not successor: explicit_save('save_final')
         after_images = model_images('after', [source_id, copied['id']])
         if repeated:
-            from tests.destructive.support.source_copy_fixture import source_graph, repeated_copy_oracle
+            from tests.destructive.support.source_copy_fixture import source_graph, repeated_copy_oracle, saved_midi
+            after_index, = [index for index in saved_model_indexes if index.phase == 'after']
+            saved_midi(after_images, index=after_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
             nodes = source_graph(after_images, copied['id'], destination_id)
             live = {role: exact(node.get('ID')) for role, node in nodes.items()}
             for prop in ('OutputLevel', 'Osc1Level'):
                 assert owned_hop(live[prop + '.rtpc']['id'], 'ControlInput', 2) == [live[prop + '.control']], 'Copied repeated ControlInput differs'
             receipt['oracle'] = repeated_copy_oracle(before_images, after_images, source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner, destination_id=destination_id, before_live=before_live, copied_live=live)
+            receipt['oracle'].update(saved_file_identity=source_archive_identity, saved_work_unit_id=source_unit_id,
+                persisted_root_child_ids=sorted(row['id'] for row in setup_children))
             assert query(source_unit_id, relation='children') == setup_children, 'Copy changed MIDI root childset'
             receipt['saved_copy_verified'] = True
             return
@@ -10102,22 +10106,40 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                             unavailable[name] = metadata
                             continue
                     readable.append(name)
-                values = {}
+                values, metadata, authority = {}, {}, {}
                 for offset in range(0, len(readable), 8):
                     selected = readable[offset:offset + 8]
+                    # This exact public query already performs typed metadata
+                    # discovery. Retain its own native packets, never reuse a
+                    # prior phase or add duplicate metadata-detail calls.
+                    metadata_before = set(native_root.glob('*getPropertyInfo.json'))
                     row, = query(identity, fields=selected)
+                    packets = set(native_root.glob('*getPropertyInfo.json')) - metadata_before
+                    assert len(packets) <= receipt['limits']['native_files'], 'Fixture metadata packet bound exceeded'
+                    page_authority = {}
+                    for path in sorted(packets):
+                        observed = observe_console_file(path, io_root=native_root)
+                        packet = json.loads(base64.b64decode(observed['content_base64'], validate=True))
+                        assert packet['api'] == 'ak.wwise.core.object.getPropertyInfo' and packet['ok'] is True and packet['version'] == runtime.version, 'Fixture query metadata packet failed'
+                        facts = packet['result']; name = facts['name']
+                        if name not in selected: continue
+                        assert name not in metadata or metadata[name] == facts, 'Fixture query metadata drift'
+                        metadata[name] = facts
+                        page_authority.setdefault(name, []).append(observed['file_proof'])
+                    assert set(page_authority) == set(selected), 'Fixture query lacks complete typed metadata authority'
+                    authority.update(page_authority)
                     if role not in live:
                         live[role] = {key: value for key, value in row.items() if key not in {'properties', 'references'}}
                     assert all(row.get(key) == live[role].get(key) for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes', 'short_id')), 'Fixture field-read identity drift'
                     assert not row.get('references') and set(row.get('properties', {})) == set(selected), 'Fixture scalar field scope incomplete or changed'
                     values.update(row['properties'])
-                snapshots[role] = {'names': [field['name'] for field in names['fields']], 'values': values, 'untyped_reference_metadata': unavailable}
+                snapshots[role] = {'names': [field['name'] for field in names['fields']], 'values': values, 'metadata': metadata, 'native_metadata_authority': authority, 'untyped_reference_metadata': unavailable}
         validate_frames(nodes, live, old_owner)
         for prop in ('OutputLevel', 'Osc1Level'):
             assert owned_hop(nodes[prop + '.rtpc'].get('ID'), 'ControlInput', 2) == [live[prop + '.control']], 'Repeated ControlInput hop differs'
         return live, snapshots
     def accept_repeated_fixture(images, checked):
-        from tests.destructive.support.source_copy_fixture import source_graph, canonical, xml, sha
+        from tests.destructive.support.source_copy_fixture import source_graph, canonical, saved_midi, validate_scalars, sha
         receipt['fixture_acceptance'] = {'status': 'checking', 'before_copy_preview': True}
         unit = repeated_unit()
         assert unit['work_unit_is_dirty'] is False, 'Baseline Save did not clean selected MIDI Work Unit'
@@ -10125,17 +10147,19 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert len(images) == 1 and sha(images[0]) != pre_save_observed['file_proof']['sha256'], 'Baseline Save lacks a real MIDI serialization witness'
         saved = source_graph(images, source_id, old_owner)
         assert canonical(saved['source']) == canonical(loaded_nodes['source']), 'Baseline Save lost or changed synthetic Source graph'
-        document = xml(images[0])
-        saved_unit, = [node for node in document.iter('WorkUnit') if node.get('ID') == source_unit_id]
+        before_index, = [index for index in saved_model_indexes if index.phase == 'before']
+        saved_unit = saved_midi(images, index=before_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
         children = saved_unit.find('ChildrenList')
-        assert {node.get('ID') for node in children} == {row['id'] for row in setup_children} and len(children) == 8, 'Serialized MIDI root membership differs'
         destination, = [node for node in children if node.get('ID') == destination_id]
         assert destination.tag == 'Sound' and destination.get('Name') == prefix and len(destination.findall('ChildrenList/*')) == 0, 'Actual destination not serialized empty in MIDI'
         live, fields = repeated_live(saved, fields=True)
-        assert live == loaded_live and fields == loaded_fields, 'Native baseline Save changed loaded Source declarations or scalar fields'
+        expected_scalars = validate_scalars(loaded_nodes, loaded_fields)
+        assert validate_scalars(saved, fields) == expected_scalars, 'Saved fixture scalar authority differs'
+        def scalar_facts(snapshots):
+            return {role: {key: value for key, value in snapshot.items() if key != 'native_metadata_authority'} for role, snapshot in snapshots.items()}
+        assert live == loaded_live and scalar_facts(fields) == scalar_facts(loaded_fields), 'Native baseline Save changed loaded Source declarations or scalar fields'
         assert owner_frame(old_owner) == owner_before and query(old_owner, relation='children') == source_children, 'Baseline Save changed original owner frame/children'
-        before_index, = [index for index in saved_model_indexes if index.phase == 'before']
-        assert observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)['file_proof'] == before_index.files[source_file.relative_to(runtime.sandbox.sandbox_project.parent).as_posix()]['file_proof'], 'Saved native fixture changed during acceptance observations'
+        assert observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)['file_proof'] == before_index.files[source_archive_identity]['file_proof'], 'Saved native fixture changed during acceptance observations'
         receipt['fixture_acceptance'] = {'status': 'accepted', 'scope': 'exact 2021 native Load and generated baseline Save only; no constructor or copy-effect credit',
             'before_copy_preview': True, 'accepted_at_call_index': len(receipt['calls']) - 1,
             'prelaunch_output_sha256': runtime.source_copy_prelaunch['output_sha256'],
@@ -10143,6 +10167,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             'saved_model_index': receipt['model_images']['before'], 'native_build': receipt['native_build'], 'endpoint': endpoint,
             'baseline_Save': receipt['continuation_links'][0], 'parent_draft_id': checked['draft']['draft_id'],
             'parent_checked_revision': checked['draft']['revision'], 'role_ids': {key: node.get('ID') for key, node in saved.items()},
+            'serialized_scalar_authority': expected_scalars,
+            'loaded_scalar_observation': archive('loaded-live-fields.json', json.dumps(loaded_fields, ensure_ascii=False).encode('utf-8')),
             'scalar_observation': archive('accepted-live-fields.json', json.dumps(fields, ensure_ascii=False).encode('utf-8'))}
         persist()
         return live
@@ -10182,6 +10208,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             source_binding = exact(source_id, extra=['--include', 'work-unit', '--include', 'file-path'])
             source_unit_id = source_binding['work_unit']['id']
             source_file = runtime.sandbox.sandbox_project.parent / MIDI
+            from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
+            source_archive_identity = archive_relative_from_absolute(source_file, runtime.sandbox.sandbox_project.parent).canonical
             assert Path(localize_waapi_host_path(source_binding['file_path'])).resolve() == source_file.resolve(), 'Source outside selected MIDI file'
             project = exact(status['project']['id'], extra=['--include', 'file-path'])
             assert Path(localize_waapi_host_path(project['file_path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), 'Repeated fixture requires exact sandbox Project'

@@ -83,6 +83,9 @@ def repeated_collector_runtime(tmp_path, *, fault=None):
         if child.get('ID') not in task.objects:
             task.objects[child.get('ID')] = {'id': child.get('ID'), 'name': child.get('Name'), 'type': child.tag, 'classId': 1900560, 'path': task.objects[unit_id]['path'] + '\\' + child.get('Name'), 'parent': {'id': unit_id}, 'notes': '', 'shortId': 0}
     mapping = {binding[0]: binding[1] for binding in SAVED_ROLES.values()}
+    # saved_source_task uses the matching SDK Source field types plus original
+    # MIDI overrides and retained native owned metadata/values (LFO4.0,Flags3).
+    # The donor byte-preserves those same overrides; only native identities differ.
     donor_roles = {}
     for index, kind in enumerate(('rtpc', 'control', 'curve')):
         node = nodes['Osc1Level.' + kind]
@@ -93,9 +96,14 @@ def repeated_collector_runtime(tmp_path, *, fault=None):
         task.objects[identity] = row
         mapping[identity] = '{' + str(uuid.UUID(int=0x59000000000000000000000000000000 + index)).upper() + '}'
         donor_roles[identity] = donor_roles[mapping[identity]] = prototype
+    if fault == 'consistent-wrong-scalar':
+        task.objects[nodes['Osc1Level.control'].get('ID')]['@LfoFrequency'] = 99.0
     original = task.call; native_calls = []
     def observed(uri, args=None, options=None):
         args = args or {}; native_calls.append((uri, deepcopy(args), deepcopy(options)))
+        if fault == 'consistent-wrong-type' and uri.endswith('getPropertyInfo') and args.get('object') == SOURCE and args.get('property') == 'FrequencyMode':
+            result = deepcopy(original(uri, args, options)); result['type'] = 'Real32'
+            return result
         if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and args.get('object') in donor_roles:
             return original(uri, {**args, 'object': donor_roles[args['object']]}, options)
         if uri.endswith('object.get') and ' select @ControlInput ' in args.get('waql', ''):
@@ -122,6 +130,8 @@ def repeated_collector_runtime(tmp_path, *, fault=None):
                 if fault == 'lost-graph':
                     source = next(node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE)
                     source.find("PropertyList/Property[@Name='Osc1Level']/RTPCList").clear()
+                if fault == 'lost-root-child' and COPIED in task.objects:
+                    children.remove(next(node for node in children if node.tag == 'BlendContainer'))
                 document.write(path)
             for key in (unit_id,): task.objects[key]['workunitIsDirty'] = False
             return {}
@@ -149,7 +159,22 @@ def test_repeated_collector_gates_copy_on_actual_baseline_serialization(tmp_path
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert category['status'] == 'PASS'
     assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'save', 'copy', 'save']
-    assert receipt['fixture_acceptance']['status'] == 'accepted'
+    acceptance = receipt['fixture_acceptance']
+    assert acceptance['status'] == 'accepted'
+    expected = acceptance['serialized_scalar_authority']
+    assert expected['source']['Osc1Pwm'] == {'type': 'Real32', 'serialized_value': '12', 'expected_value': 12.0}
+    assert expected['source']['FrequencyMode']['expected_value'] == 1
+    for prop in ('OutputLevel', 'Osc1Level'):
+        assert expected[prop + '.control']['LfoFrequency'] == {'type': 'Real64', 'serialized_value': '4', 'expected_value': 4.0}
+        assert expected[prop + '.curve']['Flags'] == {'type': 'int32', 'serialized_value': '3', 'expected_value': 3}
+    for key in ('loaded_scalar_observation', 'scalar_observation'):
+        snapshots = json.loads(Path(acceptance[key]['path']).read_text())
+        for snapshot in snapshots.values():
+            assert set(snapshot['values']) == set(snapshot['metadata']) == set(snapshot['native_metadata_authority'])
+            assert all(snapshot['native_metadata_authority'].values())
+    assert all(index['complete'] and index['file_count'] == 1 for index in receipt['model_images'].values())
+    assert len(receipt['oracle']['persisted_root_child_ids']) == 8
+    assert receipt['oracle']['saved_file_identity'] == 'Actor-Mixer Hierarchy/MIDI.wwu'
     assert receipt['oracle']['ordered_point_count'] == 4 and len(receipt['oracle']['owned_guid_mapping']) == 7
     assert receipt['budget']['unique_transactions'] == 4
     assert receipt['budget']['native_calls'] == len(runtime.fixture_native_calls)
@@ -181,3 +206,45 @@ def test_repeated_fixture_acceptance_blocks_copy_preview_on_unsaved_or_lost_grap
     assert len([row for row in receipt['calls'] if row['argv'][0] == 'preview-from-draft']) == 2
     assert receipt.get('fixture_acceptance', {}).get('status') != 'accepted'
     assert runtime.category_results[0]['status'] == 'FAIL'
+
+
+@pytest.mark.parametrize('fault', ['consistent-wrong-scalar', 'consistent-wrong-type'])
+def test_repeated_fixture_rejects_consistent_native_scalar_disagreement(tmp_path, workflow, fault):
+    from tests.destructive.support.source_copy_fixture import PROFILE
+    runtime, writes, task = repeated_collector_runtime(tmp_path, fault=fault)
+    with pytest.raises(AssertionError, match='serialized scalar'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='REPEATED_SOURCE', saved_copy=True,
+            saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=PROFILE)
+    receipt = json.loads((runtime.state_dir / 'repeated-source-copy-save-children.json').read_text())
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'save']
+    assert receipt['collection_complete'] is False
+    if fault == 'consistent-wrong-scalar':
+        observed = [json.loads(Path(row['reply']['path']).read_text())['objects'][0]['properties']['LfoFrequency']
+            for row in receipt['calls'] if row['argv'][0] == 'query-object' and 'LfoFrequency' in row['argv']
+            and '{2B5446C9-CC6F-4AAB-88F2-89E6BC10427E}' in row['argv']]
+        assert observed == [99.0, 99.0]  # Both phases agree, pinned XML says4.
+    assert receipt.get('fixture_acceptance', {}).get('status') != 'accepted'
+    assert len([row for row in receipt['calls'] if row['argv'][0] == 'preview-from-draft']) == 2
+
+
+@pytest.mark.parametrize('fault', ['wrong-file', 'second-file', 'lost-root-child'])
+def test_repeated_saved_oracle_rejects_changed_file_or_persisted_root_scope(tmp_path, workflow, monkeypatch, fault):
+    from copy import deepcopy
+    from tests.destructive.support.source_copy_fixture import PROFILE
+    from tests.destructive.support.console_file_observation import ConsoleModelImageIndex
+    runtime, writes, task = repeated_collector_runtime(tmp_path, fault=fault)
+    finish = ConsoleModelImageIndex.finish
+    def altered_index(index):
+        if index.phase == 'after' and fault in {'wrong-file', 'second-file'}:
+            entry = deepcopy(index.files['Actor-Mixer Hierarchy/MIDI.wwu'])
+            if fault == 'wrong-file': index.files.clear()
+            index.files['Actor-Mixer Hierarchy/Other.wwu'] = entry
+        return finish(index)
+    monkeypatch.setattr(ConsoleModelImageIndex, 'finish', altered_index)
+    with pytest.raises(AssertionError, match='accepted MIDI file/index|Serialized MIDI root membership'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='REPEATED_SOURCE', saved_copy=True,
+            saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=PROFILE)
+    receipt = json.loads((runtime.state_dir / 'repeated-source-copy-save-children.json').read_text())
+    assert receipt['fixture_acceptance']['status'] == 'accepted'
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'save', 'copy', 'save']
+    assert receipt['collection_complete'] is False and receipt['saved_copy_verified'] is False

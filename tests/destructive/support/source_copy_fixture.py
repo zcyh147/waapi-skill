@@ -1,6 +1,7 @@
 """Closed developer-only 2021 synthetic input and independent saved graph oracle."""
 import hashlib
 import json
+import math
 from pathlib import Path
 import uuid
 import xml.etree.ElementTree as ET
@@ -49,7 +50,7 @@ def guid(value):
 
 
 def source_graph(images, source_id, owner_id):
-    assert 1 <= len(images) <= 2
+    assert len(images) == 1, 'Repeated fixture requires exactly one MIDI image'
     found, declarations = [], []
     for raw in images:
         root = xml(raw)
@@ -102,6 +103,64 @@ def validate_frames(nodes, live, owner_id):
         assert row['name'] == node.get('Name') and row.get('notes', '') == node.findtext('Comment', '')
         if 'ShortID' in node.attrib:
             assert type(row.get('short_id')) is int and str(row['short_id']) == node.get('ShortID'), 'Fixture live ShortID differs'
+
+
+def validate_scalars(nodes, snapshots):
+    """Bind typed live observations to explicit, byte-pinned XML properties."""
+    from wwise_waapi.metadata_discovery import metadata_typed_value_type
+    expected = {}
+    for role, node in nodes.items():
+        snapshot = snapshots[role]
+        values, metadata = snapshot['values'], snapshot['metadata']
+        assert set(values) == set(metadata), 'Incomplete fixture typed field authority'
+        for name, value in values.items():
+            kind = metadata_typed_value_type(metadata[name].get('type', ''))
+            valid = (type(value) is bool if kind == 'boolean' else
+                type(value) is int if kind == 'integer' else
+                type(value) in (int, float) and math.isfinite(value) if kind == 'number' else
+                type(value) is str if kind == 'string' else False)
+            assert valid, 'Fixture serialized scalar live type is unsupported or differs: ' + role + '.' + name
+        expected[role] = {}
+        for prop in node.findall('PropertyList/Property'):
+            name, kind, text = prop.get('Name'), prop.get('Type'), prop.get('Value')
+            assert name not in expected[role] and name in metadata, 'Fixture serialized scalar missing or duplicated: ' + role + '.' + name
+            assert metadata[name].get('type') == kind, 'Fixture serialized scalar metadata type differs: ' + role + '.' + name
+            record = {'type': kind, 'serialized_value': text}
+            if text is not None:
+                value_kind = metadata_typed_value_type(kind)
+                assert value_kind in {'boolean', 'integer', 'number', 'string'}, 'Unreviewed fixture serialized scalar type'
+                if value_kind == 'boolean':
+                    assert text in {'0', '1', 'false', 'true'}, 'Invalid serialized Boolean'
+                    expected_value = text in {'1', 'true'}
+                else:
+                    expected_value = int(text) if value_kind == 'integer' else float(text) if value_kind == 'number' else text
+                assert values[name] == expected_value, 'Fixture serialized scalar value differs: ' + role + '.' + name
+                record['expected_value'] = expected_value
+            expected[role][name] = record
+    return expected
+
+
+def saved_midi(images, *, index, relative, work_unit_id, root_children):
+    """Require the exact selected standalone WWU and persisted root membership."""
+    assert len(images) == 1 and set(index.files) == {relative}, 'Repeated fixture requires exactly the accepted MIDI file/index'
+    assert index.link['complete'] is True and index.link['file_count'] == 1 and not index.errors
+    index_raw = read_file(index.index_path, 2 * 1024 * 1024)
+    assert sha(index_raw) == index.link['sha256'] and len(index_raw) == index.link['size'], 'MIDI index link differs'
+    persisted_index = json.loads(index_raw)
+    assert persisted_index['complete'] is True and persisted_index['phase'] == index.phase and not persisted_index['errors']
+    assert persisted_index['files'] == index.files, 'Persisted MIDI index differs'
+    raw, = images
+    entry = index.files[relative]
+    assert entry['status'] == 'captured' and entry['sha256'] == sha(raw) and entry['size'] == len(raw), 'MIDI image/index differs'
+    document = xml(raw)
+    units = list(document.iter('WorkUnit'))
+    assert len(units) == 1 and guid(units[0].get('ID')) == guid(work_unit_id) and units[0].get('PersistMode') == 'Standalone', 'Accepted MIDI Work Unit differs'
+    assert guid(document.get('ID')) == guid(work_unit_id), 'MIDI document Work Unit differs'
+    children = units[0].find('ChildrenList')
+    expected = {(guid(row['id']), row['name'], row['type']) for row in root_children}
+    actual = [(guid(node.get('ID')), node.get('Name'), node.tag) for node in children]
+    assert len(actual) == len(expected) == 8 and set(actual) == expected, 'Serialized MIDI root membership differs'
+    return units[0]
 
 
 def prepare_repeated_source_fixture(sandbox, *, owned_root, io_root):
