@@ -5,15 +5,17 @@ from typing import Any, Callable, Mapping
 from uuid import UUID
 
 from .builders.query import MAX_QUERY_TAKE, build_object_get_query
+from .business_declarations import normalize_live_object_identity
 from .canonical import canonical_sha256
 from .host_paths import HostPathError, parse_absolute_host_path
 from .metadata_catalog import ObjectTypeCatalogStore
 
 
 class ActiveSourceQueryError(ValueError):
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, *, details=None):
         super().__init__(message)
         self.code = code
+        self.details = details or {}
 
 
 IDENTITY = ("id", "name", "type", "path")
@@ -31,7 +33,7 @@ def _guid(value):
         parsed = UUID(value) if isinstance(value, str) and len(value) == 38 and value.startswith("{") and value.endswith("}") else None
     except ValueError:
         parsed = None
-    if parsed is None or not parsed.int:
+    if parsed is None or not parsed.int or value.casefold() != ("{" + str(parsed) + "}"):
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A canonical nonzero GUID is required.")
     return "{" + str(parsed).upper() + "}"
 
@@ -41,6 +43,12 @@ def _identity(row):
     identity["id"] = _guid(identity["id"])
     if any(not isinstance(identity[key], str) or not identity[key] for key in IDENTITY):
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Object identity is incomplete.")
+    if identity["type"] != "Project":
+        try:
+            actual = normalize_live_object_identity(row)
+        except ValueError as exc:
+            _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", str(exc))
+        identity.update(name=actual.name, type=actual.object_type, path=actual.path)
     return identity
 
 
@@ -49,6 +57,24 @@ def _path(value):
         return parse_absolute_host_path(value).comparison_key()
     except HostPathError as exc:
         _fail("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "A complete original file path is required: " + str(exc))
+
+
+def _file_path(row):
+    if "originalWavFilePath" not in row or row["originalWavFilePath"] is None:
+        raise ActiveSourceQueryError("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "The original path was not observed.",
+            details={"field": "originalWavFilePath", "presence": "absent" if "originalWavFilePath" not in row else "null"})
+    return _path(row["originalWavFilePath"])
+
+
+def _sound_facts(row):
+    result = {**row, **_identity(row), "parent": _guid(row.get("parent")),
+              "originalWavFilePath": _file_path(row)}
+    if "audioSource:language" in row:
+        reference = row["audioSource:language"]
+        if not isinstance(reference, Mapping) or not isinstance(reference.get("name"), str):
+            _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The Sound source language is malformed.")
+        result["audioSource:language"] = {"id": _guid(reference), "name": reference["name"]}
+    return result
 
 
 def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], platform: str,
@@ -97,7 +123,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
 
     def project():
         values, _ = rows(type="Project", take=1, return_fields=(*IDENTITY, "filePath"), maximum=1)
-        if len(values) != 1 or not isinstance(values[0].get("filePath"), str):
+        if len(values) != 1 or values[0].get("type") != "Project" or not isinstance(values[0].get("filePath"), str):
             _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Project identity cannot be bound.")
         return {**_identity(values[0]), "filePath": values[0]["filePath"]}
 
@@ -112,8 +138,8 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Active-source derivation requires an actual class-proven Sound.")
     if "object_id" in selector and _guid(selector["object_id"]) != identity["id"] or "path" in selector and selector["path"] != identity["path"]:
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The exact Sound selector returned another object.")
-    wanted_path = _path(owner.get("originalWavFilePath"))
-    _guid(owner.get("parent"))
+    before_sound = _sound_facts(owner)
+    wanted_path = before_sound["originalWavFilePath"]
 
     def children():
         values, _ = rows(object_id=identity["id"], select=("children",), take=MAX_QUERY_TAKE,
@@ -137,7 +163,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
             language_id = _guid(source_language)
             facts[actual["id"]] = {**actual, "classId": row["classId"], "parent": identity["id"],
                 "language": {"id": language_id, "name": source_language["name"]},
-                "original_path": _path(row.get("originalWavFilePath"))}
+                "original_path": _file_path(row)}
         return facts
 
     before_children = children()
@@ -148,7 +174,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
     if children() != before_children:
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "Source membership or selection facts changed during observation.")
     after, _ = rows(object_id=identity["id"], return_fields=fields, maximum=1, **view)
-    if after != before or project() != before_project:
+    if len(after) != 1 or _sound_facts(after[0]) != before_sound or project() != before_project:
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "The Sound or project changed during observation.")
     after_info = read("ak.wwise.core.getInfo", {}, {})
     if any(after_info.get(key) != live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")):
@@ -157,7 +183,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
     return [{**owner, "active_source": {"id": selected["id"], "name": selected["name"]}}], preview, {
         "method": "unique_same_view_original_path", "platform": selected_platform, "language": selected_language,
         "source_count": len(before_children), "complete": True, "stable_observation": True,
-        "observation_sha256": canonical_sha256({"project": before_project, "sound": owner,
+        "observation_sha256": canonical_sha256({"project": before_project, "sound": before_sound,
             "children": before_children, "view": view}),
         "atomic": False, "native_absence_proven": False,
     }

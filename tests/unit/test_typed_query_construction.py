@@ -1361,7 +1361,7 @@ def test_short_id_query_rejects_unbound_or_duplicate_native_candidates(tmp_path:
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
 
 
-def test_2021_active_source_joins_complete_same_view_paths_independent_of_child_order(tmp_path):
+def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
     sound = "{11111111-1111-1111-1111-111111111111}"
     inactive = "{22222222-2222-2222-2222-222222222222}"
     active = "{33333333-3333-3333-3333-333333333333}"
@@ -1371,6 +1371,9 @@ def test_2021_active_source_joins_complete_same_view_paths_independent_of_child_
     project_file = tmp_path / "Fixture.wproj"
     project_file.write_text("<Project />")
     class Client(_AdvancedQueryClient):
+        child_reads = 0
+        sound_reads = 0
+
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.getInfo":
                 return {**super().call(uri, args, options), "sessionId": project, "processId": 42}
@@ -1385,23 +1388,53 @@ def test_2021_active_source_joins_complete_same_view_paths_independent_of_child_
             elif query.startswith("from type Platform"):
                 rows = [{"id": platform, "name": "Mac", "type": "Platform", "path": r"\Platforms\Mac"}]
             elif query.startswith("from type Language"):
-                rows = [{"id": language, "name": "SFX", "type": "Language", "path": r"\Languages\SFX"}]
+                rows = [{"id": language, "name": language_name, "type": "Language", "path": "\\Languages\\" + language_name}]
             elif "select children" in query:
+                self.child_reads += 1
                 rows = [{"id": identity, "name": name, "type": "AudioFileSource", "classId": 16,
                     "path": r"\Sounds\Rain" + "\\" + name, "parent": {"id": sound},
-                    "audioSource:language": {"id": language, "name": "SFX"},
+                    "audioSource:language": {"id": language, "name": language_name},
                     "originalWavFilePath": "/owned/Originals/SFX/" + name + ".wav"}
                     for identity, name in ((inactive, "Alpha"), (active, "Beta"))]
+                if language_name != "SFX":
+                    rows[0]["audioSource:language"] = {"id": project, "name": "French(France)"}
+                if fault == "duplicate-path":
+                    rows[0]["originalWavFilePath"] = rows[1]["originalWavFilePath"]
+                elif fault == "wrong-parent":
+                    rows[1]["parent"] = {"id": project}
+                elif fault == "missing-class":
+                    del rows[1]["classId"]
+                elif fault == "plugin":
+                    rows[1]["type"] = "SourcePlugin"
+                elif fault == "membership-drift" and self.child_reads == 2:
+                    rows.pop(0)
+                elif fault == "fence":
+                    rows = [{**rows[0], "id": "{%08X-0000-0000-0000-000000000000}" % index} for index in range(1, 1001)]
             else:
                 assert sound in query, query
+                self.sound_reads += 1
                 rows = [{"id": sound, "name": "Rain", "type": "Sound", "classId": 65552,
                     "path": r"\Sounds\Rain", "parent": {"id": project},
                     "originalWavFilePath": "/owned/Originals/SFX/Beta.wav",
-                    "audioSource:language": {"id": language, "name": "SFX"}}]
+                    "audioSource:language": {"id": language, "name": language_name}}]
+                if fault in {"wrong-path", "sound-drift"} and (fault == "wrong-path" or self.sound_reads == 2):
+                    rows[0]["originalWavFilePath"] = "/owned/Originals/SFX/Other.wav"
+                elif fault == "null-path":
+                    rows[0]["originalWavFilePath"] = None
+                elif fault == "missing-path":
+                    del rows[0]["originalWavFilePath"]
+                elif fault == "parent-representation" and self.sound_reads == 2:
+                    rows[0]["parent"] = project
             return {"return": [{key: row[key] for key in options["return"] if key in row} for row in rows]}
-    client = Client("2021.1")
+    return Client("2021.1"), {"sound": sound, "active": active, "platform": platform, "language": language}
+
+
+@pytest.mark.parametrize("language_name", ["SFX", "English(US)"])
+def test_2021_active_source_joins_complete_same_view_paths_independent_of_child_order(tmp_path, language_name):
+    client, ids = _legacy_active_source_client(tmp_path, language_name=language_name)
+    sound, active, platform, language = (ids[name] for name in ("sound", "active", "platform", "language"))
     code, result = gateway.execute_gateway(["query-object", "--exact-id", sound, "--platform", "Mac",
-        "--language", "SFX", "--include", "active-source"], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+        "--language", language_name, "--include", "active-source"], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
     assert code == 0, result
     assert result["agent_result"] == [{"id": sound, "name": "Rain", "type": "Sound", "path": r"\Sounds\Rain",
         "active_source": {"id": active, "name": "Beta"}}]
@@ -1413,7 +1446,40 @@ def test_2021_active_source_joins_complete_same_view_paths_independent_of_child_
     assert len(client.calls) <= 10
 
 
-@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+def test_2021_active_source_preserves_parent_identity_across_native_reference_representations(tmp_path):
+    client, ids = _legacy_active_source_client(tmp_path, fault="parent-representation")
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"], "--platform", "Mac",
+        "--language", "SFX", "--include", "active-source"], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
+
+
+@pytest.mark.parametrize("fault,expected", [
+    ("duplicate-path", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
+    ("wrong-path", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
+    ("missing-path", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
+    ("null-path", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
+    ("plugin", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
+    ("wrong-parent", "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ("missing-class", "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ("membership-drift", "ACTIVE_SOURCE_OBSERVATION_CHANGED"),
+    ("sound-drift", "ACTIVE_SOURCE_OBSERVATION_CHANGED"),
+    ("fence", "ACTIVE_SOURCE_OBSERVATION_INCOMPLETE"),
+])
+def test_2021_active_source_rejects_unproved_or_changed_selection_without_fallback(tmp_path, fault, expected):
+    client, ids = _legacy_active_source_client(tmp_path, fault=fault)
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"], "--platform", "Mac",
+        "--language", "SFX", "--include", "active-source"], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == expected, result
+    assert not result.get("agent_result") and not result.get("continuations")
+    assert result["details"]["native_absence_proven"] is False
+    if fault in {"missing-path", "null-path"}:
+        assert result["details"]["presence"] == ("absent" if fault == "missing-path" else "null")
+    assert len(client.calls) <= 10
+    assert all("activeSource" not in options.get("return", ()) for _, _, options in client.calls)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_path, version):
     sound = "{11111111-1111-1111-1111-111111111111}"
     source = "{22222222-2222-2222-2222-222222222222}"
@@ -1444,13 +1510,13 @@ def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_p
     if version == "2021.1":
         code, schema = gateway.execute_gateway(["query-schema", "--output", "active-source"], env=env)
         detail = schema["business_output"]
-        assert code == 0 and detail["available"] is False
-        assert detail["alternative"]["relationship"] == "children"
-        assert detail["alternative"]["active_selection_proof"] is False
+        assert code == 0 and detail["available"] is True
+        assert detail["native_definition"] is None
+        assert detail["derivation"]["runtime_xml"] is False
         before = len(client.calls)
         code, error = gateway.execute_gateway(["query-object", "--exact-id", sound, "--include", "active-source"],
             env=env, client_factory=lambda _: client)
-        assert code != 0 and "remains unresolved" in error["message"]
+        assert code != 0 and "explicit platform and language" in error["message"]
         assert len(client.calls) == before
         code, detail = gateway.execute_gateway(["query-schema", "--output", "original-file-path"], env=env)
         assert code == 0 and detail["business_output"]["native_definition"]["pointer"].endswith("/originalWavFilePath")

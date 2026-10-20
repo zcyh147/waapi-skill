@@ -15419,6 +15419,9 @@ def dispatch_command(
             calls = []
             configuration = selected_connection_binding(env)
             def read_active_source(api, native_args, native_options):
+                if len(calls) >= 10:
+                    raise GatewayResultShapeError("Active-source observation exceeded its owned read budget",
+                        error_code="ACTIVE_SOURCE_OBSERVATION_INCOMPLETE")
                 call = dispatch(dispatcher, api, connection=connection, version=detected_version,
                     args=native_args, options=native_options)
                 calls.append(dispatch_call_summary(call))
@@ -15432,7 +15435,7 @@ def dispatch_command(
                     platform=args.query_platform, language=args.query_language,
                     return_fields=tuple(return_fields), live_info=live_info)
             except ActiveSourceQueryError as exc:
-                raise GatewayResultShapeError(str(exc), details={"calls": calls, "native_absence_proven": False},
+                raise GatewayResultShapeError(str(exc), details={"calls": calls, "native_absence_proven": False, **exc.details},
                     error_code=exc.code) from exc
             if configuration != selected_connection_binding(env):
                 raise GatewayResultShapeError("Query configuration changed", error_code="ACTIVE_SOURCE_OBSERVATION_CHANGED")
