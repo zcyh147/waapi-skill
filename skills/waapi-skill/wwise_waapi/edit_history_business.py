@@ -251,8 +251,8 @@ def _compound_observations(prepared, execution, verification):
     path_context = prepared['pre_state']['execution_plan'].get('path_context')
     created_children = ()
     if path_context is not None:
-        from .object_graph_paths import validate_compound_path_context, compound_context_result_matches
-        validate_compound_path_context(path_context, calls)
+        from .object_graph_paths import compound_expected_context, compound_context_result_matches
+        path_context = compound_expected_context(path_context, calls)
         from .object_graph_paths import compound_created_child_roots
         created_children = compound_created_child_roots(calls, phases)
         from .object_graph_paths import compound_phase_arguments

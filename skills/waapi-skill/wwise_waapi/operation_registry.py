@@ -2734,7 +2734,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                             ("object",),
                             {
                                 "object": IDENTITY_ARGUMENT_SCHEMA,
-                                "name": {"type": "string", "minLength": 1},
+                                "name": {"type": "string", "minLength": 1,
+                                    "description": "Exact new name of this existing GUID; child creation conflict policy does not choose a different name."},
                                 "notes": {"type": "string"},
                                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                                 "list_mode": {
@@ -2744,6 +2745,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                                 "on_name_conflict": {
                                     "type": "string",
                                     "enum": ["fail", "rename", "merge", "replace"],
+                                    "description": "Collision policy for new child/list-member creation; existing GUID name edits remain exact.",
                                 },
                                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                                 "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
@@ -6136,13 +6138,7 @@ def _prepare_object_set(
                     "NO_OP",
                     f"object.set objects[{index}].name already matches the live target.",
                 )
-            if row_conflict == "merge":
-                raise OperationContractError(
-                    "INVALID_CONFLICT_POLICY",
-                    "Renaming an existing object does not support on_name_conflict=merge.",
-                    details={"index": index},
-                )
-            trusted["name"] = result_context["root_prepared_names"].get(target_spec["request_path"], requested_name) if result_context else requested_name
+            trusted["name"] = requested_name
         for descriptor in properties:
             info = _read_property_info_cached(
                 read,
@@ -6364,11 +6360,12 @@ def _prepare_object_set(
                     "object.set rename collision path resolved more than once.",
                     details={"path": future_target_path, "rows": rename_rows},
                 )
-            if row_conflict == "fail" and rename_rows:
+            if rename_rows:
                 raise OperationContractError(
                     "TARGET_EXISTS",
-                    "object.set rename with fail requires the exact requested path to be absent.",
-                    details={"path": future_target_path, "rows": rename_rows},
+                    "Existing-object rename requires the exact requested name; child creation policy cannot resolve its collision.",
+                    details={"path": future_target_path, "rows": rename_rows,
+                        "name_conflict_scope": "new_children_and_list_members"},
                 )
             path_snapshots.append(
                 {
@@ -6378,14 +6375,7 @@ def _prepare_object_set(
                 }
             )
             target_spec["rename_collision_rows"] = rename_rows
-            if row_conflict == "replace" and rename_rows:
-                raise OperationContractError(
-                    "TARGET_EXISTS",
-                    "The child replacement policy does not authorize deleting an existing target's rename collision.",
-                    details={"path": future_target_path, "rows": rename_rows, "name_conflict_scope": "new_children_and_list_members"},
-                )
-            if row_conflict in {"fail", "replace"}:
-                target_spec["expected_path"] = future_target_path
+            target_spec["expected_path"] = future_target_path
         for child_spec in child_specs:
             child_spec["target_index"] = index
             child_spec["parent_request_path"] = (
@@ -18150,6 +18140,7 @@ def verify_prepared_operation(
     history_resolver=None,
     compound_path_context=None,
     compound_created_children=(),
+    compound_phase_path_context=None,
 ) -> VerificationResult:
     """Run the closed postcondition for one persisted prepared operation."""
 
@@ -18471,8 +18462,8 @@ def verify_prepared_operation(
                 from .object_graph_paths import compound_created_child_roots
                 created_children = compound_created_child_roots(inner_plan, phases)
             if path_context is not None:
-                from .object_graph_paths import validate_compound_path_context, observe_compound_path_context
-                validate_compound_path_context(path_context, inner_plan)
+                from .object_graph_paths import compound_expected_context, observe_compound_path_context
+                path_context = compound_expected_context(path_context, inner_plan)
                 context_assertion, context_read = observe_compound_path_context(path_context, read=read_call)
                 assertions.append(context_assertion)
                 readbacks.append(context_read)
@@ -18492,12 +18483,17 @@ def verify_prepared_operation(
                 ):
                     child_business_state_verified = False
                     continue
+                phase_path_context = None
+                if path_context is not None:
+                    from .object_graph_paths import compound_rename_edits
+                    phase_path_context = {'edits': compound_rename_edits(inner_plan[:index + 1])}
                 child_verification = verify_prepared_operation(
                     prepared_child,
                     execution_result=dispatch_result,
                     read_call=read_call,
                     compound_path_context=path_context,
                     compound_created_children=created_children,
+                    compound_phase_path_context=phase_path_context,
                 )
                 verified_child_count += 1
                 child_business_state_verified = (
@@ -20013,10 +20009,7 @@ def verify_prepared_operation(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if effective_conflict == "rename" and (
-                spec.get("existing_target") is not True
-                or spec.get("original_name") != spec.get("requested_name")
-            ):
+            if effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
                 name_ok = (
@@ -20035,6 +20028,13 @@ def verify_prepared_operation(
                 name_ok = row.get("name") == spec.get("requested_name") and (
                     result_node is None or row.get("name") == returned_name
                 )
+            if (compound_path_context and compound_phase_path_context is not None
+                    and kind == 'object-set-batch' and spec.get('existing_target') is True
+                    and spec.get('requested_name') == spec.get('original_name')):
+                from .object_graph_paths import project_compound_snapshot
+                final_name = project_compound_snapshot(spec['pre_state'], compound_path_context)['name']
+                phase_name = project_compound_snapshot(spec['pre_state'], compound_phase_path_context)['name']
+                name_ok = row.get('name') == final_name and (result_node is None or returned_name == phase_name)
             check(
                 f"{request_path} name follows the reviewed conflict policy",
                 name_ok,
@@ -20138,10 +20138,14 @@ def verify_prepared_operation(
                     {"expected": spec.get("requested_notes"), "actual": row.get("notes")},
                 )
             elif (spec.get("existing_target") is True or spec.get("preexisting_id") is not None) and isinstance(spec.get("pre_state"), Mapping):
+                expected_notes = spec["pre_state"].get("notes")
+                if compound_path_context:
+                    from .object_graph_paths import project_compound_snapshot
+                    expected_notes = project_compound_snapshot(spec["pre_state"], compound_path_context).get("notes")
                 check(
                     f"{request_path} untouched notes remain unchanged",
-                    row.get("notes") == spec["pre_state"].get("notes"),
-                    {"expected": spec["pre_state"].get("notes"), "actual": row.get("notes")},
+                    row.get("notes") == expected_notes,
+                    {"expected": expected_notes, "actual": row.get("notes")},
                 )
             for field_spec in spec.get("properties", []):
                 if not isinstance(field_spec, Mapping):

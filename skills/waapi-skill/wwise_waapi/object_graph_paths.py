@@ -61,7 +61,7 @@ def expected_snapshot(snapshot, *, edits, read_row):
         actual = read_row(target_id)
         actual_name = actual.get('name')
         if (not isinstance(name, str) or not isinstance(actual_name, str) or not actual_name or '\\' in actual_name
-                or not (actual_name == name or (node.get('on_name_conflict') == 'rename' and actual_name.startswith(name)))):
+                or actual_name != name):
             raise ValueError('Actual name differs from the sealed graph rename policy')
         if path_affected:
             segments[len(old_path.split('\\')) - 1] = actual_name
@@ -151,6 +151,21 @@ def compound_rename_edits(calls):
     return edits
 
 
+def compound_expected_context(context, calls):
+    """Reconstruct declared final notes without changing the sealed path context."""
+    validate_compound_path_context(context, calls)
+    notes = {}
+    for call in calls:
+        plan = call.get('prepared_operation', {}).get('verification_plan', {})
+        if plan.get('kind') == 'same-guid-notes':
+            notes[plan['object_id'].casefold()] = plan['expected_notes']
+        elif plan.get('kind') == 'object-set-batch':
+            for node in plan.get('nodes', []):
+                if node.get('existing_target') is True and node.get('notes_supplied') is True:
+                    notes[node['target_id'].casefold()] = node['requested_notes']
+    return {**context, 'notes_outcomes': notes}
+
+
 def project_compound_path(path, context):
     if not context:
         return path
@@ -238,11 +253,13 @@ def validate_compound_path_context(context, calls):
 
 
 def compound_context_expected(context):
-    def intent(key):
-        edit = next(node for node in context['edits'] if node['target_id'].casefold() == key.casefold())
-        return {'name': edit['requested_name']}
-    return [{key: value for key, value in expected_snapshot(row, edits=context['edits'], read_row=intent).items()
-        if key != 'notes'} for row in context['snapshots']]
+    expected = []
+    for row in context['snapshots']:
+        projected = project_compound_snapshot(row, context)
+        if row['id'].casefold() not in context.get('notes_outcomes', {}):
+            projected.pop('notes', None)  # Unrequested notes retain their existing preservation observers.
+        expected.append(projected)
+    return expected
 
 
 def observe_compound_path_context(context, *, read):
@@ -317,7 +334,11 @@ def project_compound_snapshot(row, context):
     def intent(key):
         return {'name': next(node['requested_name'] for node in context['edits']
             if node['target_id'].casefold() == key.casefold())}
-    return expected_snapshot(row, edits=context['edits'], read_row=intent)
+    projected = expected_snapshot(row, edits=context['edits'], read_row=intent)
+    key = str(row.get('id')).casefold()
+    if key in context.get('notes_outcomes', {}):
+        projected['notes'] = context['notes_outcomes'][key]
+    return projected
 
 
 def compound_created_child_roots(calls, phases):
