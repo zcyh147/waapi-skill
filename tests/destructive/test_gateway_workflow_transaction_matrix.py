@@ -16,6 +16,7 @@ import time
 import uuid
 import wave
 import xml.etree.ElementTree as ET
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
@@ -7313,7 +7314,7 @@ def _collect_ordinary_existing_source_case(runtime, gateway, receipt, *, prefix,
     def exact(identity, **view):
         row, = rows(['--exact-id', identity], **view)
         assert uuid.UUID(row['id']) == uuid.UUID(identity), row
-        return row
+        return deepcopy(row)
     def children(identity):
         return sorted(rows(['--exact-id', identity, '--relationship', 'children']), key=lambda row: uuid.UUID(row['id']))
     parent_before = exact(parent['id'])
@@ -7509,7 +7510,9 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             try:
                 code, payload = runtime.raw_gateway(argv)
                 assert len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) <= receipt['limits']['reply_bytes']
-                row.update(exit_code=code, payload=payload)
+                # Preserve the exact boundary result even when a later oracle
+                # merges normalized observations from several read pages.
+                row.update(exit_code=code, payload=deepcopy(payload))
                 return code, payload
             except Exception as exc:
                 row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}

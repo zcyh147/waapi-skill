@@ -5056,8 +5056,10 @@ def _ordinary_existing_source_runtime(tmp_path, workflow, *, fault=None):
         return original(uri, args, options)
     task.call = call
     raw = runtime.raw_gateway
+    runtime.original_boundary_calls = []
     def observe(argv):
         code, result = raw(argv)
+        runtime.original_boundary_calls.append({'argv': list(argv), 'exit_code': code, 'payload': deepcopy(result)})
         # Corrupt only after Gateway verification: collector must independently
         # detect preservation loss, retain that success, and never replay it.
         if fault == 'retained-file-path' and argv[0] == 'verify' and code == 0 and len(writes) == 3:
@@ -5106,6 +5108,14 @@ def test_ordinary_existing_source_collector_adds_one_source_and_preserves_file_p
     artifact = receipt['calls'][source['preview_call']['call_index']]['payload']['artifact']
     assert artifact['request']['operation'] == 'object.set' and 'voice_source_staging' not in artifact['request']['arguments']
     _assert_source_phase_references(receipt)
+    queries = [(call, original) for call, original in zip(receipt['calls'], runtime.original_boundary_calls, strict=True)
+        if call['argv'][0] == 'query-object']
+    assert queries and all(call == original for call, original in queries), 'Collector changed an original Gateway query payload'
+    assert receipt['calls'] == runtime.original_boundary_calls
+    tone = next(row for row in receipt['before']['sources'] if row['type'] == 'SourcePlugin')
+    assert 'properties.WaveGain' in tone['unavailable_fields']  # Absent on a later page; never invented/null-filled.
+    first = next(original for _, original in queries if '--include-field' in original['argv'] and 'AttackTime' in original['argv'])
+    assert 'properties.WaveGain' not in first['payload']['objects'][0]['unavailable_fields']
 
 
 def test_ordinary_existing_source_collector_retains_verified_write_when_independent_file_observation_changes(tmp_path, workflow):
