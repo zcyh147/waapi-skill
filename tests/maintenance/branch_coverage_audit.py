@@ -350,7 +350,7 @@ def portable_binding_inputs(index_path, requirements):
     from tests.maintenance.branch_audit_completion import read_sealed_artifact
     raw = index_path.read_bytes()
     index = json.loads(raw)
-    if (set(index) != {'contract', 'base', 'entries'}
+    if (set(index) not in ({'contract', 'base', 'entries'}, {'contract', 'base', 'entries', 'metadata_attachments'})
             or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
             or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
             or not isinstance(index['entries'], list) or not index['entries']):
@@ -359,11 +359,15 @@ def portable_binding_inputs(index_path, requirements):
     base = (index_path.parent / index['base']).resolve(strict=True)
     if not base.is_relative_to(boundary):
         raise ValueError('portable evidence base escapes its index context')
-    def read(descriptor):
+    def read(descriptor, *, record_index=None):
         if (not isinstance(descriptor, dict) or set(descriptor) != {'artifact', 'sha256'}
                 or not isinstance(descriptor['artifact'], str) or Path(descriptor['artifact']).is_absolute()
                 or not (base / descriptor['artifact']).resolve().is_relative_to(base)):
             raise ValueError('portable evidence descriptor must remain relative to its bundle')
+        if record_index is not None:
+            if type(record_index) is not int or record_index < 0:
+                raise ValueError("invalid original metadata JSONL index")
+            descriptor = {**descriptor, "record_index":record_index}
         return read_sealed_artifact(descriptor, base)
     bindings, names = {}, set()
     for entry in index['entries']:
@@ -404,9 +408,62 @@ def portable_binding_inputs(index_path, requirements):
                        for key, value in policy['branches'].items())):
             raise ValueError('portable requirement differs from reviewed exact branch policy')
         bindings.update(projected['bindings'])
+    attachments = index.get('metadata_attachments', [])
+    if not isinstance(attachments, list):
+        raise ValueError('closed metadata attachment list required')
+    attached = set()
+    if attachments:
+        from tests.support.metadata_replay_branch_evidence import selected_ids
+    for descriptor in attachments:
+        attachment = read(descriptor)
+        if (set(attachment) != {'contract','branch_id','native_shape_sha256','category_inputs','evidence'}
+                or attachment['contract'] != 'waapi-skill.r51-metadata-attachment/v1'):
+            raise ValueError('closed R51 metadata attachment fields required')
+        identity = attachment['branch_id']
+        policy = requirements['branches'].get(identity, {})
+        if (identity in attached or identity not in bindings
+                or identity not in selected_ids()
+                or policy.get('categories') != ['program','live_metadata']
+                or policy.get('native_shape_sha256') != attachment['native_shape_sha256']
+                or bindings[identity]['native_shape_sha256'] != attachment['native_shape_sha256']
+                or 'live_metadata' in bindings[identity]['evidence'] or bindings[identity].get('category_inputs')):
+            raise ValueError('duplicate/conflicting or out-of-scope metadata attachment')
+        attached.add(identity)
+        evidence = attachment['evidence']
+        if set(evidence) != {'artifact','sha256','nodeid'}:
+            raise ValueError('closed metadata evidence descriptor required')
+        record = read({key:evidence[key] for key in ('artifact','sha256')})
+        if (set(record) != {'candidate_sha256','scope_kind','evidence_kind','metadata_run','invocation','replay',
+                'replay_bindings','source_bridge','branch_assertions','category_inputs'}
+                or record['evidence_kind'] != 'historical_metadata_current_program_replay'
+                or record['category_inputs'] != attachment['category_inputs']
+                or set(attachment['category_inputs']) != {'historical','replay'}
+                or any(not isinstance(value,list) or not value for value in attachment['category_inputs'].values())
+                or identity not in record['branch_assertions'] or identity not in record['replay_bindings']):
+            raise ValueError('closed exact metadata attachment record required')
+        archive = record['metadata_run']
+        if (set(archive) != {'contract','category','observation','status','identity','reply','native','call_index'}
+                or archive['contract'] != 'waapi-skill.r51-metadata-read/v1'):
+            raise ValueError('closed original metadata archive required')
+        for role in ('category','observation','status','identity','reply','native'):
+            expected = {'artifact','sha256','record_index','nodeid'} if role == 'category' else {'artifact','sha256'}
+            if set(archive[role]) != expected:
+                raise ValueError('closed original metadata dependency required')
+            read({key:archive[role][key] for key in ('artifact','sha256')},
+                 record_index=archive[role]['record_index'] if role == 'category' else None)
+        replay = record['replay']
+        if set(replay) != {'artifact','sha256','nodeid'} or replay['nodeid'] != evidence['nodeid']:
+            raise ValueError('exact current metadata replay node required')
+        program = read({key:replay[key] for key in ('artifact','sha256')})
+        if any(program.get(key) for key in ('artifacts','native_runs','metadata_run','observation_artifacts')):
+            raise ValueError('metadata replay has an unresolved nested dependency')
+        # Add only this category's evidence and independently bound input.
+        # Existing program projections, source mappings and inputs stay exact.
+        bindings[identity]['evidence']['live_metadata'] = deepcopy(evidence)
+        bindings[identity]['category_inputs'] = {'live_metadata':deepcopy(attachment['category_inputs'])}
     return {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}, base, {
         'mode': 'portable-index', 'index_sha256': hashlib.sha256(raw).hexdigest(),
-        'selected_documents_sha256': digest(index['entries'])}
+        'selected_documents_sha256': digest({'entries':index['entries'],'metadata_attachments':attachments}) if attachments else digest(index['entries'])}
 
 
 def main(argv=None):
