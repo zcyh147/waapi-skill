@@ -1486,15 +1486,16 @@ class OperationDraftStore:
 
     def _source_copy_parent_unlocked(self, origin):
         from .source_copy_proof import require, validate_origin, baseline_origin
-        validate_origin(origin, '2021.1')
+        validate_origin(origin, origin.get('version') if isinstance(origin, dict) else None)
         require(origin['stage'] == 'baseline', 'Expected a baseline origin')
         parent = origin['parent']
         loaded = self._require_unexpired(self._load_available(parent['draft_id']), now=_utc_datetime(None))
         record = loaded.record
-        require(record.authority_digest == parent['authority_digest'], 'Baseline parent authority changed')
+        require(record.version == origin['version'] and record.authority_digest == parent['authority_digest'],
+            'Baseline parent version or authority changed')
         from .operation_registry import operation_request_schema_digest
-        _require_current_binding(record, schema_digest=operation_request_schema_digest('object.copy', '2021.1'),
-            composer_digest=operation_composer_digest('object.copy', '2021.1'))
+        _require_current_binding(record, schema_digest=operation_request_schema_digest('object.copy', record.version),
+            composer_digest=operation_composer_digest('object.copy', record.version))
         request = _materialize_draft_composition(record.operation, record.version, record.composition, history_state_dir=self.state_dir)
         expected = baseline_origin(record, canonical_sha256(request), {'project_guard': origin['context']['project_guard'], 'binding': origin['context']})
         require(expected == origin, 'Baseline parent revision/request/audit changed')

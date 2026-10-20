@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 from types import SimpleNamespace
 
-from tests.unit.test_source_copy_saved_continuation_gateway import saved_source_task, SOURCE, DEST
+from tests.unit.test_source_copy_saved_continuation_gateway import saved_source_task, modern_saved_source_task, SOURCE, DEST
 from tests.unit.test_field_interface_closure_gateway import gateway
 from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker
 from tests.semantic.support.typed_gateway_input import _render_step_arguments
@@ -16,8 +16,8 @@ from tests.support.platform_process import run_model_argv
 SKILL = Path(__file__).parents[2] / 'skills/waapi-skill'
 
 
-def source_request():
-    return {'contract': 'waapi-skill.operation-request/v1', 'version': '2021.1',
+def source_request(version='2021.1'):
+    return {'contract': 'waapi-skill.operation-request/v1', 'version': version,
         'operation': 'object.copy', 'arguments': {
             'object': {'kind': 'id', 'value': SOURCE},
             'parent': {'kind': 'id', 'value': DEST}, 'on_name_conflict': 'fail'}}
@@ -295,17 +295,17 @@ def test_mandatory_task_result_composer_consumer_seals_source_chains(tmp_path, m
 
 
 
-def source_provenance(root, protocol, prompts):
+def source_provenance(root, protocol, prompts, *, version='2021.1'):
     import hashlib
     from tests.semantic.support.codex_prompt_provenance_v3 import write_prompt_provenance
     (root / 'evidence').mkdir(parents=True, exist_ok=True)
     (root / 'owned').mkdir(exist_ok=True)
-    scenario = SimpleNamespace(id='SOURCE-OWNED-01', api='ak.wwise.core.object.copy', versions=('2021.1',),
+    scenario = SimpleNamespace(id='SOURCE-OWNED-01', api='ak.wwise.core.object.copy', versions=(version,),
         prompt=prompts[0], prompt_sha256=hashlib.sha256(prompts[0].encode()).hexdigest(), visible_inputs=(), fixture={},
         primary_dispatch=SimpleNamespace(count=1), confirmation_turn_count=len(prompts) - 1,
         confirmation_prompt='Confirm the current Preview.', follow_up_prompts=tuple(prompts[1:]),
         scenario_family='source-copy-proof', render_prompt=lambda values: prompts[0])
-    return scenario, write_prompt_provenance(scenario=scenario, version='2021.1', scenario_root=root,
+    return scenario, write_prompt_provenance(scenario=scenario, version=version, scenario_root=root,
         prompts=prompts, visible_values={}, protocol=protocol)
 
 
@@ -461,7 +461,7 @@ def test_source_provenance_writer_and_strict_reader_reject_unowned_copy(tmp_path
             require_paths=True)
 
 
-def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False):
+def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False, version='2021.1'):
     """Real formal consumers; replace only external Codex and fake WAAPI I/O."""
     import hashlib
     from tests.semantic.support import codex_harness as harness
@@ -473,15 +473,15 @@ def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False)
     import tests.semantic.support.codex_expansion_reconciliation as reconciliation
     from tests.semantic.support.codex_harness import _business_draft_continuation_candidates
 
-    protocol = build_source_copy_saved_proof_protocol(source_request(), dirty_baseline=policy != 'read_only', policy=policy)
+    protocol = build_source_copy_saved_proof_protocol(source_request(version), dirty_baseline=policy != 'read_only', policy=policy)
     prompts = ['Copy the pinned Source.'] + [
         READ_ONLY_FOLLOW_UP_PROMPT if policy == 'read_only' else 'Confirm the current Preview.'
     ] * (len(protocol.turn_prefix_counts) - 1)
     scenario_root = tmp_path / 'scenario'
-    scenario, provenance = source_provenance(scenario_root, protocol, prompts)
+    scenario, provenance = source_provenance(scenario_root, protocol, prompts, version=version)
     count = 0 if policy == 'read_only' else 1
     scenario.primary_dispatch = SimpleNamespace(count=count)
-    plan = write_business_oracle_plan(scenario_id=scenario.id, version='2021.1', api=scenario.api,
+    plan = write_business_oracle_plan(scenario_id=scenario.id, version=version, api=scenario.api,
         runner='project', family='object', scenario_root=scenario_root,
         fixture_spec={'kind': 'scenario_fixture', 'sha256': hashlib.sha256(b'{}').hexdigest()},
         protocol_sha256=provenance.payload['protocol']['sha256'], provenance_sha256=provenance.sha256,
@@ -494,8 +494,10 @@ def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False)
     if repeated_graph:
         from tests.unit.test_source_copy_saved_continuation_gateway import repeated_saved_source_task
         _, writes, native, _ = repeated_saved_source_task(fixture)
-    else:
+    elif version == '2021.1':
         _, writes, native = saved_source_task(fixture)
+    else:
+        _, writes, native = modern_saved_source_task(fixture, version)
     if policy != 'read_only':
         from tests.unit.test_field_interface_closure_gateway import PROJECT
         native.objects[PROJECT]['workunitIsDirty'] = True
@@ -570,14 +572,14 @@ def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False)
     options = SimpleNamespace(skill_source=SKILL, codex_binary=binary, auth_json=auth, model='pure-code-no-model',
         reasoning_effort='medium', service_tier='default', timeout_seconds=60,
         profile='source-owned-deterministic', protocol_manifest_revision=None, windows_powershell_core_host=None)
-    run = runner.run_v3_codex_task(scenario_id=scenario.id, version='2021.1', scenario=scenario,
+    run = runner.run_v3_codex_task(scenario_id=scenario.id, version=version, scenario=scenario,
         prompts=prompts, protocol=protocol, task_root=root, skill_source=SKILL, codex_binary=binary, auth_json=auth,
         model=options.model, reasoning_effort=options.reasoning_effort, service_tier=options.service_tier,
         timeout_seconds=60, runner_environment={**native.env, 'WWISE_WAAPI_HOST': '127.0.0.1',
             'WWISE_WAAPI_PORT': '31337'}, required_reference='references/waapi-operate.md',
         business_oracle_plan=plan, project_modification_policy=policy, expected_primary_dispatch_count=count)
     assert run.passed
-    unit = SimpleNamespace(unit_id=scenario.id, base_scenario_id=scenario.id, version='2021.1', scenario=scenario,
+    unit = SimpleNamespace(unit_id=scenario.id, base_scenario_id=scenario.id, version=version, scenario=scenario,
         user_turn_count=len(prompts), project_modification_policy=policy, expected_primary_dispatch_count=count,
         turns=tuple(SimpleNamespace(index=index, kind='request' if index == 1 else 'confirmation', prompt=prompt)
             for index, prompt in enumerate(prompts, start=1)))
@@ -604,6 +606,15 @@ def test_full_dirty_source_task_through_real_broker_grader_archive_and_campaign_
     assert responses['tx01.saved-verify']['verification']['verification_scope']['complete_copy_preservation'] is True
     assert json.loads((root / 'task-result.json').read_text())['composer_evidence']['flow_count'] == 3
     assert all((root / f'turns/turn-{index:02d}/events.jsonl').is_file() for index in range(1, len(run.turns) + 1))
+
+
+def test_modern_source_task_through_actual_broker_archive_and_strict_campaign_reader(tmp_path, monkeypatch):
+    run, root, writes, responses, outputs = run_full_source_task(
+        tmp_path, monkeypatch, policy='ask_before_changes', version='2025.1')
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'copy', 'save']
+    final = responses['tx01.saved-verify']['verification']['verification_scope']
+    assert final['complete_copy_preservation'] and final['owned_role_count'] == 3
+    assert json.loads((root / 'task-result.json').read_text())['composer_evidence']['flow_count'] == 3
 
 
 

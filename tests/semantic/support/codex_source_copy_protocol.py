@@ -193,9 +193,9 @@ def validate_source_copy_role_payload(broker, step, payload):
                     issued_ids.add(receipt['draft']['draft_id'])
         records = load_operation_draft_archive_records(state, tuple(sorted(issued_ids)), allow_cleaned_file_evidence=True)
         parent, child = records[root_id], records[child_id]
-        if (parent.operation != 'object.copy' or parent.version != '2021.1'
+        if (parent.operation != 'object.copy' or parent.version not in SOURCE_PROTOCOL_VERSIONS
                 or parent.authority_digest != operation_draft_authority_digest(root['task_authority'])
-                or child.operation != SAVE or child.version != '2021.1'
+                or child.operation != SAVE or child.version != parent.version
                 or child.connection_binding != parent.connection_binding
                 or child.authority_digest != operation_draft_authority_digest(child_payload['task_authority'])):
             raise ValueError('issued Save differs from its exact parent/capability/configuration')
@@ -216,8 +216,10 @@ def validate_source_copy_role_payload(broker, step, payload):
                 raise ValueError('baseline Save has another checked revision')
         else:
             transaction = load_transaction_archive_snapshot(state, choice['transaction_id'])
+            if transaction.preview.artifact['request']['version'] != parent.version:
+                raise ValueError('final Save copy version differs from its owning Draft')
             baseline = transaction.preview.artifact['prepared_operation']['pre_state']['source_copy_saved_proof']
-            expected_origin = {'contract': 'waapi-skill.source-copy-saved-proof/v1', 'version': '2021.1',
+            expected_origin = {'contract': 'waapi-skill.source-copy-saved-proof/v1', 'version': parent.version,
                 'stage': 'final', 'baseline_digest': baseline['digest'], 'context': baseline['context'],
                 'parent': {'transaction_id': transaction.record.transaction_id,
                     'artifact_hash': transaction.preview.artifact_hash,
@@ -247,7 +249,7 @@ def validate_source_copy_role_payload(broker, step, payload):
                     key: value for key, value in origin['parent'].items() if key in {'draft_id', 'transaction_id'}}:
                 raise ValueError('generated Save public parent differs from its durable origin')
             draft = payload['draft']
-            if (draft['binding'] != {'operation': SAVE, 'version': '2021.1', 'schema_digest': child.schema_digest}
+            if (draft['binding'] != {'operation': SAVE, 'version': parent.version, 'schema_digest': child.schema_digest}
                     or draft['revision'] != 3 or draft['lifecycle_state'] != 'editable'
                     or not any(event['event_type'] == 'source_copy.save_started' for event in child.audit)):
                 raise ValueError('generated Save is not the production-issued editable child')

@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 import uuid
 import re
+import math
 
 from .canonical import canonical_sha256
 from .console_project_operations import _read_xml_artifact, _project_io_root_identity, MAX_PROJECT_FILE_BYTES
@@ -106,9 +107,7 @@ def matching_runtime(context):
 
 
 def supported(context):
-    # Modern saved syntax and runtime origins are independently classified;
-    # selected Source membership/field observations still gate their admission.
-    return matching_runtime(context) and context['project_guard']['version'] == '2021.1'
+    return matching_runtime(context)
 
 
 def authority(context, source_id, destination_id, read):
@@ -193,6 +192,17 @@ def source_nodes(documents, identity, owner_id, *, version='2021.1'):
         'Saved Source version grammar is unfinished')
     parents = {child: node for node in source.iter() for child in node}
     for node in nodes.values():
+        if version != '2021.1' and node.tag in {'Curve', 'ModulatorLfo'}:
+            custom = parents.get(node)
+            reference = parents.get(custom)
+            reference_list = parents.get(reference)
+            rtpc = parents.get(reference_list)
+            name = 'Curve' if node.tag == 'Curve' else 'ControlInput'
+            require_shape(custom is not None and custom.tag == 'Custom'
+                and reference is not None and reference.tag == 'Reference' and reference.get('Name') == name
+                and reference_list is not None and reference_list.tag == 'ReferenceList'
+                and rtpc is not None and rtpc.tag == 'RTPC',
+                'Saved owned declaration lies outside its canonical RTPC reference')
         if node.tag != 'RTPC': continue
         container = parents.get(node)
         if version == '2021.1':
@@ -260,9 +270,18 @@ def serialized(node, nodes=None, *, rename_root=None):
     return [node.tag, [[key, value] for key, value in sorted(attrs.items())], text, tail, [serialized(child, nodes) for child in node]]
 
 
-def live_roles(nodes, owner, read):
+def live_roles(nodes, owner, read, *, version='2021.1'):
     rows = {}
     owners, controls = graph_edges(nodes)
+    references = {role: {'ControlInput': target} for role, target in controls.items()}
+    modern = version != '2021.1'
+    if modern:
+        for role, node in nodes.items():
+            if node.tag != 'RTPC': continue
+            require_shape(owners[role] == 'source', 'Nested RTPC list membership has no reviewed native authority')
+            curves = [item for item in node.findall("ReferenceList/Reference[@Name='Curve']/Custom/Curve")]
+            require_shape(len(curves) == 1 and role in references, 'Modern RTPC requires both owned references')
+            references[role]['Curve'] = next(key for key, item in nodes.items() if item is curves[0])
     field_count = 0
     for role, node in nodes.items():
         expected_class = SOURCE_CLASS if role == 'source' else OWNED_CLASSES.get(node.tag)
@@ -273,7 +292,15 @@ def live_roles(nodes, owner, read):
             'Saved/live role class or type differs')
         expected_owner = owner if role == 'source' else nodes[owners[role]].get('ID')
         require(guid(row.get('parent' if role == 'source' else 'owner')) == guid(expected_owner), 'Saved/live owned role edge differs')
-        require(row.get('name') == node.get('Name') and row.get('notes', '') == node.findtext('Comment', ''), 'Saved/live role name or notes differs')
+        saved_notes = node.findtext('Comment', '')
+        native_notes = row.get('notes', '')
+        require(row.get('name') == node.get('Name') and isinstance(native_notes, str)
+            and (native_notes.replace('\r\n', '\n') if modern else native_notes) == saved_notes,
+            'Saved/live role name or notes differs')
+        if modern:
+            # XML parsing normalizes CRLF; keep both witnesses, while all
+            # native original/copy notes comparisons remain exact.
+            row['saved_comment'] = saved_notes
         if 'ShortID' in node.attrib:
             require(type(row.get('shortId')) is int and str(row['shortId']) == node.get('ShortID'), 'Saved ShortID is not independently live-bound')
         else:
@@ -285,17 +312,49 @@ def live_roles(nodes, owner, read):
             for metadata in fields['field_metadata'].values():
                 metadata.pop('scope', None)
                 metadata.pop('available_names', None)
-            allowed = {'ControlInput'} if role in controls else set()
-            require_shape(set(fields['unreadable_fields']) <= allowed
+            allowed = set(references.get(role, {}))
+            require_shape(set(fields['unreadable_fields']) <= (set() if modern else allowed)
                 and set(fields['reference_fields']) <= allowed,
                 'Owned live field/reference scope is not certified by this serialized shape')
+            if modern and node.tag == 'RTPC':
+                require_shape(set(fields['reference_fields']) == allowed,
+                    'Modern RTPC reference metadata is incomplete')
+                properties = node.findall("PropertyList/Property[@Name='PropertyName']")
+                require_shape(len(properties) == 1 and properties[0].get('Type') == 'string',
+                    'Modern RTPC property binding is unfinished')
+                require(type(fields['field_values'].get('PropertyName')) is str
+                    and fields['field_values']['PropertyName'] == properties[0].get('Value'),
+                    'Saved/live RTPC property binding differs')
+                for name, target in references[role].items():
+                    require(guid(fields['field_values'].get(name)) == guid(nodes[target].get('ID')),
+                        'RTPC field reference differs from its saved owned declaration')
+                curve = fields['field_values']['Curve']
+                points = curve.get('points') if isinstance(curve, dict) else None
+                saved_points = nodes[references[role]['Curve']].findall('PointList/Point')
+                require(isinstance(points, list) and len(points) == len(saved_points)
+                    and all(isinstance(point, dict) and isinstance(point.get('shape'), str)
+                        and all(type(point.get(axis)) in {int, float} and math.isfinite(point[axis])
+                            and point[axis] == float(saved.findtext(tag))
+                            for axis, tag in (('x', 'XPos'), ('y', 'YPos')))
+                        for point, saved in zip(points, saved_points)),
+                    'Saved/live Curve coordinates differ')
             row['default_fields'] = fields
         rows[role] = row
-    for role, target in controls.items():
-        identity = rows[role]['id']
-        hop = read(GET, {'waql': f'from object "{identity}" select @ControlInput take 2'}, {'return': ['id']}).get('return')
-        require(isinstance(hop, list) and len(hop) == 1 and guid(hop[0].get('id')) == guid(rows[target]['id']),
-            'Documented ControlInput does not bind the saved owned declaration')
+    if modern:
+        expected = [guid(node.get('ID')) for node in nodes.values() if node.tag == 'RTPC']
+        limit = len(expected) + 1
+        identity = rows['source']['id']
+        members = read(GET, {'waql': f'from object "{identity}" select @RTPC take {limit}'}, {'return': ['id']}).get('return')
+        require(isinstance(members, list) and len(members) < limit
+            and [guid(member.get('id')) for member in members] == expected,
+            'Source RTPC membership is incomplete, reordered, duplicated or differs from saved declarations')
+        rows['source']['rtpc_membership'] = expected
+    for role, targets in references.items():
+        for name, target in targets.items():
+            identity = rows[role]['id']
+            hop = read(GET, {'waql': f'from object "{identity}" select @{name} take 2'}, {'return': ['id']}).get('return')
+            require(isinstance(hop, list) and len(hop) == 1 and guid(hop[0].get('id')) == guid(rows[target]['id']),
+                f'Documented {name} does not bind the saved owned declaration')
     return rows
 
 
@@ -304,6 +363,7 @@ def compare_owned_fields(original_live, copied_live, original_ids, new_ids):
     for role in original_live:
         require(original_live[role]['classId'] == copied_live[role]['classId']
             and original_live[role]['type'] == copied_live[role]['type'], 'Copied live owned class or type differs')
+        require(original_live[role].get('notes') == copied_live[role].get('notes'), 'Copied native owned notes differ')
         if role == 'source': continue  # Shared Source observer already compares all observed Source scalars.
         def mapped_fields(fields, role_ids):
             fields = deepcopy(fields)
@@ -351,8 +411,8 @@ def capture_baseline(context, snapshot, read):
         if dirty:
             return {'status': 'baseline_save_pending', 'graph_format': GRAPH_FORMAT, 'authority': binding, 'context': context['binding'],
                 'source_id': guid(source['id']), 'destination_id': guid(destination), 'files': proofs}
-        nodes = source_nodes(documents, source['id'], guid(source['parent']))
-        live = live_roles(nodes, guid(source['parent']), read)
+        nodes = source_nodes(documents, source['id'], guid(source['parent']), version=context['project_guard']['version'])
+        live = live_roles(nodes, guid(source['parent']), read, version=context['project_guard']['version'])
         after = authority(context, source['id'], destination, read)
         require(lifecycle_snapshot_equal(binding, after), 'Model authority changed during baseline observation')
         _, proof_after = read_documents(after)
@@ -382,8 +442,8 @@ def validate_baseline(baseline, context, read):
     require(lifecycle_snapshot_equal(observed, baseline['authority']), 'Saved-copy clean file authority drifted before dispatch')
     documents, proofs = read_documents(observed)
     require(proofs == baseline['files'], 'Saved-copy baseline files changed before dispatch')
-    nodes = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
-    require(lifecycle_snapshot_equal(live_roles(nodes, baseline['source_owner'], read), baseline['roles']),
+    nodes = source_nodes(documents, baseline['source_id'], baseline['source_owner'], version=context['project_guard']['version'])
+    require(lifecycle_snapshot_equal(live_roles(nodes, baseline['source_owner'], read, version=context['project_guard']['version']), baseline['roles']),
         'Original owned live state drifted before copy dispatch')
 
 
@@ -477,8 +537,8 @@ def revalidate_origin(origin, context, *, read=None, before_write=True):
             baseline = snapshot.preview.artifact['prepared_operation']['pre_state'][KEY]
             binding = validate_pending_files(baseline, context, read)
             documents, _ = read_documents(binding)
-            nodes = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
-            require(lifecycle_snapshot_equal(live_roles(nodes, baseline['source_owner'], read), baseline['roles']), 'Original owned live state changed before optional Save')
+            nodes = source_nodes(documents, baseline['source_id'], baseline['source_owner'], version=context['project_guard']['version'])
+            require(lifecycle_snapshot_equal(live_roles(nodes, baseline['source_owner'], read, version=context['project_guard']['version']), baseline['roles']), 'Original owned live state changed before optional Save')
             from .operation_registry import verify_prepared_operation
             require(verify_prepared_operation(snapshot.preview.artifact['prepared_operation'],
                 execution_result=execution(snapshot)['details']['dispatch_result'], read_call=read).status == 'verified',
@@ -536,23 +596,23 @@ def verify_saved(baseline, context, snapshot, read):
         and binding['objects'] == baseline['authority']['objects']
         and {k: membership(v) for k, v in binding['units'].items()} == {k: membership(v) for k, v in baseline['authority']['units'].items()}, 'Saved proof file/identity membership changed')
     documents, proofs = read_documents(binding)
-    original = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
-    copied = source_nodes(documents, origin['parent']['copied_id'], baseline['destination_id'])
+    original = source_nodes(documents, baseline['source_id'], baseline['source_owner'], version=context['project_guard']['version'])
+    copied = source_nodes(documents, origin['parent']['copied_id'], baseline['destination_id'], version=context['project_guard']['version'])
     require(canonical_sha256(serialized(original['source'])) == baseline['source_exact_digest'], 'Original saved Source/owned state changed')
     original_ids, new_ids = baseline['role_ids'], {k: guid(v.get('ID')) for k, v in copied.items()}
     require(set(original_ids.values()).isdisjoint(new_ids.values()) and len(set(new_ids.values())) == len(original_ids) and set(original_ids) == set(new_ids), 'Copied GUID mapping aliases original/owned identities')
     rename = snapshot.preview.artifact['prepared_operation']['verification_plan']['on_name_conflict'] == 'rename'
     expected_name = original['source'].get('Name') if rename else None
     require(canonical_sha256(serialized(copied['source'], copied, rename_root=expected_name)) == baseline['source_normalized_digest'], 'Copied serialized fields/attributes/text/order/points differ')
-    original_live = live_roles(original, baseline['source_owner'], read)
+    original_live = live_roles(original, baseline['source_owner'], read, version=context['project_guard']['version'])
     require(lifecycle_snapshot_equal(original_live, baseline['roles']), 'Original live owned identities or fields changed')
-    copied_live = live_roles(copied, baseline['destination_id'], read)
+    copied_live = live_roles(copied, baseline['destination_id'], read, version=context['project_guard']['version'])
     compare_owned_fields(original_live, copied_live, original_ids, new_ids)
     after = authority(context, baseline['source_id'], baseline['destination_id'], read)
     require(after == binding, 'Saved proof authority changed during final observation')
     _, after_proofs = read_documents(after)
     require(proofs == after_proofs, 'Saved model changed during final observation')
-    return {'complete_copy_preservation': True, 'supported_shape': '2021.1.14.8108_Synth_owned_declaration_graph_zero_ObjectRefs',
+    return {'complete_copy_preservation': True, 'supported_shape': '.'.join(str(value) for value in MATCHING_BUILDS[context['project_guard']['version']]) + '_Synth_owned_declaration_graph_zero_ObjectRefs',
         'baseline_digest': baseline['digest'], 'final_save_receipt': receipt, 'model_proofs_digest': canonical_sha256(proofs),
         'owned_guid_mapping': {original_ids[k]: new_ids[k] for k in original_ids}, 'owned_role_count': len(original_ids) - 1,
         'ordered_point_count': sum(len(node.findall('PointList/Point')) for node in copied.values() if node.tag == 'Curve'),
@@ -582,18 +642,18 @@ def _validate_decline_observed(baseline, context, snapshot, read):
     # A refusal never hides an observable original/copied graph contradiction.
     binding = authority(context, baseline['source_id'], baseline['destination_id'], read)
     documents, _ = read_documents(binding)
-    original = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
+    original = source_nodes(documents, baseline['source_id'], baseline['source_owner'], version=context['project_guard']['version'])
     require(canonical_sha256(serialized(original['source'])) == baseline['source_exact_digest'], 'Original saved graph changed before refusal')
-    original_live = live_roles(original, baseline['source_owner'], read)
+    original_live = live_roles(original, baseline['source_owner'], read, version=context['project_guard']['version'])
     require(lifecycle_snapshot_equal(original_live, baseline['roles']), 'Original owned state changed before refusal')
     identity = copied_id(snapshot)
     present = [node for doc in documents.values() for node in doc.iter('SourcePlugin') if guid(node.get('ID')) == identity]
     if present:
-        copied = source_nodes(documents, identity, baseline['destination_id'])
+        copied = source_nodes(documents, identity, baseline['destination_id'], version=context['project_guard']['version'])
         rename = snapshot.preview.artifact['prepared_operation']['verification_plan']['on_name_conflict'] == 'rename'
         require(canonical_sha256(serialized(copied['source'], copied, rename_root=original['source'].get('Name') if rename else None))
             == baseline['source_normalized_digest'], 'Copied saved graph corruption cannot become scoped success')
-        copied_live = live_roles(copied, baseline['destination_id'], read)
+        copied_live = live_roles(copied, baseline['destination_id'], read, version=context['project_guard']['version'])
         compare_owned_fields(original_live, copied_live, baseline['role_ids'], {role: guid(node.get('ID')) for role, node in copied.items()})
     return True
 

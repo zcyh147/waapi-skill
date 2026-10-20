@@ -91,13 +91,159 @@ def public_copy(task, *, parent=DEST, conflict='fail'):
         code, payload = task.run(*argv)
         assert code == 0, payload
         return payload
-    preview = create_object_lifecycle_business_preview(gateway, version='2021.1',
+    preview = create_object_lifecycle_business_preview(gateway, version=task.version,
         operation='object.copy', object_id=SOURCE, parent_id=parent, name_conflict=conflict)
     tx = preview['transaction_id']
     code, shown = task.run('transaction-show', tx, '--summary-only'); assert code == 0, shown
     code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
     code, result = task.run('execute', tx); assert code == 0, result
     return tx
+
+
+def modern_saved_source_task(path, version='2022.1', *, owned_notes=None):
+    """Matching saved originals and the four Root-reviewed read-only probes.
+
+    Only fake copy/Save effects are synthesized; these are program evidence.
+    Probe receipts/hashes: /tmp/waapi-r58-source-modern-proof-map.json and the
+    Root reviews cited by the R58 handoff. No native files are runtime inputs.
+    """
+    runtime, writes, task = saved_source_task(path)
+    task.version = runtime.version = version
+    assert task.run('config-set', '--wwise-version', version)[0] == 0
+    catalog = Path(__file__).parents[2] / 'skills/waapi-skill/resources/metadata' / version / 'object-types.json'
+    task.types = json.loads(catalog.read_text())['types']
+    folder = 'Containers' if version == '2025.1' else 'Actor-Mixer Hierarchy'
+    original_file = Path(__file__).parents[1] / '_org' / version / folder / 'MIDI.wwu'
+    document = ET.parse(original_file)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    source_path = Path(task.objects[SOURCE]['filePath'])
+    source_path.write_bytes(original_file.read_bytes())
+    notes = source.findtext('Comment', '')
+    task.objects[SOURCE]['notes'] = notes.replace('\n', '\r\n') if version == '2025.1' else notes
+    old, copied_rtpc = SAVED_ROLES['rtpc'][:2]
+    control, copied_control = SAVED_ROLES['control_input'][:2]
+    curve, copied_curve = SAVED_ROLES['curve'][:2]
+    if owned_notes is not None:
+        lfo, = source.iter('ModulatorLfo')
+        ET.SubElement(lfo, 'Comment').text = owned_notes
+        document.write(source_path)
+        task.objects[control]['notes'] = owned_notes
+    task.objects[old].update({'@PropertyName': 'OutputLevel', '@ControlInput': {'id': control},
+        '@Curve': {'id': curve, 'points': [{'shape': 'Linear', 'x': 0.0, 'y': -5.67053},
+            {'shape': 'Linear', 'x': 1.0, 'y': 0.0}], '@Flags': 3}})
+    # Actual modern metadata has empty type plus explicit reference restriction.
+    metadata = {
+        'Color': {'name': 'Color', 'type': 'int16', 'default': 0},
+        'ControlInput': {'name': 'ControlInput', 'type': '', 'default': None,
+            'restriction': {'type': 'reference'}},
+        'Curve': {'name': 'Curve', 'type': '', 'default': None,
+            'restriction': {'type': 'reference'}},
+        'OverrideColor': {'name': 'OverrideColor', 'type': 'bool', 'default': False},
+        'PropertyName': {'name': 'PropertyName', 'type': 'string', 'default': ''},
+    }
+    mapping = {value[0]: value[1] for value in SAVED_ROLES.values()}
+    builds = {'2022.1': (19, 8584), '2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}
+    call = task.call
+    def observed(uri, args=None, options=None):
+        args = args or {}
+        if args.get('object') in {old, copied_rtpc}:
+            if uri.endswith('getPropertyAndReferenceNames'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': list(metadata)}
+            if uri.endswith('getPropertyInfo'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return deepcopy(metadata[args['property']])
+        expression = args.get('waql', '')
+        if uri.endswith('object.get') and ' select @' in expression:
+            identity = expression.split('"')[1]
+            target = ({SOURCE: old, COPIED: copied_rtpc}.get(identity) if ' select @RTPC ' in expression
+                else {old: control, copied_rtpc: copied_control}.get(identity) if ' select @ControlInput ' in expression
+                else {old: curve, copied_rtpc: copied_curve}.get(identity) if ' select @Curve ' in expression else None)
+            if target is not None:
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                return {'return': task.project_rows([task.objects[target]], options)}
+        result = call(uri, args, options)
+        if uri.endswith('getInfo'):
+            minor, build = builds[version]
+            result['version'].update(year=int(version[:4]), minor=minor, build=build,
+                displayName=f'v{version}.{minor}.{build}')
+        if uri.endswith('object.copy'):
+            for original, replacement in mapping.items():
+                task.objects[replacement]['notes'] = task.objects[original]['notes']
+            task.objects[copied_rtpc].update({'@PropertyName': task.objects[old]['@PropertyName'],
+                '@ControlInput': {'id': copied_control}, '@Curve': {**deepcopy(task.objects[old]['@Curve']), 'id': copied_curve}})
+        if uri.endswith('project.save') and COPIED in task.objects:
+            copied = deepcopy(source)
+            for node in copied.iter():
+                if node.get('ID') in mapping:
+                    node.set('ID', mapping[node.get('ID')])
+                    if 'ShortID' in node.attrib:
+                        node.set('ShortID', str(task.objects[node.get('ID')]['shortId']))
+            destination_path = Path(task.objects[DEST]['filePath'])
+            destination = ET.parse(destination_path)
+            sound, = [node for node in destination.iter('Sound') if node.get('ID') == DEST]
+            children = sound.find('ChildrenList')
+            children.clear()
+            children.append(copied)
+            destination.write(destination_path)
+        return result
+    task.call = observed
+    return runtime, writes, task
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_modern_source_copy_finishes_after_its_generated_save_with_owned_fields(tmp_path, version):
+    runtime, writes, task = modern_saved_source_task(tmp_path, version)
+    transaction = public_copy(task)
+    code, pending = task.run('verify', transaction)
+    assert code == 0 and pending['status'] == 'source_copy_saved_proof_pending', pending
+    save = final_save_preview(task, pending)
+    saved = authorize_execute_verify(task, save['transaction_id'])
+    code, final = task.run(*saved['next_command']['gateway_argv'])
+    assert code == 0 and final['verification']['verification_scope']['complete_copy_preservation'], final
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['copy', 'save']
+    assert task.run('execute', transaction)[0] == 2
+
+
+@pytest.mark.parametrize('fault', ['saturated-membership', 'missing-membership', 'Curve-hop', 'PropertyName'])
+def test_modern_source_copy_revalidates_owned_membership_references_and_property_before_dispatch(tmp_path, fault):
+    runtime, writes, task = modern_saved_source_task(tmp_path, '2025.1')
+    def gateway(argv):
+        code, payload = task.run(*argv); assert code == 0, payload
+        return payload
+    preview = create_object_lifecycle_business_preview(gateway, version='2025.1',
+        operation='object.copy', object_id=SOURCE, parent_id=DEST, name_conflict='fail')
+    shown = gateway(['transaction-show', preview['transaction_id'], '--summary-only'])
+    gateway(['confirm', preview['transaction_id'], '--confirmation-token', shown['confirmation']['token']])
+    assert not writes
+    if fault == 'PropertyName':
+        task.objects[SAVED_ROLES['rtpc'][0]]['@PropertyName'] = 'Osc1Level'
+    call = task.call
+    def drifted(uri, args=None, options=None):
+        expression = (args or {}).get('waql', '')
+        if uri.endswith('object.get') and ' select @RTPC ' in expression and fault.endswith('membership'):
+            assert expression.endswith('take 2')
+            row = {'id': SAVED_ROLES['rtpc'][0]}
+            return {'return': [row, row] if fault == 'saturated-membership' else []}
+        if uri.endswith('object.get') and ' select @Curve ' in expression and fault == 'Curve-hop':
+            return {'return': [{'id': SAVED_ROLES['control_input'][0]}]}
+        return call(uri, args, options)
+    task.call = drifted
+    code, failed = task.run('execute', preview['transaction_id'])
+    assert code == 2 and not writes, failed
+
+
+def test_modern_saved_proof_compares_owned_native_notes_exactly_after_xml_newline_binding(tmp_path):
+    runtime, writes, task = modern_saved_source_task(tmp_path, '2025.1', owned_notes='first\nsecond')
+    transaction = public_copy(task)
+    code, pending = task.run('verify', transaction); assert code == 0, pending
+    save = final_save_preview(task, pending)
+    saved = authorize_execute_verify(task, save['transaction_id'])
+    task.objects[SAVED_ROLES['control_input'][1]]['notes'] = 'first\r\nsecond'
+    code, failed = task.run(*saved['next_command']['gateway_argv'])
+    assert code == 2 and failed['status'] == 'verification_failed', failed
+    assert 'Copied native owned notes differ' in json.dumps(failed), failed
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['copy', 'save']
 
 
 def test_clean_saved_source_copy_defers_terminal_for_separate_final_save(tmp_path):
@@ -1026,11 +1172,24 @@ def test_saved_source_parser_rejects_another_versions_wrapper_family(saved_versi
         source_nodes({str(path): ET.parse(path)}, SOURCE, SAVED_OWNER, version=claimed_version)
 
 
+def test_modern_source_parser_rejects_an_owned_curve_outside_its_canonical_reference():
+    from wwise_waapi.source_copy_proof import source_nodes, UnsupportedSavedShape
+    path = Path(__file__).parents[1] / '_org/2025.1/Containers/MIDI.wwu'
+    document = ET.parse(path)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    rtpc, = source.iter('RTPC')
+    extra = deepcopy(next(rtpc.iter('Curve')))
+    extra.set('ID', '{58585858-5858-4858-8858-585858585858}')
+    rtpc.append(extra)
+    with pytest.raises(UnsupportedSavedShape):
+        source_nodes({str(path): document}, SOURCE, SAVED_OWNER, version='2025.1')
+
+
 @pytest.mark.parametrize('version,minor,build', [
     ('2022.1', 19, 8584), ('2023.1', 19, 8928), ('2024.1', 13, 9056), ('2025.1', 7, 9143),
 ])
-def test_saved_source_origin_validates_exact_modern_runtime_without_enabling_admission(tmp_path, version, minor, build):
-    from wwise_waapi.source_copy_proof import final_origin, validate_origin, supported
+def test_saved_source_origin_validates_only_the_exact_modern_runtime(tmp_path, version, minor, build):
+    from wwise_waapi.source_copy_proof import final_origin, validate_origin, supported, SavedCopyProofError
     from wwise_waapi.transactions import TransactionStore
     runtime, writes, task = saved_source_task(tmp_path)
     transaction = TransactionStore(runtime.state_dir).load_snapshot(public_copy(task))
@@ -1040,7 +1199,11 @@ def test_saved_source_origin_validates_exact_modern_runtime_without_enabling_adm
     guard['version'] = version
     guard['wwise']['version'].update(year=int(version[:4]), minor=minor, build=build, displayName='v' + version + f'.{minor}.{build}')
     validate_origin(origin, version)
-    assert not supported({'project_guard': guard}), 'The selected Source probe still gates modern admission'
+    assert supported({'project_guard': guard})
+    guard['wwise']['version']['build'] += 1
+    assert not supported({'project_guard': guard})
+    with pytest.raises(SavedCopyProofError):
+        validate_origin(origin, version)
 
 
 def test_final_source_origin_preserves_its_parent_version(tmp_path):

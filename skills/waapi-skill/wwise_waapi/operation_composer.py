@@ -1709,7 +1709,7 @@ def _normalize_business_composition(
     if decision is not None:
         from .source_copy_proof import validate_decision
         validate_decision(decision)
-        if operation != 'object.copy' or version != '2021.1':
+        if operation != 'object.copy' or decision['origin']['version'] != version:
             raise OperationComposerError('Baseline decision belongs only to its original copy')
     private = {key: dict(value) for key, value in (('source_copy_parent_return', private_return),
         ('source_copy_proof_decision', decision)) if value is not None}
