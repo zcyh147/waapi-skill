@@ -1,0 +1,20 @@
+{
+  "contract": "waapi-skill.class-metadata-attachment/v1",
+  "branch_id": "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+  "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "category_inputs": {
+    "native": [
+      "metadata",
+      "detail",
+      "--custom-kind",
+      "EffectSlot",
+      "--selection",
+      "mf1.1792523883.1.7f0203d3c753ccaf68f75c8d958d2885640341b68721574b25ea8653eaee7c1f"
+    ]
+  },
+  "evidence": {
+    "artifact": "r54-class-metadata-8a8d5f8e-2024-r1/branch-attachments/read-2.json",
+    "sha256": "b28938f98eaed1e0afa37643d3168ea7a1f15779d782508e317c674c2fec215f",
+    "nodeid": "tests/maintenance/collect_class_metadata.py::class_metadata[2024.1]"
+  }
+}

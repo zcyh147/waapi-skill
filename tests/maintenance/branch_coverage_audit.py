@@ -417,12 +417,17 @@ def portable_binding_inputs(index_path, requirements):
     for descriptor in attachments:
         attachment = read(descriptor)
         if (set(attachment) != {'contract','branch_id','native_shape_sha256','category_inputs','evidence'}
-                or attachment['contract'] != 'waapi-skill.r51-metadata-attachment/v1'):
+                or attachment['contract'] not in {'waapi-skill.r51-metadata-attachment/v1','waapi-skill.class-metadata-attachment/v1'}):
             raise ValueError('closed R51 metadata attachment fields required')
         identity = attachment['branch_id']
+        class_attachment = attachment['contract'] == 'waapi-skill.class-metadata-attachment/v1'
+        eligible = selected_ids()
+        if class_attachment:
+            from tests.maintenance.collect_class_metadata import collection_plan
+            eligible = set(collection_plan(identity.split('|',1)[0])['eligible_branch_ids'])
         policy = requirements['branches'].get(identity, {})
         if (identity in attached or identity not in bindings
-                or identity not in selected_ids()
+                or identity not in eligible
                 or policy.get('categories') != ['program','live_metadata']
                 or policy.get('native_shape_sha256') != attachment['native_shape_sha256']
                 or bindings[identity]['native_shape_sha256'] != attachment['native_shape_sha256']
@@ -433,6 +438,46 @@ def portable_binding_inputs(index_path, requirements):
         if set(evidence) != {'artifact','sha256','nodeid'}:
             raise ValueError('closed metadata evidence descriptor required')
         record = read({key:evidence[key] for key in ('artifact','sha256')})
+        if class_attachment:
+            if (set(record) != {'candidate_sha256','scope_kind','evidence_kind','metadata_run','invocation',
+                    'branch_assertions','category_inputs','source_context'}
+                    or record['evidence_kind'] != 'current_public_class_metadata'
+                    or record['category_inputs'] != attachment['category_inputs']
+                    or set(record['category_inputs']) != {'native'}
+                    or not isinstance(record['category_inputs']['native'],list)
+                    or set(record['source_context']) != {'native_candidate','relevant_sources'}
+                    or identity not in record['branch_assertions']):
+                raise ValueError('Closed current native class attachment required')
+            archive=record['metadata_run']
+            if (set(archive) != {'contract','root','seal','status_receipt','receipt','target_index'}
+                    or archive['contract'] != 'waapi-skill.class-metadata-read/v1'
+                    or not isinstance(archive['root'],str) or Path(archive['root']).is_absolute()
+                    or type(archive['target_index']) is not int or archive['target_index'] < 0):
+                raise ValueError('Closed portable class metadata archive required')
+            capture_root=(base/archive['root']).resolve()
+            if not capture_root.is_relative_to(base):raise ValueError('Class metadata root escapes bundle')
+            seal=read(archive['seal'])
+            if (set(seal) != {'contract','files'} or seal['contract'] != 'waapi-skill.class-metadata-seal/v1'
+                    or not isinstance(seal['files'],list) or len(seal['files']) > 512):
+                raise ValueError('Bounded class metadata seal required')
+            paths=set();total=0
+            for entry in seal['files']:
+                if (set(entry) != {'path','bytes','sha256'} or not isinstance(entry['path'],str)
+                        or Path(entry['path']).is_absolute() or '..' in Path(entry['path']).parts
+                        or '\\' in entry['path'] or entry['path'] in paths
+                        or type(entry['bytes']) is not int or not 0 <= entry['bytes'] <= 1_048_576):
+                    raise ValueError('Closed bounded class metadata file descriptor required')
+                paths.add(entry['path']);total+=entry['bytes']
+                path=capture_root/entry['path']
+                if (path.is_symlink() or not path.resolve().is_relative_to(capture_root)
+                        or not path.resolve().is_relative_to(base) or total > 128*1024*1024):
+                    raise ValueError('Class metadata dependency escapes bundle or bounds')
+                content=path.read_bytes()
+                if len(content)!=entry['bytes'] or hashlib.sha256(content).hexdigest()!=entry['sha256']:
+                    raise ValueError('Original class metadata file digest/size mismatch')
+            bindings[identity]['evidence']['live_metadata']=deepcopy(evidence)
+            bindings[identity]['category_inputs']={'live_metadata':deepcopy(attachment['category_inputs'])}
+            continue
         if (set(record) != {'candidate_sha256','scope_kind','evidence_kind','metadata_run','invocation','replay',
                 'replay_bindings','source_bridge','branch_assertions','category_inputs'}
                 or record['evidence_kind'] != 'historical_metadata_current_program_replay'

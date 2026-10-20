@@ -178,19 +178,23 @@ entire Source-owned closure. No such query is added to this successor and no new
 native launch is authorized by this note.
 
 
-## R52: fixture-scoped saved-copy diagnostic (native pending)
+## R52: completed fixture-scoped saved-copy diagnostic
 
 R51's accepted 28-read result proves the documented ControlInput hop and exact
 RTPC/LFO/Curve owner/class frames, not a points getter. Its immutable evidence is
 `/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/diagnostic-result.md`.
-The next diagnostic reuses the existing collector and lifecycle, with four
+The completed R52 diagnostic reused the existing collector and lifecycle, with four
 separate public transactions: baseline `project.save`, empty SFX Sound setup,
 Source-only copy, final `project.save`. Matching 2021.1.14 SDK/reflection and
 closed `request-schema` snapshots are `/tmp/waapi-r51-copy-save-primary/`.
 Save's schema digest is
 `3ba730f37f73a10ca133846b3604783903adc088d29bc8cfce9b414568c2c89e`;
-its public continuation is zero-input, not a 2025 auto-check-out declaration.
-The existing `_save_sandbox_project` follows preview/confirmation/one execution/
+its historical public continuation was zero-input. The accepted newer Save
+change `ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90` now exposes closed Core Business
+Draft declarations on all five versions: 2021.1/2022.1 disclose an empty plan,
+while 2023.1–2025.1 disclose optional Boolean `auto_check_out`. This does not
+change the original R52 request or establish persistence from a Save reply.
+The `_save_sandbox_project` helper follows preview/confirmation/one execution/
 verification; result-schema checking alone never establishes saved state.
 
 Before each Save, an exact Project GUID query with file-path must equal the owned
@@ -217,10 +221,41 @@ exact copied GUID/class/type/name/notes/owner reads and actual Boolean IsVoice/
 complete childsets for both Sounds remain mandatory. No R51 metadata detail
 campaign or Source-field paging is duplicated to populate the receipt.
 
-The new node is `test_legacy_source_only_copy_saved_graph_console_diagnostic`.
-Fake protocol completion and pure XML controls do not prove native copy. The
-category remains diagnostic-only with `business_effect_verified=false`; the
-production verifier and its authority/history boundary are unchanged. No user
-project is implicitly saved, no original quarantine is opened, and this test
-oracle is never a runtime filesystem fallback. Native execution requires its
-own reviewed frozen candidate and explicit authorization.
+The node `test_legacy_source_only_copy_saved_graph_console_diagnostic` completed
+once on `56a7c3767596e8f3afc9b86d56621b35ca040c32`, Console2021.1.14.8108:
+**1 passed in 11.07s**, 67 public calls and four separate transactions. The
+independent saved-image oracle compared the complete original/copied serialized
+Source subtree, RTPC/LFO/Curve owners, ordered points and live-bound ShortIDs.
+All source and cleanup checks passed. Its original summary is
+`.waapi-skill-state/full-coverage/r52-saved-source-copy-56a7c376-2021-r1/diagnostic-result.md`.
+Save phases remain `result_schema_checked`; the collection remains
+diagnostic-only with `business_effect_verified=false`. No ObjectRefs were
+present, so general internal/external reference remapping was not exercised.
+
+## R53: completed production live-field acceptance, full-copy authority open
+
+The successor `a8d30c5b4a98b878dbbc7e255475c4a056346860` completed exactly one
+matching 2021.1.14.8108 diagnostic: **1 passed in 11.39s**, 67 public calls and
+the same four separately previewed transactions. Its production Source-only
+copy verified all 18 discovered/certified Source scalar fields, notes, class,
+language, original preservation and both Sounds' Boolean IsVoice frames and
+complete childsets. The reported strength is
+`source_default_view_fields_and_owner_frames_only`, with
+`complete_copy_preservation=false` and zero observed owned roles.
+
+The independent saved oracle again proved this genuine Synth fixture's
+serialized Source/RTPC/LFO/Curve graph and ordered PointList, with exact live
+identity/owner/ControlInput bindings. That oracle is fixture evidence; production
+owned-membership, Curve-points, reference-remapping, platform and media proof
+remain unobserved. There is no file-Source live claim, generic points getter,
+runtime filesystem/Save continuation, complete-copy or history proof. The
+collection remains diagnostic-only with `business_effect_verified=false`.
+
+The primary summary is
+`.waapi-skill-state/full-coverage/r53-source-copy-live-a8d30c5b-2021-r1/diagnostic-result.md`;
+Root's independent `r53-root-native-review.json` retains 198 raw/native pair
+checks, proof-index SHA-256
+`1deb7f07478ce9b79718668132a0b7205240328ccd26f022a73574eb97c53985`,
+the scoped runtime result and successful source/cleanup proof. Original failed
+roots and quarantines remain unchanged. Future native execution still requires
+its own reviewed frozen candidate and authorization.

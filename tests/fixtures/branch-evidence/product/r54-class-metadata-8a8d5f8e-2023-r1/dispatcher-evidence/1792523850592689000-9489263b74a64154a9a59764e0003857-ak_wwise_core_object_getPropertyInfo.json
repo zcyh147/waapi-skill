@@ -1,0 +1,236 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2023-r1/dispatcher-evidence/1792523850592689000-9489263b74a64154a9a59764e0003857-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": 0,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "2",
+                  "value": 2
+                },
+                {
+                  "displayName": "3",
+                  "value": 3
+                },
+                {
+                  "displayName": "4",
+                  "value": 4
+                },
+                {
+                  "displayName": "5",
+                  "value": 5
+                },
+                {
+                  "displayName": "6",
+                  "value": 6
+                },
+                {
+                  "displayName": "7",
+                  "value": 7
+                },
+                {
+                  "displayName": "8",
+                  "value": 8
+                },
+                {
+                  "displayName": "9",
+                  "value": 9
+                },
+                {
+                  "displayName": "10",
+                  "value": 10
+                },
+                {
+                  "displayName": "11",
+                  "value": 11
+                },
+                {
+                  "displayName": "12",
+                  "value": 12
+                },
+                {
+                  "displayName": "13",
+                  "value": 13
+                },
+                {
+                  "displayName": "14",
+                  "value": 14
+                },
+                {
+                  "displayName": "15",
+                  "value": 15
+                },
+                {
+                  "displayName": "16",
+                  "value": 16
+                },
+                {
+                  "displayName": "17",
+                  "value": 17
+                },
+                {
+                  "displayName": "18",
+                  "value": 18
+                },
+                {
+                  "displayName": "19",
+                  "value": 19
+                },
+                {
+                  "displayName": "26",
+                  "value": 26
+                },
+                {
+                  "displayName": "27",
+                  "value": 27
+                },
+                {
+                  "displayName": "28",
+                  "value": 28
+                },
+                {
+                  "displayName": "29",
+                  "value": 29
+                },
+                {
+                  "displayName": "30",
+                  "value": 30
+                },
+                {
+                  "displayName": "31",
+                  "value": 31
+                },
+                {
+                  "displayName": "34",
+                  "value": 34
+                },
+                {
+                  "displayName": "35",
+                  "value": 35
+                },
+                {
+                  "displayName": "36",
+                  "value": 36
+                },
+                {
+                  "displayName": "37",
+                  "value": 37
+                },
+                {
+                  "displayName": "38",
+                  "value": 38
+                },
+                {
+                  "displayName": "39",
+                  "value": 39
+                },
+                {
+                  "displayName": "40",
+                  "value": 40
+                },
+                {
+                  "displayName": "42",
+                  "value": 42
+                },
+                {
+                  "displayName": "50",
+                  "value": 50
+                },
+                {
+                  "displayName": "51",
+                  "value": 51
+                },
+                {
+                  "displayName": "52",
+                  "value": 52
+                },
+                {
+                  "displayName": "53",
+                  "value": 53
+                },
+                {
+                  "displayName": "54",
+                  "value": 54
+                },
+                {
+                  "displayName": "55",
+                  "value": 55
+                },
+                {
+                  "displayName": "56",
+                  "value": 56
+                },
+                {
+                  "displayName": "57",
+                  "value": 57
+                }
+              ]
+            }
+          }
+        ],
+        "context": "Self",
+        "property": "ActionType",
+        "type": "property"
+      }
+    ],
+    "display": {
+      "group": "",
+      "index": 1582,
+      "name": "Scope"
+    },
+    "name": "Scope",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Game Object",
+          "value": 0
+        },
+        {
+          "displayName": "Global",
+          "value": 1
+        }
+      ]
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "int16",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.964647749991855,
+  "version": "2023.1"
+}
