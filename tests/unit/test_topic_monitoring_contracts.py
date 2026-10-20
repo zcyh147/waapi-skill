@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import importlib.util
 import json
 import sys
@@ -23,8 +24,13 @@ VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 
 
 class Client:
-    def __init__(self, version, events):
+    def __init__(self, version, events, *, pinned_build=None):
         self.version = version
+        self.pinned_build = pinned_build
+        self.calls = []
+        self.subscriptions = []
+        self.callbacks = []
+        self.argv = []
         self.events = events
         self.unsubscribed = 0
         self.options = None
@@ -32,12 +38,17 @@ class Client:
 
     def call(self, uri, args=None, options=None):
         assert uri == "ak.wwise.core.getInfo"
-        return {"displayName": "Wwise", "isCommandLine": True,
-                "version": {"year": int(self.version[:4]), "major": 1, "minor": 0, "build": 1}}
+        parts = [int(part) for part in self.pinned_build.split(".")] if self.pinned_build else [int(self.version[:4]), 1, 0, 1]
+        result = {"displayName": "Wwise", "isCommandLine": True,
+                  "version": dict(zip(("year", "major", "minor", "build"), parts))}
+        self.calls.append({"uri": uri, "args": deepcopy(args), "options": deepcopy(options), "result": deepcopy(result)})
+        return result
 
     def subscribe(self, uri, callback, options=None):
-        self.options = options
+        self.options = deepcopy(options)
+        self.subscriptions.append({"uri": uri, "options": deepcopy(options)})
         for event in self.events:
+            self.callbacks.append({"uri": uri, "options": deepcopy(options), "event": deepcopy(event)})
             callback(event)
         return self
 
@@ -49,18 +60,19 @@ class Client:
         self.disconnected = True
 
 
-def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03):
+def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03, event_count=1, pinned_build=None):
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1",
                                  "waapi_port": 31337, "project_modification_policy": "read_only"}))
-    client = Client(version, events)
+    client = Client(version, events, pinned_build=pinned_build)
     records = []
+    client.argv = ["--timeout", str(timeout_seconds), mode, topic,
+                   "--topic-contract-digest", topic_business_contract(version, topic).contract_digest,
+                   *(["--event-count", str(event_count)] if mode == "stream-topic" else []), *facts]
     code, payload = gateway.execute_gateway(
-        ["--timeout", str(timeout_seconds), mode, topic,
-         "--topic-contract-digest", topic_business_contract(version, topic).contract_digest,
-         *(["--event-count", "1"] if mode == "stream-topic" else []), *facts],
+        client.argv,
         env={"WAAPI_SKILL_CONFIG_PATH": str(config)},
-        client_factory=lambda _url: client, stream_sink=records.append,
+        client_factory=lambda _url: client, stream_sink=lambda record: records.append(deepcopy(record)),
     )
     return code, payload, client, records
 
@@ -320,3 +332,73 @@ def test_native_subscription_setup_exception_does_not_claim_unsubscribe(tmp_path
     assert result["cleanup"] == "unknown"
     assert result["monitoring_outcome"]["subscription_established"] is None
     assert client.unsubscribed == 0
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_created_fixed_scalar_packets_preserve_ordered_public_stream(tmp_path, request, version):
+    """Injected/schema-valid packets; native co-occurrence is deliberately unproved."""
+    import os
+    from tests.support.created_topic_cases import URI, BUILDS, created_packets, created_fields
+    from tests.support.created_topic_branch_evidence import validate_packets, stream_observation
+    packets = created_packets(version)
+    validate_packets(version, packets)  # Independent pinned reflection, not the compiler.
+    observed = {}
+    context_path = os.environ.get("WAAPI_CREATED_TOPIC_BRANCH_CAPTURE_CONTEXT")
+    if context_path:
+        from tests.support.created_topic_branch_evidence import load_capture, finish_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_capture(Path(context_path), request.node.nodeid, version)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_capture(capture, reports, observed))
+    facts = [token for field in created_fields(version) for token in ("--topic-option", "include", field)]
+    code, terminal, client, records = run(tmp_path, version, "stream-topic", URI, packets, *facts,
+        timeout_seconds=1.0, event_count=4, pinned_build=BUILDS[version])
+    observed.update(stream_observation(code, terminal, client, records))
+    assert code == 0, terminal
+    assert "agent_result" not in terminal
+    assert client.subscriptions == [{"uri": URI, "options": {"return": created_fields(version)}}]
+    assert [record["record_type"] for record in records] == ["started", "event", "event", "event", "event"]
+    assert [record["event"] for record in records[1:]] == packets
+    assert [record["sequence"] for record in records[1:]] == [1, 2, 3, 4]
+    assert all(record["event_validation"]["unresolved_refs"] == [] for record in records[1:])
+    assert terminal["status"] == "completed"
+    assert terminal["event_count"] == 4 and terminal["event_count_reached"] is True
+    assert terminal["monitoring_outcome"]["target_completed"] is True
+    assert terminal["cleanup"] == "unsubscribed" and client.unsubscribed == 1 and client.disconnected
+
+
+def test_created_stream_sink_freezes_received_records_before_later_mutation(tmp_path, monkeypatch):
+    """Run the public flow, then mutate the raw records retained by its consumer."""
+    from tests.support.created_topic_cases import URI, BUILDS, created_packets, created_fields
+    original_execute = gateway.execute_gateway
+    received, before_mutation = [], []
+
+    def execute_with_mutating_consumer(*args, **kwargs):
+        sink = kwargs['stream_sink']
+
+        def observe(record):
+            received.append(record)
+            before_mutation.append(deepcopy(record))
+            sink(record)
+
+        kwargs['stream_sink'] = observe
+        result = original_execute(*args, **kwargs)
+        # Gateway completed normally. A consumer retaining the original object
+        # must not be able to rewrite the independently recorded sink snapshot.
+        for record in received:
+            if record['record_type'] == 'event':
+                record['event']['object']['notes'] = 'changed after receipt'
+        return result
+
+    monkeypatch.setattr(gateway, 'execute_gateway', execute_with_mutating_consumer)
+    packets = created_packets('2025.1')
+    expected_packets = deepcopy(packets)
+    facts = [token for field in created_fields('2025.1') for token in ('--topic-option', 'include', field)]
+    code, terminal, client, records = run(tmp_path, '2025.1', 'stream-topic', URI, packets, *facts,
+        timeout_seconds=1.0, event_count=4, pinned_build=BUILDS['2025.1'])
+    assert code == 0 and terminal['cleanup'] == 'unsubscribed'
+    assert terminal['monitoring_outcome']['target_completed'] is True
+    assert client.unsubscribed == 1 and client.disconnected
+    assert len(received) == 5 and received != before_mutation
+    assert records == before_mutation
+    assert [record['event'] for record in records[1:]] == expected_packets
+    assert [callback['event'] for callback in client.callbacks] == expected_packets
