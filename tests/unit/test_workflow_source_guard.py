@@ -4195,7 +4195,8 @@ def _stationary_tone_runtime(tmp_path, workflow, *, fault=None, version='2025.1'
                 raise RuntimeError('fixture native generation outcome unknown')
             floating = args['bitDepth'] == 'float32'
             # Synthetic boundary bytes are not native evidence or a tolerance oracle.
-            samples = [0.5 * math.sin(2 * math.pi * 440 * i / 48000) for i in range(12000)]
+            gain = {0: 1.0, -6: 0.5011872336272722}[args['sustainLevel']]
+            samples = [gain * math.sin(2 * math.pi * 440 * i / 48000) for i in range(12000)]
             audio = b''.join(struct.pack('<f' if floating else '<h', value if floating else int(value * 32767)) for value in samples)
             fmt = struct.pack('<HHIIHH', 3 if floating else 1, 1, 48000, 192000 if floating else 96000,
                 4 if floating else 2, 32 if floating else 16)
@@ -4247,9 +4248,9 @@ def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_p
         assert archived == native_files[phase['output_path']]
         assert hashlib.sha256(archived).hexdigest() == phase['wav']['archive_proof']['sha256']
         shown = json.loads(Path(phase['transaction']['path']).read_text())
-        assert shown['transaction_id'] == phase['transaction_id'] and shown['state'] == 'result_schema_checked'
+        assert shown['transaction_id'] == phase['transaction_id'] and shown['state'] == 'verified'
         assert shown['artifact']['request']['arguments']['args'] == next(row for row in writes if row['path'] == phase['output_path'])
-        assert shown['events'] and phase['verification']['business_state_verified'] is False
+        assert shown['events'] and phase['verification']['business_state_verified'] is True
     assert receipt['get_info']['isCommandLine'] is True
     assert receipt['get_info']['version']['build'] == 9143
     assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
@@ -4264,7 +4265,7 @@ def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_p
             'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
         transactions=exact_transaction_outcomes(runtime.state_dir))
     record = json.loads(Path(runtime.env['WWISE_CATEGORY_EVIDENCE_PATH']).read_text())
-    assert len(record['transactions']) == 4 and all(row['state'] == 'result_schema_checked' for row in record['transactions'])
+    assert len(record['transactions']) == 4 and all(row['state'] == 'verified' for row in record['transactions'])
     assert record['categories'][0]['status'] == 'blocked' and record['categories'][0]['business_effect_verified'] is False
     assert record['categories'][0]['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
     assert record['source']['hash_before'] == record['source']['hash_after']
