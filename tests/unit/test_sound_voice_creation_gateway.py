@@ -249,6 +249,7 @@ def language_voice_task(path, version='2023.1'):
     task.languages = [{'id': JAPANESE, 'name': 'Japanese', 'shortId': 2}]
     original = task.call
     def call(uri, args=None, options=None):
+        before_ids = set(task.objects) if uri.endswith('object.set') else set()
         result = original(uri, args, options)
         if uri.endswith('getProjectInfo'):
             result.update(displayTitle='Fixture', isDirty=False, currentLanguageId=JAPANESE,
@@ -258,8 +259,8 @@ def language_voice_task(path, version='2023.1'):
                 directories={key: str(task.project_file.parent) for key in
                     ('root', 'cache', 'originals', 'soundBankOutputRoot', 'commands', 'properties')})
         if uri.endswith('object.set'):
-            for row in task.objects.values():
-                if row['type'] == 'Sound':
+            for object_id, row in task.objects.items():
+                if object_id not in before_ids and row['type'] == 'Sound':
                     row['activeSource'] = None
         return result
     task.call = call
@@ -268,6 +269,13 @@ def language_voice_task(path, version='2023.1'):
 
 def test_new_empty_voice_preserves_explicit_construction_language(tmp_path):
     task = language_voice_task(tmp_path)
+    existing = '{88888888-8888-8888-8888-888888888888}'
+    active = '{77777777-7777-7777-7777-777777777777}'
+    task.objects[existing] = {'id': existing, 'name': 'Existing voice', 'type': 'Sound', 'classId': 65552,
+        'path': task.objects[SECOND]['path'] + r'\Existing voice', 'parent': {'id': SECOND},
+        'notes': 'Keep recording', '@IsVoice': True, 'activeSource': {'id': active}}
+    task.objects[active] = {'id': active, 'name': 'Keep recording', 'type': 'AudioFileSource', 'classId': 16,
+        'path': task.objects[existing]['path'] + r'\Keep recording', 'parent': {'id': existing}}
     code, declared = declare_voice(task, extra=('--field', 'language', 'Japanese'))
     assert code == 0, declared
     tx, shown = task.preview()
@@ -282,6 +290,8 @@ def test_new_empty_voice_preserves_explicit_construction_language(tmp_path):
     assert code == 0 and verified['verified'] is True, verified
     voice = next(row for row in task.objects.values() if row['name'] == 'Rain')
     assert voice['@IsVoice'] is True and voice['@Volume'] == -6 and voice['parent'] == {'id': SECOND}
+    assert task.objects[existing]['activeSource'] == {'id': active}
+    assert task.objects[active]['parent'] == {'id': existing}
     writes = [args for uri, args, _ in task.calls if uri.endswith('object.set')]
     assert len(writes) == 1
     assert any(args.get('transform') == [{'select': ['children']}]
