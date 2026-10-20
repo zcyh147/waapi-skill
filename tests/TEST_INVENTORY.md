@@ -5,6 +5,57 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R39 scoped regression integration
+
+Frozen runtime merge `c51371d1` preserves accepted graph fixtures `3eb19047`,
+registry fixtures `373b9ff4`, optional active-source diagnostic `34a64ac1` and
+Render/remaining fixtures `4404f41d`: all 21 component files match their reviewed
+blobs. The Render repair retains explicit reference intent, binds planned
+targets to the existing graph GUID proof and rechecks certified equivalent
+platform views. Public schemas and seals for all 153 versioned operation rows
+(34 named operations) remain equal to `695344f1`.
+
+Root's original **R38 failed-node subset** on exact `695344f1` ended **976 passed,
+466 failed, 3,598 deselected in 375.99s**, exit 1 (wrapper 376.777s). Its 1,897
+tracked files stayed unchanged and no owned process remained. Original records
+remain in `.waapi-skill-state/full-coverage/r38-failed-subset-695344f1-r1/`.
+This differs from the earlier full Program failure on `c18225d9` recorded below;
+neither is an R39 acceptance result.
+
+R39 controls are separate staged Non-live runs, not an aggregate gate:
+
+| Component selection | Original result |
+|---|---|
+| Four graph fixture files and related controls | 106 passed in 30.52s |
+| Registry original failed nodes and related controls | 126 passed, 35 failed in 10.29s |
+| Only corrected registry residuals plus retained Japanese-language boundary | 31 passed, 5 failed in 0.64s |
+| Only five remaining registry corrections | 5 passed in 0.28s |
+| Only registry cleanup-affected data controls | 10 passed in 0.39s |
+| Render certified-equivalent-view positives and prewrite drift controls | 4 passed in 4.23s |
+| Other modern Render version controls | 5 passed in 5.29s |
+| Only final compound directory-entry assertion correction | 1 passed in 0.97s |
+
+The remaining component's original 75-node closure maps to its staged receipts;
+it is not a final-candidate 75-test run or a sum of passes. Original intermediate
+failures, including a registry collection error before any test ran, remain.
+Exact selections and receipts are indexed in `/tmp/waapi-r39-graph-fixtures-handoff.md`,
+`/tmp/waapi-r39-registry-fixtures-plan.md` and
+`/tmp/waapi-r39-other-fixtures/handoff.md`. The original no-media Japanese merge
+request remains an exact unresolved-boundary control under #180/#181; its
+separate positive proves platform scoping only.
+
+Four serial inventory generation/check commands exited zero once. Only the
+registry source hash, three existing source-index entries and native candidate
+identity refresh; interface inventory, source membership, native descriptors and
+all 272,313 compressed obligation rows remain exact. No merger pytest, native,
+Fresh or replacement broad gate ran. Root owns the subsequent 466-node subset.
+
+The separate Root-owned 2021.1 diagnostic on `34a64ac1` **failed in 12.78s** at
+`ordering_counterexample_unproven`. All three two-source copies' path joins
+matched saved ActiveSource GUIDs, but the active source was always ordinal zero
+in public and saved ordering. This remains blocked/diagnostic-only with no
+generic active-source credit; see the retained native follow-up.
+
 ## 2026-10-20 R38 selected regression repairs
 
 Runtime merge `5fcd2d97` preserves accepted components `8836b0e5` (local-import
@@ -43,8 +94,9 @@ On frozen `5fcd2d97`, four serial inventory generation/check commands exited
 zero once. All four policy seals, 79 source members, 91 source-index members,
 272,313 native obligation rows and compressed artifact bytes remain exact;
 only existing source hashes/line offsets and native candidate identity refresh.
-No merger pytest, full Program, native or Fresh run occurred. The original
-1,442 failed-node subset has not yet been retested on R38; the earlier failure
+No merger pytest, full Program, native or Fresh run occurred. At that checkpoint
+the original 1,442 failed-node subset had not yet been retested; the subsequent
+exact `695344f1` subset result is recorded above. The earlier full-gate failure
 below remains unchanged and no broad PASS credit follows.
 
 ## 2026-10-20 R37 focused integration and original Program failure

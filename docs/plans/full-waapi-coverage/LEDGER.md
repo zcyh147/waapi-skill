@@ -564,3 +564,36 @@ Index/document integrity is sealed separately from candidate source identity,
 preventing a receipt/index self-reference. New selection logic lives in the
 already source-sealed audit module. Temporary output/check receipts validate
 this component; committed inventory regeneration belongs to integration.
+
+
+## R39 regression integration and retained gaps
+
+Runtime merge `c51371d1` preserves the four accepted component tips without
+fixups (21 exact file blobs). Its two runtime files repair modern EffectSlot
+Render proof for explicit retarget/clear/planned references and equivalent
+certified platform views; the remaining changes are fixtures and an opt-in
+owned diagnostic. All public schemas/seals for 153 versioned operation rows
+across 34 named operations are unchanged from `695344f1`. No new public route,
+raw request or client fallback is added.
+
+Four serial inventory generate/check commands passed once. The generated delta
+is one registry source hash, three existing source-index entries and the native
+candidate identity. All 79 source members, 91 source-index members, native
+catalogs/descriptors, 272,313 compressed obligations, ownership, requirements,
+exclusions and evidence states remain exact. Product coverage remains incomplete;
+staged program controls do not grant a branch transition, family/leaf credit or
+native acceptance. Exact staged results are recorded in the test inventory.
+
+Root's original `695344f1` failed subset ended 976 passed / 466 failed, distinct
+from the retained earlier full Program failure on `c18225d9`. No replacement
+broad gate or merger pytest ran. The no-media Japanese merge intent remains
+required unimplemented/unproved #180/#181 work; its original request and exact
+boundary are retained beside a platform-only positive. Source-anchored follow-up:
+`/tmp/waapi-r39-language-followup.md`.
+
+The separate `34a64ac1` native active-source diagnostic remains FAIL and its
+category blocked: observed path joins matched saved active GUIDs, but every
+active source was first in both source orderings. It therefore cannot separate
+a correct active-selection oracle from a first-child shortcut. #181 remains
+open; neither current boundaries nor this insufficient diagnostic prove native
+absence. See the retained native follow-up.

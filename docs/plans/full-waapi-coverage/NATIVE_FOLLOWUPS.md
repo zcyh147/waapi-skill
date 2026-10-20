@@ -655,3 +655,28 @@ Original evidence is in the short-ID worktree's
 archived native output, before/after model images and final category record.
 The earlier format-conversion failure and missing REV backend remain separate
 unresolved work; this dump grants no business-effect acceptance.
+
+
+## R39 2021 multi-source active-selection diagnostic — #181
+
+Root ran the opt-in owned Console diagnostic on exact `34a64ac1`. The original
+**FAIL (12.78s)** ends at `ordering_counterexample_unproven`; category status
+remains blocked/diagnostic-only. The import and all three copies verified, and
+each target exposed exactly two distinct sources. In all three copies, the
+same-view Sound/source WAV-path join matched the saved ActiveSource GUID.
+However, the active child was ordinal zero in both public child order and saved
+XML order every time. The observation does not distinguish that join from a
+first-child heuristic, so it grants no generic active-source implementation or
+business-preservation credit. The existing unique-source import proof remains
+narrow; SFX/Voice, multiple-language/platform and ambiguous-path cases are not
+completed by this diagnostic.
+
+Source-project full hash, mtime and tree plus all 1,897 tracked files stayed
+unchanged; no owned process remained. The failed sandbox is quarantined and
+original `summary.json`, `result.json`, `category.jsonl` and archived observations
+remain in Root's `.waapi-skill-state/full-coverage/181-multisource-34a64ac1-2021-r1/`.
+Do not regrade the FAIL, choose source order as an oracle, or automatically
+relaunch. A useful successor needs an independently known active source that is
+not first, or another documented independent discriminator, before generic
+mapping is implemented or credited. Root's method review and any further native
+attempt remain separate decisions.
