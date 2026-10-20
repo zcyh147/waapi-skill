@@ -64,6 +64,27 @@ def active_source_linkage_disclosure() -> dict[str, Any]:
     }
 
 
+def active_source_native_limitations(version: str) -> list[dict[str, Any]]:
+    """Keep observed native kind rejection distinct from unproved alternatives."""
+    build = {"2022.1": "2022.1.19.8584", "2023.1": "2023.1.19.8928"}.get(version)
+    if build is None:
+        return []
+    return [{
+        "source_type_name": "Wwise Tone Generator",
+        "source_class_id": 6684674,
+        "admission": "rejected_before_preview_in_this_version",
+        "observed_native_build": build,
+        "observed_request_scope": "Console_current_default_platform_view",
+        "observed_native_error": "The object is not a source.",
+        "other_plugin_classes": "not_classified_by_this_observation",
+        "alternative_status": "required_unresolved_under_#181",
+        "next_step": (
+            "Keep the requested Tone selection pending under #181 until a version-correct "
+            "alternative is proved; do not retry this setter or substitute another source."
+        ),
+    }]
+
+
 def project_setting_business_operations() -> frozenset[str]:
     return frozenset(_CONTRACTS)
 
@@ -112,7 +133,8 @@ def project_setting_business_contract_data(
         "version": version,
         "input_mode": "business_declaration",
         "execution_shape": "draft_mutation",
-        **({"source_linkage": active_source_linkage_disclosure()}
+        **({"source_linkage": active_source_linkage_disclosure(),
+             "native_source_limitations": active_source_native_limitations(version)}
            if operation == SOUND_SET_ACTIVE_SOURCE_URI else {}),
         **({"selection_guidance": dict(selection_guidance_for_uri(operation))}
            if operation == GAME_PARAMETER_SET_RANGE_URI else {}),
@@ -155,6 +177,7 @@ def project_setting_business_contract_data(
 
 __all__ = [
     "active_source_linkage_disclosure",
+    "active_source_native_limitations",
     "GAME_PARAMETER_SET_RANGE_URI",
     "PROJECT_SETTING_BUSINESS_CONTRACT",
     "SOUND_SET_ACTIVE_SOURCE_URI",

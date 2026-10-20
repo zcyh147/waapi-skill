@@ -2198,14 +2198,14 @@ class _PluginSourceSelectionTask:
         if code == 0 and 'draft' in payload: self.revision = payload['draft']['revision']
         return code, payload
 
-    def declare(self):
+    def declare(self, *, platform='Windows'):
         handles = {}
         for role, identity in (('sound', self.client.sound_id), ('source', self.client.source_id)):
             code, bound = self.step('draft-bind-object', '--role', role, '--object-id', identity)
             assert code == 0, bound
             handles[role] = bound['bound_object']['handle']
         return self.step('draft-declare-project-setting-plan', '--sound-handle', handles['sound'],
-            '--source-handle', handles['source'], '--platform-name', 'Windows')
+            '--source-handle', handles['source'], *(['--platform-name', platform] if platform is not None else []))
 
     def preview(self):
         code, declared = self.declare(); assert code == 0, declared
@@ -2231,18 +2231,88 @@ def test_source_plugin_child_can_be_selected_through_public_project_setting_draf
     assert len(task.client.writes) == 1
 
 
-@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1'])
+def test_2022_tone_selection_reports_native_rejection_before_preview_or_write(tmp_path):
+    task = _PluginSourceSelectionTask(tmp_path, '2022.1')
+    code, declared = task.declare(platform=None)
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code != 0, rejected
+    assert rejected['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY', rejected
+    assert rejected['details']['source_class_id'] == 6684674
+    assert '#181' in rejected['details']['next_step']
+    assert task.client.writes == []
+    assert not list((task.state / 'transactions').glob('*'))
+
+
+@pytest.mark.parametrize('version', ['2024.1'])
 def test_source_plugin_selection_matches_other_admitted_version_schemas(tmp_path, version):
     task = _PluginSourceSelectionTask(tmp_path, version)
-    # The constructor also accepts the native Source readback alias.
-    if version == '2023.1':
-        task.client.objects[task.client.source_id]['type'] = 'Source'
     tx, shown = task.preview()
     code, executed = task.run('execute', tx)
     assert code == 0, executed
     code, verified = task.run('verify', tx)
     assert code == 0 and verified['verified'] is True, verified
     assert task.client.writes == [{'sound': task.client.sound_id, 'source': task.client.source_id, 'platform': 'Windows'}]
+
+
+def test_2023_tone_source_alias_keeps_the_observed_native_boundary(tmp_path):
+    task = _PluginSourceSelectionTask(tmp_path, '2023.1')
+    task.client.objects[task.client.source_id]['type'] = 'Source'
+    code, declared = task.declare()
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code != 0 and rejected['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY', rejected
+    assert rejected['details']['source_class_id'] == 6684674
+    assert task.client.writes == [] and not list((task.state / 'transactions').glob('*'))
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_tone_native_selection_limitations_are_disclosed_before_binding(tmp_path, version):
+    env = _env(tmp_path, version=version)
+    code, schema = gateway.execute_gateway(['request-schema', SOUND_SET_ACTIVE_SOURCE_URI], env=env,
+        client_factory=lambda _: pytest.fail('Offline schema must not connect'))
+    assert code == 0, schema
+    limits = schema['business_adapter']['native_source_limitations']
+    if version in {'2022.1', '2023.1'}:
+        limitation, = limits
+        assert limitation['source_class_id'] == 6684674
+        assert limitation['source_type_name'] == 'Wwise Tone Generator'
+        assert limitation['observed_request_scope'] == 'Console_current_default_platform_view'
+        assert limitation['other_plugin_classes'] == 'not_classified_by_this_observation'
+        assert limitation['alternative_status'] == 'required_unresolved_under_#181'
+        assert 'do not retry' in limitation['next_step']
+    else:
+        assert limits == []
+    code, started = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'),
+        'draft-start', SOUND_SET_ACTIVE_SOURCE_URI], env=env,
+        client_factory=lambda _: pytest.fail('Offline start must not connect'))
+    assert code == 0, started
+    assert started['draft']['next_action_binding']['business_contract']['native_source_limitations'] == limits
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1'])
+def test_tone_version_boundary_preserves_file_source_selection(tmp_path, version):
+    task = _PluginSourceSelectionTask(tmp_path, version)
+    # Explicit alternative fixture state; reads only project requested fields.
+    source = task.client.objects[task.client.source_id]
+    source.update(type='AudioFileSource', classId=16)
+    tx, shown = task.preview()
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(task.client.writes) == 1
+    assert task.client.objects[task.client.sound_id]['activeSource']['id'] == task.client.source_id
+
+
+def test_observed_tone_rejection_does_not_classify_other_source_plugin_classes(tmp_path):
+    task = _PluginSourceSelectionTask(tmp_path, '2022.1')
+    # Independent pinned Silence class; this is program admission, not native effect evidence.
+    task.client.types[1] = {'name': 'Wwise Silence', 'type': 'Source', 'classId': 6619138}
+    for identity in (task.client.source_id, task.client.old_source_id):
+        task.client.objects[identity]['classId'] = 6619138
+    task.preview()
+    assert task.client.writes == []
 
 
 def _mutate_source_plugin_binding(task, fault):
