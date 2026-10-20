@@ -6,6 +6,7 @@ Native sources are enumerated before any public implementation is joined.
 from __future__ import annotations
 
 from collections import Counter
+from functools import lru_cache
 import sys
 
 
@@ -620,6 +621,157 @@ def validate_native_absence_observations(record, binding, checks, hosts):
         raise ValueError('native absence observation is present')
 
 
+def validate_created_topic_program(record, branch, binding, checks, root, reference_edges):
+    """Only Console object.created fixed primitive publish leaves, four callbacks.
+
+    Generic streams have no agent_result. Preserve their actual ordered sink
+    records and independently observed callbacks; never accept an arbitrary
+    public pointer, args/options proof, or an omission without its parent.
+    """
+    import hashlib
+    import json
+    import re
+    from wwise_waapi.native_catalog import canonical_digest
+    from wwise_waapi.topic_business import topic_business_contract
+
+    uri = 'ak.wwise.core.object.created'
+    version, host, build, kind, actual_uri = branch['route'].split('|')
+    definition = '/publishSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/'
+    if (host != 'wwise-console' or kind != 'topic' or actual_uri != uri
+            or not branch['pointer'].startswith(definition)
+            or branch['kind'] not in ('schema', 'optional_presence', 'empty_string', 'boolean_value', 'enum_value')
+            or branch['id'] != branch['route'] + '|' + branch['pointer']):
+        raise ValueError('created stream proof requires the exact Console publishSchema scalar branch')
+    # Cache only by exact immutable bytes, not a path/mtime. Every read still
+    # verifies the current file against the original native catalog index.
+    catalog_root = root / 'skills/waapi-skill/resources/native-catalog'
+    name = version + '/' + host + '.json'
+    raw = (catalog_root / name).read_bytes()
+    seal = hashlib.sha256(raw).hexdigest()
+    if json.loads((catalog_root / 'index.json').read_text())[name] != seal:
+        raise ValueError('created stream native catalog seal changed')
+    catalog = _created_topic_catalog(str(catalog_root), version, seal)
+    if catalog['provenance']['build'] != build:
+        raise ValueError('created stream native build changed')
+    definitions = catalog['definitions']['documents']['waapi_definitions.json']['definitions']
+    object_schema = definitions['objectReturn']
+    builtins = definitions['returnExpression']['items']['anyOf'][0]['enum']
+    properties = object_schema['properties']
+    fields = sorted(name for name, schema in properties.items() if name in builtins
+        and schema.get('type') in ('string', 'number', 'integer', 'boolean')
+        and set(schema) <= {'type', 'enum', 'description'})
+    field, _, suffix = branch['pointer'][len(definition):].partition('/')
+    if field not in fields:
+        raise ValueError('created stream field is not a fixed primitive include')
+    schema = properties[field]
+    expected_suffix = {'schema': '', 'optional_presence': '@presence/' + str(branch.get('value')),
+        'empty_string': '@empty/string', 'boolean_value': '@boolean/' + str(branch.get('value')).lower()}.get(branch['kind'])
+    if branch['kind'] == 'enum_value':
+        if not re.fullmatch(r'enum/[0-9]+', suffix):
+            raise ValueError('created stream enum occurrence changed')
+        expected_value = schema['enum'][int(suffix.split('/')[1])]
+        if type(expected_value) is not type(branch.get('value')) or expected_value != branch.get('value'):
+            raise ValueError('created stream enum alternative changed')
+        expected_suffix = suffix
+    if suffix != expected_suffix or branch['shape_sha256'] != canonical_digest(schema if branch['kind'] == 'schema' else branch.get('value')):
+        raise ValueError('created stream exact alternative shape changed')
+    edge_id = branch['route'] + '|/publishSchema/properties/object/$ref'
+    edge = reference_edges[edge_id]
+    if (binding.get('reference_chain') != [edge_id]
+            or edge['value'] != catalog['schemas'][uri]['publishSchema']['properties']['object']['$ref']
+            or edge['reference']['target'] != branch['route'] + '|' + definition.rsplit('/properties/', 1)[0]
+            or edge['reference']['target_sha256'] != canonical_digest(object_schema)):
+        raise ValueError('created stream exact native reference occurrence changed')
+    match = re.fullmatch(r'/observations/callbacks/([0-3])', binding.get('dispatch_pointer', ''))
+    if not match:
+        raise ValueError('created stream needs an exact callback index')
+    index = int(match[1])
+    native_pointer = f'/observations/callbacks/{index}/event/object/{field}'
+    public_pointer = f'/stream_records/{index + 1}/event/object/{field}'
+    if binding.get('observation_pointer') != native_pointer or binding.get('gateway_observation_pointer') != public_pointer:
+        raise ValueError('created stream callback/public occurrence or field differs')
+    exact_observation_pointer(branch, {**binding, 'observation_pointer': public_pointer},
+                              f'/stream_records/{index + 1}', 'event', reference_edges)
+    digest = topic_business_contract(version, uri).contract_digest
+    argv = ['--timeout', '1.0', 'stream-topic', uri, '--topic-contract-digest', digest, '--event-count', '4',
+            *[token for name in fields for token in ('--topic-option', 'include', name)]]
+    if record['gateway']['argv'] != argv or binding.get('input', {}).get('gateway_argv') != argv:
+        raise ValueError('created stream exact public argv differs')
+    options = {'return': fields}
+    if record.get('subscriptions') != [{'uri': uri, 'options': options}]:
+        raise ValueError('created stream exact subscription/options missing')
+    callbacks, records = record['observations']['callbacks'], record['stream_records']
+    if len(callbacks) != 4 or len(records) != 5:
+        raise ValueError('created stream requires four exact ordered callback/sink records')
+    contract = 'waapi-skill.topic-stream/v1'
+    started, terminal = records[0], record['gateway']['payload']
+    for envelope in (started, terminal):
+        if (envelope.get('contract') != contract or envelope.get('command') != 'stream-topic'
+                or envelope.get('topic') != uri or envelope.get('detected_version') != version
+                or envelope.get('is_command_line') is not True or envelope.get('topic_contract_digest') != digest
+                or envelope.get('match') is not None
+                or envelope.get('subscription_timeout') != {'mode': 'finite', 'seconds': 1.0, 'source': 'explicit'}):
+            raise ValueError('created stream original public envelope missing')
+    if (started.get('record_type') != 'started' or started.get('ok') is not True
+            or started.get('status') != 'streaming' or type(started.get('event_count_limit')) is not int
+            or started['event_count_limit'] != 4):
+        raise ValueError('created stream original started record missing')
+    for sequence, (callback, event_record) in enumerate(zip(callbacks, records[1:]), 1):
+        validation = event_record['event_validation']
+        if (callback['uri'] != uri or callback['options'] != options
+                or event_record.get('contract') != contract or event_record.get('record_type') != 'event'
+                or event_record.get('topic') != uri or type(event_record.get('sequence')) is not int
+                or event_record['sequence'] != sequence
+                or canonical_digest(callback['event']) != canonical_digest(event_record['event'])
+                or validation.get('uri') != uri or validation.get('version') != version
+                or validation.get('section') != 'event' or validation.get('required_fields') != ['object']
+                or validation.get('unresolved_refs') != [] or type(validation.get('validated_nodes')) is not int
+                or validation['validated_nodes'] <= 0):
+            raise ValueError('created stream ordered callback/validated sink record differs')
+        for event in (callback['event'], event_record['event']):
+            if not isinstance(event, dict) or not isinstance(event.get('object'), dict):
+                raise ValueError('created stream omission requires an existing object parent')
+            if set(event) != {'object'} or set(event['object']) - set(fields):
+                raise ValueError('created stream packet leaves the reviewed primitive fields')
+            for name, value in event['object'].items():
+                field_schema = properties[name]
+                allowed = {'string': (str,), 'boolean': (bool,), 'number': (int, float), 'integer': (int,)}[field_schema['type']]
+                if type(value) not in allowed or ('enum' in field_schema and value not in field_schema['enum']):
+                    raise ValueError('created stream scalar type/enum differs from pinned reflection')
+    if (terminal.get('record_type') != 'terminal' or terminal.get('ok') is not True
+            or terminal.get('status') != 'completed' or terminal.get('cleanup') != 'unsubscribed'
+            or terminal.get('completion_reason') != 'event_count_reached'
+            or type(terminal.get('event_count')) is not int or terminal['event_count'] != 4
+            or type(terminal.get('requested_event_count')) is not int or terminal['requested_event_count'] != 4
+            or terminal.get('event_count_reached') is not True
+            or canonical_digest(terminal.get('monitoring_outcome')) != canonical_digest({
+                'subscription_established': True, 'requested_event_count': 4, 'event_count': 4,
+                'target_completed': True, 'termination': 'event_count_reached'})
+            or canonical_digest(record.get('lifecycle')) != canonical_digest({'unsubscribe_count': 1, 'disconnected': True})):
+        raise ValueError('created stream completed count and final cleanup required')
+    info_calls = record.get('info_calls', [])
+    if len(info_calls) != 1 or info_calls[0]['uri'] != 'ak.wwise.core.getInfo':
+        raise ValueError('created stream original host detection missing')
+    info = info_calls[0]['result']
+    if info.get('isCommandLine') is not True or '.'.join(str(info['version'][key]) for key in ('year', 'major', 'minor', 'build')) != build:
+        raise ValueError('created stream injected host/build context differs')
+    for pointer in (f'/stream_records/{index + 1}/event', '/gateway/payload', '/subscriptions', '/lifecycle'):
+        if not any(check['pointer'] == pointer and 'equals' in check for check in checks):
+            raise ValueError('created stream exact whole event/terminal/subscription/cleanup proof missing')
+    public_checks = [check for check in checks if check['pointer'] == public_pointer]
+    if not any(proves_alternative(check, branch) for check in public_checks):
+        raise ValueError('created stream exact public scalar alternative proof missing')
+
+
+@lru_cache(maxsize=10)
+def _created_topic_catalog(catalog_root, version, seal):
+    from pathlib import Path
+    from wwise_waapi.native_catalog import load_native_catalog
+    # seal is the verified exact-byte cache key; load retains the original
+    # index, content, complete reflection and reference validation checks.
+    return load_native_catalog(version, 'wwise-console', root=Path(catalog_root))
+
+
 def evidence_result(descriptor, branch, candidate, category, scope_kind, base, binding=None, source_root=None, reference_edges=None):
     """Read preserved run records. A declaration/test filename has no PASS credit."""
     from pathlib import Path
@@ -733,7 +885,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                     and isinstance(pointer_value(record, '/gateway/payload/agent_result/metadata'), dict)
                     and any(c['pointer'] == '/gateway/payload/agent_result' and 'equals' in c for c in checks)):
                 public_equals = True
-            if (not public_pointer.startswith('/gateway/payload/agent_result')
+            if public_pointer.startswith('/stream_records/'):
+                validate_created_topic_program(record, branch, binding, checks, root, reference_edges or {})
+            elif (not public_pointer.startswith('/gateway/payload/agent_result')
                     or not public_equals):
                 raise ValueError('exact public Gateway result assertion missing')
             if gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True or not gateway['argv']:
