@@ -9480,8 +9480,9 @@ def test_source_plugin_explicit_current_platform_alternative(workflow_sandbox_ru
     assert category['status'] == 'PASS', category
 
 
-def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
-    """One diagnostic public Source-only copy; deliberately not a deep-copy oracle."""
+def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        owned_read_only: bool = False) -> dict[str, Any]:
+    """Existing bounded diagnostic, optionally stopping at original owned reads."""
     from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
     from wwise_waapi.dispatcher import MAX_LIVE_RESULT_JSON_BYTES
     from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_QUERIES
@@ -9492,10 +9493,12 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     source_id = '{95DDA32B-B666-4269-A54C-5ABF4E201C99}'
     original_owned_ids = ['{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
         '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}']
-    output = runtime.state_dir / 'legacy-source-copy-feasibility.json'
+    stem = 'legacy-source-owned-read' if owned_read_only else 'legacy-source-copy-feasibility'
+    output = runtime.state_dir / (stem + '.json')
     assert not output.exists(), 'Never replace an earlier feasibility attempt'
     output.parent.mkdir(parents=True, exist_ok=True)
-    artifacts = runtime.state_dir / 'legacy-source-copy-artifacts'; artifacts.mkdir(exist_ok=False)
+    artifacts = runtime.state_dir / ('legacy-source-owned-read-artifacts' if owned_read_only else 'legacy-source-copy-artifacts')
+    artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); old_native = set(native_root.glob('*.json'))
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
     transactions: list[str] = []
@@ -9504,6 +9507,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         'business_effect_verified': False, 'coverage_credit': 'none; native feasibility diagnostic',
         'verifier_strength': 'diagnostic_class_parent_live_fields_owner_frames_and_owned_topology; no_complete_copy_credit',
         'transaction_ids': transactions, 'observation_path': str(output)}
+    if owned_read_only:
+        category.update(category='legacy-original-source-owned-read',
+            coverage_credit='none; original read-only metadata diagnostic',
+            verifier_strength='read_only_original_live_metadata_fields_and_owned_edges; no_copy_or_curve_points_credit')
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.legacy-source-copy-feasibility/v1',
         'candidate': runtime.candidate, 'version': runtime.version, 'diagnostic_only': True,
@@ -9523,6 +9530,11 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         'limits': {'calls': 128, 'reply_bytes': MAX_LIVE_RESULT_JSON_BYTES, 'total_reply_bytes': 16 * 1024 * 1024,
             'receipt_bytes': 256 * 1024, 'archive_bytes': 64 * 1024 * 1024, 'native_files': 512},
         'archive_bytes': 0, 'total_reply_bytes': 0}
+    if owned_read_only:
+        receipt.update(contract='waapi-skill.legacy-source-owned-read/v1', read_only=True,
+            curve_points={'status': 'unavailable_in_2021_public_contract',
+                'native_getter': 'not established; inspect actual metadata, no guessed Points accessor'},
+            scope_exclusions=['copy_admission', 'copied_owned_mapping', 'curve_points', 'history', 'audio_effect'])
     attempted: set[str] = set()
     def persist():
         raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
@@ -9541,6 +9553,9 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     class Gateway:
         def raw_gateway(self, argv):
             assert len(receipt['calls']) < receipt['limits']['calls'], 'Diagnostic public call bound exceeded'
+            if owned_read_only:
+                assert argv[0] in {'status', 'query-object'} or argv[:2] in (
+                    ['metadata', 'types'], ['metadata', 'list'], ['metadata', 'detail']), 'Owned diagnostic permits only reads'
             if argv[0] == 'execute':
                 assert argv[1] not in attempted, 'Never retry setup or Source-only copy'
                 attempted.add(argv[1])
@@ -9580,29 +9595,47 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert row['type'] == 'Sound' and row['class_id'] == 65552, row
         assert type(row.get('properties', {}).get('IsVoice')) is bool, 'Owner needs its actual Boolean IsVoice'
         return {'identity': row, 'scope': 'identity/class/parent/name/notes/IsVoice only; other owner properties unobserved'}
-    def snapshot(identity):
-        row = exact(identity); names, page = [], None
+    def snapshot(identity, *, details=False):
+        row = exact(identity); names, page, selections = [], None, {}
         while True:
             result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
                 *(['--page', page] if page else [])], live=True)['agent_result']
             for field in result['fields']:
                 name = field['name']; assert isinstance(name, str) and name and name not in names, result
                 names.append(name)
+                if details: selections[name] = field['selection']
             if result['complete']:
                 assert len(names) == result['total_count'], result
                 break
             next_page = result['next_page']; assert next_page and next_page != page, result
             page = next_page
+        readable_names = list(names)
+        unavailable_names = []
+        if details:
+            for name in names:
+                result = gateway.gateway(['metadata', 'detail', '--exact-id', identity,
+                    '--selection', selections[name]], live=True)['agent_result']
+                assert result.get('complete') is True and result['metadata']['name'] == name, result
+                metadata = result['metadata']
+                # Same unknown-kind boundary as live custom-field discovery;
+                # detail does not expose the internal selected_field_kind key.
+                if not metadata.get('type') and metadata.get('restriction', {}).get('type') != 'reference':
+                    readable_names.remove(name); unavailable_names.append(name)
+            if unavailable_names:
+                receipt.setdefault('metadata_unreadable_fields', {})[identity] = unavailable_names
         pages = []
         # Public custom outputs first traverse bounded lexical discovery. The
         # native projection ceiling alone cannot size this public request.
         size = min(MAX_METADATA_DISCOVERY_QUERIES, waapi_gateway.MAX_QUERY_CUSTOM_OUTPUTS,
             MAX_STRUCTURED_RETURN_FIELDS - 8)
-        for offset in range(0, len(names), size):
-            rows = query(identity, fields=names[offset:offset + size]); assert len(rows) == 1, rows
+        for offset in range(0, len(readable_names), size):
+            rows = query(identity, fields=readable_names[offset:offset + size]); assert len(rows) == 1, rows
             assert all(rows[0].get(key) == row.get(key) for key in ('id', 'name', 'type', 'path', 'parent', 'owner', 'class_id', 'notes')), rows
+            if owned_read_only:
+                assert set(rows[0].get('properties', {})) | set(rows[0].get('references', {})) == set(readable_names[offset:offset + size]), rows
             pages.append(rows[0])
-        return {'identity': row, 'field_names': names, 'field_pages': pages}
+        return {'identity': row, 'field_names': names, 'field_pages': pages,
+            **({'unreadable_field_names': unavailable_names} if details else {})}
     observation_start = 0
     def save_observation(name, value):
         nonlocal observation_start
@@ -9622,6 +9655,40 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 'observed topology/class/notes only; fields and copied GUID mapping unverified' if rows else
                 'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
         return observations
+    def owned_hop(identity, token, bound):
+        # These fixed fixture-owned hops reuse the existing public RTPC observer;
+        # their acceptance on 2021 is precisely the pending native observation.
+        result = gateway.gateway(['query-object', '--advanced-waql', f'from object "{identity}" select @{token}',
+            '--max-results', str(bound), '--include', 'class-id', '--include', 'owner',
+            '--include', 'parent', '--include', 'notes'], live=True)
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        rows = result['objects']; assert result['count'] == len(rows) and len(rows) < bound, result
+        assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
+        return rows
+    def original_owned_read():
+        members = owned_hop(source_id, 'RTPC', 8)
+        assert len(members) == 1 and members[0]['id'] == original_owned_ids[0], members
+        rtpc = save_observation('original-rtpc', snapshot(members[0]['id'], details=True))
+        assert rtpc['identity'] == members[0] and rtpc['identity']['class_id'] == 1441808, rtpc
+        assert rtpc['identity'].get('owner', {}).get('id') == source_id, rtpc
+        assert 'ControlInput' in rtpc['field_names'], 'Live RTPC metadata must disclose ControlInput'
+        # Genuine 2021 metadata can leave this field untyped. Use the SDK's
+        # reference hop, without inventing a metadata reference restriction.
+        controls = owned_hop(members[0]['id'], 'ControlInput', 2)
+        assert len(controls) == 1 and controls[0]['id'] == original_owned_ids[1], controls
+        control_id = controls[0]['id']
+        lfo = save_observation('original-control-input', snapshot(control_id, details=True))
+        assert lfo['identity'] == controls[0] and lfo['identity']['class_id'] == 4194320, lfo
+        assert lfo['identity'].get('owner', {}).get('id') == members[0]['id'], lfo
+        curves = owned_hop(members[0]['id'], 'Curve', 2)
+        assert len(curves) == 1 and curves[0]['id'] == original_owned_ids[2], curves
+        curve = save_observation('original-curve', snapshot(curves[0]['id'], details=True))
+        assert curve['identity'] == curves[0] and curve['identity']['class_id'] == 917520, curve
+        assert curve['identity'].get('owner', {}).get('id') == members[0]['id'], curve
+        receipt['owned_observation'] = {'rtpc_id': members[0]['id'], 'control_input_id': control_id,
+            'curve_id': curves[0]['id'], 'rtpc_field_names': rtpc['field_names'],
+            'control_input_field_names': lfo['field_names'], 'curve_field_names': curve['field_names'],
+            'mapping_scope': 'original owner edges only; no copied graph or curve point observation'}
     def complete(preview, label):
         tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
         phase = {'name': label, 'transaction_id': tx, 'execution_attempted': False}; receipt['phases'].append(phase)
@@ -9650,6 +9717,12 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert len(selected) == 1 and selected[0]['classId'] == 9699330 and selected[0]['type'] == 'Source', selected
         source_before = save_observation('source-before', snapshot(source_id))
         assert source_before['identity']['type'] in {'Source', 'SourcePlugin'} and source_before['identity']['class_id'] == 9699330
+        if owned_read_only:
+            original_owned_read()
+            assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
+            receipt['collection_complete'] = True; category['status'] = 'blocked'
+            category['reason'] = 'Original read protocol complete; Curve points and any untyped fields remain unverified'
+            return category
         old_owner = source_before['identity']['parent']['id']
         owner_before = save_observation('original-owner-before', owner_frame(old_owner))
         assert owner_before['identity']['type'] == 'Sound' and owner_before['identity']['class_id'] == 65552
@@ -9735,3 +9808,12 @@ def test_legacy_source_only_copy_console_feasibility(workflow_sandbox_runtime: _
         pytest.skip('Source-only copy feasibility is pinned to Console2021.1.14.8108')
     category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='WAAPI_SOURCE_COPY_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_original_source_owned_read_console_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Original owned metadata observation is pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='', owned_read_only=True)
+    assert category['status'] == 'blocked', category
