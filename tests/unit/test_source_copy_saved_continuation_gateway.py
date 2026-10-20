@@ -790,3 +790,172 @@ def test_dirty_baseline_save_allows_live_source_not_yet_serialized_in_valid_work
     assert checked['next_command']['command'] == 'continue-source-copy-proof', checked
     save = final_save_preview(task, checked)
     assert save['state'] == 'awaiting_confirmation' and not writes, save
+
+
+def repeated_saved_source_task(tmp_path):
+    """Two property-local copies of genuine 2021 RTPC/LFO/Curve XML and metadata."""
+    import uuid
+    runtime, writes, task = saved_source_task(tmp_path)
+    source_path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(source_path)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    original = source.find("PropertyList/Property[@Name='OutputLevel']/RTPCList")
+    other_property = source.find("PropertyList/Property[@Name='Osc1Level']")
+    additional = deepcopy(original)
+    other_property.append(additional)
+    mappings = {binding[0]: binding[1] for binding in SAVED_ROLES.values()}
+    extra_objects, prototypes = {}, {}
+    for index, (role, binding) in enumerate(SAVED_ROLES.items()):
+        if role == 'source': continue
+        old, copied, tag, *_ = binding
+        added = '{' + str(uuid.UUID(int=0x57000000000000000000000000000000 + index)).upper() + '}'
+        cloned = '{' + str(uuid.UUID(int=0x58000000000000000000000000000000 + index)).upper() + '}'
+        node, = [node for node in additional.iter(tag) if node.get('ID') == old]
+        node.set('ID', added)
+        if 'ShortID' in node.attrib: node.set('ShortID', str(57000 + index))
+        extra_objects[added] = deepcopy(task.objects[old])
+        extra_objects[added].update(id=added, shortId=57000 + index)
+        prototypes[added] = prototypes[cloned] = old
+        mappings[added] = cloned
+    extra_ids = list(extra_objects)
+    extra_objects[extra_ids[1]]['owner'] = {'id': extra_ids[0]}
+    extra_objects[extra_ids[2]]['owner'] = {'id': extra_ids[0]}
+    task.objects.update(extra_objects)
+    document.write(source_path)
+    hops = {SAVED_ROLES['rtpc'][0]: SAVED_ROLES['control_input'][0], extra_ids[0]: extra_ids[1]}
+    call = task.call
+    def observed(uri, args=None, options=None):
+        args = args or {}
+        if uri.endswith(('getPropertyAndReferenceNames', 'getPropertyInfo')) and args.get('object') in prototypes:
+            return call(uri, {**args, 'object': prototypes[args['object']]}, options)
+        if uri.endswith('object.get') and ' select @ControlInput ' in args.get('waql', ''):
+            identity = args['waql'].split('"')[1]
+            mapped_hops = {**hops, **{mappings[key]: mappings[value] for key, value in hops.items()}}
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': task.project_rows([task.objects[mapped_hops[identity]]], options)}
+        result = call(uri, args, options)
+        if uri.endswith('object.copy'):
+            for identity, row in extra_objects.items():
+                clone = deepcopy(row)
+                clone.update(id=mappings[identity], shortId=row['shortId'] + 1000)
+                clone['owner'] = {'id': mappings[clone['owner']['id']]}
+                task.objects[clone['id']] = clone
+        if uri.endswith('project.save') and COPIED in task.objects:
+            copied = deepcopy(source)
+            for node in copied.iter():
+                if node.get('ID') in mappings:
+                    node.set('ID', mappings[node.get('ID')])
+                    if 'ShortID' in node.attrib: node.set('ShortID', str(task.objects[node.get('ID')]['shortId']))
+            destination_path = Path(task.objects[DEST]['filePath'])
+            destination = ET.parse(destination_path)
+            saved_owner, = [node for node in destination.iter('Sound') if node.get('ID') == DEST]
+            saved_owner.find('ChildrenList')[:] = [copied]
+            destination.write(destination_path)
+        return result
+    task.call = observed
+    return runtime, writes, task, mappings
+
+
+def test_property_generic_repeated_owned_graph_finishes_through_separate_save(tmp_path):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx)
+    assert code == 0 and pending['state'] == 'executed_unverified', json.dumps(pending.get('verification', pending))
+    saved = final_save_preview(task, pending)
+    result = authorize_execute_verify(task, saved['transaction_id'])
+    code, result = task.run(*result['next_command']['gateway_argv'])
+    assert code == 0 and result['verified'] is True, result
+    scope = result['verification']['verification_scope']
+    assert scope['complete_copy_preservation'] is True
+    assert scope['owned_role_count'] == 6 and scope['ordered_point_count'] == 4
+    assert scope['owned_guid_mapping'] == mapping
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('fault', ['duplicate', 'cross-tag-alias', 'original-alias', 'owner', 'class', 'field', 'point-order'])
+def test_repeated_owned_graph_corruption_cannot_become_complete_copy(tmp_path, fault):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0, pending
+    saved = final_save_preview(task, pending)
+    authorize_execute_verify(task, saved['transaction_id'])
+    extra = [identity for identity in mapping if identity not in {row[0] for row in SAVED_ROLES.values()}]
+    rtpc, lfo, curve = [mapping[identity] for identity in extra]
+    if fault in {'owner', 'class', 'field'}:
+        if fault == 'owner': task.objects[lfo]['owner'] = {'id': SAVED_ROLES['rtpc'][1]}
+        elif fault == 'class': task.objects[lfo]['classId'] += 1
+        else: task.objects[lfo]['@LfoFrequency'] = 99
+    else:
+        path = Path(task.objects[DEST]['filePath'])
+        document = ET.parse(path)
+        source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == COPIED]
+        node, = [node for node in source.iter('Curve') if node.get('ID') == curve]
+        if fault == 'point-order': node.find('PointList')[:] = reversed(list(node.find('PointList')))
+        elif fault == 'cross-tag-alias':
+            ET.SubElement(document.find('.//WorkUnit/ChildrenList'), 'Sound', {'ID': curve, 'Name': 'Aliased unrelated declaration'})
+        elif fault == 'original-alias': node.set('ID', extra[2])
+        else: node.set('ID', SAVED_ROLES['curve'][1])
+        document.write(path)
+    code, failed = task.run('verify', tx)
+    assert code == 2 and failed['state'] == 'verification_failed', failed
+    assert failed['verification']['ok'] is False
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+    assert task.run('execute', tx)[0] == 2
+
+
+def test_obsolete_saved_graph_format_blocks_new_save_child_before_any_write(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256, canonical_json_bytes
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    path = tmp_path / 'state/operation-drafts-v1/records' / (checked['draft']['draft_id'] + '.json')
+    record = json.loads(path.read_text())
+    # Model the previously sealed file authority, independently of damaged-file
+    # detection: obsolete proof state has no owned-graph format discriminator.
+    record['check']['source_copy_file_binding'].pop('graph_format', None)
+    record.pop('record_digest')
+    record['record_digest'] = canonical_sha256({'contract': 'waapi-skill.operation-draft-record-digest/v1', 'record': record})
+    path.write_bytes(canonical_json_bytes(record))
+    code, blocked = task.run(*checked['next_command']['gateway_argv'])
+    assert code == 2 and 'next_command' not in blocked and writes == [], blocked
+    assert 'new object.copy Draft' in json.dumps(blocked), blocked
+
+
+@pytest.mark.parametrize('encoding', ['ObjectRef', 'unknown-reference'])
+def test_unclassified_graph_references_keep_ordinary_copy_explicitly_partial(tmp_path, encoding):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(path)
+    source, = [node for node in document.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    if encoding == 'ObjectRef': ET.SubElement(source, 'ObjectRef', {'ID': DEST})
+    else: source.find('.//Reference').set('Name', 'UnknownReference')
+    document.write(path)
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['verified'] is True, result
+    assert result['verification']['verification_scope']['complete_copy_preservation'] is False
+    assert 'next_command' not in result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('pointer_tag', ['ObjectRef', 'AudioNodeRef'])
+def test_known_pointer_outside_source_does_not_alias_owned_declaration(tmp_path, pointer_tag):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(path)
+    # Reuse an actual 2021 pointer element encoding. Its occurrence is outside
+    # the copied Source and does not create a second object declaration.
+    retained = document if pointer_tag == 'ObjectRef' else ET.parse(
+        Path(__file__).parents[1] / '_org/2021.1/Dynamic Dialogue/Dialogue.wwu')
+    pointer = deepcopy(next(node for node in retained.iter(pointer_tag)))
+    pointer.set('ID', SOURCE)
+    pointer.set('Name', task.objects[SOURCE]['name'])
+    document.find('.//WorkUnit/ChildrenList').append(pointer)
+    document.write(path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx)
+    assert code == 0 and pending['state'] == 'executed_unverified', pending
+    saved = final_save_preview(task, pending)
+    result = authorize_execute_verify(task, saved['transaction_id'])
+    code, verified = task.run(*result['next_command']['gateway_argv'])
+    assert code == 0 and verified['verification']['verification_scope']['complete_copy_preservation'] is True, verified
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']

@@ -461,7 +461,7 @@ def test_source_provenance_writer_and_strict_reader_reject_unowned_copy(tmp_path
             require_paths=True)
 
 
-def run_full_source_task(tmp_path, monkeypatch, *, policy):
+def run_full_source_task(tmp_path, monkeypatch, *, policy, repeated_graph=False):
     """Real formal consumers; replace only external Codex and fake WAAPI I/O."""
     import hashlib
     from tests.semantic.support import codex_harness as harness
@@ -491,7 +491,11 @@ def run_full_source_task(tmp_path, monkeypatch, *, policy):
         assertion_ids=('common.task-receipt',), static_expectation={}, live_binding={}, delta_rules=())
     fixture = tmp_path / 'fake-native'
     fixture.mkdir()
-    _, writes, native = saved_source_task(fixture)
+    if repeated_graph:
+        from tests.unit.test_source_copy_saved_continuation_gateway import repeated_saved_source_task
+        _, writes, native, _ = repeated_saved_source_task(fixture)
+    else:
+        _, writes, native = saved_source_task(fixture)
     if policy != 'read_only':
         from tests.unit.test_field_interface_closure_gateway import PROJECT
         native.objects[PROJECT]['workunitIsDirty'] = True
@@ -623,3 +627,13 @@ def test_source_continuation_classifier_accepts_exact_public_token_only():
     for arguments in (('continue-source-copy-proofs', 'issued-owner'),
             ('unknown-command', 'continue-source-copy-proof'), ('--unknown', 'continue-source-copy-proof')):
         assert gateway_subcommand(arguments) is None
+
+
+def test_repeated_dirty_source_graph_through_real_broker_grader_archive_and_campaign_reader(tmp_path, monkeypatch):
+    run, root, writes, responses, outputs = run_full_source_task(
+        tmp_path, monkeypatch, policy='ask_before_changes', repeated_graph=True)
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save', 'copy', 'save']
+    scope = responses['tx01.saved-verify']['verification']['verification_scope']
+    assert scope['complete_copy_preservation'] is True and scope['owned_role_count'] == 6
+    assert scope['ordered_point_count'] == 4 and len(scope['owned_guid_mapping']) == 7
+    assert json.loads((root / 'task-result.json').read_text())['composer_evidence']['flow_count'] == 3

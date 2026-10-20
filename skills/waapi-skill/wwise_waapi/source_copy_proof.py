@@ -9,7 +9,7 @@ import re
 from .canonical import canonical_sha256
 from .console_project_operations import _read_xml_artifact, _project_io_root_identity, MAX_PROJECT_FILE_BYTES
 from .host_paths import localize_waapi_host_path
-from .object_lifecycle_graph import GET, LifecycleGraphError, capture_lifecycle_fields, lifecycle_snapshot_equal
+from .object_lifecycle_graph import GET, MAX_NODES, MAX_FIELDS, capture_lifecycle_fields, lifecycle_snapshot_equal
 from .platform_paths import localize_live_wwise_project_path
 from .operation_soundbank import FILE_PROOF_CONTRACT, _require_sealed
 from .transaction_locality import is_loopback_waapi_host
@@ -21,8 +21,17 @@ DECISION = 'source_copy_proof_decision'
 CONTRACT = 'waapi-skill.source-copy-saved-proof/v1'
 CHILD_PREFIX = 'od1-f54c50'
 SAVE = 'ak.wwise.core.project.save'
-ROLES = {'source': ('SourcePlugin', 9699330), 'rtpc': ('RTPC', 1441808),
-    'control_input': ('ModulatorLfo', 4194320), 'curve': ('Curve', 917520)}
+# Native host/build and Source class admission remain separate from graph shape.
+SOURCE_CLASS = 9699330
+GRAPH_FORMAT = 'waapi-skill.source-copy-owned-declarations/v1'
+# Concrete GUID-pointer encodings in the matching 2021 saved SampleProject.
+# They are not declarations. Unknown encodings are never admitted by suffix.
+SAVED_POINTER_TAGS = frozenset({
+    'ObjectRef', 'ActiveSource', 'ArgumentRef', 'PathElementRef', 'AudioNodeRef',
+    'AudioSourceRef', 'MidiSourceRef', 'SegmentRef', 'JumpToPlaylistItemRef',
+    'StateGroupRef', 'StateRef', 'TransitionObjectRef', 'TriggerRef', 'ItemRef',
+    'SwitchRef', 'BusRef', 'GameParameterRef', 'CurrentStateRef', 'CurrentSwitchRef',
+})
 
 
 class SavedCopyProofError(ValueError):
@@ -33,6 +42,12 @@ class SavedCopyProofError(ValueError):
 
 class UnsupportedSavedShape(SavedCopyProofError):
     error_code = 'SOURCE_COPY_SAVED_SHAPE_UNFINISHED'
+
+
+def require_graph_format(proof):
+    require(isinstance(proof, dict) and proof.get('graph_format') == GRAPH_FORMAT,
+        'Saved Source graph format is obsolete or unknown; start a new object.copy Draft for new work. '
+        'Inspect any existing executed copy without retrying it.')
 
 
 def require_shape(condition, message):
@@ -124,12 +139,10 @@ def read_documents(binding):
 
 
 def source_nodes(documents, identity, owner_id):
-    found, all_ids = [], []
+    found = []
     for document in documents.values():
         parents = {child: node for node in document.iter() for child in node}
         for node in document.iter():
-            if node.tag in {row[0] for row in ROLES.values()} and 'ID' in node.attrib:
-                all_ids.append(guid(node.get('ID')))
             if node.tag != 'SourcePlugin' or guid(node.get('ID')) != guid(identity): continue
             children = parents.get(node); owner = parents.get(children)
             require(children is not None and children.tag == 'ChildrenList' and owner is not None
@@ -139,17 +152,51 @@ def source_nodes(documents, identity, owner_id):
     source = found[0]
     require_shape(source.get('PluginName') == 'Wwise Synth One' and source.get('PluginID') == '148'
         and source.get('CompanyID') == '0' and not list(source.iter('ObjectRef')), 'Serialized plugin/reference shape is not certified')
-    base = "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC"
-    selections = {'source': [source], 'rtpc': source.findall(base),
-        'control_input': source.findall(base + "/ReferenceList/Reference[@Name='ControlInput']/Custom/ModulatorLfo"),
-        'curve': source.findall(base + '/Curve')}
-    require_shape(all(len(rows) == 1 for rows in selections.values()), 'Saved owned roles are missing or ambiguous')
-    nodes = {key: value[0] for key, value in selections.items()}
-    declarations = [node for node in source.iter() if 'ID' in node.attrib]
-    require_shape(set(declarations) == set(nodes.values()), 'Saved owned declaration shape is unclassified')
-    ids = [guid(node.get('ID')) for node in declarations]
-    require(len(set(ids)) == 4 and all(all_ids.count(x) == 1 for x in ids), 'Saved owned GUIDs alias another declaration')
+    # Ordered XML addresses distinguish repeated declarations without relying on
+    # property names, GUIDs, plugin class tuples, or a fixed role cardinality.
+    nodes = {}
+    def collect(node, address):
+        if 'ID' in node.attrib:
+            nodes[address] = node
+            require_shape(len(nodes) <= MAX_NODES, 'Saved owned graph exceeds the complete object bound')
+        for index, child in enumerate(node):
+            collect(child, address + '/' + str(index))
+    collect(source, 'source')
+    # Saved selections/references can repeat a declaration GUID elsewhere in
+    # the selected WWU. Unknown GUID-bearing encodings remain conservatively
+    # counted so real declarations cannot hide aliases under another tag.
+    all_ids = [guid(node.get('ID')) for document in documents.values() for node in document.iter()
+        if node.tag not in SAVED_POINTER_TAGS
+        and re.fullmatch(r'\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', node.get('ID', ''))]
+    ids = [guid(node.get('ID')) for node in nodes.values()]
+    require(len(set(ids)) == len(ids) and all(all_ids.count(x) == 1 for x in ids),
+        'Saved owned GUIDs alias another declaration')
+    # Only the independently observed canonical ControlInput hop currently has
+    # native authority. Other reference encodings remain required work.
+    for reference in source.iter('Reference'):
+        custom = reference.find('Custom')
+        require_shape(reference.get('Name') == 'ControlInput'
+            and len(reference) == 1 and custom is not None and len(custom) == 1
+            and custom[0] in nodes.values(), 'Saved owned reference semantics are unfinished')
     return nodes
+
+
+def graph_edges(nodes):
+    """Nearest serialized declaration owner, independent of wrapper layout."""
+    addresses = {node: role for role, node in nodes.items()}
+    owners, controls = {}, {}
+    def visit(node, owner):
+        role = addresses.get(node)
+        if role is not None:
+            if owner is not None: owners[role] = owner
+            owner = role
+        if node.tag == 'Reference' and node.get('Name') == 'ControlInput':
+            control = node.find('Custom')[0]
+            require_shape(owner not in controls, 'Owned ControlInput is ambiguous')
+            controls[owner] = addresses[control]
+        for child in node: visit(child, owner)
+    visit(nodes['source'], None)
+    return owners, controls
 
 
 def serialized(node, nodes=None, *, rename_root=None):
@@ -167,39 +214,46 @@ def serialized(node, nodes=None, *, rename_root=None):
 
 def live_roles(nodes, owner, read):
     rows = {}
-    for role, (tag, cls) in ROLES.items():
-        node = nodes[role]
+    owners, controls = graph_edges(nodes)
+    field_count = 0
+    for role, node in nodes.items():
         row = exact(guid(node.get('ID')), ['name', 'type', 'classId', 'parent', 'owner', 'notes', 'shortId'], read)
-        require(row.get('classId') == cls and row.get('type') in ({'Source', 'SourcePlugin'} if role == 'source' else {tag}), 'Saved/live role class or type differs')
-        expected_owner = owner if role == 'source' else nodes['source' if role == 'rtpc' else 'rtpc'].get('ID')
+        require(type(row.get('classId')) is int and row['classId'] > 0
+            and row.get('type') in ({'Source', 'SourcePlugin'} if role == 'source' else {node.tag}),
+            'Saved/live role class or type differs')
+        expected_owner = owner if role == 'source' else nodes[owners[role]].get('ID')
         require(guid(row.get('parent' if role == 'source' else 'owner')) == guid(expected_owner), 'Saved/live owned role edge differs')
         require(row.get('name') == node.get('Name') and row.get('notes', '') == node.findtext('Comment', ''), 'Saved/live role name or notes differs')
         if 'ShortID' in node.attrib:
             require(type(row.get('shortId')) is int and str(row['shortId']) == node.get('ShortID'), 'Saved ShortID is not independently live-bound')
         else:
-            require(role == 'curve', 'Unclassified missing serialized ShortID')
+            require_shape(node.tag == 'Curve', 'Unclassified missing serialized ShortID')
         if role != 'source':
             fields = capture_lifecycle_fields(row['id'], read=read, strict=False)
+            field_count += fields['field_inventory']['count']
+            require_shape(field_count <= MAX_FIELDS, 'Saved owned graph exceeds the complete field bound')
             for metadata in fields['field_metadata'].values():
                 metadata.pop('scope', None)
                 metadata.pop('available_names', None)
-            # The first complete serialized shape has only this documented
-            # owned reference hop. Unclassified live values remain ordinary
-            # copy scope, never a stronger preservation claim.
-            allowed = {'ControlInput'} if role == 'rtpc' else set()
+            allowed = {'ControlInput'} if role in controls else set()
             require_shape(set(fields['unreadable_fields']) <= allowed
                 and set(fields['reference_fields']) <= allowed,
                 'Owned live field/reference scope is not certified by this serialized shape')
             row['default_fields'] = fields
         rows[role] = row
-    rtpc = rows['rtpc']['id']
-    hop = read(GET, {'waql': f'from object "{rtpc}" select @ControlInput take 2'}, {'return': ['id']}).get('return')
-    require(isinstance(hop, list) and len(hop) == 1 and guid(hop[0].get('id')) == guid(rows['control_input']['id']), 'Documented ControlInput does not bind the saved LFO')
+    for role, target in controls.items():
+        identity = rows[role]['id']
+        hop = read(GET, {'waql': f'from object "{identity}" select @ControlInput take 2'}, {'return': ['id']}).get('return')
+        require(isinstance(hop, list) and len(hop) == 1 and guid(hop[0].get('id')) == guid(rows[target]['id']),
+            'Documented ControlInput does not bind the saved owned declaration')
     return rows
 
 
 def compare_owned_fields(original_live, copied_live, original_ids, new_ids):
-    for role in ROLES:
+    require(set(original_live) == set(copied_live), 'Copied owned declaration graph differs')
+    for role in original_live:
+        require(original_live[role]['classId'] == copied_live[role]['classId']
+            and original_live[role]['type'] == copied_live[role]['type'], 'Copied live owned class or type differs')
         if role == 'source': continue  # Shared Source observer already compares all observed Source scalars.
         def mapped_fields(fields, role_ids):
             fields = deepcopy(fields)
@@ -219,7 +273,7 @@ def compare_owned_fields(original_live, copied_live, original_ids, new_ids):
 def capture_baseline(context, snapshot, read):
     if not supported(context): return {'status': 'unavailable', 'reason': 'version_host_or_local_runtime_authority_unavailable'}
     source = snapshot['source']['frame']; destination = snapshot['destination']
-    if source.get('classId') != 9699330: return {'status': 'unavailable', 'reason': 'serialized_source_shape_not_certified'}
+    if source.get('classId') != SOURCE_CLASS: return {'status': 'unavailable', 'reason': 'serialized_source_shape_not_certified'}
     if snapshot['source']['unreadable_fields'] or snapshot['source']['reference_fields']:
         return {'status': 'unavailable', 'reason': 'source_live_field_scope_unfinished'}
     if not all(owner['children_complete'] for owner in snapshot['owners'].values()):
@@ -245,7 +299,7 @@ def capture_baseline(context, snapshot, read):
         # Save is not permission to repair or overwrite unexpected disk state.
         documents, proofs = read_documents(binding)
         if dirty:
-            return {'status': 'baseline_save_pending', 'authority': binding, 'context': context['binding'],
+            return {'status': 'baseline_save_pending', 'graph_format': GRAPH_FORMAT, 'authority': binding, 'context': context['binding'],
                 'source_id': guid(source['id']), 'destination_id': guid(destination), 'files': proofs}
         nodes = source_nodes(documents, source['id'], guid(source['parent']))
         live = live_roles(nodes, guid(source['parent']), read)
@@ -253,7 +307,7 @@ def capture_baseline(context, snapshot, read):
         require(lifecycle_snapshot_equal(binding, after), 'Model authority changed during baseline observation')
         _, proof_after = read_documents(after)
         require(proofs == proof_after, 'Model files changed during baseline observation')
-        body = {'contract': CONTRACT, 'status': 'ready', 'origin': 'authorized_baseline_Save' if decision else 'already_clean',
+        body = {'contract': CONTRACT, 'graph_format': GRAPH_FORMAT, 'status': 'ready', 'origin': 'authorized_baseline_Save' if decision else 'already_clean',
             **({'baseline_save_receipt': decision['receipt']} if decision else {}),
             'authority': binding, 'context': context['binding'], 'files': proofs,
             'source_id': guid(source['id']), 'source_owner': guid(source['parent']), 'destination_id': destination,
@@ -272,6 +326,7 @@ def capture_baseline(context, snapshot, read):
 
 
 def validate_baseline(baseline, context, read):
+    require_graph_format(baseline)
     require(supported(context) and baseline['context'] == context['binding'], 'Saved-copy context drifted')
     observed = authority(context, baseline['source_id'], baseline['destination_id'], read)
     require(lifecycle_snapshot_equal(observed, baseline['authority']), 'Saved-copy clean file authority drifted before dispatch')
@@ -336,6 +391,7 @@ def final_origin(snapshot):
     from .transactions import TransactionState
     require(snapshot.record.state is TransactionState.EXECUTED_UNVERIFIED, 'Final Save requires its still-unverified executed copy')
     baseline = snapshot.preview.artifact['prepared_operation']['pre_state'][KEY]
+    require_graph_format(baseline)
     require(baseline['status'] == 'ready', 'Copy has no certified saved baseline')
     return {'contract': CONTRACT, 'version': '2021.1', 'stage': 'final', 'baseline_digest': baseline['digest'],
         'context': baseline['context'], 'parent': {'transaction_id': snapshot.record.transaction_id,
@@ -344,6 +400,7 @@ def final_origin(snapshot):
 
 
 def validate_pending_files(baseline, context, read):
+    require_graph_format(baseline)
     require(supported(context) and context['binding'] == baseline['context'], 'Saved proof runtime/configuration changed')
     binding = authority(context, baseline['source_id'], baseline['destination_id'], read)
     def without_dirty(value):
@@ -358,6 +415,7 @@ def validate_pending_files(baseline, context, read):
 def revalidate_origin(origin, context, *, read=None, before_write=True):
     from .transactions import TransactionStore, TransactionState
     validate_origin(origin, context['project_guard']['version'])
+    if origin['stage'] == 'baseline': require_graph_format(origin['file_binding'])
     require(context['binding'] == origin['context'], 'Generated Save context changed')
     if origin['stage'] == 'final':
         snapshot = TransactionStore(context['state_dir']).load_snapshot(origin['parent']['transaction_id'])
@@ -377,6 +435,7 @@ def revalidate_origin(origin, context, *, read=None, before_write=True):
         OperationDraftStore(context['state_dir']).inspect_source_copy_parent(origin)
         if read is not None and before_write:
             file_binding = origin['file_binding']
+            require_graph_format(file_binding)
             observed = authority(context, file_binding['source_id'], file_binding['destination_id'], read)
             require(lifecycle_snapshot_equal(without_dirty(observed), without_dirty(file_binding['authority'])),
                 'Baseline Save selected file authority changed')
@@ -411,6 +470,7 @@ def resolve_save_receipt(origin, context, *, child=None):
 
 
 def verify_saved(baseline, context, snapshot, read):
+    require_graph_format(baseline)
     origin = final_origin(snapshot)
     receipt = resolve_save_receipt(origin, context)
     if receipt is None: return None
@@ -427,7 +487,7 @@ def verify_saved(baseline, context, snapshot, read):
     copied = source_nodes(documents, origin['parent']['copied_id'], baseline['destination_id'])
     require(canonical_sha256(serialized(original['source'])) == baseline['source_exact_digest'], 'Original saved Source/owned state changed')
     original_ids, new_ids = baseline['role_ids'], {k: guid(v.get('ID')) for k, v in copied.items()}
-    require(set(original_ids.values()).isdisjoint(new_ids.values()) and len(set(new_ids.values())) == 4, 'Copied GUID mapping aliases original/owned identities')
+    require(set(original_ids.values()).isdisjoint(new_ids.values()) and len(set(new_ids.values())) == len(original_ids) and set(original_ids) == set(new_ids), 'Copied GUID mapping aliases original/owned identities')
     rename = snapshot.preview.artifact['prepared_operation']['verification_plan']['on_name_conflict'] == 'rename'
     expected_name = original['source'].get('Name') if rename else None
     require(canonical_sha256(serialized(copied['source'], copied, rename_root=expected_name)) == baseline['source_normalized_digest'], 'Copied serialized fields/attributes/text/order/points differ')
@@ -439,10 +499,10 @@ def verify_saved(baseline, context, snapshot, read):
     require(after == binding, 'Saved proof authority changed during final observation')
     _, after_proofs = read_documents(after)
     require(proofs == after_proofs, 'Saved model changed during final observation')
-    return {'complete_copy_preservation': True, 'supported_shape': '2021.1.14.8108_Synth_RTPC_LFO_Curve_zero_ObjectRefs',
+    return {'complete_copy_preservation': True, 'supported_shape': '2021.1.14.8108_Synth_owned_declaration_graph_zero_ObjectRefs',
         'baseline_digest': baseline['digest'], 'final_save_receipt': receipt, 'model_proofs_digest': canonical_sha256(proofs),
-        'owned_guid_mapping': {original_ids[k]: new_ids[k] for k in ROLES}, 'owned_role_count': 3,
-        'ordered_point_count': len(copied['curve'].findall('PointList/Point')),
+        'owned_guid_mapping': {original_ids[k]: new_ids[k] for k in original_ids}, 'owned_role_count': len(original_ids) - 1,
+        'ordered_point_count': sum(len(node.findall('PointList/Point')) for node in copied.values() if node.tag == 'Curve'),
         'live_role_digest': canonical_sha256(copied_live)}
 
 
@@ -465,6 +525,7 @@ def unexecuted_child(origin, context):
 
 
 def _validate_decline_observed(baseline, context, snapshot, read):
+    require_graph_format(baseline)
     # A refusal never hides an observable original/copied graph contradiction.
     binding = authority(context, baseline['source_id'], baseline['destination_id'], read)
     documents, _ = read_documents(binding)
@@ -490,6 +551,7 @@ def baseline_origin(record, request_digest, context):
         and isinstance(record.check, dict) and record.check['request_digest'] == request_digest
         and record.check['source_revision'] == record.revision - 1, 'Baseline Save requires the current checked copy Draft')
     require(record.check['project_guard'] == context['project_guard'], 'Checked parent runtime changed')
+    require_graph_format(record.check['source_copy_file_binding'])
     return {'contract': CONTRACT, 'version': record.version, 'stage': 'baseline',
         'parent': {'draft_id': record.draft_id, 'authority_digest': record.authority_digest,
             'source_revision': record.revision, 'request_digest': request_digest,
@@ -545,7 +607,8 @@ def without_dirty(value):
 
 def validate_file_binding(binding, version):
     require(version == '2021.1' and isinstance(binding, dict)
-        and set(binding) == {'source_id', 'destination_id', 'authority', 'files'}, 'Baseline file binding is invalid')
+        and set(binding) in ({'source_id', 'destination_id', 'authority', 'files'},
+            {'graph_format', 'source_id', 'destination_id', 'authority', 'files'}), 'Baseline file binding is invalid')
     source, destination = guid(binding['source_id']), guid(binding['destination_id'])
     observed = binding['authority']
     require(isinstance(observed, dict) and set(observed) == {'project', 'project_path', 'root', 'root_identity', 'units', 'objects'}
