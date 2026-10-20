@@ -9534,7 +9534,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         receipt.update(contract='waapi-skill.legacy-source-owned-read/v1', read_only=True,
             curve_points={'status': 'unavailable_in_2021_public_contract',
                 'native_getter': 'not established; inspect actual metadata, no guessed Points accessor'},
-            scope_exclusions=['copy_admission', 'copied_owned_mapping', 'curve_points', 'history', 'audio_effect'])
+            scope_exclusions=['copy_admission', 'copied_owned_mapping', 'curve_points', 'history', 'audio_effect',
+                'Source_RTPC_membership', 'Source_field_reobservation'])
     attempted: set[str] = set()
     def persist():
         raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
@@ -9595,8 +9596,9 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert row['type'] == 'Sound' and row['class_id'] == 65552, row
         assert type(row.get('properties', {}).get('IsVoice')) is bool, 'Owner needs its actual Boolean IsVoice'
         return {'identity': row, 'scope': 'identity/class/parent/name/notes/IsVoice only; other owner properties unobserved'}
-    def snapshot(identity, *, details=False):
-        row = exact(identity); names, page, selections = [], None, {}
+    def snapshot(identity, *, details=False, identity_row=None):
+        row = exact(identity) if identity_row is None else identity_row
+        names, page, selections = [], None, {}
         while True:
             result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
                 *(['--page', page] if page else [])], live=True)['agent_result']
@@ -9656,8 +9658,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
         return observations
     def owned_hop(identity, token, bound):
-        # These fixed fixture-owned hops reuse the existing public RTPC observer;
-        # their acceptance on 2021 is precisely the pending native observation.
+        # The fixed ControlInput hop follows matching SDK reference semantics;
+        # its acceptance on 2021 is precisely the pending native observation.
         result = gateway.gateway(['query-object', '--advanced-waql', f'from object "{identity}" select @{token}',
             '--max-results', str(bound), '--include', 'class-id', '--include', 'owner',
             '--include', 'parent', '--include', 'notes'], live=True)
@@ -9666,29 +9668,34 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
         return rows
     def original_owned_read():
-        members = owned_hop(source_id, 'RTPC', 8)
-        assert len(members) == 1 and members[0]['id'] == original_owned_ids[0], members
-        rtpc = save_observation('original-rtpc', snapshot(members[0]['id'], details=True))
-        assert rtpc['identity'] == members[0] and rtpc['identity']['class_id'] == 1441808, rtpc
-        assert rtpc['identity'].get('owner', {}).get('id') == source_id, rtpc
+        # R50 rejected Source select @RTPC. The retained exact member GUID/class
+        # and Source-owner edge bind this read without any list-completeness claim.
+        rtpc_id = original_owned_ids[0]
+        bound = save_observation('original-rtpc-binding', exact(rtpc_id))
+        assert bound['class_id'] == 1441808 and bound.get('owner', {}).get('id') == source_id, 'Retained RTPC class/Source-owner binding changed'
+        rtpc = save_observation('original-rtpc', snapshot(rtpc_id, details=True, identity_row=bound))
         assert 'ControlInput' in rtpc['field_names'], 'Live RTPC metadata must disclose ControlInput'
         # Genuine 2021 metadata can leave this field untyped. Use the SDK's
         # reference hop, without inventing a metadata reference restriction.
-        controls = owned_hop(members[0]['id'], 'ControlInput', 2)
-        assert len(controls) == 1 and controls[0]['id'] == original_owned_ids[1], controls
-        control_id = controls[0]['id']
-        lfo = save_observation('original-control-input', snapshot(control_id, details=True))
-        assert lfo['identity'] == controls[0] and lfo['identity']['class_id'] == 4194320, lfo
-        assert lfo['identity'].get('owner', {}).get('id') == members[0]['id'], lfo
-        curves = owned_hop(members[0]['id'], 'Curve', 2)
-        assert len(curves) == 1 and curves[0]['id'] == original_owned_ids[2], curves
-        curve = save_observation('original-curve', snapshot(curves[0]['id'], details=True))
-        assert curve['identity'] == curves[0] and curve['identity']['class_id'] == 917520, curve
-        assert curve['identity'].get('owner', {}).get('id') == members[0]['id'], curve
-        receipt['owned_observation'] = {'rtpc_id': members[0]['id'], 'control_input_id': control_id,
-            'curve_id': curves[0]['id'], 'rtpc_field_names': rtpc['field_names'],
+        control_id, curve_id = original_owned_ids[1:]
+        control = save_observation('original-control-input-binding', exact(control_id))
+        assert control['class_id'] == 4194320 and control.get('owner', {}).get('id') == rtpc_id, 'Retained LFO class/RTPC-owner binding changed'
+        lfo = save_observation('original-control-input', snapshot(control_id, details=True, identity_row=control))
+        curve_binding = save_observation('original-curve-binding', exact(curve_id))
+        assert curve_binding['class_id'] == 917520 and curve_binding.get('owner', {}).get('id') == rtpc_id, 'Retained Curve class/RTPC-owner binding changed'
+        curve = save_observation('original-curve', snapshot(curve_id, details=True, identity_row=curve_binding))
+        receipt['owned_observation'] = {'rtpc_id': rtpc_id, 'control_input_id': control_id,
+            'curve_id': curve_id, 'rtpc_field_names': rtpc['field_names'],
             'control_input_field_names': lfo['field_names'], 'curve_field_names': curve['field_names'],
+            'source_membership_complete': False, 'binding': 'retained exact RTPC GUID/class/Source-owner edge',
+            'control_input_hop': 'attempted',
             'mapping_scope': 'original owner edges only; no copied graph or curve point observation'}
+        persist()
+        # Read all retained objects first. Only ControlInput has matching SDK
+        # reference semantics; no speculative @Curve hop precedes Curve metadata.
+        controls = owned_hop(rtpc_id, 'ControlInput', 2)
+        assert len(controls) == 1 and controls[0] == lfo['identity'], controls
+        receipt['owned_observation']['control_input_hop'] = 'canonical_id_read_verified'
     def complete(preview, label):
         tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
         phase = {'name': label, 'transaction_id': tx, 'execution_attempted': False}; receipt['phases'].append(phase)
@@ -9715,7 +9722,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert types['complete'] is True, types
         selected = [row for row in types['types'] if row['name'] == 'Wwise Synth One']
         assert len(selected) == 1 and selected[0]['classId'] == 9699330 and selected[0]['type'] == 'Source', selected
-        source_before = save_observation('source-before', snapshot(source_id))
+        source_before = save_observation('source-before', {'identity': exact(source_id)} if owned_read_only else snapshot(source_id))
         assert source_before['identity']['type'] in {'Source', 'SourcePlugin'} and source_before['identity']['class_id'] == 9699330
         if owned_read_only:
             original_owned_read()

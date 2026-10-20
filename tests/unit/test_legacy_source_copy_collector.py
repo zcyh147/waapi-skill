@@ -235,13 +235,14 @@ def legacy_owned_read_runtime(tmp_path, *, fault=None):
         expression = args.get('waql', '')
         if uri.endswith('object.get') and ' select @' in expression:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if ' select @RTPC ' in expression:
+                raise RuntimeError('Unknown property RTPC (61)')  # Actual R50 native rejection.
+            if ' select @Curve ' in expression:
+                raise RuntimeError('No source-backed 2021 Curve hop')
             if fault == 'hop-error':
-                raise RuntimeError('Pinned owned-list read rejected; no alternate spelling')
-            selected = rtpc if ' select @RTPC ' in expression else lfo if ' select @ControlInput ' in expression else curve
-            assert expression in (f'from object "{SOURCE}" select @RTPC take 8',
-                f'from object "{rtpc}" select @ControlInput take 2',
-                f'from object "{rtpc}" select @Curve take 2'), expression
-            return {'return': task.project_rows([task.objects[selected]], options)}
+                raise RuntimeError('Pinned ControlInput read rejected; no alternate spelling')
+            assert expression == f'from object "{rtpc}" select @ControlInput take 2', expression
+            return {'return': task.project_rows([task.objects[lfo]], options)}
         return original(uri, args, options)
     task.call = call
     return runtime, commands, writes, task
@@ -262,7 +263,11 @@ def test_legacy_owned_read_uses_public_metadata_and_never_starts_copy(tmp_path, 
     queries = [argv for argv in commands if argv[0] == 'query-object']
     assert all(argv.count('--include-field') <= 8 and 'curve-points' not in argv for argv in queries)
     source_pages = [argv for argv in queries if SOURCE in argv and '--include-field' in argv]
-    assert len(source_pages) == 3  # 18 actual SDK names, not the old one-field fake.
+    assert source_pages == []  # R50 already read all18 Source fields; observe only missing owned semantics.
+    assert receipt['owned_observation']['source_membership_complete'] is False
+    assert receipt['owned_observation']['binding'] == 'retained exact RTPC GUID/class/Source-owner edge'
+    assert not any('select @RTPC' in str(argv) for argv in commands)
+    assert not any('select @Curve' in str(argv) for argv in commands)
     from tests.destructive.support.category_evidence import build_category_evidence_record
     record = build_category_evidence_record(repo_root=workflow.REPO_ROOT, candidate=runtime.candidate,
         version='2021.1', host={'is_command_line': True}, categories=[category], source={},
@@ -282,5 +287,20 @@ def test_legacy_owned_read_preserves_first_hop_error_without_writes_or_fallback(
     assert writes == [] and len([argv for argv in commands if '--advanced-waql' in argv]) == 1
     assert receipt['calls'][-1]['exit_code'] != 0 and receipt['calls'][-1]['reply']
     failed = json.loads(Path(receipt['calls'][-1]['reply']['path']).read_text())
-    assert failed['call']['message'] == 'Pinned owned-list read rejected; no alternate spelling'
+    assert failed['call']['message'] == 'Pinned ControlInput read rejected; no alternate spelling'
+    assert receipt['owned_observation']['curve_field_names'] == ['Flags']
+    assert receipt['owned_observation']['control_input_hop'] == 'attempted'
     assert receipt['native_evidence'] and runtime.category_results[0]['status'] == 'FAIL'
+
+
+@pytest.mark.parametrize('corruption', ['class', 'Source-owner'])
+def test_legacy_exact_owned_read_rejects_changed_rtpc_binding_before_metadata(tmp_path, workflow, corruption):
+    runtime, commands, writes, task = legacy_owned_read_runtime(tmp_path)
+    rtpc = task.objects['{CE99046D-D354-422D-A7BB-F1305FF00B2F}']
+    if corruption == 'class': rtpc['classId'] = 917520  # Genuine Curve class, not RTPC.
+    else: rtpc['owner'] = {'id': FIRST}  # A Sound is not the retained Source owner.
+    with pytest.raises(AssertionError, match='Retained RTPC class/Source-owner binding changed'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='UNUSED', owned_read_only=True)
+    receipt = json.loads((runtime.state_dir / 'legacy-source-owned-read.json').read_text())
+    assert receipt['collection_complete'] is False and writes == []
+    assert not any(argv[:2] == ['metadata', 'list'] or '--advanced-waql' in argv for argv in commands)

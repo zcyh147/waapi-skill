@@ -87,47 +87,92 @@ The original quarantine stays unopened and immutable. It cannot supply the
 unsaved copied graph through a clone. Original run ERROR and accepted8e2 remain
 preserved.
 
-## Next bounded observation
+## R50 original-only read: exact native failure
+
+Frozen `cbd067c2a4ba230a49cfa090512a5a505ad3c582` ran exactly once on
+Console2021.1.14.8108. Evidence root:
+`/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r50-original-owned-read-cbd067c2-2021-r1/`.
+Original `category.jsonl` records final v3/node/category FAIL; collection is
+incomplete and business verification false. Eight public reads made zero
+transactions or writes. All68 source file contents/size/mtime and full tree,
+project mtime and2211 tracked files stayed unchanged; owned processes closed and
+the failed sandbox remains quarantined. No old project was opened or replayed.
+
+The first Source-list expression `from object "{95DDA32B-B666-4269-A54C-5ABF4E201C99}" select @RTPC take 8`
+failed with `ak.wwise.query.invalid_query`, message `Unknown property RTPC (61)`.
+All18 Source scalar fields were observed first, but the RTPC/LFO/Curve metadata
+and reference hops were never reached. This establishes rejection of that exact
+Source hop, not API-wide absence of owned lists or Curve points. Do not rerun it
+or let it block an independent exact-GUID read.
+
+## Successor: known exact objects first, documented reference hop last
 
 `test_legacy_original_source_owned_read_console_diagnostic` reuses the existing
-workflow lifecycle and diagnostic archive. It performs **zero setup/copy writes**:
+workflow lifecycle/config/archive, with **zero setup/copy writes**. The
+successor is based on integration17c0 and preserves the original cbd067 pin and
+native evidence. It must be reviewed before a separate native authorization.
 
-1. Verify the exact Console build and fresh Synth type; read the original Source
-   GUID `{95DDA32B-B666-4269-A54C-5ABF4E201C99}` and all live-discovered fields.
-2. Through public `query-object --advanced-waql`, read that Source's fixed
-   `select @RTPC` hop, max8. Require its retained known member GUID and owner.
-3. Read that RTPC's complete live `metadata list`, its returned detail selections,
-   and certified exact-ID field meanings through `--include-field`. Record each
-   unknown-kind field explicitly as unreadable through that public projection;
-   do not silently discard it or fabricate metadata. Do not require the
-   undocumented modern PropertyName/Curve fields or invent them.
-4. Use the documented reference selection `select @ControlInput`, max2, to reach
-   the known LFO even when ControlInput's live metadata is untyped. Read its
-   identity/owner, complete metadata and every publicly readable field; retain
-   explicit unknown-kind fields. A canonical reference hop proves that edge,
-   not mutation applicability or a missing property type.
-5. Read the fixed RTPC `select @Curve` hop, max2, then that Curve's exact identity,
-   owner, complete metadata and discovered fields. No `curve-points`, guessed
-   @Points or raw projection is accepted. The pending native observation must
-   establish whether these exact 2021 hops and metadata reads work.
+1. Verify the exact Console build and fresh Synth type. Read only the original
+   Source identity/class at `{95DDA32B-B666-4269-A54C-5ABF4E201C99}`; its18 fields
+   are already proved by R50 and are not rediscovered for this narrower case.
+2. Bind RTPC `{CE99046D-D354-422D-A7BB-F1305FF00B2F}` by exact-ID read, require
+   class1441808 and owner=that Source before metadata. This GUID/class/owner edge
+   was independently observed before/after the ae7 attempt; it is not derived
+   from the rejected list accessor. Read its complete live metadata list,
+   returned detail selections and every publicly readable field in8-field pages.
+3. Independently bind LFO `{E323F786-253F-48C6-86B9-AB0335804E9F}` by exact GUID,
+   class4194320 and owner=that RTPC. Read its actual complete metadata and fields.
+4. Independently bind Curve `{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}` by exact GUID,
+   class917520 and owner=that RTPC. Read its actual complete metadata and fields.
+   No @Curve hop precedes or replaces this observation: ParamControl's matching
+   docs/names do not establish that reference. No curve-points or guessed @Points
+   getter is supplied.
+5. Persist all known-object observations, then attempt only the documented
+   `select @ControlInput` reference hop on the exact RTPC, max2, with ordinary
+   business identity/class/owner/parent/notes projection. Require the returned
+   row to agree with the independently read LFO. Its SDK reference semantics are
+   known; this particular2021 public/native hop remains unproved. Its failure
+   must preserve the already collected Curve metadata and stop without another
+   spelling, setup or copy.
 
-`gateway.py::_bind_query_custom_fields_from_live_metadata` owns property/reference
-accessor compilation. The advanced layer owns object.get, projection and final
-take; it has no caller custom projection. If a native hop rejects or metadata
-cannot express a value, archive the exact first result and stop without retry,
-alternate spelling, setup or copy. A complete diagnostic protocol keeps its
-business category blocked and still excludes points,
-copy mapping, business verification and history coverage. If Curve metadata has
-only Flags, the inline @Curve getter remains unresolved; it must not be declared
-absent from that result alone. Any next proposed closed read seam needs matching
-source evidence and separate review, not a raw escape hatch.
+Source RTPC membership is **not enumerated or declared complete**. Unknown-kind
+metadata values, including ControlInput's retained empty native type/restriction,
+are recorded in `metadata_unreadable_fields`; no Reference restriction or scalar
+type is fabricated to force `--include-field`. A canonical reference hop proves
+only that edge, not mutation applicability. Complete diagnostic collection keeps
+business category blocked, diagnostic_only=true/business_effect_verified=false;
+Curve points, copied graph, whole-plugin behavior and history remain unresolved.
 
-The collector keeps the existing128-call,1MiB-per-reply,16MiB-total-reply,
-256KiB-receipt,64MiB-archive/512-native-file bounds. Fields use the existing
-8-meaning discovery page limit; metadata uses public64-name pages and returned
-selections. The read-only mode rejects every Gateway command outside status,
-query-object and metadata types/list/detail. Fake controls cover genuine
-18-field Synth and ten-field LFO paging, real v3 category validation, and a
-first-hop rejection with zero writes/fallback. They prove routing and evidence
-handling only. No native launch or wider production copy verifier is authorized
-by this note.
+The read-only mode permits only status, query-object and metadata types/list/detail.
+The Gateway owns custom projection from live metadata, and owns advanced URI,
+projection and final take. Existing128-call,1MiB-per-reply,16MiB-total-reply,
+256KiB-receipt,64MiB-archive/512-native-file limits stay unchanged. Metadata pages
+contain at most64 names and use returned selections; custom fields use the
+existing8-meaning limit. Fakes prove routing, genuine field paging, exact-binding
+class/owner rejection before metadata, and a documented-hop rejection with zero
+writes/fallback. They never prove native queryability or field availability.
+
+## Separate future membership candidate, not dispatched by this diagnostic
+
+The matching WAQL reference documents custom-object owner selection/filtering
+(lines227–236 of the retained text), chained object/value accessors (281–284),
+and GUID equality (305–310). Thus an owner.id equality filter has explicit
+language semantics; it is not an invented property name. The pinned live type
+catalog reports ParamControl/class1441808 and Curve/class917520. `RTPC` is an
+observed row type, not a catalog spelling to substitute for ParamControl.
+
+A separately reviewed membership observation could first confirm fresh
+`metadata types --meaning ParamControl --meaning Curve` selections, then test
+bounded advanced queries using those exact catalog names and owner GUIDs:
+`from type ParamControl where owner.id = "{95DDA32B-B666-4269-A54C-5ABF4E201C99}"`
+and `from type Curve where owner.id = "{CE99046D-D354-422D-A7BB-F1305FF00B2F}"`.
+The Gateway supplies final take and fixed projection. These are source-backed
+candidates, **not native-proven membership reads**: catalog metadata does not
+certify from-type queryability or enumeration of internal objects. Require the
+known exact member as a positive control, matching classes/owners, unique IDs,
+complete projection and no result-limit truncation. Empty results while a known
+exact member resolves cannot certify an empty list. A rejected catalog generator
+must remain that precise failure; do not try alternate aliases or infer absence.
+Even a successful RTPC/Curve query would certify only that scoped class, not the
+entire Source-owned closure. No such query is added to this successor and no new
+native launch is authorized by this note.
