@@ -4727,12 +4727,15 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
 
 
 def _collect_new_result_scalar_reference_acceptance(
-    runtime: _WorkflowSandboxRuntime, *, root_name: str,
+    runtime: _WorkflowSandboxRuntime, *, root_name: str, compound_exact_rename_history: bool = False,
 ) -> dict[str, Any]:
     """One public graph write; source scalar value must equal a new target's actual GUID."""
-    operation = "object.create" if runtime.version == "2021.1" else "object.set"
-    observation_path = runtime.state_dir / "new-result-scalar-reference-acceptance.json"
-    category = {"category": "same-graph-new-result-scalar-reference", "status": "FAIL",
+    operation = "object.create" if runtime.version == "2021.1" or compound_exact_rename_history else "object.set"
+    if compound_exact_rename_history:
+        assert runtime.version == '2025.1', 'Compound exact-rename characterization is Console2025-only'
+    observation_path = runtime.state_dir / ('compound-exact-rename-history-acceptance.json' if compound_exact_rename_history
+        else 'new-result-scalar-reference-acceptance.json')
+    category = {"category": "compound-exact-rename-history" if compound_exact_rename_history else "same-graph-new-result-scalar-reference", "status": "FAIL",
         "verifier_strength": "gateway_verified_plus_independent_exact_guid_class_parent_and_scalar_reference",
         "observation_path": str(observation_path), "operation": operation}
     runtime.category_results.append(category)
@@ -4741,9 +4744,18 @@ def _collect_new_result_scalar_reference_acceptance(
         "reference_effect": "not_observed", "business_effect_verified": False,
         "lifecycle_acceptance": "Requires this node's final host-category-evidence/v3 PASS; prepared/PENDING grants no cleanup or source-integrity credit."}
 
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url} if compound_exact_rename_history else None
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']) if compound_exact_rename_history else None
+    native_before = set(native_root.glob('*.json')) if native_root is not None else set()
+    if compound_exact_rename_history:
+        category['verifier_strength'] = 'compound_source_receipt_plus_independent_exact_rename_graph_notes_undo_redo'
+        receipt.update(transactions=[], native_evidence=[], complete=False, setup_coverage_credit=False,
+            stack_head_observed=False, outside_scope_preservation_observed=False,
+            scope='one2025_exact_existing_rename_dependent_ordinary_graph_and_receipt_bound_undo_redo', endpoint=endpoint)
+
     def persist():
         encoded = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
-        assert len(encoded) <= 2 * 1024 * 1024, "graph scalar-reference receipt bound exceeded"
+        assert len(encoded) <= (16 if compound_exact_rename_history else 2) * 1024 * 1024, "graph scalar-reference receipt bound exceeded"
         observation_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = observation_path.with_suffix(".tmp")
         temporary.write_bytes(encoded)
@@ -4751,7 +4763,7 @@ def _collect_new_result_scalar_reference_acceptance(
 
     class ReceiptGateway:
         def raw_gateway(self, command):
-            assert len(receipt["calls"]) < 32, "graph scalar-reference public call bound exceeded"
+            assert len(receipt["calls"]) < (128 if compound_exact_rename_history else 32), "graph scalar-reference public call bound exceeded"
             row = {"argv": list(command)}
             receipt["calls"].append(row)
             try:
@@ -4767,6 +4779,8 @@ def _collect_new_result_scalar_reference_acceptance(
         def gateway(self, command, *, live):
             code, payload = self.raw_gateway(command)
             assert code == 0 and payload.get("ok") is True, payload
+            if live and compound_exact_rename_history:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
             return payload
 
     gateway = ReceiptGateway()
@@ -4776,14 +4790,102 @@ def _collect_new_result_scalar_reference_acceptance(
         rows = payload.get("objects")
         assert payload.get("count") == 1 and isinstance(rows, list) and len(rows) == 1, payload
         assert isinstance(rows[0], Mapping), payload
+        if compound_exact_rename_history:
+            assert payload.get('status') != 'partial' and payload.get('projection_complete') is not False, payload
+            assert payload.get('limit_reached') is not True, payload
         uuid_value = uuid.UUID(_required_string(rows[0], "id"))
         assert uuid_value.int != 0, rows[0]
         return rows[0]
 
     segments = ("Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy", "Default Work Unit")
+    projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+    def query(selector):
+        payload = gateway.gateway(['query-object', *selector, *projection], live=True)
+        rows = payload.get('objects')
+        assert isinstance(rows, list) and payload.get('count') == len(rows), payload
+        assert payload.get('status') != 'partial' and payload.get('projection_complete') is not False, payload
+        assert payload.get('limit_reached') is not True, payload
+        assert len(rows) < 65 and len({uuid.UUID(row['id']) for row in rows}) == len(rows), payload
+        return sorted(rows, key=lambda row: uuid.UUID(row['id']))
+    def exact_identity(identity):
+        rows = query(['--exact-id', identity]); assert len(rows) == 1 and rows[0]['id'] == identity, rows
+        assert type(rows[0].get('class_id')) is int and isinstance(rows[0].get('notes'), str), rows
+        return rows[0]
+    def children(identity):
+        return query(['--exact-id', identity, '--relationship', 'children', '--max-results', '65'])
+    def path(components):
+        return query([value for segment in components for value in ('--path-segment', segment)])
+    def complete(draft, role):
+        phase = {'role': role, 'native_outcome': 'not_executed'}; receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', tx], live=False)
+        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'])
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = executed
+        if code != 0 or executed.get('ok') is not True:
+            phase['native_outcome'] = 'rejected' if executed.get('state') == 'execution_failed' else 'indeterminate'
+        assert code == 0 and executed.get('ok') is True, executed
+        assert executed.get('automatic_retry') is False and executed.get('state') == 'executed_unverified', executed
+        phase['native_outcome'] = 'accepted'
+        verified = gateway.gateway(['verify', tx], live=True); phase['verify'] = verified
+        assert verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        if role in {'undo', 'redo'}: assert verified.get('verification_strength') == 'scoped_history_effect_readback', verified
+        phase['transaction'] = gateway.gateway(['transaction-show', tx], live=False)
+        assert phase['transaction']['artifact'] == phase['immutable_preview'], 'Transaction mutated its original Preview'
+        return phase
+    def owned_child(parent, operation):
+        started = _update_business_draft(gateway, parent, 'draft-start-undo-child', ['--operation', operation], live=False)
+        row = started['draft']
+        return _BusinessDraft(row['draft_id'], started['task_authority'], int(row['revision']))
+    def history(source_id, direction):
+        draft = _start_business_draft(gateway, 'ak.wwise.core.undo.' + direction)
+        _update_business_draft(gateway, draft, 'draft-declare-core-plan', ['--value', 'history_scope', 'latest_project_history',
+            '--value', 'expectation_receipt', source_id], live=True)
+        return draft
     try:
-        draft = _start_business_draft(gateway, operation)
-        parent_handle = _bind_business_object(gateway, draft, path_segments=segments)
+        if compound_exact_rename_history:
+            status = gateway.gateway(['status'], live=True)
+            assert status.get('wwise', {}).get('isCommandLine') is True, status
+            receipt['host_and_project'] = status
+            placement, = path(segments)
+            assert exact_identity(placement['id']) == placement and placement['type'] == 'WorkUnit', placement
+            setup_ids = {}
+            for role, name in (('setup-owner', root_name + '_Original'), ('setup-sibling', root_name + '_Preserved')):
+                setup = _start_business_draft(gateway, 'object.create')
+                parent = _bind_business_object(gateway, setup, object_id=placement['id'])
+                kind = _discover_business_type(gateway, setup, meaning='Bus', role='object', expected_label='Bus')
+                _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', 'setup', '--parent-handle', parent,
+                    '--kind', kind, '--name', name], live=False)
+                setup_ids[role] = _created_object_id(complete(setup, role)['execute'])
+            owner_id, sibling_id = setup_ids['setup-owner'], setup_ids['setup-sibling']
+            before = receipt['before'] = {'owner': exact_identity(owner_id), 'sibling': exact_identity(sibling_id), 'parent': exact_identity(placement['id']),
+                'owner_children': children(owner_id), 'placement_children': children(placement['id'])}
+            assert before['owner']['type'] == before['sibling']['type'] == 'Bus' and owner_id != sibling_id, before
+            assert before['owner']['name'] == root_name + '_Original' and before['sibling']['name'] == root_name + '_Preserved', before
+            for role in ('owner', 'sibling'):
+                assert before[role]['class_id'] == 1376272 and before[role]['path'] == '\\' + '\\'.join((*segments, before[role]['name'])), before
+            assert before['owner_children'] == [] and before['owner']['parent']['id'] == before['sibling']['parent']['id'] == placement['id'], before
+            requested_name = receipt['requested_name'] = root_name + '_Renamed'
+            assert path((*segments, requested_name)) == [], 'Exact requested rename path is already occupied'
+            parent_draft = _start_business_draft(gateway, 'waapi.undoGroup')
+            notes_child = owned_child(parent_draft, 'object.setNotes')
+            _bind_business_object(gateway, notes_child, object_id=owner_id)
+            requested_notes = receipt['requested_notes'] = 'Prior declared compound notes ' + root_name
+            _update_business_draft(gateway, notes_child, 'draft-declare-object-change', ['--notes', requested_notes], live=False)
+            _update_business_draft(gateway, notes_child, 'draft-check', live=True)
+            rename_child = owned_child(parent_draft, 'object.set')
+            owner = _bind_business_object(gateway, rename_child, object_id=owner_id)
+            _update_business_draft(gateway, rename_child, 'draft-declare-existing', ['--declaration-id', 'rename', '--object-handle', owner,
+                '--field', 'new_name', requested_name], live=False)
+            _update_business_draft(gateway, rename_child, 'draft-check', live=True)
+            draft = owned_child(parent_draft, operation)
+            parent_handle = _bind_business_object(gateway, draft, object_id=owner_id)
+        else:
+            draft = _start_business_draft(gateway, operation)
+            parent_handle = _bind_business_object(gateway, draft, path_segments=segments)
         types = {name: _discover_business_type(gateway, draft, meaning=name, role="object", expected_label=name)
             for name in ("Bus", "AuxBus")}
         # Browse names before binding: the human display meaning also matches HPF/LPF fields.
@@ -4820,32 +4922,52 @@ def _collect_new_result_scalar_reference_acceptance(
         _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "source",
             "--parent-handle", root_handle, "--name", "Sender", "--kind", types["AuxBus"],
             "--field-value", field_handle, target_handle], live=False)
-        _update_business_draft(gateway, draft, "draft-check", live=True)
-        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
-        transaction_id = _required_string(preview, "transaction_id")
-        category["transaction_id"] = receipt["transaction_id"] = transaction_id
-        receipt["artifact_hash"] = preview["artifact_hash"]
-        shown = gateway.gateway(["transaction-show", transaction_id], live=False)
-        receipt["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
-        gateway.gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], live=False)
-        receipt["native_outcome"] = "indeterminate"
-        execute_code, executed = gateway.raw_gateway(["execute", transaction_id])
-        receipt["native_response"] = executed
-        if execute_code != 0 or executed.get("ok") is not True:
-            receipt["native_outcome"] = "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
-            return category
-        assert executed.get("state") == "executed_unverified" and executed.get("automatic_retry") is False, executed
-        receipt["native_outcome"] = "accepted"
-        verify_code, verified = gateway.raw_gateway(["verify", transaction_id])
-        receipt["gateway_verification"] = {"exit_code": verify_code, "payload": verified}
-        receipt["reference_effect"] = "incomplete"
+        if compound_exact_rename_history:
+            _update_business_draft(gateway, draft, 'draft-check', live=True)
+            child_args = [value for child in (notes_child, rename_child, draft)
+                for value in ('--child-draft', child.draft_id, child.task_authority)]
+            _update_business_draft(gateway, parent_draft, 'draft-declare-undo-plan',
+                ['--display-name', 'Exact rename dependent graph ' + root_name, *child_args], live=False)
+            source_phase = complete(parent_draft, 'source')
+            transaction_id = source_phase['transaction_id']
+            executed, verified = source_phase['execute'], source_phase['verify']
+            verify_code = 0
+            actual_owner = exact_identity(owner_id)
+            assert actual_owner['id'] == owner_id and actual_owner['name'] == requested_name, actual_owner
+            assert actual_owner['notes'] == requested_notes, actual_owner
+            assert actual_owner['path'] == before['owner']['path'].rsplit('\\', 1)[0] + '\\' + actual_owner['name'], actual_owner
+            graph_segments = (*segments, actual_owner['name'], root_name)
+            category['transaction_id'] = transaction_id
+            receipt.update(transaction_id=transaction_id, native_outcome='accepted', gateway_verification=verified)
+        else:
+            _update_business_draft(gateway, draft, "draft-check", live=True)
+            preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+            transaction_id = _required_string(preview, "transaction_id")
+            category["transaction_id"] = receipt["transaction_id"] = transaction_id
+            receipt["artifact_hash"] = preview["artifact_hash"]
+            shown = gateway.gateway(["transaction-show", transaction_id], live=False)
+            receipt["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+            gateway.gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+            receipt["native_outcome"] = "indeterminate"
+            execute_code, executed = gateway.raw_gateway(["execute", transaction_id])
+            receipt["native_response"] = executed
+            if execute_code != 0 or executed.get("ok") is not True:
+                receipt["native_outcome"] = "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+                return category
+            assert executed.get("state") == "executed_unverified" and executed.get("automatic_retry") is False, executed
+            receipt["native_outcome"] = "accepted"
+            verify_code, verified = gateway.raw_gateway(["verify", transaction_id])
+            receipt["gateway_verification"] = {"exit_code": verify_code, "payload": verified}
+            receipt["reference_effect"] = "incomplete"
+            graph_segments = (*segments, root_name)
         # Select by closed fixture names, then independently re-read every exact GUID.
         independently_found = {}
         for name, child_segments in (("root", ()), ("target", ("Destination",)), ("source", ("Sender",))):
-            path_segments = (*segments, root_name, *child_segments)
+            path_segments = (*graph_segments, *child_segments)
             found = exact_row(["query-object", *(value for segment in path_segments for value in ("--path-segment", segment))])
             exact = exact_row(["query-object", "--exact-id", found["id"], "--include", "class-id", "--include", "parent",
-                *(["--include-field", field_name] if name == "source" else [])])
+                *(["--include-field", field_name] if name == "source" else []),
+                *(['--include', 'notes'] if compound_exact_rename_history else [])])
             assert all(found.get(key) == exact.get(key) for key in ("id", "name", "type", "path")), (found, exact)
             receipt["independent_" + name] = exact
             independently_found[name] = exact
@@ -4860,6 +4982,39 @@ def _collect_new_result_scalar_reference_acceptance(
         assert actual_target_id == target_row["id"], {"source_reference": reference, "independent_target": target_row}
         assert verify_code == 0 and verified.get("state") == "verified" and verified.get("verified") is True, verified
         assert verified.get("verification", {}).get("business_state_verified") is True, verified
+        if compound_exact_rename_history:
+            assert root_row['parent']['id'] == owner_id, root_row
+            def observed_state():
+                rows = {role: exact_identity(identity) for role, identity in (('owner', owner_id), ('sibling', sibling_id), ('parent', placement['id']))}
+                assert rows['sibling'] == before['sibling'] and rows['parent'] == before['parent'], rows
+                assert {key: value for key, value in rows['owner'].items() if key not in {'name', 'path', 'notes'}} == {
+                    key: value for key, value in before['owner'].items() if key not in {'name', 'path', 'notes'}}, rows
+                rows['owner_children'] = children(owner_id)
+                rows['placement_children'] = children(placement['id'])
+                expected_siblings = [rows['owner'] if row['id'] == owner_id else row for row in before['placement_children']]
+                assert rows['placement_children'] == expected_siblings, rows
+                rows['graph'] = {name: exact_row(['query-object', '--exact-id', row['id'], *projection,
+                    *(['--include-field', field_name] if name == 'source' else [])]) for name, row in independently_found.items()}
+                rows['graph_children'] = children(root_row['id'])
+                assert rows['owner_children'] == [rows['graph']['root']], rows
+                assert rows['graph_children'] == sorted([rows['graph']['target'],
+                    {key: value for key, value in rows['graph']['source'].items() if key != 'references'}], key=lambda row: uuid.UUID(row['id'])), rows
+                return rows
+            source_state = receipt['source_state'] = observed_state()
+            assert source_state['graph'] == independently_found, source_state
+            assert path((*segments, before['owner']['name'])) == [], 'Original owner path survived rename'
+            assert path((*segments, requested_name)) == [source_state['owner']], 'Exact requested rename path differs'
+            complete(history(transaction_id, 'undo'), 'undo')
+            undo_state = receipt['undo_state'] = {'owner': exact_identity(owner_id), 'sibling': exact_identity(sibling_id), 'parent': exact_identity(placement['id']),
+                'owner_children': children(owner_id), 'placement_children': children(placement['id'])}
+            assert undo_state == before, undo_state
+            for row in independently_found.values(): assert query(['--exact-id', row['id']]) == [], row
+            assert path(graph_segments) == path((*segments, before['owner']['name'], root_name)) == [], 'Created graph path survived undo'
+            complete(history(transaction_id, 'redo'), 'redo')
+            receipt['redo_state'] = observed_state()
+            assert receipt['redo_state'] == source_state, (source_state, receipt['redo_state'])
+            assert path((*segments, before['owner']['name'])) == []
+            receipt.update(complete=True, source_receipt=transaction_id)
         receipt.update(reference_effect="proven", business_effect_verified=True)
         category["status"] = "PASS"
         return category
@@ -4867,7 +5022,25 @@ def _collect_new_result_scalar_reference_acceptance(
         receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)}
         raise
     finally:
-        persist()
+        if native_root is not None:
+            status = category['status']; category['status'] = 'FAIL'
+            archive = runtime.state_dir / 'compound-exact-rename-native-archive'; archive.mkdir(parents=True, exist_ok=True)
+            paths = sorted(set(native_root.glob('*.json')) - native_before)
+            assert len(paths) <= 512, 'Compound exact-rename native evidence file bound exceeded'
+            total = 0
+            for index, native in enumerate(paths):
+                body = read_bounded_exclusive_regular_file(native, max_bytes=32 * 1024 * 1024 - total,
+                    require_private_posix_mode=False).raw
+                total += len(body)
+                assert total <= 32 * 1024 * 1024, 'Compound exact-rename native evidence byte bound exceeded'
+                target = archive / f'{index:04d}-{native.name}'; target.write_bytes(body)
+                receipt['native_evidence'].append({'native_path': str(native), 'archive_path': str(target),
+                    'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
+            persist()
+            category['observation_sha256'] = hashlib.sha256(observation_path.read_bytes()).hexdigest()
+            category['status'] = status
+        else:
+            persist()
 
 
 def _collect_existing_bus_send_acceptance(
@@ -5151,6 +5324,16 @@ def test_same_graph_new_result_scalar_reference_acceptance(workflow_sandbox_runt
     category = _collect_new_result_scalar_reference_acceptance(workflow_sandbox_runtime,
         root_name="WAAPI_RESULT_REFERENCE_" + uuid.uuid4().hex[:12])
     assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_compound_exact_rename_graph_history_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('One2025 exact-rename graph/history case; other lanes remain separate')
+    category = _collect_new_result_scalar_reference_acceptance(workflow_sandbox_runtime,
+        root_name='WAAPI_EXACT_GRAPH_' + uuid.uuid4().hex[:10], compound_exact_rename_history=True)
+    assert category['status'] == 'PASS', category
 
 
 @pytest.mark.live
