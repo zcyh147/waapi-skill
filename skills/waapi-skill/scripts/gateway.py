@@ -16843,6 +16843,11 @@ def dispatch_voice_source_continuation(args, *, env, connection, detected_versio
     return payload
 
 
+def source_copy_proof_context(*, env, project_guard, state_dir):
+    return {'project_guard': dict(project_guard), 'state_dir': str(state_dir),
+        'binding': {'project_guard': dict(project_guard), 'connection_configuration': selected_connection_binding(env)}}
+
+
 def dispatch_operation_draft_check(
     args: argparse.Namespace,
     *,
@@ -17144,6 +17149,7 @@ def dispatch_operation_draft_check(
         read_call=read_call,
         project_guard=project_guard,
         history_resolver=gateway_history_resolver(TransactionStore(state_dir), project_guard),
+        copy_proof_context=source_copy_proof_context(env=env, project_guard=project_guard, state_dir=state_dir),
         skill_root=SKILL_ROOT,
         ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS,
     ).as_dict()
@@ -20967,6 +20973,7 @@ def create_transaction_preview(
         read_call=read_call,
         project_guard=project_guard,
         history_resolver=gateway_history_resolver(store, project_guard),
+        copy_proof_context=source_copy_proof_context(env=env, project_guard=project_guard, state_dir=state_dir),
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
@@ -21570,7 +21577,8 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         role_validation = validate_prepared_roles(prepared, read_call=read_call,
-            history_resolver=gateway_history_resolver(store, artifact["project_guard"]))
+            history_resolver=gateway_history_resolver(store, artifact["project_guard"]),
+            copy_proof_context=source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir))
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
                 transaction_id,
@@ -22758,6 +22766,20 @@ def _dispatch_transaction_command_with_execution_lease(
                     execution_result=execution_result,
                 ),
             )
+        saved_baseline = prepared.get('pre_state', {}).get('source_copy_saved_proof', {})
+        if verification.status == 'verified' and saved_baseline.get('status') == 'ready':
+            next_command = transaction_next_command('continue-source-copy-proof',
+                ['continue-source-copy-proof', transaction_id], state_dir=args.state_dir)
+            cleanup = transaction_cleanup_payload(prepared, phase='executed', execution_result=execution_result)
+            return {'ok': True, 'status': 'source_copy_saved_proof_pending', **common,
+                'transaction_id': transaction_id, 'state': record.state.value, 'executed': True,
+                'verified': False, 'automatic_retry': False, 'verification': verification.as_dict(),
+                'source_copy_saved_proof': {'baseline_origin': saved_baseline['origin'], 'baseline_digest': saved_baseline['digest'],
+                    'complete_copy_preservation': False, 'remaining': 'separately authorized final Save then strict saved readback'},
+                'next_command': next_command, 'cleanup': cleanup,
+                'agent_result': transaction_agent_result(request=request_payload, transaction_id=transaction_id,
+                    artifact_hash=preview.artifact_hash, state=record.state.value, executed=True, verified=False,
+                    cleanup=cleanup, next_command=next_command)}
         outcome = {
             "verified": TransactionState.VERIFIED,
             "result_schema_checked": TransactionState.RESULT_SCHEMA_CHECKED,
