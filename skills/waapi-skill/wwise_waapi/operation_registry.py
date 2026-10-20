@@ -6264,7 +6264,7 @@ def _prepare_object_set(
             str(spec["request_path"]): spec for spec in child_specs
         }
         for node in children.nodes:
-            if node.language is not None:
+            if node.language is not None and node.import_arg is not None:
                 requested_languages.add(node.language)
             if node.import_arg is not None:
                 trusted_import, import_spec = _prepare_object_set_import(
@@ -6380,9 +6380,8 @@ def _prepare_object_set(
                 assert isinstance(expected_path, str)
                 fields = _object_spec_return_fields(child_spec)
                 snapshot_platform = child_spec.get("platform")
-                snapshot_language = _localized_import_read_language(
-                    child_spec.get("requested_language")
-                )
+                snapshot_language = (None if "construction_language" in child_spec else
+                    _localized_import_read_language(child_spec.get("requested_language")))
                 rows = _read_object_path_rows(
                     expected_path,
                     fields=fields,
@@ -6436,9 +6435,8 @@ def _prepare_object_set(
                 assert isinstance(expected_path, str)
                 fields = _object_spec_return_fields(child_spec)
                 snapshot_platform = child_spec.get("platform")
-                snapshot_language = _localized_import_read_language(
-                    child_spec.get("requested_language")
-                )
+                snapshot_language = (None if "construction_language" in child_spec else
+                    _localized_import_read_language(child_spec.get("requested_language")))
                 collision_path = (
                     _request_node_expected_path(target_path, child_spec, child_specs,
                                                 root_request_path=target_spec["request_path"])
@@ -6548,7 +6546,7 @@ def _prepare_object_set(
                 str(spec["request_path"]): spec for spec in prepared_specs
             }
             for node in descriptor.nodes:
-                if node.language is not None:
+                if node.language is not None and node.import_arg is not None:
                     requested_languages.add(node.language)
                 if node.import_arg is not None:
                     trusted_import, import_spec = _prepare_object_set_import(
@@ -6956,12 +6954,17 @@ def _prepare_object_set(
             if language_requires_live_project_validation(language):
                 requested_languages.add(str(language))
 
+    construction_specs = [spec for spec in node_specs if "construction_language" in spec]
+    construction_inventory = (_read_import_language_inventory(request.version, read=import_context_read)
+                              if construction_specs else None)
+    for spec in construction_specs:
+        context = spec["construction_language"]
+        context["selected"] = _select_construction_language(construction_inventory, context["requested"])
+        context["project"] = construction_inventory["project"]
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
-        language_inventory = _read_import_language_inventory(
-            request.version,
-            read=import_context_read,
-        )
+        language_inventory = (construction_inventory if construction_inventory is not None else
+            _read_import_language_inventory(request.version, read=import_context_read))
         available_languages = {
             str(row["name"])
             for row in language_inventory.get("languages", [])
@@ -8070,13 +8073,13 @@ def _prepare_object_node_specs(
     merge_guards = [] if merge_guards is None else merge_guards
     shareset_placements = {}
     for node in nodes:
-        # Composition can add media after declaring a Voice. Only the complete
-        # request can establish whether an explicit language has a Source effect.
-        if node.language is not None and node.import_arg is None:
-            raise OperationContractError(
-                "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
+        # Semantic Voice and an explicit discovered Sound.IsVoice=true converge
+        # on the same Boolean intent; language never converts an unspecified Sound.
+        if (node.language is not None and node.import_arg is None
+                and not any(field.name.casefold() == "isvoice" and field.value is True for field in node.properties)):
+            raise OperationContractError("OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
                 "An explicit language without localized media still needs Source effect evidence; omit language for an empty Voice or add the requested media.",
-            )
+                details={"request_path": node.request_path, "requested_language": node.language})
         requested_type_token = _object_type_token(node.type)
         uses_2025_actor_mixer_alias = (
             version == "2025.1" and requested_type_token == "actormixer"
@@ -8160,6 +8163,16 @@ def _prepare_object_node_specs(
             roles[f"merge:{node.request_path}"] = merge_target
             spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
                     structural_class_id=type_info.class_id)
+        if node.language is not None and node.import_arg is None:
+            if merge_target is not None:
+                raise OperationContractError(
+                    "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED",
+                    "Construction language does not establish a language mutation on an existing merged Voice.",
+                    details={"request_path": node.request_path, "requested_language": node.language,
+                             "preexisting_id": merge_target.object, "existing_path": merge_target.row.get("path")},
+                )
+            spec["construction_language"] = {"requested": node.language, "role": "voice-construction-context",
+                "mode": "new", "expected_sources": [], "version": version}
         metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
@@ -8890,6 +8903,18 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    language_nodes = [node for node in pre_state.get("object_set_nodes", []) if "construction_language" in node] if isinstance(pre_state, Mapping) else []
+    if language_nodes:
+        try:
+            inventory = _read_import_language_inventory(language_nodes[0]["construction_language"]["version"], read=read)
+            for node in language_nodes:
+                context = node["construction_language"]
+                selected = _select_construction_language(inventory, context["requested"])
+                assertions.append({"name": "Voice construction language binding remains valid", "passed":
+                    selected == context["selected"] and inventory["project"] == context["project"],
+                    "evidence": {"expected": context, "selected": selected, "project": inventory["project"]}})
+        except OperationContractError as exc:
+            assertions.append({"name": "Voice construction language binding remains valid", "passed": False, "evidence": exc.as_dict()})
     result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
     if result_context:
         try:
@@ -10329,8 +10354,8 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
             *(
                 OBJECT_SET_IMPORT_READBACK_FIELDS
                 if isinstance(spec.get("import"), Mapping)
-                or isinstance(spec.get("requested_language"), str)
-                else ()
+                or (isinstance(spec.get("requested_language"), str) and "construction_language" not in spec)
+                else ("activeSource",) if "construction_language" in spec else ()
             ),
         ]
     )
@@ -12254,6 +12279,15 @@ def _normalize_import_language_rows(value: Any, *, authority: str) -> list[dict[
         seen_ids.add(id_key)
         rows.append({"id": language_id, "name": name})
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"].casefold()))
+
+
+def _select_construction_language(inventory, requested):
+    rows = [row for row in inventory["languages"]
+            if row["name"] == requested or (_valid_object_id(requested) and _same_identity(row["id"], requested))]
+    if len(rows) != 1 or not _valid_object_id(rows[0]["id"]):
+        raise OperationContractError("UNKNOWN_PROJECT_LANGUAGE", "Voice construction language must select one live Project Language by exact name or GUID.",
+            details={"requested": requested, "matches": rows})
+    return dict(rows[0])
 
 
 def _read_import_language_inventory(version: str, *, read: ReadCall) -> dict[str, Any]:
@@ -19750,7 +19784,7 @@ def verify_prepared_operation(
             rows = read_object(
                 object_id=object_id,
                 fields=fields,
-                language=_localized_import_read_language(requested_language),
+                language=None if "construction_language" in spec else _localized_import_read_language(requested_language),
                 platform=platform,
             )
             check(f"{request_path} GUID resolves exactly once", len(rows) == 1, rows)
@@ -19964,10 +19998,14 @@ def verify_prepared_operation(
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
             import_spec = spec.get("import")
-            if isinstance(import_spec, Mapping) or isinstance(
-                requested_language,
-                str,
-            ):
+            if "construction_language" in spec:
+                children = read_direct_children(object_id=object_id, fields=IDENTITY_RETURN_FIELDS)
+                check(f"{request_path} empty Voice has no Source children", not children,
+                      {"expected": [], "children": children, "construction_language": spec["construction_language"]})
+                check(f"{request_path} empty Voice has an observed nil active Source",
+                      _has_field(row, "activeSource") and _reference_requirement_matches(row, "activeSource", None),
+                      {"present": _has_field(row, "activeSource"), "activeSource": _field_value(row, "activeSource")})
+            if isinstance(import_spec, Mapping) or (isinstance(requested_language, str) and "construction_language" not in spec):
                 raw_sources: list[Mapping[str, Any]] = []
                 if isinstance(import_spec, Mapping):
                     raw_import_sources = import_spec.get("sources")

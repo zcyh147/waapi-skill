@@ -5,6 +5,38 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## R40 Voice and Tone evidence limits
+
+Runtime merge `495f8a7f` integrates the accepted compact graph correction,
+explicit language context for genuinely new empty Voice, and stationary sine
+artifact verification. The original R39 subset remains **456 passed / 10 failed**;
+staged R40 controls are recorded separately in the test inventory. No merger
+pytest, native or Fresh run accompanied this integration, and no new native
+PASS or branch credit is claimed.
+
+Voice construction validates the selected project language before and after
+execution and independently proves actual IsVoice plus empty Source state.
+It does not establish persisted Sound.Language, localized Source creation or
+existing-Voice merge/language effects. The existing staged Voice-to-bound-owner
+Source-plugin workflow is distinct from the unresolved atomic planned-parent
+Source producer/native question under #179/#180/#181. Earlier native receipts
+without explicit language do not certify the new language branch.
+
+Tone reuses the retained 2023/24/25 bytes without changing their original
+receipts. The new verifier establishes requested stationary digital sine samples
+within its disclosed gain/shape/representation policy; it does not establish a
+bit-exact writer algorithm or unique analog origin. Phase is unparameterized;
+requested frequency and gain are not fitted away. Rank-deficient, aliased or
+quantization-indistinguishable observations remain explicit, additive partial
+results, while resolvable short records can verify. Other waveforms, envelopes
+and remaining #193 branches stay required. The diagnostic collector category
+remains blocked even when its corrected fake transaction signals verify.
+
+The four approved business-disclosure leaf changes do not change the 153
+Registry machine seals. Inventory reconciliation preserves all 272,313 native
+obligations, ownership, statuses and existing missing evidence. No active-source
+component is included in R40.
+
 ## R38 regression repair evidence limits
 
 R38 runtime merge `5fcd2d97` repairs selected Program failures with unchanged
@@ -14,7 +46,8 @@ separate staged fake-native controls, recorded in
 or a combined gate. Four serial inventory commands preserve all 272,313 native
 obligation rows and compressed bytes, including missing current R26 evidence;
 only source hashes/line offsets and candidate identity refresh. No native or
-Fresh run accompanied R38. The original failed subset is not yet retested.
+Fresh run accompanied R38. Subsequent original failed-node subset outcomes are
+recorded separately in the test inventory.
 The explicit generic active-source boundary in 2021.1 remains #181 work,
 not a completed feature, new exclusion or finding of native absence.
 

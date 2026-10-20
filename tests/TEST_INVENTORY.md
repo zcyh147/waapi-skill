@@ -5,6 +5,55 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R40 scoped regression, Voice context and stationary Tone
+
+Runtime merge `495f8a7f` preserves accepted graph `026f9181`, Voice `89d0ef9f`
+and Tone `49e4b69e` components: nine exact file blobs, without merger fixups.
+Root's original R39 failed-node subset on `6e126276` ended **456 passed,
+10 failed, 2,008 deselected in 103.95s**. Its retained original log is
+`.waapi-skill-state/full-coverage/r39-failed-subset-6e126276-r1/run.log`.
+This is a failed subset result, distinct from both the R38 subset and the
+earlier full Program failure; R40 does not replace it with an aggregate PASS.
+
+The ten graph residuals have separate staged results: **5 passed / 5 failed in
+1.26s**, only five unresolved cases **1 passed / 4 failed in 0.73s**, then only
+four remaining cases **4 passed in 0.58s**. Existing 7/8 KB compactness limits
+remain unchanged; full public inspection retains the complete RTPC declaration
+and batch precondition. No final ten-node or broad rerun is inferred.
+
+Voice controls include **19 passed / 4 failed in 4.81s**, corrected four controls
+**4 passed in 1.24s**, final two original-language negatives **2 passed in 0.32s**,
+and the unrelated Source-preservation RED **1 failed in 0.76s** followed by
+**1 passed in 0.65s**. These are separate receipts, not a combined result.
+The new empty Voice language is validated construction context in 2022.1–2025.1,
+not a persisted Sound language or localized Source. Existing-merge language
+effects and atomic planned-parent Source construction remain #179/#180/#181
+work. Staged Voice creation then Source-plugin creation on its bound existing
+GUID already exists; the atomic gap does not mean all Source creation is absent.
+
+Tone's public wrong-frequency RED is **1 failed in 0.93s**. Separate successor
+selections passed **13 tests in 6.18s** (retained-file route combinations),
+**16 in 7.79s** (signal/partial controls), **45 in 19.85s** (existing guards),
+and **11 in 12.76s** (short-record/diagnostic controls). Overlapping selections
+are not summed. Exact original failures, projection corrections and argv are in
+`/tmp/waapi-r40-tone-handoff.md`; graph and Voice chronology are in
+`/tmp/waapi-r40-graph-residuals-handoff.md` and
+`/tmp/waapi-r40-voice-language/handoff.md`.
+
+Stationary zero-attack/release sine verification checks frozen frequency/gain
+within a disclosed numerical policy, including every active sample and exact
+masked-off silence. Retained native bytes are reused offline; original native
+outcomes remain unchanged. No new native/Fresh run or business acceptance is
+claimed. Other waveforms/envelopes and remaining #193 scope stay required.
+
+Four serial inventory generate/check commands passed once. Only the four
+2022–2025 object.set `sound_semantics.language_and_media` disclosure leaves,
+their public contract references and reviewed aggregate seal change, alongside
+source/hash/line/candidate refreshes. All 153 Registry machine seals (including
+the `6085...` object.set literal), source membership and 272,313 native obligation
+bytes/statuses/ownership/evidence remain unchanged. No merger pytest ran; Root
+owns publication and selection of the next settled gate.
+
 ## 2026-10-20 R39 scoped regression integration
 
 Frozen runtime merge `c51371d1` preserves accepted graph fixtures `3eb19047`,
@@ -48,7 +97,8 @@ Four serial inventory generation/check commands exited zero once. Only the
 registry source hash, three existing source-index entries and native candidate
 identity refresh; interface inventory, source membership, native descriptors and
 all 272,313 compressed obligation rows remain exact. No merger pytest, native,
-Fresh or replacement broad gate ran. Root owns the subsequent 466-node subset.
+Fresh or replacement broad gate ran at that handoff. Root owned the subsequent
+466-node subset; its original result is recorded in the R40 entry above.
 
 The separate Root-owned 2021.1 diagnostic on `34a64ac1` **failed in 12.78s** at
 `ordering_counterexample_unproven`. All three two-source copies' path joins
