@@ -1471,6 +1471,10 @@ def test_2021_active_source_pages_bind_the_complete_candidate_observation(tmp_pa
         "--language", "SFX", "--include", "active-source", "--include", "notes"], env=env, client_factory=lambda _: client)
     assert code == 0 and first["status"] == "partial", first
     continuation = first["agent_result"]["next_command"]["gateway_argv"]
+    code, unchanged = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
+    assert code == 0 and list(unchanged)[-1] == "agent_result", unchanged
+    project_reads = [args for uri, args, _ in client.calls if uri.endswith("object.get") and args.get("waql", "").startswith("from type Project")]
+    assert len(project_reads) == 4  # Two independent project observations per invocation, reused by paging.
     client.inactive_file_changed = True
     code, rejected = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
     assert code == 2 and rejected["error_code"] == "QUERY_RESULT_CONTINUATION_CHANGED", rejected

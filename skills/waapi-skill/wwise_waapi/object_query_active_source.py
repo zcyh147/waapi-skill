@@ -82,7 +82,8 @@ def _sound_facts(row):
 
 
 def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], platform: str,
-                               language: str, return_fields: tuple[str, ...], live_info: Mapping[str, Any]):
+                               language: str, return_fields: tuple[str, ...], live_info: Mapping[str, Any],
+                               project_before: Mapping[str, Any] | None = None):
     """Return the unchanged requested Sound row plus an independently joined reference.
 
     No row order, import return value or serialized project file is an oracle.
@@ -131,11 +132,15 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
             _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Project identity cannot be bound.")
         return {**_identity(values[0]), "filePath": values[0]["filePath"]}
 
-    before_project = project()
+    if project_before is not None and (project_before.get("type") != "Project"
+            or not isinstance(project_before.get("filePath"), str) or not project_before["filePath"]):
+        _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The already observed project identity is incomplete.")
+    before_project = ({**_identity(project_before), "filePath": project_before["filePath"]}
+                      if project_before is not None else project())
     fields = tuple(dict.fromkeys((*return_fields, *SOURCE_FACTS)))
     before, preview = rows(**selector, return_fields=fields, maximum=1, **view)
     if not before:
-        return [], preview, {"method": "unique_same_view_original_path", "sound_count": 0}
+        return [], preview, {"method": "unique_same_view_original_path", "sound_count": 0}, before_project
     owner = before[0]
     identity = _identity(owner)
     if identity["type"] != "Sound" or not _class_matches(owner.get("classId"), classes["Sound"]):
@@ -190,4 +195,4 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
         "observation_sha256": canonical_sha256({"project": before_project, "sound": before_sound,
             "children": before_children, "view": view}),
         "atomic": False, "native_absence_proven": False,
-    }
+    }, before_project

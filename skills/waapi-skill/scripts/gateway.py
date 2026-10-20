@@ -15430,15 +15430,17 @@ def dispatch_command(
                         error_code="ACTIVE_SOURCE_OBSERVATION_FAILED")
                 return call["result"]
             try:
-                native_rows, preview, source_proof = resolve_2021_active_source(read=read_active_source,
+                native_rows, preview, source_proof, project_observation = resolve_2021_active_source(read=read_active_source,
                     selector={"object_id": args.object_id} if args.object_id is not None else {"path": args.path},
                     platform=args.query_platform, language=args.query_language,
-                    return_fields=tuple(return_fields), live_info=live_info)
+                    return_fields=tuple(return_fields), live_info=live_info,
+                    project_before=getattr(args, "query_project_observation", None))
             except ActiveSourceQueryError as exc:
                 raise GatewayResultShapeError(str(exc), details={"calls": calls, "native_absence_proven": False, **exc.details},
                     error_code=exc.code) from exc
             if configuration != selected_connection_binding(env):
                 raise GatewayResultShapeError("Query configuration changed", error_code="ACTIVE_SOURCE_OBSERVATION_CHANGED")
+            args.query_project_observation = project_observation
             business_rows = _project_query_business_rows(args, native_rows)
             query_payload = {"ok": True, "status": "ok", **common, "semantic_preview": preview.as_dict(),
                 "query_bound": _query_bound_summary(args), "calls": calls, "active_source_resolution": source_proof,
@@ -24799,20 +24801,25 @@ def _bind_query_custom_fields_from_live_metadata(
 
 
 def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info):
-    project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
-        connection=connection, version=detected_version,
-        **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
-           if detected_version == "2021.1" else {}))
-    if not project_call.get("ok"):
-        raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
-            details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-    if detected_version == "2021.1":
-        project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
-            maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
-            error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-    else:
-        project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    # Reuse only this invocation's already observed project. A continuation's
+    # stored context never populates this attribute or substitutes for a read.
+    project = getattr(args, "query_project_observation", None)
+    if project is None:
+        project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
+            connection=connection, version=detected_version,
+            **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
+               if detected_version == "2021.1" else {}))
+        if not project_call.get("ok"):
+            raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
+                details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+        if detected_version == "2021.1":
+            project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
+                maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
+                error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+        else:
+            project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
     project = require_project_identity(project, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    args.query_project_observation = project
     require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
     return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
         "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
