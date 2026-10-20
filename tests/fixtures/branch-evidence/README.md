@@ -47,3 +47,12 @@ Fresh, other-host, descendant or whole-family proof follows. Source changes
 must remain stale unless independently justified by the existing exact source
 equivalence rules. Original receipts are immutable and are never relabeled as
 proof for a successor. The default product ledger remains incomplete.
+
+The default index now selects `product/metadata-default-r47r2-*`, captured after
+the missing-metadata-parent reader repair on source candidate
+`1d3be0862774691d78a51a5dd1bb7e0f91f9ea87`. Its 30 original nodes again observe
+the same 65 facts with the same 343-file dependency membership. The first R47
+bundle remains unchanged as original, now-stale evidence; neither its PASS nor
+its source seals are rewritten. The new bundle is also program-only evidence.
+The reader compatibility fixture that omits or nulls the metadata parent is a
+controlled synthetic corruption test and grants no product metadata credit.
