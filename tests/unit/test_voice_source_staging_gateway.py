@@ -7,8 +7,21 @@ from tests.unit.test_workflow_source_guard import workflow, _planned_source_char
 from tests.unit.test_sound_voice_creation_gateway import declare_voice
 
 
-def combined_task(tmp_path, workflow, *, references=False):
+def combined_task(tmp_path, workflow, *, references=False, unobserved=None):
     runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='staged-atomic-order')
+    if unobserved in {'authoring', 'other-build'}:
+        original_context_call = task.call
+        def context_call(uri, args=None, options=None):
+            result = original_context_call(uri, args, options)
+            if uri.endswith('getInfo'):
+                if unobserved == 'authoring':
+                    result['isCommandLine'] = False
+                else:
+                    result['version'].update(build=9144, displayName='v2025.1.7.9144')
+            return result
+        task.call = context_call
+    if unobserved == 'other-source-class':
+        next(row for row in task.types if row['name'] == 'Wwise Tone Generator')['classId'] += 65536
     voice_extra = []
     source_extra = []
     if references:
@@ -72,6 +85,7 @@ def test_combined_voice_localized_source_finishes_in_two_owned_stages_and_reuses
     task, writes = combined_task(tmp_path, workflow)
     code, pending = task.step('draft-check')
     assert code == 2 and pending['error_code'] == 'VOICE_SOURCE_STAGED_COMPLETION_REQUIRED', pending
+    assert 'native evidence' not in pending['message']
     assert not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
     code, configured = task.run(*pending['next_command']['gateway_argv'])
     assert code == 0, configured
@@ -266,3 +280,26 @@ def test_copied_stage_record_cannot_grant_an_ordinary_set_continuation_authority
     code, rejected = ordinary.step('draft-check')
     assert code == 2 and rejected['ok'] is False, rejected
     assert ordinary_writes == [] and writes == []
+
+
+@pytest.mark.parametrize('context', ['authoring', 'other-build', 'other-source-class', 'explicit-view', 'other-graph'])
+def test_default_atomic_boundary_does_not_classify_unobserved_contexts(tmp_path, workflow, context):
+    task, writes = combined_task(tmp_path, workflow, unobserved=context)
+    if context == 'explicit-view':
+        code, configured = task.step('draft-business-configure', '--platform', 'Windows')
+        assert code == 0, configured
+    elif context == 'other-graph':
+        code, inspected = task.run('draft-inspect', task.draft, '--task-authority', task.authority)
+        assert code == 0, inspected
+        parent = next(row['target']['parent_handle'] for row in inspected['draft']['declarations'] if row['declaration_id'] == 'voice')
+        code, declared = task.step('draft-declare-new', '--declaration-id', 'other',
+            '--parent-handle', parent, '--name', 'Other', '--kind', 'sound-sfx')
+        assert code == 0, declared
+    code, checked = task.step('draft-check')
+    assert code == 0 and checked['ok'] is True, checked
+    assert writes == [] and not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
+
+    if context == 'other-graph':
+        code, rejected = task.step('draft-business-configure', '--voice-source-completion', 'separate-previews')
+        assert code == 2 and rejected['error_code'] == 'VOICE_SOURCE_STAGE_INVALID', rejected
+        assert writes == []

@@ -20,6 +20,51 @@ def fail(message):
     raise OperationContractError('VOICE_SOURCE_STAGE_INVALID', message)
 
 
+def observed_atomic_boundary(raw, live_info):
+    """Match only the retained Console/Tone/default-view counterexample.
+
+    Other admitted graphs and live contexts are unclassified here. Explicit
+    staging still uses the separate strict whole-graph recognizer below.
+    """
+    version = live_info.get('version')
+    if (raw.get('version') != '2025.1' or live_info.get('isCommandLine') is not True
+            or not isinstance(version, Mapping)
+            or tuple(version.get(key) for key in ('year', 'major', 'minor', 'build')) != (2025, 1, 7, 9143)):
+        return False
+    args = raw.get('arguments')
+    if (not isinstance(args, Mapping)
+            or set(args) - {'objects', 'on_name_conflict', 'list_mode', 'auto_add_to_source_control'}
+            or args.get('on_name_conflict', 'fail') != 'fail'
+            or args.get('list_mode', 'append') != 'append'
+            or args.get('auto_add_to_source_control', False) is not False):
+        return False
+    rows = args.get('objects')
+    if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping)
+            or set(rows[0]) != {'object', 'children'}):
+        return False
+    roots = rows[0].get('children')
+    if not isinstance(roots, list) or len(roots) != 1 or not isinstance(roots[0], Mapping):
+        return False
+    voice = roots[0]
+    properties = voice.get('properties', [])
+    if not isinstance(properties, list):
+        return False
+    if (voice.get('type') != 'Sound'
+            or set(voice) - {'type', 'name', 'notes', 'language', 'properties', 'references', 'children'}
+            or not any(isinstance(row, Mapping) and isinstance(row.get('name'), str)
+                and row['name'].casefold() == 'isvoice' and row.get('value') is True for row in properties)):
+        return False
+    children = voice.get('children')
+    if not isinstance(children, list) or len(children) != 1 or not isinstance(children[0], Mapping):
+        return False
+    source = children[0]
+    plugin = source.get('plugin')
+    return (not set(source) - {'type', 'name', 'notes', 'properties', 'references', 'plugin'}
+        and isinstance(plugin, Mapping) and 'platform' not in plugin
+        and plugin.get('kind') == 'source' and plugin.get('class_id') == 6684674
+        and isinstance(plugin.get('language'), str) and bool(plugin['language']))
+
+
 def parts(raw):
     """Recognize the entire request; never lower a matching subset."""
     def localized(node):

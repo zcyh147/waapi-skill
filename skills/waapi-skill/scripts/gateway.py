@@ -16887,14 +16887,14 @@ def dispatch_operation_draft_check(
     if (inspected.operation == "object.set" and detected_version == "2025.1"
             and request_payload.get("operation") == "object.set"
             and "voice_source_staging" not in request_payload.get("arguments", {})):
-        from wwise_waapi.voice_source_staging import parts
-        if parts(request_payload) is not None:
+        from wwise_waapi.voice_source_staging import observed_atomic_boundary
+        if observed_atomic_boundary(request_payload, live_info):
             session = BusinessDeclarationSession.from_dict(inspected.composition["business_session"])
             atomic_required = session.settings.get("voice_source_completion") == "atomic-required"
             payload = operation_draft_payload(args.command, inspected, offline=False, state_dir=args.state_dir,
                 task_authority=args.task_authority)
             payload.update(ok=False, status="incomplete", error_code="VOICE_SOURCE_ATOMIC_UNRESOLVED" if atomic_required else "VOICE_SOURCE_STAGED_COMPLETION_REQUIRED",
-                message="The observed 2025 atomic localized Source request is unresolved; the supplied Voice and Source intent remains in this Draft. Two separately previewed stages have native evidence.",
+                message="This atomic localized Source request is unresolved in the observed Console build and default view. Your complete Voice and Source intent remains in this Draft; choose two separately authorized Previews to continue.",
                 original_request_sha256=materialized.request_digest,
                 staged_completion={"complete": False, "atomic_requirement": atomic_required, "declarations_preserved": True})
             if not atomic_required:
@@ -25458,7 +25458,6 @@ def project_successful_transaction_execute_payload(
             "automatic_retry",
             "next_command",
             "stdout_projection",
-            "next_command",
             "staged_completion",
         )
         projected = {key: projected[key] for key in keep if key in projected}
