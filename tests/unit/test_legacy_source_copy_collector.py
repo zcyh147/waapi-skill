@@ -235,13 +235,14 @@ def legacy_owned_read_runtime(tmp_path, *, fault=None):
         expression = args.get('waql', '')
         if uri.endswith('object.get') and ' select @' in expression:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if ' select @RTPC ' in expression:
+                raise RuntimeError('Unknown property RTPC (61)')  # Actual R50 native rejection.
+            if ' select @Curve ' in expression:
+                raise RuntimeError('No source-backed 2021 Curve hop')
             if fault == 'hop-error':
-                raise RuntimeError('Pinned owned-list read rejected; no alternate spelling')
-            selected = rtpc if ' select @RTPC ' in expression else lfo if ' select @ControlInput ' in expression else curve
-            assert expression in (f'from object "{SOURCE}" select @RTPC take 8',
-                f'from object "{rtpc}" select @ControlInput take 2',
-                f'from object "{rtpc}" select @Curve take 2'), expression
-            return {'return': task.project_rows([task.objects[selected]], options)}
+                raise RuntimeError('Pinned ControlInput read rejected; no alternate spelling')
+            assert expression == f'from object "{rtpc}" select @ControlInput take 2', expression
+            return {'return': task.project_rows([task.objects[lfo]], options)}
         return original(uri, args, options)
     task.call = call
     return runtime, commands, writes, task
@@ -262,7 +263,11 @@ def test_legacy_owned_read_uses_public_metadata_and_never_starts_copy(tmp_path, 
     queries = [argv for argv in commands if argv[0] == 'query-object']
     assert all(argv.count('--include-field') <= 8 and 'curve-points' not in argv for argv in queries)
     source_pages = [argv for argv in queries if SOURCE in argv and '--include-field' in argv]
-    assert len(source_pages) == 3  # 18 actual SDK names, not the old one-field fake.
+    assert source_pages == []  # R50 already read all18 Source fields; observe only missing owned semantics.
+    assert receipt['owned_observation']['source_membership_complete'] is False
+    assert receipt['owned_observation']['binding'] == 'retained exact RTPC GUID/class/Source-owner edge'
+    assert not any('select @RTPC' in str(argv) for argv in commands)
+    assert not any('select @Curve' in str(argv) for argv in commands)
     from tests.destructive.support.category_evidence import build_category_evidence_record
     record = build_category_evidence_record(repo_root=workflow.REPO_ROOT, candidate=runtime.candidate,
         version='2021.1', host={'is_command_line': True}, categories=[category], source={},
@@ -282,5 +287,239 @@ def test_legacy_owned_read_preserves_first_hop_error_without_writes_or_fallback(
     assert writes == [] and len([argv for argv in commands if '--advanced-waql' in argv]) == 1
     assert receipt['calls'][-1]['exit_code'] != 0 and receipt['calls'][-1]['reply']
     failed = json.loads(Path(receipt['calls'][-1]['reply']['path']).read_text())
-    assert failed['call']['message'] == 'Pinned owned-list read rejected; no alternate spelling'
+    assert failed['call']['message'] == 'Pinned ControlInput read rejected; no alternate spelling'
+    assert receipt['owned_observation']['curve_field_names'] == ['Flags']
+    assert receipt['owned_observation']['control_input_hop'] == 'attempted'
     assert receipt['native_evidence'] and runtime.category_results[0]['status'] == 'FAIL'
+
+
+@pytest.mark.parametrize('corruption', ['class', 'Source-owner'])
+def test_legacy_exact_owned_read_rejects_changed_rtpc_binding_before_metadata(tmp_path, workflow, corruption):
+    runtime, commands, writes, task = legacy_owned_read_runtime(tmp_path)
+    rtpc = task.objects['{CE99046D-D354-422D-A7BB-F1305FF00B2F}']
+    if corruption == 'class': rtpc['classId'] = 917520  # Genuine Curve class, not RTPC.
+    else: rtpc['owner'] = {'id': FIRST}  # A Sound is not the retained Source owner.
+    with pytest.raises(AssertionError, match='Retained RTPC class/Source-owner binding changed'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='UNUSED', owned_read_only=True)
+    receipt = json.loads((runtime.state_dir / 'legacy-source-owned-read.json').read_text())
+    assert receipt['collection_complete'] is False and writes == []
+    assert not any(argv[:2] == ['metadata', 'list'] or '--advanced-waql' in argv for argv in commands)
+
+
+SAVED_ROLES = {
+    'source': (SOURCE, COPIED, 'SourcePlugin', 9699330, 883831456, 10001),
+    'rtpc': ('{CE99046D-D354-422D-A7BB-F1305FF00B2F}', '{B1111111-1111-4111-8111-111111111111}', 'RTPC', 1441808, 274268052, 10002),
+    'control_input': ('{E323F786-253F-48C6-86B9-AB0335804E9F}', '{B2222222-2222-4222-8222-222222222222}', 'ModulatorLfo', 4194320, 641284001, 10003),
+    'curve': ('{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}', '{B3333333-3333-4333-8333-333333333333}', 'Curve', 917520, None, None),
+}
+SAVED_OWNER = '{63E5A1E6-4265-463E-A5C5-322F742423E1}'
+
+
+def saved_copy_example():
+    """Genuine 2021 MIDI content; generated identities model only fake copy output."""
+    import xml.etree.ElementTree as ET
+    path = Path(__file__).parents[1] / '_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu'
+    before = path.read_bytes()
+    tree = ET.fromstring(before)
+    source, = [node for node in tree.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    copied = deepcopy(source)
+    for original, replacement, tag, cls, old_short, new_short in SAVED_ROLES.values():
+        node, = [node for node in copied.iter(tag) if node.get('ID') == original]
+        node.set('ID', replacement)
+        if new_short is not None: node.set('ShortID', str(new_short))
+    destination = ET.SubElement(tree.find('.//WorkUnit/ChildrenList'), 'Sound', {'Name': 'Copy destination', 'ID': DEST})
+    ET.SubElement(destination, 'ChildrenList').append(copied)
+    def live(which):
+        result = {}
+        for role, row in SAVED_ROLES.items():
+            original, replacement, tag, cls, old_short, new_short = row
+            identity = original if which == 'before' else replacement
+            owner = (SAVED_OWNER if which == 'before' else DEST) if role == 'source' else (
+                SAVED_ROLES['source' if role == 'rtpc' else 'rtpc'][0 if which == 'before' else 1])
+            node, = [node for node in (source if which == 'before' else copied).iter(tag) if node.get('ID') == identity]
+            result[role] = {'id': identity, 'name': node.get('Name'), 'type': tag, 'class_id': cls,
+                'notes': node.findtext('Comment', ''), 'parent' if role == 'source' else 'owner': {'id': owner}}
+            if old_short is not None: result[role]['short_id'] = old_short if which == 'before' else new_short
+        return result
+    return before, tree, copied, live('before'), live('copy')
+
+
+def test_legacy_saved_copy_oracle_preserves_genuine_owned_points_and_live_bound_identities(workflow):
+    import xml.etree.ElementTree as ET
+    before, tree, copied, before_live, copied_live = saved_copy_example()
+    result = workflow._legacy_saved_source_copy_oracle([before], [ET.tostring(tree)],
+        source_id=SOURCE, copied_id=COPIED, original_owner_id=SAVED_OWNER, destination_id=DEST,
+        before_live=before_live, copied_live=copied_live)
+    assert result['owned_guid_mapping'] == {row[0]: row[1] for row in SAVED_ROLES.values()}
+    assert result['original_preserved'] is True and result['ordered_point_count'] == 2
+    assert result['short_id_classification'] == 'serialized declaration identity bound independently to live short_id'
+
+
+@pytest.mark.parametrize('fault', ['point-value', 'point-order', 'alias', 'missing-member', 'short-id', 'unknown-attribute', 'original-field', 'whitespace-notes'])
+def test_legacy_saved_copy_oracle_rejects_unexplained_saved_or_live_change(workflow, fault):
+    import xml.etree.ElementTree as ET
+    before, tree, copied, before_live, copied_live = saved_copy_example()
+    if fault == 'point-value': copied.find('.//Curve/PointList/Point/YPos').text = '-4'
+    elif fault == 'point-order': copied.find('.//Curve/PointList')[:] = list(reversed(copied.find('.//Curve/PointList')))
+    elif fault == 'alias': copied.find('.//ModulatorLfo').set('ID', SAVED_ROLES['rtpc'][1])
+    elif fault == 'missing-member': copied.find('.//Reference/Custom').clear()
+    elif fault == 'short-id': copied_live['rtpc']['short_id'] += 1
+    elif fault == 'unknown-attribute': copied.find('.//Curve').set('Unexpected', 'retained?')
+    elif fault == 'whitespace-notes':
+        baseline = ET.fromstring(before)
+        source, = [node for node in baseline.iter('SourcePlugin') if node.get('ID') == SOURCE]
+        retained, = [node for node in tree.iter('SourcePlugin') if node.get('ID') == SOURCE]
+        source.find('Comment').text = retained.find('Comment').text = before_live['source']['notes'] = ' '
+        copied.find('Comment').text = copied_live['source']['notes'] = '  '
+        before = ET.tostring(baseline)
+    else:
+        original, = [node for node in tree.iter('SourcePlugin') if node.get('ID') == SOURCE]
+        original.find("PropertyList/Property[@Name='Osc1Transpose']").set('Value', '0')
+    with pytest.raises(AssertionError):
+        workflow._legacy_saved_source_copy_oracle([before], [ET.tostring(tree)], source_id=SOURCE,
+            copied_id=COPIED, original_owner_id=SAVED_OWNER, destination_id=DEST,
+            before_live=before_live, copied_live=copied_live)
+
+
+def saved_copy_runtime(tmp_path, *, fault=None):
+    import xml.etree.ElementTree as ET
+    runtime, commands, writes, task = legacy_runtime(tmp_path)
+    before, tree, copied, before_live, copied_live = saved_copy_example()
+    midi = ET.fromstring(before)
+    midi_unit = midi.find('.//WorkUnit')
+    midi_id = midi_unit.get('ID')
+    directory = task.project_file.parent / 'Actor-Mixer Hierarchy'; directory.mkdir()
+    midi_path, default_path = directory / 'MIDI.wwu', directory / 'Default Work Unit.wwu'
+    midi_path.write_bytes(before)
+    default_path.write_text('<WwiseDocument/>')
+    runtime.sandbox.sandbox_project = task.project_file
+    runtime.sandbox.sandbox_path = task.project_file.parent
+    task.objects[SAVED_OWNER] = task.objects.pop(FIRST)
+    task.objects[SAVED_OWNER].update(id=SAVED_OWNER, name='Synth', path=r'\Actor-Mixer Hierarchy\MIDI\Synth',
+        parent={'id': midi_id})
+    task.objects[SECOND]['filePath'] = str(default_path)
+    task.objects[midi_id] = {'id': midi_id, 'name': 'MIDI', 'type': 'WorkUnit', 'classId': 1638416,
+        'path': r'\Actor-Mixer Hierarchy\MIDI', 'filePath': str(midi_path)}
+    del task.objects[DEST]
+    for role, row in before_live.items():
+        original, replacement, tag, cls, old_short, new_short = SAVED_ROLES[role]
+        task.objects[original] = {**row, 'classId': cls, 'shortId': old_short,
+            'path': r'\Actor-Mixer Hierarchy\MIDI\Synth\Wwise Synth One' if role == 'source' else tag,
+            **({'workunit': {'id': midi_id}} if role == 'source' else {})}
+        task.objects[original].pop('class_id')
+    from tests.unit.test_field_interface_closure_gateway import PROJECT
+    task.objects[PROJECT] = {'id': PROJECT, 'name': 'Fixture', 'type': 'Project', 'path': '\\',
+        'filePath': str(tmp_path / 'unowned/Other.wproj') if fault == 'wrong-project' else str(task.project_file)}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if fault == 'wrong-project' and uri.endswith('object.get') and (args or {}).get('waql') == 'from type Project take 1':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            from tests.unit.test_field_interface_closure_gateway import PROJECT
+            return {'return': task.project_rows([{'id': PROJECT, 'name': 'Other project', 'type': 'Project',
+                'path': '\\', 'filePath': str(tmp_path / 'unowned/Other.wproj')}], options)}
+        if uri.endswith('project.save'):
+            task.calls.append((uri, deepcopy(args or {}), deepcopy(options or {}))); writes.append((uri, {}))
+            document = ET.Element('WwiseDocument')
+            unit = ET.SubElement(document, 'WorkUnit', {'ID': SECOND, 'Name': 'Default Work Unit'})
+            children = ET.SubElement(unit, 'ChildrenList')
+            destinations = [row for row in task.objects.values() if row.get('parent') == {'id': SECOND} and row['type'] == 'Sound']
+            for row in destinations:
+                sound = ET.SubElement(children, 'Sound', {'ID': row['id'], 'Name': row['name']})
+                if COPIED in task.objects:
+                    ET.SubElement(sound, 'ChildrenList').append(deepcopy(copied))
+            if fault == 'save-error' and COPIED in task.objects:
+                raise RuntimeError('Final Save failed; preserve first attempt')
+            default_path.write_bytes(ET.tostring(document))
+            return {}
+        if uri.endswith('object.get') and ' select @ControlInput ' in (args or {}).get('waql', ''):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            identity = args['waql'].split('"')[1]
+            assert identity == SAVED_ROLES['rtpc'][1]
+            return {'return': task.project_rows([task.objects[SAVED_ROLES['control_input'][1]]], options)}
+        result = original(uri, args, options)
+        if uri.endswith('object.copy'):
+            for role, row in copied_live.items():
+                if role == 'source':
+                    task.objects[COPIED].update(shortId=row['short_id'], notes=row['notes'], workunit={'id': SECOND})
+                    continue
+                task.objects[row['id']] = {**row, 'classId': row['class_id'],
+                    'shortId': row.get('short_id'), 'path': row['type']}
+            if fault == 'point-value': copied.find('.//Curve/PointList/Point/YPos').text = '99'
+            if fault == 'live-owner': task.objects[SAVED_ROLES['control_input'][1]]['owner'] = {'id': SOURCE}
+        return result
+    task.call = call
+    if fault == 'project-drift':
+        original_raw = runtime.raw_gateway
+        def drift_after_copy_verify(argv):
+            result = original_raw(argv)
+            if argv[0] == 'verify' and COPIED in task.objects:
+                task.objects[PROJECT]['filePath'] = str(tmp_path / 'unowned/Other.wproj')
+            return result
+        runtime.raw_gateway = drift_after_copy_verify
+    return runtime, commands, writes, task
+
+
+def test_legacy_saved_copy_collector_uses_four_public_transactions_and_bounded_file_proofs(tmp_path, workflow, request):
+    runtime, commands, writes, task = saved_copy_runtime(tmp_path)
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and category['business_effect_verified'] is False
+    assert receipt['saved_copy_verified'] is True and receipt['collection_complete'] is True
+    assert [row['name'] for row in receipt['phases']] == ['save_baseline', 'create_empty_destination', 'copy_source_only', 'save_final']
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy', 'save']
+    assert len([argv for argv in commands if argv[0] == 'execute']) == 4
+    assert len(commands) <= receipt['limits']['calls'] == 128
+    assert not any(argv[:2] in (['metadata', 'list'], ['metadata', 'detail']) for argv in commands)
+    assert receipt['oracle']['ordered_point_count'] == 2 and receipt['oracle']['original_preserved']
+    assert set(receipt['model_images']) == {'before', 'after'}
+    assert all(value['complete'] for value in receipt['model_images'].values())
+    from tests.destructive.support.category_evidence import build_category_evidence_record
+    from tests.destructive.support.exact_real_evidence import exact_transaction_outcomes
+    record = build_category_evidence_record(repo_root=workflow.REPO_ROOT, candidate=runtime.candidate,
+        version='2021.1', host={'is_command_line': True}, categories=[category], source={},
+        residual_state={'sandbox': 'quarantined_pending_release', 'quarantine_path': str(tmp_path)},
+        invocation={'selected_test_nodeids': [request.node.nodeid], 'node_outcomes': [
+            {'nodeid': request.node.nodeid, 'outcome': 'PASS'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'prepared', 'outcome': 'PENDING'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    assert record['categories'][0]['diagnostic_only'] is True
+    assert record['categories'][0]['business_effect_verified'] is False
+    assert len(record['transactions']) == 4
+    (tmp_path / 'budget.json').write_text(json.dumps({key: receipt[key] for key in ('archive_bytes', 'total_reply_bytes')}
+        | {'calls': len(commands), 'native_files': len(receipt['native_evidence']),
+           'max_reply_bytes': max(row['reply']['size'] for row in receipt['calls']),
+           'receipt_bytes': Path(category['observation_path']).stat().st_size,
+           'model_bytes': sum(row['total_bytes'] for row in receipt['model_images'].values())}))
+
+
+@pytest.mark.parametrize('fault', ['point-value', 'live-owner', 'save-error'])
+def test_legacy_saved_copy_failure_keeps_single_attempt_and_original_evidence(tmp_path, workflow, fault):
+    runtime, commands, writes, task = saved_copy_runtime(tmp_path, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True)
+    receipt = json.loads((runtime.state_dir / 'legacy-source-saved-copy.json').read_text())
+    assert receipt['collection_complete'] is False and receipt['saved_copy_verified'] is False
+    assert runtime.category_results[0]['status'] == 'FAIL' and receipt['failure']
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy', 'save']
+    executed = [argv[1] for argv in commands if argv[0] == 'execute']
+    assert len(executed) == len(set(executed)) == 4
+    assert all(phase['execution_attempted'] for phase in receipt['phases'])
+    assert receipt['native_evidence'] and receipt['model_images']['before']['complete']
+    if fault == 'save-error':
+        failed = json.loads(Path(receipt['calls'][-1]['reply']['path']).read_text())
+        assert 'Final Save failed; preserve first attempt' in json.dumps(failed)
+        assert 'after' not in receipt['model_images']
+    else:
+        assert receipt['model_images']['after']['complete']
+
+
+@pytest.mark.parametrize('fault', ['wrong-project', 'project-drift'])
+def test_legacy_saved_copy_refuses_save_outside_exact_owned_project(tmp_path, workflow, fault):
+    runtime, commands, writes, task = saved_copy_runtime(tmp_path, fault=fault)
+    with pytest.raises(AssertionError, match='Save requires the exact owned sandbox project'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True)
+    if fault == 'wrong-project':
+        assert writes == [] and not any(argv[0] in {'typed-zero-call', 'draft-start', 'execute'} for argv in commands)
+    else:
+        assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy']
+        assert len([argv for argv in commands if argv[0] == 'typed-zero-call']) == 1
