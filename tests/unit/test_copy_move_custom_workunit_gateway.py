@@ -154,3 +154,26 @@ def test_source_transfer_verification_rejects_class_contradiction_after_one_writ
     else: next(row for row in task.types if row['classId'] == task.objects[FIRST]['classId'])['type'] = 'Effect'
     code, result = task.run('verify', tx)
     assert code == 2 and result.get('verified') is not True and len(task.writes) == 1, result
+
+
+@pytest.mark.parametrize('operation', ['object.copy', 'object.move'])
+@pytest.mark.parametrize('missing_type', [False, True])
+def test_registry_transfer_requires_actual_source_type_even_under_default_workunit(tmp_path, operation, missing_type):
+    from wwise_waapi.builders.common import SemanticValidationError
+    from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT, parse_operation_request, prepare_operation
+    task = TransferTask(tmp_path, '2025.1', operation, default=True)
+    request = parse_operation_request({'contract': OPERATION_REQUEST_CONTRACT, 'version': '2025.1',
+        'operation': operation, 'arguments': {'object': {'kind': 'id', 'value': FIRST}, 'parent': {'kind': 'id', 'value': SECOND}}})
+    def read(uri, args, options):
+        result = task.call(uri, args, options)
+        if missing_type and uri.endswith('object.get'):
+            for row in result.get('return', []):
+                if row.get('id') == FIRST: row.pop('type', None)
+        return result
+    if missing_type:
+        with pytest.raises(SemanticValidationError, match='source.type'):
+            prepare_operation(request, read_call=read)
+    else:
+        prepared = prepare_operation(request, read_call=read)
+        assert prepared.as_dict()['dispatch']['args']['parent'] == SECOND
+    assert task.writes == []
