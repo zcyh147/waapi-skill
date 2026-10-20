@@ -959,3 +959,37 @@ def test_known_pointer_outside_source_does_not_alias_owned_declaration(tmp_path,
     code, verified = task.run(*result['next_command']['gateway_argv'])
     assert code == 0 and verified['verification']['verification_scope']['complete_copy_preservation'] is True, verified
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('unreviewed', ['new-tag', 'same-tag-wrong-class'])
+def test_unreviewed_owned_class_keeps_source_copy_partial(tmp_path, unreviewed):
+    runtime, writes, task, mapping = repeated_saved_source_task(tmp_path)
+    identity = SAVED_ROLES['control_input'][0]
+    path = Path(task.objects[SOURCE]['filePath'])
+    document = ET.parse(path)
+    node, = [node for node in document.iter('ModulatorLfo') if node.get('ID') == identity]
+    if unreviewed == 'new-tag':
+        node.tag = task.objects[identity]['type'] = 'ModulatorEnvelope'
+        task.objects[identity]['classId'] = 4259856  # Matching packaged 2021 type catalog.
+        node.find('PropertyList').clear()
+        # Valid complete typed scalar observations at the fake-native boundary;
+        # matching XML/live type and readable values do not certify a new class.
+        call = task.call
+        def observed(uri, args=None, options=None):
+            args = args or {}
+            if args.get('object') == identity:
+                if uri.endswith('getPropertyAndReferenceNames'):
+                    return {'return': ['Color', 'OverrideColor']}
+                if uri.endswith('getPropertyInfo'):
+                    return {'name': args['property'], 'type': 'bool' if args['property'] == 'OverrideColor' else 'int16'}
+            return call(uri, args, options)
+        task.call = observed
+    else:
+        task.objects[identity]['classId'] += 1
+    document.write(path)
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['state'] == 'verified', result
+    assert result['verification']['verification_scope']['complete_copy_preservation'] is False
+    assert 'next_command' not in result
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']

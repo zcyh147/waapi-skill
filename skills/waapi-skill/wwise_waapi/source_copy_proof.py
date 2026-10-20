@@ -23,6 +23,8 @@ CHILD_PREFIX = 'od1-f54c50'
 SAVE = 'ak.wwise.core.project.save'
 # Native host/build and Source class admission remain separate from graph shape.
 SOURCE_CLASS = 9699330
+# Native-proven declaration classes are independent of address/cardinality.
+OWNED_CLASSES = {'RTPC': 1441808, 'ModulatorLfo': 4194320, 'Curve': 917520}
 GRAPH_FORMAT = 'waapi-skill.source-copy-owned-declarations/v1'
 # Concrete GUID-pointer encodings in the matching 2021 saved SampleProject.
 # They are not declarations. Unknown encodings are never admitted by suffix.
@@ -217,8 +219,10 @@ def live_roles(nodes, owner, read):
     owners, controls = graph_edges(nodes)
     field_count = 0
     for role, node in nodes.items():
+        expected_class = SOURCE_CLASS if role == 'source' else OWNED_CLASSES.get(node.tag)
+        require_shape(expected_class is not None, 'Saved owned declaration class has no reviewed native authority')
         row = exact(guid(node.get('ID')), ['name', 'type', 'classId', 'parent', 'owner', 'notes', 'shortId'], read)
-        require(type(row.get('classId')) is int and row['classId'] > 0
+        require(type(row.get('classId')) is int and row['classId'] == expected_class
             and row.get('type') in ({'Source', 'SourcePlugin'} if role == 'source' else {node.tag}),
             'Saved/live role class or type differs')
         expected_owner = owner if role == 'source' else nodes[owners[role]].get('ID')
