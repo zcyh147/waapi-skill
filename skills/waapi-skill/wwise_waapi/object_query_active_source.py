@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any, Callable, Mapping
 from uuid import UUID
 
-from .builders.query import MAX_QUERY_TAKE, build_object_get_query
+from .builders.query import MAX_QUERY_TAKE, MAX_STRUCTURED_SOURCE_ITEMS, build_object_get_query
 from .business_declarations import normalize_live_object_identity
 from .canonical import canonical_sha256
 from .host_paths import HostPathError, parse_absolute_host_path
@@ -81,9 +81,17 @@ def _sound_facts(row):
     return result
 
 
-def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], platform: str,
+def _selected_source(sound, candidates, language):
+    matching = [row for row in candidates.values() if row["original_path"] == sound["originalWavFilePath"]
+                and row["language"] == {"id": language["id"], "name": language["name"]}]
+    if len(matching) != 1:
+        _fail("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "The selected Sound path does not identify one exact language-matching source.")
+    return {"id": matching[0]["id"], "name": matching[0]["name"]}
+
+
+def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], platform: str,
                                language: str, return_fields: tuple[str, ...], live_info: Mapping[str, Any],
-                               project_before: Mapping[str, Any] | None = None):
+                               project_before: Mapping[str, Any] | None = None, broad: bool = False):
     """Return the unchanged requested Sound row plus an independently joined reference.
 
     No row order, import return value or serialized project file is an oracle.
@@ -138,61 +146,77 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
     before_project = ({**_identity(project_before), "filePath": project_before["filePath"]}
                       if project_before is not None else project())
     fields = tuple(dict.fromkeys((*return_fields, *SOURCE_FACTS)))
-    before, preview = rows(**selector, return_fields=fields, maximum=1, **view)
-    if not before:
+    before, preview = rows(**selector, return_fields=fields, maximum=MAX_QUERY_TAKE if broad else 1, **view)
+    if broad and len(before) == MAX_QUERY_TAKE:
+        _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The Sound query reached its observation fence.")
+    if not before and not broad:
         return [], preview, {"method": "unique_same_view_original_path", "sound_count": 0}, before_project
-    owner = before[0]
-    identity = _identity(owner)
-    if identity["type"] != "Sound" or not _class_matches(owner.get("classId"), classes["Sound"]):
-        _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Active-source derivation requires an actual class-proven Sound.")
-    if "object_id" in selector and _guid(selector["object_id"]) != identity["id"] or "path" in selector and selector["path"] != identity["path"]:
-        _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The exact Sound selector returned another object.")
-    before_sound = _sound_facts(owner)
-    wanted_path = before_sound["originalWavFilePath"]
+    owners = {}
+    for owner in before:
+        if broad and owner.get("type") != "Sound":
+            continue  # Ordinary projection reports this output unavailable on these retained rows.
+        identity = _identity(owner)
+        if identity["type"] != "Sound" or not _class_matches(owner.get("classId"), classes["Sound"]):
+            _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Active-source derivation requires an actual class-proven Sound.")
+        if not broad and (selector.get("object_id") is not None and _guid(selector["object_id"]) != identity["id"]
+                          or selector.get("path") is not None and selector["path"] != identity["path"]):
+            _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The exact Sound selector returned another object.")
+        owners[identity["id"]] = _sound_facts(owner)
+
+    owner_ids = list(owners)
+    batches = [owner_ids[start:start + MAX_STRUCTURED_SOURCE_ITEMS]
+               for start in range(0, len(owner_ids), MAX_STRUCTURED_SOURCE_ITEMS)]
 
     def children():
-        values, _ = rows(object_id=identity["id"], select=("children",), take=MAX_QUERY_TAKE,
-                         return_fields=SOURCE_FACTS, **view)
-        if len(values) == MAX_QUERY_TAKE:
-            _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The complete child set reached its result fence.")
-        facts = {}
-        for row in values:
-            actual = _identity(row)
-            if _guid(row.get("parent")) != identity["id"]:
-                _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child belongs to another parent.")
-            if actual["path"] != identity["path"] + "\\" + actual["name"]:
-                _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child's actual hierarchy path differs from its direct parent.")
-            if actual["type"] != "AudioFileSource":
-                _fail("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "Non-file source selection remains unresolved.")
-            if not _class_matches(row.get("classId"), classes["AudioSource"]):
-                _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child's actual class differs from its semantic class.")
-            source_language = row.get("audioSource:language")
-            if not isinstance(source_language, Mapping) or not isinstance(source_language.get("name"), str):
-                _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The actual source language is incomplete.")
-            language_id = _guid(source_language)
-            facts[actual["id"]] = {**actual, "classId": row["classId"], "parent": identity["id"],
-                "language": {"id": language_id, "name": source_language["name"]},
-                "original_path": _file_path(row)}
+        facts = {owner_id: {} for owner_id in owners}
+        observed_ids = set()
+        for batch in batches:
+            child_selector = {"object_ids": batch} if broad else {"object_id": batch[0]}
+            values, _ = rows(**child_selector, select=("children",), take=MAX_QUERY_TAKE,
+                             return_fields=SOURCE_FACTS, **view)
+            if len(values) == MAX_QUERY_TAKE:
+                _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The complete child set reached its result fence.")
+            for row in values:
+                actual = _identity(row)
+                parent = _guid(row.get("parent"))
+                if parent not in batch or actual["id"] in observed_ids:
+                    _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child belongs to another parent or repeats a GUID.")
+                observed_ids.add(actual["id"])
+                if actual["path"] != owners[parent]["path"] + "\\" + actual["name"]:
+                    _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child's actual hierarchy path differs from its direct parent.")
+                if actual["type"] != "AudioFileSource":
+                    _fail("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "Non-file source selection remains unresolved.")
+                if not _class_matches(row.get("classId"), classes["AudioSource"]):
+                    _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child's actual class differs from its semantic class.")
+                source_language = row.get("audioSource:language")
+                if not isinstance(source_language, Mapping) or not isinstance(source_language.get("name"), str):
+                    _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The actual source language is incomplete.")
+                language_id = _guid(source_language)
+                facts[parent][actual["id"]] = {**actual, "classId": row["classId"], "parent": parent,
+                    "language": {"id": language_id, "name": source_language["name"]},
+                    "original_path": _file_path(row)}
         return facts
 
     before_children = children()
-    matching = [row for row in before_children.values() if row["original_path"] == wanted_path
-                and row["language"] == {"id": selected_language["id"], "name": selected_language["name"]}]
-    if len(matching) != 1:
-        _fail("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "The selected Sound path does not identify one exact language-matching source.")
+    selections = {owner_id: _selected_source(owner, before_children[owner_id], selected_language)
+                  for owner_id, owner in owners.items()}
     if children() != before_children:
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "Source membership or selection facts changed during observation.")
-    after, _ = rows(object_id=identity["id"], return_fields=fields, maximum=1, **view)
-    if len(after) != 1 or _sound_facts(after[0]) != before_sound or project() != before_project:
+    after_selector = selector if broad else {"object_id": owner_ids[0]}
+    after, _ = rows(**after_selector, return_fields=fields, maximum=MAX_QUERY_TAKE if broad else 1, **view)
+    def owner_facts(values):
+        return [_sound_facts(row) if row.get("type") == "Sound" else dict(row) for row in values]
+    if owner_facts(after) != owner_facts(before) or project() != before_project:
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "The Sound or project changed during observation.")
     after_info = read("ak.wwise.core.getInfo", {}, {})
     if any(after_info.get(key) != live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")):
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "The Wwise host changed during observation.")
-    selected = matching[0]
-    return [{**owner, "active_source": {"id": selected["id"], "name": selected["name"]}}], preview, {
+    return [{**owner, **({"active_source": selections[_guid(owner["id"])]} if owner.get("type") == "Sound" else {})}
+            for owner in before], preview, {
         "method": "unique_same_view_original_path", "platform": selected_platform, "language": selected_language,
-        "source_count": len(before_children), "complete": True, "stable_observation": True,
-        "observation_sha256": canonical_sha256({"project": before_project, "sound": before_sound,
+        "source_count": sum(map(len, before_children.values())), "sound_count": len(owners),
+        "complete": True, "stable_observation": True,
+        "observation_sha256": canonical_sha256({"project": before_project, "sounds": owner_facts(before),
             "children": before_children, "view": view}),
         "atomic": False, "native_absence_proven": False,
     }, before_project

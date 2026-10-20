@@ -1474,6 +1474,102 @@ def test_2021_active_source_preserves_parent_identity_across_native_reference_re
     assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
 
 
+def _legacy_multi_sound_client(tmp_path):
+    original, ids = _legacy_active_source_client(tmp_path)
+    second_sound = "{88888888-8888-8888-8888-888888888888}"
+    second_active = "{99999999-9999-9999-9999-999999999999}"
+    second_inactive = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    parent = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    sounds = [
+        {"id": ids["sound"], "name": "Rain", "type": "Sound", "classId": 65552,
+         "path": r"\Sounds\Rain", "parent": {"id": parent},
+         "originalWavFilePath": "/owned/Originals/SFX/Beta.wav"},
+        {"id": second_sound, "name": "RainLoop", "type": "Sound", "classId": 65552,
+         "path": r"\Sounds\RainLoop", "parent": {"id": parent},
+         "originalWavFilePath": "/owned/Originals/SFX/Gamma.wav"},
+    ]
+    children = [
+        {"id": identity, "name": name, "type": "AudioFileSource", "classId": 16,
+         "path": owner["path"] + "\\" + name, "parent": {"id": owner["id"]},
+         "audioSource:language": {"id": ids["language"], "name": "SFX"},
+         "originalWavFilePath": "/owned/Originals/SFX/" + name + ".wav"}
+        for owner, sources in (
+            (sounds[0], (("{22222222-2222-2222-2222-222222222222}", "Alpha"), (ids["active"], "Beta"))),
+            (sounds[1], ((second_active, "Gamma"), (second_inactive, "Delta"))),
+        )
+        for identity, name in sources
+    ]
+
+    class MultiSoundClient(type(original)):
+        include_container = False
+
+        def call(self, uri, args=None, options=None):
+            query = (args or {}).get("waql", "")
+            if uri == "ak.wwise.core.object.get" and (query.startswith("from type Sound")
+                    or parent in query and "select children" in query):
+                rows = list(sounds)
+                if self.include_container:
+                    rows.insert(1, {"id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}", "name": "Layers",
+                                    "type": "Folder", "path": r"\Sounds\Layers", "parent": {"id": parent}})
+            elif uri == "ak.wwise.core.object.get" and "select children" in query:
+                rows = [row for row in children if row["parent"]["id"] in query]
+            else:
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args), dict(options)))
+            return {"return": [{key: row[key] for key in options["return"] if key in row} for row in rows]}
+
+    return MultiSoundClient("2021.1"), {**ids, "second_sound": second_sound, "second_active": second_active,
+                                      "container": parent}
+
+
+def test_2021_active_source_derives_each_sound_from_closed_name_predicate(tmp_path):
+    client, ids = _legacy_multi_sound_client(tmp_path)
+    code, result = gateway.execute_gateway([
+        "query-object", "--kind", "all-sounds", "--predicate", "name-contains", "Rain",
+        "--max-results", "10", "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"] == [
+        {"id": ids["sound"], "name": "Rain", "type": "Sound", "path": r"\Sounds\Rain",
+         "active_source": {"id": ids["active"], "name": "Beta"}},
+        {"id": ids["second_sound"], "name": "RainLoop", "type": "Sound", "path": r"\Sounds\RainLoop",
+         "active_source": {"id": ids["second_active"], "name": "Gamma"}},
+    ]
+    assert list(result)[-1] == "agent_result"
+    owner_queries = [args["waql"] for uri, args, _ in client.calls
+                     if uri.endswith("object.get") and args.get("waql", "").startswith("from type Sound")]
+    assert owner_queries == ['from type Sound where name : "Rain" take 10'] * 2
+
+
+def test_2021_active_source_derives_sound_results_of_closed_children_relationship(tmp_path):
+    client, ids = _legacy_multi_sound_client(tmp_path)
+    code, result = gateway.execute_gateway([
+        "query-object", "--exact-id", ids["container"], "--relationship", "children",
+        "--predicate", "kind-is", "sound", "--max-results", "10",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert [(row["id"], row["active_source"]["id"]) for row in result["agent_result"]] == [
+        (ids["sound"], ids["active"]), (ids["second_sound"], ids["second_active"])]
+    owner_queries = [args["waql"] for uri, args, _ in client.calls
+                     if uri.endswith("object.get") and ids["container"] in args.get("waql", "")]
+    assert owner_queries == ['from object "' + ids["container"] + '" select children where type = "Sound" take 10'] * 2
+
+
+def test_2021_active_source_preserves_non_sound_rows_with_existing_unavailable_projection(tmp_path):
+    client, ids = _legacy_multi_sound_client(tmp_path)
+    client.include_container = True
+    code, result = gateway.execute_gateway([
+        "query-object", "--exact-id", ids["container"], "--relationship", "children", "--max-results", "10",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"][1] == {"id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}", "name": "Layers",
+        "type": "Folder", "path": r"\Sounds\Layers", "unavailable_fields": ["active_source"]}
+    assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
+    assert result["agent_result"][2]["active_source"]["id"] == ids["second_active"]
+
+
 def test_2021_active_source_composes_with_live_selected_property_without_native_derived_accessor(tmp_path):
     client, ids = _legacy_active_source_client(tmp_path)
     code, result = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"], "--platform", "Mac",

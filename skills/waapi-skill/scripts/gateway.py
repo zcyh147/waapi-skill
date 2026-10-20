@@ -5851,10 +5851,8 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
     args.query_output_bindings = tuple(bindings)
     args.query_derived_outputs = tuple(binding[2] for binding in bindings if binding[0] == "derived")
     if args.query_derived_outputs:
-        if (not (args.path is not None or args.object_id is not None or args.path_segments) or args.relationships
-                or args.business_predicates or args.advanced_waql is not None
-                or args.query_platform is None or args.query_language is None):
-            raise GatewayInputError("2021.1 active-source derivation currently requires one exact Sound, explicit platform and language, and no predicates or relationships; other shapes remain #181 work")
+        if (args.advanced_waql is not None or args.query_platform is None or args.query_language is None):
+            raise GatewayInputError("2021.1 active-source derivation requires a closed business query and explicit platform and language; advanced shapes remain #181 work")
     args.query_return_fields = (
         *SELECTED_REQUIRED_RETURN_FIELDS,
         *native_fields,
@@ -15416,14 +15414,31 @@ def dispatch_command(
         _require_exact_identity_return_field(args, return_fields)
         if getattr(args, "query_derived_outputs", ()):
             from wwise_waapi.object_query_active_source import ActiveSourceQueryError, resolve_2021_active_source
+            from wwise_waapi.canonical import canonical_json_bytes
+            _require_explicit_query_bound(args)
+            broad = not ((args.object_id is not None or args.path is not None) and not args.select and not where)
+            selector = ({"object_id": args.object_id} if args.object_id is not None else {"path": args.path})
+            if broad:
+                selector = {"path": args.path, "object_id": args.object_id, "object_ids": args.object_ids,
+                    "type": args.object_type, "search": args.search, "query": args.query,
+                    "where": where, "select": tuple(args.select or ()), "take": args.take}
+            read_limit = 40 if broad else 10
             calls = []
+            observed_bytes = 0
             configuration = selected_connection_binding(env)
             def read_active_source(api, native_args, native_options):
-                if len(calls) >= 10:
+                nonlocal observed_bytes
+                if len(calls) >= read_limit:
                     raise GatewayResultShapeError("Active-source observation exceeded its owned read budget",
                         error_code="ACTIVE_SOURCE_OBSERVATION_INCOMPLETE")
                 call = dispatch(dispatcher, api, connection=connection, version=detected_version,
                     args=native_args, options=native_options)
+                result_bytes = len(canonical_json_bytes(call.get("result")))
+                if result_bytes > read_limit * MAX_GATEWAY_RESULT_JSON_BYTES - observed_bytes:
+                    raise GatewayResultShapeError("Active-source observation exceeded its aggregate byte budget",
+                        details={"completed_calls": len(calls), "observed_bytes": observed_bytes},
+                        error_code="ACTIVE_SOURCE_OBSERVATION_INCOMPLETE")
+                observed_bytes += result_bytes
                 calls.append(dispatch_call_summary(call))
                 if not call.get("ok"):
                     raise GatewayResultShapeError("Active-source observation failed", details={"calls": calls},
@@ -15431,7 +15446,7 @@ def dispatch_command(
                 return call["result"]
             try:
                 native_rows, preview, source_proof, project_observation = resolve_2021_active_source(read=read_active_source,
-                    selector={"object_id": args.object_id} if args.object_id is not None else {"path": args.path},
+                    selector=selector, broad=broad,
                     platform=args.query_platform, language=args.query_language,
                     return_fields=tuple(return_fields), live_info=live_info,
                     project_before=getattr(args, "query_project_observation", None))
@@ -15441,10 +15456,14 @@ def dispatch_command(
             if configuration != selected_connection_binding(env):
                 raise GatewayResultShapeError("Query configuration changed", error_code="ACTIVE_SOURCE_OBSERVATION_CHANGED")
             args.query_project_observation = project_observation
+            validate_exact_query_identity(args, native_rows)
+            validate_query_business_view_result(args, native_rows)
             business_rows = _project_query_business_rows(args, native_rows)
             query_payload = {"ok": True, "status": "ok", **common, "semantic_preview": preview.as_dict(),
                 "query_bound": _query_bound_summary(args), "calls": calls, "active_source_resolution": source_proof,
                 "count": len(business_rows), "objects": business_rows,
+                **_query_incomplete_identity_observation({"result": {"return": native_rows}}, business_rows),
+                **({"mutation_selection": selection} if (selection := _query_mutation_selection(args, business_rows)) else {}),
                 "agent_result": business_rows}
             continuations = _query_business_continuations(args, business_rows)
             if continuations:
