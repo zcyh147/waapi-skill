@@ -3691,6 +3691,7 @@ def test_policy_authorized_allow_changes_executes_once_and_can_verify(
     )
     execute_client = FakeClient(
         {
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
             "ak.wwise.core.object.get": [
@@ -3726,9 +3727,10 @@ def test_policy_authorized_allow_changes_executes_once_and_can_verify(
 
     verify_client = FakeClient(
         {
+            "ak.wwise.core.object.getTypes": [create_type_catalog()],
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
-            "ak.wwise.core.object.get": [{"return": [created_row()]}],
+            "ak.wwise.core.object.get": [{"return": [{**created_row(), "type": "ActorMixer", "classId": 1}]}],
         }
     )
     verify_exit, verified = execute(
