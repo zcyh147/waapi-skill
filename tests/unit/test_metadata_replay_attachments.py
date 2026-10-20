@@ -532,12 +532,14 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
     assert result() == ('passed',None)
     source_pin = 'ee78f00baf06f1840228313ae1bb6b263fd95301'
     tone_pin = '8d0157647035504a6ab4e4d9e9b06e8b6ec8985d'
+    gateway_pin = '4a6208a15d19f847b3bac848a075229eb3547585'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
                  'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
                  'operation_composer.py','operation_drafts.py','transaction_runtime.py','source_copy_proof.py'):
         relative = ('skills/waapi-skill/scripts/' if name == 'gateway.py' else 'skills/waapi-skill/wwise_waapi/')+name
-        accepted = tone_pin if name in ('operation_tone.py','host_ui_debug_business_contracts.py') else source_pin
+        accepted = (gateway_pin if name=='gateway.py' else
+            tone_pin if name in ('operation_tone.py','host_ui_debug_business_contracts.py') else source_pin)
         raw = subprocess.check_output(['git','show',accepted+':'+relative],cwd=audit.ROOT)
         packets[audit.ROOT/relative] = raw
     read_bytes = Path.read_bytes

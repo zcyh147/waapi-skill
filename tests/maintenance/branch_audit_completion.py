@@ -531,11 +531,12 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         'docs/branch-coverage-requirements.json','tests/unit/test_metadata_default_branch_evidence.py',
         'tests/support/media_pool_branch_evidence.py'}
     # Reviewed saved-copy ee78f00baf06f1840228313ae1bb6b263fd95301 and
-    # stationary-square 8d0157647035504a6ab4e4d9e9b06e8b6ec8985d.
+    # stationary-square 8d0157647035504a6ab4e4d9e9b06e8b6ec8985d, plus
+    # Gateway-only choice disclosure4a6208a15d19f847b3bac848a075229eb3547585.
     # Full original/current maps remain mandatory. All thirteen exact runtime
     # pairs occur together, including both explicit new-file before=None rows.
     # Future hashes and partially combined runtimes are not this bridge.
-    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': '62db192ec33ed3c6e2b97e75411dc571e5fbb594d06f746d24ee312b9321ce66',
+    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': 'f86e1102b99d7d552dd1fabebbda7ea4a3020f21b796233bdfc69186123c711c',
                                            'before': '1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca'},
  'skills/waapi-skill/wwise_waapi/core_business.py': {'after': '62e361dd638a53af8b62455ec5c414bff7e5e9a9fdf6a2a419edb44a6f970bb6',
                                                      'before': '2cbf4c4aa6aeca19af2bad665f36d1b0f3bbbcdc148e7da360973574ae0a2f46'},
@@ -653,9 +654,9 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
         'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_default_branch_evidence.py',
         'tests/support/media_pool_branch_evidence.py'}
     changes=producer.source_changes(before,after)
-    # Same two reviewed successor pins as R51 above; original R54 runtime is8a.
+    # Same reviewed successors and Gateway-only4a disclosure as R51 above; original R54 is8a.
     # These eight exact pairs do not grant native credit to the current source.
-    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': '62db192ec33ed3c6e2b97e75411dc571e5fbb594d06f746d24ee312b9321ce66',
+    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': 'f86e1102b99d7d552dd1fabebbda7ea4a3020f21b796233bdfc69186123c711c',
                                            'before': '9fead77024b8646db90fa6d80a16933c5bbe05c3f83f10c6d40ef8b8f7b86ebe'},
  'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'after': '4e231f2b1556d38b61534ab98889b309a136f7bdfd2631ceb5a20d80fefc979e',
                                                                         'before': 'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
