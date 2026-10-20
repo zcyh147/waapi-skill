@@ -8550,6 +8550,8 @@ def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime
                 'sentinel': exact(sentinel_id, sound=True), 'sentinel_children': children(sentinel_id), 'parent': exact(parent['id'])}, current_target
         before, owner = preservation()
         assert before['sources'] == sources and before['sentinel'] == sentinel and before['parent'] == parent
+        assert before['sound'] == {key: value for key, value in target.items() if key != 'active_source'}, 'Source setup changed the original Sound fields'
+        assert before['sentinel_children'] == [], 'Source setup changed the unrelated Sound child set'
         assert len(before['children']) == 2 and {uuid.UUID(row['id']) for row in before['children']} == {uuid.UUID(row['id']) for row in sources}, before
         initial = active(owner); assert initial in {str(uuid.UUID(row['id'])) for row in sources}, owner
         selected, = [row for row in sources if str(uuid.UUID(row['id'])) != initial]
