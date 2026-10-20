@@ -464,6 +464,7 @@ def expected_preview_calls() -> list[
             {"property": "Volume", "object": OBJECT_GUID},
             {},
         ),
+        ("ak.wwise.core.getProjectInfo", {}, {}),  # optional history observer remains unobserved
         (
             "ak.wwise.core.object.get",
             {"from": {"id": [OBJECT_GUID]}},

@@ -768,9 +768,17 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
         assert not rejected.get("transaction_id"), rejected
         assert state_bytes() == before  # every existing immutable child artifact/journal byte remains exact
         parent_after = json.loads(parent_path.read_text())
-        assert {key: value for key, value in parent_after.items() if key != "audit"} == {
-            key: value for key, value in parent_before.items() if key != "audit"}
-        # A recorded rejection audit is allowed; parent state/seal/reservation are unchanged.
+        unchanged = lambda record: {key: value for key, value in record.items()
+            if key not in {"audit", "record_digest", "connection_binding"}}
+        assert unchanged(parent_after) == unchanged(parent_before)
+        assert parent_after["connection_binding"]["configuration"] == parent_before["connection_binding"]["configuration"]
+        if "live" in parent_before["connection_binding"]:
+            assert parent_after["connection_binding"]["live"] == parent_before["connection_binding"]["live"]
+        else:
+            live = parent_after["connection_binding"]["live"]
+            assert live["project_id"] == "{33333333-3333-3333-3333-333333333333}"
+            assert live["version"]["year"] == int(version[:4]) and live["version"]["major"] == 1
+        # First live attestation/rejection audit may be recorded; no parent Preview/seal/reservation is created.
         assert not any(uri.startswith("ak.wwise.core.undo.") or uri.endswith(("object.setNotes", "object.setName", "object.setProperty", "object.setReference"))
                        for uri, _args, _options in client.calls[calls_before:])
         return rejected
