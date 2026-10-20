@@ -8,6 +8,38 @@
         "native"
       ],
       "reason": "Exact Console moveSingle result shape plus independent saved-media migration effects; injected public Gateway proof alone does not certify native effects. This fixed file-based slice needs no metadata/Fresh requirement."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.mediaPool.get|/optionsSchema/@definition/waapi_definitions.json/definitions/mediaPoolReturnOption/anyOf/0/enum/0": {
+      "native_shape_sha256": "ee6251f853e10e7fb27ede4afb9f240c17ecb0b38e1616539efb062c40fbd792",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact 2025.1 Console Media Pool fixed return options through a closed public read and lossless projection. Injected program evidence does not establish real native host behavior; native remains required. This fixed-enum slice needs no live metadata or separate Fresh interaction."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.mediaPool.get|/optionsSchema/@definition/waapi_definitions.json/definitions/mediaPoolReturnOption/anyOf/4/enum/0": {
+      "native_shape_sha256": "60bb3338e0ad558c986d5dd4e957de1185ad02fdfa4edd6640c5c2bd0b97826e",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact 2025.1 Console Media Pool fixed return options through a closed public read and lossless projection. Injected program evidence does not establish real native host behavior; native remains required. This fixed-enum slice needs no live metadata or separate Fresh interaction."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.mediaPool.get|/optionsSchema/@definition/waapi_definitions.json/definitions/mediaPoolReturnOption/anyOf/5/enum/0": {
+      "native_shape_sha256": "ed407d08538bdf0f69552bf2e032b2fe5e3966c01a1d130f616c52b219293bfc",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact 2025.1 Console Media Pool fixed return options through a closed public read and lossless projection. Injected program evidence does not establish real native host behavior; native remains required. This fixed-enum slice needs no live metadata or separate Fresh interaction."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.mediaPool.get|/optionsSchema/@definition/waapi_definitions.json/definitions/mediaPoolReturnOption/anyOf/6/enum/0": {
+      "native_shape_sha256": "e38b5f36d9189568ee19a6c06eea564077e20030802d7475236f92fcb1b3c5a8",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact 2025.1 Console Media Pool fixed return options through a closed public read and lossless projection. Injected program evidence does not establish real native host behavior; native remains required. This fixed-enum slice needs no live metadata or separate Fresh interaction."
     }
   }
 }
