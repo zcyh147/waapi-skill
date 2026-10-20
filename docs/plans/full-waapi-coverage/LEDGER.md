@@ -734,3 +734,22 @@ native component receipts are recorded in [the test inventory](../../../tests/TE
 Render native acceptance, ordinary Source graphs, broader #192 work and final
 #195 gates remain open. No native/Fresh run, push, main merge or ticket closure
 was performed by this integration. Root owns review and publication.
+
+## R46 existing Source preservation and Render collector integration
+
+Runtime merge `5e41bed1` combines accepted `7979072d` and `dceb20f1` with no
+conflicts; all 11 changed files retain exact component blobs. It adds ordinary
+fail-mode Source placement under bound Sound/Voice owners, observed file/plugin
+Source preservation through bounded pages, and the reviewed scoped Render
+receipt-reference repair without changing global limits.
+
+The deduplicated affected focus passed **9 tests in 27.44s**. Four inventory
+generate/check commands passed once. One reviewed aggregate seal and four
+`object.set` contract references refresh; all native obligations, compressed
+bytes, owners and evidence requirements remain intact. Exact scope and original
+2022 native PASS / 2025 capacity FAIL are recorded in
+[the test inventory](../../../tests/TEST_INVENTORY.md); neither is regraded.
+
+No local preflight or native/Fresh/full gate ran. Root owns review, publication,
+exact-head hosted CI and one new 2025 Render sandbox acceptance attempt. Ordinary
+Source native preservation, broader #192 and final #195 gates remain open.
