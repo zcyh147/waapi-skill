@@ -4619,9 +4619,21 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
     import uuid
     from tests.unit.test_sound_voice_creation_gateway import planned_source_task, SOURCE_CLASS, JAPANESE, SECOND
     task = planned_source_task(tmp_path, '2025.1')
+    captured = json.loads((Path(__file__).resolve().parents[1] / 'fixtures/metadata/tone-source-2025.1-properties.json').read_text())
+    assert captured['type'] == {'classId': SOURCE_CLASS, 'name': 'Wwise Tone Generator', 'type': 'Source'}
+    task.metadata.pop('Frequency')
+    task.metadata.update(deepcopy(captured['metadata']))
+    if fault == 'missing-field':
+        task.metadata.pop('StartFreq')
+    task.languages = deepcopy(captured['project_languages'])
+    language_objects = deepcopy(captured['language_objects'])
+    if fault == 'language-membership':
+        language_objects = [row for row in language_objects if row['name'] != 'English(US)']
     task.types.append({'name': 'Language', 'classId': 4915216, 'type': 'WObject'})
     french = '{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}'
-    task.languages.append({'id': french, 'name': 'French', 'shortId': 4})
+    if fault == 'two-locales':
+        task.languages.append({'id': french, 'name': 'French', 'shortId': 4})
+        language_objects.append({'id': french, 'name': 'French', 'type': 'Language', 'path': 'French'})
     task.objects[SECOND]['path'] = r'\Containers\Default Work Unit'
     native = tmp_path / 'native'; native.mkdir()
     task.env['WWISE_EVIDENCE_DIR'] = str(native)
@@ -4636,7 +4648,9 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
             'path': task.objects[parent]['path'] + '\\' + node['name'], 'parent': {'id': parent},
             'notes': node.get('notes', ''), **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
         if node['type'] == 'Source':
-            row.setdefault('@Frequency', 440)
+            row.setdefault('@StartFreq', captured['metadata']['StartFreq']['default'])
+            row.setdefault('@WaveType', captured['metadata']['WaveType']['default'])
+            if fault == 'ignored-real-field': row['@StartFreq'] = 220
             row['audioSource:language'] = {'name': node.get('language', 'SFX')}
             if fault == 'ignored-language' and node.get('language'): row['audioSource:language']['name'] = 'SFX'
             created_sources.append(identity)
@@ -4651,7 +4665,7 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
     def call(uri, args=None, options=None):
         if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from type Language '):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            return {'return': [{'id': row['id'], 'name': row['name'], 'type': 'Language', 'path': '\\Languages\\' + row['name']} for row in task.languages]}
+            return {'return': deepcopy(language_objects)}
         expression = (args or {}).get('waql', '')
         if uri.endswith('object.get') and expression.startswith('from object "'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -4679,14 +4693,22 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
         lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
     def raw(argv):
         commands.append(list(argv))
-        return task.run(*argv)
+        code, result = task.run(*argv)
+        if argv[0] == 'draft-discover-fields' and code == 0 and fault == 'ambiguous-field':
+            meaning, = result['meaning_results']
+            selected, = [row for row in meaning['candidates'] if row['metadata']['name'] == 'StartFreq']
+            meaning['candidates'].append(deepcopy(selected))
+            meaning['candidate_count'] += 1
+            result['candidate_count'] += 1
+        return code, result
     runtime.raw_gateway = raw
     return runtime, commands, writes, task
 
 
-def test_planned_source_collector_preserves_three_transactions_and_original_source_identity(tmp_path, workflow):
+@pytest.mark.parametrize('locales', ['captured-single', 'two-locales'])
+def test_planned_source_collector_preserves_three_transactions_and_original_source_identity(tmp_path, workflow, locales):
     import hashlib
-    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='two-locales' if locales == 'two-locales' else None)
     category = workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
     receipt_path = Path(category['observation_path'])
     receipt = json.loads(receipt_path.read_text())
@@ -4695,13 +4717,22 @@ def test_planned_source_collector_preserves_three_transactions_and_original_sour
     assert category['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
     assert [p['case'] for p in receipt['phases']] == ['sfx', 'voice-explicit-source', 'voice-default-source']
     assert len(writes) == 3 and len({p['transaction_id'] for p in receipt['phases']}) == 3
+    for args in writes:
+        source = args['objects'][0]['children'][0]['children'][0]
+        assert source['@StartFreq'] == 440 and '@Frequency' not in source
     assert sum(argv[0] == 'execute' for argv in commands) == 3
     assert len(commands) == receipt['limits']['calls'] == 74
     ids = [p['independent_source']['id'] for p in receipt['phases']]
     assert len(set(ids)) == 3
     assert receipt['phases'][1]['retained_before'][0]['source'] == receipt['phases'][0]['independent_source']
     assert receipt['phases'][2]['retained_after'] == receipt['phases'][2]['retained_before']
-    assert receipt['phases'][1]['construction_language'] != receipt['phases'][1]['source_language']
+    assert (receipt['phases'][1]['construction_language'] != receipt['phases'][1]['source_language']) is (locales == 'two-locales')
+    assert receipt['distinct_language_disambiguation'] is (locales == 'two-locales')
+    assert [row['name'] for row in receipt['language_choices']] == (['English(US)', 'French'] if locales == 'two-locales' else ['English(US)'])
+    for phase in receipt['phases']:
+        assert phase['frequency_field']['metadata']['name'] == 'StartFreq'
+        assert phase['frequency_field']['metadata']['dependencies'][0]['property'] == 'WaveType'
+        assert phase['independent_source']['properties']['StartFreq'] == 440
     assert receipt['phases'][2]['source_language'] is None
     assert receipt['phases'][2]['source_language_effect'] == 'observed_default_only_no_inheritance_claim'
     assert receipt['get_info']['version']['build'] == 9143
@@ -4733,4 +4764,26 @@ def test_planned_source_collector_preserves_failed_native_effect_and_never_retri
         assert 'retained GUID' in receipt['failure']['message']
     if fault == 'extra-child':
         assert 'changed the original owner/Source' in receipt['failure']['message']
+    assert receipt['native_evidence'] and receipt['failure']
+
+
+@pytest.mark.parametrize('fault', ['missing-field', 'ambiguous-field', 'language-membership'])
+def test_planned_source_collector_requires_exact_field_and_project_language_membership(tmp_path, workflow, fault):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert not writes and not any(argv[0] == 'execute' for argv in commands)
+    assert runtime.category_results[-1]['status'] == 'FAIL' and receipt['collection_complete'] is False
+    assert receipt['native_evidence'] and receipt['failure']
+
+
+def test_planned_source_collector_rejects_ignored_actual_start_frequency(tmp_path, workflow):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='ignored-real-field')
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
+    assert receipt['phases'][0]['verify']['payload']['state'] == 'verification_failed'
+    assert runtime.category_results[-1]['status'] == 'FAIL' and receipt['business_effect_verified'] is False
     assert receipt['native_evidence'] and receipt['failure']
