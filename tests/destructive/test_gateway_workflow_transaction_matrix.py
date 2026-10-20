@@ -8745,7 +8745,7 @@ def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime
 @pytest.mark.live
 @pytest.mark.destructive
 def test_source_plugin_active_selection_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
-    if workflow_sandbox_runtime.version != '2025.1':
-        pytest.skip('Initial SourcePlugin A-to-B acceptance is Console2025-only; other setter lanes remain unproven')
+    if workflow_sandbox_runtime.version not in {'2022.1', '2023.1', '2024.1', '2025.1'}:
+        pytest.skip('SourcePlugin A-to-B acceptance requires the pinned 2022.1–2025.1 Console setter; 2021.1 remains unresolved')
     category = _collect_source_plugin_selection_acceptance(workflow_sandbox_runtime, prefix='WAAPI_SRC_SELECT_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
