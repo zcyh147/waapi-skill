@@ -3862,6 +3862,14 @@ def _execute_gateway_unconstrained(
             "message": normalized["message"],
             "details": details,
         }
+        if isinstance(details, Mapping) and isinstance(details.get("issues"), list) and any(
+            isinstance(issue, Mapping) and issue.get("error_code") == "UNKNOWN_PROJECT_LANGUAGE"
+            for issue in details.get("issues", [])
+        ):
+            error_payload["next_command"] = transaction_next_command(
+                "metadata", ["metadata", "types", "--meaning", "Language", "--page-size", "64"],
+                state_dir=args.state_dir,
+            )
         if getattr(args, "command", None) == "transaction-show" and isinstance(
             details, Mapping
         ):
@@ -15542,8 +15550,9 @@ def dispatch_command(
                 if page.get("next_page"):
                     page["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", page["next_page"]])
                 for row in page["types"]:
-                    if row.get("details_complete") is False:
+                    if row.get("details_complete") is False or row.get("name") == "Language":
                         row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", "20"])
+                    if row.get("details_complete") is False:
                         row["detail_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", row["selection"]])
                         if isinstance(row.get("classId"), int):
                             row["fields_command"] = transaction_next_command("metadata", ["metadata", "list", "--type-selection", row["selection"]])

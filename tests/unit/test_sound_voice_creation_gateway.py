@@ -412,6 +412,20 @@ def test_construction_language_admission_requires_valid_project_language_and_voi
         assert details['available'] == [{'id': JAPANESE, 'name': 'Japanese'}]
         assert details['available_total'] == 1 and details['available_returned'] == 1
         assert details['available_truncated'] is False
+        task.types.append({'name': 'Language'})
+        original = task.call
+        def call(uri, args=None, options=None):
+            if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from type Language '):
+                task.calls.append((uri, args, options))
+                return {'return': [{'id': JAPANESE, 'name': 'Japanese', 'type': 'Language', 'path': r'\Languages\Japanese'}]}
+            return original(uri, args, options)
+        task.call = call
+        code, types = task.run(*checked['next_command']['gateway_argv'])
+        assert code == 0, types
+        language_type, = [row for row in types['agent_result']['types'] if row.get('name') == 'Language']
+        code, languages = task.run(*language_type['query_command']['gateway_argv'])
+        assert code == 0, languages
+        assert [(row['id'], row['name']) for row in languages['objects']] == [(JAPANESE, 'Japanese')]
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
 
 

@@ -11674,7 +11674,7 @@ def prepare_object_set_batch_check(
                     issue["details"] = {"field": "language", "available": [],
                         "available_total": exc.details["available_total"], "available_returned": 0,
                         "available_truncated": True,
-                        "language_discovery": {"available": False, "missing_seam": "paginated_project_language_choices"},
+                        "language_discovery": {"available": True, "source": "metadata_types_exact_Language", "follow": "query_command_then_result_page_next_command"},
                         "repair_details": "aggregate_repair_budget_exhausted", "mutation_dispatched": False}
             if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
                 # Preserve the exact owner and staged repair at this public
@@ -12334,8 +12334,8 @@ def _bounded_language_choice_details(details, *, byte_budget):
         bounded["available_returned"] = len(bounded["available"])
         bounded["available_truncated"] = bounded["available_returned"] < bounded["available_total"]
         if bounded["available_truncated"]:
-            # There is no public project-language paging command yet. Never
-            # direct callers to status, which deliberately omits this inventory.
+            # Exact live Language type selections disclose bounded query/result
+            # continuations; status deliberately omits this inventory.
             bounded["language_discovery"] = {"available": False, "missing_seam": "paginated_project_language_choices"}
         if len(canonical_json_bytes(bounded)) <= byte_budget:
             return bounded
