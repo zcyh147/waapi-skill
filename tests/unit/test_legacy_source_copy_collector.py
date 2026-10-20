@@ -153,7 +153,7 @@ def test_legacy_source_copy_pages_all_documented_synth_read_fields(tmp_path, wor
     assert {argv[index + 1] for argv in pages for index, token in enumerate(argv) if token == '--include-field'} == set(names)
 
 
-def test_legacy_source_copy_collector_records_admission_without_full_copy_claim(tmp_path, workflow):
+def test_legacy_source_copy_collector_records_admission_without_full_copy_claim(tmp_path, workflow, request):
     runtime, commands, writes, task = legacy_runtime(tmp_path)
     category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_LEGACY_COPY')
     receipt = json.loads(Path(category['observation_path']).read_text())
@@ -165,6 +165,21 @@ def test_legacy_source_copy_collector_records_admission_without_full_copy_claim(
     assert receipt['copy_observation']['class_id'] == 9699330
     assert all('payload' not in row and 'reply' in row for row in receipt['calls'])
     assert receipt['copy_observation']['owned_state_mapping'] == 'unverified; no copied-GUID equality assumed'
+    # Exercise the real v3 schema seam used by lifecycle finalization. A body
+    # PASS alone previously hid an incomplete category from this fake control.
+    from tests.destructive.support.category_evidence import build_category_evidence_record
+    from tests.destructive.support.exact_real_evidence import exact_transaction_outcomes
+    record = build_category_evidence_record(repo_root=workflow.REPO_ROOT, candidate=runtime.candidate,
+        version=runtime.version, host={'is_command_line': True, 'version': {'year': 2021, 'major': 1,
+            'minor': 14, 'build': 8108}}, categories=[category], source={},
+        residual_state={'sandbox': 'quarantined_pending_release', 'quarantine_path': str(tmp_path / 'quarantine')},
+        invocation={'selected_test_nodeids': [request.node.nodeid], 'node_outcomes': [
+            {'nodeid': request.node.nodeid, 'outcome': 'PASS'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'prepared', 'outcome': 'PENDING'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert record['categories'][0]['diagnostic_only'] is True
+    assert record['categories'][0]['business_effect_verified'] is False
 
 
 @pytest.mark.parametrize('fault', ['native-error', 'copied-class', 'original-field'])

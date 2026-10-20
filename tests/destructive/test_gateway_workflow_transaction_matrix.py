@@ -9308,6 +9308,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
     category = {'category': 'legacy-source-only-copy-feasibility', 'status': 'FAIL', 'diagnostic_only': True,
         'business_effect_verified': False, 'coverage_credit': 'none; native feasibility diagnostic',
+        'verifier_strength': 'diagnostic_class_parent_live_fields_owner_frames_and_owned_topology; no_complete_copy_credit',
         'transaction_ids': transactions, 'observation_path': str(output)}
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.legacy-source-copy-feasibility/v1',
