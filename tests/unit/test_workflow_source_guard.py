@@ -4606,6 +4606,12 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
             return {'return': task.project_rows(rows, options or {})}
         if uri.endswith('object.set'): writes.append(deepcopy(args))
         result = original(uri, args, options)
+        if uri.endswith('object.set') and fault == 'extra-child' and len(writes) == 2:
+            original_owner = task.objects[created_sources[0]]['parent']['id']
+            extra = '{FAFAFAFA-FAFA-FAFA-FAFA-FAFAFAFAFAFA}'
+            task.objects[extra] = {'id': extra, 'name': 'Unexpected retained child', 'type': 'SourcePlugin',
+                'classId': SOURCE_CLASS, 'path': task.objects[original_owner]['path'] + r'\Unexpected retained child',
+                'parent': {'id': original_owner}, 'notes': 'Unexpected'}
         if uri.endswith('getInfo'):
             result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
         return result
@@ -4633,6 +4639,7 @@ def test_planned_source_collector_preserves_three_transactions_and_original_sour
     assert [p['case'] for p in receipt['phases']] == ['sfx', 'voice-explicit-source', 'voice-default-source']
     assert len(writes) == 3 and len({p['transaction_id'] for p in receipt['phases']}) == 3
     assert sum(argv[0] == 'execute' for argv in commands) == 3
+    assert len(commands) == receipt['limits']['calls'] == 74
     ids = [p['independent_source']['id'] for p in receipt['phases']]
     assert len(set(ids)) == 3
     assert receipt['phases'][1]['retained_before'][0]['source'] == receipt['phases'][0]['independent_source']
@@ -4649,7 +4656,7 @@ def test_planned_source_collector_preserves_three_transactions_and_original_sour
         assert len(raw) == evidence['size'] and hashlib.sha256(raw).hexdigest() == evidence['sha256']
 
 
-@pytest.mark.parametrize('fault', ['reuse', 'ignored-language'])
+@pytest.mark.parametrize('fault', ['reuse', 'ignored-language', 'extra-child'])
 def test_planned_source_collector_preserves_failed_native_effect_and_never_retries(tmp_path, workflow, fault):
     runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault)
     with pytest.raises(AssertionError):
@@ -4660,11 +4667,13 @@ def test_planned_source_collector_preserves_failed_native_effect_and_never_retri
     assert len(writes) == 2
     ids = [argv[1] for argv in commands if argv[0] == 'execute']
     assert len(ids) == len(set(ids)) == 2
-    expected_state = 'verified' if fault == 'reuse' else 'verification_failed'
+    expected_state = 'verified' if fault in {'reuse', 'extra-child'} else 'verification_failed'
     assert receipt['phases'][-1]['verify']['payload']['state'] == expected_state
     assert receipt['phases'][-1]['final_transaction']['state'] == expected_state
     if fault == 'reuse':
         # The local new-owner graph has no old children. Independent cross-phase
         # GUID proof must still reject reparenting a Source from another owner.
         assert 'retained GUID' in receipt['failure']['message']
+    if fault == 'extra-child':
+        assert 'changed the original owner/Source' in receipt['failure']['message']
     assert receipt['native_evidence'] and receipt['failure']

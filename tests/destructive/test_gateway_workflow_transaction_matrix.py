@@ -6979,7 +6979,7 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             'cleanup_status': 'unresolved_until_final_row'},
         'lifecycle_acceptance': 'Requires exact final category row source hash/mtime/tree and owned-process/sandbox cleanup; body completion alone is not final acceptance.',
         'scope_exclusions': ['other_versions', '2021_alternative', 'Source_language_inheritance', 'activeSource_switch', 'Tone_audio_effect'],
-        'limits': {'calls': 128, 'receipt_bytes': 8 * 1024 * 1024, 'reply_bytes': 1024 * 1024,
+        'limits': {'calls': 74, 'receipt_bytes': 8 * 1024 * 1024, 'reply_bytes': 1024 * 1024,
             'native_files': 1024, 'native_bytes': 128 * 1024 * 1024}}
     attempted: set[str] = set()
     def persist():
@@ -7027,7 +7027,8 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
     retained: list[dict[str, Any]] = []
     def retained_rows():
         return [{'owner': exact(row['owner']['id'], voice=True),
-            'source': exact(row['source']['id'], source=True, language=row['language'])} for row in retained]
+            'source': exact(row['source']['id'], source=True, language=row['language']),
+            'children': query(['--exact-id', row['owner']['id'], '--relationship', 'children'], language=row['language'])} for row in retained]
     persist()
     try:
         status = gateway.gateway(['status'], live=True)
@@ -7060,7 +7061,7 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 'source_language_effect': 'explicit_exact_name' if case == 'voice-explicit-source' else 'observed_default_only_no_inheritance_claim',
                 'retained_before': retained_rows(), 'execution_attempted': False}
             receipt['phases'].append(phase); persist()
-            assert phase['retained_before'] == [{'owner': row['owner'], 'source': row['source']} for row in retained]
+            assert phase['retained_before'] == [{'owner': row['owner'], 'source': row['source'], 'children': row['children']} for row in retained]
             draft = _start_business_draft(gateway, 'object.set')
             owner_parent = _bind_business_object(gateway, draft, object_id=parent['id'])
             name = prefix + '_' + case
@@ -7117,7 +7118,7 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 assert phase['retained_after'] == phase['retained_before'], 'A later construction changed the original owner/Source'
                 assert exact(parent['id']) == parent, 'Construction changed the bound parent'
                 seen.update((uuid.UUID(owner_id), uuid.UUID(source_id)))
-                retained.append({'owner': actual_owner, 'source': actual_source, 'language': phase['source_language']})
+                retained.append({'owner': actual_owner, 'source': actual_source, 'children': children, 'language': phase['source_language']})
                 phase['effect_verified'] = True
             finally:
                 phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False)
