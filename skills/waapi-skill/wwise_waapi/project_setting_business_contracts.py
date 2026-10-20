@@ -72,15 +72,16 @@ def active_source_native_limitations(version: str) -> list[dict[str, Any]]:
     return [{
         "source_type_name": "Wwise Tone Generator",
         "source_class_id": 6684674,
-        "admission": "rejected_before_preview_in_this_version",
+        "admission": "rejected_before_preview_only_in_observed_context",
         "observed_native_build": build,
         "observed_request_scope": "Console_current_default_platform_view",
         "observed_native_error": "The object is not a source.",
         "other_plugin_classes": "not_classified_by_this_observation",
-        "alternative_status": "required_unresolved_under_#181",
+        "unobserved_contexts": ["Authoring", "explicit_platform", "other_builds"],
+        "alternative_status": "no_verified_method_for_same_selection_in_observed_context",
         "next_step": (
-            "Keep the requested Tone selection pending under #181 until a version-correct "
-            "alternative is proved; do not retry this setter or substitute another source."
+            "Leave the current selection unchanged. No verified alternate method is available "
+            "for this source in this context; do not retry or substitute another source."
         ),
     }]
 

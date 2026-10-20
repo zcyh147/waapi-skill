@@ -10811,13 +10811,18 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if source_guard is not None:
                 from .project_setting_business_contracts import active_source_native_limitations
                 for limitation in active_source_native_limitations(request.version):
-                    if source_guard["source"]["classId"] == limitation["source_class_id"]:
-                        raise OperationContractError(
-                            "VERSION_BEHAVIOR_BOUNDARY",
-                            "This Wwise version rejected native Tone Source-plugin selection; "
-                            "the requested alternative remains unresolved.",
-                            details={"api": api, "version": request.version, **limitation},
-                        )
+                    if source_guard["source"]["classId"] == limitation["source_class_id"] and "platform" not in call_args:
+                        host = read(GET_INFO_URI, {}, {})
+                        native_version = host.get("version")
+                        build = (".".join(str(native_version.get(key)) for key in ("year", "major", "minor", "build"))
+                                 if isinstance(native_version, Mapping) else None)
+                        if host.get("isCommandLine") is True and build == limitation["observed_native_build"]:
+                            raise OperationContractError(
+                                "VERSION_BEHAVIOR_BOUNDARY",
+                                "This Console build rejected Tone source selection in its current "
+                                "default platform view. This request made no change.",
+                                details={"api": api, "version": request.version, **limitation},
+                            )
                 metadata["active_source_plugin_binding"] = source_guard
                 roles.update({role: ResolvedObject(identity=ObjectIdentity(id=source_guard[role]["id"]),
                     object=source_guard[role]["id"], resolution="live-exact-id", row=source_guard[role]) for role in ("sound", "source")})

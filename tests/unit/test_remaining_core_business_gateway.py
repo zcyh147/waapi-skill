@@ -2147,6 +2147,10 @@ class _PluginSourceSelectionClient(_SourceControlDraftClient):
         from copy import deepcopy
         super().__init__(path)
         self.version, self.calls, self.writes = version, [], []
+        self.is_command_line = True
+        self.live_version = dict(zip(('year', 'major', 'minor', 'build'), {
+            '2022.1': (2022, 1, 19, 8584), '2023.1': (2023, 1, 19, 8928),
+            '2024.1': (2024, 1, 13, 9056), '2025.1': (2025, 1, 7, 9143)}[version]))
         root = r'\Containers' if version == '2025.1' else r'\Actor-Mixer Hierarchy'
         sound_path = root + r'\Default Work Unit\Voice'
         self.objects = {self.sound_id: {'id': self.sound_id, 'name': 'Voice', 'type': 'Sound',
@@ -2175,7 +2179,8 @@ class _PluginSourceSelectionClient(_SourceControlDraftClient):
             return {}
         result = super().call(uri, args, options)
         if uri == 'ak.wwise.core.getInfo':
-            result['version']['year'] = int(self.version[:4])
+            result['version'].update(self.live_version)
+            result['isCommandLine'] = self.is_command_line
         return result
 
 
@@ -2207,8 +2212,8 @@ class _PluginSourceSelectionTask:
         return self.step('draft-declare-project-setting-plan', '--sound-handle', handles['sound'],
             '--source-handle', handles['source'], *(['--platform-name', platform] if platform is not None else []))
 
-    def preview(self):
-        code, declared = self.declare(); assert code == 0, declared
+    def preview(self, *, platform='Windows'):
+        code, declared = self.declare(platform=platform); assert code == 0, declared
         code, checked = self.step('draft-check'); assert code == 0, checked
         code, preview = self.step('preview-from-draft'); assert code == 0, preview
         tx = preview['transaction_id']
@@ -2239,7 +2244,7 @@ def test_2022_tone_selection_reports_native_rejection_before_preview_or_write(tm
     assert code != 0, rejected
     assert rejected['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY', rejected
     assert rejected['details']['source_class_id'] == 6684674
-    assert '#181' in rejected['details']['next_step']
+    assert 'current selection unchanged' in rejected['details']['next_step']
     assert task.client.writes == []
     assert not list((task.state / 'transactions').glob('*'))
 
@@ -2258,7 +2263,7 @@ def test_source_plugin_selection_matches_other_admitted_version_schemas(tmp_path
 def test_2023_tone_source_alias_keeps_the_observed_native_boundary(tmp_path):
     task = _PluginSourceSelectionTask(tmp_path, '2023.1')
     task.client.objects[task.client.source_id]['type'] = 'Source'
-    code, declared = task.declare()
+    code, declared = task.declare(platform=None)
     assert code == 0, declared
     code, rejected = task.step('draft-check')
     assert code != 0 and rejected['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY', rejected
@@ -2279,7 +2284,8 @@ def test_tone_native_selection_limitations_are_disclosed_before_binding(tmp_path
         assert limitation['source_type_name'] == 'Wwise Tone Generator'
         assert limitation['observed_request_scope'] == 'Console_current_default_platform_view'
         assert limitation['other_plugin_classes'] == 'not_classified_by_this_observation'
-        assert limitation['alternative_status'] == 'required_unresolved_under_#181'
+        assert limitation['alternative_status'] == 'no_verified_method_for_same_selection_in_observed_context'
+        assert limitation['unobserved_contexts'] == ['Authoring', 'explicit_platform', 'other_builds']
         assert 'do not retry' in limitation['next_step']
     else:
         assert limits == []
@@ -2296,7 +2302,7 @@ def test_tone_version_boundary_preserves_file_source_selection(tmp_path, version
     # Explicit alternative fixture state; reads only project requested fields.
     source = task.client.objects[task.client.source_id]
     source.update(type='AudioFileSource', classId=16)
-    tx, shown = task.preview()
+    tx, shown = task.preview(platform=None)
     code, executed = task.run('execute', tx)
     assert code == 0, executed
     code, verified = task.run('verify', tx)
@@ -2311,7 +2317,18 @@ def test_observed_tone_rejection_does_not_classify_other_source_plugin_classes(t
     task.client.types[1] = {'name': 'Wwise Silence', 'type': 'Source', 'classId': 6619138}
     for identity in (task.client.source_id, task.client.old_source_id):
         task.client.objects[identity]['classId'] = 6619138
-    task.preview()
+    task.preview(platform=None)
+    assert task.client.writes == []
+
+
+@pytest.mark.parametrize('context', ['Authoring', 'explicit-platform', 'other-build'])
+def test_tone_selection_contexts_without_native_rejection_remain_admitted(tmp_path, context):
+    task = _PluginSourceSelectionTask(tmp_path, '2022.1')
+    if context == 'Authoring':
+        task.client.is_command_line = False
+    elif context == 'other-build':
+        task.client.live_version['minor'] = 18
+    task.preview(platform='Windows' if context == 'explicit-platform' else None)
     assert task.client.writes == []
 
 
