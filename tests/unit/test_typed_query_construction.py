@@ -1361,6 +1361,58 @@ def test_short_id_query_rejects_unbound_or_duplicate_native_candidates(tmp_path:
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
 
 
+def test_2021_active_source_joins_complete_same_view_paths_independent_of_child_order(tmp_path):
+    sound = "{11111111-1111-1111-1111-111111111111}"
+    inactive = "{22222222-2222-2222-2222-222222222222}"
+    active = "{33333333-3333-3333-3333-333333333333}"
+    platform = "{44444444-4444-4444-4444-444444444444}"
+    language = "{55555555-5555-5555-5555-555555555555}"
+    project = "{66666666-6666-6666-6666-666666666666}"
+    project_file = tmp_path / "Fixture.wproj"
+    project_file.write_text("<Project />")
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return {**super().call(uri, args, options), "sessionId": project, "processId": 42}
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [{"classId": 65552, "name": "Sound", "type": "WObject"},
+                    {"classId": 16, "name": "AudioSource", "type": "WObject"}]}
+            assert uri == "ak.wwise.core.object.get", uri
+            query = args["waql"]
+            if query.startswith("from type Project"):
+                rows = [{"id": project, "name": "Fixture", "type": "Project", "path": "\\", "filePath": str(project_file)}]
+            elif query.startswith("from type Platform"):
+                rows = [{"id": platform, "name": "Mac", "type": "Platform", "path": r"\Platforms\Mac"}]
+            elif query.startswith("from type Language"):
+                rows = [{"id": language, "name": "SFX", "type": "Language", "path": r"\Languages\SFX"}]
+            elif "select children" in query:
+                rows = [{"id": identity, "name": name, "type": "AudioFileSource", "classId": 16,
+                    "path": r"\Sounds\Rain" + "\\" + name, "parent": {"id": sound},
+                    "audioSource:language": {"id": language, "name": "SFX"},
+                    "originalWavFilePath": "/owned/Originals/SFX/" + name + ".wav"}
+                    for identity, name in ((inactive, "Alpha"), (active, "Beta"))]
+            else:
+                assert sound in query, query
+                rows = [{"id": sound, "name": "Rain", "type": "Sound", "classId": 65552,
+                    "path": r"\Sounds\Rain", "parent": {"id": project},
+                    "originalWavFilePath": "/owned/Originals/SFX/Beta.wav",
+                    "audioSource:language": {"id": language, "name": "SFX"}}]
+            return {"return": [{key: row[key] for key in options["return"] if key in row} for row in rows]}
+    client = Client("2021.1")
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", sound, "--platform", "Mac",
+        "--language", "SFX", "--include", "active-source"], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"] == [{"id": sound, "name": "Rain", "type": "Sound", "path": r"\Sounds\Rain",
+        "active_source": {"id": active, "name": "Beta"}}]
+    assert list(result)[-1] == "agent_result"
+    observations = [(args, options) for uri, args, options in client.calls if uri.endswith("object.get") and sound in args.get("waql", "")]
+    assert len(observations) == 4
+    assert all(options["platform"] == platform and options["language"] == language for _, options in observations)
+    assert all("activeSource" not in options["return"] for _, options in observations)
+    assert len(client.calls) <= 10
+
+
 @pytest.mark.parametrize("version", ["2021.1", "2022.1"])
 def test_public_source_query_uses_exact_versioned_file_and_active_bindings(tmp_path, version):
     sound = "{11111111-1111-1111-1111-111111111111}"

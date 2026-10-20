@@ -5820,7 +5820,7 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}"
                                     + (f"; {alternative}" if alternative else ""))
         native, output = available_query_outputs(version)[name]
-        bindings.append(("business", native, output))
+        bindings.append(("derived" if native is None else "business", native or output, output))
 
     def bounded_custom_meaning(value: Any) -> str:
         if (
@@ -5843,12 +5843,18 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         raise GatewayInputError("query-object --include-field meanings must be unique")
     args.query_custom_field_meanings = tuple(normalized_meanings)
 
-    native_fields = [binding[1] for binding in bindings]
+    native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
     if len(set(native_fields)) != len(native_fields):
         raise GatewayInputError(
             "query-object requested the same native result field more than once"
         )
     args.query_output_bindings = tuple(bindings)
+    args.query_derived_outputs = tuple(binding[2] for binding in bindings if binding[0] == "derived")
+    if args.query_derived_outputs:
+        if (not (args.path is not None or args.object_id is not None or args.path_segments) or args.relationships
+                or args.business_predicates or args.advanced_waql is not None
+                or args.query_platform is None or args.query_language is None):
+            raise GatewayInputError("2021.1 active-source derivation currently requires one exact Sound, explicit platform and language, and no predicates or relationships; other shapes remain #181 work")
     args.query_return_fields = (
         *SELECTED_REQUIRED_RETURN_FIELDS,
         *native_fields,
@@ -15408,6 +15414,42 @@ def dispatch_command(
         where = typed_query_predicates(args)
         return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
+        if getattr(args, "query_derived_outputs", ()):
+            from wwise_waapi.object_query_active_source import ActiveSourceQueryError, resolve_2021_active_source
+            calls = []
+            configuration = selected_connection_binding(env)
+            def read_active_source(api, native_args, native_options):
+                call = dispatch(dispatcher, api, connection=connection, version=detected_version,
+                    args=native_args, options=native_options)
+                calls.append(dispatch_call_summary(call))
+                if not call.get("ok"):
+                    raise GatewayResultShapeError("Active-source observation failed", details={"calls": calls},
+                        error_code="ACTIVE_SOURCE_OBSERVATION_FAILED")
+                return call["result"]
+            try:
+                native_rows, preview, source_proof = resolve_2021_active_source(read=read_active_source,
+                    selector={"object_id": args.object_id} if args.object_id is not None else {"path": args.path},
+                    platform=args.query_platform, language=args.query_language,
+                    return_fields=tuple(return_fields), live_info=live_info)
+            except ActiveSourceQueryError as exc:
+                raise GatewayResultShapeError(str(exc), details={"calls": calls, "native_absence_proven": False},
+                    error_code=exc.code) from exc
+            if configuration != selected_connection_binding(env):
+                raise GatewayResultShapeError("Query configuration changed", error_code="ACTIVE_SOURCE_OBSERVATION_CHANGED")
+            business_rows = _project_query_business_rows(args, native_rows)
+            query_payload = {"ok": True, "status": "ok", **common, "semantic_preview": preview.as_dict(),
+                "query_bound": _query_bound_summary(args), "calls": calls, "active_source_resolution": source_proof,
+                "count": len(business_rows), "objects": business_rows,
+                "agent_result": business_rows}
+            continuations = _query_business_continuations(args, business_rows)
+            if continuations:
+                terminal_result = query_payload.pop("agent_result")
+                query_payload["continuations"] = continuations
+                query_payload["agent_result"] = terminal_result
+            return _finish_object_query_result(args, query_payload,
+                native={"result": {"return": native_rows, "active_source_resolution": source_proof}},
+                envelope=preview.envelope, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info)
         preview = build_object_get_query(
             path=args.path,
             object_id=args.object_id,
@@ -24858,6 +24900,7 @@ def project_successful_query_object_payload(
         "query_contract",
         "query_bound",
         "source_resolution",
+        "active_source_resolution",
         "count",
         "limit_reached",
         "projection_complete",
