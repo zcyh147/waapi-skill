@@ -74,12 +74,14 @@ tests/unit/test_object_graph_owned_choices_gateway.py
 tests/unit/test_object_inline_curve_gateway.py
 tests/unit/test_object_lifecycle_replace_gateway.py
 tests/unit/test_copy_move_custom_workunit_gateway.py
+tests/unit/test_source_copy_field_preservation_gateway.py
 tests/unit/test_cross_family_voice_import.py
 tests/unit/test_cross_family_game_sync_gateway.py
 tests/unit/test_business_declaration_state.py
 tests/unit/test_business_planning.py
 tests/unit/test_core_business_adapter.py
 tests/unit/test_core_business_gateway.py
+tests/unit/test_project_save_business_versions_gateway.py
 tests/unit/test_attenuation_curve_business_gateway.py
 tests/unit/test_media_build_business_adapter.py
 tests/unit/test_media_build_business_gateway.py
@@ -248,6 +250,7 @@ tests/unit/test_branch_coverage_audit.py
 tests/unit/test_branch_coverage_completion_cli.py
 tests/unit/test_metadata_default_branch_evidence.py
 tests/unit/test_metadata_replay_attachments.py
+tests/unit/test_class_metadata_collection.py
 tests/unit/test_created_topic_branch_evidence.py
 
 tests/unit/test_condition_scalar_batch_evidence.py
