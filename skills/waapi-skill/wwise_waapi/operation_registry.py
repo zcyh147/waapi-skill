@@ -9614,6 +9614,11 @@ def _materialize_canonical_object_node(
         if native_nodes is not None:
             native_nodes[current.request_path] = row
         row["type"] = canonical_types[current.request_path]
+        if current.language is not None and current.import_arg is None and row["type"] == "Sound":
+            # A no-media Voice language is a validated Gateway context, not a
+            # native Sound field. 2025.1 rejects it here: "Language can only be
+            # used for a Source." Explicit plugin language stays on its Source.
+            row.pop("language", None)
         if current.plugin is not None:
             payload = (plugin_materializations or {}).get(current.request_path)
             if payload is None:
