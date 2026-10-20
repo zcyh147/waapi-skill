@@ -52,13 +52,21 @@ def test_default_product_inputs_select_portable_stale_receipt_without_business_c
     assert default['completion']['complete'] is False
     assert default['completion']['obligations'] == 272313
     assert default['completion']['states'] == {'approved_exclusion': 116,
-        'implemented_unverified': 1, 'unresolved': 272196}
+        'implemented_unverified': 66, 'unresolved': 272131}
     assert audit.main([*argv, '--check']) == 2
     capsys.readouterr()
     copied = tmp_path / 'relocated-product'
     shutil.copytree(audit.ROOT / 'tests/fixtures/branch-evidence/product', copied)
+    index = audit.load(audit.ROOT / 'docs/branch-coverage-evidence-index.json')
+    index['base'] = 'relocated-product'
+    index_path = tmp_path / 'relocated-index.json'
+    write_json(index_path, index)
+    selected, _, _ = audit.portable_binding_inputs(index_path,
+        audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json'))
+    explicit_bindings = copied / 'all.bindings.json'
+    write_json(explicit_bindings, selected)
     explicit = tmp_path / 'explicit.json'
-    assert audit.main(['--bindings', str(copied / 'move-single-r26-2025.1.bindings.json'),
+    assert audit.main(['--bindings', str(explicit_bindings),
         '--output', str(explicit), '--require-complete']) == 2
     capsys.readouterr()
     actual = audit.load(explicit)['native_coverage']

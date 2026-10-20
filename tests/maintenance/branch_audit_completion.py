@@ -632,10 +632,21 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             raise ValueError('controlled evidence cannot grant product credit')
         binding = binding or {}
         metadata_context = None
+        metadata_pointer = None
         if category == 'live_metadata':
             metadata_context = read_metadata_run(record['metadata_run'], base)
             record['gateway'] = metadata_context['gateway']
-            if binding.get('observation_pointer', '').startswith('/gateway/payload/agent_result/') is False:
+            if (branch.get('route') or '').endswith('|function|ak.wwise.core.object.getPropertyInfo'):
+                # The same binding retains the program's exact native occurrence.
+                # A real metadata receipt observes its corresponding public leaf.
+                exact_observation_pointer(branch, binding, binding.get('dispatch_pointer', '/native_call'),
+                                          'result', reference_edges or {})
+                metadata_pointer = binding.get('gateway_observation_pointer', '')
+                exact_observation_pointer(branch, {**binding, 'observation_pointer': metadata_pointer},
+                                          '/gateway/payload/agent_result', 'metadata', reference_edges or {})
+            else:
+                metadata_pointer = binding.get('observation_pointer', '')
+            if metadata_pointer.startswith('/gateway/payload/agent_result/') is False:
                 raise ValueError('live metadata requires an exact original public result field')
         if category in ('native', 'native_absence'):
             observations = record.get('observation_artifacts', {})
@@ -667,7 +678,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         dispatch_pointer = binding.get('dispatch_pointer', '/native_call')
         section = branch['pointer'].split('/')[1]
         native_section = {'argsSchema': 'args', 'optionsSchema': 'options', 'resultSchema': 'result', 'publishSchema': 'event'}.get(section)
-        prefix = binding.get('observation_pointer')
+        prefix = metadata_pointer if category == 'live_metadata' else binding.get('observation_pointer')
         boundary = branch.get('approved_boundary')
         if boundary is None and category != 'native_absence':
             if native_section is not None and category == 'program':
@@ -707,8 +718,18 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             if branch['route'] is not None and native_call['uri'] != branch['route'].split('|')[4]:
                 raise ValueError('mapped native dispatch URI mismatch')
             public_pointer = binding.get('gateway_observation_pointer', '/gateway/payload/agent_result')
+            public_equals = any(c['pointer'] == public_pointer and 'equals' in c for c in checks)
+            if (not public_equals and branch['route'] is not None
+                    and branch['route'].endswith('|function|ak.wwise.core.object.getPropertyInfo')
+                    and branch['pointer'] == '/resultSchema/properties/default/@presence/absent'
+                    and branch['kind'] == 'optional_presence' and branch.get('value') == 'absent'
+                    and public_pointer == '/gateway/payload/agent_result/metadata/default'
+                    and {'pointer': public_pointer, 'absent': True} in checks
+                    and isinstance(pointer_value(record, '/gateway/payload/agent_result/metadata'), dict)
+                    and any(c['pointer'] == '/gateway/payload/agent_result' and 'equals' in c for c in checks)):
+                public_equals = True
             if (not public_pointer.startswith('/gateway/payload/agent_result')
-                    or not any(c['pointer'] == public_pointer and 'equals' in c for c in checks)):
+                    or not public_equals):
                 raise ValueError('exact public Gateway result assertion missing')
             if gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True or not gateway['argv']:
                 raise ValueError('successful public Gateway receipt missing')
