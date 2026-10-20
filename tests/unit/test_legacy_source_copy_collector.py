@@ -937,3 +937,30 @@ def test_selected_source_probe_reserves_list_typed_rtpc_for_independent_candidat
     assert receipt['budget']['native_calls'] == len(task.probe_native_calls)
     request.node.user_properties.append(('probe_budget', receipt['budget']))
     assert writes == []
+
+
+def test_selected_2025_source_probe_records_xml_newline_equivalence_without_rewriting_native_notes(tmp_path, workflow):
+    import hashlib
+    runtime, commands, writes, task = selected_owned_probe_runtime(tmp_path, version='2025.1')
+    original = Path(__file__).parents[1] / '_org/2025.1/Containers/MIDI.wwu'
+    raw = original.read_bytes()
+    # Literal saved CRLF bytes match the retained3db2025 native Source reply;
+    # ElementTree's XML end-of-line processing exposes LF for this same text.
+    source_span = raw.split(SOURCE.encode('ascii'), 1)[1].split(b'</SourcePlugin>', 1)[0]
+    native_notes = source_span.split(b'<Comment>', 1)[1].split(b'</Comment>', 1)[0].decode('utf-8')
+    assert hashlib.sha256(native_notes.encode('utf-8')).hexdigest() == 'd8e0017651ea5d6af8cc120e5029ef0fd1cbbd6ed714aa802b371e78b7aa3f13'
+    assert native_notes.count('\r\n') == 8
+    task.objects[SOURCE]['notes'] = native_notes
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='', selected_owned_probe=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    probe = receipt['selected_owned_probe']
+    assert receipt['collection_complete'] is True
+    assert probe['frames']['source']['notes'] == native_notes  # Native bytes remain observable.
+    assert probe['notes_comparison']['source'] == {
+        'exact': False, 'xml_crlf_equivalent': True,
+        'comparison': 'native notes CRLF to LF versus parsed saved Comment; notes only',
+        'native_utf8_sha256': 'd8e0017651ea5d6af8cc120e5029ef0fd1cbbd6ed714aa802b371e78b7aa3f13',
+        'saved_parsed_utf8_sha256': 'd2147876babea62f80ebd92b2a64de163bcc699da02434705a1bd66bd617631b'}
+    archive = Path(probe['fixture']['archive']['path'])
+    assert archive.read_bytes() == raw
+    assert writes == []

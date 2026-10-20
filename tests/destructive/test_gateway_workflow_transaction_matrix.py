@@ -10121,7 +10121,18 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             if 'ShortID' in nodes[role].attrib:
                 assert row.get('short_id') == int(nodes[role].get('ShortID')), row
             assert row['name'] == nodes[role].get('Name', ''), row
-            assert row.get('notes') == (nodes[role].findtext('Comment') or ''), row
+            native_notes, saved_notes = row.get('notes'), nodes[role].findtext('Comment') or ''
+            assert isinstance(native_notes, str), row
+            # XML parsing replaces literal CRLF in Comment text with LF.
+            # Keep the live frame and original saved WWU bytes unchanged;
+            # compare only notes under this observed newline equivalence.
+            comparison = {'exact': native_notes == saved_notes,
+                'xml_crlf_equivalent': native_notes.replace('\r\n', '\n') == saved_notes,
+                'comparison': 'native notes CRLF to LF versus parsed saved Comment; notes only',
+                'native_utf8_sha256': hashlib.sha256(native_notes.encode('utf-8')).hexdigest(),
+                'saved_parsed_utf8_sha256': hashlib.sha256(saved_notes.encode('utf-8')).hexdigest()}
+            probe.setdefault('notes_comparison', {})[role] = comparison
+            assert comparison['exact'] or comparison['xml_crlf_equivalent'], row
         for role, identity in ids.items():
             row, = rows(gateway.gateway(['query-object', '--exact-id', identity, '--max-results', '2',
                 *[arg for name in ('class-id', 'parent', 'owner', 'notes', 'short-id') for arg in ('--include', name)]], live=True))
