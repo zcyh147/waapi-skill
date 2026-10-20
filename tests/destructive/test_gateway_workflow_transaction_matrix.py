@@ -6579,22 +6579,155 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
     assert category['status'] == 'PASS', category
 
 
+def _collect_compound_render_rename_history(gateway, receipt, *, version, owner_id, selected_id,
+        field, renamed, snapshot, metadata_scopes):
+    """One owned compound change and receipt-bound history, using the caller's oracle."""
+    assert version in {'2022.1', '2025.1'}, version
+    def metadata():
+        result = {}
+        for identity, required in metadata_scopes:
+            names, selections, page = [], {}, None
+            for _ in range(4):
+                listed = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                    *(['--page', page] if page else [])], live=True)['agent_result']
+                for item in listed['fields']:
+                    assert item['name'] not in names, listed
+                    names.append(item['name'])
+                    if item['name'] in required: selections[item['name']] = item['selection']
+                if listed.get('complete') is True:
+                    assert len(names) == listed['total_count'] <= 256, listed
+                    break
+                next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+                page = next_page
+            else: raise AssertionError('Render history metadata exceeds four pages')
+            assert set(selections) == set(required), (required, names)
+            details = {}
+            for name, selection in selections.items():
+                detail = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', selection], live=True)['agent_result']
+                assert detail.get('complete') is True, detail
+                facts = detail.get('metadata', detail.get('entries'))
+                assert isinstance(facts, (dict, list)), detail
+                details[name] = facts
+            result[identity] = {'names': names, 'details': details}
+        return result
+    def observe():
+        return {'state': snapshot(), 'metadata': metadata()}
+    def complete(draft, role):
+        phase = {'phase': role, 'setup_no_credit': False, 'native_outcome': 'not_executed', 'effect_verified': False}
+        receipt['transactions'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = _required_string(preview, 'transaction_id')
+        shown = gateway.gateway(['transaction-show', tx], live=False)
+        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'],
+            compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        if role == 'source':
+            calls = shown['artifact']['prepared_operation']['pre_state']['execution_plan']['calls']
+            assert len(calls) == 2, calls
+            assert [(call['prepared_operation']['dispatch']['uri'], call['args']) for call in calls] == [
+                ('ak.wwise.core.object.setName', {'object': owner_id, 'value': renamed}),
+                ('ak.wwise.core.object.setProperty', {'object': selected_id, 'property': field, 'value': True})], calls
+        else:
+            dispatch = shown['artifact']['prepared_operation']['dispatch']
+            assert dispatch['uri'] == 'ak.wwise.core.undo.' + role and dispatch['args'] == {}, dispatch
+        phase['collector_prestate'] = snapshot()
+        assert phase['collector_prestate'] == receipt['history_before' if role in {'source', 'redo'} else 'history_after']['state'], phase
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['native_outcome'] = 'indeterminate'
+        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
+        phase['native_outcome'] = 'accepted'
+        code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        if role != 'source': assert verified.get('verification_strength') == 'scoped_history_effect_readback', verified
+        final = gateway.gateway(['transaction-show', tx], live=False)
+        assert final['artifact'] == phase['immutable_preview'], 'History flow changed an immutable Preview'
+        phase['transaction'] = final
+        return phase
+    receipt.update(history_complete=False, stack_head_observed=False, outside_scope_preservation_observed=False,
+        history_scope='existing_chain_exact_owner_rename_and_stored_Render_not_rendered_audio')
+    before = receipt['history_before'] = observe()
+    assert before['state']['owner']['id'] == owner_id
+    expected = json.loads(json.dumps(before))
+    old_path = expected['state']['owner']['path']
+    new_path = old_path.rsplit('\\', 1)[0] + '\\' + renamed
+    def project(value):
+        if isinstance(value, dict):
+            result = {key: project(item) for key, item in value.items()}
+            if value.get('id') == owner_id and 'name' in value: result['name'] = renamed
+            if isinstance(value.get('path'), str) and (value['path'] == old_path or value['path'].startswith(old_path + '\\')):
+                result['path'] = new_path + value['path'][len(old_path):]
+            return result
+        return [project(item) for item in value] if isinstance(value, list) else value
+    expected['state'] = project(expected['state'])
+    if version == '2025.1':
+        assert [row['properties']['Render'] for row in before['state']['slots']] == [False, False]
+        for row in expected['state']['slots']: row['properties']['Render'] = True
+    else:
+        assert all(before['state']['owner']['properties'][f'RenderEffect{i}'] is False for i in range(4))
+        for i in range(2): expected['state']['owner']['properties'][f'RenderEffect{i}'] = True
+    parent = _start_business_draft(gateway, 'waapi.undoGroup')
+    children = []
+    for operation in ('object.setName', 'object.setProperty'):
+        started = _update_business_draft(gateway, parent, 'draft-start-undo-child', ['--operation', operation], live=False)
+        row = started['draft']; child = _BusinessDraft(row['draft_id'], started['task_authority'], int(row['revision']))
+        bound = _bind_business_object(gateway, child, object_id=owner_id if operation == 'object.setName' else selected_id)
+        if operation == 'object.setName':
+            _update_business_draft(gateway, child, 'draft-declare-object-change', ['--new-name', renamed], live=False)
+        else:
+            matches, page = [], None
+            for _ in range(4):
+                listed = _update_business_draft(gateway, child, 'draft-discover-fields', ['--object-handle', bound,
+                    '--list', '--page-size', '64', *(['--page', page] if page else [])], live=True)['agent_result']
+                matches.extend(item for item in listed['fields'] if item['name'] == field)
+                if listed.get('complete') is True: break
+                next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+                page = next_page
+            else: raise AssertionError('Render field discovery exceeds four pages')
+            assert len(matches) == 1, matches
+            chosen = _update_business_draft(gateway, child, 'draft-discover-fields', ['--object-handle', bound, '--selection', matches[0]['selection']], live=True)
+            handle = discovered_business_field_handle(chosen, field)
+            _update_business_draft(gateway, child, 'draft-declare-field-change', ['--object-handle', bound,
+                '--field-handle', handle, '--business-value', 'true'], live=False)
+        _update_business_draft(gateway, child, 'draft-check', live=True); children.append(child)
+    _update_business_draft(gateway, parent, 'draft-declare-undo-plan', ['--display-name', 'Owned Render exact rename',
+        *[arg for child in children for arg in ('--child-draft', child.draft_id, child.task_authority)]], live=False)
+    phase = complete(parent, 'source')
+    source_id = phase['transaction_id']
+    after = receipt['history_after'] = observe(); phase['independent_effect'] = after
+    assert after == expected, (expected, after)
+    phase['effect_verified'] = True
+    for direction in ('undo', 'redo') if version == '2025.1' else ('undo',):
+        draft = _start_business_draft(gateway, 'ak.wwise.core.undo.' + direction)
+        _update_business_draft(gateway, draft, 'draft-declare-core-plan', ['--value', 'history_scope', 'latest_project_history',
+            '--value', 'expectation_receipt', source_id], live=True)
+        phase = complete(draft, direction)
+        observed = receipt['history_' + direction] = observe(); phase['independent_effect'] = observed
+        assert observed == (before if direction == 'undo' else after), observed
+        phase['effect_verified'] = True
+    receipt['history_complete'] = True
+
+
 def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str,
-        render_suffix_diagnostic: bool = False) -> dict[str, Any]:
+        render_suffix_diagnostic: bool = False, compound_render_history: bool = False) -> dict[str, Any]:
     """Three modern new-List effects inside the existing owned workflow lifecycle."""
-    output = runtime.state_dir / ('effect-render-suffix-observation.json' if render_suffix_diagnostic else 'anonymous-effect-slot-construction-acceptance.json')
-    category = {'category': 'effect-render-suffix-observation' if render_suffix_diagnostic else 'anonymous-effect-slot-construction', 'status': 'FAIL',
+    assert not (render_suffix_diagnostic and compound_render_history)
+    output = runtime.state_dir / ('compound-render-history-acceptance.json' if compound_render_history else 'effect-render-suffix-observation.json' if render_suffix_diagnostic else 'anonymous-effect-slot-construction-acceptance.json')
+    category = {'category': 'compound-render-history' if compound_render_history else 'effect-render-suffix-observation' if render_suffix_diagnostic else 'anonymous-effect-slot-construction', 'status': 'FAIL',
         'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_membership_exact_guid_class_owner_reference_fields_and_preservation',
         'observation_path': str(output)}
     if render_suffix_diagnostic:
         category.update(diagnostic_only=True, business_effect_verified=False,
             verifier_strength='diagnostic_stored_Render_suffix_and_complete_preservation_observation_no_business_credit')
+    if compound_render_history:
+        category['verifier_strength'] = 'receipt_bound_compound_source_undo_redo_plus_independent_full_chain_target_metadata_preservation'
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'setup_coverage_credit': False, 'business_effect_verified': False,
         'scope': 'stored_Render_suffix_observation_not_business_acceptance' if render_suffix_diagnostic else 'new_anonymous_EffectSlot_construction_not_existing_member_name_merge',
         'lifecycle_acceptance': 'existing host-category-evidence/v3 finalizer owns source/cleanup acceptance'}
     if render_suffix_diagnostic: receipt.update(diagnostic_complete=False, classification='not_observed')
+    if compound_render_history: receipt['scope'] = 'existing_modern_chain_exact_owner_rename_and_receipt_bound_history'
     def persist():
         body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(body) <= 8 * 1024 * 1024, 'Anonymous EffectSlot receipt byte bound exceeded'
@@ -6700,7 +6833,7 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
         handles = []
         for index, target in enumerate(targets):
             values = ['--field-value', fields['Bypass'], 'false' if render_suffix_diagnostic or index == 0 else 'true',
-                '--field-value', fields['Render'], 'true' if render_suffix_diagnostic or index == 0 else 'false']
+                '--field-value', fields['Render'], 'false' if compound_render_history else 'true' if render_suffix_diagnostic or index == 0 else 'false']
             if target is not None: values += ['--field-value', fields['Effect'], target]
             declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', f'slot{index}',
                 '--parent-handle', owner, '--kind', kind, '--field', 'object_list', effects, *values], live=False)
@@ -6919,9 +7052,24 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
             declare_slots(draft, owner, effects, kind, fields, handles)
             if mode == 'replace-all': _update_business_draft(gateway, draft, 'draft-business-configure', ['--list-behavior', mode], live=False)
             phase = complete(draft, 'setup_rendered_chain_no_credit' if render_suffix_diagnostic else 'append_existing_sharesets' if mode == 'append' else 'replace_all_population',
-                setup=render_suffix_diagnostic)
+                setup=render_suffix_diagnostic or compound_render_history)
             if render_suffix_diagnostic:
                 return observe_suffix()
+            if compound_render_history:
+                assert runtime.version == '2025.1', runtime.version
+                ordered_ids = [row['id'] for row in members(sound['id'])]
+                assert len(ordered_ids) == 2, ordered_ids
+                target_fields = {row['id']: gain_fields(row['id']) for row in targets}
+                def history_snapshot():
+                    return {**slot_snapshot(sound['id'], [row['id'] for row in targets], observing_suffix=True),
+                        'targets': [exact(row['id'], target_fields[row['id']]) for row in targets],
+                        'folder': exact(folder['id']), 'parents': {key: exact(row['id']) for key, row in parents.items()}}
+                _collect_compound_render_rename_history(gateway, receipt, version=runtime.version, owner_id=sound['id'],
+                    selected_id=ordered_ids[1], field='Render', renamed=prefix + '_Renamed', snapshot=history_snapshot,
+                    metadata_scopes=[*[(identity, ('Effect', 'Bypass', 'Render')) for identity in ordered_ids],
+                        *[(row['id'], target_fields[row['id']]) for row in targets]])
+                receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+                return category
             observed = slot_snapshot(sound['id'], [row['id'] for row in target_order])
             assert observed['owner'] == sound, (sound, observed)
             assert not set(observed['ordered_ids']).intersection(previous), observed
@@ -7722,15 +7870,19 @@ def test_effect_render_suffix_observation(workflow_sandbox_runtime: _WorkflowSan
     assert category.get('classification') in {'cleared', 'retained'}, category
 
 
-def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+        compound_render_history: bool = False) -> dict[str, Any]:
     """Legacy owner Render with media/immutable structure, in the existing lifecycle."""
     assert runtime.version in {'2021.1', '2022.1'}, runtime.version
-    output = runtime.state_dir / 'legacy-import-render-acceptance.json'
+    if compound_render_history: assert runtime.version == '2022.1', runtime.version
+    output = runtime.state_dir / ('compound-render-history-acceptance.json' if compound_render_history else 'legacy-import-render-acceptance.json')
     view_scope = ('current_default_view_only_unobserved_platform_identity' if runtime.version == '2021.1'
         else 'actual_preview_read_view_certificate_no_cross_platform_claim')
-    category = {'category': 'legacy-import-render', 'status': 'FAIL', 'read_view_scope': view_scope,
+    category = {'category': 'compound-render-history' if compound_render_history else 'legacy-import-render', 'status': 'FAIL', 'read_view_scope': view_scope,
         'verifier_strength': 'gateway_verified_plus_independent_full_owner_chain_actual_identity_source_ownership_media_hash_and_effect_preservation',
         'observation_path': str(output)}
+    if compound_render_history:
+        category['verifier_strength'] = 'receipt_bound_compound_source_undo_plus_independent_full_legacy_chain_target_metadata_preservation'
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'setup_coverage_credit': False, 'shareset_construction_verified': False, 'business_effect_verified': False,
@@ -8000,6 +8152,14 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
             result = _imported_object(phase['execute']['payload'], '\\' + '\\'.join((*segments, name)))
             assert result['id'] == owner['id'], (result, owner)
             if setup: existing_owner = owner
+            if setup and compound_render_history:
+                def history_snapshot():
+                    return {'owner': exact(owner['id'], [*chain, 'Volume', 'IsVoice']), 'preserved': preserved()}
+                _collect_compound_render_rename_history(gateway, receipt, version=runtime.version, owner_id=owner['id'],
+                    selected_id=owner['id'], field='RenderEffect1', renamed=prefix + '_Renamed', snapshot=history_snapshot,
+                    metadata_scopes=[(owner['id'], chain), *[(row['id'], target_fields[row['id']]) for row in targets]])
+                receipt['business_effect_verified'] = True; category['status'] = 'PASS'
+                return category
             if existing: assert owner['id'] == existing_owner['id'], owner
             if not setup and not existing: assert owner['id'] != existing_owner['id'], owner
             if index in (1, 2):
@@ -8051,6 +8211,23 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
 def test_legacy_import_render_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     assert workflow_sandbox_runtime.version in {'2021.1', '2022.1'}, 'Legacy owner Render applies only to 2021/2022'
     category = _collect_legacy_import_render_acceptance(workflow_sandbox_runtime, prefix='WAAPI_LEGACY_IMPORT_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+def _collect_compound_render_history_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    assert runtime.version in {'2022.1', '2025.1'}, runtime.version
+    collector = (_collect_legacy_import_render_acceptance if runtime.version == '2022.1'
+        else _collect_anonymous_effect_slot_construction_acceptance)
+    return collector(runtime, prefix=prefix, compound_render_history=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_compound_render_exact_owner_rename_history_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version not in {'2022.1', '2025.1'}:
+        pytest.skip('Two distinct native shapes: legacy2022 source/undo and modern2025 source/undo/redo')
+    category = _collect_compound_render_history_acceptance(workflow_sandbox_runtime,
+        prefix='WAAPI_RENDER_HISTORY_' + uuid.uuid4().hex[:10])
     assert category['status'] == 'PASS', category
 
 
