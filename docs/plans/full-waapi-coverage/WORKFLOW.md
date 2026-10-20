@@ -17,6 +17,14 @@ If behavior remains uncertain, use one minimal owned native case before building
 the wider verifier or history machinery. Simulated clients must follow these
 sources; passing a simulated test does not establish native behavior.
 
+For a new compound harness protocol, trace the actual task runner through prompt
+provenance, request materialization, Broker execution, task-result sealing and
+campaign replay before expanding its test matrix. First prove one complete task
+through those existing consumers, stubbing only the external Codex process for
+the pure-code check. Reuse its authenticated receipts for focused corruption and
+retry-prefix controls. Lower-level Broker passes alone do not prove that the
+task can produce and replay its final result.
+
 1. Freeze one bounded batch of explicitly selected immutable worker refs. Workers
    run their relevant focused cases; a new preparation read also selects its
    affected existing public-route matrix rows. Confirm negative tests reach the
