@@ -221,3 +221,32 @@ digest. The existing projection compacts the 128 observation rows without a
 capacity increase. This is distinct from the earlier maximum-label request
 cases that select the exceptional bounded envelope; neither is native/Fresh or
 Broker/archive acceptance.
+
+## Bounded successor: stationary square numerical conformance
+
+The existing Gateway artifact verifier now checks every active stationary
+square sample against the requested gain, an independent mean-absolute gain
+interval and one common phase at the exact requested frequency/rate. The
+previously reviewed .02 dB gain, .002 relative shape and two representation-unit
+allowances are unchanged. Exact rational phase intersection holds at most one
+interval or two endpoints per channel; only mathematically exact discontinuities
+permit either limiting sign, with no transition window or per-edge adjustment.
+The [mathematical/source note](../TONE_STATIONARY_SQUARE.md) owns that policy.
+
+Successful observations prove the disclosed digital conformance. An empty
+exact phase intersection remains partial cadence observability, retaining its
+first incompatible frame: matching sources do not specify utility input/phase
+precision. No guessed native numeric type, rounded request or frequency fit
+turns that uncertainty into acceptance. Independent magnitude, mean-gain,
+nonfinite and silent-channel contradictions still fail; unobservable recurrence,
+quantization, aliasing and fractional interpretations remain explicit.
+
+Public program controls use the byte-identical retained Console 2025.1.7.9143
+square and independent analytic signals. The original diagnostic run remains
+unchanged. Program contracts cover 2023.1/2024.1/2025.1 and preserve the pinned
+2021.1/2022.1 absence boundary; new native waveform observation exists only at
+the one retained 2025 setting. Exact terminal results remain bounded at the
+largest 36-channel anonymous configuration. Triangle/noise/nonstationary square,
+other native settings/builds/hosts, fractional rounding, remaining representation
+and marker work, #193/#188 completion and downstream #194 acceptance remain
+separate obligations. No native, Fresh, full gate or coverage credit is added.

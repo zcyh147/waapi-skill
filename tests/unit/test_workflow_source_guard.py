@@ -4396,7 +4396,7 @@ def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certif
     for phase in receipt['phases']:
         assert phase['signal_verified'] is False
         assert phase['verification']['business_state_verified'] is False
-        expected_state = 'verification_failed' if phase['business_values']['waveform'] == 'sine' else 'result_schema_checked'
+        expected_state = 'verification_failed' if phase['business_values']['waveform'] in {'sine', 'square'} else 'result_schema_checked'
         assert phase['verification']['state'] == expected_state
         if expected_state == 'result_schema_checked':
             assert phase['verification']['verification_strength'] == 'partial_tone_artifact'
@@ -4422,7 +4422,7 @@ def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certif
     assert final['residual_state']['process_cleanup'] == 'cleaned'
     assert final['residual_state']['residual_processes'] == []
     assert len(final['transactions']) == 6
-    assert sorted(row['state'] for row in final['transactions']) == ['result_schema_checked'] * 3 + ['verification_failed'] * 3
+    assert sorted(row['state'] for row in final['transactions']) == ['result_schema_checked'] * 2 + ['verification_failed'] * 4
     calls_before = len(commands)
     with pytest.raises(AssertionError, match='overwrite'):
         workflow._collect_tone_waveform_envelope_characterization(runtime)

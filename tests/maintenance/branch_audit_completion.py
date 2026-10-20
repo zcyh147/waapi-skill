@@ -372,7 +372,7 @@ def read_r51_metadata_run(descriptor, base):
         'receipt_sha256': descriptor['reply']['sha256']}
 
 
-def read_metadata_run(descriptor, base):
+def read_metadata_run(descriptor, base, *, historical_class=False):
     """Read sealed ScenarioLifecycle/v3 captures and their original public receipts."""
     import hashlib
     import json
@@ -432,14 +432,14 @@ def read_metadata_run(descriptor, base):
     if len(repositories) != 1 or len(repositories[0]['commit']) != 40:
         raise ValueError('metadata exact source candidate missing')
     repository = repositories[0]
-    sources = {r['path'][len(repository['checkout']) + 1:]: r['sha256'] for r in plan['source_seals']
-               if r['path'].startswith(repository['checkout'] + '/')}
+    from tests.maintenance.collect_class_metadata import collection_source_map
+    sources = collection_source_map(plan['source_seals'],repository['checkout'])
     if class_read:
         import math
         from tests.maintenance import collect_class_metadata as collector
         targets = read('targets.json')
         target = targets[descriptor['target_index']]
-        selected = collector.collection_plan(context['version'])
+        selected = collector.collection_plan(context['version'],cohort=plan.get('cohort','r54'))
         expected_fields = {(scope,field) for scope,fields in selected['targets'].items() for field in fields}
         if (any(plan[key] != value for key,value in selected.items())
                 or plan.get('observation_origin') not in {'native_scenario_lifecycle','controlled_public_gateway'}
@@ -468,7 +468,7 @@ def read_metadata_run(descriptor, base):
         native = read(target['native_receipt'])
         if native['evidence_path'] != target['native_path']:
             raise ValueError('Original class native/public path identity changed')
-        collector.validate_native_pair(payload,native,context['version'],target['scope'],target['field'])
+        collector.validate_native_pair(payload,native,context['version'],target['scope'],target['field'],cohort=plan.get('cohort','r54'))
         if (target['default_present'] is not ('default' in native['result'])
                 or ('default' in native['result'] and json.dumps(target['observed_default'],allow_nan=False)
                     != json.dumps(native['result']['default'],allow_nan=False))):
@@ -479,8 +479,16 @@ def read_metadata_run(descriptor, base):
             raise ValueError('Original class selection did not come from its own live inventory')
         # Capture and reader use the same complete deduplicated collection map,
         # including lifecycle imports. Omitted extras and source drift stay missing.
-        required = {str(Path(row['path']).relative_to(collector.REPO)):row['sha256']
-                    for row in collector.source_links(context['version'],selected['targets'])[1]}
+        if historical_class:
+            from tests.support.metadata_replay_branch_evidence import validate_class_original_sources,R55_ORIGINAL_SEALS
+            if plan['observation_origin']!='native_scenario_lifecycle':
+                raise ValueError('Original class native origin changed')
+            validate_class_original_sources(repository['commit'],sources,plan.get('cohort','r54'))
+            if plan.get('cohort','r54')=='r55' and descriptor['seal']['sha256']!=R55_ORIGINAL_SEALS.get(context['version']):
+                raise ValueError('Original accepted R55 seal anchor changed')
+            required=sources
+        else:
+            required = collection_source_map(collector.source_links(context['version'],selected['targets'])[1],collector.REPO)
         if (not sources or len(sources) != len(plan['source_seals'])
                 or any(Path(name).is_absolute() or '..' in Path(name).parts or '\\' in name for name in sources)
                 or sources != required):
@@ -490,7 +498,7 @@ def read_metadata_run(descriptor, base):
             receipt_sha256=files[prefix+'.stdout']['sha256'],format=descriptor['contract'],
             native_result=native['result'],native_sha256=target['native_sha256'],class_name=target['scope'],
             class_id=selected['class_ids'][target['scope']],field=target['field'],invocation=summary['invocation'],
-            observation_origin=plan['observation_origin'])
+            observation_origin=plan['observation_origin'],cohort=plan.get('cohort','r54'))
     return dict(context, candidate=repository['commit'], relevant_sources=sources,
                 gateway={'argv': command['gateway_arguments'], 'exit_code': result['exit_code'], 'payload': payload},
                 receipt_sha256=files[prefix + '.stdout']['sha256'])
@@ -522,29 +530,40 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
     allowed = {'tests/maintenance/branch_audit_completion.py','tests/maintenance/branch_coverage_audit.py',
         'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_replay_attachments.py',
         'tests/support/metadata_replay_cases.json','tests/support/metadata_replay_branch_evidence.py',
-        'docs/branch-coverage-requirements.json'}
-    # Reviewed combined Tone/Source-copy/Save source ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90.
-    # This does not participate in the exact RTPC metadata read. All nine
-    # exact old/new blobs occur together, including the explicit new-file
-    # before=None. Later edits and partially combined runtimes are not this bridge.
-    reviewed_runtime = {'skills/waapi-skill/wwise_waapi/operation_tone.py': {'before': '34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912',
-                                                          'after': '73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
-     'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'before': '40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6',
-                                                                            'after': 'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
-     'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py': {'before': '55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177',
-                                                                  'after': 'a392d1a2bc4665dd1ac64a83d88bb89561c2cd8570e3ebd7ab6355c5d62300ba'},
-     'skills/waapi-skill/wwise_waapi/object_lifecycle_graph.py': {'before': '97c3eef5097e66d34c5ecc87b56c787969c7bfe10c88d7a7f2ba3b2eef983c72',
-                                                                  'after': '8f2df48a3089554996730ad1a074db35bea444316408d0c2f366686a646e226f'},
-     'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '20be86428b6e1ae9fb6cab954ee7ada6b8092406bf33b8bc148b869853539b14',
-                                                              'after': 'ae7d8430d03548ce8b42601d99dbc303ed2f99210a0d1d6e090b7fd7b1b3aade'},
-     'skills/waapi-skill/wwise_waapi/source_copy_observations.py': {'before': None,
-                                                                    'after': '78759d095e860f22b0c0ca85b98c3bb7913feb47b6cbc503940a9f62ea287b3e'},
-     'skills/waapi-skill/scripts/gateway.py': {'before': '1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca',
-                                               'after': '9fead77024b8646db90fa6d80a16933c5bbe05c3f83f10c6d40ef8b8f7b86ebe'},
-     'skills/waapi-skill/wwise_waapi/core_business.py': {'before': '2cbf4c4aa6aeca19af2bad665f36d1b0f3bbbcdc148e7da360973574ae0a2f46',
-         'after': '62e361dd638a53af8b62455ec5c414bff7e5e9a9fdf6a2a419edb44a6f970bb6'},
-     'skills/waapi-skill/wwise_waapi/core_business_contracts.py': {'before': 'c0a66082248ef5c1a23020dafc90f1a9eb08ac3dfe5073bc6e9f75f2171fa65f',
-         'after': 'f9fe51a42199b137420dc906e3ceea57a64e6f3d302940887747d7616f61d61a'}}
+        'docs/branch-coverage-requirements.json','tests/unit/test_metadata_default_branch_evidence.py',
+        'tests/support/media_pool_branch_evidence.py'}
+    # Reviewed saved-copy ee78f00baf06f1840228313ae1bb6b263fd95301 and
+    # stationary-square 8d0157647035504a6ab4e4d9e9b06e8b6ec8985d, plus
+    # Gateway-only choice disclosure4a6208a15d19f847b3bac848a075229eb3547585.
+    # Full original/current maps remain mandatory. All thirteen exact runtime
+    # pairs occur together, including both explicit new-file before=None rows.
+    # Future hashes and partially combined runtimes are not this bridge.
+    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': 'f86e1102b99d7d552dd1fabebbda7ea4a3020f21b796233bdfc69186123c711c',
+                                           'before': '1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca'},
+ 'skills/waapi-skill/wwise_waapi/core_business.py': {'after': '62e361dd638a53af8b62455ec5c414bff7e5e9a9fdf6a2a419edb44a6f970bb6',
+                                                     'before': '2cbf4c4aa6aeca19af2bad665f36d1b0f3bbbcdc148e7da360973574ae0a2f46'},
+ 'skills/waapi-skill/wwise_waapi/core_business_contracts.py': {'after': 'f9fe51a42199b137420dc906e3ceea57a64e6f3d302940887747d7616f61d61a',
+                                                               'before': 'c0a66082248ef5c1a23020dafc90f1a9eb08ac3dfe5073bc6e9f75f2171fa65f'},
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py': {'after': 'a392d1a2bc4665dd1ac64a83d88bb89561c2cd8570e3ebd7ab6355c5d62300ba',
+                                                              'before': '55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177'},
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'after': '4e231f2b1556d38b61534ab98889b309a136f7bdfd2631ceb5a20d80fefc979e',
+                                                                        'before': '40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6'},
+ 'skills/waapi-skill/wwise_waapi/object_lifecycle_graph.py': {'after': '8f2df48a3089554996730ad1a074db35bea444316408d0c2f366686a646e226f',
+                                                              'before': '97c3eef5097e66d34c5ecc87b56c787969c7bfe10c88d7a7f2ba3b2eef983c72'},
+ 'skills/waapi-skill/wwise_waapi/operation_composer.py': {'after': '456440f1b0502c3e1299943b07a21f88224f65ccbd0f475d6235e176ea52eb12',
+                                                          'before': 'f56b8fd67de519c2b391ce8399bee9c031e6f8b5d7804afa48ddf8b3326168f5'},
+ 'skills/waapi-skill/wwise_waapi/operation_drafts.py': {'after': '528e50ab6e1432415bfb4eedd34ce10eaa507a39e84a8590c9f5a048f70bfe01',
+                                                        'before': 'dc6a828ae864c0d7ac1f4845c616bb1b1a49d2aad9ca5e503f754fd4a4922c98'},
+ 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045',
+                                                          'before': '20be86428b6e1ae9fb6cab954ee7ada6b8092406bf33b8bc148b869853539b14'},
+ 'skills/waapi-skill/wwise_waapi/operation_tone.py': {'after': 'db783ace35413ca1d126ea6a100bef0e2c813008502306dc6e4e3c4d03155fa8',
+                                                      'before': '34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912'},
+ 'skills/waapi-skill/wwise_waapi/source_copy_observations.py': {'after': '78759d095e860f22b0c0ca85b98c3bb7913feb47b6cbc503940a9f62ea287b3e',
+                                                                'before': None},
+ 'skills/waapi-skill/wwise_waapi/source_copy_proof.py': {'after': '71a1d2ae8c7d5e1b390733cd69cc20606465a475f10581eafaa77f55c757bb79',
+                                                         'before': None},
+ 'skills/waapi-skill/wwise_waapi/transaction_runtime.py': {'after': 'eca18101c572eb89c6af494235e7957602a4851073db4c99430f6086a7727baf',
+                                                           'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'}}
     if set(changes) & set(reviewed_runtime):
         if any(changes.get(name) != expected for name,expected in reviewed_runtime.items()):
             raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
@@ -600,7 +619,7 @@ def validate_current_class_metadata(record,branch,binding,context,scope_kind):
     """Current-source native metadata only; independent program evidence stays required."""
     from tests.maintenance import collect_class_metadata as collector
     from tests.support.metadata_replay_branch_evidence import git_source_seals
-    plan=collector.collection_plan(context['version'])
+    plan=collector.collection_plan(context['version'],cohort=context.get('cohort','r54'))
     expected={'native_candidate':context['candidate'],'relevant_sources':context['relevant_sources']}
     if (branch['id'] not in plan['eligible_branch_ids']
             or record.get('evidence_kind') != 'current_public_class_metadata'
@@ -620,6 +639,96 @@ def validate_current_class_metadata(record,branch,binding,context,scope_kind):
         raise ValueError('Controlled metadata origin cannot grant product native credit')
     if scope_kind == 'product' and git_source_seals(context['candidate'],context['relevant_sources']) != context['relevant_sources']:
         raise ValueError('Current native class source pin differs from its full sealed closure')
+
+
+def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,root,scope_kind,reference_edges):
+    """Original8a native facts plus exact current public replay, never current native."""
+    import json
+    from tests.support import metadata_replay_branch_evidence as producer
+    from tests.maintenance.collect_class_metadata import collection_plan
+    cohort=context['cohort'];profile=producer.class_original_profile(cohort)
+    if branch['id'] not in collection_plan(context['version'],cohort=cohort)['eligible_branch_ids']:
+        raise ValueError('Historical class replay is limited to its exact original default leaves')
+    bridge=record['source_bridge'];before=context['relevant_sources'];after=producer.r54_current_sources()
+    producer.validate_class_original_sources(context['candidate'],before,cohort)
+    allowed={'tests/maintenance/collect_class_metadata.py','tests/maintenance/branch_audit_completion.py',
+        'tests/maintenance/branch_coverage_audit.py','tests/support/metadata_replay_branch_evidence.py',
+        'tests/unit/test_class_metadata_collection.py','tests/unit/test_metadata_replay_attachments.py',
+        'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_default_branch_evidence.py',
+        'tests/support/media_pool_branch_evidence.py'}
+    changes=producer.source_changes(before,after)
+    # Same reviewed successors and Gateway-only4a disclosure as R51 above; original R54 is8a.
+    # These eight exact pairs do not grant native credit to the current source.
+    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': 'f86e1102b99d7d552dd1fabebbda7ea4a3020f21b796233bdfc69186123c711c',
+                                           'before': '9fead77024b8646db90fa6d80a16933c5bbe05c3f83f10c6d40ef8b8f7b86ebe'},
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'after': '4e231f2b1556d38b61534ab98889b309a136f7bdfd2631ceb5a20d80fefc979e',
+                                                                        'before': 'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
+ 'skills/waapi-skill/wwise_waapi/operation_composer.py': {'after': '456440f1b0502c3e1299943b07a21f88224f65ccbd0f475d6235e176ea52eb12',
+                                                          'before': 'f56b8fd67de519c2b391ce8399bee9c031e6f8b5d7804afa48ddf8b3326168f5'},
+ 'skills/waapi-skill/wwise_waapi/operation_drafts.py': {'after': '528e50ab6e1432415bfb4eedd34ce10eaa507a39e84a8590c9f5a048f70bfe01',
+                                                        'before': 'dc6a828ae864c0d7ac1f4845c616bb1b1a49d2aad9ca5e503f754fd4a4922c98'},
+ 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045',
+                                                          'before': 'ae7d8430d03548ce8b42601d99dbc303ed2f99210a0d1d6e090b7fd7b1b3aade'},
+ 'skills/waapi-skill/wwise_waapi/operation_tone.py': {'after': 'db783ace35413ca1d126ea6a100bef0e2c813008502306dc6e4e3c4d03155fa8',
+                                                      'before': '73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
+ 'skills/waapi-skill/wwise_waapi/source_copy_proof.py': {'after': '71a1d2ae8c7d5e1b390733cd69cc20606465a475f10581eafaa77f55c757bb79',
+                                                         'before': None},
+ 'skills/waapi-skill/wwise_waapi/transaction_runtime.py': {'after': 'eca18101c572eb89c6af494235e7957602a4851073db4c99430f6086a7727baf',
+                                                           'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'}}
+    if cohort=='r55':reviewed_runtime={} # Native860 already owns this exact accepted runtime.
+    if any(changes.get(name)!=expected for name,expected in reviewed_runtime.items()):
+        raise ValueError('Exact R54 reviewed runtime blob proof missing; unreviewed runtime drift')
+    allowed.update(reviewed_runtime)
+    if (set(bridge)!={'contract','attribution','historical_candidate','historical_sources','current_sources','changed_files'}
+            or bridge['contract']!=profile['bridge_contract']
+            or bridge['attribution']!='historical_native_current_program_not_current_native'
+            or bridge['historical_candidate']!=profile['candidate'] or bridge['historical_sources']!=before
+            or bridge['current_sources']!=after or bridge['changed_files']!=changes or not set(changes)<=allowed):
+        raise ValueError('Exact full R54/current source delta missing; unreviewed runtime drift')
+    replay=read_sealed_artifact(record['replay'],base)
+    case='|'.join((context['version'],context['class_name'],context['field']))
+    nodeid=profile['node']+'['+case+']'
+    if (record.get('evidence_kind')!='historical_class_metadata_current_program_replay'
+            or record['invocation']!=replay['invocation']
+            or record['invocation']!={'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':nodeid,'outcome':'PASS'}]}
+            or record['replay']['nodeid']!=nodeid or replay['relevant_sources']!=after
+            or context['observation_origin']!='native_scenario_lifecycle' or replay['original_case']!=case):
+        raise ValueError('Original R54 origin/current replay final node changed')
+    if scope_kind=='product' and producer.git_source_seals(replay['git_candidate'],after)!=after:
+        raise ValueError('Current R54 replay Git/source ownership changed')
+    inputs={'historical':context['gateway']['argv'],'replay':replay['gateway']['argv']}
+    if record['category_inputs']!=inputs or binding.get('category_inputs',{}).get('live_metadata')!=inputs:
+        raise ValueError('R54 native and current inputs must bind their own receipts')
+    def same(a,b):return json.dumps(a,sort_keys=True,allow_nan=False)==json.dumps(b,sort_keys=True,allow_nan=False)
+    native=replay['native_call'];public=replay['gateway']['payload'];original=context['gateway']['payload']['agent_result']
+    if (native['uri']!=producer.URI or native['args']!={'classId':context['class_id'],'property':context['field']}
+            or native['options']!={} or not same(native['result'],context['native_result'])
+            or replay['replayed_original_native_sha256']!=context['native_sha256']
+            or replay['replayed_original_packets_sha256']!=producer.r54_replay_case(case,record['metadata_run'],base=base,cohort=cohort)['packet_sha256s']
+            or replay['client_disconnected'] is not True or public.get('detected_version')!=context['version']
+            or public.get('is_command_line') is not True or public['agent_result']['scope']!=original['scope']
+            or public['agent_result']['complete'] is not True
+            or not same({k:public['agent_result']['metadata'][k] for k in native['result']},context['native_result'])):
+        raise ValueError('Exact original R54 class/field/raw/native/public replay changed')
+    pages=replay['discovery_pages'];prefix=['metadata','list','--custom-kind',context['class_name'],'--page-size','64']
+    if not 1<=len(pages)<=8:raise ValueError('Bounded R54 current selection pages required')
+    for i,page in enumerate(pages):
+        expected=prefix+(['--page',pages[i-1]['payload']['agent_result']['next_page']] if i else [])
+        if (page['argv']!=expected or page['payload'].get('ok') is not True
+                or page['payload']['agent_result']['scope']!=original['scope']
+                or page['payload']['agent_result']['snapshot']!=pages[0]['payload']['agent_result']['snapshot']):
+            raise ValueError('Exact current R54 class selection page changed')
+    if (replay['gateway']['argv']!=['metadata','detail','--custom-kind',context['class_name'],'--selection',public['agent_result']['selection']]
+            or not any(row['name']==context['field'] and row['selection']==public['agent_result']['selection']
+                for page in pages for row in page['payload']['agent_result']['fields'])):
+        raise ValueError('Current R54 field selection not independently discovered')
+    for receipt in (record,replay):
+        if not any(c['pointer']=='/gateway/payload/agent_result' and 'equals' in c
+                for c in receipt['branch_assertions'][branch['id']]['checks']):
+            raise ValueError('Whole original/current R54 result proof missing')
+    result=evidence_result(record['replay'],branch,candidate,'program',scope_kind,base,
+        record['replay_bindings'][branch['id']],source_root=root,reference_edges=reference_edges)
+    if result!=('passed',None):raise ValueError('Current R54 public replay did not prove leaf: '+str(result))
 
 
 def binding_semantics(binding):
@@ -1059,7 +1168,8 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         metadata_pointer = None
         metadata_replay = False
         if category == 'live_metadata':
-            metadata_context = read_metadata_run(record['metadata_run'], base)
+            metadata_context = read_metadata_run(record['metadata_run'], base,
+                historical_class=record.get('evidence_kind')=='historical_class_metadata_current_program_replay')
             record['gateway'] = metadata_context['gateway']
             if (branch.get('route') or '').endswith('|function|ak.wwise.core.object.getPropertyInfo'):
                 if not branch['pointer'].startswith('/resultSchema/') and branch['pointer'] != '/resultSchema':
@@ -1180,7 +1290,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                     validate_r51_metadata_replay(record,branch,candidate,binding,metadata_context,base,root,scope_kind,reference_edges or {})
                     metadata_replay = True
                 elif metadata_context.get('format') == 'waapi-skill.class-metadata-read/v1':
-                    validate_current_class_metadata(record,branch,binding,metadata_context,scope_kind)
+                    if record.get('evidence_kind')=='historical_class_metadata_current_program_replay':
+                        validate_r54_metadata_replay(record,branch,candidate,binding,metadata_context,base,root,scope_kind,reference_edges or {})
+                    else:validate_current_class_metadata(record,branch,binding,metadata_context,scope_kind)
                     metadata_replay = True
                 elif record['gateway']['argv'] != binding.get('input', {}).get('gateway_argv'):
                     raise ValueError('metadata public input mismatch')

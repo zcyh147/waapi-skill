@@ -425,6 +425,8 @@ def portable_binding_inputs(index_path, requirements):
         if class_attachment:
             from tests.maintenance.collect_class_metadata import collection_plan
             eligible = set(collection_plan(identity.split('|',1)[0])['eligible_branch_ids'])
+            if identity.split('|',1)[0] != '2025.1':
+                eligible.update(collection_plan(identity.split('|',1)[0],cohort='r55')['eligible_branch_ids'])
         policy = requirements['branches'].get(identity, {})
         if (identity in attached or identity not in bindings
                 or identity not in eligible
@@ -439,15 +441,35 @@ def portable_binding_inputs(index_path, requirements):
             raise ValueError('closed metadata evidence descriptor required')
         record = read({key:evidence[key] for key in ('artifact','sha256')})
         if class_attachment:
-            if (set(record) != {'candidate_sha256','scope_kind','evidence_kind','metadata_run','invocation',
-                    'branch_assertions','category_inputs','source_context'}
-                    or record['evidence_kind'] != 'current_public_class_metadata'
-                    or record['category_inputs'] != attachment['category_inputs']
-                    or set(record['category_inputs']) != {'native'}
-                    or not isinstance(record['category_inputs']['native'],list)
-                    or set(record['source_context']) != {'native_candidate','relevant_sources'}
-                    or identity not in record['branch_assertions']):
+            historical=record.get('evidence_kind')=='historical_class_metadata_current_program_replay'
+            common={'candidate_sha256','scope_kind','evidence_kind','metadata_run','invocation','branch_assertions','category_inputs'}
+            expected=common|({'replay','replay_bindings','source_bridge'} if historical else {'source_context'})
+            if (set(record)!=expected or record['category_inputs']!=attachment['category_inputs']
+                    or identity not in record['branch_assertions']
+                    or (not historical and (record['evidence_kind']!='current_public_class_metadata'
+                        or set(record['category_inputs'])!={'native'}
+                        or not isinstance(record['category_inputs']['native'],list)
+                        or set(record['source_context'])!={'native_candidate','relevant_sources'}))):
                 raise ValueError('Closed current native class attachment required')
+            if historical:
+                from tests.support.metadata_replay_branch_evidence import class_original_profile
+                profiles={class_original_profile(c)['bridge_contract']:c for c in ('r54','r55')}
+                cohort=profiles.get(record['source_bridge'].get('contract'))
+                if cohort is None:raise ValueError('Unreviewed original class bridge contract')
+                profile=class_original_profile(cohort)
+                if (record['source_bridge'].get('historical_candidate')!=profile['candidate']
+                        or identity not in collection_plan(identity.split('|',1)[0],cohort=cohort)['eligible_branch_ids']
+                        or set(record['category_inputs'])!={'historical','replay'}
+                        or any(not isinstance(v,list) or not v for v in record['category_inputs'].values())
+                        or identity not in record['replay_bindings']
+                        or set(record['source_bridge'])!={'contract','attribution','historical_candidate','historical_sources','current_sources','changed_files'}):
+                    raise ValueError('Closed historical R54 metadata attachment required')
+                replay=record['replay']
+                if set(replay)!={'artifact','sha256','nodeid'} or replay['nodeid']!=evidence['nodeid']:
+                    raise ValueError('Exact R54 current replay descriptor required')
+                program=read({key:replay[key] for key in ('artifact','sha256')})
+                if any(program.get(key) for key in ('artifacts','native_runs','metadata_run','observation_artifacts')):
+                    raise ValueError('R54 replay has unresolved nested dependency')
             archive=record['metadata_run']
             if (set(archive) != {'contract','root','seal','status_receipt','receipt','target_index'}
                     or archive['contract'] != 'waapi-skill.class-metadata-read/v1'

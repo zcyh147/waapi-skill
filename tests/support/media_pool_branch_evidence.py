@@ -61,7 +61,7 @@ def _source_seals() -> dict[str, str]:
         "tests/support/media_pool_branch_evidence.py", "tests/unit/test_media_build_business_gateway.py",
         "tests/conftest.py", "tests/support/exact_evidence_finalization.py",
         "tests/maintenance/branch_coverage_audit.py", "tests/maintenance/branch_audit_completion.py")]
-    return {str(path.relative_to(audit.ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(selected)}
+    return {path.relative_to(audit.ROOT).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(selected)}
 
 
 def _git_candidate() -> str:

@@ -5,6 +5,60 @@ import pytest
 from tests.maintenance import collect_class_metadata as collector
 
 
+def test_second_closed_cohort_keeps_r54_plans_and_selects_only_six_primary_fields():
+    import json
+    from tests.support.metadata_replay_branch_evidence import r54_original_reads
+    original_plans={case.split('|')[0]:json.loads((Path(desc['root'])/'plan.json').read_bytes())
+        for case,desc in r54_original_reads().items()}
+    for version in collector.BUILDS:
+        old=collector.collection_plan(version)
+        assert {key:original_plans[version][key] for key in old}==old
+    expected={'2021.1':{'MusicStinger':['CustomCueMatchName']},
+        '2022.1':{'MusicStinger':['CustomCueMatchName']},
+        '2023.1':{'MusicStinger':['CustomCueMatchName'],'ModulatorTime':['EnvelopeStopPlayback']},
+        '2024.1':{'MusicStinger':['CustomCueMatchName'],'ModulatorTime':['EnvelopeStopPlayback']}}
+    for version,targets in expected.items():
+        before=collector.collection_plan(version)
+        plan=collector.collection_plan(version,cohort='r55')
+        assert plan['targets']==targets and plan['cohort']=='r55'
+        assert len(plan['eligible_branch_ids'])==(3 if version in {'2023.1','2024.1'} else 2)
+        assert all('/anyOf/1' in i or '/@boolean/true' in i for i in plan['eligible_branch_ids'])
+        assert plan['class_ids']['MusicStinger']==2490384
+        assert plan['limits']==before['limits']
+        assert collector.collection_plan(version)==before
+    with pytest.raises(ValueError):collector.collection_plan('2025.1',cohort='r55')
+
+
+
+@pytest.mark.parametrize(('checkout','source'),[
+    ('/work space/声音 & repo','/work space/声音 & repo/tests/support/proof.py'),
+    (r'C:\work space\声音 & repo',r'C:\work space\声音 & repo\tests\support\proof.py'),
+    (r'\\server\share\声音 & repo',r'\\server\share\声音 & repo\tests\support\proof.py'),
+])
+def test_collection_source_map_keeps_portable_keys_for_producer_path_flavor(checkout,source,monkeypatch):
+    from tests.support import metadata_replay_branch_evidence as producer
+    rows=[{'path':source,'sha256':'a'*64}]
+    assert collector.collection_source_map(rows,checkout)=={'tests/support/proof.py':'a'*64}
+    with monkeypatch.context() as patch:
+        patch.setattr(collector,'REPO',checkout)
+        patch.setattr(collector,'source_links',lambda *_:([],rows))
+        assert producer.r54_current_sources()=={'tests/support/proof.py':'a'*64}
+    with pytest.raises(ValueError):collector.collection_source_map(rows+rows,checkout)
+    with pytest.raises(ValueError):collector.collection_source_map([{'path':source+'/../escape.py','sha256':'a'*64}],checkout)
+    with pytest.raises(ValueError):collector.collection_source_map([{'path':'/unrelated/proof.py','sha256':'a'*64}],checkout)
+
+
+def test_shared_metadata_source_seals_use_same_posix_keys_on_windows(monkeypatch):
+    from pathlib import PureWindowsPath
+    from tests.support.media_pool_branch_evidence import _source_seals
+    before=_source_seals();relative_to=Path.relative_to
+    with monkeypatch.context() as patch:
+        patch.setattr(Path,'relative_to',lambda self,*args:PureWindowsPath(*relative_to(self,*args).parts))
+        windows=_source_seals()
+    assert windows==before
+    assert all('\\' not in name for name in windows)
+
+
 def test_versioned_schedule_uses_only_owned_class_fields_and_keeps_unobserved_choices_missing():
     plans = {v:collector.collection_plan(v) for v in collector.BUILDS}
     assert plans['2022.1']['targets'] == {'Wwise Delay':['DelayTime','FeedbackEnabled'], 'Sound':['BypassEffect0','Effect0']}
@@ -23,13 +77,14 @@ def test_versioned_schedule_uses_only_owned_class_fields_and_keeps_unobserved_ch
         assert plan['project_mutation_commands'] == 0 and plan['agent_started'] is False
 
 
-def public_gateway(tmp_path,version='2022.1',scope='Wwise Delay'):
+def public_gateway(tmp_path,version='2022.1',scope='Wwise Delay',*,cohort='r54'):
     """Actual public Gateway with injected packets; controlled program only."""
     from copy import deepcopy
     import json
     from tests.unit import test_metadata_discovery_gateway as public
     root = tmp_path;root.mkdir(exist_ok=True)
-    scopes = collector.SCHEDULE[version] if scope is None else {scope:collector.SCHEDULE[version][scope]}
+    schedule=collector.SCHEDULE if cohort=='r54' else collector.COMPLETION_SCHEDULE
+    scopes = schedule[version] if scope is None else {scope:schedule[version][scope]}
     fields = next(iter(scopes.values()))
     responses = public._metadata_responses(root,version=version,names=tuple(fields))
     responses[public.GET_INFO_URI]['version']['minor']=int(collector.BUILDS[version].split('.')[2])
@@ -60,6 +115,18 @@ def public_gateway(tmp_path,version='2022.1',scope='Wwise Delay'):
         if 'agent_result' in payload:(root/(stem+'.agent-result.json')).write_text(json.dumps(payload['agent_result'],allow_nan=False))
         return payload,stem
     return gateway,client
+
+
+@pytest.mark.parametrize('version,scope',[(v,s) for v in ('2021.1','2022.1','2023.1','2024.1')
+    for s in (['MusicStinger','ModulatorTime'] if v in ('2023.1','2024.1') else ['MusicStinger'])])
+def test_completion_cohort_uses_own_public_class_selection_without_borrowing_old_plan(tmp_path,version,scope):
+    plan=collector.collection_plan(version,cohort='r55');gateway,_=public_gateway(tmp_path,version,scope,cohort='r55')
+    with pytest.raises(collector.HostFailure,match='Unreviewed'):
+        collector.collect_scope(gateway,version,scope,plan['targets'][scope],tmp_path,lambda:None)
+    rows=collector.collect_scope(gateway,version,scope,plan['targets'][scope],tmp_path,lambda:None,cohort='r55')
+    assert len(rows)==1 and rows[0]['default_present'] is True
+    expected=True if scope=='ModulatorTime' else ''
+    assert type(rows[0]['observed_default']) is type(expected) and rows[0]['observed_default']==expected
 
 
 def test_closed_collector_uses_live_public_selections_and_seals_actual_dispatcher_bytes(tmp_path):
