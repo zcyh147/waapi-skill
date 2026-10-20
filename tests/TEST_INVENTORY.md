@@ -5,6 +5,73 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R49 transfer admission and exact metadata-default evidence
+
+Runtime merge `c7b21ae9` integrates only frozen `4199c5d1`, `2c444f69`,
+`8e2eb229` and `0a183133` from `4ccbd66e`, without conflicts. The shared
+collector composes both accepted additions; the other component files retain
+exact accepted blobs apart from the two intentional Program-manifest edits.
+Copy/move admits resolved compatible custom WorkUnits and Source-to-Sound
+transfers with required actual source type, exact class/category checks and
+execution/verification drift checks. Transfer admission does not prove complete
+Source/plugin copying or constructor support. The ordinary Source recorder now
+preserves complete original query replies. The legacy diagnostic supplies the
+category field required by the existing finalizer; original failures stay frozen.
+
+After interface generation/check, clean source `e7ec62de` received one existing
+30-node metadata capture: **30 passed in 5.83s** (wrapper 6.435s). All 343
+source seals and 2,210 tracked files stayed unchanged, with no owned process
+remaining. Thirty new portable entries retain byte-identical originals and only
+relocate the program locator in projections. All 320 pre-existing fixture files,
+including R26 and R47 r1/r2, remain byte-identical. The fixed Program manifest
+now includes the metadata-default test file and contains 265 entries; this is a
+manifest count, not a passing-test count.
+
+On generated candidate `16ead09b`, one deduplicated focus passed **11 tests in
+27.27s** (wrapper 27.864s): complete ordinary-Source query/all-call immutability,
+actual legacy category validation, current portable metadata evaluation, the
+canonical manifest, positive/missing source-type copy/move, two source
+class/category drift controls and one complete Source-copy flow. HEAD and all
+2,360 tracked files stayed unchanged; the owned process group ended empty.
+Worker checks remain separate original receipts, not an aggregate gate.
+
+Interface generate/check passed once in **17.455s / 17.627s**; branch
+generate/check passed once in **25.247s / 23.370s**, after the frozen capture
+and import. Only ten copy/move safety disclosure contract references and their
+reviewed aggregate seal refresh; all 153 machine contracts, parser/continuation
+contracts and 79/91 source/index memberships remain exact. All 272,313 native
+IDs, shapes and owners remain exact. Only the selected 65 default-result rows
+acquire program evidence: **65 program passed / 65 live_metadata missing**,
+all implemented_unverified. Original R26 and all 116 exclusions are unchanged;
+complete=false (66 implemented_unverified / 272,131 unresolved). Source identity
+is `6a83b79f8b61ffae5ddfd8297f0c1c7d93914d8c39da975a23114b4cd91d1127`.
+Original commands, process/source/output seals and proofs are retained under
+`/tmp/waapi-r49-integration/`; capture is in ignored
+`.waapi-skill-state/read-evidence-r49/capture-r1/`.
+
+Separately completed historical macOS Console evidence remains bound to its
+original candidate and root under `.waapi-skill-state/full-coverage/`:
+
+- `r46-render-history-4ccbd66e-2025-r1`: **PASS, 16.51s**, 227 calls / 2,821,903
+  receipt bytes, seven verified transactions and exact source/undo/redo state.
+  Hosted CI run `39456571914` passed exact `4ccbd66e`; neither is R49 evidence.
+- `r47-ordinary-source-da0becf6-2025-r1`: original **PASS, 12.50s**, 66 calls,
+  three verified transactions and retained file/Tone state. Its root-review
+  addendum records in-place query-payload mutation, so those query replies are
+  not exact original Gateway receipt proof. `2c444f69` repairs copying with
+  program evidence only; no new native acceptance is claimed.
+- `r48-legacy-copy-ae7a6b4b-2021-r1`: native Source-only copy admission and 18
+  observed scalars succeeded, with 55 calls and two verified transactions, but
+  the overall result remains **ERROR_EVIDENCE_FINALIZATION** (one body passed,
+  one teardown error, 12.78s) because the category field was missing. Original
+  failure, source closure and quarantine remain; `8e2eb229` is program-only.
+  Copied owned-object remapping/full-copy semantics remain unproved.
+
+This integration ran no local fixed preflight, full Program/Non-live, native,
+Fresh, CLI Agent, installation, other-host validation or publication. Root owns
+review, push and exact-head hosted CI. Remaining implementation/evidence and
+final gates stay open; no main merge or ticket closure occurred.
+
 ## 2026-10-21 R46 existing Source preservation and Render collector integration
 
 Runtime merge `5e41bed1` combines only accepted `7979072d` and `dceb20f1`

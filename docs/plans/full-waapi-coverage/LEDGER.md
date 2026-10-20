@@ -753,3 +753,50 @@ bytes, owners and evidence requirements remain intact. Exact scope and original
 No local preflight or native/Fresh/full gate ran. Root owns review, publication,
 exact-head hosted CI and one new 2025 Render sandbox acceptance attempt. Ordinary
 Source native preservation, broader #192 and final #195 gates remain open.
+
+## R49 transfer admission and exact metadata-default evidence integration
+
+Runtime merge `c7b21ae9` combines only accepted `4199c5d1`, `2c444f69`,
+`8e2eb229` and `0a183133` from `4ccbd66e`, without conflicts. The shared
+collector retains both accepted modes. Custom WorkUnit and Source-to-Sound
+copy/move admission now requires actual source type and live class/category
+proof; it grants no constructor or full plugin-copy claim. Ordinary Source
+query receipts are copied before observation; the diagnostic legacy category
+uses the existing finalizer's required field. No original native outcome changes.
+
+One existing 30-node capture on clean `e7ec62de` passed **30 tests in 5.83s**;
+all 343 source seals stayed exact. Thirty fresh portable entries select these
+originals with locator-only projections; all 320 older fixture files and R26
+remain byte-identical. The fixed Program roster gains the metadata-default
+file and its canonical required-entry/count assertion (265 manifest entries).
+The final generated candidate `16ead09b` passed one deduplicated focus:
+**11 tests in 27.27s**, including query/all-call immutability, actual legacy
+category validation, current portable evaluation and transfer type/class flow.
+HEAD/all 2,360 tracked files remained unchanged; no owned process remained.
+
+Interface generate/check ran once (17.455s / 17.627s), then frozen capture/import,
+then branch generate/check once (25.247s / 23.370s). Only the reviewed copy/move
+safety aggregate seal and ten public contract references refresh. All 153
+machine contracts, parser/continuation contracts, 79/91 source memberships and
+272,313 native IDs/shapes/owners remain exact. Only the selected 65 defaults
+acquire program proof: **65 program passed / 65 live_metadata missing**;
+all remain implemented_unverified. Original R26 and 116 exclusions stay exact;
+complete=false, with 66 implemented_unverified and 272,131 unresolved. Current
+source identity is `6a83b79f8b61ffae5ddfd8297f0c1c7d93914d8c39da975a23114b4cd91d1127`.
+Receipts and exact original/native limitations are recorded in
+[the test inventory](../../../tests/TEST_INVENTORY.md) and
+`/tmp/waapi-r49-integration/`.
+
+Separately retained native roots remain: exact `4ccbd66e` 2025 Render PASS
+(16.51s, 227 calls / 2,821,903 bytes; exact-head CI `39456571914` PASS);
+`da0becf6` 2025 ordinary Source original PASS (12.50s, 66 calls, three
+transactions), with the explicit in-place query-payload mutation limitation;
+and `ae7a6b4b` 2021 Source-copy admission observed (55 calls, 18 scalars, two
+verified transactions), overall ERROR_EVIDENCE_FINALIZATION with quarantine
+retained. Copy-immutability/category successors are program-only. No full-copy,
+owned-remapping, other-version/host or Fresh credit is inferred.
+
+No local fixed preflight, full Program/Non-live, native/Fresh/CLI Agent or
+installation ran in this batch. Root owns publication and exact-head hosted CI;
+no main merge or ticket closure is authorized. Remaining Source verification,
+native metadata and final acceptance obligations remain open.
