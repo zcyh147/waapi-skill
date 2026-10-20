@@ -1385,7 +1385,14 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
             if uri == "ak.wwise.core.object.getTypes":
                 return {"return": [{"classId": 65552, "name": "Sound", "type": "WObject"},
                     {"classId": 16, "name": "AudioSource", "type": "WObject"}]}
+            if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+                return {"return": ["Volume"]}
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                return {"name": "Volume", "type": "Real64", "display": {"name": "Volume"},
+                        "restriction": {"type": "range", "min": -96, "max": 12}}
             assert uri == "ak.wwise.core.object.get", uri
+            if "active_source" in options["return"]:
+                raise ValueError("Unknown native return accessor active_source")
             query = args["waql"]
             if query.startswith("from type Project"):
                 rows = [{"id": project, "name": "Fixture", "type": "Project", "path": "\\", "filePath": str(project_file)}]
@@ -1425,6 +1432,7 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                 self.sound_reads += 1
                 rows = [{"id": sound, "name": "Rain", "type": "Sound", "classId": 65552,
                     "notes": self.notes,
+                    "@Volume": -7.25,
                     "OverrideOutput": False, "OutputBus": {"id": project, "name": "Master Audio Bus"},
                     "path": r"\Sounds\Rain", "parent": {"id": project},
                     "originalWavFilePath": "/owned/Originals/SFX/Beta.wav",
@@ -1464,6 +1472,21 @@ def test_2021_active_source_preserves_parent_identity_across_native_reference_re
         "--language", "SFX", "--include", "active-source"], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
     assert code == 0, result
     assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
+
+
+def test_2021_active_source_composes_with_live_selected_property_without_native_derived_accessor(tmp_path):
+    client, ids = _legacy_active_source_client(tmp_path)
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"], "--platform", "Mac",
+        "--language", "SFX", "--include", "active-source", "--include-field", "Volume"],
+        env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"] == [{"id": ids["sound"], "name": "Rain", "type": "Sound", "path": r"\Sounds\Rain",
+        "active_source": {"id": ids["active"], "name": "Beta"}, "properties": {"Volume": -7.25}}]
+    assert list(result)[-1] == "agent_result"
+    source_reads = [(args, options) for uri, args, options in client.calls
+        if uri.endswith("object.get") and ids["sound"] in args.get("waql", "") and "select children" not in args["waql"]]
+    assert len(source_reads) == 2
+    assert all("@Volume" in options["return"] and "active_source" not in options["return"] for _, options in source_reads)
 
 
 def test_2021_active_source_pages_bind_the_complete_candidate_observation(tmp_path):

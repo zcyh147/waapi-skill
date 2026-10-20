@@ -24789,7 +24789,7 @@ def _bind_query_custom_fields_from_live_metadata(
             "unresolved": unresolved,
             "repair": "refine each --include-field meaning until one live field matches",
         }
-    native_fields = [binding[1] for binding in bindings]
+    native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
     if len(set(native_fields)) != len(native_fields):
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
