@@ -4554,3 +4554,117 @@ def test_multisource_collector_requires_two_sources_exact_xml_active_guid_and_or
     elif fault == 'same-order':
         assert receipt['path_join_matches_saved_oracle'] is True
         assert receipt['oracle']['ordering_discrimination'] is False
+
+
+def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
+    """Public Gateway plus independently stored native constructor results."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_sound_voice_creation_gateway import planned_source_task, SOURCE_CLASS, JAPANESE, SECOND
+    task = planned_source_task(tmp_path, '2025.1')
+    task.types.append({'name': 'Language', 'classId': 4915216, 'type': 'WObject'})
+    french = '{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}'
+    task.languages.append({'id': french, 'name': 'French', 'shortId': 4})
+    task.objects[SECOND]['path'] = r'\Containers\Default Work Unit'
+    native = tmp_path / 'native'; native.mkdir()
+    task.env['WWISE_EVIDENCE_DIR'] = str(native)
+    task.env['WWISE_CATEGORY_EVIDENCE_PATH'] = str(tmp_path / 'category.jsonl')
+    created_sources, writes, commands = [], [], []
+    def create(node, parent, *, owned=False):
+        identity = '{' + str(uuid.uuid4()).upper() + '}'
+        if node['type'] == 'Source' and fault == 'reuse' and created_sources:
+            identity = created_sources[0]
+        row = {'id': identity, 'name': node['name'], 'type': 'SourcePlugin' if node['type'] == 'Source' else 'Sound',
+            'classId': SOURCE_CLASS if node['type'] == 'Source' else 65552,
+            'path': task.objects[parent]['path'] + '\\' + node['name'], 'parent': {'id': parent},
+            'notes': node.get('notes', ''), **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
+        if node['type'] == 'Source':
+            row.setdefault('@Frequency', 440)
+            row['audioSource:language'] = {'name': node.get('language', 'SFX')}
+            if fault == 'ignored-language' and node.get('language'): row['audioSource:language']['name'] = 'SFX'
+            created_sources.append(identity)
+        else:
+            row.setdefault('@IsVoice', False)
+            row['activeSource'] = None
+        task.objects[identity] = row
+        children = [create(child, identity) for child in node.get('children', [])]
+        return {'id': identity, 'name': row['name'], **({'children': children} if children else {})}
+    task._create = create
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from type Language '):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': row['id'], 'name': row['name'], 'type': 'Language', 'path': '\\Languages\\' + row['name']} for row in task.languages]}
+        expression = (args or {}).get('waql', '')
+        if uri.endswith('object.get') and expression.startswith('from object "'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            selected = expression.split('"')[1]
+            rows = [row for row in task.objects.values() if row['id'] == selected or row['path'] == selected]
+            if ' select children ' in expression:
+                assert len(rows) == 1, args
+                rows = [row for row in task.objects.values() if row.get('parent') == {'id': rows[0]['id']}]
+            return {'return': task.project_rows(rows, options or {})}
+        if uri.endswith('object.set'): writes.append(deepcopy(args))
+        result = original(uri, args, options)
+        if uri.endswith('getInfo'):
+            result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+        return result
+    task.call = call
+    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+        state_dir=tmp_path / 'state', env=task.env, port=31337,
+        sandbox=SimpleNamespace(source_project=task.project_file),
+        lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(argv):
+        commands.append(list(argv))
+        return task.run(*argv)
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+def test_planned_source_collector_preserves_three_transactions_and_original_source_identity(tmp_path, workflow):
+    import hashlib
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    category = workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt_path = Path(category['observation_path'])
+    receipt = json.loads(receipt_path.read_text())
+    assert category['status'] == 'PASS' and receipt['collection_complete'] is True
+    assert receipt['business_effect_verified'] is True
+    assert category['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert [p['case'] for p in receipt['phases']] == ['sfx', 'voice-explicit-source', 'voice-default-source']
+    assert len(writes) == 3 and len({p['transaction_id'] for p in receipt['phases']}) == 3
+    assert sum(argv[0] == 'execute' for argv in commands) == 3
+    ids = [p['independent_source']['id'] for p in receipt['phases']]
+    assert len(set(ids)) == 3
+    assert receipt['phases'][1]['retained_before'][0]['source'] == receipt['phases'][0]['independent_source']
+    assert receipt['phases'][2]['retained_after'] == receipt['phases'][2]['retained_before']
+    assert receipt['phases'][1]['construction_language'] != receipt['phases'][1]['source_language']
+    assert receipt['phases'][2]['source_language'] is None
+    assert receipt['phases'][2]['source_language_effect'] == 'observed_default_only_no_inheritance_claim'
+    assert receipt['get_info']['version']['build'] == 9143
+    assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+    assert receipt['lifecycle_final_reference']['transaction_ids'] == [p['transaction_id'] for p in receipt['phases']]
+    for evidence in receipt['native_evidence']:
+        raw = Path(evidence['archive_path']).read_bytes()
+        assert raw == Path(evidence['native_path']).read_bytes()
+        assert len(raw) == evidence['size'] and hashlib.sha256(raw).hexdigest() == evidence['sha256']
+
+
+@pytest.mark.parametrize('fault', ['reuse', 'ignored-language'])
+def test_planned_source_collector_preserves_failed_native_effect_and_never_retries(tmp_path, workflow, fault):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['collection_complete'] is False and receipt['business_effect_verified'] is False
+    assert len(writes) == 2
+    ids = [argv[1] for argv in commands if argv[0] == 'execute']
+    assert len(ids) == len(set(ids)) == 2
+    expected_state = 'verified' if fault == 'reuse' else 'verification_failed'
+    assert receipt['phases'][-1]['verify']['payload']['state'] == expected_state
+    assert receipt['phases'][-1]['final_transaction']['state'] == expected_state
+    if fault == 'reuse':
+        # The local new-owner graph has no old children. Independent cross-phase
+        # GUID proof must still reject reparenting a Source from another owner.
+        assert 'retained GUID' in receipt['failure']['message']
+    assert receipt['native_evidence'] and receipt['failure']
