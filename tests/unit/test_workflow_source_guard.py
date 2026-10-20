@@ -4371,7 +4371,7 @@ def test_stationary_tone_diagnostic_uses_matching_pinned_console_catalog_without
     assert category['status'] == 'blocked' and category['diagnostic_only'] is True
 
 
-def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
+def _multisource_public_runtime(tmp_path, workflow, *, fault=None, version='2021.1'):
     """Fake public replies exercise collector protocol/oracle only, not native admission."""
     from copy import deepcopy
     import shutil
@@ -4381,12 +4381,15 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
     project = sandbox / 'Fixture.wproj'; project.write_text('<WwiseDocument/>')
     unit_path = sandbox / 'Actor-Mixer Hierarchy' / 'Default Work Unit.wwu'; unit_path.parent.mkdir()
     guid = lambda value: '{' + str(uuid.UUID(int=value)).upper() + '}'
-    unit, platform = guid(1), guid(2)
+    unit, platform, windows = guid(1), guid(2), guid(3)
     objects = {unit: {'id': unit, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'class_id': 1638416,
         'path': workflow.ACTOR_MIXER_PARENT, 'parent': None, 'notes': '', 'file_path': str(unit_path)},
         platform: {'id': platform, 'name': 'Mac', 'type': 'Platform', 'class_id': 4, 'path': r'\Platforms\Mac', 'parent': None, 'notes': ''}}
+    if version == '2022.1':
+        objects[windows] = {'id': windows, 'name': 'Windows', 'type': 'Platform', 'class_id': 4,
+            'path': r'\Platforms\Windows', 'parent': None, 'notes': ''}
     commands, drafts, transactions = [], {}, {}
-    state = {'copies': 0, 'copy_attempts': 0, 'imports': 0, 'deletes': 0, 'active': {}}
+    state = {'copies': 0, 'copy_attempts': 0, 'imports': 0, 'deletes': 0, 'active': {}, 'platform_active': {}, 'selections': 0, 'selection_attempts': 0}
     def saved_xml():
         root = ET.Element('WwiseDocument'); work = ET.SubElement(root, 'WorkUnit', ID=unit)
         children = ET.SubElement(work, 'ChildrenList')
@@ -4401,20 +4404,22 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 ET.SubElement(node, 'AudioFile').text = Path(source['original_file_path']).name
             active = state['active'][row['id']]
             refs = ET.SubElement(sound, 'ActiveSourceList')
-            ET.SubElement(refs, 'ActiveSource', ID=guid(999) if fault == 'xml-guid' else active,
-                Name=objects[active]['name'], Platform='Linked')
+            choices = [(name, source) for (owner, name), source in state['platform_active'].items() if owner == row['id']]
+            for name, source in choices or [('Linked', active)]:
+                ET.SubElement(refs, 'ActiveSource', ID=guid(999) if fault == 'xml-guid' else source,
+                    Name=objects[source]['name'], Platform=name)
         unit_path.write_bytes(ET.tostring(root))
     def raw(argv):
         argv = list(argv); commands.append(argv)
-        payload = {'ok': True, 'detected_version': '2021.1',
+        payload = {'ok': True, 'detected_version': version,
             'endpoint': {'host': '127.0.0.1', 'port': 31337, 'url': 'ws://127.0.0.1:31337/waapi'}}
         command = argv[0]
         if command == 'metadata':
             payload['agent_result'] = {'complete': True, 'types': [
                 {'name': name, 'classId': value, 'type': 'WObject', 'selection': name}
-                for name, value in [('Sound', 65552), ('AudioSource', 16), ('WorkUnit', 1638416), ('Platform', 4)]]}
+                for name, value in [('Sound', 65552), ('AudioSource' if version == '2021.1' else 'AudioFileSource', 16), ('WorkUnit', 1638416), ('Platform', 4)]]}
         elif command == 'query-object':
-            if '--type-selection' in argv: found = [objects[platform]]
+            if '--type-selection' in argv: found = [row for row in objects.values() if row['type'] == 'Platform']
             elif '--path-segment' in argv:
                 path = '\\' + '\\'.join(argv[i + 1] for i, arg in enumerate(argv) if arg == '--path-segment')
                 found = [row for row in objects.values() if row['path'] == path]
@@ -4423,6 +4428,13 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 owner = argv[argv.index('--exact-id') + 1]
                 found = [row for row in objects.values() if isinstance(row.get('parent'), dict) and row['parent']['id'] == owner]
                 if fault != 'same-order': found = sorted(found, key=lambda row: row['name'])
+            if version == '2022.1':
+                name = 'Windows' if '--platform' in argv and argv[argv.index('--platform') + 1] in {windows, 'Windows'} else 'Mac'
+                found = [deepcopy(row) for row in found]
+                for row in found:
+                    if row['type'] == 'Sound':
+                        source = state['platform_active'].get((row['id'], name), state['active'][row['id']])
+                        row.update(original_file_path=objects[source]['original_file_path'], active_source={'id': source, 'name': objects[source]['name']})
             includes = [argv[i + 1].replace('-', '_') for i, arg in enumerate(argv) if arg == '--include']
             keys = {'id', 'name', 'type', 'path', *includes}
             found = [{key: deepcopy(value) for key, value in row.items()
@@ -4438,9 +4450,12 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
         elif command == 'draft-start':
             identity = 'draft-' + str(len(drafts)); drafts[identity] = {'operation': argv[1], 'revision': 1, 'roles': {}, 'rows': []}
             payload.update(draft={'draft_id': identity, 'revision': 1}, task_authority='authority')
-        elif command in {'draft-bind-object', 'draft-declare-new', 'draft-declare-object-change', 'draft-declare-core-plan', 'draft-check', 'preview-from-draft'}:
+        elif command in {'draft-bind-object', 'draft-declare-new', 'draft-declare-object-change', 'draft-declare-core-plan', 'draft-declare-project-setting-plan', 'draft-check', 'preview-from-draft'}:
             draft = drafts[argv[1]]
             if command == 'draft-check' and draft['operation'] == 'object.copy' and fault == 'preparation':
+                return 2, {**payload, 'ok': False, 'error_code': 'INVALID_TARGET',
+                    'recovery': {'project_write_outcome': 'no_project_write_in_this_invocation'}}
+            if command == 'draft-check' and draft['operation'] == 'ak.wwise.core.sound.setActiveSource' and fault == 'select-preparation':
                 return 2, {**payload, 'ok': False, 'error_code': 'INVALID_TARGET',
                     'recovery': {'project_write_outcome': 'no_project_write_in_this_invocation'}}
             if command == 'draft-bind-object':
@@ -4448,6 +4463,7 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 draft['roles'][role] = argv[argv.index('--object-id') + 1]
                 payload['bound_object'] = {'handle': 'handle-' + role}
             elif command == 'draft-declare-new': draft['rows'].append(argv)
+            elif command == 'draft-declare-project-setting-plan': draft['platform_name'] = argv[argv.index('--platform-name') + 1]
             elif command == 'preview-from-draft':
                 identity = 'tx-' + str(len(transactions)); transactions[identity] = draft
                 payload.update(transaction_id=identity, artifact_hash='hash-' + identity)
@@ -4466,7 +4482,7 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 if operation == 'ak.wwise.core.project.save': saved_xml()
                 elif operation == 'audio.import':
                     state['imports'] += 1
-                    assert len(draft['rows']) == 6
+                    assert len(draft['rows']) == (6 if version == '2021.1' else 2)
                     for index, row in enumerate(draft['rows']):
                         fields = {row[i + 1]: row[i + 2] for i, arg in enumerate(row) if arg == '--field'}
                         language, source_file = fields['language'], Path(fields['media_file'])
@@ -4499,6 +4515,16 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                         identity = guid(300 + state['copies'])
                         objects[identity] = {**deepcopy(source), 'id': identity, 'parent': {'id': parent['id']},
                             'path': parent['path'] + '\\' + source['name']}
+                elif operation == 'ak.wwise.core.sound.setActiveSource':
+                    state['selection_attempts'] += 1
+                    if fault in {'select-native', 'select-indeterminate'}:
+                        dispatch = {'ok': False, 'failure_origin': 'exception' if fault == 'select-native' else 'missing_response'}
+                        if fault == 'select-native': dispatch['waapi_error_uri'] = 'ak.wwise.invalid_arguments'
+                        return 2, {**payload, 'ok': False, 'state': 'indeterminate', 'dispatch_result': dispatch}
+                    state['selections'] += 1
+                    owner, source = draft['roles']['sound'], draft['roles']['source']
+                    if fault == 'linked-selection': state['active'][owner] = source
+                    else: state['platform_active'][(owner, draft['platform_name'])] = source
                 elif operation == 'object.delete':
                     state['deletes'] += 1
                     identity = draft['roles']['object']
@@ -4507,10 +4533,41 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 else: raise AssertionError(operation)
         else: raise AssertionError(argv)
         return 0, payload
-    runtime = SimpleNamespace(version='2021.1', state_dir=tmp_path / 'state', candidate='program-fixture',
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', candidate='program-fixture',
         category_results=[], raw_gateway=raw, lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'),
         port=31337, sandbox=SimpleNamespace(sandbox_path=sandbox, sandbox_project=project))
     return runtime, commands, state
+
+
+def test_platform_active_source_characterizer_reuses_one_pair_and_saves_distinct_view_choices(tmp_path, workflow):
+    runtime, commands, state = _multisource_public_runtime(tmp_path, workflow, version='2022.1')
+    category = workflow._collect_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_PLATFORM_TEST', platform_characterization=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS', receipt.get('failure')
+    assert state['imports'] == 1 and state['copies'] == 1 and state['selections'] == 2 and state['deletes'] == 2
+    assert len([row for row in commands if row[0] == 'draft-declare-new']) == 2
+    assert receipt['oracle']['platform_choices_diverge'] is True
+    assert receipt['path_join_matches_saved_oracle'] is True
+    assert sum(receipt['call_counts'].values()) == len(commands) <= receipt['limits']['public_calls'] == 111
+    assert receipt['generic_active_source_mapping'] is False and receipt['native_absence_proven'] is False
+
+
+@pytest.mark.parametrize('fault,outcome,attempts', [
+    ('select-preparation', 'skill_preparation_rejected', 0),
+    ('select-native', 'native_rejection_reported', 1),
+    ('select-indeterminate', 'execution_indeterminate', 1),
+    ('linked-selection', 'saved_oracle_blocked', 2),
+    ('xml-guid', 'saved_oracle_blocked', 2),
+])
+def test_platform_active_source_characterizer_preserves_rejections_and_never_replays_linked_surrogate(tmp_path, workflow, fault, outcome, attempts):
+    runtime, commands, state = _multisource_public_runtime(tmp_path, workflow, version='2022.1', fault=fault)
+    category = workflow._collect_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_PLATFORM_TEST', platform_characterization=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'blocked' and receipt['outcome'] == outcome, receipt.get('failure')
+    assert state['selection_attempts'] == attempts and state['deletes'] == 0
+    assert state['imports'] == 1 and state['copies'] == 1
+    assert receipt['collection_complete'] is False and receipt['native_absence_proven'] is False
+    assert len([row for row in commands if row[:2] == ['draft-start', 'ak.wwise.core.sound.setActiveSource']]) <= 2
 
 
 @pytest.mark.parametrize('fault', [None, 'scalar-parent'])
