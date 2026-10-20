@@ -42,6 +42,125 @@ def write(path, value, **extra):
     return {'artifact':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),**extra}
 
 
+def test_r54_original_class_reader_retains_full_8a_native_source_and_origin():
+    originals=producer.r54_original_reads()
+    assert len(originals)==16
+    descriptor=originals['2022.1|Wwise Delay|DelayTime']
+    context=completion.read_metadata_run(descriptor,audit.ROOT,historical_class=True)
+    assert context['candidate']=='8a8d5f8e006fd56dd5c78ebe6429ee24450abf26'
+    assert len(context['relevant_sources'])==560
+    assert context['native_result']['default']==0.5
+    assert context['observation_origin']=='native_scenario_lifecycle'
+    with pytest.raises(ValueError,match='source closure changed'):
+        completion.read_metadata_run(descriptor,audit.ROOT)
+
+
+def r54_control(tmp_path,inventory,case='2022.1|Wwise Delay|DelayTime'):
+    from tests.unit.test_metadata_discovery_gateway import _run_original_r54_metadata_replay
+    from tests.maintenance.collect_class_metadata import collection_plan
+    observed={};_run_original_r54_metadata_replay(tmp_path,case,observed)
+    original=producer.r54_original_reads()[case]
+    context=completion.read_metadata_run(original,audit.ROOT,historical_class=True)
+    eligible=set(collection_plan(context['version'])['eligible_branch_ids'])
+    from tests.support.metadata_read_branch_evidence import _witness
+    edges={r['id']:r for r in inventory['native_coverage']['obligations'] if r['kind']=='reference'}
+    branches=[r for r in inventory['native_coverage']['obligations'] if r['id'] in eligible
+        and _witness(r,context['native_result'],edges) is not None]
+    capture={'scope_kind':'controlled','candidate_sha256':'c'*64,'git_candidate':'controlled_current_program',
+        'relevant_sources':producer.r54_current_sources(),'historical_sources':context['relevant_sources'],
+        'originals':{case:original},'branches':branches,'edges':edges,
+        'case_branch_ids':{case:[r['id'] for r in branches]}}
+    program,bindings=producer.make_r54_replay_receipt(capture,case,observed,dict.fromkeys(('setup','call','teardown'),'passed'))
+    descriptor=write(tmp_path/'r54-program.json',program,nodeid=producer.R54_NODE+'['+case+']')
+    record=producer.make_r54_attachment_record(capture,case,descriptor,program,bindings,base=audit.ROOT)
+    attachment=write(tmp_path/'r54-attachment.json',record,nodeid=descriptor['nodeid'])
+    branch=next(r for r in branches if r['pointer'].endswith('/anyOf/2'))
+    binding={**bindings[branch['id']],'category_inputs':{'live_metadata':record['category_inputs']}}
+    return capture,program,record,attachment,branch,binding
+
+
+def test_original_r54_and_current_replay_keep_distinct_full_source_and_public_inputs(inventory,tmp_path):
+    capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory)
+    assert record['source_bridge']['attribution']=='historical_native_current_program_not_current_native'
+    assert len(record['source_bridge']['historical_sources'])==560
+    assert completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
+        source_root=audit.ROOT,reference_edges=capture['edges'])==('passed',None)
+
+
+def test_r54_assigns_only_observed_versioned_leaves_to_sixteen_original_scenarios(inventory):
+    from tests.maintenance.collect_class_metadata import collection_plan
+    originals=producer.r54_original_reads()
+    contexts={case:completion.read_metadata_run(desc,audit.ROOT,historical_class=True) for case,desc in originals.items()}
+    selected=set().union(*(set(collection_plan(v)['eligible_branch_ids']) for v in ('2021.1','2022.1','2023.1','2024.1','2025.1')))
+    rows=[r for r in inventory['native_coverage']['obligations'] if r['id'] in selected]
+    edges={r['id']:r for r in inventory['native_coverage']['obligations'] if r['kind']=='reference'}
+    owners=producer.r54_case_assignments(rows,edges,contexts)
+    assert len(owners)==16 and sum(map(len,owners.values()))==41
+    assert {i for ids in owners.values() for i in ids}==selected
+    unobserved=next(r for r in inventory['native_coverage']['obligations'] if r['id'] in collection_plan('2022.1',cohort='r55')['eligible_branch_ids'])
+    with pytest.raises(ValueError,match='do not witness'):
+        producer.r54_case_assignments(rows+[unobserved],edges,contexts)
+
+
+@pytest.mark.parametrize('damage',['native-git','native-source','native-origin','native-field','raw-result','raw-input',
+    'current-source','changed-file-proof','runtime-drift','current-field','leaf','whole','reference','category-input',
+    'attribution','product-git','teardown'])
+def test_r54_historical_replay_controls_start_from_valid_original_and_current_flow(inventory,tmp_path,monkeypatch,damage):
+    capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory)
+    def result(scope='controlled'):
+        return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata',scope,tmp_path,binding,
+            source_root=audit.ROOT,reference_edges=capture['edges'])
+    assert result()==('passed',None)
+    if damage in {'native-git','native-source','native-origin','native-field'}:
+        import shutil
+        original=Path(record['metadata_run']['root']);dest=tmp_path/'altered-original';shutil.copytree(original,dest)
+        record['metadata_run']['root']=str(dest)
+        record['metadata_run']['seal']['artifact']=str(dest/'evidence-seal.json')
+        plan=json.loads((dest/'plan.json').read_bytes())
+        if damage=='native-git':plan['repositories'][0]['commit']='ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90'
+        elif damage=='native-source':plan['source_seals']=plan['source_seals'][1:]
+        elif damage=='native-origin':plan['observation_origin']='controlled_public_gateway'
+        else:record['metadata_run']['target_index']=1
+        (dest/'plan.json').write_text(json.dumps(plan))
+        seal=json.loads((dest/'evidence-seal.json').read_bytes());entry=next(e for e in seal['files'] if e['path']=='plan.json')
+        entry.update(sha256=hashlib.sha256((dest/'plan.json').read_bytes()).hexdigest(),bytes=(dest/'plan.json').stat().st_size)
+        (dest/'evidence-seal.json').write_text(json.dumps(seal))
+        record['metadata_run']['seal']['sha256']=hashlib.sha256((dest/'evidence-seal.json').read_bytes()).hexdigest()
+    elif damage=='raw-result':program['native_call']['result']['default']=0.75
+    elif damage=='raw-input':program['replayed_original_packets_sha256']['ak.wwise.core.object.getTypes']='0'*64
+    elif damage=='current-source':record['source_bridge']['current_sources'].pop('tests/unit/test_metadata_default_branch_evidence.py')
+    elif damage=='changed-file-proof':
+        assert 'tests/unit/test_metadata_default_branch_evidence.py' in record['source_bridge']['changed_files']
+        record['source_bridge']['changed_files'].pop('tests/unit/test_metadata_default_branch_evidence.py')
+    elif damage=='runtime-drift':
+        before=Path.read_bytes;path=audit.ROOT/'skills/waapi-skill/scripts/gateway.py'
+        monkeypatch.setattr(Path,'read_bytes',lambda p:before(p)+b'\n# unreviewed change\n' if p==path else before(p))
+        current=producer.r54_current_sources();record['source_bridge']['current_sources']=current
+        record['source_bridge']['changed_files']=producer.source_changes(record['source_bridge']['historical_sources'],current)
+        program['relevant_sources']=current
+    elif damage=='current-field':program['native_call']['args']['property']='FeedbackEnabled'
+    elif damage=='leaf':
+        checks=program['branch_assertions'][branch['id']]['checks'];checks[:]=[c for c in checks if c['pointer']!='/native_call/result/default']
+    elif damage=='whole':
+        checks=record['branch_assertions'][branch['id']]['checks'];checks[:]=[c for c in checks if c['pointer']!='/gateway/payload/agent_result']
+    elif damage=='reference':binding['reference_chain']=[branch['route']+'|/resultSchema/properties/audioEngineId/$ref']
+    elif damage=='category-input':
+        record['category_inputs']['replay']=record['category_inputs']['historical']
+        binding['category_inputs']['live_metadata']=record['category_inputs']
+    elif damage=='attribution':record['source_bridge']['attribution']='current_native'
+    elif damage=='product-git':
+        record['scope_kind']=program['scope_kind']='product';program['git_candidate']=producer.R54_ORIGINAL
+    elif damage=='teardown':
+        program['invocation']['outcome']='FAIL';program['invocation']['node_outcomes'][0]['outcome']='FAIL'
+        record['invocation']=deepcopy(program['invocation'])
+    record['replay']=write(tmp_path/'altered-r54-program.json',program,nodeid=descriptor['nodeid'])
+    descriptor=write(tmp_path/'altered-r54-attachment.json',record,nodeid=descriptor['nodeid'])
+    outcome,reason=result('product' if damage=='product-git' else 'controlled')
+    assert outcome=='missing',reason
+    if damage=='runtime-drift':assert 'unreviewed runtime drift' in reason
+    if damage=='product-git':assert 'Git/source ownership' in reason
+
+
 @pytest.mark.parametrize('damage', ('reply-bytes','status-host','identity-class','business-promotion',
     'unfinished-node','source-drift','residual-process','wrong-occurrence','native-public-mismatch',
     'category-transaction','identity-endpoint','reply-session-endpoint'))
@@ -145,6 +264,52 @@ def portable_control(tmp_path, original_root, inventory):
     document = {'contract':index['contract'],'base':'bundle','entries':[entry],'metadata_attachments':[attachment]}
     path = tmp_path/'index.json';path.write_text(json.dumps(document))
     return path,document,base,attached,branch
+
+
+def portable_r54_control(tmp_path,inventory):
+    import shutil
+    capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory)
+    index=audit.load(audit.ROOT/'docs/branch-coverage-evidence-index.json');source=(audit.ROOT/'docs'/index['base']).resolve()
+    entry=next(e for e in index['entries'] if branch['id'] in json.loads((source/e['bindings']['artifact']).read_bytes())['bindings'])
+    base=tmp_path/'bundle';base.mkdir()
+    for desc in [entry['bindings'],*entry['origin'].values()]:
+        target=base/desc['artifact'];target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source/desc['artifact'],target)
+    archive=record['metadata_run'];original=Path(archive['root']);shutil.copytree(original,base/original.name)
+    archive['root']=original.name;archive['seal']['artifact']=original.name+'/evidence-seal.json'
+    shutil.copyfile(record['replay']['artifact'],base/'replay.json');record['replay']['artifact']='replay.json'
+    proof=write(base/'metadata.json',record,nodeid=descriptor['nodeid']);proof['artifact']='metadata.json'
+    item={'contract':'waapi-skill.class-metadata-attachment/v1','branch_id':branch['id'],
+        'native_shape_sha256':branch['shape_sha256'],'category_inputs':record['category_inputs'],'evidence':proof}
+    attached=write(base/'attachment.json',item);attached['artifact']='attachment.json'
+    document={'contract':index['contract'],'base':'bundle','entries':[entry],'metadata_attachments':[attached]}
+    path=tmp_path/'index.json';path.write_text(json.dumps(document));return path,document,base,item,branch
+
+
+@pytest.mark.parametrize('damage',[None,'duplicate','extra','archive-bytes','replay-bytes','dependency-escape'])
+def test_r54_historical_portable_transport_preserves_program_and_checks_original_dependencies(inventory,tmp_path,damage):
+    path,index,base,item,branch=portable_r54_control(tmp_path,inventory)
+    policy=audit.load(audit.ROOT/'docs/branch-coverage-requirements.json')
+    original=json.loads((base/index['entries'][0]['bindings']['artifact']).read_bytes())['bindings'][branch['id']]
+    actual,_,_=audit.portable_binding_inputs(path,policy)
+    assert actual['bindings'][branch['id']]['input']==original['input']
+    assert actual['bindings'][branch['id']]['evidence']['program']==original['evidence']['program']
+    assert actual['bindings'][branch['id']]['evidence']['live_metadata']==item['evidence']
+    if damage is None:
+        edges={r['id']:r for r in inventory['native_coverage']['obligations'] if r['kind']=='reference'}
+        assert completion.evidence_result(item['evidence'],branch,'c'*64,'live_metadata','controlled',base,
+            actual['bindings'][branch['id']],source_root=audit.ROOT,reference_edges=edges)==('passed',None)
+        return
+    record=json.loads((base/'metadata.json').read_bytes())
+    if damage=='duplicate':index['metadata_attachments'].append(deepcopy(index['metadata_attachments'][0]))
+    elif damage=='archive-bytes':(base/record['metadata_run']['root']/'targets.json').write_text('[]')
+    elif damage=='replay-bytes':(base/'replay.json').write_text('{}')
+    else:
+        if damage=='extra':record['source_bridge']['arbitrary_equivalence']=True
+        else:record['metadata_run']['root']='../escape'
+        proof=write(base/'metadata.json',record,nodeid=item['evidence']['nodeid']);proof['artifact']='metadata.json';item['evidence']=proof
+        attached=write(base/'attachment.json',item);attached['artifact']='attachment.json';index['metadata_attachments']=[attached]
+    path.write_text(json.dumps(index))
+    with pytest.raises(ValueError):audit.portable_binding_inputs(path,policy)
 
 
 def test_portable_metadata_attachment_is_additive_and_keeps_original_program(original_root,inventory,tmp_path):

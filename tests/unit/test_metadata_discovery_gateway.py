@@ -1873,3 +1873,58 @@ def _run_original_r51_metadata_replay(tmp_path, field, expected, observed):
     assert payload['agent_result']['metadata']['default'] == expected
     assert {key: payload['agent_result']['metadata'][key] for key in packets[field]['native']['result']} == packets[field]['native']['result']
     assert payload['agent_result']['complete'] is True and client.disconnected
+
+
+@pytest.mark.parametrize('case', [v+'|'+scope+'|'+field for v,scopes in {
+    '2021.1':{'ModulatorTime':['EnvelopeStopPlayback']},
+    '2022.1':{'Wwise Delay':['DelayTime','FeedbackEnabled'],'Sound':['BypassEffect0','Effect0']},
+    '2023.1':{'Action':['Scope'],'EffectSlot':['Bypass','Effect']},
+    '2024.1':{'Sound':['AttenuationDistanceScaling'],'EffectSlot':['Bypass','Effect']},
+    '2025.1':{'Sound':['Weight'],'EffectSlot':['Bypass','Effect'],'ModulatorTime':['EnvelopeStopPlayback'],
+        'MediaPoolFilter':['FieldName']}}.items() for scope,fields in scopes.items() for field in fields])
+def test_original_r54_class_metadata_replays_through_current_public_gateway(tmp_path,request,case):
+    """Preserved native responses, current injected execution; no new native fact."""
+    import os
+    from tests.support import metadata_replay_branch_evidence as replay
+    observed={};context_path=os.environ.get('WAAPI_R54_METADATA_REPLAY_CAPTURE_CONTEXT')
+    if context_path:
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture=replay.load_r54_capture(context_path,request.node.nodeid,case)
+        register_exact_evidence_finalizer(request.node,lambda reports:replay.finish_r54_capture(capture,reports,case,observed))
+    _run_original_r54_metadata_replay(tmp_path,case,observed)
+
+
+def _run_original_r54_metadata_replay(tmp_path,case,observed):
+    from copy import deepcopy
+    from tests.support import metadata_replay_branch_evidence as replay
+    source=replay.r54_replay_case(case);context=source['context'];version,scope,field=case.split('|')
+    packets=source['packets']
+    def property_info(args,options):
+        assert args=={'classId':context['class_id'],'property':field} and options=={}
+        return deepcopy(context['native_result'])
+    client=FakeClient({**{api:deepcopy(packet['result']) for api,packet in packets.items()},
+        GET_PROPERTY_INFO_URI:property_info})
+    env=_gateway_env(tmp_path,version=version)
+    argv=['metadata','list','--custom-kind',scope,'--page-size','64']
+    code,listed=waapi_gateway.execute_gateway(argv,env=env,client_factory=lambda _:client)
+    assert code==0,listed
+    pages=[{'argv':argv,'payload':listed}]
+    while not any(row['name']==field for row in listed['agent_result']['fields']):
+        assert listed['agent_result']['next_page'] and len(pages)<8
+        argv=['metadata','list','--custom-kind',scope,'--page-size','64','--page',listed['agent_result']['next_page']]
+        code,listed=waapi_gateway.execute_gateway(argv,env=env,client_factory=lambda _:client)
+        assert code==0,listed
+        pages.append({'argv':argv,'payload':listed})
+    selected,=[row for row in listed['agent_result']['fields'] if row['name']==field]
+    argv=['metadata','detail','--custom-kind',scope,'--selection',selected['selection']]
+    code,payload=waapi_gateway.execute_gateway(argv,env=env,client_factory=lambda _:client)
+    calls=[(uri,args,options) for uri,args,options in client.calls if uri==GET_PROPERTY_INFO_URI]
+    assert calls==[(GET_PROPERTY_INFO_URI,{'classId':context['class_id'],'property':field},{})]
+    from tests.support.media_pool_branch_evidence import public_read_observation
+    observed.update(public_read_observation(gateway_argv=argv,exit_code=code,payload=payload,uri=GET_PROPERTY_INFO_URI,
+        args=calls[0][1],options={},result=context['native_result']))
+    observed.update(discovery_pages=pages,client_disconnected=client.disconnected,
+        replayed_original_native_sha256=context['native_sha256'],original_case=case,
+        replayed_original_packets_sha256=source['packet_sha256s'])
+    assert code==0 and payload['agent_result']['complete'] is True,payload
+    assert json.dumps({k:payload['agent_result']['metadata'][k] for k in context['native_result']},sort_keys=True,allow_nan=False)==json.dumps(context['native_result'],sort_keys=True,allow_nan=False)
