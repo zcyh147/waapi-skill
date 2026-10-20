@@ -26,16 +26,20 @@ sources; passing a simulated test does not establish native behavior.
    `tests/maintenance/generate_interface_depth_inventory.py`, then generate
    `tests/maintenance/branch_coverage_audit.py`; use their `--check` modes to prove
    the final artifacts are current. Preserve all native IDs, owners and evidence.
-3. Freeze the merged, reconciled candidate for the central batch/PR preflight:
-   `poetry run python ci/preflight.py`. It runs existing roster/schema seals,
+3. Deduplicate the affected selection and run one proportional combined focus
+   for behavior beyond the preflight. Keep each original verdict bound to its
+   tested candidate; an unchanged worker check need not be repeated wholesale.
+4. Publish the merged, reconciled candidate and use the PR's automatic
+   `ci/preflight.py` run as the fixed batch preflight. Inspect its terminal
+   result on the exact published commit; do not duplicate it locally before
+   pushing. It runs existing roster/schema seals,
    the complete fake public-route matrix and actual Tone terminal-output controls
    through `ci/test_driver.py`. It takes no selection overrides and launches no
    Wwise or Codex. The PR workflow uses the same command with Python 3.11 and
-   locked Poetry dependencies. This is a cheap development guard, not full
-   Program acceptance or a requirement for every small worker handoff.
-4. Deduplicate the affected selection and run one proportional combined focus
-   for behavior beyond the preflight. Keep each original verdict bound to its
-   tested candidate; an unchanged worker check need not be repeated wholesale.
+   locked Poetry dependencies. Use `poetry run python ci/preflight.py` locally
+   only when CI is unavailable or diagnosing a specific CI failure requires it.
+   This is a cheap development guard, not full Program acceptance or a
+   requirement for every small worker handoff.
 5. During development, run only failed and affected cases. Run required full
    Program and Non-live gates after the integration batch is stable.
    Keep source unchanged while tests run and wait on the same live process

@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R46 existing Source preservation and Render collector integration
+
+Runtime merge `5e41bed1` combines only accepted `7979072d` and `dceb20f1`
+from workflow-only `06fcadaf`. All 11 component files retain their exact pinned
+blobs; the merge had no conflicts. Ordinary existing Sound/Voice Source
+placement now retains observed plugin/file Source state through bounded field
+pages. The scoped Render collector keeps complete calls and independent state
+while replacing duplicate phase payloads with exact call/hash references.
+
+One combined focus through pinned Poetry and `ci/test.sh --mode nonlive` passed
+**9 tests in 27.44s** (wrapper 28.409s): three file Source preservation cases,
+two paged-field cases, two stripped-origin controls, the staged two-Preview
+flow, and one modern Render path with captured native metadata and receipt
+sizing. HEAD and all 1,905 tracked files stayed unchanged; no owned process
+remained. Original argv/source/process/output seals and logs are retained under
+`/tmp/waapi-r46-integration/`.
+
+Interface generate/check and branch generate/check each passed once, serially:
+**18.067s / 17.547s / 24.689s / 23.734s**. Only the reviewed operation-contract
+aggregate seal and four `object.set` public contract references refresh. All 153
+machine schemas, parser/continuation contracts, 79/91 source/index memberships,
+272,313 native obligations and compressed bytes, owners and evidence requirements
+remain exact.
+
+Original `027ac095` native results remain separate: 2022 **PASS** and 2025
+**FAIL** at the unchanged 8MiB receipt ceiling. The latter verified source and
+undo, then stopped with redo awaiting confirmation; redo was not executed.
+`r45-render-history-027ac095-native-summary.json` under Root's ignored
+full-coverage directory retains both attempts and their original receipt hashes.
+The collector repair and simulated sizing grant no native redo acceptance.
+No local preflight, full Program/Non-live, native or Fresh run occurred in this
+integration. Root owns exact-head hosted CI after publication and a separately
+scheduled new 2025 Render sandbox case. Broader Source/history work and final
+gates remain open; no ticket is closed.
+
 ## 2026-10-20 R44 scoped Source, staged completion and exact Render/history integration
 
 Runtime merge `f173d0c0` combines only accepted `4f869927`, `d8c55b4d` and

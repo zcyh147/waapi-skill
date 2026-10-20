@@ -4044,6 +4044,7 @@ def _legacy_import_render_runtime(tmp_path, workflow, version='2022.1', *, fault
             payload['status'] = 'partial'
         return code, payload
     runtime.raw_gateway = raw
+    runtime.native_task = task
     return runtime, commands, writes
 
 
@@ -5167,3 +5168,156 @@ def test_compound_exact_rename_history_collector_retains_failed_independent_effe
     assert [cmd[0] for cmd in commands].count('execute') == len(receipt['transactions'])
     assert len([uri for uri, _, _ in writes if uri.endswith('object.set')]) == 1
     assert not any(uri.endswith('.redo') for uri, _, _ in writes)
+
+
+def _compound_render_history_runtime(tmp_path, workflow, *, fault=None, version='2025.1', native_metadata=False):
+    from copy import deepcopy
+    if version == '2025.1':
+        runtime, commands, writes, task = _anonymous_effect_construction_runtime(tmp_path, workflow)
+    else:
+        runtime, commands, writes = _legacy_import_render_runtime(tmp_path, workflow, version)
+        task = runtime.native_task
+        # The import fixture appends its already-present source class; native
+        # getTypes has one exact row, rather than two identical fixture entries.
+        task.types = list({(row['classId'], row['name'], row['type']): row for row in task.types}.values())
+    original = task.call
+    if native_metadata:
+        task.metadata.update(deepcopy(_render_native_size_fixture()['slot_raw_metadata']))
+    history, actions = {}, []
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['property'] == ('Render' if version == '2025.1' else 'RenderEffect1'), args
+            reference = task.objects[args['object']]['@Effect' if version == '2025.1' else '@Effect1']
+            assert (reference.get('id') if isinstance(reference, dict) else reference) in task.objects, args
+            return {'return': True}
+        if uri in {'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.endGroup', 'ak.wwise.core.undo.cancelGroup'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); actions.append(uri)
+            if uri.endswith('beginGroup'): history['before'] = deepcopy(task.objects)
+            if uri.endswith('endGroup'): history['after'] = deepcopy(task.objects)
+            if uri.endswith('cancelGroup'): task.objects = deepcopy(history['before'])
+            return {}
+        if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); actions.append(uri)
+            task.objects = deepcopy(history['before' if uri.endswith('.undo') else 'after'])
+            return {}
+        if uri == 'ak.wwise.core.object.setName':
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); actions.append(uri)
+            row = task.objects[args['object']]; old = row['path']
+            row.update(name=args['value'], path=old.rsplit('\\', 1)[0] + '\\' + args['value'])
+            for child in task.objects.values():
+                if child['path'].startswith(old + '\\'): child['path'] = row['path'] + child['path'][len(old):]
+                for key in ('owner', 'parent'):
+                    relation = child.get(key)
+                    if isinstance(relation, dict) and relation.get('id') == row['id'] and 'name' in relation:
+                        relation['name'] = args['value']
+            return {}
+        if uri == 'ak.wwise.core.object.setProperty':
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); actions.append(uri)
+            assert args['property'] == ('Render' if version == '2025.1' else 'RenderEffect1') and args['value'] is True, args
+            if fault == 'native-error': raise RuntimeError('Render refused; preserve original outcome without retry')
+            selected = task.objects[args['object']]
+            if version == '2025.1':
+                owner = task.objects[selected['owner']['id']]
+                for item in owner['@Effects']:
+                    task.objects[item['id']]['@Render'] = True
+                    if item['id'] == selected['id']: break
+            else:
+                selected['@RenderEffect0'] = selected['@RenderEffect1'] = True
+            return {}
+        result = original(uri, args, options)
+        if uri.endswith('getProjectInfo'):
+            result.update(currentPlatformId='{44444444-4444-4444-4444-444444444444}', platforms=[
+                {'id': '{44444444-4444-4444-4444-444444444444}', 'name': 'Windows'}])
+        return result
+    task.call = call
+    return runtime, commands, writes, actions
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
+def test_compound_render_history_collector_uses_existing_setup_and_public_source_undo_redo(tmp_path, workflow, version):
+    runtime, commands, writes, actions = _compound_render_history_runtime(tmp_path, workflow, version=version)
+    category = workflow._collect_compound_render_history_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    _assert_render_phase_call_references(receipt)
+    assert category['status'] == 'PASS' and receipt['history_complete'] is True
+    assert receipt['history_before'] == receipt['history_undo']
+    if version == '2025.1': assert receipt['history_after'] == receipt['history_redo']
+    assert [phase['phase'] for phase in receipt['transactions'] if 'phase' in phase][-3 if version == '2025.1' else -2:] == (['source', 'undo', 'redo'] if version == '2025.1' else ['source', 'undo'])
+    assert len(writes) == (4 if version == '2025.1' else 1)  # Setup only; source is exactly setName + setProperty.
+    assert actions == ['ak.wwise.core.undo.beginGroup', 'ak.wwise.core.object.setName',
+        'ak.wwise.core.object.setProperty', 'ak.wwise.core.undo.endGroup',
+        'ak.wwise.core.undo.undo', *(['ak.wwise.core.undo.redo'] if version == '2025.1' else [])]
+    assert len(receipt['calls']) <= 256 and Path(category['observation_path']).stat().st_size <= 8 * 1024 * 1024
+
+
+def test_compound_render_history_collector_retains_failed_execute_without_verify_or_retry(tmp_path, workflow):
+    runtime, commands, writes, actions = _compound_render_history_runtime(tmp_path, workflow, fault='native-error')
+    with pytest.raises(AssertionError):
+        workflow._collect_compound_render_history_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    _assert_render_phase_call_references(receipt)
+    assert category['status'] == 'FAIL' and receipt['business_effect_verified'] is False and receipt['history_complete'] is False
+    source = receipt['transactions'][-1]
+    assert source['phase'] == 'source' and source['execute']['exit_code'] == 2 and 'verify' not in source
+    assert len(writes) == 4 and [cmd[0] for cmd in commands].count('verify') == 4
+    assert actions.count('ak.wwise.core.object.setProperty') == 1
+    assert actions[-1] == 'ak.wwise.core.undo.cancelGroup'
+    assert not any(uri in actions for uri in ('ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'))
+
+
+def _render_native_size_fixture():
+    import gzip
+    path = Path(__file__).parents[1] / 'fixtures/metadata/render-history-2025-native-size.json.gz'
+    assert path.stat().st_size < 200 * 1024
+    with gzip.open(path, 'rb') as source:
+        body = source.read(2 * 1024 * 1024 + 1)
+    assert len(body) <= 2 * 1024 * 1024
+    return json.loads(body)
+
+
+def _assert_render_phase_call_references(receipt):
+    from wwise_waapi.canonical import canonical_sha256
+    for phase in receipt['transactions']:
+        if phase['phase'] not in {'source', 'undo', 'redo'}: continue
+        assert 'immutable_preview' not in phase and 'transaction' not in phase
+        for key, command in [('preview_call', 'transaction-show'), ('transaction_call', 'transaction-show'),
+                ('execute', 'execute'), ('verify', 'verify')]:
+            if key not in phase: continue
+            reference = phase[key]['call'] if key in {'execute', 'verify'} else phase[key]
+            index = reference['call_index']
+            assert type(index) is int and 0 <= index < len(receipt['calls'])
+            call = receipt['calls'][index]
+            assert reference['call_canonical_sha256'] == canonical_sha256(call)
+            assert call['argv'] == [command, phase['transaction_id']]
+            if key in {'execute', 'verify'}: assert phase[key]['exit_code'] == call['exit_code']
+        if 'transaction_call' in phase:
+            before = receipt['calls'][phase['preview_call']['call_index']]['payload']['artifact']
+            after = receipt['calls'][phase['transaction_call']['call_index']]['payload']['artifact']
+            assert before == after
+
+
+def test_compound_render_history_collector_keeps_native_metadata_and_complete_redo_within_existing_bounds(tmp_path, workflow):
+    runtime, commands, writes, actions = _compound_render_history_runtime(tmp_path, workflow, native_metadata=True)
+    category = workflow._collect_compound_render_history_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    path = Path(category['observation_path']); receipt = json.loads(path.read_text())
+    _assert_render_phase_call_references(receipt)
+    assert category['status'] == 'PASS' and receipt['history_complete'] is True
+    assert receipt['history_before'] == receipt['history_undo'] and receipt['history_after'] == receipt['history_redo']
+    assert len(receipt['calls']) == 227 < 256
+    assert path.stat().st_size < 4 * 1024 * 1024  # Leaves margin for larger actual native envelopes.
+    capture = _render_native_size_fixture()
+    assert capture['source_partial_calls'] == 193
+    # Actual native and fake source/undo/redo previews have the same indices;
+    # use exact captured blobs for the largest native journal/Preview replies.
+    modeled = json.loads(json.dumps(receipt))
+    for index, call in capture['calls'].items():
+        assert modeled['calls'][int(index)]['argv'][0] == call['argv'][0]
+        modeled['calls'][int(index)] = call
+    from wwise_waapi.canonical import canonical_json_bytes
+    # Native redo has not executed. Conservatively budget two largest captured
+    # native undo journal records for its verify and final transaction replies.
+    largest = capture['calls']['162']
+    modeled['calls'][202] = modeled['calls'][203] = largest
+    assert len(canonical_json_bytes(modeled)) < 5 * 1024 * 1024

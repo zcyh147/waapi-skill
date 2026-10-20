@@ -174460,7 +174460,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 897
   },
-  "inventory_sha256": "0cb2ea427c4955f4d8ca1e9fc10770d066f67046f1f23df3840c57bbdd5a75e5",
+  "inventory_sha256": "42fc034d8039b5f5411bede2be77526b31cd1737ba60a69a21f246601710d6b2",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -206116,7 +206116,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "dc00d6185359a627275ba1da46bbeb705e6c1a0b44ab76a1856756e52190c3c0",
+      "contract_sha256": "c1ad8c514070d7c9eff895379785ae454e65199ea099409316b12acee512d13c",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206143,7 +206143,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "b6b6736ff128a843c75eacee45531d7cc498d04ef5a4b9497bda7d749e9eeb49",
+      "contract_sha256": "60a43fe599e175b91db242559fe99690766fe619c54b5d4be095eae763b24e82",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206170,7 +206170,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "1ecdf01cc290f6cb05bd9700cd38b10a0411d7dae940315f0fbcb60f373d1e8d",
+      "contract_sha256": "1dc673501c84c1cc3c6259217357eabc76ca7b7bcdc792e416f5c5c398f2c833",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206197,7 +206197,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "a89be347ec8488fe4c8349c056e03104f29a6ea37a5fc95f7b9982412c20d30e",
+      "contract_sha256": "549cc1f4fc3f84127d924c2cdd67d747811d437228dcda38ec094cc2912f2dd7",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208527,7 +208527,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "dce2f9c49744069a16be79a3e145bbdb0dfee2190d3d53e1e2836ebb343d46b0",
-    "operation_contract_sha256": "a8f1ad5945cc36d9239e80c69c076bd1dd20f30b013348fefe85ce0997ebf81d",
+    "operation_contract_sha256": "02df8a0b069745b3873ba53b802e4391b72d0467718349dddad59595db671e48",
     "public_continuation_sha256": "d70ab5cd8cb16538326e7939250429dd86ea03dc7993f3f110fa25438f05e5c0",
     "typed_request_surface_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150"
   },
