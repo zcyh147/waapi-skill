@@ -442,6 +442,7 @@ def read_metadata_run(descriptor, base):
         selected = collector.collection_plan(context['version'])
         expected_fields = {(scope,field) for scope,fields in selected['targets'].items() for field in fields}
         if (any(plan[key] != value for key,value in selected.items())
+                or plan.get('observation_origin') not in {'native_scenario_lifecycle','controlled_public_gateway'}
                 or any(character not in '0123456789abcdef' for character in repository['commit'])
                 or set(plan['actual_deadlines']) != {'readiness_seconds','total_seconds'}
                 or any(type(value) not in (int,float) or not math.isfinite(value) or not 0 < value <= 3600
@@ -488,7 +489,8 @@ def read_metadata_run(descriptor, base):
             gateway={'argv':command['gateway_arguments'],'exit_code':result['exit_code'],'payload':payload},
             receipt_sha256=files[prefix+'.stdout']['sha256'],format=descriptor['contract'],
             native_result=native['result'],native_sha256=target['native_sha256'],class_name=target['scope'],
-            class_id=selected['class_ids'][target['scope']],field=target['field'],invocation=summary['invocation'])
+            class_id=selected['class_ids'][target['scope']],field=target['field'],invocation=summary['invocation'],
+            observation_origin=plan['observation_origin'])
     return dict(context, candidate=repository['commit'], relevant_sources=sources,
                 gateway={'argv': command['gateway_arguments'], 'exit_code': result['exit_code'], 'payload': payload},
                 receipt_sha256=files[prefix + '.stdout']['sha256'])
@@ -614,6 +616,8 @@ def validate_current_class_metadata(record,branch,binding,context,scope_kind):
     # The reader has checked every archived source against current bytes and
     # requires its complete metadata/collector closure. Product also proves the
     # original native source pin owns those exact bytes; controls cannot grant it.
+    if scope_kind == 'product' and context['observation_origin'] != 'native_scenario_lifecycle':
+        raise ValueError('Controlled metadata origin cannot grant product native credit')
     if scope_kind == 'product' and git_source_seals(context['candidate'],context['relevant_sources']) != context['relevant_sources']:
         raise ValueError('Current native class source pin differs from its full sealed closure')
 

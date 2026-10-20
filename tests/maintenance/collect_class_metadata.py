@@ -351,7 +351,8 @@ def main():
                WWISE_READINESS_TIMEOUT=str(args.readiness_seconds), PYTHONDONTWRITEBYTECODE='1')
     def write(name, value):
         (root/name).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False, default=str)+'\n', encoding='utf-8')
-    write('plan.json', {**selected_plan, 'source_links':links, 'source_seals':sources, 'repositories':identities,
+    write('plan.json', {**selected_plan, 'observation_origin':'native_scenario_lifecycle',
+        'source_links':links, 'source_seals':sources, 'repositories':identities,
         'actual_deadlines':{'readiness_seconds':args.readiness_seconds,'total_seconds':args.total_seconds}})
     def empty_home(_sandbox, _assets, _io):
         if not private_home.is_dir() or any(private_home.iterdir()) or os.path.lexists(prefix):
@@ -565,6 +566,8 @@ def write_branch_attachments(root, inventory, *, scope_kind='product'):
     for index,(case,descriptor) in enumerate(descriptors.items()):
         context=reader.read_metadata_run(descriptor,root.parent)
         if scope_kind == 'product':
+            if context['observation_origin'] != 'native_scenario_lifecycle':
+                raise ValueError('Controlled metadata origin cannot grant product native credit')
             from tests.support.metadata_replay_branch_evidence import git_source_seals
             if git_source_seals(context['candidate'],context['relevant_sources']) != context['relevant_sources']:
                 raise ValueError('Native class source pin does not own its full original closure')

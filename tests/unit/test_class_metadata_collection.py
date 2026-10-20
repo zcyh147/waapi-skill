@@ -92,6 +92,7 @@ def controlled_capture(tmp_path):
     write('ready.json',{'get_info':status['wwise'],'source_hash_before':source,'source_mtime_before_ns':1,
         'host':status['endpoint']['host'],'port':status['endpoint']['port']})
     plan=collector.collection_plan('2022.1')
+    plan['observation_origin']='controlled_public_gateway'
     # Keep only the exercised scope; it is still one exact scheduled source.
     plan['actual_deadlines']={'readiness_seconds':180,'total_seconds':600}
     plan['source_seals']=collector.source_links('2022.1',plan['targets'])[1]
@@ -279,7 +280,7 @@ def test_portable_class_transport_controls_start_from_valid_sealed_baseline(tmp_
     with pytest.raises(ValueError):audit.portable_binding_inputs(path,policy)
 
 
-@pytest.mark.parametrize('damage',['input','source','whole-proof','leaf-proof','reference','product-git'])
+@pytest.mark.parametrize('damage',['input','source','whole-proof','leaf-proof','reference','product-origin','product-git'])
 def test_current_native_category_controls_do_not_borrow_program_or_other_sources(tmp_path,damage):
     import json,hashlib
     from copy import deepcopy
@@ -301,11 +302,34 @@ def test_current_native_category_controls_do_not_borrow_program_or_other_sources
     if damage=='input':binding['category_inputs']['live_metadata']['native']=binding['input']['gateway_argv']
     elif damage=='source':record['source_context']['native_candidate']='0'*40
     elif damage=='reference':binding['reference_chain']=[branch['route']+'|/resultSchema/properties/audioEngineId/$ref']
-    elif damage=='product-git':record['scope_kind']='product'
+    elif damage=='product-origin':record['scope_kind']='product'
+    elif damage=='product-git':
+        # Reseal an internally consistent ancestor pin; do not depend on a dirty
+        # checkout or treat the controlled public Gateway fixture as native.
+        ancestor='ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90'
+        plan=json.loads((root/'plan.json').read_bytes())
+        plan['repositories'][0]['commit']=ancestor
+        plan['observation_origin']='native_scenario_lifecycle'  # Simulated admission input, zero native credit.
+        (root/'plan.json').write_text(json.dumps(plan))
+        seal=json.loads((root/'evidence-seal.json').read_bytes())
+        entry=next(row for row in seal['files'] if row['path']=='plan.json')
+        entry.update(sha256=hashlib.sha256((root/'plan.json').read_bytes()).hexdigest(),bytes=(root/'plan.json').stat().st_size)
+        (root/'evidence-seal.json').write_text(json.dumps(seal))
+        record['metadata_run']['seal']['sha256']=hashlib.sha256((root/'evidence-seal.json').read_bytes()).hexdigest()
+        record['source_context']['native_candidate']=ancestor
+        context=reader.read_metadata_run(record['metadata_run'],tmp_path)
+        assert context['candidate']==ancestor and context['relevant_sources']==record['source_context']['relevant_sources']
+        path=tmp_path/'ancestor-native-record.json';path.write_text(json.dumps(record))
+        desc={**desc,'artifact':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+        assert result()==('passed',None)  # Only product Git ownership remains unproved.
+        record['scope_kind']='product'
     else:
         checks=record['branch_assertions'][branch['id']]['checks']
         pointer='/gateway/payload/agent_result' if damage=='whole-proof' else '/gateway/payload/agent_result/metadata/default'
         checks[:]=[check for check in checks if check['pointer']!=pointer]
     path=tmp_path/'changed-native-record.json';path.write_text(json.dumps(record))
     desc={**desc,'artifact':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
-    assert result('product' if damage=='product-git' else 'controlled')[0]=='missing'
+    outcome,reason=result('product' if damage in {'product-git','product-origin'} else 'controlled')
+    assert outcome=='missing'
+    if damage=='product-git':assert 'committed metadata source closure unavailable' in reason
+    if damage=='product-origin':assert 'Controlled metadata origin' in reason
