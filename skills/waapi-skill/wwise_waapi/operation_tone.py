@@ -455,9 +455,12 @@ def _triangle_arithmetic(observed, args, signal):
     # See TONE_STATIONARY_TRIANGLE.md. These rationals describe the numerical
     # policy, never a guessed native input/accumulator type. All sample, phase,
     # projection and acceptance arithmetic below is exact and fixed-size.
+    gain, error = Fraction(signal['requested_gain']), Fraction(signal['sample_error_limit'])
+    maximum_level = gain + error
     return {'step': Fraction(str(args.get('frequency', 440))) / observed['sample_rate'],
         'scale': 32768 if observed['sample_format'] == 'int16' else 2 ** 149,
-        'gain': Fraction(signal['requested_gain']), 'error': Fraction(signal['sample_error_limit']),
+        'gain': gain, 'error': error,
+        'maximum_level_numerator': maximum_level.numerator, 'maximum_level_denominator': maximum_level.denominator,
         'representation': Fraction(signal['representation_error']),
         'gain_lower': Fraction(signal['requested_gain'] * 10 ** (-0.02 / 20)),
         'gain_upper': Fraction(signal['requested_gain'] * 10 ** (0.02 / 20))}
@@ -467,7 +470,7 @@ def _observe_triangle_sample(sample, frame, row, arithmetic, signal, channel):
     scale, gain, error = arithmetic['scale'], arithmetic['gain'], arithmetic['error']
     numerator, denominator = sample.as_integer_ratio()
     value = numerator if scale == 32768 else numerator * (scale // denominator)
-    if abs(value) * (gain + error).denominator > (gain + error).numerator * scale:
+    if abs(value) * arithmetic['maximum_level_denominator'] > arithmetic['maximum_level_numerator'] * scale:
         raise SoundBankContractError('INVALID_TONE_WAV',
             'Tone stationary triangle sample exceeds the phase-independent requested gain bound.',
             details={'stationary_triangle': signal, 'channel': channel, 'frame': frame})
