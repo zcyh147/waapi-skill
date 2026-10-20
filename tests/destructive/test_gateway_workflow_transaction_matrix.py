@@ -9478,3 +9478,260 @@ def test_source_plugin_explicit_current_platform_alternative(workflow_sandbox_ru
     category = _collect_source_plugin_selection_acceptance(workflow_sandbox_runtime,
         prefix='WAAPI_SRC_EXPLICIT_' + uuid.uuid4().hex[:10], explicit_current_platform=True)
     assert category['status'] == 'PASS', category
+
+
+def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    """One diagnostic public Source-only copy; deliberately not a deep-copy oracle."""
+    from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    from wwise_waapi.dispatcher import MAX_LIVE_RESULT_JSON_BYTES
+    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_QUERIES
+    from wwise_waapi.native_catalog import load_native_catalog
+
+    assert runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    source_id = '{95DDA32B-B666-4269-A54C-5ABF4E201C99}'
+    original_owned_ids = ['{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
+        '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}']
+    output = runtime.state_dir / 'legacy-source-copy-feasibility.json'
+    assert not output.exists(), 'Never replace an earlier feasibility attempt'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / 'legacy-source-copy-artifacts'; artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); old_native = set(native_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    transactions: list[str] = []
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    category = {'category': 'legacy-source-only-copy-feasibility', 'status': 'FAIL', 'diagnostic_only': True,
+        'business_effect_verified': False, 'coverage_credit': 'none; native feasibility diagnostic',
+        'verifier_strength': 'diagnostic_class_parent_live_fields_owner_frames_and_owned_topology; no_complete_copy_credit',
+        'transaction_ids': transactions, 'observation_path': str(output)}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.legacy-source-copy-feasibility/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'diagnostic_only': True,
+        'business_effect_verified': False, 'native_admission_verified': False, 'collection_complete': False,
+        'transaction_ids': transactions, 'calls': [], 'phases': [], 'native_evidence': [], 'endpoint': endpoint,
+        'source_project': str(runtime.sandbox.source_project), 'config_sha256': config_hash,
+        'fixture_topology': {'file': 'tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu',
+            'source_line': 12173, 'source_id': source_id, 'owned_ids': original_owned_ids,
+            'shape': 'OutputLevel RTPC owns Curve and custom ControlInput ModulatorLfo; copied IDs may differ'},
+        'scope_exclusions': ['deep_owned_copy_mapping', 'all_plugin_copy_business_coverage',
+            'all_owner_properties', 'known_owned_fields', 'empty_project_constructor', 'Tone_constructor',
+            'other_versions', 'audio_effect', 'locale_or_platform_changes'],
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
+            'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
+            'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
+            'cleanup_status': 'unresolved_until_final_row'},
+        'limits': {'calls': 128, 'reply_bytes': MAX_LIVE_RESULT_JSON_BYTES, 'total_reply_bytes': 16 * 1024 * 1024,
+            'receipt_bytes': 256 * 1024, 'archive_bytes': 64 * 1024 * 1024, 'native_files': 512},
+        'archive_bytes': 0, 'total_reply_bytes': 0}
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Diagnostic receipt bound exceeded'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    def archive(name, raw):
+        assert len(raw) <= MAX_LIVE_RESULT_JSON_BYTES and receipt['archive_bytes'] + len(raw) <= receipt['limits']['archive_bytes']
+        path = artifacts / name
+        prove_artifact_path(path, io_root=artifacts, field='Source copy archive', expect_directory=False)
+        fd = os.open(path, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        with os.fdopen(fd, 'wb') as stream: stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+        assert path.read_bytes() == raw
+        receipt['archive_bytes'] += len(raw)
+        return {'path': str(path), 'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw)}
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Diagnostic public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry setup or Source-only copy'
+                attempted.add(argv[1])
+            row = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                raw = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+                receipt['total_reply_bytes'] += len(raw)
+                assert receipt['total_reply_bytes'] <= receipt['limits']['total_reply_bytes']
+                row.update(exit_code=code, reply=archive('reply-' + str(len(receipt['calls'])) + '.json', raw))
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}; raise
+            finally: persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live: assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    def query(identity, *, relation=None, fields=()):
+        result = gateway.gateway(['query-object', '--exact-id', identity,
+            *(['--relationship', relation] if relation else []), '--include', 'class-id', '--include', 'parent',
+            '--include', 'owner', '--include', 'notes', *[arg for field in fields for arg in ('--include-field', field)],
+            '--max-results', '128' if relation else '2'], live=True)
+        assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
+        rows = result['objects']; assert result['count'] == len(rows), result
+        assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
+        return sorted(rows, key=lambda row: uuid.UUID(row['id']))
+    def exact(identity):
+        rows = query(identity); assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        return rows[0]
+    def owner_frame(identity):
+        rows = query(identity, fields=['IsVoice'])
+        assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        row = rows[0]
+        assert row['type'] == 'Sound' and row['class_id'] == 65552, row
+        assert type(row.get('properties', {}).get('IsVoice')) is bool, 'Owner needs its actual Boolean IsVoice'
+        return {'identity': row, 'scope': 'identity/class/parent/name/notes/IsVoice only; other owner properties unobserved'}
+    def snapshot(identity):
+        row = exact(identity); names, page = [], None
+        while True:
+            result = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in result['fields']:
+                name = field['name']; assert isinstance(name, str) and name and name not in names, result
+                names.append(name)
+            if result['complete']:
+                assert len(names) == result['total_count'], result
+                break
+            next_page = result['next_page']; assert next_page and next_page != page, result
+            page = next_page
+        pages = []
+        # Public custom outputs first traverse bounded lexical discovery. The
+        # native projection ceiling alone cannot size this public request.
+        size = min(MAX_METADATA_DISCOVERY_QUERIES, waapi_gateway.MAX_QUERY_CUSTOM_OUTPUTS,
+            MAX_STRUCTURED_RETURN_FIELDS - 8)
+        for offset in range(0, len(names), size):
+            rows = query(identity, fields=names[offset:offset + size]); assert len(rows) == 1, rows
+            assert all(rows[0].get(key) == row.get(key) for key in ('id', 'name', 'type', 'path', 'parent', 'owner', 'class_id', 'notes')), rows
+            pages.append(rows[0])
+        return {'identity': row, 'field_names': names, 'field_pages': pages}
+    observation_start = 0
+    def save_observation(name, value):
+        nonlocal observation_start
+        # Replies are already archived once. Retain call references and the
+        # normalized comparison digest rather than serializing them again.
+        receipt.setdefault('observations', {})[name] = {
+            'preceding_call_indexes': list(range(observation_start, len(receipt['calls']))),
+            'normalized_sha256': hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()}
+        observation_start = len(receipt['calls'])
+        return value
+    def known_owned():
+        observations = {}
+        for identity in original_owned_ids:
+            rows = query(identity)
+            assert len(rows) <= 1 and (not rows or uuid.UUID(rows[0]['id']) == uuid.UUID(identity)), rows
+            observations[identity] = {'identity_rows': rows, 'scope':
+                'observed topology/class/notes only; fields and copied GUID mapping unverified' if rows else
+                'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
+        return observations
+    def complete(preview, label):
+        tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
+        phase = {'name': label, 'transaction_id': tx, 'execution_attempted': False}; receipt['phases'].append(phase)
+        shown = gateway.gateway(['transaction-show', tx, '--summary-only'], live=False)
+        gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+        phase['execution_attempted'] = True; persist()
+        code, result = gateway.raw_gateway(['execute', tx])
+        phase['execute_exit_code'] = code; phase['native_outcome'] = result.get('state', result.get('status'))
+        assert code == 0 and result.get('state') == 'executed_unverified', result
+        verified = gateway.gateway(['verify', tx], live=True)
+        assert verified.get('state') == 'verified', verified
+        phase['gateway_verification_scope'] = 'existing identity verifier only; independent diagnostic observes plugin state'
+        return result
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        info = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
+        assert info['isCommandLine'] is True
+        assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == (2021, 1, 14, 8108), info
+        receipt['native_build'] = catalog['provenance']['build']
+        types = gateway.gateway(['metadata', 'types', '--meaning', 'Wwise Synth One', '--page-size', '64'], live=True)['agent_result']
+        assert types['complete'] is True, types
+        selected = [row for row in types['types'] if row['name'] == 'Wwise Synth One']
+        assert len(selected) == 1 and selected[0]['classId'] == 9699330 and selected[0]['type'] == 'Source', selected
+        source_before = save_observation('source-before', snapshot(source_id))
+        assert source_before['identity']['type'] in {'Source', 'SourcePlugin'} and source_before['identity']['class_id'] == 9699330
+        old_owner = source_before['identity']['parent']['id']
+        owner_before = save_observation('original-owner-before', owner_frame(old_owner))
+        assert owner_before['identity']['type'] == 'Sound' and owner_before['identity']['class_id'] == 65552
+        source_children = save_observation('original-owner-children-before', query(old_owner, relation='children'))
+        save_observation('source-descendants-before', query(source_id, relation='descendants'))
+        owned_before = save_observation('known-owned-before', known_owned())
+        # Existing classic Gateway creation; no field/default or locale changes.
+        draft = _start_business_draft(gateway, 'object.create')
+        parent = _bind_business_object(gateway, draft, path_segments=ACTOR_MIXER_PARENT_SEGMENTS)
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'destination',
+            '--parent-handle', parent, '--name', prefix, '--kind', 'sound-sfx', '--field', 'notes', 'Owned copy feasibility destination'], live=False)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        setup = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        complete(setup, 'create_empty_destination')
+        rows = gateway.gateway(['query-object', *[arg for segment in (*ACTOR_MIXER_PARENT_SEGMENTS, prefix)
+            for arg in ('--path-segment', segment)], '--include', 'parent', '--include', 'class-id', '--max-results', '2'], live=True)['objects']
+        destination, = rows; destination_id = receipt['destination_id'] = destination['id']
+        destination_before = save_observation('destination-before', owner_frame(destination_id))
+        assert destination['type'] == 'Sound' and destination['class_id'] == 65552
+        assert destination_before['identity']['properties']['IsVoice'] is False, destination_before
+        assert query(destination_id, relation='children') == [], 'Copy destination must be empty'
+        preview = create_object_lifecycle_business_preview(lambda argv: gateway.gateway(argv,
+            live=argv[0] in {'draft-bind-object', 'draft-check', 'preview-from-draft'}),
+            version=runtime.version, operation='object.copy', object_id=source_id, parent_id=destination_id, name_conflict='fail')
+        # Full immutable artifact stays in its single archived reply, not duplicated in the receipt.
+        shown = gateway.gateway(['transaction-show', preview['transaction_id']], live=False)
+        assert shown['artifact']['prepared_operation']['dispatch']['args'] == {
+            'object': source_id, 'parent': destination_id, 'onNameConflict': 'fail'}, shown
+        complete(preview, 'copy_source_only')
+        children = query(destination_id, relation='children'); copied, = children
+        assert uuid.UUID(copied['id']) != uuid.UUID(source_id) and copied['class_id'] == 9699330
+        assert copied['type'] in {'Source', 'SourcePlugin'} and copied['parent']['id'] == destination_id, copied
+        receipt['native_admission_verified'] = True
+        copied_state = save_observation('copied-source', snapshot(copied['id']))
+        save_observation('copied-descendants', query(copied['id'], relation='descendants'))
+        source_after = save_observation('source-after', snapshot(source_id))
+        owner_after = save_observation('original-owner-after', owner_frame(old_owner))
+        destination_after = save_observation('destination-after', owner_frame(destination_id))
+        owned_after = save_observation('known-owned-after', known_owned())
+        assert source_after == source_before and owner_after == owner_before and owned_after == owned_before, 'Original Source/owner/observed owned objects changed'
+        assert query(old_owner, relation='children') == source_children, 'Original owner childset changed'
+        assert destination_after == destination_before, 'Destination identity/Voice frame changed'
+        receipt['preservation'] = {'original_source_observed_state': True, 'original_owner_identity_voice_frame': True,
+            'original_owner_children': True, 'destination_identity_voice_frame': True, 'known_owned_topology_observations': True,
+            'unresolvable_owned_ID_scope': 'equal unavailable observations do not prove owned object preservation'}
+        before_fields = {key: value for row in source_before['field_pages'] for key, value in row.get('properties', {}).items()}
+        after_fields = {key: value for row in copied_state['field_pages'] for key, value in row.get('properties', {}).items()}
+        before_refs = {key: value for row in source_before['field_pages'] for key, value in row.get('references', {}).items()}
+        after_refs = {key: value for row in copied_state['field_pages'] for key, value in row.get('references', {}).items()}
+        receipt['copy_observation'] = {'new_id': copied['id'], 'class_id': copied['class_id'], 'parent_id': destination_id,
+            'same_field_names': copied_state['field_names'] == source_before['field_names'],
+            'same_notes': copied_state['identity'].get('notes') == source_before['identity'].get('notes'),
+            'observed_scalar_differences': {key: {'before': before_fields.get(key), 'after': after_fields.get(key)}
+                for key in before_fields.keys() | after_fields.keys() if before_fields.get(key) != after_fields.get(key)},
+            'observed_reference_differences': {key: {'before': before_refs.get(key), 'after': after_refs.get(key)}
+                for key in before_refs.keys() | after_refs.keys() if before_refs.get(key) != after_refs.get(key)},
+            'reference_difference_scope': 'owned reference GUID remapping is not classified as corruption',
+            'owned_state_mapping': 'unverified; no copied-GUID equality assumed'}
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
+        receipt.update(collection_complete=True, native_admission_verified=True); category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}; raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - old_native)
+            assert len(paths) <= receipt['limits']['native_files']
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                receipt['native_evidence'].append({'native_path': str(path),
+                    **archive('native-' + str(index) + '.json', raw), 'native_file_proof': observed['file_proof']})
+        except Exception as exc:
+            receipt.update(collection_complete=False, native_admission_verified=False,
+                archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]}); category['status'] = 'FAIL'; raise
+        finally: persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_source_only_copy_console_feasibility(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Source-only copy feasibility is pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='WAAPI_SOURCE_COPY_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
