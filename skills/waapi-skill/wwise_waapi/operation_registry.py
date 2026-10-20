@@ -32,6 +32,7 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
 from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
+from .source_copy_observations import capture_source_copy, source_copy_scope, verify_source_copy
 from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
@@ -1859,6 +1860,7 @@ class VerificationResult:
     message: str = ""
     verification_strength: str = "operation_specific_readback"
     business_state_verified: bool = True
+    verification_scope: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         # Verifier strength is not a claim that a failed check verified state.
@@ -1880,6 +1882,7 @@ class VerificationResult:
             "message": self.message,
             "verification_strength": self.verification_strength,
             "business_state_verified": self.business_state_verified,
+            **({"verification_scope": _json_mapping(self.verification_scope)} if self.verification_scope is not None else {}),
         }
 
 
@@ -11542,6 +11545,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                     "complete_business_verification": False,
                 }} if conflict == "replace" else {}),
         }
+        if request.operation == "object.copy" and "source_transfer_parent_guard" in metadata:
+            try:
+                snapshot = capture_source_copy(source.object, parent.object, read=read, version=request.version)
+            except LifecycleGraphError as exc:
+                raise OperationContractError("INVALID_SOURCE_COPY_OBSERVATION", str(exc)) from exc
+            metadata["source_copy_observation"] = snapshot
+            verification["source_copy_live_fields"] = True
+            verification["verification_scope"] = source_copy_scope(snapshot)
         cleanup = {
             "kind": "delete-created-copy" if request.operation == "object.copy" else "move-back-to-original-parent",
             "source_snapshot": dict(source.row),
@@ -16846,6 +16857,20 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             assertions.append({"name": "copy/move " + label + " is unchanged", "passed": lifecycle_snapshot_equal(observed, expected),
                                "evidence": {"expected": expected, "actual": observed}})
 
+    source_copy_before = pre_state.get("source_copy_observation") if isinstance(pre_state, Mapping) else None
+    if isinstance(source_copy_before, Mapping):
+        def source_copy_read(uri, args, options):
+            result = read_call(uri, args, options)
+            readbacks.append({"role": "source-copy-state", "uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+            return result
+        try:
+            observed = capture_source_copy(source_copy_before["source"]["frame"]["id"], source_copy_before["destination"],
+                read=source_copy_read, version=source_copy_before["version"])
+        except LifecycleGraphError as exc:
+            observed = {"error": str(exc)}
+        assertions.append({"name": "Source-copy fields and owner frames are unchanged before execution",
+            "passed": lifecycle_snapshot_equal(observed, source_copy_before)})
+
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
     if isinstance(linked_before, Mapping):
         object_id = linked_before.get("object_id")
@@ -21549,6 +21574,21 @@ def verify_prepared_operation(
                     not any(_same_identity(row.get("id"), plan.get("source_id")) for row in old_rows),
                     old_rows,
                 )
+        if is_copy and plan.get("source_copy_live_fields") is True:
+            snapshot = pre_state.get("source_copy_observation") if isinstance(pre_state, Mapping) else None
+            if not isinstance(snapshot, Mapping):
+                raise OperationContractError("INVALID_PREVIEW", "Source-copy live-field verification lacks its sealed observation.")
+            def source_copy_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+                return result
+            verification_strength = "source_default_view_fields_and_owner_frames_only"
+            try:
+                for name, passed in verify_source_copy(snapshot, object_id, read=source_copy_read,
+                        replaced_ids=[row["id"] for row in plan.get("replaced_subtree_rows", [])]):
+                    check(name, passed, {})
+            except LifecycleGraphError as exc:
+                check("Source-copy bounded observation completed", False, {"error": str(exc)})
         if plan.get("on_name_conflict") == "replace":
             source_snapshot = plan.get("source_subtree_rows")
             replaced_snapshot = plan.get("replaced_subtree_rows")
@@ -21589,6 +21629,7 @@ def verify_prepared_operation(
                     + ", ".join(plan.get("verification_scope", {}).get("unobserved", ["unlinked_platform_views", "owned_lists_and_plugin_state"]))
                     + "; complete copy/move preservation is unverified.",
                     "hierarchy_notes_certified_field_views_only", False,
+                    plan.get("verification_scope") if plan.get("source_copy_live_fields") is True else None,
                 )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")
@@ -23429,6 +23470,7 @@ def verify_prepared_operation(
         success_status=success_status,
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
+        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True else None,
     )
 
     if kind == 'authoring-layout-reset-observation':
@@ -23584,6 +23626,7 @@ def _verification(
     success_status: str = "verified",
     verification_strength: str = "operation_specific_readback",
     business_state_verified: bool = True,
+    verification_scope: Mapping[str, Any] | None = None,
 ) -> VerificationResult:
     passed = bool(assertions) and all(item.get("passed") is True for item in assertions)
     status = success_status if passed else "verification_failed"
@@ -23619,6 +23662,7 @@ def _verification(
         message,
         verification_strength,
         business_state_verified,
+        verification_scope,
     )
 
 

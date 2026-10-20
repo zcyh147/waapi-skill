@@ -25538,6 +25538,7 @@ def successful_verification_result_summary(value: Mapping[str, Any]) -> dict[str
         "readbacks_canonical_sha256": canonical_sha256(readbacks),
         "canonical_sha256": canonical_sha256(value),
         "full_evidence_in_stdout": False,
+        **({"verification_scope": dict(value["verification_scope"])} if isinstance(value.get("verification_scope"), Mapping) else {}),
         **({'optional_none_state_materialization': [dict(row) for row in readbacks
             if isinstance(row, Mapping) and row.get('kind') == 'optional-none-custom-state-materialization']}
             if any(isinstance(row, Mapping) and row.get('kind') == 'optional-none-custom-state-materialization'
@@ -31932,6 +31933,8 @@ def transaction_verification_summary(
 
     summary = transaction_value_summary(value, include_keys=include_keys)
     plan = value if isinstance(value, Mapping) else {}
+    if isinstance(plan.get("verification_scope"), Mapping):
+        summary["verification_scope"] = dict(plan["verification_scope"])
     for key in (
         "kind",
         "strategy",

@@ -47,6 +47,11 @@ class TransferTask(OwnedGraphTask):
         assert code == 0, result
 
     def call(self, uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('transform') == [{'select': ['children']}, {'range': [0, 130]}]:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            parent = args['from']['id'][0]
+            rows = [row for row in self.objects.values() if row.get('parent') == {'id': parent}]
+            return {'return': self.project_rows(rows[:130], options)}
         if uri.endswith(('object.copy', 'object.move')):
             self.calls.append((uri, deepcopy(args), deepcopy(options))); self.writes.append(deepcopy(args))
             identity = COPIED if self.operation == 'object.copy' else FIRST

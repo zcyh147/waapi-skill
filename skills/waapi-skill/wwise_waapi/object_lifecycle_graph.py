@@ -5,6 +5,7 @@ import math
 import re
 from typing import Any, Callable, Mapping
 
+from .canonical import canonical_sha256
 from .builders.metadata import bind_get_property_info_result
 from .metadata_discovery import metadata_typed_value_type
 
@@ -64,6 +65,66 @@ def _require_scalar_value(value: Any, metadata_type: str) -> None:
         valid = kind == "string" and isinstance(value, str)
     if not valid:
         raise LifecycleGraphError("Lifecycle scalar read does not match its exact live metadata type")
+
+
+def capture_lifecycle_fields(object_id: str, *, read: Read, strict: bool = True) -> dict[str, Any]:
+    """Shared exact typed default-view field pages; partial reads never invent values."""
+    result = read(NAMES, {"object": object_id}, {})
+    names = result.get("return")
+    if (not isinstance(names, list) or (strict and len(names) > MAX_FIELDS)
+            or not all(isinstance(name, str) and _TOKEN.fullmatch(name) for name in names)
+            or len(names) != len(set(names))):
+        raise LifecycleGraphError("Lifecycle field discovery must be bounded, complete and unique")
+    inventory = {"count": len(names), "canonical_sha256": canonical_sha256(sorted(names))}
+    if not strict and len(names) > MAX_FIELDS:
+        return {"field_values": {}, "reference_fields": [], "field_types": {}, "field_metadata": {},
+            "unreadable_fields": {"*": "field_inventory_over_observation_budget"}, "field_inventory": inventory}
+    values: dict[str, Any] = {}
+    unreadable = {}
+    reference_fields = []
+    field_types = {}
+    field_metadata = {}
+    for name in sorted(names):
+        try:
+            info = bind_get_property_info_result(
+                read(INFO, {"object": object_id, "property": name}, {}),
+                field_token=name, available_names=names,
+            )
+        except ValueError as exc:
+            raise LifecycleGraphError("Lifecycle field metadata is malformed") from exc
+        if info.name != name:
+            raise LifecycleGraphError("Lifecycle field metadata does not match the discovered field")
+        reference = (info.type or "").casefold() in {"reference", "objectreference"} or info.restriction.get("type") == "reference"
+        if not reference and metadata_typed_value_type(info.type) is None:
+            if strict:
+                raise LifecycleGraphError("Lifecycle field metadata does not certify a supported scalar value type")
+            unreadable[name] = "uncertified_native_type"
+        field_types[name] = "reference" if reference else info.type
+        field_metadata[name] = {**info.as_dict(include_raw=True), "scope": {"object": object_id}, "available_names": sorted(names)}
+        if reference:
+            reference_fields.append(name)
+    readable = [name for name in sorted(names) if name not in unreadable]
+    for offset in range(0, len(readable), 32):
+        chunk = readable[offset:offset + 32]
+        observed = _rows(read(GET, {"from": {"id": [object_id]}}, {"return": ["id", *("@" + name for name in chunk)]}))
+        if len(observed) != 1 or str(observed[0].get("id", "")).upper() != object_id.upper():
+            raise LifecycleGraphError("Lifecycle field read lost its exact object identity")
+        for name in chunk:
+            if "@" + name not in observed[0]:
+                if strict: raise LifecycleGraphError("Lifecycle field read omitted a discovered field")
+                unreadable[name] = "omitted_native_value"
+                continue
+            if name not in reference_fields:
+                try:
+                    _require_scalar_value(observed[0]["@" + name], field_types[name])
+                except LifecycleGraphError:
+                    if strict: raise
+                    unreadable[name] = "uncertified_native_value"
+                    continue
+            values[name] = observed[0]["@" + name]
+    return {"field_values": values, "reference_fields": reference_fields,
+        "field_types": field_types, "field_metadata": field_metadata,
+        **({"unreadable_fields": unreadable, "field_inventory": inventory} if not strict else {})}
 
 
 def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = None) -> list[dict[str, Any]]:
@@ -134,50 +195,11 @@ def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = N
         if not isinstance(parent_id, str) or expected_parent is None or expected_parent["id"].upper() != parent_id.upper():
             raise LifecycleGraphError("Lifecycle descendant has a missing or inconsistent direct parent")
     for row in normalized:
-        result = read(NAMES, {"object": row["id"]}, {})
-        names = result.get("return")
-        if (not isinstance(names, list) or len(names) > MAX_FIELDS
-                or not all(isinstance(name, str) and _TOKEN.fullmatch(name) for name in names)
-                or len(names) != len(set(names))):
-            raise LifecycleGraphError("Lifecycle field discovery must be bounded, complete and unique")
-        values: dict[str, Any] = {}
-        reference_fields = []
-        field_types = {}
-        field_metadata = {}
-        link_support = {}
-        for name in sorted(names):
-            try:
-                info = bind_get_property_info_result(
-                    read(INFO, {"object": row["id"], "property": name}, {}),
-                    field_token=name, available_names=names,
-                )
-            except ValueError as exc:
-                raise LifecycleGraphError("Lifecycle field metadata is malformed") from exc
-            if info.name != name:
-                raise LifecycleGraphError("Lifecycle field metadata does not match the discovered field")
-            reference = (info.type or "").casefold() in {"reference", "objectreference"} or info.restriction.get("type") == "reference"
-            if not reference and metadata_typed_value_type(info.type) is None:
-                raise LifecycleGraphError("Lifecycle field metadata does not certify a supported scalar value type")
-            field_types[name] = "reference" if reference else info.type
-            link_support[name] = info.supports.get("unlink")
-            field_metadata[name] = {**info.as_dict(include_raw=True), "scope": {"object": row["id"]}, "available_names": sorted(names)}
-            if reference:
-                reference_fields.append(name)
-        for offset in range(0, len(names), 32):
-            chunk = sorted(names)[offset:offset + 32]
-            observed = _rows(read(GET, {"from": {"id": [row["id"]]}}, {"return": ["id", *("@" + name for name in chunk)]}))
-            if len(observed) != 1 or str(observed[0].get("id", "")).upper() != row["id"].upper():
-                raise LifecycleGraphError("Lifecycle field read lost its exact object identity")
-            for name in chunk:
-                if "@" + name not in observed[0]:
-                    raise LifecycleGraphError("Lifecycle field read omitted a discovered field")
-                if name not in reference_fields:
-                    _require_scalar_value(observed[0]["@" + name], field_types[name])
-                values[name] = observed[0]["@" + name]
-        row["field_values"] = values
-        row["reference_fields"] = reference_fields
-        row["field_types"] = field_types
-        row["field_metadata"] = field_metadata
+        fields = capture_lifecycle_fields(row["id"], read=read)
+        row.update(fields)
+        names = list(fields["field_types"])
+        reference_fields, field_types = fields["reference_fields"], fields["field_types"]
+        link_support = {name: record["supports"].get("unlink") for name, record in fields["field_metadata"].items()}
         if platforms is not None:
             platform_field_values += len(platforms) * len(names)
             if platform_field_values > MAX_PLATFORM_FIELD_VALUES:
