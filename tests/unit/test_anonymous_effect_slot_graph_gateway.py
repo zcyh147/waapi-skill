@@ -339,8 +339,8 @@ def test_anonymous_constructor_revalidates_source_and_target_before_one_write(tm
     assert not writes
 
 
-def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, equivalent_view=None, view_drift=None):
-    task = anonymous_task(tmp_path)
+def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, equivalent_view=None, view_drift=None, version='2025.1'):
+    task = anonymous_task(tmp_path, version)
     windows = '{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}'
     reference_platform = ('Windows' if equivalent_view == 'name' else windows if equivalent_view == 'guid'
                           else 'Mac' if fault == 'other-platform' else None)
@@ -488,6 +488,13 @@ def test_append_reference_equivalent_certified_view_matches_omitted_chain(tmp_pa
 @pytest.mark.parametrize('drift', ['name', 'current'])
 def test_append_reference_equivalent_view_drift_stops_before_one_write(tmp_path, drift):
     _append_reference_edit_case(tmp_path, 'retarget', equivalent_view='name', view_drift=drift)
+
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+@pytest.mark.parametrize('planned', [False, True])
+def test_append_reference_intent_matches_other_supported_modern_versions(tmp_path, version, planned):
+    _append_reference_edit_case(tmp_path, 'retarget', version=version, planned=planned)
 
 def test_existing_nested_shareset_reference_uses_actual_parent_chain_not_constructor_destination(tmp_path):
     task = anonymous_task(tmp_path)
