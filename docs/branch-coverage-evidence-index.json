@@ -29,878 +29,916 @@
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2021.1-boolean-true-additive-frequency.bindings.json",
-        "sha256": "4701e9201edaa82060e5e0167817595fec223bc73e92b70397702dabfb36f95a"
+        "artifact": "metadata-default-r52-stable-r1-2021.1-boolean-true-additive-frequency.bindings.json",
+        "sha256": "fab34e685b813ed83ff2293e1e9df637e1cf822c3205c4cc7db018c7d1dcb95c"
       },
-      "id": "metadata-default-r50-stable-r1-2021.1-boolean-true-additive-frequency",
+      "id": "metadata-default-r52-stable-r1-2021.1-boolean-true-additive-frequency",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-boolean-true-additive-frequency/bindings.original.json",
-          "sha256": "acc464c9cee8bdba5751987d16efac52daf48e0dd32f84bade046c208a45ec92"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-boolean-true-additive-frequency/bindings.original.json",
+          "sha256": "c827ad71648f21d0144e7fb52cd05d3d7989de9a02131efd2b36e935c5841bae"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-boolean-true-additive-frequency/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-boolean-true-additive-frequency/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-boolean-true-additive-frequency/program.original.json",
-          "sha256": "a46ae24862fcb7f8e5ecd7e683c9a6645aaf0c60ac8bca6301152d3e184296fa"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-boolean-true-additive-frequency/program.original.json",
+          "sha256": "6f9ef811186020e738e6e53a9f805105ab45b7e192453e00fb2116d7d9337305"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-boolean-true-additive-frequency/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2021.1-boolean-true-additive-frequency/requirements.original.json",
           "sha256": "e26d83f34e1386b31775d924f026b66748603ab14ef1c5fcb00bc547b64ded1d"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2021.1-default-false.bindings.json",
-        "sha256": "dcc0cf00b86b9cc865cf7d76ee3a41ed216ccbad3846f0568a3d37ab87dc32c1"
+        "artifact": "metadata-default-r52-stable-r1-2021.1-default-false.bindings.json",
+        "sha256": "04adc7c7cb604a87d58011ef6a281721a7fa44060b3d949a3ee5281dcf448186"
       },
-      "id": "metadata-default-r50-stable-r1-2021.1-default-false",
+      "id": "metadata-default-r52-stable-r1-2021.1-default-false",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-default-false/bindings.original.json",
-          "sha256": "5c3f7eaa45a3fa98757b13ae32b5b49e0c1b5e6df5a25e9bde1b566ebf06a899"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-default-false/bindings.original.json",
+          "sha256": "369d691f6d17e7861982596f4fad4b1c4aea031cad82ab891e322df0a19c6ee7"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-default-false/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-default-false/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-default-false/program.original.json",
-          "sha256": "c51e804ea68b20c244b001f32a19e039a830ef530ff8e120ff4392aafa314c31"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-default-false/program.original.json",
+          "sha256": "c08a1f0efa7213aef3399bc11f2c45604a2d36a4f25bbf804b5e3b0cd7e7474a"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-default-false/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2021.1-default-false/requirements.original.json",
           "sha256": "8e7e3fee0d7d38a580ae2f731e9bb0d9b74d4b2fb82cc350889160df45cd375e"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2021.1-empty-string-exclusive-decibels.bindings.json",
-        "sha256": "b08738d39e49db26b432f523939119301f3dad5078d6192eea5443569f1069b1"
+        "artifact": "metadata-default-r52-stable-r1-2021.1-empty-string-exclusive-decibels.bindings.json",
+        "sha256": "dee54128201eaab1ce9d0c1d30d9a399a7268d9a813072e67d95f6581d1af49c"
       },
-      "id": "metadata-default-r50-stable-r1-2021.1-empty-string-exclusive-decibels",
+      "id": "metadata-default-r52-stable-r1-2021.1-empty-string-exclusive-decibels",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-empty-string-exclusive-decibels/bindings.original.json",
-          "sha256": "e241adb8c4d2f4e946bd347c7580edb675f4010feef16a1ec00a1b2e0a82c6d5"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-empty-string-exclusive-decibels/bindings.original.json",
+          "sha256": "68a541b298a84dac40e6a06e04b0956698f0e5a324b5f2e9f972b97160972dc3"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-empty-string-exclusive-decibels/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-empty-string-exclusive-decibels/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-empty-string-exclusive-decibels/program.original.json",
-          "sha256": "af4c2bf0fa0ddc08aa0728d43ef5416dbc6fed13fffb1348c4bcebe4e3493e05"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-empty-string-exclusive-decibels/program.original.json",
+          "sha256": "976d87a262bbbbd0b66b5280a43a18dfb9dd5c90b69e738b6f85d899de030eac"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-empty-string-exclusive-decibels/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2021.1-empty-string-exclusive-decibels/requirements.original.json",
           "sha256": "3adea1ac99bc27f06e18bde3ed4519d495f9950e68dee8fa7454a3fc2b68f0e2"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2021.1-null-multiplicative-pitch.bindings.json",
-        "sha256": "c35796affdba0b1010edbf99a204ab5acc7d56122bcf91732ace5d8c99c2ce6a"
+        "artifact": "metadata-default-r52-stable-r1-2021.1-null-multiplicative-pitch.bindings.json",
+        "sha256": "8a4859df7674e344dc1d96c216cec053aaaaccb04921138e2b45df516e0ca3fc"
       },
-      "id": "metadata-default-r50-stable-r1-2021.1-null-multiplicative-pitch",
+      "id": "metadata-default-r52-stable-r1-2021.1-null-multiplicative-pitch",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-null-multiplicative-pitch/bindings.original.json",
-          "sha256": "2837799f06efceb4159ff5b5b3db7518525741cc2da124d3601c4ce4da9cddae"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-null-multiplicative-pitch/bindings.original.json",
+          "sha256": "e2a58635a4b2d7f9befdacdb571107f8f98bdcdc46ba248d67fa567d8413c886"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-null-multiplicative-pitch/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-null-multiplicative-pitch/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-null-multiplicative-pitch/program.original.json",
-          "sha256": "aa410d6e2bdbe7ec1f6c228bd5d18ff8939a29eef3f7f30105aa71fdcb3e5c66"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-null-multiplicative-pitch/program.original.json",
+          "sha256": "bd2390ec946ab67bfdf29929d7e3233d7198836c538a87bb0b872d560919ce2f"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-null-multiplicative-pitch/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2021.1-null-multiplicative-pitch/requirements.original.json",
           "sha256": "31c3a6d6860286f437794f052a9430cc12ce45230faf1053b907d9d81a45ef68"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2021.1-number-false-none.bindings.json",
-        "sha256": "c3b43cb3ef0bef7850921bcfddfc9acc80591021c79220ea1a85bc95a489ed5e"
+        "artifact": "metadata-default-r52-stable-r1-2021.1-number-false-none.bindings.json",
+        "sha256": "134005338def09bc554d5244dcc74c1a034187837156d2a24ebb91fa231781ad"
       },
-      "id": "metadata-default-r50-stable-r1-2021.1-number-false-none",
+      "id": "metadata-default-r52-stable-r1-2021.1-number-false-none",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-number-false-none/bindings.original.json",
-          "sha256": "a5f4053acbf184f0088949a29d1afbbe4e5d144d154d93704eb5c55c495327c2"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-number-false-none/bindings.original.json",
+          "sha256": "e2ba0962456d1b6af9a734d73ebcc525583548a1afc2eab1af00d5f9cb141230"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-number-false-none/capture.original.json",
-          "sha256": "936a209a86b0b6dba63461b467641f2b0cc9ac4a4299e6ab493e1cea1df9e325"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-number-false-none/capture.original.json",
+          "sha256": "47509c20f2c30446f33551331b3818bca187286cb57a228b4b84febafee0624f"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-number-false-none/program.original.json",
-          "sha256": "0a28d0f4cc49e0cc577d82c5895afba35c077249fbb2c61e6ec32f378b3a8b4c"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-number-false-none/program.original.json",
+          "sha256": "358c3a117f61e06f09f6fc0e0ba366c85fa08e363627d39143f5218e3596449e"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-number-false-none/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2021.1-number-false-none/requirements.original.json",
           "sha256": "d264032bd12443e742770a8ed330e6258e736b39bd0d31a6cb2af4ae4f1e5638"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2021.1-omitted.bindings.json",
-        "sha256": "9dfcccf30dcf0dbafa956b621ef01d11e167fbff27d0151516250898f2c0f7e2"
+        "artifact": "metadata-default-r52-stable-r1-2021.1-omitted.bindings.json",
+        "sha256": "1843b23f2b8aad716ef9622513e1403b3eaf8ab08525de7388f1b1b796e9b153"
       },
-      "id": "metadata-default-r50-stable-r1-2021.1-omitted",
+      "id": "metadata-default-r52-stable-r1-2021.1-omitted",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-omitted/bindings.original.json",
-          "sha256": "792fb7c1be258be1efc82bb2c6b29f376309a50eda57dcf41a067c781e4d6b11"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-omitted/bindings.original.json",
+          "sha256": "ce2b612cec0fdc0d0efb7d0f0a31a044a64cc821666342744cb0403514ef8657"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-omitted/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-omitted/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-omitted/program.original.json",
-          "sha256": "f76e2d5dd590bae9b0d67c0b040eeaedfe1b58c8b0d462de7c7bf7e70074816b"
+          "artifact": "metadata-default-r52-stable-r1-2021.1-omitted/program.original.json",
+          "sha256": "25992088b3e4345ee2deddcd781920d7c94f71f8cb4f775418bfe97aa8f854b7"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2021.1-omitted/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2021.1-omitted/requirements.original.json",
           "sha256": "10e9d5c8da40a5fc39f36f00e695a364f2d68b67a528867b43b2ef894a161323"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2022.1-boolean-true-additive-frequency.bindings.json",
-        "sha256": "1dc11ec6cc933949ff4d3ab54bcf2ffeebc3a37856ea7cdc03464ee2f33cd8ac"
+        "artifact": "metadata-default-r52-stable-r1-2022.1-boolean-true-additive-frequency.bindings.json",
+        "sha256": "28c08fcfca262d5ec5452b81eac0eab0f5b23e178656ef2fec3bffe8b3ac4502"
       },
-      "id": "metadata-default-r50-stable-r1-2022.1-boolean-true-additive-frequency",
+      "id": "metadata-default-r52-stable-r1-2022.1-boolean-true-additive-frequency",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-boolean-true-additive-frequency/bindings.original.json",
-          "sha256": "963d5d9db90ccae4c42da0da2502c6985feffd7db96f987d6bfef6556ce00927"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-boolean-true-additive-frequency/bindings.original.json",
+          "sha256": "2ebd04c13e5a34e3f3649860e2f62453e10a48abaeb927700105f6a75064e963"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-boolean-true-additive-frequency/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-boolean-true-additive-frequency/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-boolean-true-additive-frequency/program.original.json",
-          "sha256": "96a9d36a4e958ef781fa52ab79eaaf20421862db622f17b5ed56490176819853"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-boolean-true-additive-frequency/program.original.json",
+          "sha256": "d84890e882221779d3236f7958af53b6b49cf1537c8ce8457710b7fb1039d54d"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-boolean-true-additive-frequency/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2022.1-boolean-true-additive-frequency/requirements.original.json",
           "sha256": "87d7e8dcaa0ad89cd018c0b3d15ae156c674294be932ea9704effc62b2cbee33"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2022.1-default-false.bindings.json",
-        "sha256": "e5c4f90b8a094aa6ff3896e22ae045a68ecad2b36d4b49323b5d134785e78da1"
+        "artifact": "metadata-default-r52-stable-r1-2022.1-default-false.bindings.json",
+        "sha256": "9d362acc32dedc90e1c0026eb089eded5d7778cf3e9290c608c431f152c1faa0"
       },
-      "id": "metadata-default-r50-stable-r1-2022.1-default-false",
+      "id": "metadata-default-r52-stable-r1-2022.1-default-false",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-default-false/bindings.original.json",
-          "sha256": "34f08d75159af3a9bb647a65e94d350a626fd12e18b5a8c490a33032bc48b863"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-default-false/bindings.original.json",
+          "sha256": "5455a0481f56cb907d793912a549e9f802c105d318e6c40803c4f465c168b7ac"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-default-false/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-default-false/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-default-false/program.original.json",
-          "sha256": "6831c7807876c4aa395a6d9400870803f878bd556d16ff74607a3991eebd80b6"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-default-false/program.original.json",
+          "sha256": "9d99cfbee346f87b5a2733a740e6a3a68bd4c28bed561d853b0dfab0a6743a2e"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-default-false/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2022.1-default-false/requirements.original.json",
           "sha256": "574d6a7434ca34679c813d852ec4fc24b0dbaf01ff2a75d80baa7f2f587e8e0c"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2022.1-empty-string-exclusive-decibels.bindings.json",
-        "sha256": "7aa35f7b2c2083aa8151cd67e946a3c714ac558fa1a0fe7c8c6b59d7690811a8"
+        "artifact": "metadata-default-r52-stable-r1-2022.1-empty-string-exclusive-decibels.bindings.json",
+        "sha256": "d1b498b13ac92d3618c1a022b6ab61a718212b95b05c0b56c923ca8c57322b57"
       },
-      "id": "metadata-default-r50-stable-r1-2022.1-empty-string-exclusive-decibels",
+      "id": "metadata-default-r52-stable-r1-2022.1-empty-string-exclusive-decibels",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-empty-string-exclusive-decibels/bindings.original.json",
-          "sha256": "aa0c4aca386c3cadd527416700104d7e5ff8024d52a408eb39f918f3925c2ef0"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-empty-string-exclusive-decibels/bindings.original.json",
+          "sha256": "505139e08a9a96fd3e9e936b4605ffb503e71b3e1233955760ab303d13fdc16c"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-empty-string-exclusive-decibels/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-empty-string-exclusive-decibels/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-empty-string-exclusive-decibels/program.original.json",
-          "sha256": "f30fffe572250562bffc75caa6d1893574df794e3c69e2214a8da782a65e9707"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-empty-string-exclusive-decibels/program.original.json",
+          "sha256": "cf4e9be77f1cda3aa7702194c793d025318054a00d2f33ccef322585321cb06f"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-empty-string-exclusive-decibels/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2022.1-empty-string-exclusive-decibels/requirements.original.json",
           "sha256": "bbf3c6b2b41722a151398304e02b063da0586349cd6df50e3402a664f0351229"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2022.1-null-multiplicative-pitch.bindings.json",
-        "sha256": "30213ef635c9e902af1fbae381984afc9772e680a619c618e15166292cdc4eeb"
+        "artifact": "metadata-default-r52-stable-r1-2022.1-null-multiplicative-pitch.bindings.json",
+        "sha256": "4e55b882c7c08a1a506106034b73a24a54dad205e7f671f6c546a82897d14ad5"
       },
-      "id": "metadata-default-r50-stable-r1-2022.1-null-multiplicative-pitch",
+      "id": "metadata-default-r52-stable-r1-2022.1-null-multiplicative-pitch",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-null-multiplicative-pitch/bindings.original.json",
-          "sha256": "96bda1599321147f30fad03ca0e15c7eace41d957a5215c3bd62c3176319711d"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-null-multiplicative-pitch/bindings.original.json",
+          "sha256": "e19c02b802b8b39c120587f98fc266a8f66171ab9aef15c9edd7d1188d64d3a1"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-null-multiplicative-pitch/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-null-multiplicative-pitch/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-null-multiplicative-pitch/program.original.json",
-          "sha256": "422feecc03d15a77d8dd5e2a12d2b3bda231290cd1f9d59fa8957e8285406407"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-null-multiplicative-pitch/program.original.json",
+          "sha256": "a32fae00c6dd6ab2b652c050df1d528f7f6c9fabee5c5b41330c2da17077473c"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-null-multiplicative-pitch/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2022.1-null-multiplicative-pitch/requirements.original.json",
           "sha256": "06112c46e7f2554769f612bffdb226ca86bcf9f13b3976e1138e918a2f4a72fc"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2022.1-number-false-none.bindings.json",
-        "sha256": "42912f5c3ffe89300f3bbdfe9fb3b43ac85a59655f6de75e8db1e72150173055"
+        "artifact": "metadata-default-r52-stable-r1-2022.1-number-false-none.bindings.json",
+        "sha256": "eb66d578bdaf8ca5745ad1886657a6ef6ba1734ba20266ad10f48c9dba2100fe"
       },
-      "id": "metadata-default-r50-stable-r1-2022.1-number-false-none",
+      "id": "metadata-default-r52-stable-r1-2022.1-number-false-none",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-number-false-none/bindings.original.json",
-          "sha256": "c1fc84cdd09947103d97715cccf5cbc8851a7134ac1f951f939b9aa5f8187e87"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-number-false-none/bindings.original.json",
+          "sha256": "001fc09e1c894c10b68273cab6a515587b96c9560923754678f334fdad169080"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-number-false-none/capture.original.json",
-          "sha256": "936a209a86b0b6dba63461b467641f2b0cc9ac4a4299e6ab493e1cea1df9e325"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-number-false-none/capture.original.json",
+          "sha256": "47509c20f2c30446f33551331b3818bca187286cb57a228b4b84febafee0624f"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-number-false-none/program.original.json",
-          "sha256": "61543ac6d73d6b1a9c1f53cdf5202f12091782b7c57df1eef38b215fa12a7a78"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-number-false-none/program.original.json",
+          "sha256": "e3e52c71d35b62086b03a619747bc5be8598fe6ab8a1c7af55dabc53295a6dc0"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-number-false-none/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2022.1-number-false-none/requirements.original.json",
           "sha256": "67eff8df979fb0f438d5978f930a20f19f7b2e7a10d07ccd6b7ee4e923c6bcfd"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2022.1-omitted.bindings.json",
-        "sha256": "429b79c4e18a8afa4fa28cb2d419c3705e3a24f0d97e7aa402145332038504f5"
+        "artifact": "metadata-default-r52-stable-r1-2022.1-omitted.bindings.json",
+        "sha256": "60c7ffbcb235dd7305a1d6a85cb9ddb7f2b8107b2ecb805f35961cbd0652b1ac"
       },
-      "id": "metadata-default-r50-stable-r1-2022.1-omitted",
+      "id": "metadata-default-r52-stable-r1-2022.1-omitted",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-omitted/bindings.original.json",
-          "sha256": "f2d4f2ec42da014637a12120fee0d4a736a6be91e9f0c3fac414dd53a8c623bf"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-omitted/bindings.original.json",
+          "sha256": "866d84d98f738925b61c171561020d68c0e596964dae23f6890456a7b37fc33b"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-omitted/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-omitted/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-omitted/program.original.json",
-          "sha256": "cff77b90023d933f59e83a8e2766a489c832e19959dd4da8dba51086c03b5f7b"
+          "artifact": "metadata-default-r52-stable-r1-2022.1-omitted/program.original.json",
+          "sha256": "7ca8572b25ddfbf174631dabc86f39b49d66ae8fc6700242f9b8b7dc7f2f62df"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2022.1-omitted/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2022.1-omitted/requirements.original.json",
           "sha256": "0a10318aa0a23675fc110a9dc067ed7678559670b1e00aaf5fe6ea1be13821a0"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2023.1-boolean-true-additive-frequency.bindings.json",
-        "sha256": "5f0a7d13089c859511a08505493fcfae1a49a251a6fd56887ad1e80a58635e5e"
+        "artifact": "metadata-default-r52-stable-r1-2023.1-boolean-true-additive-frequency.bindings.json",
+        "sha256": "4a4d52c75a07d71987a2e7b546837138416686c55d8142daafb913703d8cd038"
       },
-      "id": "metadata-default-r50-stable-r1-2023.1-boolean-true-additive-frequency",
+      "id": "metadata-default-r52-stable-r1-2023.1-boolean-true-additive-frequency",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-boolean-true-additive-frequency/bindings.original.json",
-          "sha256": "b2f305788f7ff9076b204ff925363fee6f939a9cd70a7fb49d310ed47f0f415a"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-boolean-true-additive-frequency/bindings.original.json",
+          "sha256": "9dd9736be8faf7b186f847b2301bafc5edbec1bf29c84466bdaa192b50e54d28"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-boolean-true-additive-frequency/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-boolean-true-additive-frequency/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-boolean-true-additive-frequency/program.original.json",
-          "sha256": "ecb992370bc49de6b4054fd0df674bf48f6dccc0f27665aaa0db68d46f564b1a"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-boolean-true-additive-frequency/program.original.json",
+          "sha256": "e5477055d5d8bad3bffc03023b750af43625666019dc707d9f76e483aefc6df1"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-boolean-true-additive-frequency/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2023.1-boolean-true-additive-frequency/requirements.original.json",
           "sha256": "bc0f81274b25274a0a2ca583fbccb99db8e02f8aaab54bb2e2fa4ae2f82672f7"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2023.1-default-false.bindings.json",
-        "sha256": "c22f8c57d9ff6579d032d05edd85f83072a73effac7ec8faeb1cd457cbb644ff"
+        "artifact": "metadata-default-r52-stable-r1-2023.1-default-false.bindings.json",
+        "sha256": "5cb274929a54a5e9c43fd1c3a7c849db71d48d763ac943466b717ae57399062d"
       },
-      "id": "metadata-default-r50-stable-r1-2023.1-default-false",
+      "id": "metadata-default-r52-stable-r1-2023.1-default-false",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-default-false/bindings.original.json",
-          "sha256": "74d7b78b1dd9a3ec9d2c1c2393ab25122ebb26f90fb18627a61c76cd901d68b6"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-default-false/bindings.original.json",
+          "sha256": "956ff98ff47e385d022efbb25ccbd3c5b06a297f0923bf82327d7fe926ac8767"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-default-false/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-default-false/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-default-false/program.original.json",
-          "sha256": "6291d083e5b23790d1bed34988451674141c1cec7f8a0fc6dbdcaa11e08576c7"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-default-false/program.original.json",
+          "sha256": "6fe3204545695d90079ef5ebee26e47b9f0e67dde86f7f1ea3be6a0de83517b1"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-default-false/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2023.1-default-false/requirements.original.json",
           "sha256": "d190e0da8f03808fd85e6153f681d7abe8b5eac8aa565eaa5c89e02958c5af50"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2023.1-empty-string-exclusive-decibels.bindings.json",
-        "sha256": "8a4a5671cddf47ef990cfd0420b2f38b6772d7fa17504b0f9401c7c3cc2a09d2"
+        "artifact": "metadata-default-r52-stable-r1-2023.1-empty-string-exclusive-decibels.bindings.json",
+        "sha256": "696cfb3ddce4ac50e65f5cd1d645fd5d7536e5fbed64e24164da8ac55f68735f"
       },
-      "id": "metadata-default-r50-stable-r1-2023.1-empty-string-exclusive-decibels",
+      "id": "metadata-default-r52-stable-r1-2023.1-empty-string-exclusive-decibels",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-empty-string-exclusive-decibels/bindings.original.json",
-          "sha256": "71fbaa0d100e152e6319011914231f2b4cff360d18eb450fd1f40e4619216fc6"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-empty-string-exclusive-decibels/bindings.original.json",
+          "sha256": "55b146695a89928925c335909568e42ed2bbd0bf2e62841cbdcaa43b7b176764"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-empty-string-exclusive-decibels/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-empty-string-exclusive-decibels/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-empty-string-exclusive-decibels/program.original.json",
-          "sha256": "224eae639a08235155a154fb71279233c924e1928caa5970fb5c11ee6746a86f"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-empty-string-exclusive-decibels/program.original.json",
+          "sha256": "36c6d1757ed84a320a7f934c3e65e540d7869342333d5bb4561a1ee0718c8b47"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-empty-string-exclusive-decibels/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2023.1-empty-string-exclusive-decibels/requirements.original.json",
           "sha256": "393ccdc86c73ae21cd65b4d6c1c4e33fb82bdf26d75bddf6d584abd1a087efb3"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2023.1-null-multiplicative-pitch.bindings.json",
-        "sha256": "410437218e532a3353cff28ba1f213d33da543573eb4ea726a6a518583d25752"
+        "artifact": "metadata-default-r52-stable-r1-2023.1-null-multiplicative-pitch.bindings.json",
+        "sha256": "9cb4e10a5ce7e639b4baaba4259d7dd867c0b00c63a27f77fd1dcff8023c2556"
       },
-      "id": "metadata-default-r50-stable-r1-2023.1-null-multiplicative-pitch",
+      "id": "metadata-default-r52-stable-r1-2023.1-null-multiplicative-pitch",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-null-multiplicative-pitch/bindings.original.json",
-          "sha256": "e2f44e5be48617f4f02803c4d6d9b51906b6462349c5549f8a9b4602ad5413ba"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-null-multiplicative-pitch/bindings.original.json",
+          "sha256": "6bcc58e1741cb23a6bf373fa352f5a3d9acf24a8638c58ad9c20f07ebb80b897"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-null-multiplicative-pitch/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-null-multiplicative-pitch/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-null-multiplicative-pitch/program.original.json",
-          "sha256": "7635df6ec9ac3299855cc5d93bbc7d2780f8cf22d15be9b562d93a97827b4f6a"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-null-multiplicative-pitch/program.original.json",
+          "sha256": "1c9d8467ba10c345a3a5159d2fafa85e5b18ea1995d920b0e2e836cdbee5a23b"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-null-multiplicative-pitch/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2023.1-null-multiplicative-pitch/requirements.original.json",
           "sha256": "0a9133979cf4ae06943c382bc54c500afa23373385533f1180e15dabc60f35be"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2023.1-number-false-none.bindings.json",
-        "sha256": "09ef3ab479baa07dd06294a8a308bfb2e0b0456a587312ee1e47a51bc029cd19"
+        "artifact": "metadata-default-r52-stable-r1-2023.1-number-false-none.bindings.json",
+        "sha256": "0c886db427cbd2d794df36dea3dc61dff3bfd28a3ff2f255444aef1cca5cb639"
       },
-      "id": "metadata-default-r50-stable-r1-2023.1-number-false-none",
+      "id": "metadata-default-r52-stable-r1-2023.1-number-false-none",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-number-false-none/bindings.original.json",
-          "sha256": "645839a4fa648189758b954737f259bb78feac87a57ed3c68a910875c9e27efd"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-number-false-none/bindings.original.json",
+          "sha256": "fbc91893b653b10b6eb1a56dffdb51993c0cddcf6477beb55bae7c4e473bd640"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-number-false-none/capture.original.json",
-          "sha256": "936a209a86b0b6dba63461b467641f2b0cc9ac4a4299e6ab493e1cea1df9e325"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-number-false-none/capture.original.json",
+          "sha256": "47509c20f2c30446f33551331b3818bca187286cb57a228b4b84febafee0624f"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-number-false-none/program.original.json",
-          "sha256": "037afd0bf390c76ef3778d295b60e25ea9e7b0c38856a0b3e741d76a7c408c3a"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-number-false-none/program.original.json",
+          "sha256": "ff8e372fe122de90c93f93a341d1492e79731ddb24865428a42451132e37be58"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-number-false-none/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2023.1-number-false-none/requirements.original.json",
           "sha256": "551dd31dae1bc34eefde5f9ae1b0f2fca0d484f8c3a1602dbf00d7b561dbdeea"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2023.1-omitted.bindings.json",
-        "sha256": "06f9cb13349261572040118a838055fca81735ae6be58abef2f98d647d8b1d44"
+        "artifact": "metadata-default-r52-stable-r1-2023.1-omitted.bindings.json",
+        "sha256": "453e69123c382a26ec0b296502165a1b65fcbd06b025ab0b716237d2192d4fd0"
       },
-      "id": "metadata-default-r50-stable-r1-2023.1-omitted",
+      "id": "metadata-default-r52-stable-r1-2023.1-omitted",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-omitted/bindings.original.json",
-          "sha256": "ef82f7dd2af49f4f3a8ac61a55e67d13cd3175bced4a30b6db0185991a27cb7c"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-omitted/bindings.original.json",
+          "sha256": "766a800c00ba2f1af45f36df53049445621c5fdd6015cf89f5cdbd7be85f87c1"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-omitted/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-omitted/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-omitted/program.original.json",
-          "sha256": "697a16d071feadb44e8d1f972df1bc7c7f2d951c5a1d75623bbfadd2854de543"
+          "artifact": "metadata-default-r52-stable-r1-2023.1-omitted/program.original.json",
+          "sha256": "929ff5606813260ca098f270653d42d20a8f559ada0df0a644b8637b60a2b31b"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2023.1-omitted/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2023.1-omitted/requirements.original.json",
           "sha256": "43f228b61f0aaa89da465bd1efb7234c758d17096b948ec384c5b974b18db0bc"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2024.1-boolean-true-additive-frequency.bindings.json",
-        "sha256": "e5eb86ae1a40c11dba9da454095fcb8a60aa1b5a320e15174b0712c24fe496aa"
+        "artifact": "metadata-default-r52-stable-r1-2024.1-boolean-true-additive-frequency.bindings.json",
+        "sha256": "5682971e2665b228dffa427c310a1787de67b9a6ffd0494b2cec4cb4cb19f1df"
       },
-      "id": "metadata-default-r50-stable-r1-2024.1-boolean-true-additive-frequency",
+      "id": "metadata-default-r52-stable-r1-2024.1-boolean-true-additive-frequency",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-boolean-true-additive-frequency/bindings.original.json",
-          "sha256": "6ccf9dd6ef2856ce641f3e417e1d80fe4b9414e06d1dfd97b32449c111272ec6"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-boolean-true-additive-frequency/bindings.original.json",
+          "sha256": "5678559d9f956a12aab9fe7edf052d823fc618b7a9ef1978391ccb514e684da3"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-boolean-true-additive-frequency/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-boolean-true-additive-frequency/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-boolean-true-additive-frequency/program.original.json",
-          "sha256": "8e439fd4d61b944545c85275ec3783ffd9330a5f559b9f807d67c31becf7d85f"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-boolean-true-additive-frequency/program.original.json",
+          "sha256": "24c390461fe3c56c61cdc799a1ef6d9d7dd81bb2e953a189b5a7ec8b2a34b8c5"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-boolean-true-additive-frequency/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2024.1-boolean-true-additive-frequency/requirements.original.json",
           "sha256": "05e8e9ca38f53fbd7b87199232146d95d333e0dd0c82b31e5d8edf7e6f3dcc42"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2024.1-default-false.bindings.json",
-        "sha256": "5452b116c299283b9147700dc1c87b2246e1e74644a6238a106e1591cf84f265"
+        "artifact": "metadata-default-r52-stable-r1-2024.1-default-false.bindings.json",
+        "sha256": "a88fe8fcbeaa3064912f5b514ae232af57d4c8790dc303a7bf929dc5ee56d84e"
       },
-      "id": "metadata-default-r50-stable-r1-2024.1-default-false",
+      "id": "metadata-default-r52-stable-r1-2024.1-default-false",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-default-false/bindings.original.json",
-          "sha256": "78f03080b70e8ae7c8e1aceac9f96e7f43bc8a90b02f6f9562800778ffaa9e1b"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-default-false/bindings.original.json",
+          "sha256": "b7e3a91fbbb86af256873c6f1ddf75a9f93aaef6fe2ec5479c56ff13811c89e0"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-default-false/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-default-false/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-default-false/program.original.json",
-          "sha256": "ad9dff2dac1c6a14789bac1881ba933abcb0acfa63914189c675b53f6bc4c30f"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-default-false/program.original.json",
+          "sha256": "13ec9ecc68f126dd0892e9fea3db58583aa809fb6e71373902d7b284a3d20155"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-default-false/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2024.1-default-false/requirements.original.json",
           "sha256": "f74ddbaf86a88ac6c8f2dbbcfdd86aa7b9274514ae697a6786bc72b84fd3ae6f"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2024.1-empty-string-exclusive-decibels.bindings.json",
-        "sha256": "f9e9691dbbc12d320c0e72ad715b009f6348b2c37fde7b65527d69a0f3afda82"
+        "artifact": "metadata-default-r52-stable-r1-2024.1-empty-string-exclusive-decibels.bindings.json",
+        "sha256": "1e26b92d91493e0a8e1e68eaa8cbd503866659de9a68e53228ded6baadedec2e"
       },
-      "id": "metadata-default-r50-stable-r1-2024.1-empty-string-exclusive-decibels",
+      "id": "metadata-default-r52-stable-r1-2024.1-empty-string-exclusive-decibels",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-empty-string-exclusive-decibels/bindings.original.json",
-          "sha256": "4d92b9344e478340ed55fc11d3b7ddfc0ddd999f803e9117a4847205150afa6f"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-empty-string-exclusive-decibels/bindings.original.json",
+          "sha256": "a86f61520c2ad4b87f254e17c808aa70708fa78bb10ab4af083df292e77bf483"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-empty-string-exclusive-decibels/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-empty-string-exclusive-decibels/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-empty-string-exclusive-decibels/program.original.json",
-          "sha256": "55aae370ef26b60793e2fb76a2b7be9877d62fa9abdbef4c77e5cb8363710296"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-empty-string-exclusive-decibels/program.original.json",
+          "sha256": "95288cfa7091f651f0ddd711d02e2edb3202b51b4690e840eda8f4a2cc3d18f0"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-empty-string-exclusive-decibels/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2024.1-empty-string-exclusive-decibels/requirements.original.json",
           "sha256": "efccae5f287ff1e2569757c28e879768c2196ec09555a8b568cc00de4cfb3699"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2024.1-null-multiplicative-pitch.bindings.json",
-        "sha256": "d92f219d477a1837ace7524fe50d30c40f35c56db14586465aa98af4c0ffa143"
+        "artifact": "metadata-default-r52-stable-r1-2024.1-null-multiplicative-pitch.bindings.json",
+        "sha256": "f8142156b6e803a61cc274db44775e7efa39ea859294f475291e623a5213aad5"
       },
-      "id": "metadata-default-r50-stable-r1-2024.1-null-multiplicative-pitch",
+      "id": "metadata-default-r52-stable-r1-2024.1-null-multiplicative-pitch",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-null-multiplicative-pitch/bindings.original.json",
-          "sha256": "6860a8891309111c17eb4184817ee42f3fa83a23989353f9059f9f1c4cd04d69"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-null-multiplicative-pitch/bindings.original.json",
+          "sha256": "218fe3601dae4e6f6874de5246063f249c137a6686a5f6a509b0ee0eea4f3671"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-null-multiplicative-pitch/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-null-multiplicative-pitch/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-null-multiplicative-pitch/program.original.json",
-          "sha256": "8b235c0a075a75cd0087b2769aac5ee5de5753ae8c6df32cb20086a76ca566e6"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-null-multiplicative-pitch/program.original.json",
+          "sha256": "47403333673a06735e6b84274c88e7bf3c270c6b00d44934ce8cba184a3a039c"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-null-multiplicative-pitch/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2024.1-null-multiplicative-pitch/requirements.original.json",
           "sha256": "fb934dda800c0ac9da1c5f52785f4ccff29819dfb56059ee5a0a66eb86e05339"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2024.1-number-false-none.bindings.json",
-        "sha256": "5b4a52c28da9648784768a8c628a0245329a29a7b65edc4ca472db485016266c"
+        "artifact": "metadata-default-r52-stable-r1-2024.1-number-false-none.bindings.json",
+        "sha256": "a5338b30459779e5719a484ef20f59fe7de80007595c602e6437bc2dfe80040f"
       },
-      "id": "metadata-default-r50-stable-r1-2024.1-number-false-none",
+      "id": "metadata-default-r52-stable-r1-2024.1-number-false-none",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-number-false-none/bindings.original.json",
-          "sha256": "d34d8960f17e2f71d51a032492f57f97ebbded60852416082061eb64e993c006"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-number-false-none/bindings.original.json",
+          "sha256": "cbc32353e51da03b8cdac8c457458402447e4d8bacf8bae378c5a071e811d42d"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-number-false-none/capture.original.json",
-          "sha256": "936a209a86b0b6dba63461b467641f2b0cc9ac4a4299e6ab493e1cea1df9e325"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-number-false-none/capture.original.json",
+          "sha256": "47509c20f2c30446f33551331b3818bca187286cb57a228b4b84febafee0624f"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-number-false-none/program.original.json",
-          "sha256": "9a040166aa20b62f04b6730624093c5c00d33f5db32b5aa932746c7444b5b6d3"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-number-false-none/program.original.json",
+          "sha256": "78ba00601a4e4322281a7f3fa80fa14f1c3f1a39a44084eb1b367ab495b6581a"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-number-false-none/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2024.1-number-false-none/requirements.original.json",
           "sha256": "6ca8f0466538f4413cd358ab8b483a8d09cfa68b02e026f890cf3174b69a9bac"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2024.1-omitted.bindings.json",
-        "sha256": "cf4d4e514f69d9822441bbb70cd5aecd2baf610372ed21a791a725d599d64fb3"
+        "artifact": "metadata-default-r52-stable-r1-2024.1-omitted.bindings.json",
+        "sha256": "8cf6e62834ff51b4407de89eac55544ef657e4040b97f7fe60fdb11ef22cbb30"
       },
-      "id": "metadata-default-r50-stable-r1-2024.1-omitted",
+      "id": "metadata-default-r52-stable-r1-2024.1-omitted",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-omitted/bindings.original.json",
-          "sha256": "8c9977c2aad9774810b037b867675fea7cdeeeea27fa349ac55021a168ba0c61"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-omitted/bindings.original.json",
+          "sha256": "17d69017680c900a8dc94b0cd6ed5c1928584b9269c10cced129fe7790229973"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-omitted/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-omitted/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-omitted/program.original.json",
-          "sha256": "c94002f5152d3ad920e69ac66b49dbb1882d247a8393e5c85bedbd50c8f60609"
+          "artifact": "metadata-default-r52-stable-r1-2024.1-omitted/program.original.json",
+          "sha256": "0c6a512d4cb330ff3a9fd3dfd2924e35d28a46e73f51d1e6e726b303dca7f612"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2024.1-omitted/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2024.1-omitted/requirements.original.json",
           "sha256": "48fa3da4659f5cdb3a7a76bbe478f0d0923e3b1ab9bbb514856e935601fb5235"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2025.1-boolean-true-additive-frequency.bindings.json",
-        "sha256": "c57a5e314ecf6450adc714fddcd4b4e6e2f9c8ed2f8e4bd829467198b4e93974"
+        "artifact": "metadata-default-r52-stable-r1-2025.1-boolean-true-additive-frequency.bindings.json",
+        "sha256": "52ed0ad9aee5d6fbb1787f9c8f85a0cb3fa3daf7e2d90a0667f3cc5ddb75f5ce"
       },
-      "id": "metadata-default-r50-stable-r1-2025.1-boolean-true-additive-frequency",
+      "id": "metadata-default-r52-stable-r1-2025.1-boolean-true-additive-frequency",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-boolean-true-additive-frequency/bindings.original.json",
-          "sha256": "91189c63914767dd0304f3a7f738c3421294be8597586e5fd6e37bfd14a301b1"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-boolean-true-additive-frequency/bindings.original.json",
+          "sha256": "92552194342a3fe98b502c27ee6e4d218a9aac0c2eaec6e729e8658064bad054"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-boolean-true-additive-frequency/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-boolean-true-additive-frequency/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-boolean-true-additive-frequency/program.original.json",
-          "sha256": "7dc5f6dcb07ba47bf0c9fc5943ec0a3f2f2fe4334d676bbeb99a476961db83ad"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-boolean-true-additive-frequency/program.original.json",
+          "sha256": "85c60ad258aecd45903ae279b4fd5a87257f3c9d82fd8058cfb3f72b6eeb750a"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-boolean-true-additive-frequency/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2025.1-boolean-true-additive-frequency/requirements.original.json",
           "sha256": "207a33700b3493265a981d105ea9698672317edd95430b64272436b4d407e3f9"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2025.1-default-false.bindings.json",
-        "sha256": "6dd9a051eab5100c4799a638a0f6e0a9262d755a7910a5eb8fa6ee461d300555"
+        "artifact": "metadata-default-r52-stable-r1-2025.1-default-false.bindings.json",
+        "sha256": "603d782fc365170d9b4747c3ddd9eb331c8d21685d47b068930d4b3464941538"
       },
-      "id": "metadata-default-r50-stable-r1-2025.1-default-false",
+      "id": "metadata-default-r52-stable-r1-2025.1-default-false",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-default-false/bindings.original.json",
-          "sha256": "3c2d022d3c527693bb7acd5f03b07bdc59e1d5fce31de1dbbc4c84a16f519e8f"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-default-false/bindings.original.json",
+          "sha256": "940f0dd7e5af6d9174adc5cd35d8244d8a9384195663c48d86eb9bd83ac7d29e"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-default-false/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-default-false/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-default-false/program.original.json",
-          "sha256": "240fc67bc392660dfdf823e2a7a7fe870dc3d82754b7016a8791cfa5e2eeeba1"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-default-false/program.original.json",
+          "sha256": "e82d1c230b4b90f5f6e8032a645ebfc8393128b6f2991b9f66ec69a56c9185d9"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-default-false/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2025.1-default-false/requirements.original.json",
           "sha256": "edb00b643190cc59ff51308b421a301eebd594a467d2806e0f49e42a902c16e3"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2025.1-empty-string-exclusive-decibels.bindings.json",
-        "sha256": "cfbbcc6d82eed9c0ed4029dd1383f6edaa969bc7af1cd587e4bbdbd6600253f2"
+        "artifact": "metadata-default-r52-stable-r1-2025.1-empty-string-exclusive-decibels.bindings.json",
+        "sha256": "c75fe50bb0b8e9d5d851eedd8e706fec5b1a692cfc029d9511596b927f15299f"
       },
-      "id": "metadata-default-r50-stable-r1-2025.1-empty-string-exclusive-decibels",
+      "id": "metadata-default-r52-stable-r1-2025.1-empty-string-exclusive-decibels",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-empty-string-exclusive-decibels/bindings.original.json",
-          "sha256": "54d66b000a1bff22e7b8ae7202524759257989b872269efecf35eb5c43a6ff3a"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-empty-string-exclusive-decibels/bindings.original.json",
+          "sha256": "f4b5af416739087cf17ef0fb277eaf21c1b45ade57f5b97ff07a1cbdcd88fcbc"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-empty-string-exclusive-decibels/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-empty-string-exclusive-decibels/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-empty-string-exclusive-decibels/program.original.json",
-          "sha256": "e1601918754e0c38cea34a55b9196ad2e58e864cc6c07c31fe991047572d8418"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-empty-string-exclusive-decibels/program.original.json",
+          "sha256": "31a319a9dd945bec580a4a03ddf0dd3920cb5aa7f99deba042d41493db7b95fc"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-empty-string-exclusive-decibels/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2025.1-empty-string-exclusive-decibels/requirements.original.json",
           "sha256": "4479d5d814b3a1f0d7c327b6df445f132b94889a55b2ae21d4c692dd9d69e408"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2025.1-null-multiplicative-pitch.bindings.json",
-        "sha256": "bb2f6da75201daa1a8e32b45f7e472b79d25186c638607d02ae2f469c84a1c7f"
+        "artifact": "metadata-default-r52-stable-r1-2025.1-null-multiplicative-pitch.bindings.json",
+        "sha256": "8ac3ce41bcaddfa02e79c5369b7b232384f4d3191cb92582dfb0e14279f451b1"
       },
-      "id": "metadata-default-r50-stable-r1-2025.1-null-multiplicative-pitch",
+      "id": "metadata-default-r52-stable-r1-2025.1-null-multiplicative-pitch",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-null-multiplicative-pitch/bindings.original.json",
-          "sha256": "8aa29b0649e91c654f0a3e0acd2183aa3916eda0ef25c197f5456dd10fed6d71"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-null-multiplicative-pitch/bindings.original.json",
+          "sha256": "89da587b6b27c42895f32b43751dd1f6e141cc3e59be58774de7764d209ff823"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-null-multiplicative-pitch/capture.original.json",
-          "sha256": "25a5385a60f337dc7c276584d43b9ac0f87d75cd07de83aa32763257943a5403"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-null-multiplicative-pitch/capture.original.json",
+          "sha256": "be1f8e7fa262db53d0b3484dcfd1bfe2ca6807f93039bed77c1f668ea9b90cf1"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-null-multiplicative-pitch/program.original.json",
-          "sha256": "305509c8615ebc719c869e7b88f48d2ddf84ed650a0cc1623f40f509131b26fc"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-null-multiplicative-pitch/program.original.json",
+          "sha256": "f4180488f98c08af3510685ffc0fafac730aba27f38f15becec4a297d0b803d4"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-null-multiplicative-pitch/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2025.1-null-multiplicative-pitch/requirements.original.json",
           "sha256": "062e6b8a2decfa4d4bd0b29f1f65ccf1fef54c28632320d87a60337a5ce11418"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2025.1-number-false-none.bindings.json",
-        "sha256": "8d998da1ccefd8101afacbefa4206bc6252bc2526e2058322a910e61a3401510"
+        "artifact": "metadata-default-r52-stable-r1-2025.1-number-false-none.bindings.json",
+        "sha256": "5a08814034a11a4edd1975d83d6dc3a1874c5987d4ddaeab71b0d4ec5a8be3e0"
       },
-      "id": "metadata-default-r50-stable-r1-2025.1-number-false-none",
+      "id": "metadata-default-r52-stable-r1-2025.1-number-false-none",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-number-false-none/bindings.original.json",
-          "sha256": "7fca883d1ce0a3257f7a756627f3dc0a446c119795f066bc72e6ce502a831cc2"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-number-false-none/bindings.original.json",
+          "sha256": "7afe5b1b8c3aad3fa2639c979a0c5c476d53ba22545126c46402fdb43b861689"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-number-false-none/capture.original.json",
-          "sha256": "936a209a86b0b6dba63461b467641f2b0cc9ac4a4299e6ab493e1cea1df9e325"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-number-false-none/capture.original.json",
+          "sha256": "47509c20f2c30446f33551331b3818bca187286cb57a228b4b84febafee0624f"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-number-false-none/program.original.json",
-          "sha256": "e36899b292c129af4511db010d552e8e3fbcf16df4ef903d71d070a62f5e25d0"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-number-false-none/program.original.json",
+          "sha256": "304b98b1f30112ee630d100983456be3cbc8a89342a3aae97044f974c42fcb6c"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-number-false-none/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2025.1-number-false-none/requirements.original.json",
           "sha256": "6fedebb2223072b907029f2a7943af52e8ac415686f9391bbcdb272181feac16"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "metadata-default-r50-stable-r1-2025.1-omitted.bindings.json",
-        "sha256": "fb9e97ab967f8c1c2705290596a34de6a4e2d505deba4997e5bbd21ac02290b6"
+        "artifact": "metadata-default-r52-stable-r1-2025.1-omitted.bindings.json",
+        "sha256": "625475dda010f995cce93368469691515fd653cb65a3c066c8132efa67b47ec0"
       },
-      "id": "metadata-default-r50-stable-r1-2025.1-omitted",
+      "id": "metadata-default-r52-stable-r1-2025.1-omitted",
       "origin": {
         "bindings": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-omitted/bindings.original.json",
-          "sha256": "ef0c14bddcb72bc2d5f618459cd2172216b848b992084411a58a5663f9f143cb"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-omitted/bindings.original.json",
+          "sha256": "f65f6841b733796d873a11957e8e8a9a5365a9bb788d244872f06fc9566578af"
         },
         "capture": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-omitted/capture.original.json",
-          "sha256": "8d7e5e8a24fa020e2ed883b6e02df271c3eb44aca672b6d03bb80a2974a3082b"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-omitted/capture.original.json",
+          "sha256": "a420d75b7d21981c70a0260a780ac701b63cb0a9037e81e84bff17510ef7732a"
         },
         "program": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-omitted/program.original.json",
-          "sha256": "11fcf1df894e30b5f33a2ae9eef14baaf6093174a13642c70a4be11da8758fe0"
+          "artifact": "metadata-default-r52-stable-r1-2025.1-omitted/program.original.json",
+          "sha256": "07415051e69358ce7e807415351a45d9a6250dfeeae57496d6ac1186f127eb5b"
         },
         "requirements": {
-          "artifact": "metadata-default-r50-stable-r1-2025.1-omitted/requirements.original.json",
+          "artifact": "metadata-default-r52-stable-r1-2025.1-omitted/requirements.original.json",
           "sha256": "704add71c8d62d5ad3411c3ea7d1c3ad351cc24515e5c1e65c48d4c763fe6a2b"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "created-topic-r50-stable-r1-2021.1.bindings.json",
-        "sha256": "1200e18192abf53c0ae5a40db83ca726eaa0f252c6fc9e8bffee2b0bb40c983a"
+        "artifact": "created-topic-r52-stable-r1-2021.1.bindings.json",
+        "sha256": "cf0c3bc99b418c283b1108c1dc54518c51f5dfd970ac7673194e66d6fec6ea7d"
       },
-      "id": "created-topic-r50-stable-r1-2021.1",
+      "id": "created-topic-r52-stable-r1-2021.1",
       "origin": {
         "bindings": {
-          "artifact": "created-topic-r50-stable-r1-2021.1/bindings.original.json",
-          "sha256": "0149bc7793fa20081e067e8f3d4bf7e4c2dd0432349e2cd21fa9ff67ab76d806"
+          "artifact": "created-topic-r52-stable-r1-2021.1/bindings.original.json",
+          "sha256": "071f838b2bb9878025c0094528403e6043a1775b8d60d0b0e37e6c4277fcdd7a"
         },
         "capture": {
-          "artifact": "created-topic-r50-stable-r1-2021.1/capture.original.json",
+          "artifact": "created-topic-r52-stable-r1-2021.1/capture.original.json",
           "sha256": "07c17e6e60e0d84d84d6c1d55c62a858cfa0eae598d4d8b1bb9d3cc6aa859673"
         },
         "program": {
-          "artifact": "created-topic-r50-stable-r1-2021.1/program.original.json",
-          "sha256": "5771ece5af0f8e3bbeea9f20a76d7e44867b026a1d236ac9f195ed2142fc9ac1"
+          "artifact": "created-topic-r52-stable-r1-2021.1/program.original.json",
+          "sha256": "af375d4b56f586d538b72a06599e326a75c0973529f6abff6cbe1ae1997b90a7"
         },
         "requirements": {
-          "artifact": "created-topic-r50-stable-r1-2021.1/requirements.original.json",
+          "artifact": "created-topic-r52-stable-r1-2021.1/requirements.original.json",
           "sha256": "3da13ca6db4a06a411d117aafdf53a11dee6f63861e8a152205ff4867de1ccd5"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "created-topic-r50-stable-r1-2022.1.bindings.json",
-        "sha256": "69115ed5d2401d256a3a9c35a0dda9c06e85db9a08d70445ef2ce4d76afe1b7f"
+        "artifact": "created-topic-r52-stable-r1-2022.1.bindings.json",
+        "sha256": "8b9c2d6b94d47c71fea7ecfbd77c159e4a331fee4b8c2734ce009af9b1b7aad2"
       },
-      "id": "created-topic-r50-stable-r1-2022.1",
+      "id": "created-topic-r52-stable-r1-2022.1",
       "origin": {
         "bindings": {
-          "artifact": "created-topic-r50-stable-r1-2022.1/bindings.original.json",
-          "sha256": "f1744b44e8d236a4a09e8a58a60716a73e3a00a2072581b1cb69ef95025da82c"
+          "artifact": "created-topic-r52-stable-r1-2022.1/bindings.original.json",
+          "sha256": "8202cabcd8e95a2c87a2bf58d126a0e59167fe173095f5f02b279e7e6add3b97"
         },
         "capture": {
-          "artifact": "created-topic-r50-stable-r1-2022.1/capture.original.json",
+          "artifact": "created-topic-r52-stable-r1-2022.1/capture.original.json",
           "sha256": "a9df64f1ae0070ba68b319cf540c0829e312258e46142862ec304ee3f864daf2"
         },
         "program": {
-          "artifact": "created-topic-r50-stable-r1-2022.1/program.original.json",
-          "sha256": "2067ff131d2275791ad6186f289a48902a770ac7b3380985c4da802070e8ebfe"
+          "artifact": "created-topic-r52-stable-r1-2022.1/program.original.json",
+          "sha256": "bbf2776f6b3572b8f8ae649b40d15302149b47125d70ad2ebb2d9e6103e0e3d0"
         },
         "requirements": {
-          "artifact": "created-topic-r50-stable-r1-2022.1/requirements.original.json",
+          "artifact": "created-topic-r52-stable-r1-2022.1/requirements.original.json",
           "sha256": "82ff5ca1f6b0d6f358eaefae86f78caf2c29e4bc2d4b9db6d7f9cf2fb81d09cf"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "created-topic-r50-stable-r1-2023.1.bindings.json",
-        "sha256": "76844e3023b36c6fb29360bd95917d6c0b0d8e1c06d5523cefb91345af5302ea"
+        "artifact": "created-topic-r52-stable-r1-2023.1.bindings.json",
+        "sha256": "e42237f9582c07047ed28e297d1a7475dabd22f2d6bae77b632a60812f2ef941"
       },
-      "id": "created-topic-r50-stable-r1-2023.1",
+      "id": "created-topic-r52-stable-r1-2023.1",
       "origin": {
         "bindings": {
-          "artifact": "created-topic-r50-stable-r1-2023.1/bindings.original.json",
-          "sha256": "a5ea06beb373274a984c37c5e55214269a067c6c2998378e1917bffc19a0f0bc"
+          "artifact": "created-topic-r52-stable-r1-2023.1/bindings.original.json",
+          "sha256": "e419a731b2e4e560352c33905effb16fdb0d5567c2461641a19b3eea374f121b"
         },
         "capture": {
-          "artifact": "created-topic-r50-stable-r1-2023.1/capture.original.json",
+          "artifact": "created-topic-r52-stable-r1-2023.1/capture.original.json",
           "sha256": "9e936832becc857f4418dcb3b853f503c13371f9bf3d85268967f23ff31a4725"
         },
         "program": {
-          "artifact": "created-topic-r50-stable-r1-2023.1/program.original.json",
-          "sha256": "582c4131084a7723edff13b3b69aa4d27a48e0c404c9a8699552b06fc101cd97"
+          "artifact": "created-topic-r52-stable-r1-2023.1/program.original.json",
+          "sha256": "6d535898dc26cf0f78927b141e3ebc58d28bb450387d675e0ca414ced6642e78"
         },
         "requirements": {
-          "artifact": "created-topic-r50-stable-r1-2023.1/requirements.original.json",
+          "artifact": "created-topic-r52-stable-r1-2023.1/requirements.original.json",
           "sha256": "7e8bc641463629964df855c2575554390b6cec1ad38dbead4d99f70df7ee235b"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "created-topic-r50-stable-r1-2024.1.bindings.json",
-        "sha256": "76833b45112f432345b349111e055ad59c5abbe2898d6f3c7f6d1793e513341e"
+        "artifact": "created-topic-r52-stable-r1-2024.1.bindings.json",
+        "sha256": "1593c4216b79b9ab0d110364ae1c4256b5102e293ae1101c92236845ad289cef"
       },
-      "id": "created-topic-r50-stable-r1-2024.1",
+      "id": "created-topic-r52-stable-r1-2024.1",
       "origin": {
         "bindings": {
-          "artifact": "created-topic-r50-stable-r1-2024.1/bindings.original.json",
-          "sha256": "d2a672cf68f91158cad962b2a93be36e9cb18126b1cf8fda991e317a757e2aef"
+          "artifact": "created-topic-r52-stable-r1-2024.1/bindings.original.json",
+          "sha256": "9cf0d1d691554fa0f1834f6c23442d7a8a1d669d4b573d9bb7655e7b18e3d62a"
         },
         "capture": {
-          "artifact": "created-topic-r50-stable-r1-2024.1/capture.original.json",
+          "artifact": "created-topic-r52-stable-r1-2024.1/capture.original.json",
           "sha256": "c194dbd2c316291e302d9e85b81ceacf5e0cf68f0d1b8076746ac724dc3676b4"
         },
         "program": {
-          "artifact": "created-topic-r50-stable-r1-2024.1/program.original.json",
-          "sha256": "1e59bed8405133c310db79b132fdf670ee9ecfecb011c0aad6bfa61d1bc5243c"
+          "artifact": "created-topic-r52-stable-r1-2024.1/program.original.json",
+          "sha256": "451aa264a44810750f6cd6513802f2c7b539369fe9ebffc5227f9e0e93202995"
         },
         "requirements": {
-          "artifact": "created-topic-r50-stable-r1-2024.1/requirements.original.json",
+          "artifact": "created-topic-r52-stable-r1-2024.1/requirements.original.json",
           "sha256": "fc877941db653f601f4239ccee1ff4b831836f9aae89fe731b762f7a4348ed38"
         }
       }
     },
     {
       "bindings": {
-        "artifact": "created-topic-r50-stable-r1-2025.1.bindings.json",
-        "sha256": "4e0b2fae95b9678f31815562832f1e30e13d81d98d4629f0323eb932623a770f"
+        "artifact": "created-topic-r52-stable-r1-2025.1.bindings.json",
+        "sha256": "00ff9111d8eeae5b4737a818b3036126567215691e95188306fc727778219398"
       },
-      "id": "created-topic-r50-stable-r1-2025.1",
+      "id": "created-topic-r52-stable-r1-2025.1",
       "origin": {
         "bindings": {
-          "artifact": "created-topic-r50-stable-r1-2025.1/bindings.original.json",
-          "sha256": "b5ffd276310563abadda3c7301c19428b43ed537063c7022a113c5b99658094e"
+          "artifact": "created-topic-r52-stable-r1-2025.1/bindings.original.json",
+          "sha256": "42a2ae87b3d4dfd9bfffca658b3c29deadb6fd45e9d768336d64bd4b92b9620d"
         },
         "capture": {
-          "artifact": "created-topic-r50-stable-r1-2025.1/capture.original.json",
+          "artifact": "created-topic-r52-stable-r1-2025.1/capture.original.json",
           "sha256": "9afa815001f279a1d17b501113eac71c5d8954fab863cb88b31fa078963390a5"
         },
         "program": {
-          "artifact": "created-topic-r50-stable-r1-2025.1/program.original.json",
-          "sha256": "e8254968f1e6d161966c85f96879faaf17a834c57a08c73ecefbdb0a0fafcc97"
+          "artifact": "created-topic-r52-stable-r1-2025.1/program.original.json",
+          "sha256": "999601687a877ca052284471a4712a1eb5794c88e790e1600f4b8f4e4ecb0ffb"
         },
         "requirements": {
-          "artifact": "created-topic-r50-stable-r1-2025.1/requirements.original.json",
+          "artifact": "created-topic-r52-stable-r1-2025.1/requirements.original.json",
           "sha256": "ef897fa568b9204c9415669fc3995f1e402031fd45163277131e3eec1a638ad5"
         }
       }
+    }
+  ],
+  "metadata_attachments": [
+    {
+      "artifact": "r51-replay-r1/Color/attachment-0.json",
+      "sha256": "7052902b4f327fc2626090fa8f9b3a4197a3d49667198acdc00e78cf83d643da"
+    },
+    {
+      "artifact": "r51-replay-r1/Color/attachment-1.json",
+      "sha256": "449840c8ef3ff6077c7021f06eca6e71cd93b2481d1518865d9828eeaf52f894"
+    },
+    {
+      "artifact": "r51-replay-r1/Color/attachment-2.json",
+      "sha256": "6a90ac75ac8a8357d7deefc6779f543ab621995b99cbfc5217ab580faa117e89"
+    },
+    {
+      "artifact": "r51-replay-r1/Color/attachment-3.json",
+      "sha256": "15f65064415238066ac58fd128c0ffe2c1b3a4b8ef57ff7ab06cce2ce68de62c"
+    },
+    {
+      "artifact": "r51-replay-r1/Color/attachment-4.json",
+      "sha256": "f9d9bb0a57f13d77da03457f05c455aabee05adbac9964357d6f9ccd5018d40b"
+    },
+    {
+      "artifact": "r51-replay-r1/ControlInput/attachment-0.json",
+      "sha256": "b5bfdaed90aa4dcee9f73270f3d0cec15c51a9631bf010583bfebe6f5e7e1354"
+    },
+    {
+      "artifact": "r51-replay-r1/ControlInput/attachment-1.json",
+      "sha256": "d99d3de40987903876d4b0619c5c28034dde744ffa42e570c2541a1a2a152201"
+    },
+    {
+      "artifact": "r51-replay-r1/OverrideColor/attachment-0.json",
+      "sha256": "a3af3f8245960f5a51b73606362efdc40e6330a1fd253706d1f9a58d9fa7dfd1"
+    },
+    {
+      "artifact": "r51-replay-r1/OverrideColor/attachment-1.json",
+      "sha256": "87e50773c8ac31398d97c795f53c25c521be5f1c480efcbc2ff1581ad41cc4c5"
     }
   ]
 }

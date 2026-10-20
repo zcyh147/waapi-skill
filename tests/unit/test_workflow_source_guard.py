@@ -4257,7 +4257,7 @@ def test_soundcaster_dump_observation_uses_gateway_and_actual_category_writer(tm
     assert len(record['transactions']) == 1 and record['transactions'][0]['state'] == 'result_schema_checked'
 
 
-def _stationary_tone_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
+def _stationary_tone_runtime(tmp_path, workflow, *, fault=None, version='2025.1', remaining_shapes=False, anonymous_count=False):
     import math
     import struct
     from tests.unit.test_host_ui_debug_business_adapter import _ToneFileClient, _env
@@ -4268,19 +4268,31 @@ def _stationary_tone_runtime(tmp_path, workflow, *, fault=None, version='2025.1'
         if uri == 'ak.wwise.debug.generateToneWAV':
             writes.append(dict(args))
             assert set(args) == {'path', 'waveform', 'frequency', 'channelConfig', 'bitDepth',
-                'sampleRate', 'attackTime', 'sustainTime', 'releaseTime', 'sustainLevel'}, args
-            assert (args['waveform'], args['frequency'], args['channelConfig'], args['sampleRate'],
-                args['attackTime'], args['sustainTime'], args['releaseTime']) == ('sine', 440, '1.0', 48000, 0, 0.25, 0)
+                'sampleRate', 'attackTime', 'sustainTime', 'releaseTime', 'sustainLevel'} | ({'setAnonymous'} if anonymous_count else set()), args
+            if not remaining_shapes and not anonymous_count:
+                assert (args['waveform'], args['frequency'], args['channelConfig'], args['sampleRate'],
+                    args['attackTime'], args['sustainTime'], args['releaseTime']) == ('sine', 440, '1.0', 48000, 0, 0.25, 0)
             if fault == 'native-error':
                 raise RuntimeError('fixture native generation outcome unknown')
             floating = args['bitDepth'] == 'float32'
             # Synthetic boundary bytes are not native evidence or a tolerance oracle.
             gain = {0: 1.0, -6: 0.5011872336272722}[args['sustainLevel']]
-            samples = [gain * math.sin(2 * math.pi * 440 * i / 48000) for i in range(12000)]
+            frames = round((args['attackTime'] + args['sustainTime'] + args['releaseTime']) * 48000)
+            # Deliberately remains stationary sine for every requested shape:
+            # this collector must never certify unimplemented waveform/envelope effects.
+            samples = [gain * math.sin(2 * math.pi * 440 * i / 48000) for i in range(frames)]
+            channels = (35 if fault == 'wrong-anonymous-count' else 36) if anonymous_count else 1
+            if anonymous_count:
+                attack, sustain_end = round(args['attackTime'] * 48000), round((args['attackTime'] + args['sustainTime']) * 48000)
+                samples = [sample * (i / attack if i < attack else (frames - i) / (frames - sustain_end) if i >= sustain_end else 1)
+                    for i, sample in enumerate(samples) for _ in range(channels)]
             audio = b''.join(struct.pack('<f' if floating else '<h', value if floating else int(value * 32767)) for value in samples)
             fmt = struct.pack('<HHIIHH', 3 if floating else 1, 1, 48000, 192000 if floating else 96000,
                 4 if floating else 2, 32 if floating else 16)
-            raw = b'RIFF' + struct.pack('<I', 36 + len(audio)) + b'WAVEfmt ' + struct.pack('<I', 16) + fmt + b'data' + struct.pack('<I', len(audio)) + audio
+            if anonymous_count:
+                fmt = struct.pack('<HHIIHHHHI', 65534, channels, 48000, 48000 * channels * 4, channels * 4, 32, 22, 32, 0)
+                fmt += bytes.fromhex('0300000000001000800000aa00389b71')
+            raw = b'RIFF' + struct.pack('<I', 20 + len(fmt) + len(audio)) + b'WAVEfmt ' + struct.pack('<I', len(fmt)) + fmt + b'data' + struct.pack('<I', len(audio)) + audio
             if fault == 'unrecognized-file': raw = b'fixture native writer bytes requiring investigation'
             client.artifact_bytes = raw
             if fault == 'missing-file': client.write_output = False
@@ -4308,6 +4320,159 @@ def _stationary_tone_runtime(tmp_path, workflow, *, fault=None, version='2025.1'
             env=env, client_factory=lambda _: client)
     runtime.raw_gateway = raw
     return runtime, commands, writes, native_files
+
+
+def test_anonymous_count_tone_diagnostic_owns_one_36_channel_transaction_and_keeps_characterization_boundary(tmp_path, workflow):
+    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow, anonymous_count=True)
+    category = workflow._collect_tone_anonymous_count_characterization(runtime)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'blocked' and category['business_effect_verified'] is False
+    assert receipt['collection_complete'] is True and len(receipt['phases']) == 1
+    assert len(commands) == 12 and receipt['limits']['calls'] == 16 and receipt['limits']['wav_files'] == 1
+    assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
+    expected = dict(writes[0]); expected.pop('path')
+    assert expected == {'waveform': 'sine', 'frequency': 440, 'channelConfig': 'Ambisonics 5th order',
+        'setAnonymous': True, 'bitDepth': 'float32', 'sampleRate': 48000, 'attackTime': .005,
+        'sustainTime': .01, 'releaseTime': .0075, 'sustainLevel': -6}
+    phase = receipt['phases'][0]
+    assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
+    assert phase['signal_verified'] is False and phase['verification']['state'] == 'verified'
+    assert phase['verification']['verification_strength'] == 'tone_wav_artifact'
+    shown = json.loads(Path(phase['transaction']['path']).read_text())
+    verification = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    wav = verification['readbacks'][0]['wav']
+    assert (wav['channels'], wav['speaker_mask'], wav['frames']) == (36, 0, 1080)
+    assert all(len(segment['channels']) == 36 for segment in wav['sine_envelope']['segments'])
+    assert len(receipt['lifecycle_final_reference']['transaction_ids']) == 1
+    assert receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+
+
+@pytest.mark.parametrize('fault', ['native-error', 'wrong-anonymous-count'])
+def test_anonymous_count_tone_diagnostic_preserves_unknown_or_wrong_effect_and_never_retries(tmp_path, workflow, fault):
+    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow,
+        anonymous_count=True, fault=fault)
+    if fault == 'native-error':
+        with pytest.raises(Exception):
+            workflow._collect_tone_anonymous_count_characterization(runtime)
+    else:
+        category = workflow._collect_tone_anonymous_count_characterization(runtime)
+        assert category['status'] == 'blocked'
+    receipt = json.loads((runtime.state_dir / 'tone-anonymous-count-characterization.json').read_text())
+    assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
+    assert receipt['business_effect_verified'] is False
+    phase = receipt['phases'][0]
+    shown = json.loads(Path(phase['transaction']['path']).read_text())
+    if fault == 'native-error':
+        assert receipt['collection_complete'] is False and shown['state'] == 'indeterminate'
+        assert runtime.category_results[-1]['status'] == 'FAIL'
+        assert not any(argv[0] == 'verify' for argv in commands)
+    else:
+        assert receipt['collection_complete'] is True and shown['state'] == 'verification_failed'
+        assert phase['verification']['business_state_verified'] is False
+        assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
+
+
+def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certifying_wrong_signals(tmp_path, workflow, monkeypatch):
+    import hashlib
+    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow, remaining_shapes=True)
+    category = workflow._collect_tone_waveform_envelope_characterization(runtime)
+    receipt_path = Path(category['observation_path'])
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt['collection_complete'] is True and receipt['business_effect_verified'] is False
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True
+    assert category['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert [(row['waveform'], row['attackTime'], row['sustainTime'], row['releaseTime']) for row in writes] == [
+        ('triangle', 0, .25, 0), ('square', 0, .25, 0), ('whiteNoise', 0, .25, 0),
+        ('sine', .05, .10, 0), ('sine', 0, .10, .075), ('sine', .05, .10, .075)]
+    assert all((row['frequency'], row['channelConfig'], row['bitDepth'], row['sampleRate'], row['sustainLevel'])
+        == (440, '1.0', 'float32', 48000, -6) for row in writes)
+    assert len(commands) == 57 and receipt['limits']['calls'] == 64 and receipt['limits']['wav_files'] == 6
+    assert len(set(receipt['lifecycle_final_reference']['transaction_ids'])) == 6
+    assert sum(argv[0] == 'execute' for argv in commands) == 6
+    assert receipt['native_catalog']['build'] == '2025.1.7.9143'
+    assert receipt['native_schema_sha256'] == 'ad0c920e1ac9ad1f3278aa2056b0fdb8ab114b7dc88992160e96ad0bc91faa9c'
+    assert receipt['native_evidence']
+    assert receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+    for phase in receipt['phases']:
+        assert phase['signal_verified'] is False
+        assert phase['verification']['business_state_verified'] is False
+        expected_state = 'verification_failed' if phase['business_values']['waveform'] == 'sine' else 'result_schema_checked'
+        assert phase['verification']['state'] == expected_state
+        if expected_state == 'result_schema_checked':
+            assert phase['verification']['verification_strength'] == 'partial_tone_artifact'
+        assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
+        shown = json.loads(Path(phase['transaction']['path']).read_text())
+        assert shown['artifact']['request']['arguments']['args'] == next(row for row in writes if row['path'] == phase['output_path'])
+        assert shown['state'] == expected_state
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', runtime.env['WWISE_CATEGORY_EVIDENCE_PATH'])
+    node = 'fixture::remaining_tone_characterization'
+    append_category_evidence(repo_root=tmp_path, candidate=runtime.candidate, version=runtime.version,
+        host={'fixture_only': True}, categories=runtime.category_results,
+        source={'fixture_only': True, 'hash_before': 'same', 'hash_after': 'same'},
+        residual_state={'sandbox': 'deleted', 'process_cleanup': 'cleaned', 'residual_processes': []},
+        invocation={'selected_test_nodeids': [node], 'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}],
+            'started_at_unix_ns': 1, 'finished_at_unix_ns': 2, 'phase': 'final', 'outcome': 'PASS'},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    final = json.loads(Path(runtime.env['WWISE_CATEGORY_EVIDENCE_PATH']).read_text())
+    assert final['categories'][0]['status'] == 'blocked'
+    assert final['categories'][0]['business_effect_verified'] is False
+    assert final['categories'][0]['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert final['source']['hash_before'] == final['source']['hash_after']
+    assert final['residual_state']['process_cleanup'] == 'cleaned'
+    assert final['residual_state']['residual_processes'] == []
+    assert len(final['transactions']) == 6
+    assert sorted(row['state'] for row in final['transactions']) == ['result_schema_checked'] * 3 + ['verification_failed'] * 3
+    calls_before = len(commands)
+    with pytest.raises(AssertionError, match='overwrite'):
+        workflow._collect_tone_waveform_envelope_characterization(runtime)
+    assert len(commands) == calls_before
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1'])
+def test_remaining_tone_diagnostic_requires_separate_version_source_review_before_calls(tmp_path, workflow, version):
+    runtime, commands, writes, _ = _stationary_tone_runtime(tmp_path, workflow,
+        version=version, remaining_shapes=True)
+    with pytest.raises(AssertionError, match='source-reviewed successor'):
+        workflow._collect_tone_waveform_envelope_characterization(runtime)
+    assert commands == [] and writes == [] and runtime.category_results == []
+
+
+@pytest.mark.parametrize('fault', ['reply-identity', 'native-error', 'unrecognized-file'])
+def test_remaining_tone_diagnostic_keeps_failed_observations_and_never_retries_or_grants_effect_credit(tmp_path, workflow, fault):
+    runtime, commands, writes, native_files = _stationary_tone_runtime(tmp_path, workflow,
+        fault=fault, remaining_shapes=True)
+    if fault == 'reply-identity':
+        original = runtime.raw_gateway
+        def mismatched(argv):
+            code, payload = original(argv)
+            if argv[0] == 'status':
+                payload['endpoint'] = {'host': 'wrong-host', 'port': 31337, 'url': 'ws://wrong-host:31337/waapi'}
+            return code, payload
+        runtime.raw_gateway = mismatched
+    if fault == 'unrecognized-file':
+        category = workflow._collect_tone_waveform_envelope_characterization(runtime)
+        assert category['status'] == 'blocked'
+    else:
+        with pytest.raises(Exception):
+            workflow._collect_tone_waveform_envelope_characterization(runtime)
+        assert runtime.category_results[-1]['status'] == 'FAIL'
+    receipt = json.loads((runtime.state_dir / 'tone-waveform-envelope-characterization.json').read_text())
+    assert receipt['business_effect_verified'] is False
+    assert receipt['collection_complete'] is (fault == 'unrecognized-file')
+    assert len(writes) == {'reply-identity': 0, 'native-error': 1, 'unrecognized-file': 6}[fault]
+    assert sum(argv[0] == 'execute' for argv in commands) == len(writes)
+    assert all(phase['signal_verified'] is False for phase in receipt['phases'])
+    if fault == 'unrecognized-file':
+        assert all(phase['verification']['state'] == 'verification_failed' for phase in receipt['phases'])
+        assert all(Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']] for phase in receipt['phases'])
+    else:
+        assert receipt['failure'] and receipt['native_evidence']
+        assert not any(argv[0] == 'verify' for argv in commands)
+        if writes:
+            phase = receipt['phases'][0]
+            shown = json.loads(Path(phase['transaction']['path']).read_text())
+            assert shown['state'] == 'indeterminate'
 
 
 def test_stationary_tone_diagnostic_archives_four_exact_artifacts_and_separate_public_transactions(tmp_path, workflow, monkeypatch):

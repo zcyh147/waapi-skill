@@ -171,7 +171,19 @@ def host_ui_debug_business_contract_data(
                 "marker_evidence": "bounded cue records and label byte digests; complete parsed-file hash; exact label text remains in the immutable request",
                 **({"anonymous_header_checks": "recognized extensible PCM16/float32, exact requested count and zero/direct-out speaker mask; anonymous overrides layout type but preserves count"}
                    if version in {"2024.1", "2025.1"} else {}),
-                "partial_postconditions": ["active waveform/frequency/envelope", "fractional rate/frame rounding",
+                **({"anonymous_layout_override": "explicit anonymous_channels=true replaces the layout type while retaining its channel count, including count selected by Ambisonics order; genuine nonanonymous Ambisonics still requires silence"}
+                   if version in {"2024.1", "2025.1"} else {}),
+                "sine_envelope_checks": {
+                    "policy": "sine-envelope-numerical-conformance-v1",
+                    "reference": "fixed requested frequency/gain; integral-frame linear-amplitude attack n/N, sustain 1, release 1-n/N",
+                    "phase": "independent unparameterized phase per segment",
+                    "phase_relationship_checked": False,
+                    "gain_tolerance_db": 0.02, "shape_tolerance_relative": 0.002,
+                    "representation_units": 2,
+                    "not_claimed": "phase continuity/reset, bit-exact native algorithm or unique analog origin",
+                    "inconclusive": "rank-deficient, aliased or quantization-indistinguishable segments remain partial",
+                },
+                "partial_postconditions": ["triangle/square/noise waveform and envelope", "fractional rate/frame rounding",
                     "fractional marker positions, Unicode label encoding or nonzero cue chunk/block offsets",
                     "anonymous legacy headers; nonanonymous Ambisonic or unlabelled multichannel representation"],
                 "limits_are_gateway_resources_not_native_absence": True,

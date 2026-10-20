@@ -25727,7 +25727,8 @@ def transaction_verify_terminal_budget(request: Any) -> int:
         if (not path.casefold().endswith('.wav')
                 or host_path_comparison_key(str(parse_absolute_host_path(path).pure_path.parent)) != host_path_comparison_key(arguments['io_root'])
                 or mask is not None and (isinstance(mask, bool) or not isinstance(mask, int) or not 0 <= mask < 1 << channels)
-                or layout.startswith('Ambisonics ') and native.get('waveform', 'silence') != 'silence'):
+                or (layout.startswith('Ambisonics ') and native.get('waveform', 'silence') != 'silence'
+                    and native.get('setAnonymous') is not True)):
             return ordinary
         if (len(canonical_json_bytes(native)) > MAX_HOST_PLAN_BYTES
                 or not isinstance(path, str) or len(path.encode('utf-8')) > MAX_PATH_BYTES

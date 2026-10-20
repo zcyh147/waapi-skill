@@ -297,11 +297,88 @@ def validate_authoring_batch_finalization(run, base):
         raise ValueError(f'Authoring batch finalization is incomplete: {exc}') from exc
 
 
+def read_r51_metadata_run(descriptor, base):
+    """One sealed read-only protocol; its blocked copy category stays blocked."""
+    import json
+    fields = {'contract', 'category', 'observation', 'status', 'identity', 'reply', 'native', 'call_index'}
+    if set(descriptor) != fields or type(descriptor['call_index']) is not int:
+        raise ValueError('closed R51 metadata archive descriptor required')
+    for name in ('observation', 'status', 'identity', 'reply', 'native'):
+        if set(descriptor[name]) != {'artifact', 'sha256'}:
+            raise ValueError('closed R51 original artifact descriptor required')
+    category = descriptor['category']
+    node = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::test_legacy_original_source_owned_read_console_diagnostic'
+    if set(category) != {'artifact', 'sha256', 'record_index', 'nodeid'} or category['nodeid'] != node:
+        raise ValueError('exact R51 original read node required')
+    context = read_category_run(category, base)
+    if (context['candidate'] != '90c1089b77e9a9d5695224d312bff9a3ab8b5c18'
+            or (context['host'], context['build']) != ('wwise-console', '2021.1.14.8108')
+            or context['record']['transactions'] != []):
+        raise ValueError('original R51 host/build/source mismatch')
+    original = next(row for row in context['record']['categories'] if row['category'] == 'legacy-original-source-owned-read')
+    if original.get('status') != 'blocked' or original.get('diagnostic_only') is not True or original.get('business_effect_verified') is not False:
+        raise ValueError('original blocked business status must remain blocked')
+    if descriptor['observation']['sha256'] != original['observation_sha256']:
+        raise ValueError('original R51 observation link changed')
+    body = read_sealed_artifact(descriptor['observation'], base)
+    if (body['candidate'] != context['candidate'] or body['read_only'] is not True
+            or body['diagnostic_only'] is not True or body['collection_complete'] is not True
+            or body['business_effect_verified'] is not False or body['transaction_ids'] != []):
+        raise ValueError('R51 metadata read protocol incomplete or promoted to business proof')
+    status_call, call = body['calls'][0], body['calls'][descriptor['call_index']]
+    for name, link in (('status', status_call['reply']), ('identity', body['calls'][3]['reply']), ('reply', call['reply'])):
+        if descriptor[name]['sha256'] != link['sha256']:
+            raise ValueError('original R51 public reply link changed')
+    status = read_sealed_artifact(descriptor['status'], base)
+    payload = read_sealed_artifact(descriptor['reply'], base)
+    result = payload['agent_result']
+    field = result['metadata']['name']
+    object_id = '{CE99046D-D354-422D-A7BB-F1305FF00B2F}'
+    if (status_call['argv'] != ['status'] or status_call['exit_code'] != 0 or status.get('ok') is not True
+            or native_host_context(status['wwise'], 'isCommandLine') != {k: context[k] for k in ('version','build','host')}
+            or call['exit_code'] != 0 or payload.get('ok') is not True or payload.get('is_command_line') is not True
+            or payload.get('detected_version') != context['version'] or result.get('complete') is not True
+            or field not in ('Color', 'ControlInput', 'OverrideColor')
+            or result['scope'] != {'kind': 'object', 'object': object_id}
+            or call['argv'] != ['metadata','detail','--exact-id',object_id,'--selection',result['selection']]):
+        raise ValueError('exact R51 original public metadata input/result mismatch')
+    identity_reply = read_sealed_artifact(descriptor['identity'], base)
+    for reply in (status,identity_reply,payload):
+        if (reply['endpoint'] != status['endpoint'] or reply['session_context']['endpoint'] != status['endpoint']
+                or reply['detected_version'] != context['version'] or reply['is_command_line'] is not True
+                or reply['session_context']['available'] is not True
+                or reply['session_context']['adapter_version'] != context['version']):
+            raise ValueError('Original R51 public endpoint/host/version identity differs')
+    identity, = identity_reply['agent_result']
+    if (body['calls'][3]['exit_code'] != 0 or body['calls'][3]['argv'][:3] != ['query-object','--exact-id',object_id]
+            or identity_reply.get('ok') is not True or identity['id'] != object_id
+            or identity['class_id'] != 1441808 or identity['type'] != 'RTPC'
+            or body['owned_observation']['rtpc_id'] != object_id):
+        raise ValueError('Original R51 exact object/class metadata scope changed')
+    uri = 'ak.wwise.core.object.getPropertyInfo'
+    dispatch, = [row for row in payload['calls'] if row['api'] == uri]
+    native_link, = [row for row in body['native_evidence'] if row['native_path'] == dispatch['evidence_path']]
+    if descriptor['native']['sha256'] != native_link['sha256']:
+        raise ValueError('original R51 native archive link changed')
+    native = read_sealed_artifact(descriptor['native'], base)
+    if (native['api'] != uri or native['version'] != context['version'] or native.get('ok') is not True
+            or native.get('dry_run') is not False or native['result']['name'] != field
+            or json.dumps(native['result'], sort_keys=True, allow_nan=False) != json.dumps(
+                {name: result['metadata'][name] for name in native['result']}, sort_keys=True, allow_nan=False)):
+        raise ValueError('original R51 exact native/public metadata mismatch')
+    return {**context, 'format': descriptor['contract'], 'business_category_status': original['status'],
+        'native_result': native['result'], 'native_sha256': descriptor['native']['sha256'],
+        'gateway': {'argv': call['argv'], 'exit_code': call['exit_code'], 'payload': payload},
+        'receipt_sha256': descriptor['reply']['sha256']}
+
+
 def read_metadata_run(descriptor, base):
     """Read sealed ScenarioLifecycle/v3 captures and their original public receipts."""
     import hashlib
     import json
     from pathlib import Path
+    if descriptor.get('contract') == 'waapi-skill.r51-metadata-read/v1':
+        return read_r51_metadata_run(descriptor, base)
     seal = read_sealed_artifact(descriptor['seal'], base)
     root = Path(descriptor['root'])
     if not root.is_absolute():
@@ -351,6 +428,101 @@ def read_metadata_run(descriptor, base):
     return dict(context, candidate=repository['commit'], relevant_sources=sources,
                 gateway={'argv': command['gateway_arguments'], 'exit_code': result['exit_code'], 'payload': payload},
                 receipt_sha256=files[prefix + '.stdout']['sha256'])
+
+
+def validate_r51_metadata_replay(record, branch, candidate, binding, context, base, root, scope_kind, reference_edges):
+    """Historical native facts and current program replay, never current native."""
+    import json
+    from tests.support import metadata_replay_branch_evidence as producer
+    prefix = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|'
+    definition = '/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue'
+    pointers = {'/resultSchema/properties/default/@presence/present', '/resultSchema/properties/default',
+        '/resultSchema/properties/default/$ref', definition, definition+'/anyOf/0', definition+'/anyOf/0/@nullable',
+        definition+'/anyOf/2', definition+'/anyOf/3', definition+'/anyOf/3/@boolean/false'}
+    if branch['id'] != prefix+branch['pointer'] or branch['pointer'] not in pointers:
+        raise ValueError('R51 attachment is limited to nine observed Console default leaves')
+    if record.get('evidence_kind') != 'historical_metadata_current_program_replay':
+        raise ValueError('Historical/native and current/program attribution required')
+    bridge = record['source_bridge']
+    if (set(bridge) != {'contract','attribution','historical_candidate','historical_sources','current_sources','changed_files'}
+            or bridge['contract'] != 'waapi-skill.r51-metadata-leaf-replay/v1'
+            or bridge['attribution'] != 'historical_native_current_program_not_current_native'
+            or bridge['historical_candidate'] != context['candidate']):
+        raise ValueError('Closed exact metadata replay bridge required')
+    before, after = bridge['historical_sources'], bridge['current_sources']
+    if before != producer.historical_sources() or after != producer.source_seals():
+        raise ValueError('Full original/current metadata source closure changed')
+    changes = producer.source_changes(before, after)
+    allowed = {'tests/maintenance/branch_audit_completion.py','tests/maintenance/branch_coverage_audit.py',
+        'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_replay_attachments.py',
+        'tests/support/metadata_replay_cases.json','tests/support/metadata_replay_branch_evidence.py',
+        'docs/branch-coverage-requirements.json'}
+    # Reviewed Tone-only delta at 7f3c360d701e24a0e33a9c8771109789cc7b4705.
+    # This does not participate in the exact RTPC metadata read. Retain both
+    # full closures and require all four exact old/new blobs together; a later
+    # edit or a partially combined runtime is not this reviewed source bridge.
+    reviewed_tone = {
+        'skills/waapi-skill/wwise_waapi/operation_tone.py': {
+            'before':'34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912',
+            'after':'73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
+        'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {
+            'before':'40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6',
+            'after':'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
+        'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py': {
+            'before':'55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177',
+            'after':'a392d1a2bc4665dd1ac64a83d88bb89561c2cd8570e3ebd7ab6355c5d62300ba'},
+        'skills/waapi-skill/scripts/gateway.py': {
+            'before':'1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca',
+            'after':'3d6bd7a0859008dfabc7bc210c661571911679999cf8d859d354d5c2912b6245'}}
+    if set(changes) & set(reviewed_tone):
+        if any(changes.get(name) != expected for name,expected in reviewed_tone.items()):
+            raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
+        allowed.update(reviewed_tone)
+    if bridge['changed_files'] != changes or not set(changes) <= allowed:
+        raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
+    replay = read_sealed_artifact(record['replay'], base)
+    if replay['relevant_sources'] != after or record['invocation'] != replay['invocation']:
+        raise ValueError('Current replay source/node receipt differs')
+    if scope_kind == 'product':
+        # Product replay must come from its actual clean committed source pin.
+        # Controlled fixtures remain explicitly controlled and cannot grant it.
+        if producer.git_source_seals(replay['git_candidate'], after) != after:
+            raise ValueError('Product replay does not match its original committed source')
+    field = producer.branch_case(branch)
+    inputs = binding.get('category_inputs', {}).get('live_metadata')
+    if (not isinstance(inputs, dict) or set(inputs) != {'historical','replay'}
+            or inputs != record['category_inputs'] or inputs['historical'] != context['gateway']['argv']
+            or inputs['replay'] != replay['gateway']['argv']
+            or context['native_result']['name'] != field
+            or record['replay']['nodeid'] != producer.NODE+'['+producer.CASES[field]+']'):
+        raise ValueError('Each metadata category input must match its own original receipt')
+    if (replay['native_call']['args'] != {'object':producer.OBJECT,'property':field}
+            or replay['native_call']['options'] != {} or replay['client_disconnected'] is not True
+            or replay['replayed_original_native_sha256'] != context['native_sha256']
+            or json.dumps(replay['native_call']['result'],sort_keys=True,allow_nan=False)
+                != json.dumps(context['native_result'],sort_keys=True,allow_nan=False)):
+        raise ValueError('Current replay changed the exact original class/field/native response')
+    public = replay['gateway']['payload']
+    if (public.get('is_command_line') is not True or public.get('detected_version') != context['version']
+            or public['agent_result']['scope'] != context['gateway']['payload']['agent_result']['scope']
+            or json.dumps({name:public['agent_result']['metadata'][name] for name in context['native_result']},
+                sort_keys=True,allow_nan=False) != json.dumps(context['native_result'],sort_keys=True,allow_nan=False)):
+        raise ValueError('Current public replay changed the original host/scope/metadata projection')
+    if (replay['discovery']['argv'] != ['metadata','list','--exact-id',producer.OBJECT,'--page-size','64']
+            or replay['discovery']['payload']['agent_result']['complete'] is not True
+            or inputs['replay'] != ['metadata','detail','--exact-id',producer.OBJECT,'--selection',
+                replay['gateway']['payload']['agent_result']['selection']]
+            or not any(row['name'] == field and row['selection'] == inputs['replay'][-1]
+                for row in replay['discovery']['payload']['agent_result']['fields'])):
+        raise ValueError('Current replay lost its exact public discovered field selection')
+    for receipt in (record, replay):
+        if not any(check['pointer'] == '/gateway/payload/agent_result' and 'equals' in check
+                for check in receipt['branch_assertions'][branch['id']]['checks']):
+            raise ValueError('Exact whole original/current public result proof missing')
+    result = evidence_result(record['replay'],branch,candidate,'program',scope_kind,base,
+        record['replay_bindings'][branch['id']],source_root=root,reference_edges=reference_edges)
+    if result != ('passed',None):
+        raise ValueError('Current public replay did not prove this exact leaf: '+str(result))
 
 
 def binding_semantics(binding):
@@ -788,6 +960,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         binding = binding or {}
         metadata_context = None
         metadata_pointer = None
+        metadata_replay = False
         if category == 'live_metadata':
             metadata_context = read_metadata_run(record['metadata_run'], base)
             record['gateway'] = metadata_context['gateway']
@@ -906,7 +1079,10 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             observed_hosts = set()
             if category == 'live_metadata':
                 contexts = [(metadata_context, {'sha256': metadata_context['receipt_sha256']})]
-                if record['gateway']['argv'] != binding.get('input', {}).get('gateway_argv'):
+                if metadata_context.get('format') == 'waapi-skill.r51-metadata-read/v1':
+                    validate_r51_metadata_replay(record,branch,candidate,binding,metadata_context,base,root,scope_kind,reference_edges or {})
+                    metadata_replay = True
+                elif record['gateway']['argv'] != binding.get('input', {}).get('gateway_argv'):
                     raise ValueError('metadata public input mismatch')
             else:
                 if record.get('evidence_kind') != 'native_execution' or not record.get('native_runs'):
@@ -924,7 +1100,8 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                 if context['version'] != expected_version or context['build'] != expected_build:
                     raise ValueError('native version/build mismatch')
                 observed_hosts.add(context['host'])
-                validate_native_source(context, item, branch, candidate, binding, base, root)
+                if not metadata_replay:
+                    validate_native_source(context, item, branch, candidate, binding, base, root)
             if observed_hosts != required_hosts:
                 raise ValueError('native host context evidence mismatch')
         if category == 'native_absence':

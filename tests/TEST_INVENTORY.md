@@ -5,6 +5,81 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R52 saved-copy, Tone and exact metadata attachments
+
+Runtime merge `191382e0` combines only accepted saved-copy `56a7c376`
+(including `90c1089b`), Tone `7f3c360d` (including `005afc69` and `70f3ff0c`),
+and metadata `5a5eeda4`, without conflicts. The shared destructive collector
+combines both accepted additions; all other component files retain exact
+accepted blobs. The Program roster adds `test_metadata_replay_attachments.py`
+and its canonical required-entry/count assertion: 267 manifest entries.
+
+Interface generate/check passed once in **18.174s / 17.963s**; generated
+artifacts stayed byte-identical. Clean source `d1d9dd64` then received one
+38-node capture: **38 passed in 7.86s** (wrapper 8.548s), comprising the existing
+five public Topic and 30 metadata nodes plus three public replays of preserved
+R51 metadata packets. HEAD/all 2,549 tracked files stayed unchanged. Full
+closures remain 348 Topic / 343 metadata / 347 current replay files; the bridge
+also retains all 343 historical sources. Source identity:
+`32f90e32adca4c9cca68b7e831a3f0bba2ef9d93d4f08ffa1d5d84c1e6de8c76`.
+
+Existing portable importers select 35 fresh entries with 140 byte-identical
+originals and locator-only projections. The whole replay tree is copied
+byte-identically, with nine additive sealed `live_metadata` attachments; original
+program receipts remain unchanged. All 630 earlier archive/projection files and
+non-replaced index entries remain exact. New storage is 25 Topic files /
+37,625,197 bytes, 150 metadata files / 5,384,023 bytes, and 33 replay files /
+11,439,167 bytes. No old archive or failed sandbox was deleted.
+
+Branch generate/check passed once in **40.398s / 39.084s**. Strict current
+accounting proves **559 Topic program passed / 559 native missing**, and
+**65 metadata program passed / 9 live_metadata passed / 56 missing**. The nine
+leaves are only original 2021.1.14.8108 Console RTPC reads: Color default 0
+(five), ControlInput default null (two), OverrideColor default false (two).
+Historical native execution and current injected public replay retain separate
+identities; no current-native, mutation or other-host/version proof follows.
+All 272,313 IDs/shapes/owners, 116 exclusions, requirements/native policy and
+79/91 source/index memberships stay exact. Only 624 selected rows'
+evidence/bindings change; complete=false, with 9 verified,
+616 implemented_unverified and 271,572 unresolved obligations.
+
+Generated `3973fb63` passed one focus: **9 passed in 12.11s** (wrapper 12.820s).
+The portable-originals test actually ran with `WAAPI_R51_METADATA_ORIGINAL_ROOT`
+absent and no skips, alongside exact Tone bridge acceptance/drift/partial-bridge
+controls, compact 36-channel and large-marker terminal delivery, fixed manifest,
+Topic selection and saved-copy protocol. HEAD/all 2,757 tracked files stayed
+unchanged; all owned groups ended empty. Strict portable evaluation already ran
+during branch generation/check; complete worker suites were not repeated.
+
+Separately accepted native evidence stays bound to its original candidates.
+Saved-copy `56a7c376` on 2021.1.14.8108 passed its one diagnostic node in
+**11.07s**: four separately previewed transactions (baseline Save, empty Sound,
+Source-only copy, final Save), 67 public calls and independent complete saved
+subtree/live identity/owner/ShortID comparison. Save phases remain
+`result_schema_checked`; create/copy phases are `verified`. The final collection
+stays diagnostic-only, `business_effect_verified=false`. One genuine Synth
+fixture exercises no ObjectRef remapping and proves no generic copy/history,
+constructor or points-getter contract. Earlier native failures remain unchanged.
+
+Tone `7f3c360d` on 2025.1.7.9143 passed its one diagnostic node in **9.39s**:
+one 36-channel anonymous fifth-order-count sine/float32 envelope transaction,
+12 public replies and one native Tone call. Its transaction is `verified`,
+`business_state_verified=true`, under the declared artifact policy: exact
+header/count/mask/frame facts and all 108 channel/segment observations, fixed
+frequency/gain/linear envelope, independent phase per segment. Its original
+collector category remains blocked/diagnostic, `business_effect_verified=false`,
+without coverage credit. Phase continuity, internal channel-config type, other
+waveforms, 2023/2024 native effects, other patches and Windows remain open.
+Root's independent integrity review remains in
+`.waapi-skill-state/full-coverage/r52-root-native-review.json`.
+
+Plans, process/source/output receipts and preservation/storage proofs are in
+`/tmp/waapi-r52-integration/`; captures are under
+`.waapi-skill-state/read-evidence-r52/`. This integration ran no native, Fresh,
+CLI Agent, install, full Program/Non-live, local fixed preflight, push or PR edit.
+Root owns publication and exact-head hosted CI; no ticket/family closure or
+main merge occurred.
+
 ## 2026-10-21 R50 exact created-Topic evidence and original-only diagnostic
 
 Runtime merge `8bcd215f` combines only accepted Topic `8390ce8b` (including

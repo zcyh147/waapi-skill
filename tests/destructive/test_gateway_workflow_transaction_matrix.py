@@ -2423,21 +2423,50 @@ def test_host_ui_debug_business_schema_read(
 
 def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
     """Retain four exact native observations; do not certify a signal algorithm."""
+    return _collect_tone_characterization(runtime)
+
+
+def _collect_tone_waveform_envelope_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Collect six missing signal observations; no guessed waveform/envelope oracle."""
+    assert runtime.version == '2025.1', 'This source-reviewed successor is limited to Console 2025.1'
+    return _collect_tone_characterization(runtime, remaining_shapes=True)
+
+
+def _collect_tone_anonymous_count_characterization(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe one source-backed anonymous override; native admission is unproven."""
+    assert runtime.version == '2025.1', 'This source-reviewed anonymous-count probe is limited to Console 2025.1'
+    return _collect_tone_characterization(runtime, anonymous_count=True)
+
+
+def _collect_tone_characterization(runtime: _WorkflowSandboxRuntime, *, remaining_shapes=False, anonymous_count=False) -> dict[str, Any]:
     from wwise_waapi.operation_soundbank import capture_file_proof
     from wwise_waapi.native_catalog import load_native_catalog
+    from wwise_waapi.canonical import canonical_sha256
     assert runtime.version in {'2023.1', '2024.1', '2025.1'}, 'Tone is absent from the pinned older routes'
     catalog = load_native_catalog(runtime.version, 'wwise-console')
     assert 'ak.wwise.debug.generateToneWAV' in catalog['functions']
     assert 'ak.wwise.debug.generateToneWAV' in catalog['schemas']
     catalog_identity = {'host': 'wwise-console', 'version': runtime.version,
         'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']}
-    output = runtime.state_dir / 'tone-stationary-characterization.json'
+    assert not (remaining_shapes and anonymous_count), 'Tone collections have distinct fixed case rosters'
+    label = 'tone-anonymous-count' if anonymous_count else 'tone-waveform-envelope' if remaining_shapes else 'tone-stationary'
+    layout = 'Ambisonics 5th order' if anonymous_count else '1.0'
+    cases = ([('anonymous-36-sine-envelope', 'sine', 'float32', -6, .005, .01, .0075)] if anonymous_count else [
+        ('triangle-stationary', 'triangle', 'float32', -6, 0, .25, 0),
+        ('square-stationary', 'square', 'float32', -6, 0, .25, 0),
+        ('white-noise-stationary', 'white_noise', 'float32', -6, 0, .25, 0),
+        ('sine-attack-only', 'sine', 'float32', -6, .05, .10, 0),
+        ('sine-release-only', 'sine', 'float32', -6, 0, .10, .075),
+        ('sine-attack-release', 'sine', 'float32', -6, .05, .10, .075),
+    ] if remaining_shapes else [(depth + '-' + str(abs(level)) + 'db', 'sine', depth, level, 0, .25, 0)
+        for depth, level in [('int16', 0), ('int16', -6), ('float32', 0), ('float32', -6)]])
+    output = runtime.state_dir / (label + '-characterization.json')
     assert not output.exists(), 'Never overwrite an original Tone characterization'
     runtime.state_dir.mkdir(parents=True, exist_ok=True)
-    artifacts = runtime.state_dir / 'tone-stationary-artifacts'; artifacts.mkdir(exist_ok=False)
+    artifacts = runtime.state_dir / (label + '-artifacts'); artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
     prior_native = set(native_root.glob('*.json'))
-    tone_root = runtime.sandbox.sandbox_root / 'tone-stationary-output'; tone_root.mkdir(exist_ok=False)
+    tone_root = runtime.sandbox.sandbox_root / (label + '-output'); tone_root.mkdir(exist_ok=False)
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
     config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
     lifecycle_path = runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH')
@@ -2445,13 +2474,15 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         lifecycle_path = runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH')
     lifecycle_path = Path(lifecycle_path).expanduser().resolve(strict=False) if lifecycle_path else (
         REPO_ROOT / EVIDENCE_ROOT / (current_evidence_platform() + '-category-evidence.jsonl'))
-    category = {'category': 'tone-stationary-characterization', 'status': 'FAIL',
+    category = {'category': label + '-characterization', 'status': 'FAIL',
         'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none; characterization only',
-        'verifier_strength': 'exact_native_file_bytes_and_public_receipts_only; signal_oracle_unimplemented',
+        'verifier_strength': ('characterization_only; exact_native_bytes_and_public_receipts; existing_sine_envelope_conformance_reported_separately'
+            if anonymous_count else 'exact_native_file_bytes_and_public_receipts_only; signal_oracle_unimplemented'),
         'observation_path': str(output), 'reason': 'collection incomplete'}
     runtime.category_results.append(category)
-    receipt: dict[str, Any] = {'contract': 'waapi-skill.tone-stationary-characterization/v1',
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.' + label + '-characterization/v1',
         'candidate': runtime.candidate, 'version': runtime.version, 'native_catalog': catalog_identity, 'calls': [], 'phases': [],
+        'native_schema_sha256': canonical_sha256(catalog['schemas']['ak.wwise.debug.generateToneWAV']),
         'native_evidence': [], 'collection_complete': False, 'business_effect_verified': False,
         'coverage_credit': 'none; characterization only', 'config_sha256': config_hash,
         'source_project': str(runtime.sandbox.source_project),
@@ -2459,9 +2490,9 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         'lifecycle_final_reference': {'path': str(lifecycle_path), 'contract': 'waapi-skill.host-category-evidence/v3',
             'phase': 'final', 'candidate': runtime.candidate, 'category': category['category'],
             'transaction_ids': [], 'cleanup_status': 'unresolved_until_final_row'},
-        'lifecycle_acceptance': 'Requires the matching final category row with all four transaction IDs, source before/after hash/mtime/tree and residual process cleanup; prepared/PENDING is not cleanup success.',
-        'limits': {'calls': 48, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 8 * 1024 * 1024,
-            'wav_files': 4, 'file_bytes': 8 * 1024 * 1024, 'native_files': 512,
+        'lifecycle_acceptance': 'Requires the matching final category row with every collected transaction ID, source before/after hash/mtime/tree and residual process cleanup; prepared/PENDING is not cleanup success.',
+        'limits': {'calls': 16 if anonymous_count else 64 if remaining_shapes else 48, 'reply_bytes': 256 * 1024, 'total_reply_bytes': 8 * 1024 * 1024,
+            'wav_files': len(cases), 'file_bytes': 8 * 1024 * 1024, 'native_files': 512,
             'native_bytes': 32 * 1024 * 1024, 'archive_bytes': 72 * 1024 * 1024,
             'receipt_bytes': 256 * 1024}, 'archive_bytes': 0, 'total_reply_bytes': 0}
     attempted: set[str] = set()
@@ -2530,19 +2561,24 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         assert tuple(version[k] for k in ('year', 'major', 'minor', 'build')) == tuple(
             int(part) for part in catalog_identity['build'].split('.')), version
         gateway.gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'], live=False)
-        for depth, level in [('int16', 0), ('int16', -6), ('float32', 0), ('float32', -6)]:
-            phase = {'name': depth + '-' + str(abs(level)) + 'db', 'bit_depth': depth, 'sustain_db': level,
-                'output_path': str(tone_root / (depth + '-' + str(abs(level)) + 'db.wav')),
+        for name, waveform, depth, level, attack, sustain, release in cases:
+            phase = {'name': name, 'bit_depth': depth, 'sustain_db': level,
+                'business_values': {'waveform': waveform, 'frequency_hz': 440, 'channel_layout': layout,
+                    'bit_depth': depth, 'sample_rate_hz': 48000, 'attack_seconds': attack,
+                    'sustain_seconds': sustain, 'release_seconds': release, 'sustain_db': level,
+                    **({'anonymous_channels': True} if anonymous_count else {})},
+                'output_path': str(tone_root / (name + '.wav')),
                 'execution_attempted': False, 'signal_verified': False}
             receipt['phases'].append(phase); persist()
             try:
                 draft = _start_business_draft(gateway, 'ak.wwise.debug.generateToneWAV')
                 _update_business_draft(gateway, draft, 'draft-declare-host-plan', [
-                    '--value', 'output_file', phase['output_path'], '--value', 'waveform', 'sine',
-                    '--value', 'frequency_hz', '440', '--value', 'channel_layout', '1.0',
+                    '--value', 'output_file', phase['output_path'], '--value', 'waveform', waveform,
+                    '--value', 'frequency_hz', '440', '--value', 'channel_layout', layout,
                     '--value', 'bit_depth', depth, '--value', 'sample_rate_hz', '48000',
-                    '--value', 'attack_seconds', '0', '--value', 'sustain_seconds', '0.25',
-                    '--value', 'release_seconds', '0', '--value', 'sustain_db', str(level)], live=True)
+                    '--value', 'attack_seconds', str(attack), '--value', 'sustain_seconds', str(sustain),
+                    '--value', 'release_seconds', str(release), '--value', 'sustain_db', str(level),
+                    *(['--toggle', 'anonymous_channels', 'enable'] if anonymous_count else [])], live=True)
                 _update_business_draft(gateway, draft, 'draft-check', live=True)
                 preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
                 tx = phase['transaction_id'] = preview['transaction_id']
@@ -2590,7 +2626,7 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
         finally:
             persist()
     receipt['collection_complete'] = True
-    category.update(status='blocked', reason='four native files collected; signal/level oracle and other host/version evidence remain unfinished')
+    category.update(status='blocked', reason=f'{len(cases)} native files collected; requested signal effects and other host/version evidence remain unfinished')
     persist()
     return category
 
@@ -2599,6 +2635,24 @@ def _collect_stationary_tone_characterization(runtime: _WorkflowSandboxRuntime) 
 @pytest.mark.destructive
 def test_stationary_tone_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     category = _collect_stationary_tone_characterization(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_tone_waveform_envelope_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('This source-reviewed Tone signal collection targets only Console 2025.1.7.9143')
+    category = _collect_tone_waveform_envelope_characterization(workflow_sandbox_runtime)
+    assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_tone_anonymous_count_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('This source-reviewed anonymous-count probe targets only Console 2025.1.7.9143')
+    category = _collect_tone_anonymous_count_characterization(workflow_sandbox_runtime)
     assert category['status'] == 'blocked' and category['diagnostic_only'] is True, category
 
 
