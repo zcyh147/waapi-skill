@@ -374,6 +374,10 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
     assert code == 0, declared
     original, writes = task.call, []
     def call(uri, args=None, options=None):
+        if fault == 'other-platform' and uri.endswith('object.isPropertyEnabled'):
+            assert args == {'object': ROOT, 'property': 'Effect', 'platform': 'Mac'}
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
         if uri.endswith('object.set'):
             writes.append(deepcopy(args))
             rows = {row['object']: row for row in args['objects']}
@@ -406,6 +410,10 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
+    if fault == 'other-platform':
+        assert shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]['platform'] is None
+    code, unauthorized = task.run('execute', tx)
+    assert code == 2 and not writes, unauthorized
     code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
     assert code == 0, confirmed
     code, executed = task.run('execute', tx)
@@ -418,6 +426,9 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
     assert code == (2 if expected_failure else 0), json.dumps(verified)
     assert (verified.get('verified') is True) == (not expected_failure), verified
     assert len(writes) == 1
+    if fault == 'other-platform':
+        assert any(row.get('kind') == 'effect_render_chain_observation' and row['passed'] is False
+                   for row in verified['verification']['assertions']), verified
     return verified
 
 
