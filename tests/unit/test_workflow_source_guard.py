@@ -4746,7 +4746,7 @@ def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
     task.objects[SECOND]['classId'] = 1638416
     task.objects[SECOND]['parent'] = None
     task.languages = deepcopy(fixture['languages'])
-    task.metadata.pop('Frequency')
+    task.metadata.pop('Frequency', None)
     task.metadata.update(deepcopy(fixture['properties']))
     create = task._create
     def create_source(node, parent, *, owned=False):
