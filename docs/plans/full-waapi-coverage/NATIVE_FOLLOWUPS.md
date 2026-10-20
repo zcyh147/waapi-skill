@@ -665,18 +665,26 @@ remains blocked/diagnostic-only. The import and all three copies verified, and
 each target exposed exactly two distinct sources. In all three copies, the
 same-view Sound/source WAV-path join matched the saved ActiveSource GUID.
 However, the active child was ordinal zero in both public child order and saved
-XML order every time. The observation does not distinguish that join from a
-first-child heuristic, so it grants no generic active-source implementation or
-business-preservation credit. The existing unique-source import proof remains
-narrow; SFX/Voice, multiple-language/platform and ambiguous-path cases are not
-completed by this diagnostic.
+XML order every time, so the diagnostic's original ordering discriminator was
+not met. This grants no generic active-source implementation or business
+preservation credit; no resolver has been implemented. The retained matches
+cover two SFX cases and explicit English(US) Voice in a linked saved view, not
+all language/platform or ambiguous-path cases.
 
 Source-project full hash, mtime and tree plus all 1,897 tracked files stayed
 unchanged; no owned process remained. The failed sandbox is quarantined and
 original `summary.json`, `result.json`, `category.jsonl` and archived observations
 remain in Root's `.waapi-skill-state/full-coverage/181-multisource-34a64ac1-2021-r1/`.
 Do not regrade the FAIL, choose source order as an oracle, or automatically
-relaunch. A useful successor needs an independently known active source that is
-not first, or another documented independent discriminator, before generic
-mapping is implemented or credited. Root's method review and any further native
-attempt remain separate decisions.
+relaunch. Root's method review concludes that the three independent saved-GUID
+matches support proceeding with a narrow 2021 file-backed Sound path-to-source
+join. Full-path equality with exactly one complete, correctly classed and
+parented child is an evidence-backed inference for the observed linked view;
+the pinned path definition does not document a universal active relationship.
+Program permutations must prove order independence, with ambiguity, missing
+path, membership, language/view and drift controls. Another native boot solely
+to obtain a non-first active source is unnecessary. Plugin/no-file, equal-path,
+unlinked-view and active-choice-transition cases remain unresolved under #181.
+The implementation and its controls remain future work; the original blocked
+result and lack of generic credit are unchanged. Decision detail:
+`/tmp/waapi-181-multisource-next-decision.md`.

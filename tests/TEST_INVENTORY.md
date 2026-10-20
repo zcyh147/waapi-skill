@@ -54,7 +54,12 @@ The separate Root-owned 2021.1 diagnostic on `34a64ac1` **failed in 12.78s** at
 `ordering_counterexample_unproven`. All three two-source copies' path joins
 matched saved ActiveSource GUIDs, but the active source was always ordinal zero
 in public and saved ordering. This remains blocked/diagnostic-only with no
-generic active-source credit; see the retained native follow-up.
+generic active-source credit. Root's method review supports a future narrow
+2021 file-backed path join with program order-permutation and ambiguity
+controls, without another native boot solely to change the active ordinal.
+No resolver is implemented yet; plugin/no-file, equal-path, unlinked-view and
+active-choice-transition cases remain #181 work. See the retained native
+follow-up.
 
 ## 2026-10-20 R38 selected regression repairs
 

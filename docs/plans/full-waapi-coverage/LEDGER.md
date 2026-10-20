@@ -592,8 +592,12 @@ boundary are retained beside a platform-only positive. Source-anchored follow-up
 `/tmp/waapi-r39-language-followup.md`.
 
 The separate `34a64ac1` native active-source diagnostic remains FAIL and its
-category blocked: observed path joins matched saved active GUIDs, but every
-active source was first in both source orderings. It therefore cannot separate
-a correct active-selection oracle from a first-child shortcut. #181 remains
-open; neither current boundaries nor this insufficient diagnostic prove native
-absence. See the retained native follow-up.
+category blocked: all three two-source path joins matched saved active GUIDs,
+while every active source was first in both source orderings. Root's method
+review supports proceeding with a narrow 2021 file-backed Sound path-to-source
+join, with program order-permutation and ambiguity controls; another native
+boot merely to obtain a non-first active source is unnecessary. No resolver is
+implemented or generic coverage credited by this diagnostic. Plugin/no-file,
+equal-path, unlinked-view and active-choice-transition cases remain #181 work;
+neither current boundaries nor this result prove native absence. See the
+retained native follow-up.
