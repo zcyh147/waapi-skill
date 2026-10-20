@@ -1368,6 +1368,7 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
     platform = "{44444444-4444-4444-4444-444444444444}"
     language = "{55555555-5555-5555-5555-555555555555}"
     project = "{66666666-6666-6666-6666-666666666666}"
+    other_language = "{77777777-7777-7777-7777-777777777777}"
     project_file = tmp_path / "project" / "Fixture.wproj"
     project_file.parent.mkdir()
     project_file.write_text("<Project />")
@@ -1392,6 +1393,8 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                 rows = [{"id": platform, "name": "Mac", "type": "Platform", "path": r"\Platforms\Mac"}]
             elif query.startswith("from type Language"):
                 rows = [{"id": language, "name": language_name, "type": "Language", "path": "\\Languages\\" + language_name}]
+                if language_name != "SFX":
+                    rows.append({"id": other_language, "name": "French(France)", "type": "Language", "path": r"\Languages\French(France)"})
             elif "select children" in query:
                 self.child_reads += 1
                 rows = [{"id": identity, "name": name, "type": "AudioFileSource", "classId": 16,
@@ -1402,7 +1405,7 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                 if self.inactive_file_changed:
                     rows[0]["originalWavFilePath"] = "/owned/Originals/SFX/Changed.wav"
                 if language_name != "SFX":
-                    rows[0]["audioSource:language"] = {"id": project, "name": "French(France)"}
+                    rows[0]["audioSource:language"] = {"id": other_language, "name": "French(France)"}
                 if fault == "duplicate-path":
                     rows[0]["originalWavFilePath"] = rows[1]["originalWavFilePath"]
                 elif fault == "wrong-parent":
