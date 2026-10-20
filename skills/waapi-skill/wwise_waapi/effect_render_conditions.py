@@ -228,10 +228,21 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                 snapshot["after_changes"]["Render"] = change["after"]
         # Explicit changes to existing members are included in the same complete
         # chain proof. Native coupling is expected, never inferred as a pass.
-        for spec in members:
+        for spec in specs:
+            if spec.get("platform") != members[0].get("platform"):
+                continue
             for snapshot in snapshots:
                 if r._same_identity(snapshot["object_id"], spec.get("preexisting_id", spec.get("target_id"))):
                     snapshot["after_changes"].update({prop["name"]: prop["value"] for prop in spec["properties"]})
+                    references = snapshot.setdefault("reference_changes", {})
+                    for reference in spec["references"]:
+                        if reference.get("condition_guard"):
+                            continue
+                        # A planned result is not a clear: retain its sealed request path
+                        # until the ordinary graph verifier has associated actual GUIDs.
+                        references[reference["name"]] = (
+                            {"target_request_path": reference["target_request_path"]}
+                            if "target_request_path" in reference else {"target_id": reference["target_id"]})
         for spec in members:
             for name, value in new_defaults.get(spec["request_path"], {}).items():
                 if not any(prop["name"] == name for prop in spec["properties"]):
@@ -356,7 +367,7 @@ def prepare_property(*, object_id, field, value, version, platform, read):
     return prepare_graph([spec], {}, version=version, read=read)
 
 
-def chain_assertions(chains, *, read, after_write=False, edits=()):
+def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=None):
     from . import operation_registry as r
     from .documented_list_fields import resolve_class_list_evidence, resolve_live_list_evidence
     from .object_graph_paths import expected_snapshot
@@ -411,6 +422,19 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                         expected[name if name in expected else "@" + name] = value
                 selected = {name: r._reference_identity(r._field_value(expected, name)) for name in
                     (chain.get("reference_fields", [f"Effect{i}" for i in range(4)]) if legacy else ["Effect"]) if r._has_field(expected, name)}
+                if after_write:
+                    for name, intent in snapshot.get("reference_changes", {}).items():
+                        if "target_request_path" in intent:
+                            path = intent["target_request_path"]
+                            identity = resolved_ids.get(path) if isinstance(resolved_ids, dict) else None
+                            if (not r._valid_object_id(identity) or r._reference_value_is_null(identity)
+                                    or sum(r._same_identity(value, identity) for value in resolved_ids.values()) != 1):
+                                raise ValueError("Planned Render reference lacks one canonical graph result association")
+                            selected[name] = identity
+                        else:
+                            if set(intent) != {"target_id"}:
+                                raise ValueError("Render reference intent is malformed")
+                            selected[name] = intent["target_id"]
                 strip = lambda row: {key: value for key, value in row.items() if key.lstrip("@") not in selected}
                 passed = passed and len(actual) == 1 and r._native_snapshot_equal([strip(expected)], [strip(row) for row in actual]) and all(
                     r._reference_requirement_matches(actual[0], name, value) for name, value in selected.items())

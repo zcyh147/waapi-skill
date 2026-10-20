@@ -8887,7 +8887,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     return assertions
 
 
-def _condition_metadata_assertions(pre_state, *, read, after_write=False):
+def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
     result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
@@ -8929,7 +8929,8 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
         assertions.extend(planned_reference_guard_assertions(pre_state["documented_planned_reference_guards"], read=read))
     if isinstance(pre_state, Mapping) and pre_state.get("effect_render_chains"):
         from .effect_render_conditions import chain_assertions
-        assertions.extend(chain_assertions(pre_state["effect_render_chains"], read=read, after_write=after_write,
+        assertions.extend(chain_assertions([chain for chain in pre_state["effect_render_chains"]
+            if chain not in deferred_render_chains], read=read, after_write=after_write,
             edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", []))))
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
@@ -17983,7 +17984,18 @@ def verify_prepared_operation(
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
-    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True))
+    deferred_render_chains = [chain for chain in (pre_state or {}).get("effect_render_chains", [])
+        if plan.get("kind") in {"object-create-graph", "object-set-batch"}
+        and any("target_request_path" in intent for snapshot in chain["snapshots"]
+            for intent in snapshot.get("reference_changes", {}).values())]
+    # Keep a failing assertion until the normal graph association proof is reached.
+    # Malformed/early graph outcomes can never silently omit a deferred chain.
+    render_association = {"name": "planned Render chains reach the owned graph association proof",
+        "passed": False, "evidence": {"chain_count": len(deferred_render_chains)}}
+    if deferred_render_chains:
+        assertions.append(render_association)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True,
+        deferred_render_chains=deferred_render_chains))
     assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call, after_write=True))
     from .edit_history_business import observe_field_read_platform
     platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
@@ -20610,6 +20622,11 @@ def verify_prepared_operation(
                         unchanged,
                         {"expected": expected_collision, "actual": collided_rows},
                     )
+        if deferred_render_chains:
+            from .effect_render_conditions import chain_assertions
+            assertions.extend(chain_assertions(deferred_render_chains, read=read_call, after_write=True,
+                edits=specs, resolved_ids=resolved_id_by_path))
+            render_association["passed"] = True
         replaced_set_rows: list[Any] = []
         if kind == "object-set-batch":
             for field in ("replaced_subtree_rows", "replaced_list_subtree_rows"):
