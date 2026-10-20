@@ -631,3 +631,49 @@ Four serial generate/check commands passed once. Source membership remains
 native obligation bytes, ownership, requirements, statuses and evidence remain
 unchanged. Inventory reproducibility grants no branch/family/leaf transition.
 Root owns publication and the next settled gate; no merger pytest ran.
+
+## R41 Source composition, file-backed selection and reimport preservation
+
+Runtime merge `edbc24cb` integrates exact accepted reimport `aaa91777`, planned
+Source `8ec0925d` and query/disclosure `01a65041` from published `e80d9250`.
+All 17 component files are preserved: 13 exact blobs and four clean shared-file
+compositions, without fixups. Source plugins can be composed beneath planned
+Sound/Voice through the existing 2022–2025 object.set producer, with independent
+Source-language intent, actual GUID/class/parent/field proof and closed child
+sets. This is program-tested construction; atomic native acceptance and the
+2021 alternative remain required #179/#180/#181 work.
+
+The 2021 query derives each selected file-backed Sound's active Source from a
+unique full canonical path join in an explicit platform/language view. Existing
+query predicates/relationships, ordering, requested bounds and result-detail
+continuations remain; 64 is an internal batch size, not a public result cap.
+Existing-SFX reimport independently binds the selected Source and its own bytes,
+revalidates populated or empty preconditions before writing, and verifies the
+actual post-write selection. The setter now discloses existing source linkage,
+no unlinking and possible effects on other linked platforms. Unlinked views,
+same-path/plugin/no-file/transition cases, Source-plugin selection and remaining
+language/merge/preservation obligations remain open; no generic #181/#182 credit
+is inferred. The integrated import verifier intentionally changes; only the
+Source component alone preserved that original AST.
+
+The initial four serial inventory generate/check commands passed once. All 153
+Registry machine seals remain exact. Only reviewed Source graph/2021 query disclosure
+seals and corresponding contract references change, plus the setter linkage
+contract references and source/hash/line/candidate refreshes. All 272,313 native
+obligation bytes, IDs, ownership, statuses and evidence remain unchanged;
+79 source members/91 indexed members stay exact and the full candidate closure
+now contains 330 files, including the new resolver. Policy retains its original
+formatting with only the two reviewed hash values changed. A subsequent raw-byte format correction invalidated only the branch
+audit pair; those two commands passed separately in 24.666s / 23.455s. Original
+four-command receipts are preserved, and the interface pair was not repeated.
+
+The original 2022 platform diagnostic remains FAIL (11.84s): immediate setters
+verified, but saved state retained only Linked Original_A and did not prove
+persisted divergent platform selections. The original 2024 GUI observation
+remains BLOCKED (one skipped body, 224.27s): the owned window was identified,
+but one directed click produced no observed image change. Neither is native
+absence or generic completion; failed sandboxes/evidence remain retained.
+Root's separate full Program on `e80d9250` remains pending at this handoff.
+R41 staged controls are separate receipts in the test inventory, not an
+aggregate gate. No merger pytest, native, Fresh or publication ran. Root owns
+review and the next single 2025 Source acceptance attempt on the fixed stage.

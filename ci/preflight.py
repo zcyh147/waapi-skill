@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 NODES = (
     "tests/unit/test_ci_test_bat.py::test_program_manifest_is_the_single_ordered_cross_platform_node_source",
     "tests/unit/test_operation_composer_gateway.py::test_non_object_set_operation_schema_digest_inventory_is_reviewed",
+    "tests/unit/test_gateway_error_context.py::test_packaged_gateway_shape_errors_supply_context_at_each_call_site",
     "tests/unit/test_public_route_program_matrix.py",
     "tests/unit/test_host_ui_debug_business_adapter.py::test_tone_large_marker_request_survives_exact_terminal_delivery",
     "tests/unit/test_host_ui_debug_business_adapter.py::test_maximum_tone_marker_plan_and_count_survive_artifact_and_actual_stdout",

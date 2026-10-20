@@ -43,14 +43,25 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
 }
 _INTENTS = {
     SOUND_SET_ACTIVE_SOURCE_URI: (
-        "Select which AudioFileSource or Source-plugin child is active for one Sound, optionally "
-        "on an exact platform."
+        "Select which AudioFileSource or Source-plugin child is active in a Sound platform view using existing "
+        "source linkage; linked selection may affect other linked platforms and this operation does not unlink."
     ),
     GAME_PARAMETER_SET_RANGE_URI: (
         "Change one existing Game Parameter minimum and maximum and choose how dependent "
         "curves respond; does not create a parameter or set its default InitialValue."
     ),
 }
+
+
+def active_source_linkage_disclosure() -> dict[str, Any]:
+    """Describe the setter's unchanged scope without inventing observed link state."""
+    return {
+        "selection": "uses_existing_source_linkage",
+        "changes_linkage": False,
+        "linkage_observed": False,
+        "platform_isolation_implied": False,
+        "may_affect_other_linked_platforms": True,
+    }
 
 
 def project_setting_business_operations() -> frozenset[str]:
@@ -101,6 +112,8 @@ def project_setting_business_contract_data(
         "version": version,
         "input_mode": "business_declaration",
         "execution_shape": "draft_mutation",
+        **({"source_linkage": active_source_linkage_disclosure()}
+           if operation == SOUND_SET_ACTIVE_SOURCE_URI else {}),
         **({"selection_guidance": dict(selection_guidance_for_uri(operation))}
            if operation == GAME_PARAMETER_SET_RANGE_URI else {}),
         "start": {
@@ -141,6 +154,7 @@ def project_setting_business_contract_data(
 
 
 __all__ = [
+    "active_source_linkage_disclosure",
     "GAME_PARAMETER_SET_RANGE_URI",
     "PROJECT_SETTING_BUSINESS_CONTRACT",
     "SOUND_SET_ACTIVE_SOURCE_URI",

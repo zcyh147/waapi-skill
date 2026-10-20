@@ -5,6 +5,44 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## R41 selection and Source construction evidence limits
+
+Runtime merge `edbc24cb` adds program-tested planned Sound/Voice→Source-plugin
+composition in 2022–2025 and current-view file-backed selection/reimport proof
+in 2021. The existing three-case Source collector is ready for Root's reviewed
+2025 attempt: SFX with omitted Source language, Voice with a separately selected
+explicit Source language, and Voice with omitted Source language. It preserves
+known prior owners/Sources and their closed child sets, archives exact native
+bytes before teardown, and defers final acceptance to owned lifecycle evidence.
+No atomic native Source-language effect or inheritance is claimed yet; other
+versions and the 2021 construction alternative remain required.
+
+Retain the original 2022 `7e0e3161` r2 FAIL (body 11.84s, wrapper 12.398s;
+`.waapi-skill-state/full-coverage/181-platform-active-source-7e0e3161-2022-r2`).
+Import/copy and both immediate setters verified, but saved state contains only
+Linked Original_A. No simultaneous platform divergence or final live Mac
+observation was proved. The setter disclosure now states that it uses existing
+linkage, does not unlink and may affect other linked platforms; it does not
+observe linkage or promise isolation. Unlinked mapping, same-path/plugin/no-file
+sources, transitions, Source-plugin selection and remaining #181 work stay open.
+
+The 2024 OS observation on `e80d9250` remains BLOCKED: original session 63925,
+one skipped body in 224.27s, wrapper 225.478s, exit 1; root
+`.waapi-skill-state/full-coverage/soundcaster-os-observer-e80d9250-2024-r1`.
+Screen/AX permissions and the exact owned Wine window were established; one
+directed click produced no observed change and before/after image hashes were
+identical. Window observation is established; input delivery, RTPC Show All
+effect and all saved-value preservation remain unproved. No retry or value
+credit follows. Both native roots retain their sandboxes and original outcomes,
+with source hash/mtime unchanged and owned processes zero.
+
+R41 inventory reconciliation preserves all 272,313 native obligation bytes and
+existing evidence states. Separate program controls and successful inventory commands grant no new
+native/leaf/family credit. The initial four receipts remain; only the branch
+audit pair was repeated after restoring policy byte formatting. Root's full Program
+on the prior `e80d9250` candidate remains pending; no merger test/native run or
+publication accompanied this stage.
+
 ## R40 Voice and Tone evidence limits
 
 Runtime merge `495f8a7f` integrates the accepted compact graph correction,

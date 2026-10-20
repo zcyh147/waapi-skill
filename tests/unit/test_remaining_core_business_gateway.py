@@ -483,6 +483,19 @@ def test_game_parameter_exact_name_binding_resolves_inside_the_draft(
 def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(
     tmp_path: Path,
 ) -> None:
+    code, schema = gateway.execute_gateway(
+        ["request-schema", SOUND_SET_ACTIVE_SOURCE_URI], env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"),
+    )
+    assert code == 0, schema
+    linkage = schema["business_adapter"]["source_linkage"]
+    assert linkage == {
+        "selection": "uses_existing_source_linkage",
+        "changes_linkage": False,
+        "linkage_observed": False,
+        "platform_isolation_implied": False,
+        "may_affect_other_linked_platforms": True,
+    }
     state_dir = tmp_path / "state"
     client = _ProjectSettingDraftClient(tmp_path)
     code, started = gateway.execute_gateway(
@@ -572,6 +585,7 @@ def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
+    assert previewed["preview_summary"]["source_linkage"] == linkage
     artifact = TransactionStore(state_dir).load_preview(
         previewed["transaction_id"]
     ).artifact
@@ -583,6 +597,8 @@ def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(
     assert artifact["prepared_operation"]["verification_plan"]["kind"] == (
         "project-setting-state"
     )
+    assert artifact["prepared_operation"]["semantic_preview"]["envelope"]["metadata"]["source_linkage"] == linkage
+    assert any("may affect other linked platforms" in warning for warning in artifact["prepared_operation"]["warnings"])
 
 
 def test_source_control_commit_declaration_seals_live_roots_and_exact_message(

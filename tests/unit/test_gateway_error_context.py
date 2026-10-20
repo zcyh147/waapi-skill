@@ -52,6 +52,34 @@ def test_packaged_gateway_shape_errors_supply_context_at_each_call_site():
     assert missing == []
 
 
+def test_active_source_query_configuration_drift_keeps_structured_error_after_final_read(tmp_path):
+    from tests.unit import test_typed_query_construction as query
+
+    client, _ = query._legacy_multi_sound_client(tmp_path)
+    env = query._env(tmp_path, '2021.1')
+    original_call = client.call
+
+    def change_isolated_config_on_final_observation(uri, args=None, options=None):
+        result = original_call(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo' and client.child_reads == 2:
+            config = Path(env['WAAPI_SKILL_CONFIG_PATH'])
+            changed = json.loads(config.read_text(encoding='utf-8'))
+            changed['waapi_port'] = 31338
+            config.write_text(json.dumps(changed), encoding='utf-8')
+        return result
+
+    client.call = change_isolated_config_on_final_observation
+    code, result = query.gateway.execute_gateway([
+        'query-object', '--kind', 'all-sounds', '--predicate', 'name-contains', 'Rain', '--max-results', '10',
+        '--platform', 'Mac', '--language', 'SFX', '--include', 'active-source',
+    ], env=env, client_factory=lambda _: client)
+    assert code == 2 and result['error_code'] == 'ACTIVE_SOURCE_OBSERVATION_CHANGED', result
+    assert result['details']['reason'] == 'configuration_changed'
+    assert client.owner_reads == 2 and client.child_reads == 2
+    assert result.get('agent_result') is None
+    assert len(json.dumps(result, ensure_ascii=False).encode('utf-8')) < 16 * 1024
+
+
 @pytest.mark.parametrize('builder,view', [
     ('none_state_actual_continuation', 'actual-additions'),
     ('history_verification_continuation', 'verification')])
