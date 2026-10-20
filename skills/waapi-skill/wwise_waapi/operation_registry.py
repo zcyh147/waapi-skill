@@ -6963,10 +6963,8 @@ def _prepare_object_set(
         context["project"] = construction_inventory["project"]
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
-        language_inventory = _read_import_language_inventory(
-            request.version,
-            read=import_context_read,
-        )
+        language_inventory = (construction_inventory if construction_inventory is not None else
+            _read_import_language_inventory(request.version, read=import_context_read))
         available_languages = {
             str(row["name"])
             for row in language_inventory.get("languages", [])
