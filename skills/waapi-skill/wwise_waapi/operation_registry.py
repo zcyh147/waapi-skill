@@ -6036,13 +6036,10 @@ def _prepare_object_set(
             allow_language=True,
             allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
         )
-        staged_source_record = arguments.get("voice_source_staging", {})
-        staged_source_parent = (staged_source_record.get("stage") == "source"
-            and _same_identity(target.object, staged_source_record["origin"]["identity"]["id"])
-            and target.row.get("type") == "Sound" and len(children.nodes) == 1
+        live_source_parent = (target.row.get("type") == "Sound" and bool(children.roots)
             and all(root.plugin is not None and root.plugin.kind == "source" for root in children.roots))
         if children.roots:
-            if not staged_source_parent:
+            if not live_source_parent:
                 _require_object_create_writable_parent(
                     target,
                     version=request.version,
@@ -6089,6 +6086,23 @@ def _prepare_object_set(
             "properties": [],
             "references": [],
         }
+        if live_source_parent:
+            if row_conflict != "fail":
+                raise OperationContractError("SOURCE_CONFLICT_UNRESOLVED", "Source child collision modes other than fail require separately established identity semantics.")
+            info = _read_property_info_cached(read, cache=property_info_cache, object_id=target.object, name="IsVoice")
+            if (info.type or "").casefold() not in {"bool", "boolean"}:
+                raise OperationContractError("INVALID_METADATA", "A Source owner requires Boolean IsVoice metadata.")
+            owner_rows = _read_object_id_rows(target.object, fields=["id", "classId", "IsVoice"], read=read, platform=platform)
+            if (len(owner_rows) != 1 or not _same_identity(owner_rows[0].get("id"), target.object)
+                    or owner_rows[0].get("classId") != target_class
+                    or type(_field_value(owner_rows[0], "IsVoice")) is not bool):
+                raise OperationContractError("INVALID_READBACK", "A Source owner requires its exact class and actual Boolean IsVoice.")
+            is_voice = _field_value(owner_rows[0], "IsVoice")
+            if any(root.plugin.language is not None for root in children.roots) and not is_voice:
+                raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires an existing Boolean Voice owner.")
+            if any(prop.name.casefold() == "isvoice" and prop.value is not is_voice for prop in properties):
+                raise OperationContractError("SOURCE_OWNER_CHANGE_UNRESOLVED", "Change the owner's Voice flag in a separately verified Preview before adding a Source.")
+            target_spec["source_owner"] = {"is_voice": is_voice, "metadata": info.as_dict()}
         trusted: dict[str, Any] = {"object": target.object}
         render_native_nodes[target_spec["request_path"]] = trusted
         if "import" in item:
@@ -6309,7 +6323,7 @@ def _prepare_object_set(
             rtpc_snapshots=rtpc_snapshots,
             merge_guards=early_merge_guards,
             platform=platform,
-            staged_source_parent=staged_source_parent,
+            live_source_parent=live_source_parent,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
@@ -6880,6 +6894,7 @@ def _prepare_object_set(
             [
                 *IDENTITY_RETURN_FIELDS,
                 "classId",
+                *(["IsVoice"] if "source_owner" in target_spec else []),
                 *(row["name"] for row in target_spec["properties"]),
                 *(row["name"] for row in target_spec["references"]),
             ]
@@ -6924,6 +6939,8 @@ def _prepare_object_set(
             snapshot_rows[0].get("parent")
         )
         child_rows = _read_direct_children(target.object, fields=IDENTITY_RETURN_FIELDS, read=read)
+        if live_source_parent:
+            field_snapshots.extend(_capture_retained_source_state(child_rows, owner=target, catalog=type_catalog, read=read, platform=platform))
         children_snapshots.append(
             {"object_id": target.object, "fields": list(IDENTITY_RETURN_FIELDS), "rows": child_rows}
         )
@@ -7983,6 +8000,29 @@ def _resolve_merge_node_target(
         resolution="live-exact-merge-collision", row=row)
 
 
+def _capture_retained_source_state(children, *, owner, catalog, read, platform):
+    """Seal observed existing Source fields without selecting a mutation token."""
+    snapshots = []
+    for child in children:
+        if child.get("type") not in {"Source", "SourcePlugin"}:
+            continue
+        names = parse_property_and_reference_names_result(read(GET_PROPERTY_AND_REFERENCE_NAMES_URI,
+            {"object": child["id"]}, {}))
+        if len(names) > 256:
+            raise OperationContractError("LIMIT_EXCEEDED", "Retained Source field discovery exceeds its 256-field preservation bound.")
+        fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId", "audioSource:language", *("@" + row.name for row in names)])
+        rows = _read_object_id_rows(child["id"], fields=fields, read=read, platform=platform)
+        if (len(rows) != 1 or any(not _native_snapshot_equal(rows[0].get(key), child.get(key)) for key in IDENTITY_RETURN_FIELDS)
+                or not _same_identity(_parent_value(rows[0].get("parent")), owner.object)):
+            raise OperationContractError("INVALID_READBACK", "Retained Source identity and parent must remain exact during preparation.")
+        class_id = rows[0].get("classId")
+        if type(class_id) is not int or len([row for row in catalog if row.class_id == class_id and row.type.casefold() == "source"]) != 1:
+            raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "Retained Source class requires one actual live Source-category row.")
+        snapshots.append({"object_id": child["id"], "fields": fields, "platform": platform,
+            "rows": rows, "preserve_after_write": True})
+    return snapshots
+
+
 def _capture_anonymous_member_state(members, *, read, platform, preserve):
     snapshots, targets = [], set()
     for member in members:
@@ -8133,7 +8173,7 @@ def _prepare_object_node_specs(
     rtpc_snapshots: dict | None = None,
     merge_guards: list[dict[str, Any]] | None = None,
     platform: str | None = None,
-    staged_source_parent: bool = False,
+    live_source_parent: bool = False,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     node_paths = {node.request_path for node in nodes}
@@ -8445,12 +8485,12 @@ def _prepare_object_node_specs(
         if node.plugin is not None:
             if node.plugin.kind == "source":
                 parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
-                live_staged_owner = (staged_source_parent and root_parent is not None
+                live_source_owner = (live_source_parent and root_parent is not None
                     and node.parent_request_path not in node_paths and node.collection == "children")
-                if live_staged_owner:
-                    # The exact generated record additionally revalidates this
-                    # verified owner's Boolean Voice intent, fields and empty
-                    # children at preparation and immediately before dispatch.
+                if live_source_owner:
+                    # Both ordinary and generated stages use the live owner
+                    # proof. Staged provenance additionally authenticates the
+                    # original Voice intent and its empty-child prerequisite.
                     validate_plugin_target(node.plugin, target_type=root_parent.row.get("type"), target_path=root_parent.row.get("path"))
                 else:
                     if node.collection != "children" or parent_spec is None or parent_spec["canonical_type"] != "Sound":
@@ -8999,6 +9039,18 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    for node in (pre_state.get("object_set_nodes", []) if isinstance(pre_state, Mapping) else ()):
+        owner = node.get("source_owner")
+        if owner is None:
+            continue
+        rows = _read_object_id_rows(node["target_id"], fields=["id", "classId", "IsVoice"], read=read, platform=node.get("platform"))
+        actual_metadata = _read_property_info(read, object_id=node["target_id"], name="IsVoice").as_dict()
+        assertions.append({"name": "existing Source owner Boolean Voice intent and metadata remain bound",
+            "passed": (len(rows) == 1 and _same_identity(rows[0].get("id"), node["target_id"])
+                and rows[0].get("classId") == node["class_id"]
+                and _field_value(rows[0], "IsVoice") is owner["is_voice"]
+                and _native_snapshot_equal(actual_metadata, owner["metadata"])),
+            "evidence": {"expected": owner, "actual": rows, "metadata": actual_metadata}})
     from .voice_source_staging import assertions as staged_assertions
     assertions.extend(staged_assertions(pre_state, read, after_write=after_write))
     language_contexts = [node[key] for node in pre_state.get("object_set_nodes", [])
@@ -10445,6 +10497,7 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
         [
             *IDENTITY_RETURN_FIELDS,
             "classId",
+            *(["IsVoice"] if "source_owner" in spec else []),
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}

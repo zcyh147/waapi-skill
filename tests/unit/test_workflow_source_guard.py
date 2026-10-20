@@ -4704,7 +4704,7 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None, 
                 'classId': SOURCE_CLASS, 'path': task.objects[original_owner]['path'] + r'\Unexpected retained child',
                 'parent': {'id': original_owner}, 'notes': 'Unexpected'}
         if uri.endswith('getInfo'):
-            minor, build = {'2024.1': (13, 9056), '2025.1': (7, 9143)}[version]
+            minor, build = {'2022.1': (19, 8584), '2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}[version]
             result['version'].update(minor=minor, build=build, displayName=f'v{version}.{minor}.{build}')
         return result
     task.call = call
@@ -4878,10 +4878,10 @@ def test_planned_source_collector_retains_atomic_scope_at_2025_prewrite_boundary
     assert not any(argv[0] == 'continue-voice-source' for argv in commands)
 
 
-def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
+def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     """Reuse the public workflow producer, with exact retained Tone metadata."""
     from copy import deepcopy
-    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, version=version)
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native-catalog.json').read_text())
     task.types = deepcopy(fixture['catalog']['return'])
     from tests.unit.test_sound_voice_creation_gateway import SECOND

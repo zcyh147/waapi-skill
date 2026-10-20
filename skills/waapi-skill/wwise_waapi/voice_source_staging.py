@@ -13,6 +13,7 @@ from .business_declaration_state import BusinessDeclarationSession
 
 KEY = 'voice_source_staging'
 CONTRACT = 'waapi-skill.voice-source-stages/v1'
+CHILD_DRAFT_PREFIX = 'od1-f50ce0'
 
 
 def fail(message):
@@ -346,7 +347,7 @@ def projection(record, *, verified=False):
 
 def child_capability(record):
     digest = canonical_sha256({'contract': CONTRACT, 'origin': record})
-    return 'od1-' + digest[:32], 'da1-' + canonical_sha256({'authority': digest})[:40]
+    return CHILD_DRAFT_PREFIX + digest[:26], 'da1-' + canonical_sha256({'authority': digest})[:40]
 
 
 def child_session(record, context):
