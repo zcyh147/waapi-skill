@@ -9939,7 +9939,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner,
             destination_id=destination_id, before_live=before_live, copied_live=live)
         receipt['independent_copied_control_input'] = 'canonical reference hop equals exact live LFO class/owner/ShortID frame'
-        # The normal runtime verifier remains unchanged and does not consume XML.
+        # Independent XML proof does not confer production/runtime authority.
         receipt['saved_copy_verified'] = True
     def complete(preview, label):
         tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
@@ -9952,7 +9952,11 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert code == 0 and result.get('state') == 'executed_unverified', result
         verified = gateway.gateway(['verify', tx], live=True)
         assert verified.get('state') == 'verified', verified
-        phase['gateway_verification_scope'] = 'existing identity verifier only; independent diagnostic observes plugin state'
+        if saved_copy:
+            phase['gateway_verification_strength'] = verified.get('verification_strength')
+            phase['gateway_verification_scope'] = verified.get('verification', {}).get('verification_scope')
+        else:
+            phase['gateway_verification_scope'] = 'existing identity verifier only; independent diagnostic observes plugin state'
         return result
     persist()
     try:
@@ -10034,7 +10038,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                     io_root=runtime.sandbox.sandbox_path)['file_proof'] == image['file_proof'], 'Saved model changed during public observations'
             receipt['copy_observation'] = {'new_id': copied['id'], 'class_id': copied['class_id'],
                 'parent_id': destination_id, 'saved_subtree': 'independent full serialized graph oracle',
-                'runtime_verifier': 'unchanged identity verifier; no production complete-copy authority'}
+                'runtime_verifier': 'returned Gateway live-field strength/scope recorded separately; no production complete-copy authority'}
             assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
             receipt['collection_complete'] = True; category['status'] = 'PASS'
             return category
@@ -10059,12 +10063,28 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     finally:
         try:
             paths = sorted(set(native_root.glob('*.json')) - old_native)
-            assert len(paths) <= receipt['limits']['native_files']
+            assert len(paths) + int(saved_copy) <= receipt['limits']['native_files']
+            native_proofs = []
             for index, path in enumerate(paths):
                 observed = observe_console_file(path, io_root=native_root)
                 raw = base64.b64decode(observed['content_base64'], validate=True)
-                receipt['native_evidence'].append({'native_path': str(path),
-                    **archive('native-' + str(index) + '.json', raw), 'native_file_proof': observed['file_proof']})
+                link = archive('native-' + str(index) + '.json', raw)
+                if saved_copy:
+                    receipt['native_evidence'].append(link)
+                    native_proofs.append({'archive': link, 'native_file_proof': observed['file_proof']})
+                else:
+                    receipt['native_evidence'].append({'native_path': str(path), **link,
+                        'native_file_proof': observed['file_proof']})
+            if saved_copy:
+                receipt['native_file_proofs'] = archive('native-proofs.json', json.dumps({
+                    'contract': 'waapi-skill.legacy-source-native-file-proofs/v1',
+                    'count': len(native_proofs), 'files': native_proofs}, ensure_ascii=False).encode('utf-8'))
+                index_link = receipt['native_file_proofs']
+                index_observed = observe_console_file(Path(index_link['path']), io_root=artifacts)
+                assert all(index_observed['file_proof'][key] == index_link[key] for key in ('sha256', 'size')), 'Native proof index hash/size changed'
+                index_document = json.loads(base64.b64decode(index_observed['content_base64'], validate=True))
+                assert index_document['count'] == len(receipt['native_evidence'])
+                assert [row['archive'] for row in index_document['files']] == receipt['native_evidence'], 'Native proof index archive bindings changed'
         except Exception as exc:
             receipt.update(collection_complete=False, native_admission_verified=False,
                 archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]}); category['status'] = 'FAIL'; raise
