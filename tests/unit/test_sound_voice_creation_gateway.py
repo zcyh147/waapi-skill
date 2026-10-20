@@ -237,7 +237,7 @@ def test_public_sound_creation_contract_discloses_semantic_flag_and_source_bound
     assert semantics['explicit_flag_conflict'] == 'reject_before_dispatch'
     assert semantics['verification'] == 'actual_Boolean_IsVoice_and_bound_fields_identity_and_metadata'
     assert semantics['language_and_media'] == ('use_audio_import_for_localized_media' if operation == 'object.create'
-        else 'requested_media_language_independently_verified;new_empty_Voice_language_is_validated_native_construction_context_not_persisted_language_or_localized_Source;existing_merge_language_effect_unresolved;declared_Source_plugins_have_separate_language_and_closed_childset_verification')
+        else 'requested_media_language_independently_verified;new_empty_Voice_language_is_optional_validated_Gateway_context_not_emitted_on_Sound_no_native_language_effect;existing_merge_language_effect_unresolved;declared_Source_plugins_have_separate_language_and_closed_childset_verification')
 
 
 JAPANESE = '{AAAAAAAA-1111-1111-1111-111111111111}'
@@ -248,7 +248,29 @@ def language_voice_task(path, version='2023.1'):
     task = voice_task(path, version, 'object.set')
     task.languages = [{'id': JAPANESE, 'name': 'Japanese', 'shortId': 2}]
     original = task.call
+    class WaapiRequestFailed(Exception):
+        # Exact native rejection from r41-planned-source-8ed01e4f-2025-r2.
+        uri = 'ak.wwise.invalid_options'
+        kwargs = {'details': {'procedureUri': 'ak.wwise.core.object.set'},
+                  'message': 'Language can only be used for a Source.'}
+
+    def reject_non_source_language(node):
+        if isinstance(node, dict):
+            if 'language' in node and 'type' in node and node['type'] != 'Source':
+                raise WaapiRequestFailed('Language can only be used for a Source.')
+            for child in node.values():
+                reject_non_source_language(child)
+        elif isinstance(node, list):
+            for child in node:
+                reject_non_source_language(child)
+
     def call(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            try:
+                reject_non_source_language(args['objects'])
+            except WaapiRequestFailed:
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                raise
         before_ids = set(task.objects) if uri.endswith('object.set') else set()
         result = original(uri, args, options)
         if uri.endswith('getProjectInfo'):
@@ -282,7 +304,7 @@ def test_new_empty_voice_preserves_explicit_construction_language(tmp_path):
     prepared = shown['artifact']['prepared_operation']
     native = prepared['dispatch']['args']['objects'][0]['children'][0]
     assert native == {'type': 'Sound', 'name': 'Rain', 'notes': 'Keep voice',
-                      'language': 'Japanese', '@IsVoice': True, '@Volume': -6}
+                      '@IsVoice': True, '@Volume': -6}
     context = prepared['verification_plan']['nodes'][1]['construction_language']
     assert context['requested'] == 'Japanese' and context['selected'] == {'id': JAPANESE, 'name': 'Japanese'}
     assert context['role'] == 'voice-construction-context' and context['expected_sources'] == []
@@ -314,7 +336,10 @@ def test_empty_voice_construction_language_version_and_composition_paths(tmp_pat
     tx, shown = task.preview()
     native = shown['artifact']['prepared_operation']['dispatch']['args']['objects'][0]['children'][0]
     voice_native = native['children'][0] if nested else native
-    assert voice_native['language'] == selector and voice_native['@IsVoice'] is True
+    assert 'language' not in voice_native and voice_native['@IsVoice'] is True
+    context = next(row['construction_language'] for row in shown['artifact']['prepared_operation']['verification_plan']['nodes']
+                   if 'construction_language' in row)
+    assert context['requested'] == selector and context['selected'] == {'id': JAPANESE, 'name': 'Japanese'}
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
     assert len([uri for uri, _, _ in task.calls if uri.endswith('object.set')]) == 1
@@ -479,7 +504,7 @@ def test_discovered_sound_with_explicit_voice_flag_uses_same_language_constructo
     assert code == 0, declared
     tx, shown = task.preview()
     native = shown['artifact']['prepared_operation']['dispatch']['args']['objects'][0]['children'][0]
-    assert native['language'] == 'Japanese' and native['@IsVoice'] is True
+    assert 'language' not in native and native['@IsVoice'] is True
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
 
@@ -526,12 +551,12 @@ def test_planned_voice_composes_a_typed_source_with_separate_language_context(tm
     code, source = declare_planned_source(task, voice['draft']['declared_object']['result_handle'])
     assert code == 0, source
     tx, shown = task.preview()
-    native = shown['artifact']['prepared_operation']['dispatch']['args']['objects'][0]['children'][0]
-    assert native['type'] == 'Sound' and native['@IsVoice'] is True and native['language'] == 'Japanese'
-    assert native['children'] == [{'type': 'Source', 'name': 'Tone', 'classId': SOURCE_CLASS,
-                                  'language': 'Japanese', '@Frequency': 440}]
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
+    native = shown['artifact']['prepared_operation']['dispatch']['args']['objects'][0]['children'][0]
+    assert native['type'] == 'Sound' and native['@IsVoice'] is True and 'language' not in native
+    assert native['children'] == [{'type': 'Source', 'name': 'Tone', 'classId': SOURCE_CLASS,
+                                  'language': 'Japanese', '@Frequency': 440}]
     sound = next(row for row in task.objects.values() if row['name'] == 'Rain')
     assert task.objects[SOURCE]['parent'] == {'id': sound['id']}
     assert task.objects[SOURCE]['audioSource:language'] == {'name': 'Japanese'}
@@ -569,7 +594,7 @@ def test_planned_source_versions_and_owner_language_alternatives(tmp_path, versi
     source_native = native_voice['children'][0]
     assert source_native['type'] == 'Source' and source_native['classId'] == SOURCE_CLASS
     assert source_native.get('language') == source_language
-    assert native_voice.get('language') == (None if task.source_language == 'SFX' else 'Japanese')
+    assert 'language' not in native_voice
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
     assert len([uri for uri, _, _ in task.calls if uri.endswith('object.set')]) == 1

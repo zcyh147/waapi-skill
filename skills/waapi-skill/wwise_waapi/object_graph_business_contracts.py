@@ -59,7 +59,7 @@ def _sound_semantics(operation):
         "generic_Sound_Type_Handle": "explicit_class_fields_remain_available",
         "verification": "actual_Boolean_IsVoice_and_bound_fields_identity_and_metadata",
         "language_and_media": ("use_audio_import_for_localized_media" if operation == "object.create"
-            else "requested_media_language_independently_verified;new_empty_Voice_language_is_validated_native_construction_context_not_persisted_language_or_localized_Source;existing_merge_language_effect_unresolved;declared_Source_plugins_have_separate_language_and_closed_childset_verification"),
+            else "requested_media_language_independently_verified;new_empty_Voice_language_is_optional_validated_Gateway_context_not_emitted_on_Sound_no_native_language_effect;existing_merge_language_effect_unresolved;declared_Source_plugins_have_separate_language_and_closed_childset_verification"),
     }
 
 
