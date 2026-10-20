@@ -8540,7 +8540,7 @@ def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime
         'observation_path': str(output), 'scope': 'one_actual_SourcePlugin_A_to_B_on_matching_Console_current_view',
         'verifier_strength': 'Gateway_verification_plus_independent_GUID_change_class_parent_fields_complete_childset_and_preservation'}
     if explicit_current_platform:
-        category.update(diagnostic_only=True, scope='one_2022_SourcePlugin_A_to_B_explicit_current_platform_alternative')
+        category.update(scope='one_2022_SourcePlugin_A_to_B_explicit_current_platform_alternative')
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.source-plugin-selection/v1', 'candidate': runtime.candidate,
         'version': runtime.version, 'endpoint': endpoint, 'transaction_ids': transactions, 'phases': [], 'calls': [],

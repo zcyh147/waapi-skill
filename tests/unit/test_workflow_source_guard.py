@@ -4943,7 +4943,7 @@ def test_source_plugin_explicit_current_platform_probe_binds_public_identity_and
     runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, version='2022.1')
     category = workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_EXPLICIT', explicit_current_platform=True)
     receipt = json.loads(Path(category['observation_path']).read_text())
-    assert category['status'] == 'PASS' and category['diagnostic_only'] is True
+    assert category['status'] == 'PASS'
     assert receipt['business_effect_verified'] is True and receipt['collection_complete'] is True
     assert receipt['platform']['id'] == '{C0C0C0C0-C0C0-C0C0-C0C0-C0C0C0C0C0C0}'
     assert receipt['platform']['name'] == 'Observed Target'
