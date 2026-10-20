@@ -1,6 +1,7 @@
 """Unnamed RTPC pairs remain typed graph outcomes through the public Gateway."""
 from copy import deepcopy
 import json
+import shlex
 
 import pytest
 
@@ -326,6 +327,17 @@ def test_planned_owner_merge_updates_existing_unnamed_pair_in_same_batch(tmp_pat
     assert len(writes) == 1
 
 
+def _expanded_rtpc_action(task, bound):
+    continuation = bound['draft']['next_action_binding']
+    assert continuation['declare_rtpc']['available_via'] == 'more_actions'
+    more = continuation['more_actions']
+    assert more['copy_instruction']['source_field'] == 'copy_command'
+    command = shlex.split(more['copy_command'])
+    code, inspected = task.run(*command[command.index('gateway.py') + 1:])
+    assert code == 0, inspected
+    return inspected['draft']['next_action_binding']['declare_rtpc']
+
+
 def test_graph_schema_and_copied_continuation_disclose_rtpc_arguments(tmp_path):
     task, _ = rtpc_task(tmp_path)
     code, schema = task.run('operation-schema', 'object.set')
@@ -338,7 +350,7 @@ def test_graph_schema_and_copied_continuation_disclose_rtpc_arguments(tmp_path):
     assert '2022.1' in encoded and '2025.1' in encoded
     code, bound = task.step('draft-bind-object', '--object-id', FIRST)
     assert code == 0, bound
-    action = bound['draft']['next_action_binding']['declare_rtpc']
+    action = _expanded_rtpc_action(task, bound)
     assert '--declaration-id' in action['append'] and '--control-input-handle' in action['append']
     assert action['semantics']['existing_pair_update'] == 'exact_actual_RTPC_GUID_row_in_same_object_set;_no_name_merge'
 
@@ -485,7 +497,7 @@ def test_graph_discloses_all_accepted_curve_shapes_in_schema_and_continuation(tm
     assert declaration['points']['terminal_shape'] == 'gateway_normalized_to_Linear'
     code, bound = task.step('draft-bind-object', '--object-id', FIRST)
     assert code == 0, bound
-    points = bound['draft']['next_action_binding']['declare_rtpc']['semantics']['points']
+    points = _expanded_rtpc_action(task, bound)['semantics']['points']
     assert set(points['point_shapes']) == expected
     # Every disclosed non-terminal shape must pass the real public parser,
     # declaration materializer and normalizer, rather than just a schema snapshot.

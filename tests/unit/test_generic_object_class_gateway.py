@@ -147,8 +147,7 @@ def test_class_catalogue_binding_preserves_actor_alias_and_rejects_drift(tmp_pat
 def import_task(path, *, version='2022.1'):
     from tests.unit.test_anonymous_effect_slot_graph_gateway import legacy_render_import_task
     task, writes = legacy_render_import_task(path, version, media=True)
-    task.types.append({'name': 'AudioSource' if version == '2021.1' else 'AudioFileSource',
-        'classId': 16, 'type': 'WObject'})
+    # The media fixture already supplies the unique version-pinned source row.
     task.require_class_projection = True
     if version == '2021.1':
         import xml.etree.ElementTree as ET

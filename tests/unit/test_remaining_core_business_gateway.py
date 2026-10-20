@@ -1509,21 +1509,40 @@ def test_source_control_provider_read_only_policy_blocks_even_an_authorized_prev
 
 
 def test_source_control_provider_timeout_and_late_native_exception_remain_confidential(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
     import threading
-    import time
-    finished = threading.Event()
+    entered, release, finished, disconnected = (threading.Event() for _ in range(4))
     def delayed():
+        entered.set()
         try:
-            time.sleep(0.2)
+            assert release.wait(10), 'Provider release watchdog expired'
             raise RuntimeError('fake-password-雪-"\\-needle')
         finally:
             finished.set()
     client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path, native=delayed)
+    original_disconnect = client.disconnect
+    def disconnect():
+        try:
+            return original_disconnect()
+        finally:
+            disconnected.set()
+    client.disconnect = disconnect
     _authorize_provider_preview(run, preview)
-    code, result = run("--timeout", "0.1", "execute", preview["transaction_id"])
-    assert code != 0 and len(client.calls) == 1, result
-    assert "TIMEOUT" in json.dumps(result)
-    assert finished.wait(1)
+    # Entry and late failure are synchronized; elapsed preparation time is not
+    # used to guess when the provider has started or finished.
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run, "--timeout", "5", "execute", preview["transaction_id"])
+        try:
+            assert entered.wait(10), 'Public execution never entered the provider'
+            assert not future.done() and not finished.is_set()
+            code, result = future.result(timeout=10)
+            assert code != 0 and len(client.calls) == 1, result
+            assert "TIMEOUT" in json.dumps(result)
+            assert not finished.is_set(), 'Provider must fail only after the public timeout'
+        finally:
+            release.set()
+            assert finished.wait(10), 'Late provider exception did not finish'
+            assert disconnected.wait(10), 'Timed-out transport owner did not disconnect'
     _assert_no_provider_secret_artifacts(state, evidence, secret, result)
 
 
