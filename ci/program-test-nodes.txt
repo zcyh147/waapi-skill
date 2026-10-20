@@ -75,6 +75,7 @@ tests/unit/test_object_inline_curve_gateway.py
 tests/unit/test_object_lifecycle_replace_gateway.py
 tests/unit/test_copy_move_custom_workunit_gateway.py
 tests/unit/test_source_copy_field_preservation_gateway.py
+tests/unit/test_source_copy_saved_continuation_gateway.py
 tests/unit/test_cross_family_voice_import.py
 tests/unit/test_cross_family_game_sync_gateway.py
 tests/unit/test_business_declaration_state.py
