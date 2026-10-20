@@ -16,7 +16,7 @@ def bed_mixer_task(tmp_path, version, operation, policy):
     task = ScalarPropertyTask(tmp_path, version, operation)
     task.metadata = {name: deepcopy(field["metadata"]) for name, field in facts["fields"].items()}
     task.types = [deepcopy(facts["class"])]
-    task.objects[FIRST].update(name="OwnedBedMixer", type="Effect", path=r"\Effects\Default Work Unit\OwnedBedMixer",
+    task.objects[FIRST].update(name="OwnedBedMixer", type="Effect", classId=facts["class"]["classId"], path=r"\Effects\Default Work Unit\OwnedBedMixer",
                                SystemAudioObjectLimit=64, SystemAudioObjectsPolicy=policy)
     task.enabled = policy in (0, 1)
     return task

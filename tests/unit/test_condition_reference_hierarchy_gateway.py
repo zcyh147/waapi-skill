@@ -743,7 +743,9 @@ def test_shared_only_predicate_rejects_malformed_duplicate_extra_or_wrong_identi
     task.call = call
     task.declare()
     code, checked = task.step('draft-check')
-    assert code == 2 and checked['error_code'] == 'INVALID_READBACK', checked
+    assert code == 2 and checked['error_code'] == ('READBACK_FAILED' if response is None else 'INVALID_READBACK'), checked
+    if response is None:
+        assert checked['details']['error']['error_code'] == 'WAAPI_RESPONSE_MISSING', checked
     assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
 
 

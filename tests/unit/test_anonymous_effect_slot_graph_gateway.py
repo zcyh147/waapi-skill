@@ -807,6 +807,9 @@ def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.impor
     import uuid
     task, _ = list_task(tmp_path, version=version, operation=operation)
     task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    if media:
+        task.types.append({'name': 'AudioSource' if version == '2021.1' else 'AudioFileSource',
+                           'classId': 16, 'type': 'WObject'})
     task.metadata = {'IsVoice': {'name': 'IsVoice', 'type': 'bool', 'default': False},
         'Volume': {'name': 'Volume', 'type': 'Real64', 'default': 0},
         'OverrideEffect': {'name': 'OverrideEffect', 'type': 'bool', 'default': False,
@@ -854,7 +857,7 @@ def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.impor
                     copied = task.project_file.parent / 'Originals' / 'SFX' / Path(node['audioFile']).name
                     copied.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(node['audioFile'], copied)
                     identity = '{' + str(uuid.uuid4()).upper() + '}'
-                    source = {'id': identity, 'name': name, 'type': 'AudioFileSource', 'parent': {'id': owner['id']},
+                    source = {'id': identity, 'name': name, 'type': 'AudioFileSource', 'classId': 16, 'parent': {'id': owner['id']},
                         'path': path, 'notes': node.get('audioSourceNotes', ''), 'originalFilePath': str(copied),
                         'audioSource:language': {'id': EFFECT_PARENT, 'name': 'SFX'}}
                     task.objects[identity] = source

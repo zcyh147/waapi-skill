@@ -431,6 +431,7 @@ def object_row(*, volume: float | None = None) -> dict[str, Any]:
         "id": OBJECT_GUID,
         "name": "Target",
         "type": "Sound",
+        "classId": 1,
         "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Target",
         "parent": {"id": PARENT_GUID},
         "notes": "before",
@@ -443,7 +444,7 @@ def object_row(*, volume: float | None = None) -> dict[str, Any]:
 def expected_preview_calls() -> list[
     tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
 ]:
-    identity_fields = ["id", "name", "type", "path", "parent", "notes"]
+    identity_fields = ["id", "name", "type", "path", "parent", "notes", "classId"]
     return [
         ("ak.wwise.core.getInfo", None, None),
         ("ak.wwise.core.getProjectInfo", None, None),

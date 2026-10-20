@@ -755,17 +755,26 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
     declaration = ("draft-declare-undo-plan", draft, "--task-authority", authority,
         "--expected-revision", revision, "--display-name", "Cancellation case", *children,
         "--failure-cancellation", cancellation)
-    if declaration_error:
-        code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *declaration],
+    def state_bytes():
+        return {str(path.relative_to(state_dir)): path.read_bytes()
+                for path in state_dir.rglob("*") if path.is_file()}
+    def reject_without_parent_artifact(arguments, expected):
+        before, calls_before = state_bytes(), len(client.calls)
+        code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *arguments],
             env=env, client_factory=lambda _url: client)
-        assert code == 2 and declaration_error in json.dumps(rejected), rejected
+        assert code == 2 and expected in json.dumps(rejected), rejected
+        assert not rejected.get("transaction_id"), rejected
+        assert state_bytes() == before  # includes existing immutable child previews and parent Draft bytes
+        assert not any(uri.startswith("ak.wwise.core.undo.") or uri.endswith(("object.setNotes", "object.setName", "object.setProperty", "object.setReference"))
+                       for uri, _args, _options in client.calls[calls_before:])
+        return rejected
+    if declaration_error:
+        rejected = reject_without_parent_artifact(declaration, declaration_error)
         return state_dir, env, rejected
     phase = run(*declaration)
     check = ("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
     if parent_check_error:
-        code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *check],
-            env=env, client_factory=lambda _url: client)
-        assert code == 2 and parent_check_error in json.dumps(rejected), rejected
+        rejected = reject_without_parent_artifact(check, parent_check_error)
         return state_dir, env, rejected
     phase = run(*check)
     preview = run("preview-from-draft", draft, "--task-authority", authority,
@@ -909,7 +918,7 @@ def test_older_compound_rejects_unpinned_cancel_option_before_parent_preview(tmp
     client = _cancellation_client(version)
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version=version,
         cancellation=cancellation, declaration_error="UNSUPPORTED_CANCELLATION_OPTION")
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
@@ -954,8 +963,17 @@ def _property_cancellation_client(version, *, wrong_scalar=False):
     def call(uri, args=None, options=None):
         if uri == "ak.wwise.core.getProjectInfo":
             result = original(uri, args, options)
-            return {**result, "currentPlatformId": client.current_platform,
-                    "platforms": [{"id": object_id, "name": name}
+            return {**result, "displayTitle": "SampleProject", "isDirty": False,
+                    "currentLanguageId": "{66666666-6666-6666-6666-666666666666}",
+                    "referenceLanguageId": "{66666666-6666-6666-6666-666666666666}",
+                    "languages": [{"id": "{66666666-6666-6666-6666-666666666666}", "name": "English(US)", "shortId": 1}],
+                    "defaultConversion": {"id": "{77777777-7777-7777-7777-777777777777}", "name": "Default"},
+                    "directories": {name: "/project/" + name for name in
+                        ("root", "cache", "originals", "soundBankOutputRoot", "commands", "properties")},
+                    "currentPlatformId": client.current_platform,
+                    "platforms": [{"id": object_id, "name": name, "baseName": name,
+                        "baseDisplayName": name, "soundBankPath": "/project/SoundBanks/" + name,
+                        "copiedMediaPath": "/project/Media/" + name}
                                   for name, object_id in client.platform_names.items()]}
         if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
             client.calls.append((uri, args, options))
@@ -1005,7 +1023,7 @@ def test_compound_property_child_keeps_legal_current_platform_omission(tmp_path,
     if version == "2021.1":
         state_dir, _env, rejected = _preview_cancellation_case(tmp_path, client, version=version,
             cancellation=choice, property_child=True, parent_check_error="UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN")
-        assert not (state_dir / "transactions").exists()
+        assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
         assert "current_platform_or_global_linkage_observer" in json.dumps(rejected)
         return
     state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
@@ -1026,7 +1044,7 @@ def test_compound_same_current_platform_field_still_rejects_overlapping_children
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
         cancellation="undo-changes", property_child=True, duplicate_property=True,
         parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
@@ -1051,7 +1069,7 @@ def test_compound_current_and_named_platform_cannot_assume_distinct_outcomes(tmp
         cancellation="native-default", property_child=True, duplicate_property=True,
         second_platform="{44444444-4444-4444-4444-444444444444}",
         parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
@@ -1094,7 +1112,7 @@ def test_compound_distinct_platforms_need_actual_unlinked_evidence(tmp_path, ver
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version=version,
         cancellation="native-default", property_child=True, duplicate_property=True,
         second_platform="Mac", parent_check_error=error)
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
@@ -1169,7 +1187,7 @@ def test_compound_malformed_current_platform_cannot_seal_field_scope(tmp_path, p
     client.platform_values[platform] = 1.0
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
         cancellation="undo-changes", property_child=True, parent_check_error="INVALID_READBACK")
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
@@ -1180,7 +1198,7 @@ def test_compound_alias_of_current_unlinked_platform_still_overlaps(tmp_path, pl
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
         cancellation="undo-changes", property_child=True, duplicate_property=True, second_platform=platform,
         parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
@@ -1196,7 +1214,7 @@ def test_compound_current_platform_must_be_a_real_project_platform_before_previe
         del client.platform_names["Windows"]
     state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
         cancellation="undo-changes", property_child=True, parent_check_error="INVALID_READBACK")
-    assert not (state_dir / "transactions").exists()
+    assert not any(uri.startswith("ak.wwise.core.undo.") for uri, _args, _options in client.calls)
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
 
 
