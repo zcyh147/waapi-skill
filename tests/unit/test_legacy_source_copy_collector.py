@@ -196,3 +196,91 @@ def test_legacy_source_copy_failure_preserves_attempt_without_fallback(tmp_path,
     assert runtime.category_results[0]['status'] == 'FAIL' and receipt['failure']
     assert receipt['native_evidence']
     assert not any(uri.endswith('object.set') for uri, _ in writes)
+
+
+def legacy_owned_read_runtime(tmp_path, *, fault=None):
+    """2021 SDK fields and retained genuine owned identities, not modern points."""
+    runtime, commands, writes, task = legacy_runtime(tmp_path)
+    rtpc, lfo, curve = ('{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
+        '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}')
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/synth-one-2021-sdk-read-fields.json').read_text())
+    for field in fixture['properties']:
+        name, kind, value = field['name'], field['type'], field['sdk_default_text']
+        task.metadata[name] = {'name': name, 'type': kind}
+        task.objects[SOURCE].setdefault('@' + name, bool(int(value)) if kind == 'bool' else
+            int(value) if kind == 'int32' else float(value))
+    # SDK 2021.1.14 wwiseobject_paramcontrol/curve/modulatorlfo pages; these
+    # fixtures prove public routing only, never that the live hops succeed.
+    task.metadata.update(Color={'name': 'Color', 'type': 'int16'},
+        OverrideColor={'name': 'OverrideColor', 'type': 'bool'},
+        # Retained 8e9b9f17 native metadata has empty type/restriction, despite
+        # the SDK describing this as Reference. Do not fabricate certification.
+        ControlInput={'name': 'ControlInput', 'type': '', 'restriction': {}},
+        Flags={'name': 'Flags', 'type': 'int32'})
+    task.objects[rtpc] = {'id': rtpc, 'name': '', 'type': 'RTPC', 'classId': 1441808,
+        'path': task.objects[SOURCE]['path'] + r'\[RTPC: Output Level, Modulator LFO (Custom)]',
+        'owner': {'id': SOURCE}, 'notes': '', '@ControlInput': {'id': lfo}, '@Color': 0, '@OverrideColor': False}
+    task.objects[lfo] = {'id': lfo, 'name': 'Modulator LFO (Custom)', 'type': 'ModulatorLfo', 'classId': 4194320,
+        'path': 'Modulator LFO (Custom)', 'owner': {'id': rtpc}, 'notes': '', '@Color': 0, '@OverrideColor': False}
+    for name, kind, value in (('LfoAttack', 'Real64', 0.0), ('LfoDepth', 'Real64', 100.0),
+            ('LfoFrequency', 'Real64', 1.0), ('LfoInitialPhase', 'Real64', 0.0), ('LfoPWM', 'Real64', 50.0),
+            ('LfoSmoothing', 'Real64', 0.0), ('LfoWaveform', 'int32', 0), ('ModulatorScope', 'int32', 1)):
+        task.metadata[name] = {'name': name, 'type': kind}
+        task.objects[lfo]['@' + name] = value
+    task.objects[curve] = {'id': curve, 'name': '', 'type': 'Curve', 'classId': 917520,
+        'path': task.objects[rtpc]['path'] + r'\<Unnamed Curve>', 'owner': {'id': rtpc}, 'notes': '', '@Flags': 0}
+    original = task.call
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        expression = args.get('waql', '')
+        if uri.endswith('object.get') and ' select @' in expression:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if fault == 'hop-error':
+                raise RuntimeError('Pinned owned-list read rejected; no alternate spelling')
+            selected = rtpc if ' select @RTPC ' in expression else lfo if ' select @ControlInput ' in expression else curve
+            assert expression in (f'from object "{SOURCE}" select @RTPC take 8',
+                f'from object "{rtpc}" select @ControlInput take 2',
+                f'from object "{rtpc}" select @Curve take 2'), expression
+            return {'return': task.project_rows([task.objects[selected]], options)}
+        return original(uri, args, options)
+    task.call = call
+    return runtime, commands, writes, task
+
+
+def test_legacy_owned_read_uses_public_metadata_and_never_starts_copy(tmp_path, workflow, request):
+    runtime, commands, writes, task = legacy_owned_read_runtime(tmp_path)
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='UNUSED', owned_read_only=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['collection_complete'] is True and category['diagnostic_only'] is True
+    assert category['status'] == 'blocked'
+    assert category['business_effect_verified'] is False and category['transaction_ids'] == []
+    assert receipt['curve_points']['status'] == 'unavailable_in_2021_public_contract'
+    assert receipt['metadata_unreadable_fields'] == {'{CE99046D-D354-422D-A7BB-F1305FF00B2F}': ['ControlInput']}
+    assert writes == [] and not any(argv[0] in {'draft-start', 'preview', 'execute', 'confirm'} for argv in commands)
+    assert all(argv[0] in {'status', 'metadata', 'query-object'} for argv in commands)
+    assert any(argv[:2] == ['metadata', 'detail'] and '--selection' in argv for argv in commands)
+    queries = [argv for argv in commands if argv[0] == 'query-object']
+    assert all(argv.count('--include-field') <= 8 and 'curve-points' not in argv for argv in queries)
+    source_pages = [argv for argv in queries if SOURCE in argv and '--include-field' in argv]
+    assert len(source_pages) == 3  # 18 actual SDK names, not the old one-field fake.
+    from tests.destructive.support.category_evidence import build_category_evidence_record
+    record = build_category_evidence_record(repo_root=workflow.REPO_ROOT, candidate=runtime.candidate,
+        version='2021.1', host={'is_command_line': True}, categories=[category], source={},
+        residual_state={'sandbox': 'quarantined_pending_release', 'quarantine_path': str(tmp_path)},
+        invocation={'selected_test_nodeids': [request.node.nodeid], 'node_outcomes': [
+            {'nodeid': request.node.nodeid, 'outcome': 'PASS'}], 'started_at_unix_ns': 1,
+            'finished_at_unix_ns': 2, 'phase': 'prepared', 'outcome': 'PENDING'}, transactions=[])
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+
+
+def test_legacy_owned_read_preserves_first_hop_error_without_writes_or_fallback(tmp_path, workflow):
+    runtime, commands, writes, task = legacy_owned_read_runtime(tmp_path, fault='hop-error')
+    with pytest.raises(AssertionError):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='UNUSED', owned_read_only=True)
+    receipt = json.loads((runtime.state_dir / 'legacy-source-owned-read.json').read_text())
+    assert receipt['collection_complete'] is False and receipt['failure']
+    assert writes == [] and len([argv for argv in commands if '--advanced-waql' in argv]) == 1
+    assert receipt['calls'][-1]['exit_code'] != 0 and receipt['calls'][-1]['reply']
+    failed = json.loads(Path(receipt['calls'][-1]['reply']['path']).read_text())
+    assert failed['call']['message'] == 'Pinned owned-list read rejected; no alternate spelling'
+    assert receipt['native_evidence'] and runtime.category_results[0]['status'] == 'FAIL'
