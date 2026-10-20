@@ -120,3 +120,11 @@ WAVs, with full lifecycle closure. Its envelope durations are commensurate with
 [bounded sine-envelope successor](TONE_SINE_ENVELOPE.md) for the reviewed
 phase-independent numerical policy and separate program evidence. The original
 collection's partial outcomes and all earlier failures remain unchanged.
+
+The [stationary square successor](TONE_STATIONARY_SQUARE.md) reuses the untouched
+square original for program regression. It checks requested gain and full-sample
+exact digital cadence under a disclosed numerical policy. An incompatible
+exact cadence remains partial because utility phase arithmetic precision is not
+specified; it is never rounded into acceptance or labelled native invalidity.
+Triangle, noise and non-sine envelopes remain unfinished. No new collection or
+relabelled original native outcome follows from this successor.
