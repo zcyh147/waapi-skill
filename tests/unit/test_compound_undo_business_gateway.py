@@ -756,8 +756,9 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
         "--expected-revision", revision, "--display-name", "Cancellation case", *children,
         "--failure-cancellation", cancellation)
     def state_bytes():
-        return {str(path.relative_to(state_dir)): path.read_bytes()
-                for path in (state_dir / "transactions").rglob("*") if path.is_file()}
+        root = state_dir / "transactions"
+        return {str(path.relative_to(root)): path.read_bytes() if path.is_file() else None
+                for path in root.rglob("*")}
     def reject_without_parent_artifact(arguments, expected):
         before, calls_before = state_bytes(), len(client.calls)
         parent_path = state_dir / "operation-drafts-v1" / "records" / (draft + ".json")
