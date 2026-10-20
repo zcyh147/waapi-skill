@@ -123,7 +123,12 @@ def object_lifecycle_business_contract_data(
             "immutable_preview": True,
             "single_execute": True,
             "object_revalidation": "exact_guid_name_type_path",
-            **({"replace": {
+            **({"destination": {
+                "admission": "exact_live_parent_and_versioned_parent_child_compatibility_independent_of_WorkUnit_name",
+                "protected": "Project_and_management_roots_remain_prohibited",
+                "existing_Source": "exact_Sound_parent_plus_unique_live_Source_category_or_pinned_file_Source_class;_class_and_identity_revalidated",
+                "boundary": "existing_object_transfer_admission_is_not_plugin_construction_or_complete_plugin_copy_proof",
+            }, "replace": {
                 "authorization": "explicit_name_conflict_replace_and_exact_destination",
                 "preview": "complete_bounded_source_and_replaced_subtree",
                 "revalidation": "identities_topology_notes_and_discovered_default_view_fields",

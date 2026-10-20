@@ -235,6 +235,15 @@ def object_child_capability(
     )
 
 
+def object_transfer_parent_compatible(*, version: str, parent_type: object, child_type: object) -> bool:
+    """Transfer admission is distinct from creating an object of this class."""
+    if child_type in {"Source", "SourcePlugin", "AudioFileSource"}:
+        # Existing Source identity carries the plugin/file class. The public
+        # preparation seam separately certifies that class and the Sound owner.
+        return parent_type == "Sound"
+    return object_child_capability(version=version, parent_type=parent_type, child_types=(child_type,)).allowed
+
+
 __all__ = [
     "NON_INTRINSIC_NAME_OBJECT_TYPES",
     "OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION",
