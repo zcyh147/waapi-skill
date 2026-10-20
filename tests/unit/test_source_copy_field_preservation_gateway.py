@@ -156,16 +156,28 @@ def test_source_copy_keeps_uncertified_fields_explicit_without_rejecting_copy(tm
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2025.1'])
-def test_file_source_copy_uses_version_accessor_without_claiming_media_proof(tmp_path, version):
+@pytest.mark.parametrize('fault', [None, 'changed', 'omitted'])
+def test_file_source_copy_uses_version_accessor_without_claiming_media_proof(tmp_path, version, fault):
     task = source_copy_task(tmp_path, version)
     source = task.objects[FIRST]
     for field in [key for key in source if key.startswith('@')]: del source[field]
     accessor = 'originalWavFilePath' if version == '2021.1' else 'originalFilePath'
     source.update(type='AudioFileSource', classId=16, **{accessor: '/Originals/SFX/Recording.wav',
         'audioSource:language': {'id': '{99999999-9999-9999-9999-999999999999}', 'name': 'SFX'}})
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.copy'):
+            if fault == 'changed': task.objects[COPIED][accessor] = '/Originals/SFX/Wrong.wav'
+            elif fault == 'omitted': del task.objects[COPIED][accessor]
+        return result
+    task.call = call
     task.declare(); tx, shown = task.preview()
     code, result = task.finish(tx, shown)
-    assert code == 0 and result['verified'] is True, result
+    assert code == (0 if fault is None else 2) and result['verified'] is (fault is None), result
+    if fault: assert result['verification']['status'] == 'verification_failed'
+    assert len(task.writes) == 1
+    assert result['verification']['verification_scope']['file_reference_observed'] is True
     assert 'media_copy_state' in result['verification']['verification_scope']['unobserved']
     assert any(uri.endswith('object.get') and accessor in options.get('return', [])
         for uri, args, options in task.calls)

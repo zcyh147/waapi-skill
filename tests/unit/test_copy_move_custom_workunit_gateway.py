@@ -107,6 +107,10 @@ def test_file_source_transfer_uses_version_pinned_class_and_actual_object_type(t
     task.declare(); tx, shown = task.preview()
     code, result = task.finish(tx, shown)
     assert code == 0 and result['verified'] is True and len(task.writes) == 1, result
+    if operation == 'object.copy':
+        scope = result['verification']['verification_scope']
+        assert scope['file_reference_observed'] is False
+        assert 'file_reference_unavailable' in scope['unobserved']
 
 
 @pytest.mark.parametrize('version', VERSIONS)

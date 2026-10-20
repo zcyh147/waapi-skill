@@ -68,6 +68,7 @@ def capture_source_copy(source, destination, *, read, version):
 
 def source_copy_scope(snapshot):
     source = snapshot['source']
+    file_field = 'originalWavFilePath' if snapshot['version'] == '2021.1' else 'originalFilePath'
     return {'complete_copy_preservation': False,
         'observed': ['source_identity_class_notes', 'certified_default_view_scalars',
             'original_source_fields', 'owner_frames_and_bounded_childsets'],
@@ -75,6 +76,7 @@ def source_copy_scope(snapshot):
         'copied_scalar_field_count': sum(name not in source['reference_fields'] for name in source['field_values']),
         'owned_role_count': 0,
         'language_observed': 'audioSource:language' in source['frame'],
+        'file_reference_observed': file_field in source['frame'],
         'discovered_field_count': source['field_inventory']['count'],
         'uncertified_field_count': source['field_inventory']['count'] - len(source['field_values']),
         'owner_count': len(snapshot['owners']),
@@ -82,6 +84,7 @@ def source_copy_scope(snapshot):
         'owner_is_voice_count': sum('@IsVoice' in row['frame'] for row in snapshot['owners'].values()),
         'unobserved': ['owned_membership_and_values', 'curve_points', 'copied_reference_remapping',
             'other_platform_views_and_links', 'media_copy_state']
+            + (['file_reference_unavailable'] if source['frame']['type'] == 'AudioFileSource' and file_field not in source['frame'] else [])
             + (['default_fields_over_observation_budget'] if '*' in source['unreadable_fields'] else [])
             + (['owner_is_voice_unavailable'] if any('@IsVoice' not in row['frame'] for row in snapshot['owners'].values()) else [])
             + (['owner_childsets_over_observation_budget'] if any(not row['children_complete'] for row in snapshot['owners'].values()) else [])}
@@ -107,6 +110,11 @@ def verify_source_copy(snapshot, copied_id, *, read, replaced_ids=()):
     if 'audioSource:language' in expected['frame']:
         checks.append(('copied Source preserves observed language', lifecycle_snapshot_equal(
             copied['frame'].get('audioSource:language'), expected['frame']['audioSource:language'])))
+    file_field = 'originalWavFilePath' if snapshot['version'] == '2021.1' else 'originalFilePath'
+    if file_field in expected['frame']:
+        checks.append(('copied file Source preserves its observed original-file reference',
+            isinstance(expected['frame'][file_field], str) and isinstance(copied['frame'].get(file_field), str)
+            and lifecycle_snapshot_equal(copied['frame'][file_field], expected['frame'][file_field])))
     removed = {str(identity).upper() for identity in replaced_ids}
     for identity, before in snapshot['owners'].items():
         after = owners[identity]
