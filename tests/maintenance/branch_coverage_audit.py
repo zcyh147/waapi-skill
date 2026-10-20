@@ -452,7 +452,13 @@ def portable_binding_inputs(index_path, requirements):
                         or set(record['source_context'])!={'native_candidate','relevant_sources'}))):
                 raise ValueError('Closed current native class attachment required')
             if historical:
-                if (identity not in collection_plan(identity.split('|',1)[0])['eligible_branch_ids']
+                from tests.support.metadata_replay_branch_evidence import class_original_profile
+                profiles={class_original_profile(c)['bridge_contract']:c for c in ('r54','r55')}
+                cohort=profiles.get(record['source_bridge'].get('contract'))
+                if cohort is None:raise ValueError('Unreviewed original class bridge contract')
+                profile=class_original_profile(cohort)
+                if (record['source_bridge'].get('historical_candidate')!=profile['candidate']
+                        or identity not in collection_plan(identity.split('|',1)[0],cohort=cohort)['eligible_branch_ids']
                         or set(record['category_inputs'])!={'historical','replay'}
                         or any(not isinstance(v,list) or not v for v in record['category_inputs'].values())
                         or identity not in record['replay_bindings']

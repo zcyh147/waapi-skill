@@ -1886,18 +1886,37 @@ def test_original_r54_class_metadata_replays_through_current_public_gateway(tmp_
     """Preserved native responses, current injected execution; no new native fact."""
     import os
     from tests.support import metadata_replay_branch_evidence as replay
-    observed={};context_path=os.environ.get('WAAPI_R54_METADATA_REPLAY_CAPTURE_CONTEXT')
+    observed={};capture=None;context_path=os.environ.get('WAAPI_R54_METADATA_REPLAY_CAPTURE_CONTEXT')
     if context_path:
         from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
         capture=replay.load_r54_capture(context_path,request.node.nodeid,case)
         register_exact_evidence_finalizer(request.node,lambda reports:replay.finish_r54_capture(capture,reports,case,observed))
-    _run_original_r54_metadata_replay(tmp_path,case,observed)
+    _run_original_r54_metadata_replay(tmp_path,case,observed,
+        descriptor=capture['originals'][case] if capture else None,base=Path(capture['root']).parent if capture else None)
 
 
-def _run_original_r54_metadata_replay(tmp_path,case,observed):
+
+@pytest.mark.parametrize('case',[
+    '2021.1|MusicStinger|CustomCueMatchName','2022.1|MusicStinger|CustomCueMatchName',
+    '2023.1|MusicStinger|CustomCueMatchName','2023.1|ModulatorTime|EnvelopeStopPlayback',
+    '2024.1|MusicStinger|CustomCueMatchName','2024.1|ModulatorTime|EnvelopeStopPlayback'])
+def test_original_r55_class_metadata_replays_through_current_public_gateway(tmp_path,request,case):
+    """Actual frozen860 raw packets; current injected program, zero new native facts."""
+    import os
+    from tests.support import metadata_replay_branch_evidence as replay
+    observed={};capture=None;context_path=os.environ.get('WAAPI_R55_METADATA_REPLAY_CAPTURE_CONTEXT')
+    if context_path:
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture=replay.load_r54_capture(context_path,request.node.nodeid,case)
+        register_exact_evidence_finalizer(request.node,lambda reports:replay.finish_r54_capture(capture,reports,case,observed))
+    _run_original_r54_metadata_replay(tmp_path,case,observed,cohort='r55',
+        descriptor=capture['originals'][case] if capture else None,base=Path(capture['root']).parent if capture else None)
+
+
+def _run_original_r54_metadata_replay(tmp_path,case,observed,*,cohort='r54',descriptor=None,base=None):
     from copy import deepcopy
     from tests.support import metadata_replay_branch_evidence as replay
-    source=replay.r54_replay_case(case);context=source['context'];version,scope,field=case.split('|')
+    source=replay.r54_replay_case(case,descriptor,base=base,cohort=cohort);context=source['context'];version,scope,field=case.split('|')
     packets=source['packets']
     def property_info(args,options):
         assert args=={'classId':context['class_id'],'property':field} and options=={}

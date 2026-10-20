@@ -480,10 +480,12 @@ def read_metadata_run(descriptor, base, *, historical_class=False):
         # Capture and reader use the same complete deduplicated collection map,
         # including lifecycle imports. Omitted extras and source drift stay missing.
         if historical_class:
-            from tests.support.metadata_replay_branch_evidence import validate_r54_original_sources
-            if plan.get('cohort','r54')!='r54' or plan['observation_origin']!='native_scenario_lifecycle':
-                raise ValueError('Original R54 native origin/cohort changed')
-            validate_r54_original_sources(repository['commit'],sources)
+            from tests.support.metadata_replay_branch_evidence import validate_class_original_sources,R55_ORIGINAL_SEALS
+            if plan['observation_origin']!='native_scenario_lifecycle':
+                raise ValueError('Original class native origin changed')
+            validate_class_original_sources(repository['commit'],sources,plan.get('cohort','r54'))
+            if plan.get('cohort','r54')=='r55' and descriptor['seal']['sha256']!=R55_ORIGINAL_SEALS.get(context['version']):
+                raise ValueError('Original accepted R55 seal anchor changed')
             required=sources
         else:
             required = collection_source_map(collector.source_links(context['version'],selected['targets'])[1],collector.REPO)
@@ -644,10 +646,11 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
     import json
     from tests.support import metadata_replay_branch_evidence as producer
     from tests.maintenance.collect_class_metadata import collection_plan
-    if branch['id'] not in collection_plan(context['version'])['eligible_branch_ids']:
-        raise ValueError('R54 historical replay is limited to original41 default leaves')
+    cohort=context['cohort'];profile=producer.class_original_profile(cohort)
+    if branch['id'] not in collection_plan(context['version'],cohort=cohort)['eligible_branch_ids']:
+        raise ValueError('Historical class replay is limited to its exact original default leaves')
     bridge=record['source_bridge'];before=context['relevant_sources'];after=producer.r54_current_sources()
-    producer.validate_r54_original_sources(context['candidate'],before)
+    producer.validate_class_original_sources(context['candidate'],before,cohort)
     allowed={'tests/maintenance/collect_class_metadata.py','tests/maintenance/branch_audit_completion.py',
         'tests/maintenance/branch_coverage_audit.py','tests/support/metadata_replay_branch_evidence.py',
         'tests/unit/test_class_metadata_collection.py','tests/unit/test_metadata_replay_attachments.py',
@@ -672,18 +675,19 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
                                                          'before': None},
  'skills/waapi-skill/wwise_waapi/transaction_runtime.py': {'after': 'eca18101c572eb89c6af494235e7957602a4851073db4c99430f6086a7727baf',
                                                            'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'}}
+    if cohort=='r55':reviewed_runtime={} # Native860 already owns this exact accepted runtime.
     if any(changes.get(name)!=expected for name,expected in reviewed_runtime.items()):
         raise ValueError('Exact R54 reviewed runtime blob proof missing; unreviewed runtime drift')
     allowed.update(reviewed_runtime)
     if (set(bridge)!={'contract','attribution','historical_candidate','historical_sources','current_sources','changed_files'}
-            or bridge['contract']!='waapi-skill.r54-class-metadata-leaf-replay/v1'
+            or bridge['contract']!=profile['bridge_contract']
             or bridge['attribution']!='historical_native_current_program_not_current_native'
-            or bridge['historical_candidate']!=producer.R54_ORIGINAL or bridge['historical_sources']!=before
+            or bridge['historical_candidate']!=profile['candidate'] or bridge['historical_sources']!=before
             or bridge['current_sources']!=after or bridge['changed_files']!=changes or not set(changes)<=allowed):
         raise ValueError('Exact full R54/current source delta missing; unreviewed runtime drift')
     replay=read_sealed_artifact(record['replay'],base)
     case='|'.join((context['version'],context['class_name'],context['field']))
-    nodeid=producer.R54_NODE+'['+case+']'
+    nodeid=profile['node']+'['+case+']'
     if (record.get('evidence_kind')!='historical_class_metadata_current_program_replay'
             or record['invocation']!=replay['invocation']
             or record['invocation']!={'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':nodeid,'outcome':'PASS'}]}
@@ -700,7 +704,7 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
     if (native['uri']!=producer.URI or native['args']!={'classId':context['class_id'],'property':context['field']}
             or native['options']!={} or not same(native['result'],context['native_result'])
             or replay['replayed_original_native_sha256']!=context['native_sha256']
-            or replay['replayed_original_packets_sha256']!=producer.r54_replay_case(case,record['metadata_run'],base=base)['packet_sha256s']
+            or replay['replayed_original_packets_sha256']!=producer.r54_replay_case(case,record['metadata_run'],base=base,cohort=cohort)['packet_sha256s']
             or replay['client_disconnected'] is not True or public.get('detected_version')!=context['version']
             or public.get('is_command_line') is not True or public['agent_result']['scope']!=original['scope']
             or public['agent_result']['complete'] is not True
