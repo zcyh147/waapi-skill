@@ -557,6 +557,8 @@ def validate_typed_draft_evidence(
     steps: Sequence[Any],
     broker_records: Sequence[Mapping[str, Any]],
     allow_cleaned_file_evidence: bool = False,
+    user_prompts: Sequence[str] = (),
+    turn_prefix_counts: Sequence[int] = (),
 ) -> Mapping[str, Any] | None:
     """Rebuild one Composer flow from Broker facts and frozen local state."""
 
@@ -571,7 +573,9 @@ def validate_typed_draft_evidence(
             zip(steps, broker_records, strict=False),
             start=1,
         ):
-            if step.subcommand not in {"draft-start", "draft-start-undo-child"}:
+            if step.subcommand not in {"draft-start", "draft-start-undo-child"} and not (
+                step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save
+            ):
                 continue
             record = _mapping(raw_record, label=f"Composer Broker record {index}")
             payload = _record_payload(
@@ -593,6 +597,12 @@ def validate_typed_draft_evidence(
             if draft_ids
             else {}
         )
+        if any(step.source_copy_proof_role is not None for step in steps):
+            return _validate_source_copy_draft_evidence(
+                state_directory=state_directory, steps=steps, broker_records=broker_records,
+                durable_records=durable_records, allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+                user_prompts=user_prompts, turn_prefix_counts=turn_prefix_counts,
+            )
         if any(step.subcommand == "draft-start-undo-child" for step in steps):
             return _validate_compound_child_draft_evidence(
                 state_directory=state_directory, steps=steps,
@@ -612,11 +622,99 @@ def validate_typed_draft_evidence(
         OperationComposerError,
         OperationDraftError,
         TransactionError,
+        GatewayInvocationError,
+        KeyError,
+        StopIteration,
         OSError,
         TypeError,
         ValueError,
     ) as exc:
         raise TypedDraftEvidenceError(f"Composer archive replay failed: {exc}") from exc
+
+
+def _validate_source_copy_draft_evidence(
+    *, state_directory, steps, broker_records, durable_records,
+    allow_cleaned_file_evidence, user_prompts, turn_prefix_counts,
+):
+    """Account for every original receipt/event in one exact Source-owned chain."""
+    from types import SimpleNamespace
+    from tests.semantic.support.codex_source_copy_protocol import (
+        validate_source_copy_steps, validate_source_copy_role_payload,
+        source_copy_selection_bindings, source_copy_decline_command,
+    )
+    validate_source_copy_steps(steps)
+    selections = source_copy_selection_bindings(steps, broker_records,
+        user_prompts=user_prompts, turn_prefix_counts=turn_prefix_counts)
+    root = next(step for step in steps if step.subcommand == 'draft-start')
+    payloads = {}
+    groups = {draft_id: [] for draft_id in durable_records}
+    tx_owners = {record.seal['transaction_id']: draft_id for draft_id, record in durable_records.items()
+        if record.seal is not None}
+    context = SimpleNamespace(_state_directory=state_directory, _existing_state_directory=None,
+        _execution_steps=steps, _payloads_by_step=payloads,
+        _source_copy_archive_draft_ids=tuple(durable_records))
+    for index, (step, record) in enumerate(zip(steps, broker_records, strict=True)):
+        if (record.get('step_name') != step.name or record.get('sequence') != index + 1
+                or not all(record.get(key) is True for key in ('authenticated', 'accepted', 'succeeded'))):
+            _fail('Source Composer receipt is not its exact authenticated step')
+        payload = _record_payload(record, index=index + 1, subcommand=step.subcommand)
+        role = step.source_copy_proof_role
+        if role is not None:
+            expected = []
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    value = payloads[argument.step]
+                    for token in argument.pointer.lstrip('/').split('/'):
+                        value = value[token]
+                    if type(value) not in {str, int}:
+                        _fail('Source Composer owner binding is not one exact scalar')
+                    expected.append(str(value))
+                elif isinstance(argument, str):
+                    expected.append(argument)
+                else:
+                    _fail('Source Composer continuation has an unowned argument')
+            actual = _subcommand_arguments(_gateway_arguments(record, index=index + 1), step.subcommand)
+            if actual != tuple(expected):
+                _fail('Source Composer continuation differs from its exact owner/revision')
+            if index in selections:
+                choice = payloads[role.choice_step]
+                decline = source_copy_decline_command(choice, stage=role.kind.split('_')[0])
+                selected = decline if role.is_decline else choice['next_command']
+                if tuple(selected['gateway_argv']) != (step.subcommand, *actual):
+                    _fail('Source Composer selection differs from its disclosed command')
+            validate_source_copy_role_payload(context, step, payload)
+            if role.issues_save or role.is_resume:
+                owner = payload['draft']['draft_id']
+            else:
+                owner = payloads[root.name]['draft']['draft_id']
+        elif isinstance(payload.get('draft'), Mapping):
+            owner = payload['draft'].get('draft_id')
+        elif step.subcommand in {'preview-from-draft', 'transaction-show', 'confirm', 'execute', 'verify'}:
+            owner = tx_owners.get(payload.get('transaction_id'))
+        elif step.subcommand == 'operation-schema':
+            owner = next(draft_id for draft_id, durable in durable_records.items() if durable.operation == 'object.copy')
+        else:
+            _fail('Source Composer receipt has no recognized owning chain')
+        if owner not in groups:
+            _fail('Source Composer receipt refers to an unissued Draft/transaction')
+        groups[owner].append((step, payload))
+        payloads[step.name] = payload
+    if sum(len(group) for group in groups.values()) != len(steps) or any(not group for group in groups.values()):
+        _fail('Source Composer chains do not account for every receipt exactly once')
+    flows = []
+    for draft_id, group in groups.items():
+        durable = durable_records[draft_id]
+        flows.append(_validate_business_draft_evidence(
+            state_directory=state_directory, operation=durable.operation, version=durable.version,
+            schema_digest=durable.schema_digest, draft_id=draft_id, durable=durable,
+            steps=tuple(step for step, _ in group), payloads=tuple(payload for _, payload in group),
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence, source_copy_chain=True,
+        ))
+    evidence = {'contract': TYPED_DRAFT_EVIDENCE_CONTRACT, 'flow_count': len(flows),
+        'flows': flows, 'flows_sha256': canonical_sha256(flows)}
+    if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+        _fail('Source Composer evidence exceeds its fixed archive byte ceiling')
+    return evidence
 
 
 def _composer_flow_step_indexes(
@@ -810,6 +908,7 @@ def _validate_business_draft_evidence(
     payloads: Sequence[Mapping[str, Any]],
     allow_cleaned_file_evidence: bool,
     compound_child: bool = False,
+    source_copy_chain: bool = False,
 ) -> Mapping[str, Any]:
     event_options: list[frozenset[str]] = []
     response_revisions: list[int] = []
@@ -827,6 +926,15 @@ def _validate_business_draft_evidence(
         # Child creation starts its own original record; it is never a parent
         # mutation or a generic business command event fallback.
         options = frozenset({"started"}) if child_start else _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
+        role = step.source_copy_proof_role if source_copy_chain else None
+        if role is not None:
+            if role.issues_save:
+                event_options.extend(frozenset({event}) for event in
+                    ('started', 'source_copy.save_started', 'settings.revised'))
+            elif role.kind in {'baseline_return', 'baseline_decline'}:
+                event_options.append(frozenset({'source_copy.baseline_decided'}))
+            elif role.is_resume:
+                no_event = True
         if options is not None and not no_event:
             event_options.extend(
                 (frozenset({"seal_reserved"}), frozenset({"sealed"}))
@@ -937,7 +1045,7 @@ def _validate_business_draft_evidence(
             state_directory=state_directory, canonical=canonical_request,
             transaction_id=durable.seal["transaction_id"],
             artifact_hash=durable.seal["artifact_hash"], preview_payload=preview_payload,
-            steps=steps, payloads=payloads,
+            steps=steps, payloads=payloads, source_copy_chain=source_copy_chain,
         )
         preview_binding = {**preview_binding, "transaction_state": durable.seal["transaction_state"]}
     else:
@@ -993,6 +1101,7 @@ def _sealed_draft_transaction_binding(
     *, state_directory: Path, canonical: Mapping[str, Any],
     transaction_id: str, artifact_hash: str, preview_payload: Mapping[str, Any],
     steps: Sequence[Any], payloads: Sequence[Mapping[str, Any]],
+    source_copy_chain: bool = False,
 ) -> tuple[Mapping[str, Any], Any]:
     """Replay the original immutable transaction and full journal for either Draft lane."""
     preview_agent = _mapping(
@@ -1035,9 +1144,10 @@ def _sealed_draft_transaction_binding(
     transaction_payloads = [
         payload
         for step, payload in zip(steps, payloads)
-        if step.name.startswith(f"{draft_label}.")
-        and step.subcommand
-        in {"transaction-show", "confirm", "reject", "execute", "verify"}
+        if (source_copy_chain or step.name.startswith(f"{draft_label}."))
+        and (step.subcommand in {"transaction-show", "confirm", "reject", "execute", "verify"}
+             or source_copy_chain and step.source_copy_proof_role is not None
+                and step.source_copy_proof_role.kind == 'final_decline')
     ]
     if any(payload.get("transaction_id") != transaction_id for payload in transaction_payloads):
         _fail("Composer transaction commands do not share the sealed transaction ID")
@@ -1099,11 +1209,22 @@ def _sealed_draft_transaction_binding(
         label="Composer final transaction event details",
     )
     final_transaction_payload = transaction_payloads[-1] if transaction_payloads else {}
+    projected_verification = final_transaction_payload.get('verification')
+    journal_verification = final_event_details.get('verification')
+    if (source_copy_chain and isinstance(projected_verification, Mapping)
+            and 'summary_contract' in projected_verification):
+        if (not isinstance(journal_verification, Mapping)
+                or ('verification_scope' in projected_verification) != ('verification_scope' in journal_verification)
+                or projected_verification.get('verification_scope') != journal_verification.get('verification_scope')):
+            _fail('Source Composer verification scope differs from its transaction journal')
+        # Preserve the original full-journal hashes; only the separately bound
+        # Source scope extension is outside the historical compact summary keys.
+        projected_verification = {key: value for key, value in projected_verification.items()
+            if key != 'verification_scope'}
     if (
         "verification" in final_transaction_payload
         and not _verification_projection_matches_journal(
-            final_transaction_payload["verification"],
-            final_event_details.get("verification"),
+            projected_verification, journal_verification,
         )
     ):
         _fail("Composer verification result does not match the transaction journal")

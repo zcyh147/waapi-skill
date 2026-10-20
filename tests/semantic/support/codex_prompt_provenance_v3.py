@@ -190,7 +190,8 @@ def write_prompt_provenance(
     """Write the one fixed no-overwrite provenance document."""
 
     root = _scenario_root(scenario_root, require_exists=True)
-    if scenario.api not in HEAVY_APIS:
+    from tests.semantic.support.codex_source_copy_protocol import is_source_copy_proof_protocol
+    if scenario.api not in HEAVY_APIS and not is_source_copy_proof_protocol(scenario.api, version, protocol):
         raise PromptProvenanceError(
             f"prompt provenance is closed to the heavy API set: {scenario.api}"
         )
@@ -368,7 +369,6 @@ def _read_prompt_provenance_with_codec(
         or value.get("api") != scenario.api
         or value.get("scenario_root") != str(root)
         or value.get("owned_root") != str(root / "owned")
-        or scenario.api not in HEAVY_APIS
     ):
         raise PromptProvenanceError("prompt provenance identity is misbound")
 
@@ -398,6 +398,9 @@ def _read_prompt_provenance_with_codec(
     ):
         raise PromptProvenanceError("prompt provenance protocol digest is invalid")
     protocol = protocol_decoder(protocol_value)
+    from tests.semantic.support.codex_source_copy_protocol import is_source_copy_proof_protocol
+    if scenario.api not in HEAVY_APIS and not is_source_copy_proof_protocol(scenario.api, version, protocol):
+        raise PromptProvenanceError('prompt provenance API lacks its exact Source-owned protocol')
     canonical_protocol_value = protocol_canonicalizer(protocol_value)
     if serialize_protocol(protocol) != canonical_protocol_value:
         raise PromptProvenanceError("protocol manifest is not round-trip exact")

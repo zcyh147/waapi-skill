@@ -2419,6 +2419,7 @@ def run_v3_codex_task(
                     for record in broker_records
                 ),
                 broker_records=broker_records,
+                user_prompts=prompt_values, turn_prefix_counts=protocol.turn_prefix_counts,
             )
         except (TypedDraftEvidenceError, KeyError) as exc:
             raise V3TaskRunnerError(

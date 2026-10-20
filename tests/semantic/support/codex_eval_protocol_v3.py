@@ -4200,10 +4200,13 @@ def materialize_typed_transaction_protocol_requests(
     starts = tuple(
         (index, step)
         for index, step in enumerate(protocol.steps)
-        if step.subcommand == "draft-start"
+        if step.subcommand == "draft-start" or (
+            step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save)
     )
+    source_owned = any(step.source_copy_proof_role is not None for step in protocol.steps)
     for start_index, start in starts:
-        operation = str(start.arguments[0])
+        operation = ('ak.wwise.core.project.save' if start.source_copy_proof_role is not None
+            else str(start.arguments[0]))
         next_start_index = next(
             (
                 index
@@ -4222,6 +4225,8 @@ def materialize_typed_transaction_protocol_requests(
                 index
                 for index in range(start_index + 1, next_start_index)
                 if protocol.steps[index].subcommand == "preview-from-draft"
+                and (not source_owned or isinstance(protocol.steps[index].arguments[0], ResponseBinding)
+                     and protocol.steps[index].arguments[0].step == start.name)
             ),
             None,
         )

@@ -350,3 +350,39 @@ def build_source_copy_saved_proof_protocol(request: Mapping[str, Any], *, dirty_
             steps.append(Step('tx01.saved-verify', 'verify', (Bound('tx01.execute', '/transaction_id'),)))
     prefixes.append(len(steps))
     return V3GatewayProtocol(tuple(steps), tuple(prefixes))
+
+
+
+def is_source_copy_proof_protocol(api, version, protocol):
+    """Admit only the closed Source-owned 2021 copy protocol to provenance."""
+    if api != 'ak.wwise.core.object.copy' or version != '2021.1':
+        return False
+    try:
+        steps = protocol.steps
+        validate_source_copy_steps(steps)
+        root, = (step for step in steps if step.subcommand == 'draft-start')
+        issuers = {step.name for step in steps if step.source_copy_proof_role is not None
+            and step.source_copy_proof_role.issues_save}
+        if not issuers:
+            return False
+        previews = {}
+        for step in steps:
+            if step.subcommand != 'preview-from-draft':
+                continue
+            owner = step.arguments[0].step
+            request = step.expected_operation_request
+            if owner in previews or not isinstance(request, Mapping) or request.get('version') != '2021.1':
+                return False
+            if owner == root.name:
+                if request.get('operation') != 'object.copy' or request.get('arguments', {}).get('on_name_conflict') == 'replace':
+                    return False
+            elif owner in issuers:
+                if request != {'contract': 'waapi-skill.operation-request/v1', 'version': '2021.1',
+                        'operation': 'waapi.call', 'arguments': {'api': SAVE, 'args': {}, 'options': {}}}:
+                    return False
+            else:
+                return False
+            previews[owner] = step.name
+        return set(previews) == {root.name, *issuers}
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False

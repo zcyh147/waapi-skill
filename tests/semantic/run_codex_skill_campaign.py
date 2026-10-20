@@ -4814,6 +4814,7 @@ def _validate_heavy_v3_retryable_task_failure(
         failed_prefix=failed_prefix,
         protocol=protocol,
         command_records=tuple(prior_gateway_records),
+        user_prompts=prompt_evidence.prompts,
         options=options,
         version=str(getattr(expected_unit, "version", "")),
         expected_project_modification_policy=getattr(
@@ -5251,6 +5252,7 @@ def _validate_heavy_v3_retryable_partial_broker(
     options: CampaignOptions,
     version: str,
     expected_project_modification_policy: str | None = None,
+    user_prompts: Sequence[str] = (),
 ) -> None:
     top_keys = {
         "expected_step_names",
@@ -5346,6 +5348,8 @@ def _validate_heavy_v3_retryable_partial_broker(
         options=options,
         version=version,
         label="retryable heavy partial",
+        user_prompts=user_prompts,
+        turn_prefix_counts=protocol.turn_prefix_counts,
         expected_project_modification_policy=(
             expected_project_modification_policy
         ),
@@ -6436,6 +6440,8 @@ def _validate_heavy_v3_task_result(
                 replayed_composer = validate_typed_draft_evidence(
                     **validator_arguments,
                     allow_cleaned_file_evidence=True,
+                    user_prompts=prompt_evidence.prompts,
+                    turn_prefix_counts=protocol.turn_prefix_counts,
                 )
             else:
                 # Historical grammar is imported only at the explicit
