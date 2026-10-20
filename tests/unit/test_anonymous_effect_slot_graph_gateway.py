@@ -358,7 +358,16 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
         planned_handle = declared['draft']['declared_object']['result_handle']
     declare_slots(task)
     slot = task.bind(ROOT)
-    field = select_field(task, owner=slot, token='Effect')
+    if fault == 'other-platform':
+        scope = ['--object-handle', slot, '--platform', 'Mac']
+        code, listed = task.step('draft-discover-fields', *scope, '--list')
+        assert code == 0, listed
+        selection = next(row['selection'] for row in listed['agent_result']['fields'] if row['name'] == 'Effect')
+        code, chosen = task.step('draft-discover-fields', *scope, '--selection', selection)
+        assert code == 0, chosen
+        field = chosen['meaning_results'][0]['candidates'][0]['handle']
+    else:
+        field = select_field(task, owner=slot, token='Effect')
     target = planned_handle if planned else task.bind(EFFECT_B) if value == 'retarget' else 'null'
     code, declared = task.step('draft-declare-existing', '--declaration-id', 'retarget', '--object-handle', slot,
         '--field-value', field, target)
@@ -368,7 +377,8 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
         if uri.endswith('object.set'):
             writes.append(deepcopy(args))
             rows = {row['object']: row for row in args['objects']}
-            assert rows[ROOT] == {'object': ROOT, '@Effect': planned_path if planned else EFFECT_B if value == 'retarget' else None}
+            assert rows[ROOT] == {'object': ROOT, '@Effect': planned_path if planned else EFFECT_B if value == 'retarget' else None,
+                **({'platform': 'Mac'} if fault == 'other-platform' else {})}
             if planned:
                 task.objects[new_effect] = {'id': new_effect, 'name': 'New ShareSet', 'type': 'Effect', 'classId': 8454147,
                     'parent': {'id': EFFECT_PARENT}, 'path': planned_path, 'notes': ''}
@@ -417,7 +427,7 @@ def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value)
     _append_reference_edit_case(tmp_path, value)
 
 
-@pytest.mark.parametrize('planned,fault', [(False, 'ignored'), (False, 'wrong-target'),
+@pytest.mark.parametrize('planned,fault', [(False, 'ignored'), (False, 'wrong-target'), (False, 'other-platform'),
     (True, None), (True, 'ignored'), (True, 'wrong-target'), (True, 'missing-association'),
     (True, 'duplicate-association'), (True, 'invalid-association')])
 def test_append_reference_intent_uses_actual_effect_and_owned_result_association(tmp_path, planned, fault):
