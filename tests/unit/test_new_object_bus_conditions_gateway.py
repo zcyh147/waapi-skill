@@ -100,7 +100,10 @@ def test_new_bus_reference_rejects_conflict_or_unproved_existing_parent_before_w
     if fault == "wrong-parent-class": task.objects[FIRST]["classId"] = 65552
     code, rejected = task.step("draft-check")
     assert code == 2, rejected
-    assert rejected["error_code"] == ("OVERRIDE_APPLICABILITY_INVALID" if fault == "explicit-false" else "NEW_OBJECT_DEPENDENCY_UNSUPPORTED")
+    assert rejected["error_code"] == ("OVERRIDE_APPLICABILITY_INVALID" if fault == "explicit-false" else "INVALID_OBJECT_TYPE" if fault == "wrong-parent-class" else "NEW_OBJECT_DEPENDENCY_UNSUPPORTED")
+    if fault == "wrong-parent-class":
+        assert task.objects[FIRST]["classId"] == 65552
+        assert "class" in json.dumps(rejected).lower()
     assert not writes
 
 

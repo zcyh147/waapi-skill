@@ -339,49 +339,162 @@ def test_anonymous_constructor_revalidates_source_and_target_before_one_write(tm
     assert not writes
 
 
-@pytest.mark.parametrize('value', ['retarget', 'null', 'zero', 'missing'])
-def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value):
-    task = anonymous_task(tmp_path)
+def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, equivalent_view=None, view_drift=None, version='2025.1'):
+    task = anonymous_task(tmp_path, version)
+    windows = '{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}'
+    reference_platform = ('Windows' if equivalent_view == 'name' else windows if equivalent_view == 'guid'
+                          else 'Mac' if fault == 'other-platform' else None)
+    project_view = {'current': windows, 'name': 'Windows'}
+    if equivalent_view is not None:
+        original_project = task.call
+        def project_call(uri, args=None, options=None):
+            result = original_project(uri, args, options)
+            if uri.endswith('getProjectInfo'):
+                return {**result, 'displayTitle': 'SampleProject', 'isDirty': False,
+                    'currentLanguageId': EFFECT_PARENT, 'referenceLanguageId': EFFECT_PARENT,
+                    'languages': [{'id': EFFECT_PARENT, 'name': 'English(US)', 'shortId': 1}],
+                    'defaultConversion': {'id': EFFECT_B, 'name': 'Default'},
+                    'directories': {name: '/project/' + name for name in
+                        ('root', 'cache', 'originals', 'soundBankOutputRoot', 'commands', 'properties')},
+                    'currentPlatformId': project_view['current'],
+                    'platforms': [{'id': windows, 'name': project_view['name'], 'baseName': 'Windows',
+                        'baseDisplayName': 'Windows', 'soundBankPath': '/project/SoundBanks', 'copiedMediaPath': '/project/Media'}]}
+            return result
+        task.call = project_call
     # Retained f4 native receipt returns EffectSlot for this exact binding.
     # The independent class-verified construction controls also cover generic
     # PluginInnerObject projections without rewriting their returned type.
     task.objects[ROOT]['type'] = 'EffectSlot'
     task.objects[ROOT]['@Effect'] = {key: task.objects[EFFECT][key] for key in ['id', 'name', 'type', 'path']}
+    new_effect = '{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}'
+    planned_path = task.objects[EFFECT_PARENT]['path'] + r'\New ShareSet'
+    if planned:
+        parent = task.bind(EFFECT_PARENT)
+        code, found = task.step('draft-discover-types', '--role', 'effect', '--meaning', 'Wwise Meter')
+        assert code == 0, found
+        code, declared = task.step('draft-declare-new', '--declaration-id', 'new-effect', '--parent-handle', parent,
+            '--name', 'New ShareSet', '--kind', found['type_candidates'][0]['handle'], '--field', 'plugin_placement', 'shareset')
+        assert code == 0, declared
+        planned_handle = declared['draft']['declared_object']['result_handle']
     declare_slots(task)
     slot = task.bind(ROOT)
-    field = select_field(task, owner=slot, token='Effect')
-    target = task.bind(EFFECT_B) if value == 'retarget' else 'null'
+    if reference_platform is not None:
+        scope = ['--object-handle', slot, '--platform', reference_platform]
+        code, listed = task.step('draft-discover-fields', *scope, '--list')
+        assert code == 0, listed
+        selection = next(row['selection'] for row in listed['agent_result']['fields'] if row['name'] == 'Effect')
+        code, chosen = task.step('draft-discover-fields', *scope, '--selection', selection)
+        assert code == 0, chosen
+        field = chosen['meaning_results'][0]['candidates'][0]['handle']
+    else:
+        field = select_field(task, owner=slot, token='Effect')
+    target = planned_handle if planned else task.bind(EFFECT_B) if value == 'retarget' else 'null'
     code, declared = task.step('draft-declare-existing', '--declaration-id', 'retarget', '--object-handle', slot,
         '--field-value', field, target)
     assert code == 0, declared
     original, writes = task.call, []
     def call(uri, args=None, options=None):
+        if reference_platform is not None and uri.endswith('object.isPropertyEnabled'):
+            assert args == {'object': ROOT, 'property': 'Effect', 'platform': reference_platform}
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
         if uri.endswith('object.set'):
             writes.append(deepcopy(args))
             rows = {row['object']: row for row in args['objects']}
-            assert rows[ROOT] == {'object': ROOT, '@Effect': EFFECT_B if value == 'retarget' else None}
+            assert rows[ROOT] == {'object': ROOT, '@Effect': planned_path if planned else EFFECT_B if value == 'retarget' else None,
+                **({'platform': reference_platform} if reference_platform is not None else {})}
+            if planned:
+                task.objects[new_effect] = {'id': new_effect, 'name': 'New ShareSet', 'type': 'Effect', 'classId': 8454147,
+                    'parent': {'id': EFFECT_PARENT}, 'path': planned_path, 'notes': ''}
             if value == 'retarget':
-                task.objects[ROOT]['@Effect'] = {key: task.objects[EFFECT_B][key] for key in ['id', 'name', 'type', 'path']}
+                task.objects[ROOT]['@Effect'] = {key: task.objects[new_effect if planned else EFFECT_B][key] for key in ['id', 'name', 'type', 'path']}
             elif value == 'zero':
                 task.objects[ROOT]['@Effect'] = {'id': '{00000000-0000-0000-0000-000000000000}', 'name': ''}
             elif value == 'missing':
                 del task.objects[ROOT]['@Effect']
             else:
                 task.objects[ROOT]['@Effect'] = None
+            if fault == 'ignored': task.objects[ROOT]['@Effect'] = {'id': EFFECT}
+            if fault == 'wrong-target': task.objects[ROOT]['@Effect'] = {'id': EFFECT_B if planned else EFFECT}
             for identity, source in zip([SLOT_A, SLOT_B], rows[FIRST]['@Effects'], strict=True):
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject', 'classId': 5505040,
                     'owner': {'id': FIRST}, 'path': r'\Opaque new slot ' + identity, 'notes': '',
                     '@Effect': {'id': source['@Effect']}, '@Bypass': source['@Bypass'], '@Render': source['@Render']}
             task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
-            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]}]}
+            results = [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]}]
+            if planned and fault != 'missing-association':
+                result_id = SLOT_A if fault == 'duplicate-association' else 'not-a-guid' if fault == 'invalid-association' else new_effect
+                results.insert(0, {'id': EFFECT_PARENT, 'name': 'Default Work Unit',
+                    'children': [{'id': result_id, 'name': 'New ShareSet'}]})
+            return {'objects': results}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
-    code, verified = task.finish(tx, shown)
-    assert code == (2 if value == 'missing' else 0), json.dumps(verified)
-    assert (verified.get('verified') is True) == (value != 'missing'), verified
+    if equivalent_view is not None:
+        prepared_state = shown['artifact']['prepared_operation']['pre_state']
+        assert prepared_state['effect_render_chains'][0]['field_read_platform']['platform_id'] == windows
+        proofs = [proof for proof in prepared_state['existing_field_observations'] if proof['object_id'] == ROOT]
+        assert len(proofs) == 1 and proofs[0]['field_read_platform']['status'] == 'certified'
+        assert proofs[0]['field_read_platform']['selector'] == reference_platform
+        assert proofs[0]['field_read_platform']['platform_id'] == windows
+    if fault == 'other-platform':
+        assert shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]['platform'] is None
+    code, unauthorized = task.run('execute', tx)
+    assert code == 2 and not writes, unauthorized
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if view_drift == 'current': project_view['current'] = EFFECT_PARENT
+    if view_drift == 'name': project_view['name'] = 'Renamed Windows'
+    code, executed = task.run('execute', tx)
+    if view_drift is not None:
+        assert code == 2 and not writes and executed.get('executed') is not True, executed
+        return executed
+    if code == 0:
+        code, verified = task.run('verify', tx)
+    else:
+        assert fault in {'missing-association', 'duplicate-association', 'invalid-association'}, executed
+        verified = executed
+    expected_failure = value == 'missing' or fault is not None
+    assert code == (2 if expected_failure else 0), json.dumps(verified)
+    assert (verified.get('verified') is True) == (not expected_failure), verified
     assert len(writes) == 1
+    if fault == 'other-platform':
+        assert any(row.get('kind') == 'effect_render_chain_observation' and row['passed'] is False
+                   for row in verified['verification']['assertions']), verified
+    return verified
 
+
+
+@pytest.mark.parametrize('value', ['retarget', 'null', 'zero', 'missing'])
+def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value):
+    _append_reference_edit_case(tmp_path, value)
+
+
+@pytest.mark.parametrize('planned,fault', [(False, 'ignored'), (False, 'wrong-target'), (False, 'other-platform'),
+    (True, None), (True, 'ignored'), (True, 'wrong-target'), (True, 'missing-association'),
+    (True, 'duplicate-association'), (True, 'invalid-association')])
+def test_append_reference_intent_uses_actual_effect_and_owned_result_association(tmp_path, planned, fault):
+    _append_reference_edit_case(tmp_path, 'retarget', planned=planned, fault=fault)
+
+
+
+
+@pytest.mark.parametrize('view', ['name', 'guid'])
+def test_append_reference_equivalent_certified_view_matches_omitted_chain(tmp_path, view):
+    _append_reference_edit_case(tmp_path, 'retarget', equivalent_view=view)
+
+
+
+@pytest.mark.parametrize('drift', ['name', 'current'])
+def test_append_reference_equivalent_view_drift_stops_before_one_write(tmp_path, drift):
+    _append_reference_edit_case(tmp_path, 'retarget', equivalent_view='name', view_drift=drift)
+
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+@pytest.mark.parametrize('planned', [False, True])
+def test_append_reference_intent_matches_other_supported_modern_versions(tmp_path, version, planned):
+    _append_reference_edit_case(tmp_path, 'retarget', version=version, planned=planned)
 
 def test_existing_nested_shareset_reference_uses_actual_parent_chain_not_constructor_destination(tmp_path):
     task = anonymous_task(tmp_path)
@@ -807,6 +920,9 @@ def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.impor
     import uuid
     task, _ = list_task(tmp_path, version=version, operation=operation)
     task.types = [row for row in task.types if row['name'] != 'EffectSlot']
+    if media:
+        task.types.append({'name': 'AudioSource' if version == '2021.1' else 'AudioFileSource',
+                           'classId': 16, 'type': 'WObject'})
     task.metadata = {'IsVoice': {'name': 'IsVoice', 'type': 'bool', 'default': False},
         'Volume': {'name': 'Volume', 'type': 'Real64', 'default': 0},
         'OverrideEffect': {'name': 'OverrideEffect', 'type': 'bool', 'default': False,
@@ -854,7 +970,7 @@ def legacy_render_import_task(tmp_path, version='2022.1', operation='audio.impor
                     copied = task.project_file.parent / 'Originals' / 'SFX' / Path(node['audioFile']).name
                     copied.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(node['audioFile'], copied)
                     identity = '{' + str(uuid.uuid4()).upper() + '}'
-                    source = {'id': identity, 'name': name, 'type': 'AudioFileSource', 'parent': {'id': owner['id']},
+                    source = {'id': identity, 'name': name, 'type': 'AudioFileSource', 'classId': 16, 'parent': {'id': owner['id']},
                         'path': path, 'notes': node.get('audioSourceNotes', ''), 'originalFilePath': str(copied),
                         'audioSource:language': {'id': EFFECT_PARENT, 'name': 'SFX'}}
                     task.objects[identity] = source

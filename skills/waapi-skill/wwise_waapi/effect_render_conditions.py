@@ -228,17 +228,34 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                 snapshot["after_changes"]["Render"] = change["after"]
         # Explicit changes to existing members are included in the same complete
         # chain proof. Native coupling is expected, never inferred as a pass.
-        for spec in members:
+        reference_views = []
+        for spec in specs:
             for snapshot in snapshots:
                 if r._same_identity(snapshot["object_id"], spec.get("preexisting_id", spec.get("target_id"))):
+                    intent_view, intent_platform = view_for(spec.get("platform"))
+                    if intent_platform != platform:
+                        continue
+                    if (spec.get("platform") != members[0].get("platform")
+                            and intent_view["status"] == "certified" and intent_view not in reference_views):
+                        reference_views.append(intent_view)
                     snapshot["after_changes"].update({prop["name"]: prop["value"] for prop in spec["properties"]})
+                    references = snapshot.setdefault("reference_changes", {})
+                    for reference in spec["references"]:
+                        if reference.get("condition_guard"):
+                            continue
+                        # A planned result is not a clear: retain its sealed request path
+                        # until the ordinary graph verifier has associated actual GUIDs.
+                        references[reference["name"]] = (
+                            {"target_request_path": reference["target_request_path"]}
+                            if "target_request_path" in reference else {"target_id": reference["target_id"]})
         for spec in members:
             for name, value in new_defaults.get(spec["request_path"], {}).items():
                 if not any(prop["name"] == name for prop in spec["properties"]):
                     spec["properties"].append({"name": name, "value": value, "metadata_type": "bool", "observed_class_default": True})
         chains.append({**planned, "authority": source_authority(version), "version": version, "platform": platform, "source": source,
             "field_read_platform": view, "owner_id": owner_id, "mode": mode, "before_order": [row["id"] for row in before],
-            "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets})
+            "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets,
+            "reference_view_proofs": reference_views})
     chains.extend(prepare_legacy(specs, native_nodes, version=version, read=read))
     return chains
 
@@ -356,7 +373,7 @@ def prepare_property(*, object_id, field, value, version, platform, read):
     return prepare_graph([spec], {}, version=version, read=read)
 
 
-def chain_assertions(chains, *, read, after_write=False, edits=()):
+def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=None):
     from . import operation_registry as r
     from .documented_list_fields import resolve_class_list_evidence, resolve_live_list_evidence
     from .object_graph_paths import expected_snapshot
@@ -387,6 +404,11 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                 if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]]
             observed["slot_types"] = types
             passed = source_match and chain["authority"] == source_authority(chain["version"]) and types == [chain["slot_type"]]
+            from .edit_history_business import capture_field_read_platform
+            for proof in chain.get("reference_view_proofs", []):
+                actual_view = capture_field_read_platform(proof["version"], proof["selector"], read=read)
+                observed.setdefault("reference_views", []).append({"expected": proof, "actual": actual_view})
+                passed = passed and r._native_snapshot_equal(proof, actual_view)
             if not legacy and chain["owner_id"] and (not after_write or chain["mode"] == "existing"):
                 rows = r._read_object_list(chain["owner_id"], "Effects", fields=r.OBJECT_LIST_SNAPSHOT_FIELDS,
                     read=read, platform=chain["platform"], version=chain["version"])
@@ -411,6 +433,19 @@ def chain_assertions(chains, *, read, after_write=False, edits=()):
                         expected[name if name in expected else "@" + name] = value
                 selected = {name: r._reference_identity(r._field_value(expected, name)) for name in
                     (chain.get("reference_fields", [f"Effect{i}" for i in range(4)]) if legacy else ["Effect"]) if r._has_field(expected, name)}
+                if after_write:
+                    for name, intent in snapshot.get("reference_changes", {}).items():
+                        if "target_request_path" in intent:
+                            path = intent["target_request_path"]
+                            identity = resolved_ids.get(path) if isinstance(resolved_ids, dict) else None
+                            if (not r._valid_object_id(identity) or r._reference_value_is_null(identity)
+                                    or sum(r._same_identity(value, identity) for value in resolved_ids.values()) != 1):
+                                raise ValueError("Planned Render reference lacks one canonical graph result association")
+                            selected[name] = identity
+                        else:
+                            if set(intent) != {"target_id"}:
+                                raise ValueError("Render reference intent is malformed")
+                            selected[name] = intent["target_id"]
                 strip = lambda row: {key: value for key, value in row.items() if key.lstrip("@") not in selected}
                 passed = passed and len(actual) == 1 and r._native_snapshot_equal([strip(expected)], [strip(row) for row in actual]) and all(
                     r._reference_requirement_matches(actual[0], name, value) for name, value in selected.items())
