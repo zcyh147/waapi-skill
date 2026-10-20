@@ -7,6 +7,7 @@ import math
 from decimal import Decimal
 import os
 import struct
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -237,7 +238,8 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
             unresolved = _check_requested_format(observed, args) + marker_unresolved
             observed["nonzero_samples_by_channel"], signal = _scan_samples(stream, data, observed, args)
             if signal is not None:
-                observed["sine_envelope" if 'segments' in signal else "stationary_sine"] = signal
+                observed['stationary_square' if args.get('waveform') == 'square' else
+                    ("sine_envelope" if 'segments' in signal else "stationary_sine")] = signal
             if args.get("waveform", "silence") != "silence" and args.get("waveformChannelMask") != 0:
                 if signal is None or signal['observability_reason'] is not None:
                     unresolved.append("active waveform, frequency and envelope postconditions" + (
@@ -363,7 +365,13 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
     stationary = (args.get('waveform') == 'sine' and not args.get('attackTime', 0)
         and not args.get('releaseTime', 0) and silence_mask != (1 << channels) - 1)
     sine_requested = args.get('waveform') == 'sine' and silence_mask != (1 << channels) - 1
-    signal = _sine_signal_policy(observed, args, enveloped=not stationary) if sine_requested else None
+    square_requested = (args.get('waveform') == 'square' and not args.get('attackTime', 0)
+        and not args.get('releaseTime', 0) and silence_mask != (1 << channels) - 1)
+    signal = _sine_signal_policy(observed, args, enveloped=not stationary) if sine_requested else (
+        _square_signal_policy(observed, args) if square_requested else None)
+    square_rows = {channel: {'phase_intervals': [[0, signal['phase_half_cycle_units']]], 'anchor': None,
+        'magnitude_sum': 0.0, 'previous_sign': None, 'sign_transitions': 0, 'max_sample_error': 0.0}
+        for channel in range(channels) if not silence_mask & (1 << channel)} if square_requested else None
     envelope_stats = [{'gram': [0.0, 0.0, 0.0], 'projections': [[0.0, 0.0] for _ in range(channels)]}
         for _ in signal['segments']] if signal is not None and 'segments' in signal else None
     ss = cc = sc = 0.0
@@ -377,7 +385,24 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
             nonzero[channel] += 1
             if silence_mask & (1 << channel):
                 raise _invalid(f"Tone WAV contains a nonzero sample in requested silent channel {channel} at sample {sample_index}.")
-        if signal is not None and signal['observability_reason'] is None:
+        if square_rows is not None and channel in square_rows:
+            row = square_rows[channel]
+            magnitude = abs(sample / scale)
+            error = abs(magnitude - signal['requested_gain'])
+            if error > signal['sample_error_limit']:
+                raise SoundBankContractError('INVALID_TONE_WAV',
+                    'Tone stationary square sample magnitude differs from requested gain within the numerical policy.',
+                    details={'stationary_square': signal, 'channel': channel,
+                        'sample_index': sample_index, 'sample_error': error})
+            row['magnitude_sum'] += magnitude
+            row['max_sample_error'] = max(row['max_sample_error'], error)
+            positive = sample >= 0
+            if row['previous_sign'] is not None and positive != row['previous_sign']:
+                row['sign_transitions'] += 1
+            row['previous_sign'] = positive
+            if signal['observability_reason'] is None and row['phase_intervals']:
+                _observe_square_phase(positive, sample_index // channels, row, signal)
+        if sine_requested and signal['observability_reason'] is None:
             if channel == 0:
                 phase = math.remainder(signal['angular_step'] * (sample_index // channels), math.tau)
                 sine, cosine = math.sin(phase), math.cos(phase)
@@ -395,12 +420,83 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
             target = envelope_stats[segment_index]['projections'] if envelope_stats is not None else projections
             target[channel][0] += sample / scale * sine
             target[channel][1] += sample / scale * cosine
-    if signal is not None and signal['observability_reason'] is None:
+    if sine_requested and signal['observability_reason'] is None:
         if envelope_stats is not None:
             _check_sine_envelope(stream, data, observed, silence_mask, envelope_stats, signal)
         else:
             _check_stationary_sine(stream, data, observed, silence_mask, projections, (ss, cc, sc), signal)
+    if square_rows is not None:
+        _finish_square_channels(square_rows, observed['frames'], signal)
     return nonzero, signal
+
+
+def _square_signal_policy(observed, args):
+    # Reuse the reviewed numerical allowances, not the sine's DSP model.
+    signal = _sine_signal_policy(observed, args)
+    step = Fraction(str(args.get('frequency', 440))) / observed['sample_rate']
+    signal.pop('angular_step')
+    signal.update(policy='stationary-square-numerical-conformance-v1',
+        reference='requested digital square; one unparameterized phase per channel; either limiting sign only at exact discontinuities; not a bit-exact native algorithm or unique analog origin',
+        phase_step_units=2 * step.numerator, phase_half_cycle_units=step.denominator)
+    if signal['requested_gain'] <= signal['sample_error_limit']:
+        signal['observability_reason'] = signal['observability_reason'] or (
+            'requested square levels cannot be distinguished from sample quantization')
+    return signal
+
+
+def _finish_square_channels(rows, frames, signal):
+    if not frames:
+        signal['observability_reason'] = signal['observability_reason'] or 'empty square record has no observable periodic recurrence'
+        return
+    gain = signal['requested_gain']
+    # Nonnegative summation and one division: a conservative gamma(N) bound.
+    # N <= artifact bytes / sample bytes, so N*epsilon is always far below 1.
+    gamma = frames * 2 ** -52 / (1 - frames * 2 ** -52)
+    arithmetic = (gain + signal['sample_error_limit']) * gamma / (1 - gamma)
+    uncertainty = signal['representation_error'] + arithmetic
+    lower, upper = gain * 10 ** (-0.02 / 20) - uncertainty, gain * 10 ** (0.02 / 20) + uncertainty
+    common_reason = signal['observability_reason']
+    for channel, row in rows.items():
+        mean = row['magnitude_sum'] / frames
+        if not lower <= mean <= upper:
+            raise SoundBankContractError('INVALID_TONE_WAV',
+                'Tone stationary square mean absolute gain differs from requested dB within the numerical policy.',
+                details={'stationary_square': signal, 'channel': channel,
+                    'measured_gain': mean, 'gain_interval': [lower, upper]})
+        reason = ('exact requested square cadence is incompatible; native phase arithmetic precision is unspecified'
+            if not row['phase_intervals'] else ('square record has no observable periodic recurrence (fewer than two sign transitions)'
+                if row['sign_transitions'] < 2 else None))
+        signal['channels'].append({'channel': channel, 'measured_gain': mean,
+            'gain_interval': [lower, upper], 'gain_arithmetic_error': arithmetic,
+            'max_sample_error': row['max_sample_error'], 'sign_transitions': row['sign_transitions'],
+            'exact_cadence_conforms': bool(row['phase_intervals']) if row['anchor'] is not None else None,
+            'first_cadence_mismatch_frame': row.get('first_cadence_mismatch_frame'),
+            'phase_origin_units': row['anchor'], 'phase_relative_intervals_units': row['phase_intervals']
+                if row['anchor'] is not None else None,
+            'observability_reason': common_reason or reason})
+        signal['observability_reason'] = signal['observability_reason'] or reason
+
+
+def _observe_square_phase(positive, frame, row, signal):
+    # See TONE_STATIONARY_SQUARE.md: after anchoring the first closed semicircle,
+    # every constraint is an interval or its two endpoints. State never grows.
+    half = signal['phase_half_cycle_units']
+    if row['anchor'] is None:
+        row['anchor'] = 0 if positive else half
+    start = ((0 if positive else half) - signal['phase_step_units'] * frame - row['anchor']) % (2 * half)
+    allowed = [[0, half]] if start == 0 else ([[start, half]] if start < half else (
+        [[0, 0], [half, half]] if start == half else [[0, start - half]]))
+    remaining = []
+    for lower, upper in row['phase_intervals']:
+        for left, right in allowed:
+            if max(lower, left) <= min(upper, right):
+                remaining.append([max(lower, left), min(upper, right)])
+    row['phase_intervals'] = remaining
+    if not remaining:
+        # Exact policy incompatibility alone is not native invalidity: matching
+        # sources do not pin utility input/phase precision. Never round/fix the
+        # frequency or widen edge arcs to turn that uncertainty into acceptance.
+        row['first_cadence_mismatch_frame'] = frame
 
 
 def _sine_signal_policy(observed, args, *, enveloped=False):

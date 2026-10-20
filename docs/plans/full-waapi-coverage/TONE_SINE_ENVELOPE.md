@@ -2,8 +2,9 @@
 
 This slice extends `ak.wwise.debug.generateToneWAV` through the existing public
 Gateway artifact verifier. It does not complete Tone waveform coverage.
-Triangle, square, noise, fractional rate/segment rounding and remaining marker
-or channel-representation obligations stay open.
+Triangle, noise, nonstationary square, fractional rate/segment rounding and
+remaining marker or channel-representation obligations stay open. Stationary
+square has its own [bounded conformance successor](TONE_STATIONARY_SQUARE.md).
 
 ## Observed model and accepted verification policy
 
