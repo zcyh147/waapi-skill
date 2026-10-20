@@ -2718,6 +2718,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "auto_add_to_source_control",
             "documented_list_bindings",
             "graph_result_bindings",
+            "voice_source_staging",
         ),
         argument_contract={
             **_object_contract(
@@ -2807,6 +2808,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     },
                     "auto_add_to_source_control": {"type": "boolean", "default": False},
                     "graph_result_bindings": _GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA,
+                    "voice_source_staging": {"type": "object", "description": "Gateway-generated exact staged declaration/provenance; strictly reparsed, never caller-authored."},
                     "documented_list_bindings": {"type": "array", "maxItems": 128,
                         "items": {"type": "object"}, "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 },
@@ -2817,6 +2819,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "auto_add_to_source_control",
                     "documented_list_bindings",
                     "graph_result_bindings",
+                    "voice_source_staging",
                 ),
             ),
             "maximumCanonicalRequestBytes": DEFAULT_MAX_REQUEST_BYTES,
@@ -4004,6 +4007,9 @@ def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str
     if not isinstance(arguments, Mapping):
         raise OperationContractError("INVALID_REQUEST", "arguments must be a JSON object.")
     _require_exact_keys(arguments, required=spec.required_arguments, optional=spec.optional_arguments, context=operation)
+    if "voice_source_staging" in arguments:
+        from .voice_source_staging import validate_request
+        validate_request(operation, str(version), arguments)
     _validate_nested_request_shape(operation, arguments, version=str(version))
     if operation == "waapi.call":
         _public_call_arguments(str(version), arguments)
@@ -6030,12 +6036,18 @@ def _prepare_object_set(
             allow_language=True,
             allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS,
         )
+        staged_source_record = arguments.get("voice_source_staging", {})
+        staged_source_parent = (staged_source_record.get("stage") == "source"
+            and _same_identity(target.object, staged_source_record["origin"]["identity"]["id"])
+            and target.row.get("type") == "Sound" and len(children.nodes) == 1
+            and all(root.plugin is not None and root.plugin.kind == "source" for root in children.roots))
         if children.roots:
-            _require_object_create_writable_parent(
-                target,
-                version=request.version,
-                child_types=tuple(root.type for root in children.roots),
-            )
+            if not staged_source_parent:
+                _require_object_create_writable_parent(
+                    target,
+                    version=request.version,
+                    child_types=tuple(root.type for root in children.roots),
+                )
             _require_specialized_object_tree_relationships(
                 children.nodes,
                 version=request.version,
@@ -6297,6 +6309,7 @@ def _prepare_object_set(
             rtpc_snapshots=rtpc_snapshots,
             merge_guards=early_merge_guards,
             platform=platform,
+            staged_source_parent=staged_source_parent,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
@@ -8120,6 +8133,7 @@ def _prepare_object_node_specs(
     rtpc_snapshots: dict | None = None,
     merge_guards: list[dict[str, Any]] | None = None,
     platform: str | None = None,
+    staged_source_parent: bool = False,
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     node_paths = {node.request_path for node in nodes}
@@ -8431,12 +8445,20 @@ def _prepare_object_node_specs(
         if node.plugin is not None:
             if node.plugin.kind == "source":
                 parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
-                if node.collection != "children" or parent_spec is None or parent_spec["canonical_type"] != "Sound":
-                    raise OperationContractError("INVALID_SOURCE_TARGET", "Atomic Source construction requires a planned Sound/Voice parent; a live owner uses object.createPlugin.")
-                validate_plugin_target(node.plugin, target_type=parent_spec["canonical_type"])
-                if node.plugin.language is not None and not any(
-                        prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in parent_spec["properties"]):
-                    raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires a Boolean Voice owner intent.")
+                live_staged_owner = (staged_source_parent and root_parent is not None
+                    and node.parent_request_path not in node_paths and node.collection == "children")
+                if live_staged_owner:
+                    # The exact generated record additionally revalidates this
+                    # verified owner's Boolean Voice intent, fields and empty
+                    # children at preparation and immediately before dispatch.
+                    validate_plugin_target(node.plugin, target_type=root_parent.row.get("type"), target_path=root_parent.row.get("path"))
+                else:
+                    if node.collection != "children" or parent_spec is None or parent_spec["canonical_type"] != "Sound":
+                        raise OperationContractError("INVALID_SOURCE_TARGET", "Atomic Source construction requires a planned Sound/Voice parent; a live owner uses object.createPlugin.")
+                    validate_plugin_target(node.plugin, target_type=parent_spec["canonical_type"])
+                    if node.plugin.language is not None and not any(
+                            prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in parent_spec["properties"]):
+                        raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires a Boolean Voice owner intent.")
             elif node.plugin.placement == "shareset":
                 if node.parent_request_path in node_paths or root_parent is None:
                     raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require an exact bound Effects Work Unit or Folder")
@@ -8977,6 +8999,8 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    from .voice_source_staging import assertions as staged_assertions
+    assertions.extend(staged_assertions(pre_state, read, after_write=after_write))
     language_contexts = [node[key] for node in pre_state.get("object_set_nodes", [])
         for key in ("construction_language", "source_language") if key in node] if isinstance(pre_state, Mapping) else []
     if language_contexts:
@@ -11658,6 +11682,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
     else:  # pragma: no cover - parse_operation_request closes this branch.
         raise OperationContractError("OPERATION_BOUNDARY", f"No preparer exists for {request.operation}.")
 
+    if "voice_source_staging" in arguments:
+        from .voice_source_staging import prepare as prepare_staging, projection as staging_projection
+        metadata["voice_source_staging"] = prepare_staging(arguments["voice_source_staging"], read)
+        preview = replace(preview, evidence_plan=(*preview.evidence_plan,
+            {"staged_completion": staging_projection(arguments["voice_source_staging"])}))
     return PreparedOperation(
         request=request,
         semantic_preview=preview,
@@ -20133,7 +20162,12 @@ def verify_prepared_operation(
                     row.get("path") == expected_path,
                     {"expected": expected_path, "actual": row.get("path")},
                 )
-            if kind == "object-create-graph" and parent_request_path is None and not spec.get("preexisting_id"):
+            stage_record = pre_state.get("voice_source_staging", {}).get("record", {})
+            staged_voice_root = (kind == "object-set-batch" and stage_record.get("stage") == "voice"
+                and request_path == "$.objects[0].children[0]" and len(specs) == 2
+                and not spec.get("existing_target") and not spec.get("preexisting_id"))
+            if ((kind == "object-create-graph" and parent_request_path is None and not spec.get("preexisting_id"))
+                    or staged_voice_root):
                 identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
                 relation = ("owner" if spec.get("collection") not in {None, "children"} else "parent")
                 identity_ok = (

@@ -6950,16 +6950,21 @@ def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSand
 
 
 def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *, prefix: str,
-        staged_voice_source_language: bool = False) -> dict[str, Any]:
-    """Atomic creation cases or one explicitly selected staged diagnostic."""
+        staged_voice_source_language: bool = False, gateway_staged_completion: bool = False) -> dict[str, Any]:
+    """Atomic, manual staged, or explicitly selected public staged completion."""
     from wwise_waapi.native_catalog import load_native_catalog
     assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}
+    assert not (staged_voice_source_language and gateway_staged_completion), 'Source modes are explicit and exclusive'
+    if gateway_staged_completion:
+        assert runtime.version == '2025.1', 'Initial Gateway staged acceptance is Console2025-only'
     catalog = load_native_catalog(runtime.version, 'wwise-console')
     endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
-    output = runtime.state_dir / ('staged-voice-source-language.json' if staged_voice_source_language else 'planned-source-characterization.json')
+    output = runtime.state_dir / ('gateway-staged-voice-source.json' if gateway_staged_completion else
+        'staged-voice-source-language.json' if staged_voice_source_language else 'planned-source-characterization.json')
     assert not output.exists(), 'Never overwrite original Source evidence'
     output.parent.mkdir(parents=True, exist_ok=True)
-    artifacts = runtime.state_dir / ('staged-voice-source-artifacts' if staged_voice_source_language else 'planned-source-artifacts'); artifacts.mkdir(exist_ok=False)
+    artifacts = runtime.state_dir / ('gateway-staged-voice-source-artifacts' if gateway_staged_completion else
+        'staged-voice-source-artifacts' if staged_voice_source_language else 'planned-source-artifacts'); artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
     previous_native = set(native_root.glob('*.json'))
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
@@ -6971,6 +6976,9 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
     if staged_voice_source_language:
         category.update(category='staged-voice-source-language', scope='staged_existing_Voice_Source_language',
             diagnostic_only=True, atomic_Source_language_unresolved=True)
+    if gateway_staged_completion:
+        category.update(category='gateway-staged-voice-localized-source',
+            scope='one_Gateway_combined_Draft_completed_by_two_set_Previews', atomic_Source_language_unresolved=True)
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.planned-source-characterization/v1',
         'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'phases': [], 'native_evidence': [],
@@ -6987,6 +6995,9 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             'native_files': 1024, 'native_bytes': 128 * 1024 * 1024}}
     if staged_voice_source_language:
         receipt.update(scope=category['scope'], diagnostic_only=True, atomic_Source_language_unresolved=True)
+        receipt['scope_exclusions'].append('atomic_Voice_Source_language')
+    if gateway_staged_completion:
+        receipt.update(scope=category['scope'], atomic_Source_language_unresolved=True, planned_public_calls=34)
         receipt['scope_exclusions'].append('atomic_Voice_Source_language')
     attempted: set[str] = set()
     def persist():
@@ -7085,9 +7096,10 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
         assert len(choices) == len(project_languages) and len({uuid.UUID(row['id']) for row in choices}) == len(choices), choices
         receipt['language_choices'] = choices
         construction_language = choices[0]['name']
-        source_language = choices[1 if not staged_voice_source_language and len(choices) > 1 else 0]['name']
-        receipt['distinct_language_disambiguation'] = not staged_voice_source_language and len(choices) > 1
-        receipt['distinct_language_prerequisite'] = ('not_exercised_staged_no_construction_context' if staged_voice_source_language
+        one_stage_case = staged_voice_source_language or gateway_staged_completion
+        source_language = choices[1 if not one_stage_case and len(choices) > 1 else 0]['name']
+        receipt['distinct_language_disambiguation'] = not one_stage_case and len(choices) > 1
+        receipt['distinct_language_prerequisite'] = ('not_exercised_staged_no_construction_context' if one_stage_case
             else 'established' if len(choices) > 1 else 'second_existing_language_absent_no_cross_language_credit')
         root_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
         parent_rows = query([value for segment in root_segments for value in ('--path-segment', segment)])
@@ -7171,7 +7183,113 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             assert exact(parent['id']) == parent, 'Separate Source creation changed the bound parent'
             phase['effect_verified'] = True; persist()
             assert len(transactions) == 2
-        for case in (() if staged_voice_source_language else ('sfx', 'voice-explicit-source', 'voice-default-source')):
+        if gateway_staged_completion:
+            name = prefix + '_voice'
+            empty_phase = {'case': 'Gateway-Voice-stage', 'execution_attempted': False, 'effect_verified': False,
+                'construction_language': None, 'source_language': source_language}
+            receipt['phases'].append(empty_phase); persist()
+            draft = _start_business_draft(gateway, 'object.set')
+            original_draft_id = draft.draft_id
+            owner_parent = _bind_business_object(gateway, draft, object_id=parent['id'])
+            owner = _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'owner', '--parent-handle', owner_parent, '--name', name,
+                '--kind', 'sound-voice', '--field', 'notes', 'Keep Gateway staged Voice'], live=False)
+            owner_handle = owner['draft']['declared_object']['result_handle']
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Frequency'], live=True)
+            meaning, = fields['meaning_results']
+            assert meaning['meaning'] == 'Frequency' and fields['candidate_count'] == len(meaning['candidates']), fields
+            selected = [row for row in meaning['candidates'] if row.get('label') == 'Start Frequency'
+                and row.get('field_kind') == 'property' and row.get('value_type') == 'number'
+                and row.get('metadata', {}).get('name') == 'StartFreq' and row['metadata'].get('type') == 'Real32'
+                and row['metadata'].get('display', {}).get('name') == 'Start Frequency']
+            assert len(selected) == 1, 'Start Frequency must have one exact disclosed metadata candidate'
+            field = selected[0]
+            _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'source', '--parent-handle', owner_handle, '--name', 'Tone', '--kind', kind,
+                '--field', 'plugin_placement', 'owner', '--field', 'language', source_language,
+                '--field', 'notes', 'Keep Gateway staged Source', '--field-value', field['handle'], '440'], live=False)
+            code, choice = gateway.raw_gateway(['draft-check', draft.draft_id, '--task-authority', draft.task_authority,
+                '--expected-revision', str(draft.revision)])
+            receipt['default_choice'] = choice
+            assert code == 2 and choice.get('error_code') == 'VOICE_SOURCE_STAGED_COMPLETION_REQUIRED', choice
+            assert not transactions and not attempted and choice['staged_completion']['declarations_preserved'] is True
+            configure = choice['next_command']
+            assert configure['command'] == 'draft-business-configure'
+            configured = gateway.gateway(configure['gateway_argv'], live=False)
+            assert configured['draft']['draft_id'] == original_draft_id
+            draft.revision = int(configured['draft']['revision'])
+            def inspect_gateway_voice(prepared):
+                request = empty_phase['immutable_preview']['request']
+                assert request['operation'] == 'object.set' and request['arguments']['voice_source_staging']['stage'] == 'voice'
+                native, = prepared['dispatch']['args']['objects'][0]['children']
+                assert native['type'] == 'Sound' and native['@IsVoice'] is True and 'language' not in native and not native.get('children'), native
+                owner_spec, = [row for row in prepared['pre_state']['object_set_nodes'] if row['requested_name'] == name]
+                empty_phase['owner_class_id'] = owner_spec['class_id']
+            executed = complete_staged(draft, empty_phase, inspect_gateway_voice)
+            verified = empty_phase['verify']['payload']
+            assert verified['staged_completion']['complete'] is False
+            assert verified['staged_completion']['current_stage'] == 'voice_created_source_pending'
+            root_result, = executed['dispatch_result']['result']['objects']
+            owner_result, = root_result['children']
+            owner_id = owner_result['id']
+            assert uuid.UUID(owner_id) not in seen and not owner_result.get('children'), owner_result
+            actual_owner = empty_phase['independent_owner'] = exact(owner_id, voice=True)
+            assert actual_owner['name'] == name and actual_owner['type'] == 'Sound' and actual_owner['class_id'] == empty_phase['owner_class_id'], actual_owner
+            assert actual_owner['parent']['id'] == parent['id'] and actual_owner['notes'] == 'Keep Gateway staged Voice', actual_owner
+            assert type(actual_owner['properties']['IsVoice']) is bool and actual_owner['properties']['IsVoice'] is True, actual_owner
+            empty_phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'])
+            assert empty_phase['independent_children'] == [], 'Gateway Source completion requires independently empty Voice'
+            empty_phase['effect_verified'] = True; persist()
+            continuation = verified['next_command']
+            assert continuation['command'] == 'continue-voice-source'
+            generated = receipt['generated_source_draft'] = gateway.gateway(continuation['gateway_argv'], live=True)
+            assert generated['staged_completion']['complete'] is False
+            draft = _BusinessDraft(draft_id=generated['draft']['draft_id'], task_authority=generated['task_authority'],
+                revision=int(generated['draft']['revision']))
+            assert draft.draft_id != original_draft_id
+            phase = {'case': 'Gateway-Source-stage', 'execution_attempted': False, 'effect_verified': False,
+                'source_language': source_language, 'construction_language': None, 'owner_before': actual_owner, 'frequency_field': field}
+            receipt['phases'].append(phase); persist()
+            def inspect_gateway_source(prepared):
+                request = phase['immutable_preview']['request']
+                assert request['operation'] == 'object.set' and request['arguments']['voice_source_staging']['stage'] == 'source'
+                native, = prepared['dispatch']['args']['objects']
+                assert uuid.UUID(native['object']) == uuid.UUID(owner_id) and 'language' not in native and '@IsVoice' not in native
+                source, = native['children']
+                assert source['type'] == 'Source' and source['classId'] == 6684674 and source['language'] == source_language
+                assert source['@' + field['metadata']['name']] == 440, source
+                source_spec, = [row for row in prepared['pre_state']['object_set_nodes'] if 'source_plugin' in row]
+                phase['selected_locale'] = source_spec['source_language']['selected']
+                assert uuid.UUID(phase['selected_locale']['id']) == uuid.UUID(choices[0]['id'])
+                assert phase['selected_locale']['name'] == choices[0]['name']
+                phase['source_class_id'] = source_spec['structural_class_id']
+                assert phase['source_class_id'] == source['classId'] and source_spec['source_plugin']['preexisting_plugin_ids'] == []
+            executed = complete_staged(draft, phase, inspect_gateway_source)
+            assert phase['verify']['payload']['staged_completion']['complete'] is True
+            root_result, = executed['dispatch_result']['result']['objects']
+            assert uuid.UUID(root_result['id']) == uuid.UUID(owner_id)
+            source_result, = root_result['children']
+            source_id = source_result['id']
+            assert uuid.UUID(source_id) not in {*seen, uuid.UUID(owner_id)}, source_result
+            source = phase['independent_source'] = exact(source_id, source=True, language=source_language, source_field=field['metadata']['name'])
+            assert source['name'] == 'Tone' and source['type'] in {'Source', 'SourcePlugin'} and source['class_id'] == phase['source_class_id']
+            assert source['parent']['id'] == owner_id and source['path'] == actual_owner['path'] + '\\Tone', source
+            assert source.get('owner') is None or source['owner'].get('id') == owner_id, source
+            assert source['notes'] == 'Keep Gateway staged Source' and source['properties'][field['metadata']['name']] == 440
+            assert source['source_language']['name'] == source_language
+            if source['source_language'].get('id') is not None:
+                assert uuid.UUID(source['source_language']['id']) == uuid.UUID(phase['selected_locale']['id'])
+            phase['independent_owner'] = exact(owner_id, voice=True)
+            assert all(phase['independent_owner'].get(key) == actual_owner.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes', 'properties')), 'Gateway Source stage changed the verified Voice'
+            children = phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'], language=source_language)
+            assert len(children) == 1 and all(children[0].get(key) == source.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), children
+            assert exact(parent['id']) == parent, 'Gateway Source stage changed the bound parent'
+            phase['effect_verified'] = True; persist()
+            assert len(transactions) == len(attempted) == 2
+        for case in (() if staged_voice_source_language or gateway_staged_completion else ('sfx', 'voice-explicit-source', 'voice-default-source')):
             phase: dict[str, Any] = {'case': case, 'construction_language': None if case == 'sfx' else construction_language,
                 'source_language': source_language if case == 'voice-explicit-source' else None,
                 'source_language_effect': 'explicit_exact_name' if case == 'voice-explicit-source' else 'observed_default_only_no_inheritance_claim',
@@ -7300,6 +7418,16 @@ def test_staged_voice_source_language_console_characterization(workflow_sandbox_
         pytest.skip('Staged Voice Source-language observation is Console2025-only')
     category = _collect_planned_source_characterization(workflow_sandbox_runtime,
         prefix='WAAPI_STAGED_SOURCE_' + uuid.uuid4().hex[:10], staged_voice_source_language=True)
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_gateway_staged_voice_localized_source_console_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Initial Gateway staged Voice/localized Source acceptance is Console2025-only')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime,
+        prefix='WAAPI_GATEWAY_STAGED_SOURCE_' + uuid.uuid4().hex[:10], gateway_staged_completion=True)
     assert category['status'] == 'PASS', category
 
 

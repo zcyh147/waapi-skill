@@ -479,6 +479,7 @@ class OperationDraftStore:
         schema_digest: str,
         composer_digest: str | None = None,
         compound_parent: Mapping[str, Any] | None = None,
+        voice_source_origin: Mapping[str, Any] | None = None,
         connection_binding: Mapping[str, Any] | None = None,
         now: datetime | None = None,
     ) -> OperationDraftStart:
@@ -488,6 +489,8 @@ class OperationDraftStore:
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer_digest must be a lowercase SHA-256 digest")
+        if voice_source_origin is not None and composer_digest is None:
+            raise ValueError("voice_source_origin requires a current Composer-backed Draft")
         if compound_parent is not None and composer_digest is None:
             raise ValueError(
                 "compound_parent requires a current Composer-backed Draft"
@@ -499,6 +502,19 @@ class OperationDraftStore:
             + timedelta(seconds=DEFAULT_OPERATION_DRAFT_TTL_SECONDS)
         )
         with self._store_lock():
+            if voice_source_origin is not None:
+                from .voice_source_staging import validate_record, child_capability
+                validate_record(voice_source_origin, version)
+                if operation != "object.set" or voice_source_origin["stage"] != "source":
+                    raise ValueError("Only a generated Source continuation can allocate this child Draft")
+                child_id, child_authority = child_capability(voice_source_origin)
+                if self._record_path(child_id).exists():
+                    existing = self._inspect_unlocked(child_id, task_authority=child_authority, now=created_datetime).record
+                    if (existing.operation != operation or existing.version != version or existing.schema_digest != schema_digest
+                            or existing.composer_digest != composer_digest or existing.connection_binding != connection_binding
+                            or existing.composition.get("voice_source_origin") != voice_source_origin):
+                        raise OperationDraftBindingDrift("Existing Source continuation binding changed")
+                    return OperationDraftStart(record=existing, task_authority=child_authority)
             active_drafts = self._collect_and_count_active(now=now)
             if active_drafts >= MAX_ACTIVE_OPERATION_DRAFTS:
                 raise OperationDraftLimitExceeded(
@@ -509,8 +525,8 @@ class OperationDraftStore:
                     },
                 )
             for _attempt in range(16):
-                draft_id = f"od1-{secrets.token_hex(16)}"
-                task_authority = f"da1-{secrets.token_hex(20)}"
+                draft_id = child_id if voice_source_origin is not None else f"od1-{secrets.token_hex(16)}"
+                task_authority = child_authority if voice_source_origin is not None else f"da1-{secrets.token_hex(20)}"
                 record = OperationDraftRecord(
                     draft_id=draft_id,
                     connection_binding=connection_binding,
@@ -548,6 +564,7 @@ class OperationDraftStore:
                             operation,
                             version,
                             compound_parent=compound_parent,
+                            voice_source_origin=voice_source_origin,
                         )
                         if composer_digest is not None
                         else None
@@ -2228,7 +2245,7 @@ def _materialize_draft_composition(
         try:
             session = BusinessDeclarationSession.from_dict(raw_business_session)
             adapter = business_adapter(operation)
-            return adapter.materialize(
+            request = adapter.materialize(
                 session,
                 history_state_dir=history_state_dir,
                 allow_cleaned_file_evidence=(
@@ -2236,6 +2253,17 @@ def _materialize_draft_composition(
                     and adapter.supports_cleaned_file_evidence
                 ),
             )
+            origin = composition.get("voice_source_origin")
+            if origin is not None:
+                from .voice_source_staging import KEY, source_arguments, validate_request, validate_parent_transaction, child_capability
+                validate_parent_transaction(origin, history_state_dir)
+                if session.context.task_authority_digest != _task_authority_digest(child_capability(origin)[1]):
+                    raise ValueError("Source continuation context differs from its deterministic parent capability")
+                if operation != "object.set" or dict(request["arguments"]) != source_arguments(origin):
+                    raise ValueError("Source continuation facts differ from the sealed original intent")
+                request = {**request, "arguments": {**request["arguments"], KEY: origin}}
+                validate_request(request["operation"], version, request["arguments"])
+            return request
         except (TypeError, ValueError) as exc:
             raise OperationComposerError(
                 f"{operation} business declarations cannot materialize their canonical request."

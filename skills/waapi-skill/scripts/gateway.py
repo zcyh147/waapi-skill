@@ -2447,6 +2447,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     draft_business_configure.add_argument("--replace-owner-handle")
     draft_business_configure.add_argument("--platform")
+    draft_business_configure.add_argument("--voice-source-completion", choices=("separate-previews", "atomic-required"))
     draft_business_configure.add_argument(
         "--list-behavior",
         choices=("append", "replace-all"),
@@ -3243,6 +3244,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Include complete validation and dispatch evidence",
     )
 
+    staged_source = subparsers.add_parser("continue-voice-source", help="Continue one verified staged Voice with its sealed Source intent")
+    staged_source.add_argument("transaction_id")
     preview_from_draft = subparsers.add_parser(
         "preview-from-draft",
         help=(
@@ -10588,6 +10591,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             else:
                 artifact_view = project_persistent_artifact(preview.artifact)
                 payload.update({"artifact": artifact_view, "events": list(events)})
+            staged = preview.artifact.get("request", {}).get("arguments", {}).get("voice_source_staging")
+            if staged is not None:
+                from wwise_waapi.voice_source_staging import projection as stage_projection
+                payload["staged_completion"] = stage_projection(staged, verified=record.state is TransactionState.VERIFIED)
             if project_persistent_artifact(preview.artifact) != preview.artifact:
                 payload["artifact_projection"] = "persistent_project_guidance; artifact_hash_identifies_unchanged_stored_artifact"
             if record.state is TransactionState.AWAITING_CONFIRMATION:
@@ -14319,7 +14326,11 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "continue-voice-source":
+        return dispatch_voice_source_continuation(args, env=env, connection=connection,
+            detected_version=detected_version, live_info=live_info, dispatcher=dispatcher, common=common)
     if args.command == "draft-check":
+        # One domain continuation; native writes still use ordinary Previews.
         return dispatch_operation_draft_check(
             args,
             env=env,
@@ -16746,6 +16757,92 @@ def prepared_wire_path_io_audit(
     return io_audit
 
 
+def dispatch_voice_source_continuation(args, *, env, connection, detected_version, live_info, dispatcher, common):
+    """Open/reuse one task-bound Source Draft from verified creation only."""
+    from wwise_waapi.voice_source_staging import KEY, validate_record, revalidate, child_session
+    from wwise_waapi.operation_drafts import OperationDraftRevisionConflict
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    snapshot = TransactionStore(state_dir).load_snapshot(args.transaction_id)
+    artifact = snapshot.preview.artifact
+    request = artifact.get("request", {})
+    record = request.get("arguments", {}).get(KEY)
+    if (snapshot.record.state is not TransactionState.VERIFIED or request.get("operation") != "object.set"
+            or not isinstance(record, Mapping) or record.get("stage") != "voice"):
+        raise GatewayInputError("Source completion requires fully verified staged Voice creation; never replay uncertain creation.")
+    validate_record(record, detected_version)
+    if artifact.get("connection_configuration") != selected_connection_binding(env):
+        raise GatewayInputError("Staged creation connection configuration changed")
+    project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+    guard = build_project_guard(endpoint=common["endpoint"], version=detected_version, live_info=live_info, project=project)
+    if artifact.get("project_guard") != guard:
+        raise GatewayInputError("Staged creation project/runtime changed")
+    verifications = [event.get("details", {}).get("verification", {}) for event in snapshot.events if event.get("event_type") == "verification_recorded"]
+    if len(verifications) != 1 or verifications[0].get("business_state_verified") is not True:
+        raise GatewayInputError("All declared Voice fields require independent successful verification")
+    identity = _verified_created_root_identity(verifications[0])
+    if identity is None:
+        raise GatewayInputError("Staged creation lacks one independently verified root identity")
+    origin = {**dict(record), "stage": "source", "origin": {"transaction_id": args.transaction_id,
+        "artifact_hash": snapshot.preview.artifact_hash, "identity": identity,
+        "languages": artifact["prepared_operation"]["pre_state"][KEY]["languages"]}}
+    validate_record(origin, detected_version)
+    store = OperationDraftStore(state_dir)
+    started = store.start(operation="object.set", version=detected_version,
+        schema_digest=operation_draft_schema_digest("object.set", detected_version),
+        composer_digest=operation_composer_digest("object.set", detected_version),
+        connection_binding={"configuration": selected_connection_binding(env),
+            "live": {"version": dict(live_info["version"]), "project_id": project["id"]}},
+        voice_source_origin=origin)
+    child = started.record
+    raw_child_session = child.composition.get("business_session")
+    if raw_child_session is None or not raw_child_session["declarations"]:
+        read = transaction_read_call(dispatcher, connection=connection, version=detected_version)
+        revalidate(origin, read, languages=origin["origin"]["languages"], owner=True, before_source=True)
+        context = _business_context_from_live(task_authority=started.task_authority, project=project,
+            detected_version=detected_version, live_info=live_info)
+        seed = child_session(origin, context)
+        # Use ordinary settings/declaration transitions, including resuming an
+        # interrupted initialization. Neither transition executes a project write.
+        for _ in range(3):
+            current = (BusinessDeclarationSession.create(context) if child.composition.get("business_session") is None
+                else BusinessDeclarationSession.from_dict(child.composition["business_session"]))
+            if current.declarations:
+                break
+            if current.settings not in ({}, seed.settings):
+                raise GatewayInputError("Incomplete Source continuation settings differ from the original intent")
+            configure = current.settings != seed.settings
+            declaration, = seed.declarations
+            def initialize(current):
+                bound = (current if current.handles.as_dict() == seed.handles.as_dict()
+                    else current.with_handle_registry(seed.handles))
+                return (bound.with_settings(seed.settings) if configure else bound.with_new_declaration(
+                    declaration_id=declaration.declaration_id, target=declaration.target, fields=declaration.fields))
+            try:
+                child = store.apply_business_update(child.draft_id, task_authority=started.task_authority,
+                    expected_revision=child.revision, schema_digest=child.schema_digest, composer_digest=child.composer_digest,
+                    context=context, update=initialize, event_type="settings.revised" if configure else "declaration.added")
+            except OperationDraftRevisionConflict:
+                child = store.inspect(child.draft_id, task_authority=started.task_authority)
+        if not child.composition.get("business_session", {}).get("declarations"):
+            raise GatewayInputError("Source continuation initialization did not complete within its bounded transitions")
+    payload = operation_draft_payload(args.command, child, offline=False, state_dir=args.state_dir,
+        task_authority=started.task_authority)
+    source_snapshot = TransactionStore(state_dir).load_snapshot(child.seal["transaction_id"]) if child.seal is not None else None
+    complete = source_snapshot is not None and source_snapshot.record.state is TransactionState.VERIFIED
+    payload.update(endpoint=dict(common["endpoint"]), detected_version=detected_version,
+        task_authority=started.task_authority, staged_completion={"complete": False,
+            "current_stage": "Source_Draft_reused" if child.state is not OperationDraftState.EDITABLE else "Source_Preview_required",
+            "creation_transaction": args.transaction_id, "repeat_creation": False})
+    payload["staged_completion"]["complete"] = complete
+    if source_snapshot is not None:
+        payload["staged_completion"].update(source_transaction=source_snapshot.record.transaction_id,
+            source_state=source_snapshot.record.state.value, current_stage="complete" if complete else "Source_incomplete_no_replay")
+    if child.state is OperationDraftState.EDITABLE:
+        payload["next_command"] = transaction_next_command("draft-check", ["draft-check", child.draft_id,
+            "--task-authority", started.task_authority, "--expected-revision", str(child.revision)], state_dir=args.state_dir)
+    return payload
+
+
 def dispatch_operation_draft_check(
     args: argparse.Namespace,
     *,
@@ -16787,6 +16884,24 @@ def dispatch_operation_draft_check(
             },
         )
     request_payload = dict(materialized.request)
+    if (inspected.operation == "object.set" and detected_version == "2025.1"
+            and request_payload.get("operation") == "object.set"
+            and "voice_source_staging" not in request_payload.get("arguments", {})):
+        from wwise_waapi.voice_source_staging import observed_atomic_boundary
+        if observed_atomic_boundary(request_payload, live_info):
+            session = BusinessDeclarationSession.from_dict(inspected.composition["business_session"])
+            atomic_required = session.settings.get("voice_source_completion") == "atomic-required"
+            payload = operation_draft_payload(args.command, inspected, offline=False, state_dir=args.state_dir,
+                task_authority=args.task_authority)
+            payload.update(ok=False, status="incomplete", error_code="VOICE_SOURCE_ATOMIC_UNRESOLVED" if atomic_required else "VOICE_SOURCE_STAGED_COMPLETION_REQUIRED",
+                message="This atomic localized Source request is unresolved in the observed Console build and default view. Your complete Voice and Source intent remains in this Draft; choose two separately authorized Previews to continue.",
+                original_request_sha256=materialized.request_digest,
+                staged_completion={"complete": False, "atomic_requirement": atomic_required, "declarations_preserved": True})
+            if not atomic_required:
+                payload["next_command"] = transaction_next_command("draft-business-configure", ["draft-business-configure",
+                    inspected.draft_id, "--task-authority", args.task_authority, "--expected-revision", str(inspected.revision),
+                    "--voice-source-completion", "separate-previews"], state_dir=args.state_dir)
+            return payload
     authoring_boundary = live_authoring_transaction_boundary(
         request_payload, command="draft-check", live_info=live_info, common=common,
     )
@@ -17863,6 +17978,7 @@ def dispatch_offline_business_draft_update(
                     "list_behavior",
                     "name_conflict",
                     "platform",
+                    "voice_source_completion",
                 )
                 if inspected.operation == "object.set"
                 else (
@@ -17900,7 +18016,10 @@ def dispatch_offline_business_draft_update(
                 "Business configuration requires at least one explicit batch setting"
             )
         def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
-            candidate = current.with_settings(settings)
+            # Choosing transaction shape must not erase previously supplied
+            # graph settings; ordinary configuration replacement stays intact.
+            chosen = ({**current.settings, **settings} if "voice_source_completion" in settings else settings)
+            candidate = current.with_settings(chosen)
             if adapter.family == "object-creation-graph" and candidate.declarations:
                 validate_object_graph_draft(inspected.operation, candidate)
             return candidate
@@ -22675,8 +22794,13 @@ def _dispatch_transaction_command_with_execution_lease(
             ),
             "automatic_retry": False,
         }
+        staged_voice = (sealed_request.get("operation") == "object.set"
+            and sealed_request.get("arguments", {}).get("voice_source_staging", {}).get("stage") == "voice")
         if sealed_request.get("operation") == "object.create":
             payload["creation_result"] = _created_root_business_result(verification.as_dict(), transaction_id)
+        elif staged_voice:
+            payload["creation_result"] = {"verified_root": _verified_created_root_identity(verification.as_dict()),
+                "configuration_complete": False, "repeat_creation": False}
         if verification.ok:
             transaction_request = require_mapping(
                 artifact.get("request"),
@@ -22693,7 +22817,20 @@ def _dispatch_transaction_command_with_execution_lease(
             )
             if transaction_request.get("operation") == "object.create":
                 agent_result["business_result"] = _created_root_business_result(verification.as_dict(), transaction_id)
+            elif staged_voice:
+                agent_result["business_result"] = dict(payload["creation_result"])
             transaction_arguments = transaction_request.get("arguments")
+            if transaction_arguments.get("voice_source_staging") is not None:
+                from wwise_waapi.voice_source_staging import projection as stage_projection
+                staged_record = transaction_arguments["voice_source_staging"]
+                stage_result = stage_projection(staged_record, verified=verification.business_state_verified)
+                agent_result.setdefault("business_result", {})["staged_completion"] = stage_result
+                payload["staged_completion"] = stage_result
+                if staged_record["stage"] == "voice":
+                    agent_result["business_result"]["configuration_complete"] = False
+                    payload["creation_result"]["configuration_complete"] = False
+                    payload["next_command"] = transaction_next_command("continue-voice-source",
+                        ["continue-voice-source", transaction_id], state_dir=args.state_dir)
             transaction_api = (
                 transaction_arguments.get("api")
                 if isinstance(transaction_arguments, Mapping)
@@ -25321,6 +25458,7 @@ def project_successful_transaction_execute_payload(
             "automatic_retry",
             "next_command",
             "stdout_projection",
+            "staged_completion",
         )
         projected = {key: projected[key] for key in keep if key in projected}
         projection = projected["stdout_projection"]
@@ -31132,6 +31270,10 @@ def transaction_agent_result(
         # A preview mirrors the exact top-level continuation here so the final
         # machine-readable field also ends on the selected continuation.
         result["next_command"] = next_command
+    if request.get("arguments", {}).get("voice_source_staging") is not None:
+        from wwise_waapi.voice_source_staging import projection as stage_projection
+        result.setdefault("business_result", {})["staged_completion"] = stage_projection(
+            request["arguments"]["voice_source_staging"], verified=verified is True and state == "verified")
     return result
 
 
@@ -31143,11 +31285,16 @@ def transaction_cleanup_payload(
 ) -> dict[str, Any]:
     """Preserve the immutable cleanup spec and add an honest phase status."""
 
-    return _transaction_cleanup_payload(
+    payload = _transaction_cleanup_payload(
         prepared,
         phase=phase,
         execution_result=execution_result,
     )
+    guard = prepared.get("pre_state", {}).get("voice_source_staging")
+    if guard is not None:
+        from wwise_waapi.voice_source_staging import projection as stage_projection
+        payload["staged_completion"] = stage_projection(guard["record"])
+    return payload
 
 
 def none_state_outcome_continuation(transaction_id, artifact_hash, view, *, state_dir=None, event_hash=None, page=None):
