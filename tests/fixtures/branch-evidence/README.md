@@ -68,7 +68,7 @@ all 65 live_metadata requirements remain missing and completion remains false.
 No native or full-copy proof is added. See the R49 test-inventory entry for the
 source identity, exact focused results and retained native limitations.
 
-The current index selects `product/created-topic-r50-stable-r1-*` (five versions,
+The R50 index selected `product/created-topic-r50-stable-r1-*` (five versions,
 559 exact Console object.created primitive publish leaves) and
 `product/metadata-default-r50-stable-r1-*` (30 nodes, the same 65 exact defaults).
 Both were captured on clean combined source
@@ -82,3 +82,18 @@ change only program locators. Current program proof is 559 Topic plus65 metadata
 emission/applicability/include/omission/co-occurrence/lifecycle is not established.
 R26 remains its selected historical/stale receipt; completion remains false.
 See the R50 test-inventory entry for exact source identity, limits and archive size.
+
+The current index selects `product/created-topic-r52-stable-r1-*` and
+`product/metadata-default-r52-stable-r1-*`, captured together with three current
+public metadata replays on clean source `d1d9dd64393bd181055e9c7ec6dedb302ee9acc3`.
+The existing 559 Topic and 65 metadata program requirements retain their full
+348-file and 343-file closures. The additive `product/r51-replay-r1/` tree
+preserves all original capture bytes and nine sealed `live_metadata` attachments:
+Color default 0 (five leaves), ControlInput default null (two), and OverrideColor
+default false (two), only for the original 2021.1 Console RTPC read. Its source
+bridge retains the complete historical 343-file and current 347-file closures.
+Historical native execution and current injected program replay have separate
+identities; this is no current-native, mutation, other-version or family proof.
+The remaining 56 metadata and all 559 Topic native requirements remain missing.
+All 630 earlier archive and projection files remain unchanged, and the original
+blocked business category is retained. Completion remains false.
