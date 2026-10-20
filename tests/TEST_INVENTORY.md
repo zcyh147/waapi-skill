@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R44 scoped Source, staged completion and exact Render/history integration
+
+Runtime merge `f173d0c0` combines only accepted `4f869927`, `d8c55b4d` and
+`39b7cfc9` (including exact-history `cb0e6b3d`). Withdrawn existing-GUID
+autosuffix branches are excluded. The 23 component files retain exact blobs,
+clean shared-file composition or the reviewed additive test-helper resolution.
+
+The frozen merged tree, with reconciled/generated artifacts, completed these
+checks through the pinned Poetry interpreter and existing test driver:
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| Central `ci/preflight.py` | **826 passed, 51.09s** | Complete fake public-route matrix, roster/schema seals and Tone terminal controls |
+| Shared-conflict focus | **7 passed, 25.30s** | Staged completion/drift, exact-history positive/two faults, retained atomic-2025 and explicit-current-2022 prewrite boundaries |
+
+Both test runs kept all 1,902 tracked files and HEAD unchanged and left no owned
+process. Original argv, source/process/output seals and logs are retained under
+`/tmp/waapi-r44-integration/`. Interface generate/check and branch generate/check
+each ran once, in that order: **17.398s / 17.595s / 25.239s / 40.039s**.
+Only three reviewed aggregate source seals refresh. All 149 machine-contract
+rows outside the four affected `object.set` versions remain exact. The 79/91
+source/index memberships, all 272,313 native obligations and compressed bytes,
+requirements, ownership and evidence policy remain intact.
+
+Separate original 2025 macOS Console receipts remain bound to their component
+candidates: `d8c55b4d` staged Voice/Source **1 passed, 8.05s** (34 calls, two
+separately verified `object.set` transactions), and `cb0e6b3d` exact graph
+rename/notes/history **1 passed, 19.14s** (114 calls, five verified transactions).
+Their roots are `r44-gateway-staged-source-d8c55b4d-2025-r1` and
+`r43-history-exact-cb0e6b3d-2025-r1` under Root's ignored full-coverage directory;
+neither was rerun or promoted to integrated native acceptance. Render native
+acceptance, broader Source/Render/history work and final full Program/Non-live
+gates remain open. No new native, Fresh, hosted-CI or Windows run was performed
+by this integration, and no ticket is closed.
+
 ## 2026-10-20 R42 scoped Source selection and staged Voice integration
 
 Runtime merge `779823d3` combines accepted `8664cfb6`, `1a1b3b03` and

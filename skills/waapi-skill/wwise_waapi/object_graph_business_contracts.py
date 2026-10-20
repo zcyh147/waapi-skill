@@ -335,6 +335,7 @@ def object_graph_business_contract_data(
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
                 "existing_target_choices": {
+                    "new_name": "exact_requested_name_of_bound_existing_GUID;_known_collisions_reject_before_preview;_no_creation_suffix_substitution",
                     "name_conflict": ["fail", "rename", "merge", "replace"],
                     "scope": "new_children_and_list_members_of_this_existing_target",
                     "overrides": "batch_name_conflict",

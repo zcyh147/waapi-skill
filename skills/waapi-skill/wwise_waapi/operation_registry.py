@@ -2735,7 +2735,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                             ("object",),
                             {
                                 "object": IDENTITY_ARGUMENT_SCHEMA,
-                                "name": {"type": "string", "minLength": 1},
+                                "name": {"type": "string", "minLength": 1,
+                                    "description": "Exact new name of this existing GUID; child creation conflict policy does not choose a different name."},
                                 "notes": {"type": "string"},
                                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                                 "list_mode": {
@@ -2745,6 +2746,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                                 "on_name_conflict": {
                                     "type": "string",
                                     "enum": ["fail", "rename", "merge", "replace"],
+                                    "description": "Collision policy for new child/list-member creation; existing GUID name edits remain exact.",
                                 },
                                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                                 "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
@@ -6162,13 +6164,7 @@ def _prepare_object_set(
                     "NO_OP",
                     f"object.set objects[{index}].name already matches the live target.",
                 )
-            if row_conflict == "merge":
-                raise OperationContractError(
-                    "INVALID_CONFLICT_POLICY",
-                    "Renaming an existing object does not support on_name_conflict=merge.",
-                    details={"index": index},
-                )
-            trusted["name"] = result_context["root_prepared_names"].get(target_spec["request_path"], requested_name) if result_context else requested_name
+            trusted["name"] = requested_name
         for descriptor in properties:
             info = _read_property_info_cached(
                 read,
@@ -6391,11 +6387,12 @@ def _prepare_object_set(
                     "object.set rename collision path resolved more than once.",
                     details={"path": future_target_path, "rows": rename_rows},
                 )
-            if row_conflict == "fail" and rename_rows:
+            if rename_rows:
                 raise OperationContractError(
                     "TARGET_EXISTS",
-                    "object.set rename with fail requires the exact requested path to be absent.",
-                    details={"path": future_target_path, "rows": rename_rows},
+                    "Existing-object rename requires the exact requested name; child creation policy cannot resolve its collision.",
+                    details={"path": future_target_path, "rows": rename_rows,
+                        "name_conflict_scope": "new_children_and_list_members"},
                 )
             path_snapshots.append(
                 {
@@ -6405,14 +6402,7 @@ def _prepare_object_set(
                 }
             )
             target_spec["rename_collision_rows"] = rename_rows
-            if row_conflict == "replace" and rename_rows:
-                raise OperationContractError(
-                    "TARGET_EXISTS",
-                    "The child replacement policy does not authorize deleting an existing target's rename collision.",
-                    details={"path": future_target_path, "rows": rename_rows, "name_conflict_scope": "new_children_and_list_members"},
-                )
-            if row_conflict in {"fail", "replace"}:
-                target_spec["expected_path"] = future_target_path
+            target_spec["expected_path"] = future_target_path
         for child_spec in child_specs:
             child_spec["target_index"] = index
             child_spec["parent_request_path"] = (
@@ -9036,7 +9026,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     return assertions
 
 
-def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
+def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
     for node in (pre_state.get("object_set_nodes", []) if isinstance(pre_state, Mapping) else ()):
@@ -9106,7 +9096,8 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
         from .effect_render_conditions import chain_assertions
         assertions.extend(chain_assertions([chain for chain in pre_state["effect_render_chains"]
             if chain not in deferred_render_chains], read=read, after_write=after_write,
-            edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", []))))
+            edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", [])),
+            compound_path_context=compound_path_context))
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
@@ -10886,6 +10877,35 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         if api == "ak.wwise.core.sound.setActiveSource":
             source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
             if source_guard is not None:
+                from .project_setting_business_contracts import active_source_native_limitations
+                for limitation in active_source_native_limitations(request.version):
+                    if (source_guard["source"]["classId"] == limitation["source_class_id"]
+                            and ("platform" not in call_args or request.version == "2022.1")):
+                        host = read(GET_INFO_URI, {}, {})
+                        native_version = host.get("version")
+                        build = (".".join(str(native_version.get(key)) for key in ("year", "major", "minor", "build"))
+                                 if isinstance(native_version, Mapping) else None)
+                        if host.get("isCommandLine") is True and build == limitation["observed_native_build"]:
+                            if "platform" in call_args:
+                                context = read(GET_PROJECT_INFO_URI, {}, {})
+                                current = context.get("currentPlatformId")
+                                if not _compound_project_platform(context, current):
+                                    raise OperationContractError("INVALID_READBACK",
+                                        "Current project platform requires one exact catalog identity.")
+                                platform = next(row for row in context["platforms"]
+                                    if isinstance(row, Mapping) and _same_identity(row.get("id"), current))
+                                name = platform.get("name")
+                                if not isinstance(name, str) or not name.strip():
+                                    raise OperationContractError("INVALID_READBACK",
+                                        "Current project platform requires its observed name.")
+                                if call_args["platform"] != name:
+                                    continue
+                            raise OperationContractError(
+                                "VERSION_BEHAVIOR_BOUNDARY",
+                                "This Console build rejected Tone source selection in its current "
+                                "platform view. This request made no change.",
+                                details={"api": api, "version": request.version, **limitation},
+                            )
                 metadata["active_source_plugin_binding"] = source_guard
                 roles.update({role: ResolvedObject(identity=ObjectIdentity(id=source_guard[role]["id"]),
                     object=source_guard[role]["id"], resolution="live-exact-id", row=source_guard[role]) for role in ("sound", "source")})
@@ -18232,6 +18252,7 @@ def verify_prepared_operation(
     history_resolver=None,
     compound_path_context=None,
     compound_created_children=(),
+    compound_phase_path_context=None,
 ) -> VerificationResult:
     """Run the closed postcondition for one persisted prepared operation."""
 
@@ -18299,7 +18320,7 @@ def verify_prepared_operation(
     if deferred_render_chains:
         assertions.append(render_association)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True,
-        deferred_render_chains=deferred_render_chains))
+        deferred_render_chains=deferred_render_chains, compound_path_context=compound_path_context))
     assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call, after_write=True))
     from .edit_history_business import observe_field_read_platform
     platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
@@ -18553,8 +18574,8 @@ def verify_prepared_operation(
                 from .object_graph_paths import compound_created_child_roots
                 created_children = compound_created_child_roots(inner_plan, phases)
             if path_context is not None:
-                from .object_graph_paths import validate_compound_path_context, observe_compound_path_context
-                validate_compound_path_context(path_context, inner_plan)
+                from .object_graph_paths import compound_expected_context, observe_compound_path_context
+                path_context = compound_expected_context(path_context, inner_plan)
                 context_assertion, context_read = observe_compound_path_context(path_context, read=read_call)
                 assertions.append(context_assertion)
                 readbacks.append(context_read)
@@ -18574,12 +18595,17 @@ def verify_prepared_operation(
                 ):
                     child_business_state_verified = False
                     continue
+                phase_path_context = None
+                if path_context is not None:
+                    from .object_graph_paths import compound_rename_edits
+                    phase_path_context = {'edits': compound_rename_edits(inner_plan[:index + 1])}
                 child_verification = verify_prepared_operation(
                     prepared_child,
                     execution_result=dispatch_result,
                     read_call=read_call,
                     compound_path_context=path_context,
                     compound_created_children=created_children,
+                    compound_phase_path_context=phase_path_context,
                 )
                 verified_child_count += 1
                 child_business_state_verified = (
@@ -20095,10 +20121,7 @@ def verify_prepared_operation(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if effective_conflict == "rename" and (
-                spec.get("existing_target") is not True
-                or spec.get("original_name") != spec.get("requested_name")
-            ):
+            if effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
                 name_ok = (
@@ -20117,6 +20140,13 @@ def verify_prepared_operation(
                 name_ok = row.get("name") == spec.get("requested_name") and (
                     result_node is None or row.get("name") == returned_name
                 )
+            if (compound_path_context and compound_phase_path_context is not None
+                    and kind == 'object-set-batch' and spec.get('existing_target') is True
+                    and spec.get('requested_name') == spec.get('original_name')):
+                from .object_graph_paths import project_compound_snapshot
+                final_name = project_compound_snapshot(spec['pre_state'], compound_path_context)['name']
+                phase_name = project_compound_snapshot(spec['pre_state'], compound_phase_path_context)['name']
+                name_ok = row.get('name') == final_name and (result_node is None or returned_name == phase_name)
             check(
                 f"{request_path} name follows the reviewed conflict policy",
                 name_ok,
@@ -20225,10 +20255,14 @@ def verify_prepared_operation(
                     {"expected": spec.get("requested_notes"), "actual": row.get("notes")},
                 )
             elif (spec.get("existing_target") is True or spec.get("preexisting_id") is not None) and isinstance(spec.get("pre_state"), Mapping):
+                expected_notes = spec["pre_state"].get("notes")
+                if compound_path_context:
+                    from .object_graph_paths import project_compound_snapshot
+                    expected_notes = project_compound_snapshot(spec["pre_state"], compound_path_context).get("notes")
                 check(
                     f"{request_path} untouched notes remain unchanged",
-                    row.get("notes") == spec["pre_state"].get("notes"),
-                    {"expected": spec["pre_state"].get("notes"), "actual": row.get("notes")},
+                    row.get("notes") == expected_notes,
+                    {"expected": expected_notes, "actual": row.get("notes")},
                 )
             for field_spec in spec.get("properties", []):
                 if not isinstance(field_spec, Mapping):
@@ -20976,7 +21010,7 @@ def verify_prepared_operation(
         if deferred_render_chains:
             from .effect_render_conditions import chain_assertions
             assertions.extend(chain_assertions(deferred_render_chains, read=read_call, after_write=True,
-                edits=specs, resolved_ids=resolved_id_by_path))
+                edits=specs, resolved_ids=resolved_id_by_path, compound_path_context=compound_path_context))
             render_association["passed"] = True
         replaced_set_rows: list[Any] = []
         if kind == "object-set-batch":
@@ -21062,6 +21096,10 @@ def verify_prepared_operation(
                 for before_child in parent_spec.get("preexisting_children", []):
                     if not isinstance(before_child, Mapping) or _identity_key(before_child.get("id")) in requested_ids | replaced_set_ids:
                         continue
+                    original_child = before_child
+                    if compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        before_child = project_compound_snapshot(before_child, compound_path_context)
                     matches = [row for row in actual_children if _same_identity(row.get("id"), before_child.get("id"))]
                     unchanged = len(matches) == 1 and all(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_child.get(field)))
@@ -21070,7 +21108,7 @@ def verify_prepared_operation(
                         for field in ("id", "name", "type", "parent", "notes", *(["path"] if kind == "object-create-graph" else [])) if field in before_child
                     )
                     check(f"{parent_path} unrequested pre-existing child identity and notes remain unchanged", unchanged,
-                          {"before": dict(before_child), "after": matches})
+                          {"before": dict(original_child), "expected": dict(before_child), "after": matches})
         list_roots_by_owner: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
         for list_spec in specs:
             collection = list_spec.get("collection")

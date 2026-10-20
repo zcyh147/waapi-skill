@@ -83,7 +83,7 @@ def capture_before(node, metadata, *, version, catalog, read):
             return {**proof, "reason": "complete_exact_identity_class_and_before_fields_not_observed"}
         proof.update(before=dict(rows[0]), projection=projection, reference_targets=[])
         classes = [item.as_dict() for item in catalog
-            if item.class_id == rows[0]["classId"] and item.name == rows[0].get("type")]
+            if item.class_id == rows[0]["classId"] and rows[0].get("type") in {item.name, item.type}]
         if len(classes) != 1:
             return {**proof, "reason": "exact_live_class_and_object_type_not_certified"}
         proof["class_type"] = classes[0]

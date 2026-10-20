@@ -61,7 +61,7 @@ def expected_snapshot(snapshot, *, edits, read_row):
         actual = read_row(target_id)
         actual_name = actual.get('name')
         if (not isinstance(name, str) or not isinstance(actual_name, str) or not actual_name or '\\' in actual_name
-                or not (actual_name == name or (node.get('on_name_conflict') == 'rename' and actual_name.startswith(name)))):
+                or actual_name != name):
             raise ValueError('Actual name differs from the sealed graph rename policy')
         if path_affected:
             segments[len(old_path.split('\\')) - 1] = actual_name
@@ -151,6 +151,21 @@ def compound_rename_edits(calls):
     return edits
 
 
+def compound_expected_context(context, calls):
+    """Reconstruct declared final notes without changing the sealed path context."""
+    validate_compound_path_context(context, calls)
+    notes = {}
+    for call in calls:
+        plan = call.get('prepared_operation', {}).get('verification_plan', {})
+        if plan.get('kind') == 'same-guid-notes':
+            notes[plan['object_id'].casefold()] = plan['expected_notes']
+        elif plan.get('kind') == 'object-set-batch':
+            for node in plan.get('nodes', []):
+                if node.get('existing_target') is True and node.get('notes_supplied') is True:
+                    notes[node['target_id'].casefold()] = node['requested_notes']
+    return {**context, 'notes_outcomes': notes}
+
+
 def project_compound_path(path, context):
     if not context:
         return path
@@ -164,15 +179,29 @@ def prepare_compound_path_context(calls, *, read):
     edits = compound_rename_edits(calls)
     graphs = [call['prepared_operation'] for call in calls
         if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph']
-    if not edits or not any(any(isinstance(role.get('row'), dict)
-            and (role['row']['path'] == node['pre_state']['path']
-                or role['row']['path'].startswith(node['pre_state']['path'] + '\\'))
-            for node in edits) for child in graphs for role in child.get('resolved_roles', {}).values()):
+    def affected(row):
+        return isinstance(row, dict) and isinstance(row.get('path'), str) and any(
+            row['path'] == node['pre_state']['path'] or row['path'].startswith(node['pre_state']['path'] + '\\')
+            for node in edits)
+    render_chains = [chain for call in calls
+        for chain in call.get('prepared_operation', {}).get('pre_state', {}).get('effect_render_chains', [])]
+    owned_members = {item['object_id'].casefold() for chain in render_chains for item in chain.get('snapshots', [])
+        if isinstance(parent_id(item.get('before', {}).get('owner')), str)
+        and parent_id(item['before']['owner']).casefold() == str(chain.get('owner_id')).casefold()}
+    render_rows = [row for chain in render_chains
+        for row in [chain.get('source', {}).get('scope', {}).get('owner'),
+            *(item.get('before') for item in chain.get('snapshots', [])),
+            *(item.get('before') for item in chain.get('targets', []))]]
+    if not edits or not (any(affected(role.get('row')) for child in graphs
+            for role in child.get('resolved_roles', {}).values()) or any(affected(row) for row in render_rows)):
         return None
     identities = {}
     def collect(value):
         if isinstance(value, dict):
-            if all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path')) and _GUID.fullmatch(value['id']):
+            # Owned List members retain their opaque path/owner proof in the
+            # complete Render model, not an invented ordinary parent chain.
+            if (all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path'))
+                    and _GUID.fullmatch(value['id']) and value['id'].casefold() not in owned_members):
                 if any(value['path'] == node['pre_state']['path'] or value['path'].startswith(node['pre_state']['path'] + '\\') for node in edits):
                     key = value['id'].casefold()
                     if key in identities and any(identities[key][field] != value[field] for field in ('id', 'name', 'type', 'path')):
@@ -238,11 +267,13 @@ def validate_compound_path_context(context, calls):
 
 
 def compound_context_expected(context):
-    def intent(key):
-        edit = next(node for node in context['edits'] if node['target_id'].casefold() == key.casefold())
-        return {'name': edit['requested_name']}
-    return [{key: value for key, value in expected_snapshot(row, edits=context['edits'], read_row=intent).items()
-        if key != 'notes'} for row in context['snapshots']]
+    expected = []
+    for row in context['snapshots']:
+        projected = project_compound_snapshot(row, context)
+        if row['id'].casefold() not in context.get('notes_outcomes', {}):
+            projected.pop('notes', None)  # Unrequested notes retain their existing preservation observers.
+        expected.append(projected)
+    return expected
 
 
 def observe_compound_path_context(context, *, read):
@@ -317,7 +348,11 @@ def project_compound_snapshot(row, context):
     def intent(key):
         return {'name': next(node['requested_name'] for node in context['edits']
             if node['target_id'].casefold() == key.casefold())}
-    return expected_snapshot(row, edits=context['edits'], read_row=intent)
+    projected = expected_snapshot(row, edits=context['edits'], read_row=intent)
+    key = str(row.get('id')).casefold()
+    if key in context.get('notes_outcomes', {}):
+        projected['notes'] = context['notes_outcomes'][key]
+    return projected
 
 
 def compound_created_child_roots(calls, phases):

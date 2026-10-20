@@ -27692,7 +27692,7 @@ def _business_next_action_binding(
                 if record.operation == "ak.wwise.core.gameParameter.setRange"
                 else [
                     "--sound-handle <bound-sound-handle>",
-                    "--source-handle <bound-audio-file-source-handle>",
+                    "--source-handle <bound-sound-source-handle>",
                     "[--platform-name <exact-installed-platform-name>]",
                 ]
             ),
