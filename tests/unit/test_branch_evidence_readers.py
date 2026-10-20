@@ -168,16 +168,42 @@ def test_metadata_branch_uses_original_receipt_and_reviewed_source_equivalence(t
     assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding, source_root=original_root)[0] == 'missing'
 
 
-@pytest.mark.parametrize('damage', [None, 'public-sibling', 'native-sibling', 'reference-occurrence', 'absence', 'null'])
+@pytest.mark.parametrize('damage', [None, 'public-sibling', 'native-sibling', 'reference-occurrence', 'absence', 'null',
+    'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'])
 def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispatch_pointer(tmp_path, damage):
     """Original reader compatibility only; this controlled receipt grants no product proof."""
     from tests.maintenance import branch_coverage_audit as audit
-    context = completion.read_metadata_run(metadata_descriptor(), tmp_path)
+    metadata_run = metadata_descriptor()
+    if damage in {'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'}:
+        # Deliberately corrupted/resealed reader fixtures, never native evidence.
+        # Original external receipts remain byte-identical in FIXTURES.
+        import shutil
+        copied = tmp_path / 'synthetic-metadata'
+        shutil.copytree(FIXTURES / 'metadata', copied)
+        seal = json.loads((copied / 'seal.json').read_bytes())
+        for name in ('006.stdout', '006.agent-result.json'):
+            path = copied / name
+            payload = json.loads(path.read_bytes())
+            result = payload['agent_result'] if name.endswith('.stdout') else payload
+            if damage == 'missing-parent-absence':
+                del result['metadata']
+            else:
+                result['metadata'] = {} if damage == 'empty-parent-absence' else None
+            path.write_text(json.dumps(payload), encoding='utf-8')
+            entry = next(row for row in seal['files'] if row['path'] == name)
+            entry.update(sha256=hashlib.sha256(path.read_bytes()).hexdigest(), bytes=len(path.read_bytes()))
+        (copied / 'seal.json').write_text(json.dumps(seal), encoding='utf-8')
+        metadata_run = {**metadata_run, 'root': str(copied), 'seal': sealed(copied / 'seal.json')}
+    context = completion.read_metadata_run(metadata_run, tmp_path)
     route = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo'
     target = '/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue'
     pointer = target + '/anyOf/3/@boolean/false'
     branch = {'id': route + '|' + pointer, 'route': route, 'pointer': pointer,
               'kind': 'boolean_value', 'value': False, 'shape_sha256': audit.digest(False)}
+    if damage in {'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'}:
+        pointer = '/resultSchema/properties/default/@presence/absent'
+        branch.update(id=route + '|' + pointer, pointer=pointer, kind='optional_presence', value='absent',
+                      shape_sha256=audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')['branches'][route + '|' + pointer]['native_shape_sha256'])
     edge_id = route + '|/resultSchema/properties/default/$ref'
     edges = {edge_id: {'route': route, 'pointer': '/resultSchema/properties/default/$ref',
                       'reference': {'target': route + '|' + target}}}
@@ -196,11 +222,11 @@ def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispat
         binding['observation_pointer'] = '/native_call/result/supports/unlink'
     elif damage == 'reference-occurrence':
         edges[edge_id]['pointer'] = '/resultSchema/properties/supports/properties/unlink/$ref'
-    record = {'candidate_sha256': candidate, 'scope_kind': 'controlled', 'metadata_run': metadata_descriptor(),
+    record = {'candidate_sha256': candidate, 'scope_kind': 'controlled', 'metadata_run': metadata_run,
         'invocation': {'phase': 'final', 'outcome': 'PASS', 'node_outcomes': [{'nodeid': 'preserved-metadata', 'outcome': 'PASS'}]},
         'branch_assertions': {branch['id']: {'native_shape_sha256': branch['shape_sha256'], 'native_route': route,
           'checks': [{'pointer': binding['gateway_observation_pointer'], 'equals': False}]}}}
-    if damage == 'absence':
+    if damage == 'absence' or damage in {'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'}:
         record['branch_assertions'][branch['id']]['checks'][0] = {
             'pointer': binding['gateway_observation_pointer'], 'absent': True}
     elif damage == 'null':
@@ -218,7 +244,7 @@ def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispat
     result = completion.evidence_result(sealed(path, nodeid='preserved-metadata'), branch, candidate,
         'live_metadata', 'controlled', tmp_path, binding, source_root=original_root,
         reference_edges=edges)
-    assert result == ('passed', None) if damage is None else result[0] == 'missing'
+    assert result == ('passed', None) if damage in {None, 'empty-parent-absence'} else result[0] == 'missing'
     if damage != 'native-sibling':
         assert binding['observation_pointer'] == '/native_call/result/default'
 

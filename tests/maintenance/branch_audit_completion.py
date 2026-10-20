@@ -644,6 +644,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                 metadata_pointer = binding.get('gateway_observation_pointer', '')
                 exact_observation_pointer(branch, {**binding, 'observation_pointer': metadata_pointer},
                                           '/gateway/payload/agent_result', 'metadata', reference_edges or {})
+                if (branch['pointer'] == '/resultSchema/properties/default/@presence/absent'
+                        and not isinstance(pointer_value(record, '/gateway/payload/agent_result/metadata'), dict)):
+                    raise ValueError('absent metadata default requires an existing metadata object')
             else:
                 metadata_pointer = binding.get('observation_pointer', '')
             if metadata_pointer.startswith('/gateway/payload/agent_result/') is False:
