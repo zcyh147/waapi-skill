@@ -1,5 +1,29 @@
 # Native observations needed by current implementation
 
+## Latest R55/R56 evidence and remaining work
+
+The production saved-copy continuation now proves the exercised 2021.1 Synth /
+RTPC / LFO / Curve graph through separate baseline/final Save authorization and
+an independent saved-image comparison. The owned `cd272949` case passed; this
+does not certify arbitrary Source/Voice graphs, ObjectRef remapping, conflict
+modes, other versions or copy/history preservation. Those remain implementation
+and evidence obligations under the existing parent.
+
+Four native metadata collections at `860965d3` add ten exact observations.
+Integrated portable evidence at `3f8f3146` now supports 60 of the 65 selected
+native requirements, independently of their program checks. The remaining five
+are absence-of-default branches, one per version; no returned empty value, null
+or error establishes absence. Historical/native and current/program source maps
+remain separate and complete.
+
+Stationary square and triangle program verification reuse retained native WAVs;
+their original diagnostic verdicts are unchanged. Triangle's two sufficient
+phase witnesses do not decide all possible phases. Phase completeness,
+envelope/noise/fractional cases and required native effect evidence remain
+assigned to #193. No further Wwise launch or Fresh run accompanied this evidence
+integration. Exact tested scope and results are in
+[the test inventory](../../../tests/TEST_INVENTORY.md).
+
 Parent: [#174](https://github.com/zcyh147/waapi-skill/issues/174).
 These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope

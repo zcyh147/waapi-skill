@@ -1,5 +1,22 @@
 # Branch completion ledger
 
+## Latest integration: R55/R56
+
+Artifact candidate `3f8f3146` incorporates the accepted saved-copy continuation,
+formal task-consumer repairs, square/triangle verification and exact historical
+metadata source bridge. Its 60-case capture and two actual portable-product
+checks passed; the exact sources, separate component results and limitations are
+recorded in [the test inventory](../../../tests/TEST_INVENTORY.md).
+
+The unchanged 272,313 native obligations currently comprise 60 verified,
+565 implemented_unverified, 271,572 unresolved and 116 approved exclusions.
+The selected metadata slice has 65 independent program passes and 60 historical
+native witnesses; five default-absence requirements remain missing. All 559
+selected Topic native requirements remain missing. Original receipts retain
+their native source identities and verdicts; current replay does not assert
+current-native equivalence. This checkpoint does not close a functional ticket,
+replace final gates or reduce the parent scope.
+
 This is the implementation of #176, using the existing
 `tests/maintenance/branch_coverage_audit.py` maintainer CLI. It does not extend
 runtime WAAPI execution or grant implementation credit to later tickets.

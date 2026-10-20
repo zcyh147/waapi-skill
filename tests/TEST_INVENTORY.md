@@ -5,6 +5,71 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R55/R56 saved-copy, Tone and portable metadata integration
+
+Accepted runtime/harness sources are Source saved-copy `ee78f00b` with explicit
+Save-choice disclosure `4a6208a1`, full task consumers `20c8dcc8`, stationary
+square `8d015764`, stationary triangle `4521245a`, and exact historical/current
+metadata-source bridge `514c8100`. The current Program roster has **272 modules**;
+that count is not a completed full gate.
+
+The saved-copy protocol has scoped native evidence on Console 2021.1.14.8108:
+one case at `cd272949` passed in **10.40s**, with separately authorized baseline
+and final Save children, one copy, and an independent saved-XML oracle. It covers
+the exercised Synth/RTPC/LFO/Curve graph with zero ObjectRefs. The original
+collector category remains diagnostic; arbitrary graphs, ObjectRef remapping and
+history are not certified. Full formal task-consumer program checks subsequently
+exercise the actual Broker, grader, archiver and mandatory campaign reader,
+substituting only the external Codex process and existing fake WAAPI boundary.
+The final dirty-flow/classifier selection passed **2 in 19.44s**; read-only and
+topology controls passed separately. Earlier component-only checks and mixed
+failed attempts retain their original scope and verdicts. No Fresh run follows.
+
+Stationary square/triangle checks preserve the requested cadence and gain under
+their disclosed numerical tolerance. Triangle's final affected selections passed
+**13 in 6.38s**, then **3 in 1.67s** after constant precomputation. These are
+separate program selections, not a combined gate. The actual retained triangle
+WAV is replayed byte-identically; its original diagnostic result is unchanged.
+Missing phase witnesses remain partial, and envelope/noise/fractional and other
+unverified Tone branches remain required. The exact metadata bridge passed
+**19 in 41.07s**, including strict rejection of unknown or omitted source proofs.
+
+Four sequential read-only native collections on frozen `860965d3` (2021–2024)
+observed six fields providing ten exact empty-string/Boolean witnesses. Their
+34 public calls and 82 native packets are retained in **262 sealed files /
+1,607,698 bytes**. Source projects and cleanup checks passed. These observations
+supplement the earlier R51/R54 originals; no default-absence claim is inferred.
+
+Integration capture source `0377d16b` passed **60 selected cases in 20.47s**
+(wrapper 21.12s), with no skips or source drift. Interface generation/check passed
+in **16.591s / 16.839s**. The preceding `settled-r1` stopped before capture because
+the reviewed new continuation command lacked its parser-policy seal; that failed
+attempt remains preserved. Only the reviewed seal and derived inventory changed
+before the fresh `settled-r2` capture.
+
+Artifact commit `3f8f3146` preserves all **1,587 earlier archive files** and adds
+1,096 files / 128,638,233 bytes through the existing importers. Thirty-five program
+entries were refreshed; historical native attachments are exactly **9 R51 +
+41 R54 + 10 R55**. Full original/current source maps and native bytes remain
+separate: attribution is historical-native/current-program, not current-native.
+Branch generation/check passed in **63.620s / 62.875s**. All 272,313 native
+obligation identities, shapes and owners remain exact; only the selected 624
+Topic/metadata evidence rows changed. Current accounting is **65 metadata program
+passed, 60 live_metadata passed, 5 absent-default requirements missing**;
+**559 Topic program passed, 559 native requirements missing**. Overall completion
+remains false: 60 verified, 565 implemented_unverified, 271,572 unresolved and
+116 approved exclusions.
+
+On clean `3f8f3146`, the two actual portable-product checks passed **2 in 27.97s**
+(wrapper 28.70s), with original context variables cleared, no local-evidence
+fallback, independent program proof, unchanged source and empty owned process
+groups. The fixed preflight is reserved for GitHub and was not repeated locally.
+Exact commands, logs and preservation receipts are under
+`/tmp/waapi-r55-integration/run-settled-r2`; captures remain under
+`.waapi-skill-state/read-evidence-r55-settled-r2`. The earlier full Program result
+remains FAIL (13,529 passed, 7 failed, 4 skipped). This integration is not full
+Program/Non-live, Fresh, Windows or whole-ticket acceptance.
+
 ## 2026-10-21 R54 Source-copy, closed Save and five-version class metadata
 
 Conflict-free merge `55865039` incorporates accepted class source `8a8d5f8e`,
