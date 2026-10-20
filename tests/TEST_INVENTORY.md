@@ -5,6 +5,48 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R38 selected regression repairs
+
+Runtime merge `5fcd2d97` preserves accepted components `8836b0e5` (local-import
+binding), `2c2ef80b` (version-bound import class fixtures), `7ad1f0f5`
+(condition class fixtures) and `122ea303` (compact directory prose, structured
+error context and assigned fixtures) without merger fixups. Production class,
+drift, readback, continuation and output-bound safeguards remain intact.
+
+These are separate staged Non-live selections through the pinned Poetry
+`WAAPI_TEST_PYTHON` and `ci/test.sh`; no aggregate gate result is inferred:
+
+| Component selection | Original result |
+|---|---|
+| Replacement copy/move across five versions and optional notice | 11 passed in 5.73s |
+| Import tracers, version-spanning positives and malformed/drift/alias controls | 39 passed in 2.54s |
+| Condition fixtures, first selection | 91 passed in 37.63s |
+| Condition fixtures, remaining roles and three new corruption controls | 67 passed, 3 failed in 21.76s |
+| Only three new corruption controls, first assertion correction | 3 failed in 1.03s |
+| Same three controls, exact wrapper/inner assertions corrected | 3 passed in 0.96s |
+| Gateway/small regressions and related controls | 23 passed, 1 failed in 26.02s |
+| Only remaining policy-create fixture, type/class corrected | 1 passed in 0.97s |
+
+The condition failures were test-author expectations: the strict product
+returned `OPERATION_DRAFT_CHECK_FAILED` with `INVALID_READBACK` for
+missing/malformed class and `INVALID_TARGET_TYPE` for mismatch. The small
+selection's residual failure exposed stale fake PropertyContainer state for a
+declared ActorMixer. Neither correction relaxed production behavior. The
+2021.1 generic active-source boundary remains an open #181 implementation gap.
+Original component logs/argv/process receipts remain at the paths in
+`/tmp/waapi-r38-replace-fix-handoff.md`,
+`/tmp/waapi-r38-import-fixtures/handoff.md`,
+`/tmp/waapi-r38-class-fixtures-handoff.md` and
+`/tmp/waapi-r38-small-regression-triage.md`.
+
+On frozen `5fcd2d97`, four serial inventory generation/check commands exited
+zero once. All four policy seals, 79 source members, 91 source-index members,
+272,313 native obligation rows and compressed artifact bytes remain exact;
+only existing source hashes/line offsets and native candidate identity refresh.
+No merger pytest, full Program, native or Fresh run occurred. The original
+1,442 failed-node subset has not yet been retested on R38; the earlier failure
+below remains unchanged and no broad PASS credit follows.
+
 ## 2026-10-20 R37 focused integration and original Program failure
 
 R37 `510a40f5` merges accepted history `4a8fee72` and portable evidence

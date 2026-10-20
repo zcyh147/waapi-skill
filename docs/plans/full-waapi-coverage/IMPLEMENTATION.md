@@ -18,6 +18,16 @@ references. No main merge is authorized.
 
 ## Active work
 
+- R38 runtime merge `5fcd2d97` integrates accepted local-import binding repair
+  `8836b0e5`, import fixtures `2c2ef80b`, condition fixtures `7ad1f0f5` and
+  compact Gateway/error-context repairs `122ea303` without merger fixups.
+  Strict class/readback guards remain unchanged. Four serial inventory commands
+  exited zero once; all four contract seals and all 272,313 native obligation
+  rows remain exact. Only source hashes/line offsets and candidate identity
+  refresh. Separate staged results, including intermediate failures, are in
+  [the test inventory](../../../tests/TEST_INVENTORY.md); they are not a combined
+  gate PASS. The original failed subset has not yet been retested on R38.
+  Generic 2021.1 active-source mapping remains an open #181 implementation gap.
 - R37 integration `510a40f5` accepts exact-intent created-graph ancestor
   history (#192) and portable evidence selection (#195), preserving both
   component filesets. Source/history controls are staged fake-native evidence;

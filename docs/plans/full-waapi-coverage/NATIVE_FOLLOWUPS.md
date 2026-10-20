@@ -5,6 +5,19 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## R38 regression repair evidence limits
+
+R38 runtime merge `5fcd2d97` repairs selected Program failures with unchanged
+business/version contracts and strict class guards. Its component results are
+separate staged fake-native controls, recorded in
+[the test inventory](../../../tests/TEST_INVENTORY.md), not native acceptance
+or a combined gate. Four serial inventory commands preserve all 272,313 native
+obligation rows and compressed bytes, including missing current R26 evidence;
+only source hashes/line offsets and candidate identity refresh. No native or
+Fresh run accompanied R38. The original failed subset is not yet retested.
+The explicit generic active-source boundary in 2021.1 remains #181 work,
+not a completed feature, new exclusion or finding of native absence.
+
 ## R37 history and portable evidence limits
 
 Integration `510a40f5` supports exact-intent ancestor renames around ordinary
