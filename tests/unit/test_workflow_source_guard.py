@@ -4654,6 +4654,10 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
             row['audioSource:language'] = {'name': node.get('language', 'SFX')}
             if fault == 'ignored-language' and node.get('language'): row['audioSource:language']['name'] = 'SFX'
             created_sources.append(identity)
+            if fault == 'staged-atomic-order':
+                # Adding the first Source may change this observation; it is
+                # not a requested active-source switch or a Voice field change.
+                task.objects[parent]['activeSource'] = {'id': identity}
         else:
             row.setdefault('@IsVoice', False)
             row['activeSource'] = None
@@ -4662,6 +4666,17 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
         return {'id': identity, 'name': row['name'], **({'children': children} if children else {})}
     task._create = create
     original = task.call
+    class WaapiRequestFailed(Exception):
+        uri = 'ak.wwise.invalid_language'
+        kwargs = {'details': {'procedureUri': 'ak.wwise.core.object.set'},
+            'message': 'Language can only be used on the Source of a Voice.'}
+    def atomic_localized_source(node):
+        if isinstance(node, dict):
+            if node.get('type') == 'Sound' and any(child.get('type') == 'Source' and 'language' in child
+                    for child in node.get('children', [])):
+                return True
+            return any(atomic_localized_source(value) for value in node.values())
+        return isinstance(node, list) and any(atomic_localized_source(value) for value in node)
     def call(uri, args=None, options=None):
         if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from type Language '):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -4675,7 +4690,11 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
                 assert len(rows) == 1, args
                 rows = [row for row in task.objects.values() if row.get('parent') == {'id': rows[0]['id']}]
             return {'return': task.project_rows(rows, options or {})}
-        if uri.endswith('object.set'): writes.append(deepcopy(args))
+        if uri.endswith('object.set'):
+            writes.append(deepcopy(args))
+            if fault == 'staged-atomic-order' and atomic_localized_source(args):
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                raise WaapiRequestFailed('Language can only be used on the Source of a Voice.')
         result = original(uri, args, options)
         if uri.endswith('object.set') and fault == 'extra-child' and len(writes) == 2:
             original_owner = task.objects[created_sources[0]]['parent']['id']
@@ -4693,6 +4712,11 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
         lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
     def raw(argv):
         commands.append(list(argv))
+        if fault == 'staged-wrong-voice' and argv[0] == 'query-object' and '--exact-id' in argv and '--include-field' in argv:
+            selected = argv[argv.index('--exact-id') + 1]
+            row = task.objects.get(selected, {})
+            if row.get('type') == 'Sound' and len(writes) == 1:
+                row['@IsVoice'] = False
         code, result = task.run(*argv)
         if argv[0] == 'draft-discover-fields' and code == 0 and fault == 'ambiguous-field':
             meaning, = result['meaning_results']
@@ -4703,6 +4727,53 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
         return code, result
     runtime.raw_gateway = raw
     return runtime, commands, writes, task
+
+
+def test_staged_voice_source_language_observes_existing_voice_before_separate_source_write(tmp_path, workflow):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='staged-atomic-order')
+    workflow.test_staged_voice_source_language_console_characterization(runtime)
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and receipt['collection_complete'] is True
+    assert category['scope'] == 'staged_existing_Voice_Source_language' and category['diagnostic_only'] is True
+    assert receipt['atomic_Source_language_unresolved'] is True
+    assert receipt['distinct_language_disambiguation'] is False
+    assert receipt['distinct_language_prerequisite'] == 'not_exercised_staged_no_construction_context'
+    assert [phase['case'] for phase in receipt['phases']] == ['empty-voice', 'existing-voice-explicit-source']
+    assert len(writes) == 2 and sum(argv[0] == 'execute' for argv in commands) == 2
+    empty_voice = writes[0]['objects'][0]['children'][0]
+    assert empty_voice['@IsVoice'] is True and 'language' not in empty_voice and 'children' not in empty_voice
+    voice = receipt['phases'][0]['independent_owner']
+    assert voice['properties']['IsVoice'] is True and receipt['phases'][0]['independent_children'] == []
+    assert writes[1]['objects'][0]['object'] == voice['id']
+    assert 'language' not in writes[1]['objects'][0] and '@IsVoice' not in writes[1]['objects'][0]
+    source, = writes[1]['objects'][0]['children']
+    assert source['type'] == 'Source' and source['classId'] == 6684674
+    assert source['language'] == 'English(US)' and source['@StartFreq'] == 440
+    assert receipt['phases'][1]['independent_source']['source_language']['name'] == 'English(US)'
+    after_voice = receipt['phases'][1]['independent_owner']
+    assert all(after_voice[key] == voice[key] for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes', 'properties'))
+    assert after_voice['active_source'] != voice['active_source']
+    operations = [argv[1] for argv in commands if argv[0] == 'draft-start']
+    assert operations == ['object.set', 'object.createPlugin']
+    second_draft = next(index for index, argv in enumerate(commands) if argv[:2] == ['draft-start', 'object.createPlugin'])
+    assert any(argv[:3] == ['query-object', '--exact-id', voice['id']] and 'IsVoice' in argv for argv in commands[:second_draft])
+    assert len(commands) <= receipt['limits']['calls'] == 74
+    assert receipt['native_evidence']
+
+
+def test_staged_voice_source_language_stops_before_source_write_when_existing_voice_flag_changes(tmp_path, workflow):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='staged-wrong-voice')
+    with pytest.raises(AssertionError):
+        workflow.test_staged_voice_source_language_console_characterization(runtime)
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['collection_complete'] is False
+    assert receipt['atomic_Source_language_unresolved'] is True
+    assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
+    assert not any(argv[:2] == ['draft-start', 'object.createPlugin'] for argv in commands)
+    assert receipt['phases'][0]['independent_owner']['properties']['IsVoice'] is False
+    assert receipt['native_evidence'] and len(receipt['lifecycle_final_reference']['transaction_ids']) == 1
 
 
 @pytest.mark.parametrize('locales', ['captured-single', 'two-locales'])
