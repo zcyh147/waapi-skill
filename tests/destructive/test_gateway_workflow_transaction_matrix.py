@@ -7011,9 +7011,11 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
             return payload
     gateway = Gateway()
-    def query(argv, *, source=False, voice=False, language=None):
+    def query(argv, *, source=False, voice=False, language=None, source_field=None):
         projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
-        if source: projection += ['--include', 'owner', '--include', 'source-language', '--include-field', 'Frequency']
+        if source:
+            assert source_field == 'StartFreq', 'Source observation must retain the selected real field'
+            projection += ['--include', 'owner', '--include', 'source-language', '--include-field', source_field]
         if voice: projection += ['--include-field', 'IsVoice', '--include', 'active-source']
         payload = gateway.gateway(['query-object', *argv, *projection,
             *(['--language', language] if language is not None else []), '--max-results', '8'], live=True)
@@ -7027,7 +7029,7 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
     retained: list[dict[str, Any]] = []
     def retained_rows():
         return [{'owner': exact(row['owner']['id'], voice=True),
-            'source': exact(row['source']['id'], source=True, language=row['language']),
+            'source': exact(row['source']['id'], source=True, language=row['language'], source_field=row['field']),
             'children': query(['--exact-id', row['owner']['id'], '--relationship', 'children'], language=row['language'])} for row in retained]
     persist()
     try:
@@ -7039,12 +7041,22 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
         version = receipt['get_info']['version']
         assert tuple(version[key] for key in ('year', 'major', 'minor', 'build')) == tuple(
             int(part) for part in catalog['provenance']['build'].split('.')), version
+        project_call, = [row for row in status['calls'] if row['api'] == 'ak.wwise.core.getProjectInfo']
+        project_observation = observe_console_file(Path(project_call['evidence_path']), io_root=native_root)
+        project_info = json.loads(base64.b64decode(project_observation['content_base64'], validate=True))['result']
+        project_languages = project_info['languages']
+        assert isinstance(project_languages, list) and 0 < len(project_languages) <= 64, project_languages
+        project_language_keys = {(uuid.UUID(row['id']), row['name']) for row in project_languages}
+        assert len(project_language_keys) == len(project_languages) and all(isinstance(name, str) and name for _, name in project_language_keys), project_languages
+        receipt['project_language_authority'] = {'project_id': project_info['id'], 'languages': project_languages,
+            'native_evidence_path': project_call['evidence_path'], 'file_proof': project_observation['file_proof']}
         listed = gateway.gateway(['metadata', 'types', '--meaning', 'Language', '--page-size', '64'], live=True)['agent_result']
         language_type, = [row for row in listed['types'] if row.get('name') == 'Language']
         languages = gateway.gateway(language_type['query_command']['gateway_argv'], live=True)
         assert languages.get('status') != 'partial' and languages.get('limit_reached') is not True, languages
-        choices = sorted((row for row in languages['objects'] if row.get('type') == 'Language' and row.get('name', '').casefold() != 'sfx'), key=lambda row: row['name'])
-        assert choices and len({uuid.UUID(row['id']) for row in choices}) == len(choices), choices
+        choices = sorted((row for row in languages['objects'] if row.get('type') == 'Language'
+            and (uuid.UUID(row['id']), row.get('name')) in project_language_keys), key=lambda row: row['name'])
+        assert len(choices) == len(project_languages) and len({uuid.UUID(row['id']) for row in choices}) == len(choices), choices
         receipt['language_choices'] = choices
         construction_language = choices[0]['name']
         source_language = choices[1 if len(choices) > 1 else 0]['name']
@@ -7072,7 +7084,15 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             owner_handle = declared_business_object_handle(owner, 'owner')
             kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
             fields = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Frequency'], live=True)
-            frequency = discovered_business_field_handle(fields, 'Frequency')
+            meaning, = fields['meaning_results']
+            assert meaning['meaning'] == 'Frequency' and fields['candidate_count'] == len(meaning['candidates']), fields
+            selected = [row for row in meaning['candidates'] if row.get('label') == 'Start Frequency'
+                and row.get('field_kind') == 'property' and row.get('value_type') == 'number'
+                and row.get('metadata', {}).get('name') == 'StartFreq' and row['metadata'].get('type') == 'Real32'
+                and row['metadata'].get('display', {}).get('name') == 'Start Frequency']
+            assert len(selected) == 1, 'Start Frequency must have one exact disclosed metadata candidate'
+            field = phase['frequency_field'] = selected[0]
+            frequency = field['handle']
             _update_business_draft(gateway, draft, 'draft-declare-new', [
                 '--declaration-id', 'source', '--parent-handle', owner_handle, '--name', 'Tone', '--kind', kind,
                 '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep Source ' + case,
@@ -7088,6 +7108,8 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 specs = prepared['pre_state']['object_set_nodes']
                 owner_spec, = [row for row in specs if row['requested_name'] == name]
                 source_spec, = [row for row in specs if 'source_plugin' in row]
+                assert source_spec['structural_class_id'] == source_spec['source_plugin']['descriptor']['class_id'] == 6684674, 'Selected field must belong to the observed Wwise Tone Generator class'
+                assert any(prop['name'] == field['metadata']['name'] and prop['value'] == 440 for prop in source_spec['properties']), source_spec
                 phase['preexisting_source_ids'] = source_spec['source_plugin']['preexisting_plugin_ids']
                 assert phase['preexisting_source_ids'] == [], 'All three cases construct new owners, not merged owners'
                 gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
@@ -7101,14 +7123,14 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 owner_id, source_id = owner_result['id'], source_result['id']
                 assert uuid.UUID(owner_id) not in seen and uuid.UUID(source_id) not in seen and uuid.UUID(owner_id) != uuid.UUID(source_id), 'New constructor returned a retained GUID'
                 actual_owner = phase['independent_owner'] = exact(owner_id, voice=True)
-                actual_source = phase['independent_source'] = exact(source_id, source=True, language=phase['source_language'])
+                actual_source = phase['independent_source'] = exact(source_id, source=True, language=phase['source_language'], source_field=field['metadata']['name'])
                 assert actual_owner['name'] == name and actual_owner['type'] == 'Sound' and actual_owner['class_id'] == owner_spec['class_id'], actual_owner
                 assert actual_owner['parent']['id'] == parent['id'] and actual_owner['notes'] == 'Keep ' + case, actual_owner
                 assert type(actual_owner['properties']['IsVoice']) is bool and actual_owner['properties']['IsVoice'] is (case != 'sfx'), actual_owner
                 assert actual_source['name'] == 'Tone' and actual_source['type'] in {'Source', 'SourcePlugin'} and actual_source['class_id'] == source_spec['structural_class_id'], actual_source
                 assert actual_source['parent']['id'] == owner_id and actual_source['path'] == actual_owner['path'] + '\\Tone', actual_source
                 assert actual_source.get('owner') is None or actual_source['owner'].get('id') == owner_id, actual_source
-                assert actual_source['notes'] == 'Keep Source ' + case and actual_source['properties']['Frequency'] == 440, actual_source
+                assert actual_source['notes'] == 'Keep Source ' + case and actual_source['properties'][field['metadata']['name']] == 440, actual_source
                 if phase['source_language'] is not None:
                     assert actual_source['source_language']['name'] == phase['source_language'], actual_source
                 children = phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'], language=phase['source_language'])
@@ -7118,7 +7140,7 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 assert phase['retained_after'] == phase['retained_before'], 'A later construction changed the original owner/Source'
                 assert exact(parent['id']) == parent, 'Construction changed the bound parent'
                 seen.update((uuid.UUID(owner_id), uuid.UUID(source_id)))
-                retained.append({'owner': actual_owner, 'source': actual_source, 'children': children, 'language': phase['source_language']})
+                retained.append({'owner': actual_owner, 'source': actual_source, 'children': children, 'language': phase['source_language'], 'field': field['metadata']['name']})
                 phase['effect_verified'] = True
             finally:
                 phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False)
