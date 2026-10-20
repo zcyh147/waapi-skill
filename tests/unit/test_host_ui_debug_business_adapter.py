@@ -1967,3 +1967,81 @@ def test_sine_envelope_all_supported_standard_channels_preserve_exact_terminal_a
     assert decoded['agent_result']['request'] == preview['agent_result']['request']
     assert list(decoded)[-1] == 'agent_result'
     assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+
+
+@pytest.mark.parametrize('version,large_markers', [('2024.1', False), ('2025.1', False), ('2025.1', True)],
+    ids=['2024', '2025', '2025-large-markers'])
+def test_tone_anonymous_override_uses_fifth_order_count_with_full_36_channel_proof_and_exact_terminal_result(tmp_path, monkeypatch, capsys, version, large_markers):
+    import math
+    import struct
+    from wwise_waapi.canonical import canonical_sha256
+    from wwise_waapi.transactions import TransactionStore
+    markers = [token for _ in range(4) for token in ('--marker', '0', 'x' * 8192)] if large_markers else []
+    env, state, client, _, schema, _, preview = _tone_collection_preview(tmp_path, version, markers,
+        values={'waveform': 'sine', 'channel_layout': 'Ambisonics 5th order', 'anonymous_channels': 'true',
+            'frequency_hz': '800', 'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_db': '-6',
+            'attack_seconds': '0.0025', 'sustain_seconds': '0.005', 'release_seconds': '0.00375'})
+    frozen_args = preview['agent_result']['request']['arguments']['args']
+    assert frozen_args['channelConfig'] == 'Ambisonics 5th order' and frozen_args['setAnonymous'] is True
+    assert 'anonymous_layout_override' in schema['business_adapter']['safety']['tone_artifact_verification']
+    samples = []
+    for frame in range(90):
+        amplitude = frame / 20 if frame < 20 else (90 - frame) / 30 if frame >= 60 else 1
+        samples.extend(.5011872336272722 * amplitude * math.sin(math.tau * frame / 10 + channel / 10)
+            for channel in range(36))
+    fmt = struct.pack('<HHIIHHHHI', 65534, 36, 8000, 1152000, 144, 32, 22, 32, 0)
+    fmt += bytes.fromhex('0300000000001000800000aa00389b71')
+    extra = _tone_marker_chunks([(identity, 0, b'x' * 8192) for identity in range(4)]) if large_markers else b''
+    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=36, samples=samples, fmt_override=fmt, extra=extra)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+        '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    actual_execute = gateway.execute_gateway
+    observed_payloads = []
+    def observe_actual_gateway(argv):
+        result = actual_execute(argv)
+        observed_payloads.append(result[1])
+        return result
+    with monkeypatch.context() as emitting:
+        emitting.setenv('WAAPI_SKILL_CONFIG_PATH', env['WAAPI_SKILL_CONFIG_PATH'])
+        emitting.setattr(gateway, 'default_client_factory', lambda _: client)
+        emitting.setattr(gateway, 'execute_gateway', observe_actual_gateway)
+        assert gateway.main([*state, 'verify', tx]) == 0
+    rendered = capsys.readouterr().out
+    decoded = json.loads(rendered)
+    assert decoded['verified'] is True
+    budget = 286720 if large_markers else 24576
+    assert decoded['stdout_projection']['stdout_budget_bytes'] == budget
+    assert len(rendered.encode('utf-8')) <= budget
+    assert decoded['agent_result'] == observed_payloads[0]['agent_result']
+    assert decoded['agent_result']['request'] == preview['agent_result']['request']
+    assert list(decoded)[-1] == 'agent_result'
+    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
+        if event['event_type'] == 'verification_recorded')
+    wav = journal['readbacks'][0]['wav']
+    assert (wav['channels'], wav['speaker_mask']) == (36, 0)
+    assert all([row['channel'] for row in segment['channels']] == list(range(36)) for segment in wav['sine_envelope']['segments'])
+    assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
+    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    (tmp_path / 'anonymous-36-terminal.stdout.json').write_text(rendered)
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+@pytest.mark.parametrize('anonymous', [None, 'false'])
+def test_tone_genuine_ambisonics_still_rejects_nonsilence_before_native_dispatch(tmp_path, version, anonymous):
+    values = {'waveform': 'sine', 'channel_layout': 'Ambisonics 5th order'}
+    if anonymous is not None:
+        values['anonymous_channels'] = anonymous
+    rejected = _tone_collection_preview(tmp_path, version, [], values=values, reject_declaration=True)
+    assert rejected['error_code'] == 'INVALID_ARGUMENT'
+    assert rejected['details']['repair']['field'] == 'waveform'
+
+
+def test_tone_2023_cannot_request_an_unavailable_anonymous_override_for_ambisonics(tmp_path):
+    rejected = _tone_collection_preview(tmp_path, '2023.1', [], reject_declaration=True,
+        values={'waveform': 'sine', 'channel_layout': 'Ambisonics 5th order', 'anonymous_channels': 'true'})
+    assert rejected['error_code'] == 'GatewayInputError'

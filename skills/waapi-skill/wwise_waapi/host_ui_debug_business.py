@@ -222,6 +222,7 @@ def _normalize(
     if (
         str(result.get("channel_layout", "")).startswith("Ambisonics ")
         and result.get("waveform", "silence") != "silence"
+        and result.get("anonymous_channels") is not True
     ):
         raise _invalid(
             session,
