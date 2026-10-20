@@ -148,8 +148,6 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
                       if project_before is not None else project())
     fields = tuple(dict.fromkeys((*return_fields, *SOURCE_FACTS)))
     before, preview = rows(**selector, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
-    if broad and len(before) == MAX_QUERY_TAKE:
-        _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The Sound query reached its observation fence.")
     if not before and not broad:
         return [], preview, {"method": "unique_same_view_original_path", "sound_count": 0}, before_project
     owners = {}
@@ -205,8 +203,6 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "Source membership or selection facts changed during observation.")
     after_selector = selector if broad else {"object_id": owner_ids[0]}
     after, _ = rows(**after_selector, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
-    if broad and len(after) == MAX_QUERY_TAKE:
-        _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The repeated Sound query reached its observation fence.")
     def owner_facts(values):
         return [_sound_facts(row) if row.get("type") == "Sound" else dict(row) for row in values]
     if owner_facts(after) != owner_facts(before) or project() != before_project:

@@ -1623,14 +1623,19 @@ def test_2021_active_source_rejects_contaminated_or_changed_multi_sound_observat
     assert result.get("agent_result") is None
 
 
-def test_2021_active_source_query_fence_stops_before_scanning_child_batches(tmp_path):
+def test_2021_active_source_honors_full_1000_sound_selection_with_bounded_proof(tmp_path):
     client, _ = _legacy_multi_sound_client(tmp_path, extra_sounds=998)
     code, result = gateway.execute_gateway([
         "query-object", "--kind", "all-sounds", "--max-results", "1000",
         "--platform", "Mac", "--language", "SFX", "--include", "active-source",
     ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
-    assert code == 2 and result["error_code"] == "ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", result
-    assert client.child_reads == 0
+    assert code == 0, result
+    assert result["count"] == 1000
+    assert result["active_source_resolution"]["sound_count"] == 1000
+    assert result["active_source_resolution"]["source_count"] == 1002
+    assert client.owner_reads == 2 and client.child_reads == 32
+    assert len(client.calls) <= 40
+    assert result["status"] == "partial" and result["agent_result"]["next_command"]["gateway_argv"]
 
 
 def test_2021_active_source_rejects_native_rows_beyond_actual_requested_bound_before_child_reads(tmp_path):
