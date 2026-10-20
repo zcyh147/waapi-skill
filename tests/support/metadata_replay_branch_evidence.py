@@ -73,6 +73,33 @@ def original_read(root, field):
         'reply': _descriptor(Path(call['reply']['path'])), 'native': _descriptor(Path(native['path'])), 'call_index': index}
 
 
+def portable_original_reads(index_path=None):
+    """Resolve committed sealed transport, without following historical host paths.
+
+    Original/source-freeze Git objects are still required by the later full
+    source bridge; portable receipt transport does not imply shallow support.
+    """
+    from tests.maintenance import branch_audit_completion as completion
+    index_path = Path(index_path) if index_path else audit.ROOT/'docs/branch-coverage-evidence-index.json'
+    requirements = audit.load(audit.ROOT/'docs/branch-coverage-requirements.json')
+    bindings,base,_ = audit.portable_binding_inputs(index_path,requirements)
+    originals = {}
+    for identity,binding in bindings['bindings'].items():
+        evidence = binding.get('evidence',{}).get('live_metadata')
+        if identity not in selected_ids() or evidence is None:
+            continue
+        record = completion.read_sealed_artifact(evidence,base)
+        descriptor = deepcopy(record['metadata_run'])
+        context = completion.read_metadata_run(descriptor,base)
+        field = context['native_result']['name']
+        for role in ('category','observation','status','identity','reply','native'):
+            descriptor[role]['artifact'] = str((base/descriptor[role]['artifact']).resolve())
+        if field in originals and originals[field] != descriptor:
+            raise ValueError('Conflicting portable original metadata read')
+        originals[field] = descriptor
+    return originals
+
+
 def selected_ids():
     prefix = '2021.1|wwise-console|2021.1.14.8108|function|' + URI + '|'
     definition = '/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue'

@@ -312,7 +312,8 @@ def read_r51_metadata_run(descriptor, base):
         raise ValueError('exact R51 original read node required')
     context = read_category_run(category, base)
     if (context['candidate'] != '90c1089b77e9a9d5695224d312bff9a3ab8b5c18'
-            or (context['host'], context['build']) != ('wwise-console', '2021.1.14.8108')):
+            or (context['host'], context['build']) != ('wwise-console', '2021.1.14.8108')
+            or context['record']['transactions'] != []):
         raise ValueError('original R51 host/build/source mismatch')
     original = next(row for row in context['record']['categories'] if row['category'] == 'legacy-original-source-owned-read')
     if original.get('status') != 'blocked' or original.get('diagnostic_only') is not True or original.get('business_effect_verified') is not False:
@@ -342,6 +343,12 @@ def read_r51_metadata_run(descriptor, base):
             or call['argv'] != ['metadata','detail','--exact-id',object_id,'--selection',result['selection']]):
         raise ValueError('exact R51 original public metadata input/result mismatch')
     identity_reply = read_sealed_artifact(descriptor['identity'], base)
+    for reply in (status,identity_reply,payload):
+        if (reply['endpoint'] != status['endpoint'] or reply['session_context']['endpoint'] != status['endpoint']
+                or reply['detected_version'] != context['version'] or reply['is_command_line'] is not True
+                or reply['session_context']['available'] is not True
+                or reply['session_context']['adapter_version'] != context['version']):
+            raise ValueError('Original R51 public endpoint/host/version identity differs')
     identity, = identity_reply['agent_result']
     if (body['calls'][3]['exit_code'] != 0 or body['calls'][3]['argv'][:3] != ['query-object','--exact-id',object_id]
             or identity_reply.get('ok') is not True or identity['id'] != object_id

@@ -14,14 +14,21 @@ from tests.support import metadata_replay_branch_evidence as producer
 
 @pytest.fixture(scope='module')
 def original_root():
+    retained = producer.portable_original_reads()
+    if set(retained) == set(producer.CASES):
+        return retained
     value = os.environ.get('WAAPI_R51_METADATA_ORIGINAL_ROOT')
     if not value:
-        pytest.skip('Requires retained exact R51 original read archive; no fake native substitute')
+        pytest.skip('Awaiting committed R51 portable originals; optional preparatory archive unavailable')
     return Path(value)
 
 
+def original_read(root,field):
+    return deepcopy(root[field]) if isinstance(root,dict) else producer.original_read(root,field)
+
+
 def test_original_r51_metadata_adapter_preserves_blocked_business_and_exact_read(original_root):
-    descriptor = producer.original_read(original_root, 'ControlInput')
+    descriptor = original_read(original_root, 'ControlInput')
     context = completion.read_metadata_run(descriptor, original_root)
     assert context['host'] == 'wwise-console' and context['build'] == '2021.1.14.8108'
     assert context['business_category_status'] == 'blocked'
@@ -36,34 +43,39 @@ def write(path, value, **extra):
 
 
 @pytest.mark.parametrize('damage', ('reply-bytes','status-host','identity-class','business-promotion',
-    'unfinished-node','source-drift','residual-process','wrong-occurrence','native-public-mismatch'))
+    'unfinished-node','source-drift','residual-process','wrong-occurrence','native-public-mismatch',
+    'category-transaction','identity-endpoint','reply-session-endpoint'))
 def test_original_archive_controls_start_from_valid_historical_receipt(original_root,tmp_path,damage):
-    descriptor = producer.original_read(original_root,'ControlInput')
-    assert completion.read_metadata_run(descriptor,original_root)['native_result']['default'] is None
+    descriptor = original_read(original_root,'ControlInput')
+    assert completion.read_metadata_run(descriptor,audit.ROOT)['native_result']['default'] is None
     rows = [json.loads(line) for line in Path(descriptor['category']['artifact']).read_bytes().splitlines()]
     category = rows[descriptor['category']['record_index']]
-    body = completion.read_sealed_artifact(descriptor['observation'],original_root)
+    body = completion.read_sealed_artifact(descriptor['observation'],audit.ROOT)
     if damage == 'reply-bytes':
         path = tmp_path/'corrupted-reply.json';path.write_text('{}')
         descriptor['reply']['artifact'] = str(path)
         with pytest.raises(ValueError,match='artifact digest mismatch'):
             completion.read_metadata_run(descriptor,tmp_path)
         return
-    if damage in ('status-host','identity-class','native-public-mismatch'):
-        role = {'status-host':'status','identity-class':'identity','native-public-mismatch':'native'}[damage]
-        value = completion.read_sealed_artifact(descriptor[role],original_root)
+    if damage in ('status-host','identity-class','native-public-mismatch','identity-endpoint','reply-session-endpoint'):
+        role = {'status-host':'status','identity-class':'identity','native-public-mismatch':'native',
+            'identity-endpoint':'identity','reply-session-endpoint':'reply'}[damage]
+        value = completion.read_sealed_artifact(descriptor[role],audit.ROOT)
         if damage == 'status-host':value['wwise']['isCommandLine'] = False
         elif damage == 'identity-class':value['agent_result'][0]['class_id'] = 1441792
-        else:value['result']['default'] = 0
+        elif damage == 'native-public-mismatch':value['result']['default'] = 0
+        elif damage == 'identity-endpoint':value['endpoint']['port'] += 1
+        else:value['session_context']['endpoint']['port'] += 1
         descriptor[role] = write(tmp_path/(role+'.json'),value)
         if role == 'native':
-            link = next(row for row in body['native_evidence'] if row['sha256'] == producer.original_read(original_root,'ControlInput')['native']['sha256'])
-        else:link = body['calls'][0 if role == 'status' else 3]['reply']
+            link = next(row for row in body['native_evidence'] if row['sha256'] == original_read(original_root,'ControlInput')['native']['sha256'])
+        else:link = body['calls'][{'status':0,'identity':3,'reply':descriptor['call_index']}[role]]['reply']
         link['sha256'] = descriptor[role]['sha256']
     elif damage == 'business-promotion':category['categories'][0]['status'] = 'PASS'
     elif damage == 'unfinished-node':category['invocation']['phase'] = 'call'
     elif damage == 'source-drift':category['source']['hash_after'] = '0'*64
     elif damage == 'residual-process':category['residual_state']['residual_processes'] = [12345]
+    elif damage == 'category-transaction':category['transactions'] = ['unexpected-transaction']
     else:descriptor['call_index'] += 1
     descriptor['observation'] = write(tmp_path/'observation.json',body)
     original = next(row for row in category['categories'] if row['category'] == 'legacy-original-source-owned-read')
@@ -88,7 +100,7 @@ def controlled_attachment(tmp_path, original_root, inventory, field):
     capture = {'scope_kind':'controlled','candidate_sha256':'c'*64,'git_candidate':'controlled_current_program',
         'relevant_sources':producer.source_seals(),'historical_sources':producer.historical_sources(),
         'branches':rows,'edges':{r['id']:r for r in inventory['native_coverage']['obligations']if r['kind']=='reference'},
-        'originals':{field:producer.original_read(original_root,field)}}
+        'originals':{field:original_read(original_root,field)}}
     replay, bindings = producer.make_replay_receipt(capture,field,observed,dict.fromkeys(('setup','call','teardown'),'passed'))
     descriptor = write(tmp_path/'current-program.json',replay,nodeid=producer.NODE+'['+producer.CASES[field]+']')
     record = producer.make_attachment_record(capture,field,descriptor,replay,bindings,base=tmp_path)
@@ -145,6 +157,34 @@ def test_portable_metadata_attachment_is_additive_and_keeps_original_program(ori
     assert binding['input'] == original['input']
     assert binding['evidence']['live_metadata'] == attached['evidence']
     assert binding['category_inputs']['live_metadata'] == attached['category_inputs']
+
+
+def test_portable_originals_resolve_without_environment_or_original_absolute_paths(original_root,inventory,tmp_path,monkeypatch):
+    path,index,base,attachment,branch = portable_control(tmp_path,original_root,inventory)
+    assert producer.portable_original_reads(path)['ControlInput']
+    archived = json.loads((base/'observation.original.json').read_bytes())
+    forbidden = {Path(row['reply']['path']) for row in archived['calls']}
+    forbidden.update(Path(row['path']) for row in archived['native_evidence'])
+    forbidden.update(Path(row['native_path']) for row in archived['native_evidence'])
+    category = completion.read_sealed_artifact({**json.loads((base/attachment['evidence']['artifact']).read_bytes())['metadata_run']['category'],
+        'artifact':str(base/'category.original.json')},base)
+    forbidden.update(Path(row['observation_path']) for row in category['categories'] if 'observation_path' in row)
+    monkeypatch.delenv('WAAPI_R51_METADATA_ORIGINAL_ROOT',raising=False)
+    read_bytes = Path.read_bytes
+    def portable_only(target):
+        if target in forbidden:raise FileNotFoundError('Original host absolute paths unavailable')
+        return read_bytes(target)
+    monkeypatch.setattr(Path,'read_bytes',portable_only)
+    retained = producer.portable_original_reads(path)
+    result = completion.read_metadata_run(retained['ControlInput'],tmp_path)
+    assert result['native_result']['default'] is None
+    assert result['business_category_status'] == 'blocked'
+    replay_root = tmp_path/'portable-replay';replay_root.mkdir()
+    capture,replay,record,bindings,descriptor = controlled_attachment(replay_root,retained,inventory,'ControlInput')
+    branch = next(row for row in capture['branches'] if row['id'] in bindings)
+    binding = {**bindings[branch['id']],'category_inputs':{'live_metadata':record['category_inputs']}}
+    assert completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',replay_root,binding,
+        source_root=audit.ROOT,reference_edges=capture['edges']) == ('passed',None)
 
 
 @pytest.mark.parametrize('damage', ('wrong-input','wrong-replay-input','wrong-source','missing-source','missing-change-proof',
