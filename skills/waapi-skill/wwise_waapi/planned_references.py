@@ -142,10 +142,13 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             if requested_name is None:
                 root_paths[prefix] = current
             else:
-                name, path, _rows = chosen_name(prefix, requested_name, current.rsplit("\\", 1)[0], root[1], exclude_id=root[0].object)
+                path = current.rsplit("\\", 1)[0] + "\\" + requested_name
+                collisions = [row for row in observed(path) if row['id'].casefold() != root[0].object.casefold()]
+                if collisions:
+                    raise ObjectOperationContractError("TARGET_EXISTS",
+                        "Existing-object rename requires its exact requested name; child creation policy cannot rename this GUID.",
+                        details={"path": path, "rows": collisions, "name_conflict_scope": "new_children_and_list_members"})
                 root_paths[prefix] = path
-                if name != requested_name:
-                    root_names[prefix] = name
         return root_paths[prefix]
 
     def resolve(path):

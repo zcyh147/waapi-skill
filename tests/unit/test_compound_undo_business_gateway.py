@@ -2562,7 +2562,7 @@ def test_optional_existing_history_unknown_union_remains_unobserved_without_read
 
 
 def _render_history_case(tmp_path, *, version="2025.1", operation="object.setProperty", clear=False,
-    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, platform_inventory=True, target_read_failure=None, compound=False):
+    platform="{44444444-4444-4444-4444-444444444444}", prepared_only=False, platform_inventory=True, target_read_failure=None, compound=False, opaque_members=False):
     from copy import deepcopy
     from tests.unit.test_list_merge_existing_conditions_gateway import list_task
     from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
@@ -2586,6 +2586,10 @@ def _render_history_case(tmp_path, *, version="2025.1", operation="object.setPro
                         "conditions": [{"referenceIsSet": True}]}]}
     else:
         task.objects[ROOT]["@Bypass"] = True
+        if opaque_members:
+            for identity in (ROOT, CHILD):
+                task.objects[identity]['path'] = '\\PluginInnerObject\\' + identity
+                task.objects[identity]['owner'] = {'id': FIRST, 'name': task.objects[FIRST]['name']}
     if clear:
         task.objects[ROOT]["@Render"] = task.objects[CHILD]["@Render"] = True
     original = task.call
@@ -3766,7 +3770,7 @@ def _start_parent_owned_graph_child(task, operation):
     task.draft, task.authority, task.revision = phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"]
 
 
-def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion="object.setNotes", field=None, value="false", creation_first=True, rename_existing=False, notes_companion_id=None, additional_rename_id=None, additional_rename_name="Outer renamed", expected_verified=True, before_parent_check=None):
+def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion="object.setNotes", field=None, value="false", creation_first=True, rename_existing=False, notes_companion_id=None, additional_rename_id=None, additional_rename_name="Outer renamed", expected_verified=True, before_parent_check=None, notes_child_order=None, notes_child_operation="object.setNotes", notes_child_id=None, prepared_only=False):
     from copy import deepcopy
     before = deepcopy(task.objects)
     original = task.call
@@ -3827,6 +3831,20 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
         children.extend([task.draft, task.authority])
     if not creation_first:
         children = children[2:] + children[:2]
+    if notes_child_order:
+        code, phase = task.run('draft-start-undo-child', parent, '--task-authority', authority,
+            '--expected-revision', str(revision), '--operation', notes_child_operation)
+        assert code == 0, phase
+        task.draft, task.authority, task.revision = phase['draft']['draft_id'], phase['task_authority'], phase['draft']['revision']
+        notes_owner = task.bind(notes_child_id or notes_id)
+        if notes_child_operation == 'object.setNotes':
+            assert task.step('draft-declare-object-change', '--notes', 'Earlier declared notes')[0] == 0
+        else:
+            assert task.step('draft-declare-existing', '--declaration-id', 'notes-child',
+                '--object-handle', notes_owner, '--field', 'notes', 'Earlier declared notes')[0] == 0
+        assert task.step('draft-check')[0] == 0
+        offset = 0 if notes_child_order == 'before' else 2
+        children[offset:offset] = [task.draft, task.authority]
     task.draft, task.authority, task.revision = parent, authority, revision
     code, phase = task.step("draft-declare-undo-plan", "--display-name", "Owned compound fields",
         *[token for index in range(0, len(children), 2) for token in ("--child-draft", children[index], children[index + 1])])
@@ -3839,6 +3857,8 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
         assert task.objects == before
         return rejected
     source, shown = task.preview()
+    if prepared_only:
+        return source, before, shown
     code, result = task.finish(source, shown)
     assert code == (0 if expected_verified else 2) and result["verified"] is expected_verified, result
     after = deepcopy(task.objects)
@@ -4027,7 +4047,7 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert "actual_parent_execution_phase" in scope["history_receipt"]
     assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
     assert 'exact_intent_GUID_bound' in scope['created_graph_ancestor_rename']
-    assert 'native_chosen_suffix_phase_dependency_remains_same_parent' in scope['created_graph_ancestor_rename']
+    assert 'new_object_collision_names_and_phase_reference_dependencies_remain_same_parent' in scope['created_graph_ancestor_rename']
     assert declaration["native_request_input"] == "forbidden"
 
 
@@ -4162,7 +4182,7 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     task = OwnedGraphTask(tmp_path, version, 'object.create')
@@ -4235,7 +4255,11 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     if compound:
         _install_created_graph_rename_client(task)
         assert task.step('draft-check')[0] == 0
-        source, before, after = _compound_from_graph_task(task, notes_id=PROJECT_GROUP if external_ancestor_only else SECOND, companion='object.setName', creation_first=creation_first)
+        source, before, after = _compound_from_graph_task(task, notes_id=PROJECT_GROUP if external_ancestor_only else SECOND,
+            companion=rename_operation, rename_existing=rename_operation == 'object.set', creation_first=creation_first,
+            notes_child_order=notes_child_order, notes_child_operation=notes_child_operation, notes_child_id=notes_child_id, prepared_only=prepared_only)
+        if prepared_only:
+            return task, source, before, after
         if external_ancestor_only:
             assert after[SECOND] == before[SECOND]
             assert after[ROOT] == {**before[ROOT], 'path': r'\Master-Mixer Hierarchy\Renamed parent\External'}
@@ -4254,6 +4278,8 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         code, verified = task.run('verify', tx)
         assert code == 0 and verified['verified'] is True, verified
         assert task.objects == (before if direction == 'undo' else after)
+
+    return task, source, before, after
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
@@ -4457,6 +4483,15 @@ def _install_created_graph_rename_client(task):
     task.objects[SECOND].setdefault('parent', None)
     original = task.call
     def rename(uri, args=None, options=None):
+        if uri == 'ak.wwise.core.object.set':
+            for item in args['objects']:
+                if 'name' in item:
+                    row = task.objects[item['object']]
+                    old = row['path']
+                    row.update(name=item['name'], path=old.rsplit('\\', 1)[0] + '\\' + item['name'])
+                    for child in task.objects.values():
+                        if child['path'].startswith(old + '\\'):
+                            child['path'] = row['path'] + child['path'][len(old):]
         if uri == 'ak.wwise.core.object.setName':
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             row = task.objects[args['object']]
@@ -4736,3 +4771,309 @@ def test_created_graph_history_stale_renamed_parent_stops_before_native_action(t
 def test_created_graph_external_reference_ancestor_rename_activates_independent_target_history(tmp_path):
     _exercise_created_graph_internal_reference_history(tmp_path, '2025.1', compound=True,
         external=True, external_ancestor_only=True)
+
+
+def test_prior_notes_exact_existing_rename_and_dependent_graph_have_owned_history(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+    task, source, before, after = _exercise_created_graph_internal_reference_history(
+        tmp_path, '2025.1', compound=True, creation_first=False, external=True,
+        rename_operation='object.set', notes_child_order='before')
+    assert before[SECOND]['notes'] == 'Keep buses'
+    assert after[SECOND]['notes'] == 'Earlier declared notes'
+    assert after[SECOND]['name'] == 'Renamed parent'
+
+
+@pytest.mark.parametrize('order,operation', [('before', 'object.set'), ('after', 'object.setNotes'), ('after', 'object.set')])
+def test_exact_ancestor_rename_keeps_notes_child_phase_and_final_names(tmp_path, order, operation):
+    _exercise_created_graph_internal_reference_history(tmp_path, '2025.1', compound=True,
+        creation_first=False, external=True, rename_operation='object.set',
+        notes_child_order=order, notes_child_operation=operation)
+
+
+@pytest.mark.parametrize('fault', ['ignored-notes', 'unrelated-notes', 'premature-phase-name'])
+def test_exact_ancestor_notes_history_cannot_hide_false_effects(tmp_path, fault):
+    from tests.unit.test_object_graph_owned_choices_gateway import SECOND, ROOT
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, creation_first=False, external=True, rename_operation='object.set',
+        notes_child_order='before', notes_child_operation='object.set' if fault == 'premature-phase-name' else 'object.setNotes',
+        prepared_only=True)
+    original = task.call
+    def damaged(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if fault == 'ignored-notes' and uri.endswith('object.setNotes'):
+            task.objects[SECOND]['notes'] = before[SECOND]['notes']
+        elif fault == 'unrelated-notes' and uri.endswith('undo.endGroup'):
+            task.objects[ROOT]['notes'] = 'Unrequested notes'
+        elif fault == 'premature-phase-name' and uri.endswith('object.set') and 'name' not in args['objects'][0]:
+            result['objects'][0]['name'] = 'Renamed parent'
+        return result
+    task.call = damaged
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    code, failed = task.run('verify', source)
+    assert code == 2 and failed['verified'] is False, failed
+    _reject_created_graph_receipt(task, source)
+
+
+def test_exact_ancestor_rename_keeps_declared_notes_on_retained_existing_child(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import ROOT
+    task, source, before, after = _exercise_created_graph_internal_reference_history(
+        tmp_path, '2025.1', compound=True, creation_first=False, external=True,
+        rename_operation='object.set', notes_child_order='before', notes_child_id=ROOT)
+    assert before[ROOT]['notes'] == 'Keep external'
+    assert after[ROOT]['notes'] == 'Earlier declared notes'
+    assert after[ROOT]['name'] == before[ROOT]['name']
+    assert after[ROOT]['path'] == r'\Master-Mixer Hierarchy\Renamed parent\External'
+
+
+def test_compound_render_owner_exact_rename_restores_full_chain_and_history(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _install_created_graph_rename_client(task)
+    source, before, after = _compound_from_graph_task(task, notes_id=FIRST, companion='object.setName')
+    assert after[FIRST]['name'] == 'Renamed parent'
+    assert after[ROOT]['path'] == r'\Actor-Mixer Hierarchy\Default Work Unit\Renamed parent\Slot'
+    assert after[ROOT]['@Render'] is True and after[CHILD]['@Render'] is True
+    assert after[ROOT]['@Bypass'] == before[ROOT]['@Bypass']
+    assert after[ROOT]['@Effect'] == after[CHILD]['@Effect'] == {'id': EFFECT}
+    for direction, expected in (('undo', before), ('redo', after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == expected
+
+
+def test_compound_render_retained_effect_ancestor_rename_activates_full_history_context(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT, EFFECT_PARENT
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _install_created_graph_rename_client(task)
+    source, before, after = _compound_from_graph_task(task, notes_id=EFFECT_PARENT, companion='object.setName')
+    assert after[FIRST] == before[FIRST]  # No Render owner/name dependency activates this context.
+    assert after[EFFECT]['path'] == r'\Effects\Renamed parent\Existing Effect'
+    assert after[EFFECT]['notes'] == before[EFFECT]['notes']
+    assert after[ROOT]['@Render'] is True and after[CHILD]['@Render'] is True
+    for direction, expected in (('undo', before), ('redo', after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == expected
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2025.1'])
+def test_compound_render_rename_first_preserves_distinct_models(tmp_path, version):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    task, _, _, _, _ = _render_history_case(tmp_path, version=version, compound=True,
+        opaque_members=version == '2025.1')
+    _install_created_graph_rename_client(task)
+    original = task.call
+    def owner_labels(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.setName'):
+            for row in task.objects.values():
+                if row.get('owner', {}).get('id') == args['object'] and 'name' in row['owner']:
+                    row['owner']['name'] = args['value']
+        return result
+    task.call = owner_labels
+    source, before, after = _compound_from_graph_task(task, notes_id=FIRST,
+        companion='object.setName', creation_first=False)
+    assert after[FIRST]['name'] == 'Renamed parent'
+    if version == '2025.1':
+        for identity in (ROOT, CHILD):
+            assert after[identity]['path'] == before[identity]['path']
+            assert after[identity]['owner'] == {'id': FIRST, 'name': 'Renamed parent'}
+            assert after[identity]['@Render'] is True
+    else:
+        assert after[FIRST]['@RenderEffect0'] is True and after[FIRST]['@RenderEffect1'] is True
+    if version == '2021.1':
+        code, unavailable = task.run('draft-start', 'ak.wwise.core.undo.undo')
+        assert code == 2 and '2021.1' in json.dumps(unavailable), unavailable
+        return
+    for direction, expected in [('undo', before), *([('redo', after)] if version == '2025.1' else [])]:
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == expected
+
+
+@pytest.mark.parametrize('fault', ['member-notes', 'target-class', 'order', 'derived-render'])
+def test_compound_render_rename_cannot_hide_unrequested_full_model_changes(tmp_path, fault):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _install_created_graph_rename_client(task)
+    source, before, shown = _compound_from_graph_task(task, notes_id=FIRST,
+        companion='object.setName', prepared_only=True)
+    original = task.call
+    def damaged(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('undo.endGroup'):
+            if fault == 'member-notes': task.objects[ROOT]['notes'] = 'Undeclared slot note'
+            elif fault == 'target-class': task.objects[EFFECT]['classId'] = True
+            elif fault == 'order': task.objects[FIRST]['@Effects'].reverse()
+            else: task.objects[ROOT]['@Render'] = False  # Selected later slot remains true.
+        return result
+    task.call = damaged
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    code, rejected = task.run('verify', source)
+    assert code == 2 and rejected['verified'] is False, rejected
+    _reject_created_graph_receipt(task, source)
+
+
+@pytest.mark.parametrize('missing', ['owner', 'target'])
+def test_compound_render_receipt_rejects_resealed_missing_required_identity_context(tmp_path, missing):
+    from copy import deepcopy
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT, EFFECT_PARENT
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _install_created_graph_rename_client(task)
+    source, _, _ = _compound_from_graph_task(task,
+        notes_id=FIRST if missing == 'owner' else EFFECT_PARENT, companion='object.setName')
+    directory = task.path / 'state' / 'transactions' / source
+    document = json.loads((directory / 'preview.json').read_text())
+    prepared = document['artifact']['prepared_operation']
+    plan = prepared['pre_state']['execution_plan']
+    omitted = FIRST if missing == 'owner' else EFFECT
+    snapshots = plan['path_context']['snapshots']
+    assert any(row['id'] == omitted for row in snapshots)
+    plan['path_context']['snapshots'] = [row for row in snapshots if row['id'] != omitted]
+    def replace_plan(value):
+        if isinstance(value, dict):
+            for key, item in list(value.items()):
+                if key == 'execution_plan': value[key] = deepcopy(plan)
+                else: replace_plan(item)
+        elif isinstance(value, list):
+            for item in value: replace_plan(item)
+    replace_plan(prepared)
+    document['artifact_hash'] = canonical_sha256(document['artifact'])
+    (directory / 'preview.json').write_bytes(canonical_json_bytes(document))
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    previous = ''
+    for event in events:
+        event['artifact_hash'] = document['artifact_hash']
+        if event['event_type'] == 'verification_recorded':
+            for assertion in event['details']['verification']['assertions']:
+                if assertion.get('kind') == 'compound_path_context':
+                    assertion['evidence']['sha256'] = canonical_sha256(plan['path_context'])
+                elif assertion.get('kind') == 'compound_child_observation':
+                    assertion['evidence']['path_context_sha256'] = canonical_sha256(plan['path_context'])
+        event['previous_event_hash'] = previous
+        event.pop('event_hash')
+        event['event_hash'] = previous = canonical_sha256(event)
+    (directory / 'events.jsonl').write_bytes(b''.join(canonical_json_bytes(event) + b'\n' for event in events))
+    record = json.loads((directory / 'state.json').read_text())
+    record.update(artifact_hash=document['artifact_hash'], last_event_hash=previous)
+    (directory / 'state.json').write_bytes(canonical_json_bytes(record))
+    rejected = _reject_created_graph_receipt(task, source)
+    assert 'context' in json.dumps(rejected).lower(), rejected
+
+
+def test_compound_render_receipt_requires_its_exact_parent_context_association(tmp_path):
+    from wwise_waapi.canonical import canonical_sha256
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _install_created_graph_rename_client(task)
+    source, _, _ = _compound_from_graph_task(task, notes_id=FIRST, companion='object.setName')
+    def wrong_context(verification):
+        assertions = verification['assertions']
+        actual, = [row for row in assertions if row.get('kind') == 'effect_render_chain_observation']
+        actual['evidence']['compound_path_context_sha256'] = '0' * 64
+        for row in assertions:
+            if row.get('kind') == 'compound_child_observation':
+                bounds = row['evidence']['assertions']
+                bounds['sha256'] = canonical_sha256(assertions[bounds['start']:bounds['start'] + bounds['count']])
+    _rewrite_created_graph_verification(task, source, wrong_context)
+    rejected = _reject_created_graph_receipt(task, source)
+    assert 'Render observation differs from its sealed parent identity context' in json.dumps(rejected), rejected
+
+
+@pytest.mark.parametrize('contradictory_class_type', [False, True], ids=['exact-reflection', 'contradictory-type'])
+def test_render_graph_revalidation_preserves_original_retained_target_before_declared_rename_and_notes(tmp_path, contradictory_class_type):
+    from copy import deepcopy
+    from tests.unit.test_list_merge_existing_conditions_gateway import list_task, select_field, EFFECT
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    task, _ = list_task(tmp_path, operation='object.set')
+    # Exact getTypes row from the pinned 2025.1 object-types inventory.
+    task.types.append({'name': 'Wwise Meter', 'classId': 8454147,
+        'type': 'Source' if contradictory_class_type else 'Effect'})
+    task.require_class_projection = True
+    before = deepcopy(task.objects)
+    after = None
+    original = task.call
+    writes = []
+    def call(uri, args=None, options=None):
+        nonlocal after
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects = deepcopy(before if uri.endswith('.undo') else after)
+            return {}
+        if uri == 'ak.wwise.core.object.set':
+            writes.append(deepcopy(args))
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+            effect = task.objects[EFFECT]
+            effect.update(name='Renamed effect', notes='Declared effect notes',
+                path=r'\Effects\Default Work Unit\Renamed effect')
+            after = deepcopy(task.objects)
+            return {'objects': [{'id': row['object'], 'name': task.objects[row['object']]['name']}
+                for row in args['objects']]}
+        result = original(uri, args, options)
+        if uri.endswith('getProjectInfo'):
+            result.update(currentPlatformId='{44444444-4444-4444-4444-444444444444}', platforms=[
+                {'id': '{44444444-4444-4444-4444-444444444444}', 'name': 'Windows'}])
+        return result
+    task.call = call
+    slot = task.bind(CHILD)
+    render = select_field(task, owner=slot, token='Render')
+    assert task.step('draft-declare-existing', '--declaration-id', 'render', '--object-handle', slot,
+        '--field-value', render, 'true')[0] == 0
+    target = task.bind(EFFECT)
+    assert task.step('draft-declare-existing', '--declaration-id', 'effect', '--object-handle', target,
+        '--field', 'new_name', 'Renamed effect', '--field', 'notes', 'Declared effect notes')[0] == 0
+    source, shown = task.preview()
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
+    assert task.objects[FIRST] == before[FIRST]
+    assert task.objects[EFFECT] == {**before[EFFECT], 'name': 'Renamed effect',
+        'path': r'\Effects\Default Work Unit\Renamed effect', 'notes': 'Declared effect notes'}
+    assert task.objects[ROOT]['@Render'] is True and task.objects[CHILD]['@Render'] is True
+    if contradictory_class_type:
+        rejected = _reject_created_graph_receipt(task, source)
+        assert 'Existing-field receipt original view/before/verified-after observations are unavailable' in rejected['message']
+        return
+    for direction, expected in (('undo', before), ('redo', after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == expected
+
+
+def test_render_source_without_compound_context_rejects_undeclared_opaque_member_owner_path_change(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND
+    task, source, _, _, _ = _render_history_case(tmp_path, prepared_only=True, opaque_members=True)
+    original = task.call
+    def changed_ancestor(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.setProperty':
+            task.objects[SECOND].update(name='Unexpected ancestor', path=r'\Actor-Mixer Hierarchy\Unexpected ancestor')
+            task.objects[FIRST]['path'] = r'\Actor-Mixer Hierarchy\Unexpected ancestor\Sender'
+        return result
+    task.call = changed_ancestor
+    assert task.run('confirm', source, '--confirmation-token', task.source_preview['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    code, rejected = task.run('verify', source)
+    assert code == 2 and rejected['verified'] is False, rejected
+    observations = [row for row in rejected['verification']['assertions']
+        if row.get('kind') == 'effect_render_chain_observation']
+    assert len(observations) == 1 and observations[0]['evidence']['source_matches'] is False, observations

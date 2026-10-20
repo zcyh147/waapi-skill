@@ -486,13 +486,13 @@ def test_existing_bus_send_2021_never_mutates_replacement_or_accepts_wrong_retur
         assert [cmd[0] for cmd in commands].count('confirm') == 3
 
 
-def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, noisy_fields=False, native_conditions=False):
+def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, noisy_fields=False, native_conditions=False, compound_exact_rename_history=False):
     """The real public Gateway above an exact, independently mutated native tree."""
     from copy import deepcopy
     import uuid
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask
 
-    operation = "object.create" if version == "2021.1" else "object.set"
+    operation = "object.create" if version == "2021.1" or compound_exact_rename_history else "object.set"
     task = OwnedGraphTask(tmp_path, version, operation)
     parent = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
     root, target, source = ("{" + str(uuid.UUID(int=value)) + "}" for value in (3, 5, 6))
@@ -522,7 +522,67 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
         'UserAuxSend0', 'UserAuxSend1', 'UserAuxSend2', 'UserAuxSend3',
     ] if noisy_fields else ["UserAuxSend0"]
 
+    history = {}
     def call(uri, args=None, options=None):
+        nonlocal base
+        if compound_exact_rename_history:
+            if uri.endswith('getProjectInfo'):
+                platform = '{44444444-4444-4444-4444-444444444444}'
+                return {**original(uri, args, options), 'currentPlatformId': platform,
+                    'platforms': [{'id': platform, 'name': 'Windows'}]}
+            if uri in {'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.endGroup', 'ak.wwise.core.undo.cancelGroup',
+                    'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+                task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args), deepcopy(options)))
+                if uri.endswith('.beginGroup'): history['before'] = deepcopy(task.objects)
+                elif uri.endswith('.endGroup'): history['after'] = deepcopy(task.objects)
+                elif uri.endswith(('.undo', '.cancelGroup')): task.objects = deepcopy(history['before'])
+                else: task.objects = deepcopy(history['after'])
+                return {}
+            if uri.endswith('object.setNotes'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args), deepcopy(options)))
+                task.objects[args['object']]['notes'] = args['value']
+                return {}
+            if uri.endswith('object.set'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args), deepcopy(options)))
+                node, = args['objects']; assert args['onNameConflict'] == 'fail'
+                row = task.objects[node['object']]; old = row['path']
+                assert not any(other['id'] != row['id'] and other['name'] == node['name']
+                    and other.get('parent') == row.get('parent') for other in task.objects.values())
+                row.update(name=node['name'], path=old.rsplit('\\', 1)[0] + '\\' + node['name'])
+                for child in task.objects.values():
+                    if child['path'].startswith(old + '\\'): child['path'] = row['path'] + child['path'][len(old):]
+                return {'objects': [{'id': row['id'], 'name': row['name']}]}
+            if uri.endswith('object.create') and not args.get('children'):
+                task.calls.append((uri, deepcopy(args), deepcopy(options))); writes.append((uri, deepcopy(args), deepcopy(options)))
+                identity = '{' + str(uuid.UUID(int=100 + len(writes))).upper() + '}'
+                task.objects[identity] = {'id': identity, 'name': args['name'], 'type': args['type'], 'classId': 1376272,
+                    'path': task.objects[args['parent']]['path'] + '\\' + args['name'],
+                    'parent': {'id': args['parent']}, 'notes': args.get('notes', '')}
+                return {'id': identity, 'name': args['name']}
+            if uri.endswith('object.get') and args.get('waql') != 'from type Project take 1':
+                task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                if 'waql' in args:
+                    import re
+                    match = re.fullmatch(r'from object "([^"]+)"( select children)?(?: take (\d+))?', args['waql'])
+                    assert match, args
+                    selected = [row for row in task.objects.values() if match[1] in (row['id'], row['path'])]
+                    transforms = [{'select': ['children']}] if match[2] else []
+                else:
+                    source_selector = args['from']
+                    selected = [row for row in task.objects.values() if (row['id'] in source_selector['id']
+                        if 'id' in source_selector else row['path'] in source_selector['path'])]
+                    transforms = args.get('transform', [])
+                for transform in transforms:
+                    assert len(selected) == 1
+                    if transform == {'select': ['children']}:
+                        selected = [row for row in task.objects.values() if row.get('parent') == {'id': selected[0]['id']}]
+                    else:
+                        assert transform == {'select': ['descendants']}, transform
+                        selected = [row for row in task.objects.values() if row['path'].startswith(selected[0]['path'] + '\\')]
+                return {'return': task.project_rows(selected, options)}
+        if (compound_exact_rename_history and uri.endswith('getPropertyAndReferenceNames')
+                and task.objects.get(args.get('object'), {}).get('type') == 'Bus'):
+            return original(uri, args, options)  # Existing base fake's object-scoped names; no Bus property is selected.
         if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args.get("classId") == 3997712 or args.get("object") == source, args
@@ -555,7 +615,11 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
             children = [{"type": "AuxBus", "name": "Destination"},
                 {"type": "AuxBus", "name": "Sender", "@UserAuxSend0": base + r"\Destination"}]
             if operation == "object.create":
-                assert args == {"parent": parent, "type": "Bus", "name": "WAAPI_RESULT_REFERENCE_TEST",
+                native_parent = args['parent'] if compound_exact_rename_history else parent
+                if compound_exact_rename_history:
+                    base = task.objects[native_parent]['path'] + r'\WAAPI_RESULT_REFERENCE_TEST'
+                    children[1]['@UserAuxSend0'] = base + r'\Destination'
+                assert args == {"parent": native_parent, "type": "Bus", "name": "WAAPI_RESULT_REFERENCE_TEST",
                     "children": children, "onNameConflict": "fail", "autoAddToSourceControl": False}
             else:
                 assert args == {"objects": [{"object": parent, "children": [{"type": "Bus",
@@ -564,7 +628,7 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
             if fault == "native-error":
                 raise RuntimeError("Frozen native graph rejection; never replay")
             task.objects[root] = {"id": root, "name": "WAAPI_RESULT_REFERENCE_TEST", "type": "Bus", "classId": 1376272,
-                "path": base, "parent": {"id": parent}, "notes": ""}
+                "path": base, "parent": {"id": args['parent'] if compound_exact_rename_history else parent}, "notes": ""}
             for identity, name in ((target, "Destination"), (source, "Sender")):
                 task.objects[identity] = {"id": identity, "name": name, "type": "AuxBus", "classId": 3997712,
                     "path": base + "\\" + name, "parent": {"id": root}, "notes": ""}
@@ -609,7 +673,22 @@ def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None, no
         independent_read = command[0] == "query-object"
         return workflow.waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *command],
             env=runtime.env, client_factory=lambda _url: task)
-    runtime.raw_gateway = raw
+    if compound_exact_rename_history:
+        runtime.port = 31337
+        runtime.lifecycle = SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi')
+        runtime.env['WWISE_EVIDENCE_DIR'] = str(tmp_path / 'native-evidence')
+        public_raw = raw
+        def compound_raw(command):
+            code, payload = public_raw(command)
+            if command[0] == 'verify' and code == 0:
+                if fault == 'independent-reference' and writes[-1][0].endswith('.endGroup'):
+                    task.objects[source]['@UserAuxSend0'] = {'id': root}
+                elif fault == 'independent-undo' and writes[-1][0].endswith('.undo'):
+                    task.objects = deepcopy(history['after'])
+            return code, payload
+        runtime.raw_gateway = compound_raw
+    else:
+        runtime.raw_gateway = raw
     return runtime, commands, writes, task
 
 
@@ -5052,3 +5131,39 @@ def test_gateway_staged_source_collector_stops_on_independent_voice_drift_before
     phase, = receipt['phases']
     assert phase['verify']['payload']['verified'] is True and phase['independent_owner']['properties']['IsVoice'] is False
     assert receipt['native_evidence'] and receipt['failure']
+
+
+def test_compound_exact_rename_history_collector_proves_actual_paths_notes_and_owned_history(tmp_path, workflow):
+    runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, '2025.1',
+        noisy_fields=True, native_conditions=True, compound_exact_rename_history=True)
+    category = workflow._collect_new_result_scalar_reference_acceptance(runtime,
+        root_name='WAAPI_RESULT_REFERENCE_TEST', compound_exact_rename_history=True)
+    assert category['status'] == 'PASS', category
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['business_effect_verified'] is True
+    assert len(receipt['transactions']) == 5
+    assert [row['role'] for row in receipt['transactions']] == ['setup-owner', 'setup-sibling', 'source', 'undo', 'redo']
+    assert [cmd[0] for cmd in commands].count('execute') == 5
+    assert len(writes) == 9
+    assert len(commands) <= 128
+    assert receipt['source_state']['owner']['name'] == receipt['requested_name']
+    assert receipt['undo_state']['owner']['notes'] == receipt['before']['owner']['notes']
+    assert receipt['redo_state'] == receipt['source_state']
+
+
+@pytest.mark.parametrize('fault', ['independent-reference', 'independent-undo'])
+def test_compound_exact_rename_history_collector_retains_failed_independent_effect(tmp_path, workflow, fault):
+    runtime, commands, writes, task = _new_result_reference_runtime(tmp_path, workflow, '2025.1',
+        fault=fault, noisy_fields=True, native_conditions=True, compound_exact_rename_history=True)
+    with pytest.raises(AssertionError):
+        workflow._collect_new_result_scalar_reference_acceptance(runtime,
+            root_name='WAAPI_RESULT_REFERENCE_TEST', compound_exact_rename_history=True)
+    category = runtime.category_results[-1]
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['business_effect_verified'] is False
+    assert receipt['failure'] and receipt['transactions'][2]['verify']['verified'] is True
+    assert receipt['native_evidence']
+    assert len(receipt['transactions']) == (3 if fault == 'independent-reference' else 4)
+    assert [cmd[0] for cmd in commands].count('execute') == len(receipt['transactions'])
+    assert len([uri for uri, _, _ in writes if uri.endswith('object.set')]) == 1
+    assert not any(uri.endswith('.redo') for uri, _, _ in writes)

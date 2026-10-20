@@ -1378,13 +1378,13 @@ def test_set_reference_arrays_reject_unbound_oversized_or_disallowed_targets_wit
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
-def test_set_child_replace_policy_does_not_authorize_existing_target_rename_collision(tmp_path: Path, version: str) -> None:
+@pytest.mark.parametrize("version,conflict", [(version, "replace") for version in VERSIONS[1:]] + [("2025.1", "rename")])
+def test_set_child_replace_policy_does_not_authorize_existing_target_rename_collision(tmp_path: Path, version: str, conflict: str) -> None:
     task = SetReplaceTask(tmp_path, version)
     task.objects[ROOT].update({"parent": {"id": SECOND}, "path": task.objects[SECOND]["path"] + r"\LAYERS"})
     task.objects[CHILD]["path"] = task.objects[ROOT]["path"] + r"\Old child"
     owner = task.bind(FIRST)
-    code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
+    code, configured = task.step("draft-business-configure", "--name-conflict", conflict)
     assert code == 0, configured
     code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
                                "--field", "new_name", "Layers")
@@ -1698,7 +1698,7 @@ def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_valu
 
 
 @pytest.mark.parametrize("receiver,field_style,rename_case", (("existing", "handle", None), ("existing", "stable", None), ("new", "handle", None), ("new", "stable", None),
-    ("existing", "handle", "collision"), ("existing", "handle", "old-notes-effect"), ("existing", "handle", "candidate-drift"), ("existing", "handle", "parent-rename"), ("existing", "handle", "parent-collision")))
+    ("existing", "handle", "collision"), ("existing", "handle", "old-notes-effect"), ("existing", "handle", "candidate-drift"), ("existing", "handle", "parent-rename"), ("existing", "handle", "parent-collision"), ("existing", "handle", "parent-merge")))
 def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(tmp_path, receiver, field_style, rename_case):
     task = OwnedGraphTask(tmp_path, "2025.1", "object.set")
     task.require_class_projection = True
@@ -1710,7 +1710,7 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
     task.objects[bus_parent] = {"id": bus_parent, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
         "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep buses"}
     target_collision = rename_case in {"collision", "old-notes-effect", "candidate-drift"}
-    parent_rename = rename_case in {"parent-rename", "parent-collision"}
+    parent_rename = rename_case in {"parent-rename", "parent-collision", "parent-merge"}
     prepared_bus_name = "New bus_waapi_1" if target_collision else "New bus"
     prepared_parent_name = "Renamed routing_waapi_1" if rename_case == "parent-collision" else "Renamed routing"
     if parent_rename:
@@ -1729,7 +1729,7 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
             "path": task.objects[bus_parent]["path"] + r"\New bus", "parent": {"id": bus_parent}, "notes": "Keep old collision"}
     parent, owner, destination = task.bind(SECOND), task.bind(FIRST), task.bind(bus_parent)
     if rename_case:
-        code, configured = task.step("draft-business-configure", "--name-conflict", "rename")
+        code, configured = task.step("draft-business-configure", "--name-conflict", "merge" if rename_case == "parent-merge" else "rename")
         assert code == 0, configured
     original = task.call
     bus_id, sound_id = "{55555555-5555-5555-5555-555555555555}", FIRST if receiver == "existing" else ROOT
@@ -1790,10 +1790,16 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
         code, source = task.step("draft-declare-new", "--declaration-id", "source", "--parent-handle", parent,
             "--name", sound_name, "--kind", kinds["Sound"], *assignment)
     assert code == 0, source
+    if rename_case == 'parent-collision':
+        code, rejected = task.step('draft-check')
+        assert code == 2 and rejected['error_code'] == 'TARGET_EXISTS', rejected
+        assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+        assert not (task.path / 'state' / 'transactions').exists()
+        return
     tx, shown = task.preview()
     assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"] == expected_objects
     if rename_case:
-        assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == "rename"
+        assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == ("merge" if rename_case == "parent-merge" else "rename")
         assert (prepared_parent_name if parent_rename else "New bus_waapi_1") in json.dumps(shown)
     if rename_case == "candidate-drift":
         code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
@@ -1897,3 +1903,25 @@ def test_new_result_reference_hierarchy_reuses_explicit_planned_controller_and_p
     code, verified = task.finish(tx, shown)
     assert code == (2 if fault == "wrong-parent-effect" else 0), verified
     assert (verified.get("verified") is True) == (fault != "wrong-parent-effect"), verified
+
+
+def test_existing_guid_rename_cannot_verify_a_native_creation_suffix(tmp_path):
+    task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
+    task.types = [{'name': name, 'classId': cid, 'type': 'WObject'} for name, cid in
+        [('Sound', 65552), ('WorkUnit', 1638416)]]
+    task.objects[FIRST].update(type='Sound', classId=65552)
+    task.objects[SECOND]['classId'] = 1638416
+    owner = task.bind(FIRST)
+    assert task.step('draft-business-configure', '--name-conflict', 'rename')[0] == 0
+    assert task.step('draft-declare-existing', '--declaration-id', 'rename', '--object-handle', owner,
+        '--field', 'new_name', 'Exact requested name')[0] == 0
+    original = task.call
+    def wrong_name(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            row = task.objects[FIRST]
+            row.update(name='Exact requested name_7', path=task.objects[SECOND]['path'] + r'\Exact requested name_7')
+        return original(uri, args, options)
+    task.call = wrong_name
+    tx, shown = task.preview()
+    code, failed = task.finish(tx, shown)
+    assert code == 2 and failed['verified'] is False, failed

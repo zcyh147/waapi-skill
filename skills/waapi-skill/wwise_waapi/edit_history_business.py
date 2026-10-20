@@ -251,8 +251,8 @@ def _compound_observations(prepared, execution, verification):
     path_context = prepared['pre_state']['execution_plan'].get('path_context')
     created_children = ()
     if path_context is not None:
-        from .object_graph_paths import validate_compound_path_context, compound_context_result_matches
-        validate_compound_path_context(path_context, calls)
+        from .object_graph_paths import compound_expected_context, compound_context_result_matches
+        path_context = compound_expected_context(path_context, calls)
         from .object_graph_paths import compound_created_child_roots
         created_children = compound_created_child_roots(calls, phases)
         from .object_graph_paths import compound_phase_arguments
@@ -356,7 +356,7 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
     if (prepared.get("pre_state", {}).get("effect_render_chains")
             and plan.get("kind") in {"same-guid-property", "object-set-batch"}):
         from .render_history_observations import receipt_observations as render_observations
-        observations, covered = render_observations(prepared, verification)
+        observations, covered = render_observations(prepared, verification, path_context=compound_path_context)
         if plan["kind"] == "object-set-batch":
             from .existing_field_observations import receipt_observations
             observations.extend(receipt_observations(prepared, verification, exclude_fields=covered, path_context=compound_path_context))
