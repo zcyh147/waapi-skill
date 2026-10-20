@@ -4521,6 +4521,44 @@ def _enforce_versioned_public_call_boundaries(
         )
 
 
+def _observe_active_source_plugin_binding(sound_id, source_id, *, read, rows=None, platform=None, include_active=False):
+    """Bind a Source plugin's actual class and direct parent, without caller tokens."""
+    if rows is None:
+        fields = ["id", "name", "type", "path", "classId", "parent", *(["activeSource"] if include_active else [])]
+        batch = _bounded_multi_identity_read([sound_id, source_id], fields=fields, read=read,
+            context="Active Source plugin identity binding", **({"platform": platform} if platform is not None else {}))
+        if not batch["exact"]:
+            raise OperationContractError("INVALID_READBACK", "Sound and source must resolve as one exact identity batch.")
+        rows = batch["result"]["return"]
+    by_id = {_identity_key(row["id"]): row for row in rows}
+    sound, source = by_id[_identity_key(sound_id)], by_id[_identity_key(source_id)]
+    if sound.get("type") != "Sound" or source.get("type") not in {"AudioFileSource", "Source", "SourcePlugin"}:
+        raise OperationContractError("INVALID_SOURCE_TARGET", "Active source selection requires a Sound and a file or Source-plugin child.")
+    if source["type"] == "AudioFileSource":
+        return None, rows  # Preserve the existing file-source contract and verifier.
+    from .business_declarations import normalize_live_object_identity
+    try:
+        normalize_live_object_identity(sound)
+        normalize_live_object_identity(source)
+    except ValueError as exc:
+        raise OperationContractError("INVALID_READBACK", "Sound and Source plugin require complete live identities.") from exc
+    if not _same_identity(_parent_value(source.get("parent")), sound_id):
+        raise OperationContractError("INVALID_SOURCE_TARGET", "The Source plugin must remain a direct child of the selected Sound.")
+    if source.get("path", "").rsplit("\\", 1)[0].casefold() != sound.get("path", "").casefold():
+        raise OperationContractError("INVALID_SOURCE_TARGET", "The Source plugin hierarchy must match its actual Sound parent.")
+    catalog = _read_object_type_catalog(read)
+    sound_type = _resolve_object_type("Sound", catalog=catalog)
+    if type(sound.get("classId")) is not int or sound["classId"] != sound_type.class_id:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "The Sound class must match its exact live semantic type.")
+    source_class = source.get("classId")
+    matches = [row for row in catalog if row.class_id == source_class]
+    if type(source_class) is not int or not 0 < source_class <= 0xFFFFFFFF or len(matches) != 1 or matches[0].type.casefold() != "source":
+        raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The actual Source plugin class requires one live Source-category row.")
+    return {"sound": {key: sound[key] for key in ("id", "name", "type", "path", "classId")},
+        "source": {**{key: source[key] for key in ("id", "name", "type", "path", "classId")}, "parent": sound_id},
+        "source_type": matches[0].as_dict(), "sound_type": sound_type.as_dict()}, rows
+
+
 def _public_call_verification_plan(
     *,
     api: str,
@@ -10761,6 +10799,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 else None
             ),
         )
+        if api == "ak.wwise.core.sound.setActiveSource":
+            source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
+            if source_guard is not None:
+                metadata["active_source_plugin_binding"] = source_guard
+                roles.update({role: ResolvedObject(identity=ObjectIdentity(id=source_guard[role]["id"]),
+                    object=source_guard[role]["id"], resolution="live-exact-id", row=source_guard[role]) for role in ("sound", "source")})
         if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
             from .remote_transition import remote_connection_snapshot
             try:
@@ -16089,7 +16133,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
         if role_snapshots:
             role_batch = _bounded_multi_identity_read(
                 [object_id for _, object_id, _ in role_snapshots],
-                fields=IDENTITY_RETURN_FIELDS,
+                fields=(*IDENTITY_RETURN_FIELDS, "classId", "parent") if prepared.get("pre_state", {}).get("active_source_plugin_binding") is not None else IDENTITY_RETURN_FIELDS,
                 read=read_call,
                 context="Prepared waapi.call business role validation",
             )
@@ -16142,13 +16186,31 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                         },
                     }
                 )
+        source_guard = prepared.get("pre_state", {}).get("active_source_plugin_binding")
+        if source_guard is not None:
+            current, failure = None, None
+            def source_binding_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "source-plugin-binding", "uri": uri,
+                    "args": dict(args), "options": dict(options), "result": result})
+                return result
+            if role_batch["exact"]:
+                try:
+                    current, _ = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"],
+                        read=source_binding_read, rows=role_batch["result"]["return"])
+                except OperationContractError as exc:
+                    failure = exc.as_dict()
+            unchanged = current == source_guard
+            passed = passed and unchanged
+            assertions.append({"name": "Source plugin class and direct parent binding are unchanged", "passed": unchanged,
+                "evidence": {"expected": source_guard, "actual": current, "failure": failure}})
         return {
             "contract": ROLE_VALIDATION_CONTRACT,
             "operation": operation,
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None or arguments.get("history_binding") is not None else [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None or arguments.get("history_binding") is not None or source_guard is not None else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")
@@ -18851,11 +18913,27 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Active-source verification lacks its exact source or platform.",
                 )
-            rows = read_object(
-                object_id=object_id,
-                fields=("id", "name", "type", "path", "activeSource"),
-                platform=platform,
-            )
+            source_guard = prepared.get("pre_state", {}).get("active_source_plugin_binding")
+            if source_guard is not None:
+                def source_read(uri, args, options):
+                    result = read_call(uri, args, options)
+                    readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+                    return result
+                try:
+                    current, source_rows = _observe_active_source_plugin_binding(object_id, expected_source,
+                        read=source_read, platform=platform, include_active=True)
+                    rows = [row for row in source_rows if _same_identity(row.get("id"), object_id)]
+                except OperationContractError as exc:
+                    current, rows = None, []
+                    check("Source plugin binding remains valid", False, exc.as_dict())
+                check("Source plugin class and direct parent match the immutable Preview", current == source_guard,
+                    {"expected": source_guard, "actual": current})
+            else:
+                rows = read_object(
+                    object_id=object_id,
+                    fields=("id", "name", "type", "path", "activeSource"),
+                    platform=platform,
+                )
             check(
                 "active-source target resolves exactly once",
                 len(rows) == 1,
@@ -18866,7 +18944,7 @@ def verify_prepared_operation(
                     _field_value(rows[0], "activeSource")
                 )
                 check(
-                    "Sound active source matches the requested AudioFileSource",
+                    "Sound active source matches the requested source",
                     _same_identity(actual_source, expected_source),
                     {
                         "expected": expected_source,

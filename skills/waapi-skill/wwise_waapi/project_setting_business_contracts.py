@@ -19,7 +19,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "optional_fields": ("platform_name",),
         "field_types": {
             "sound_handle": "bound_sound_handle",
-            "source_handle": "bound_audio_file_source_handle",
+            "source_handle": "bound_sound_source_handle",
             "platform_name": "platform_name",
         },
     },
@@ -43,7 +43,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
 }
 _INTENTS = {
     SOUND_SET_ACTIVE_SOURCE_URI: (
-        "Select which AudioFileSource child is active for one Sound, optionally "
+        "Select which AudioFileSource or Source-plugin child is active for one Sound, optionally "
         "on an exact platform."
     ),
     GAME_PARAMETER_SET_RANGE_URI: (

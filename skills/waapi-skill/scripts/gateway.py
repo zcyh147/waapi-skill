@@ -13254,6 +13254,7 @@ def dispatch_business_project_setting_plan(
         if value_type in {
             "bound_sound_handle",
             "bound_audio_file_source_handle",
+            "bound_sound_source_handle",
             "bound_game_parameter_handle",
         }:
             value: Any = raw
