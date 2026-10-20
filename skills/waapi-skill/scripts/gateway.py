@@ -17350,7 +17350,7 @@ def dispatch_operation_draft_check(
         runtime_guard_fingerprint=runtime_fingerprint,
         prepared_digest=canonical_sha256(prepared),
         source_copy_file_binding=(
-            {key: prepared['pre_state']['source_copy_saved_proof'][key] for key in ('source_id', 'destination_id', 'authority')}
+            {key: prepared['pre_state']['source_copy_saved_proof'][key] for key in ('source_id', 'destination_id', 'authority', 'files')}
             if prepared.get('pre_state', {}).get('source_copy_saved_proof', {}).get('status') == 'baseline_save_pending' else None),
         business_preview=(
             None if compiled_business is None else compiled_business.preview

@@ -7,10 +7,11 @@ import uuid
 import re
 
 from .canonical import canonical_sha256
-from .console_project_operations import _read_xml_artifact, _project_io_root_identity
+from .console_project_operations import _read_xml_artifact, _project_io_root_identity, MAX_PROJECT_FILE_BYTES
 from .host_paths import localize_waapi_host_path
 from .object_lifecycle_graph import GET, LifecycleGraphError, capture_lifecycle_fields, lifecycle_snapshot_equal
 from .platform_paths import localize_live_wwise_project_path
+from .operation_soundbank import FILE_PROOF_CONTRACT, _require_sealed
 from .transaction_locality import is_loopback_waapi_host
 
 KEY = 'source_copy_saved_proof'
@@ -197,6 +198,24 @@ def live_roles(nodes, owner, read):
     return rows
 
 
+def compare_owned_fields(original_live, copied_live, original_ids, new_ids):
+    for role in ROLES:
+        if role == 'source': continue  # Shared Source observer already compares all observed Source scalars.
+        def mapped_fields(fields, role_ids):
+            fields = deepcopy(fields)
+            aliases = {identity: 'owned:' + name for name, identity in role_ids.items()}
+            def mapped(value):
+                if isinstance(value, dict): return {key: mapped(item) for key, item in value.items()}
+                if isinstance(value, list): return [mapped(item) for item in value]
+                return aliases.get(value.upper(), value) if isinstance(value, str) else value
+            for name in fields['reference_fields']:
+                if name in fields['field_values']:
+                    fields['field_values'][name] = mapped(fields['field_values'][name])
+            return fields
+        require(lifecycle_snapshot_equal(mapped_fields(original_live[role]['default_fields'], original_ids),
+            mapped_fields(copied_live[role]['default_fields'], new_ids)), 'Copied live owned default fields differ')
+
+
 def capture_baseline(context, snapshot, read):
     if not supported(context): return {'status': 'unavailable', 'reason': 'version_host_or_local_runtime_authority_unavailable'}
     source = snapshot['source']['frame']; destination = snapshot['destination']
@@ -205,6 +224,8 @@ def capture_baseline(context, snapshot, read):
         return {'status': 'unavailable', 'reason': 'source_live_field_scope_unfinished'}
     if not all(owner['children_complete'] for owner in snapshot['owners'].values()):
         return {'status': 'unavailable', 'reason': 'owner_childset_scope_unfinished'}
+    if not all(type(owner['frame'].get('@IsVoice')) is bool for owner in snapshot['owners'].values()):
+        return {'status': 'unavailable', 'reason': 'owner_is_voice_scope_unfinished'}
     try:
         binding = authority(context, source['id'], destination, read)
         dirty = binding['project']['workunitIsDirty'] or any(row['workunitIsDirty'] for row in binding['units'].values())
@@ -219,10 +240,13 @@ def capture_baseline(context, snapshot, read):
                 'Baseline Save file membership changed before copy Preview')
         else:
             decision = None
+        # Dirty live nodes need not exist on disk yet. The existing Project and
+        # selected Work Units must still be valid, independently bound documents;
+        # Save is not permission to repair or overwrite unexpected disk state.
+        documents, proofs = read_documents(binding)
         if dirty:
             return {'status': 'baseline_save_pending', 'authority': binding, 'context': context['binding'],
-                'source_id': guid(source['id']), 'destination_id': guid(destination)}
-        documents, proofs = read_documents(binding)
+                'source_id': guid(source['id']), 'destination_id': guid(destination), 'files': proofs}
         nodes = source_nodes(documents, source['id'], guid(source['parent']))
         live = live_roles(nodes, guid(source['parent']), read)
         after = authority(context, source['id'], destination, read)
@@ -356,6 +380,8 @@ def revalidate_origin(origin, context, *, read=None, before_write=True):
             observed = authority(context, file_binding['source_id'], file_binding['destination_id'], read)
             require(lifecycle_snapshot_equal(without_dirty(observed), without_dirty(file_binding['authority'])),
                 'Baseline Save selected file authority changed')
+            _, proofs = read_documents(observed)
+            require(proofs == file_binding['files'], 'Unexpected baseline disk changes block the optional Save')
     return True
 
 
@@ -408,21 +434,7 @@ def verify_saved(baseline, context, snapshot, read):
     original_live = live_roles(original, baseline['source_owner'], read)
     require(lifecycle_snapshot_equal(original_live, baseline['roles']), 'Original live owned identities or fields changed')
     copied_live = live_roles(copied, baseline['destination_id'], read)
-    for role in ROLES:
-        if role == 'source': continue  # Shared Source observer already compares all observed Source scalars.
-        def mapped_fields(fields, role_ids):
-            fields = deepcopy(fields)
-            aliases = {identity: 'owned:' + name for name, identity in role_ids.items()}
-            def mapped(value):
-                if isinstance(value, dict): return {key: mapped(item) for key, item in value.items()}
-                if isinstance(value, list): return [mapped(item) for item in value]
-                return aliases.get(value.upper(), value) if isinstance(value, str) else value
-            for name in fields['reference_fields']:
-                if name in fields['field_values']:
-                    fields['field_values'][name] = mapped(fields['field_values'][name])
-            return fields
-        require(lifecycle_snapshot_equal(mapped_fields(original_live[role]['default_fields'], original_ids),
-            mapped_fields(copied_live[role]['default_fields'], new_ids)), 'Copied live owned default fields differ')
+    compare_owned_fields(original_live, copied_live, original_ids, new_ids)
     after = authority(context, baseline['source_id'], baseline['destination_id'], read)
     require(after == binding, 'Saved proof authority changed during final observation')
     _, after_proofs = read_documents(after)
@@ -458,7 +470,8 @@ def _validate_decline_observed(baseline, context, snapshot, read):
     documents, _ = read_documents(binding)
     original = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
     require(canonical_sha256(serialized(original['source'])) == baseline['source_exact_digest'], 'Original saved graph changed before refusal')
-    require(lifecycle_snapshot_equal(live_roles(original, baseline['source_owner'], read), baseline['roles']), 'Original owned state changed before refusal')
+    original_live = live_roles(original, baseline['source_owner'], read)
+    require(lifecycle_snapshot_equal(original_live, baseline['roles']), 'Original owned state changed before refusal')
     identity = copied_id(snapshot)
     present = [node for doc in documents.values() for node in doc.iter('SourcePlugin') if guid(node.get('ID')) == identity]
     if present:
@@ -466,7 +479,8 @@ def _validate_decline_observed(baseline, context, snapshot, read):
         rename = snapshot.preview.artifact['prepared_operation']['verification_plan']['on_name_conflict'] == 'rename'
         require(canonical_sha256(serialized(copied['source'], copied, rename_root=original['source'].get('Name') if rename else None))
             == baseline['source_normalized_digest'], 'Copied saved graph corruption cannot become scoped success')
-        live_roles(copied, baseline['destination_id'], read)
+        copied_live = live_roles(copied, baseline['destination_id'], read)
+        compare_owned_fields(original_live, copied_live, baseline['role_ids'], {role: guid(node.get('ID')) for role, node in copied.items()})
     return True
 
 
@@ -531,7 +545,7 @@ def without_dirty(value):
 
 def validate_file_binding(binding, version):
     require(version == '2021.1' and isinstance(binding, dict)
-        and set(binding) == {'source_id', 'destination_id', 'authority'}, 'Baseline file binding is invalid')
+        and set(binding) == {'source_id', 'destination_id', 'authority', 'files'}, 'Baseline file binding is invalid')
     source, destination = guid(binding['source_id']), guid(binding['destination_id'])
     observed = binding['authority']
     require(isinstance(observed, dict) and set(observed) == {'project', 'project_path', 'root', 'root_identity', 'units', 'objects'}
@@ -539,3 +553,14 @@ def validate_file_binding(binding, version):
         and isinstance(observed['units'], dict) and 1 <= len(observed['units']) <= 2, 'Baseline file membership is invalid')
     require(all(isinstance(observed[key], str) and observed[key] for key in ('project_path', 'root')),
         'Baseline project read paths are invalid')
+
+    paths = {observed['project_path'], *(row['local_path'] for row in observed['units'].values())}
+    proofs = binding['files']
+    require(isinstance(proofs, dict) and set(proofs) == paths, 'Baseline document proofs do not bind the selected files')
+    for path, proof in proofs.items():
+        _require_sealed(proof, contract=FILE_PROOF_CONTRACT, seal_field='proof_sha256', field='baseline document')
+        require(set(proof) == {'contract', 'path', 'size', 'sha256', 'mtime_ns', 'device', 'inode', 'proof_sha256'}
+            and proof['path'] == path and type(proof['size']) is int and 0 <= proof['size'] <= MAX_PROJECT_FILE_BYTES
+            and isinstance(proof['sha256'], str) and re.fullmatch('[0-9a-f]{64}', proof['sha256'])
+            and all(type(proof[key]) is int for key in ('mtime_ns', 'device', 'inode')),
+            'Baseline document proof is invalid')

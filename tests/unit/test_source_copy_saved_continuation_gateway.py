@@ -588,3 +588,92 @@ def test_saved_same_sound_rename_preserves_source_and_owned_graph_with_new_root_
     assert task.objects[COPIED]['name'] == 'Wwise Synth One1'
     assert task.objects[SOURCE]['name'] == 'Wwise Synth One'
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('owner', [SAVED_OWNER, DEST])
+def test_missing_owner_voice_flag_keeps_copy_partial_without_saved_proof(owner, tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    task.objects[owner].pop('@IsVoice')
+    tx = public_copy(task)
+    code, result = task.run('verify', tx)
+    assert code == 0 and result['verified'], result
+    scope = result['verification']['verification_scope']
+    assert not scope['complete_copy_preservation'] and 'owner_is_voice_unavailable' in scope['unobserved']
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+def independent_save(task):
+    code, started = task.run('draft-start', 'ak.wwise.core.project.save'); assert code == 0, started
+    identity, authority = started['draft']['draft_id'], started['task_authority']
+    code, declared = task.run('draft-declare-core-plan', identity, '--task-authority', authority,
+        '--expected-revision', str(started['draft']['revision'])); assert code == 0, declared
+    code, checked = task.run('draft-check', identity, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision'])); assert code == 0, checked
+    code, preview = task.run('preview-from-draft', identity, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])); assert code == 0, preview
+    return authorize_execute_verify(task, preview['transaction_id'])
+
+
+@pytest.mark.parametrize('fault', [None, ('control_input', 'LfoDepth', 91), ('rtpc', 'Color', 1)])
+def test_decline_after_independent_save_never_waives_observed_copied_owned_scalar_drift(tmp_path, fault):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    code, pending = task.run('verify', tx); assert code == 0 and pending['state'] == 'executed_unverified', pending
+    independent_save(task)
+    if fault:
+        role, field, value = fault
+        task.objects[SAVED_ROLES[role][1]]['@' + field] = value
+    code, result = task.run('continue-source-copy-proof', tx, '--decline-save')
+    if fault:
+        assert code == 2 and result['status'] == 'verification_failed', result
+    else:
+        assert code == 0 and result['verified'], result
+        scope = result['verification']['verification_scope']
+        assert not scope['complete_copy_preservation'] and scope['declined_saved_observation']['status'] == 'available_observations_preserved'
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
+
+
+@pytest.mark.parametrize('fault', ['malformed-project', 'wrong-project-id', 'wrong-workunit-id'])
+def test_invalid_existing_dirty_document_does_not_offer_proof_save_but_keeps_ordinary_copy(tmp_path, fault):
+    runtime, writes, task = saved_source_task(tmp_path)
+    if fault == 'malformed-project':
+        task.project_file.write_text('<WwiseDocument><Project')
+    elif fault == 'wrong-project-id':
+        task.project_file.write_text(f'<WwiseDocument><Project ID="{DEST}"/></WwiseDocument>')
+    else:
+        file = task.project_file.parent / 'Actor-Mixer Hierarchy/Default Work Unit.wwu'
+        tree = ET.parse(file)
+        tree.find('.//WorkUnit').set('ID', DEST)
+        tree.write(file)
+    checked = checked_dirty_parent(task)
+    assert checked['next_command']['command'] == 'preview-from-draft', checked
+    code, preview = task.run(*checked['next_command']['gateway_argv'])
+    assert code == 0 and preview['state'] == 'awaiting_confirmation', preview
+    assert not writes
+
+
+@pytest.mark.parametrize('document', ['project', 'workunit'])
+def test_baseline_save_rejects_same_path_document_replacement_after_preview(tmp_path, document):
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
+    save = final_save_preview(task, checked)
+    file = task.project_file if document == 'project' else task.project_file.parent / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    file.write_bytes(file.read_bytes() + b'\n')  # Valid XML, same GUIDs/path, different sealed bytes.
+    code, failed = task.run('execute', save['transaction_id'])
+    assert code == 2 and not writes, failed
+    assert 'disk changes block' in json.dumps(failed).lower(), failed
+
+
+def test_dirty_baseline_save_allows_live_source_not_yet_serialized_in_valid_workunit(tmp_path):
+    runtime, writes, task = saved_source_task(tmp_path)
+    file = task.project_file.parent / 'Actor-Mixer Hierarchy/MIDI.wwu'
+    tree = ET.parse(file)
+    for children in tree.iter('ChildrenList'):
+        for node in list(children):
+            if node.get('ID') == SOURCE: children.remove(node)
+    tree.write(file)
+    checked = checked_dirty_parent(task)
+    assert checked['next_command']['command'] == 'continue-source-copy-proof', checked
+    save = final_save_preview(task, checked)
+    assert save['state'] == 'awaiting_confirmation' and not writes, save
