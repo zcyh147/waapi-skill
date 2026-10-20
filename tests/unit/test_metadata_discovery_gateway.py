@@ -1832,3 +1832,44 @@ def test_single_large_typed_metadata_item_has_lossless_item_continuation(tmp_pat
         fragments.extend(entry["value"] for entry in value["entries"] if entry["pointer"] == ("/displayName" if view == "choices" else "/extension"))
         command = value.get("next_command")
     assert "".join(fragments) == text
+
+
+@pytest.mark.parametrize('field,expected', [('Color', 0), ('ControlInput', None), ('OverrideColor', False)])
+def test_original_r51_metadata_default_replays_through_current_public_gateway(tmp_path, request, field, expected):
+    """Current injected replay of preserved packets; no new native observation."""
+    import os
+    observed = {}
+    context_path = os.environ.get('WAAPI_METADATA_REPLAY_CAPTURE_CONTEXT')
+    if context_path:
+        from tests.support.metadata_replay_branch_evidence import load_capture, finish_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_capture(Path(context_path), request.node.nodeid, field)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_capture(capture, reports, observed))
+    _run_original_r51_metadata_replay(tmp_path, field, expected, observed)
+
+
+def _run_original_r51_metadata_replay(tmp_path, field, expected, observed):
+    from copy import deepcopy
+    from tests.support.metadata_replay_branch_evidence import replay_case, replay_observation
+    case = replay_case(field)
+    packets = case['packets']
+    def property_info(args, options):
+        assert args == {'object': case['object_id'], 'property': field} and options == {}
+        return deepcopy(packets[field]['native']['result'])
+    client = FakeClient({GET_INFO_URI: deepcopy(packets['get_info']['native']['result']),
+        OBJECT_GET_URI: deepcopy(packets['project']['native']['result']),
+        GET_TYPES_URI: deepcopy(packets['types']['native']['result']),
+        GET_NAMES_URI: deepcopy(packets['names']['native']['result']), GET_PROPERTY_INFO_URI: property_info})
+    env = _gateway_env(tmp_path, version='2021.1')
+    list_argv = ['metadata', 'list', '--exact-id', case['object_id'], '--page-size', '64']
+    code, listed = waapi_gateway.execute_gateway(list_argv, env=env, client_factory=lambda _: client)
+    assert code == 0 and listed['agent_result']['complete'] is True, listed
+    selected, = [row for row in listed['agent_result']['fields'] if row['name'] == field]
+    argv = ['metadata', 'detail', '--exact-id', case['object_id'], '--selection', selected['selection']]
+    code, payload = waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    observed.update(replay_observation(argv, code, payload, client, field, list_argv, listed))
+    assert code == 0, payload
+    assert type(payload['agent_result']['metadata']['default']) is type(expected)
+    assert payload['agent_result']['metadata']['default'] == expected
+    assert {key: payload['agent_result']['metadata'][key] for key in packets[field]['native']['result']} == packets[field]['native']['result']
+    assert payload['agent_result']['complete'] is True and client.disconnected
