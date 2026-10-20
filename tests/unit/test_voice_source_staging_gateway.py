@@ -184,7 +184,7 @@ def test_staged_source_live_binding_drift_keeps_created_voice_and_writes_no_sour
     assert sum(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls) == 1
 
 
-@pytest.mark.parametrize('fault', ['operation', 'staged-record', 'ordinary-source-without-provenance'])
+@pytest.mark.parametrize('fault', ['operation', 'staged-record', 'ordinary-source-without-provenance', 'ordinary-source-with-stale-composer'])
 def test_forged_cross_operation_or_staged_record_is_rejected_at_public_check(tmp_path, workflow, fault):
     from wwise_waapi.canonical import canonical_sha256, canonical_json_bytes
     from wwise_waapi.operation_drafts import OPERATION_DRAFT_RECORD_DIGEST_CONTRACT
@@ -201,6 +201,8 @@ def test_forged_cross_operation_or_staged_record_is_rejected_at_public_check(tmp
         payload['composition']['voice_source_origin']['original_declarations_sha256'] = '0' * 64
     else:
         del payload['composition']['voice_source_origin']
+        if fault == 'ordinary-source-with-stale-composer':
+            payload['composer_digest'] = '0' * 64
     payload['record_digest'] = canonical_sha256({'contract': OPERATION_DRAFT_RECORD_DIGEST_CONTRACT,
         'record': {key: value for key, value in payload.items() if key != 'record_digest'}})
     path.write_bytes(canonical_json_bytes(payload))
