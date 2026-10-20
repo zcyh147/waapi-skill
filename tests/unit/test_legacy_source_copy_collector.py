@@ -562,3 +562,148 @@ def test_legacy_saved_copy_rejects_tampered_native_proof_index_without_replay(tm
     assert receipt['collection_complete'] is False
     assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy', 'save']
     assert len([argv for argv in commands if argv[0] == 'execute']) == 4
+
+
+def continuation_copy_runtime(tmp_path):
+    # Reuse the genuine complete-owned metadata fixture and actual Gateway.
+    from tests.unit.test_source_copy_saved_continuation_gateway import saved_source_task
+    runtime, writes, task = saved_source_task(tmp_path)
+    del task.objects[DEST]
+    call = task.call
+    task.collector_native_calls = []
+    def observed(uri, args=None, options=None):
+        task.collector_native_calls.append((uri, deepcopy(args), deepcopy(options)))
+        result = call(uri, args, options)
+        if uri.endswith('object.create'):
+            unit = task.objects[SECOND]
+            task.objects[result['id']].update(workunit={'id': SECOND}, filePath=unit['filePath'])
+            unit['workunitIsDirty'] = True
+        return result
+    task.call = observed
+    return runtime, writes, task
+
+
+def test_saved_copy_successor_consumes_generated_children_and_original_parent(tmp_path, workflow):
+    runtime, writes, task = continuation_copy_runtime(tmp_path)
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True,
+        saved_copy_protocol='gateway-owned-save-children/v1')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS' and category['business_effect_verified'] is False
+    assert receipt['contract'] == 'waapi-skill.source-copy-save-children-collector/v1'
+    assert receipt['limits']['native_files'] == 1024 and receipt['limits']['receipt_bytes'] == 1024 * 1024
+    assert [row['name'] for row in receipt['phases']] == [
+        'create_empty_destination', 'save_baseline', 'copy_source_only', 'save_final']
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'save', 'copy', 'save']
+    phases = {row['name']: row for row in receipt['phases']}
+    copy = phases['copy_source_only']
+    assert copy['pending_state'] == 'executed_unverified'
+    assert copy['gateway_verification_scope']['complete_copy_preservation'] is True
+    assert copy['gateway_verification_strength'] == 'saved_source_graph_and_live_roles'
+    assert receipt['saved_copy_verified'] is True and receipt['collection_complete'] is True
+    assert receipt['oracle']['ordered_point_count'] == 2 and receipt['oracle']['object_ref_count'] == 0
+    assert receipt['oracle']['original_preserved'] is True
+    assert len(set(receipt['transaction_ids'])) == 4
+    links = receipt['continuation_links']
+    assert [row['stage'] for row in links] == ['baseline', 'final']
+    assert links[0]['parent_draft_id'] == receipt['copy_draft_id']
+    assert links[0]['save_transaction_id'] == phases['save_baseline']['transaction_id']
+    assert links[1]['parent_transaction_id'] == copy['transaction_id']
+    assert links[1]['save_transaction_id'] == phases['save_final']['transaction_id']
+    assert links[1]['return_gateway_argv'] == ['verify', copy['transaction_id']]
+    budget = receipt['budget']
+    assert budget['public_calls'] == len(receipt['calls']) <= 128
+    assert budget['native_calls'] == len(task.collector_native_calls)
+    assert budget['native_dispatcher_packets'] + budget['native_version_handshakes'] == budget['native_calls']
+    assert budget['native_files_including_index'] > 512 and budget['receipt_bytes'] > 256 * 1024
+    artifacts = Path(category['observation_path']).with_name('source-copy-save-children-artifacts')
+    files = [path for path in artifacts.rglob('*') if path.is_file()]
+    assert budget['archive_files'] == len(files)
+    assert budget['archive_bytes'] == sum(path.stat().st_size for path in files)
+    baseline, final = links
+    assert baseline['save_receipt'] == phases['save_baseline']['authority_receipt']
+    assert final['save_receipt'] == copy['gateway_verification_scope']['final_save_receipt']
+    assert all(final['origin']['parent'][key] == value for key, value in copy['authority_receipt'].items())
+    assert receipt['lifecycle_final_reference']['category'] == category['category']
+    assert budget['native_files_including_index'] == len(receipt['native_evidence']) + 1 <= 1024
+    assert budget['receipt_bytes'] == Path(category['observation_path']).stat().st_size <= 1024 * 1024
+    assert budget['archive_bytes'] == receipt['archive_bytes'] <= 64 * 1024 * 1024
+    assert budget['total_reply_bytes'] == receipt['total_reply_bytes'] <= 16 * 1024 * 1024
+    assert not any(row['argv'][0] == 'typed-zero-call' for row in receipt['calls'])
+    (tmp_path / 'successor-budget.json').write_text(json.dumps(budget, indent=2))
+    print('R55 complete collector budget:', json.dumps(budget))
+
+
+@pytest.mark.parametrize('fault', ['missing-index', 'tampered-index', 'missing-archive', 'tampered-archive', 'archive-link', 'index-link'])
+def test_saved_copy_successor_rejects_invalid_native_proof_index(tmp_path, workflow, monkeypatch, fault):
+    runtime, writes, task = continuation_copy_runtime(tmp_path)
+    observe = workflow.observe_console_file
+    def invalidate_index(path, *, io_root):
+        path = Path(path)
+        if path.name == 'native-proofs.json':
+            # A valid index hash alone cannot establish its referenced bytes.
+            archive = path.with_name('native-0.json')
+            if fault == 'index-link':
+                outside = tmp_path / 'outside-index.json'
+                outside.write_bytes(path.read_bytes())
+                path.unlink(); path.symlink_to(outside)
+            elif fault == 'missing-index': path.unlink()
+            elif fault == 'tampered-index': path.write_text('{}')
+            elif fault == 'missing-archive': archive.unlink()
+            elif fault == 'tampered-archive': archive.write_text('{}')
+            elif fault == 'archive-link':
+                outside = tmp_path / 'outside-native.json'
+                outside.write_bytes(archive.read_bytes())
+                archive.unlink(); archive.symlink_to(outside)
+        return observe(path, io_root=io_root)
+    monkeypatch.setattr(workflow, 'observe_console_file', invalidate_index)
+    with pytest.raises(Exception):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True,
+            saved_copy_protocol='gateway-owned-save-children/v1')
+    receipt = json.loads((runtime.state_dir / 'source-copy-save-children.json').read_text())
+    assert receipt['collection_complete'] is False and receipt['archive_failure']
+    assert runtime.category_results[0]['status'] == 'FAIL'
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'save', 'copy', 'save']
+    assert len(set(receipt['transaction_ids'])) == 4
+
+
+@pytest.mark.parametrize('fault,expected_writes', [
+    ('missing-baseline', ['create']),
+    ('missing-final', ['create', 'save', 'copy']),
+    ('wrong-child-parent', ['create']),
+    ('wrong-baseline-revision', ['create']),
+    ('wrong-final-parent-return', ['create', 'save', 'copy', 'save']),
+    ('wrong-final-receipt', ['create', 'save', 'copy', 'save']),
+])
+def test_saved_copy_successor_rejects_invalid_generated_continuation(tmp_path, workflow, fault, expected_writes):
+    runtime, writes, task = continuation_copy_runtime(tmp_path)
+    invoke = runtime.raw_gateway
+    def corrupt(argv):
+        code, payload = invoke(argv)
+        payload = deepcopy(payload)
+        proof = payload.get('source_copy_saved_proof', {})
+        if fault == 'missing-baseline' and proof.get('status') == 'baseline_save_pending':
+            payload.pop('next_command', None)
+        elif fault == 'missing-final' and payload.get('status') == 'source_copy_saved_proof_pending':
+            payload.pop('next_command', None)
+        elif fault == 'wrong-child-parent' and proof.get('stage') == 'baseline':
+            proof['parent']['draft_id'] = 'od1-' + '1' * 32
+        elif fault == 'wrong-baseline-revision' and argv[0] == 'transaction-show':
+            origin = payload.get('artifact', {}).get('prepared_operation', {}).get('pre_state', {}).get('source_copy_save_origin')
+            if origin and origin['stage'] == 'baseline': origin['parent']['source_revision'] += 1
+        elif fault == 'wrong-final-receipt' and payload.get('verification', {}).get('verification_scope', {}).get('complete_copy_preservation') is True:
+            payload['verification']['verification_scope']['final_save_receipt']['transaction_id'] = 'tx1-unrelated'
+        elif fault == 'wrong-final-parent-return' and argv[0] == 'verify' and payload.get('state') == 'result_schema_checked':
+            command = payload.get('next_command', {})
+            if command.get('command') == 'verify': command['gateway_argv'] = ['verify', 'tx1-unrelated']
+        return code, payload
+    runtime.raw_gateway = corrupt
+    with pytest.raises(AssertionError, match='continuation|parent|revision|receipt'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True,
+            saved_copy_protocol='gateway-owned-save-children/v1')
+    receipt = json.loads((runtime.state_dir / 'source-copy-save-children.json').read_text())
+    assert receipt['collection_complete'] is False and receipt['saved_copy_verified'] is False
+    assert receipt['failure'] and receipt['native_evidence'] and runtime.category_results[0]['status'] == 'FAIL'
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == expected_writes
+    attempted = [row['argv'][1] for row in receipt['calls'] if row['argv'][0] == 'execute']
+    assert len(attempted) == len(set(attempted)) == len(expected_writes)
+    assert not any(row['argv'] == ['verify', 'tx1-unrelated'] for row in receipt['calls'])
