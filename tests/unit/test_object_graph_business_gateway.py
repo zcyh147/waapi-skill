@@ -236,7 +236,8 @@ def test_object_binding_returns_version_stable_business_kind(
         "precompute_or_increment_revision",
     }
     assert "fixed_full_argv" not in continuation["more_actions"]
-    assert "draft-declare-rtpc" in continuation["declare_rtpc"]["fixed_argv_prefix_copy"]
+    assert continuation["declare_rtpc"] == {
+        "available_via": "more_actions", "use_when": "an_rtpc_outcome_is_requested"}
     assert continuation["existing_target_count_decision"] == {
         "three_or_more_requested": (
             "bind_every_requested_existing_target_before_any_field_discovery_"
@@ -244,6 +245,7 @@ def test_object_binding_returns_version_stable_business_kind(
         ),
         "one_or_two_requested": "use_the_individual_discover_and_declare_routes",
     }
+    assert "precondition" not in continuation["declare_existing_batch"]
     assert "draft-inspect" in continuation["more_actions"]["copy_command"]
     assert continuation["field_discovery"]["documented_lists"] == {
         "append": ["--field-source", "documented-lists", "--list"],
@@ -259,6 +261,9 @@ def test_object_binding_returns_version_stable_business_kind(
         version=version,
     )
     assert inspect_code == 0, inspected
+    assert "draft-declare-rtpc" in inspected["draft"]["next_action_binding"]["declare_rtpc"]["fixed_argv_prefix_copy"]
+    assert inspected["draft"]["next_action_binding"]["declare_existing_batch"]["precondition"] == (
+        "bind_every_requested_existing_target_before_starting_this_single_batch")
     assert inspected["draft"]["next_action_binding"]["field_discovery"][
         "documented_lists"
     ] == {
@@ -1430,7 +1435,8 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert continuation["declare_existing"]["cardinality"] == (
         "exactly_one_declaration_per_command"
     )
-    assert "draft-declare-rtpc" in continuation["declare_rtpc"]["fixed_argv_prefix_copy"]
+    assert continuation["declare_rtpc"] == {
+        "available_via": "more_actions", "use_when": "an_rtpc_outcome_is_requested"}
     assert "fixed_full_argv" not in json.dumps(continuation)
     assert "draft-inspect" in continuation["more_actions"]["copy_command"]
     assert continuation["field_discovery"]["available_via"] == "more_actions"
@@ -1444,6 +1450,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         tmp_path, "draft-inspect", draft_id, "--task-authority", authority,
     )
     assert inspect_code == 0, inspected
+    assert "draft-declare-rtpc" in inspected["draft"]["next_action_binding"]["declare_rtpc"]["fixed_argv_prefix_copy"]
     more_discovery = inspected["draft"]["next_action_binding"]["field_discovery"]
     assert "draft-discover-fields" in more_discovery["fixed_argv_prefix_copy"]
     assert set(more_discovery["scope_decision"]) == {

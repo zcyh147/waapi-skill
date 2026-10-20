@@ -26451,6 +26451,11 @@ def _compact_object_set_update_continuation(
                     "available_via": "more_actions",
                     "use_when": "additional_fields_or_other_scopes_are_needed",
                 }
+            elif key == "declare_rtpc":
+                action = {
+                    "available_via": "more_actions",
+                    "use_when": "an_rtpc_outcome_is_requested",
+                }
             elif key == "declare_existing" and isinstance(action, Mapping):
                 action = {
                     **action,
@@ -26473,6 +26478,10 @@ def _compact_object_set_update_continuation(
                         "field_selection_rule",
                     )
                     if name in action
+                    # Binding replies already state this requirement in the
+                    # target-count decision; draft-inspect retains it in full.
+                    and not (name == "precondition" and command == "draft-bind-object"
+                             and "existing_target_count_decision" in value)
                 }
             compact[key] = action
     compact["more_actions"] = {
