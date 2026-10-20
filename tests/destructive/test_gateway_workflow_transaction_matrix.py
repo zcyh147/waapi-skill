@@ -6582,7 +6582,14 @@ def test_rtpc_graph_acceptance_across_selected_version(workflow_sandbox_runtime:
 def _collect_compound_render_rename_history(gateway, receipt, *, version, owner_id, selected_id,
         field, renamed, snapshot, metadata_scopes):
     """One owned compound change and receipt-bound history, using the caller's oracle."""
+    from wwise_waapi.canonical import canonical_sha256
     assert version in {'2022.1', '2025.1'}, version
+    def call_reference(payload):
+        index = len(receipt['calls']) - 1
+        assert type(index) is int and 0 <= index < len(receipt['calls'])
+        call = receipt['calls'][index]
+        assert call['payload'] == payload, 'Phase reference must retain its exact original call payload'
+        return {'call_index': index, 'call_canonical_sha256': canonical_sha256(call)}
     def metadata():
         result = {}
         for identity, required in metadata_scopes:
@@ -6619,7 +6626,7 @@ def _collect_compound_render_rename_history(gateway, receipt, *, version, owner_
         preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
         tx = _required_string(preview, 'transaction_id')
         shown = gateway.gateway(['transaction-show', tx], live=False)
-        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'], immutable_preview=shown['artifact'],
+        phase.update(transaction_id=tx, artifact_hash=preview['artifact_hash'], preview_call=call_reference(shown),
             compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
         if role == 'source':
             calls = shown['artifact']['prepared_operation']['pre_state']['execution_plan']['calls']
@@ -6634,15 +6641,15 @@ def _collect_compound_render_rename_history(gateway, receipt, *, version, owner_
         assert phase['collector_prestate'] == receipt['history_before' if role in {'source', 'redo'} else 'history_after']['state'], phase
         gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
         phase['native_outcome'] = 'indeterminate'
-        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+        code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'call': call_reference(executed)}
         assert code == 0 and executed.get('state') == 'executed_unverified' and executed.get('automatic_retry') is False, executed
         phase['native_outcome'] = 'accepted'
-        code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+        code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'call': call_reference(verified)}
         assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
         if role != 'source': assert verified.get('verification_strength') == 'scoped_history_effect_readback', verified
         final = gateway.gateway(['transaction-show', tx], live=False)
-        assert final['artifact'] == phase['immutable_preview'], 'History flow changed an immutable Preview'
-        phase['transaction'] = final
+        assert final['artifact'] == shown['artifact'], 'History flow changed an immutable Preview'
+        phase['transaction_call'] = call_reference(final)
         return phase
     receipt.update(history_complete=False, stack_head_observed=False, outside_scope_preservation_observed=False,
         history_scope='existing_chain_exact_owner_rename_and_stored_Render_not_rendered_audio')
@@ -6729,7 +6736,8 @@ def _collect_anonymous_effect_slot_construction_acceptance(runtime: _WorkflowSan
     if render_suffix_diagnostic: receipt.update(diagnostic_complete=False, classification='not_observed')
     if compound_render_history: receipt['scope'] = 'existing_modern_chain_exact_owner_rename_and_receipt_bound_history'
     def persist():
-        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        body = json.dumps(receipt, ensure_ascii=False, indent=None if compound_render_history else 2,
+            separators=(',', ':') if compound_render_history else None).encode('utf-8')
         assert len(body) <= 8 * 1024 * 1024, 'Anonymous EffectSlot receipt byte bound exceeded'
         output.parent.mkdir(parents=True, exist_ok=True)
         temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)
@@ -8017,7 +8025,8 @@ def _collect_legacy_import_render_acceptance(runtime: _WorkflowSandboxRuntime, *
         'read_view_scope': view_scope, 'tsv_media_verified': False,
         'lifecycle_acceptance': 'Requires existing host-category-evidence/v3 source-integrity and cleanup finalizer'}
     def persist():
-        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        body = json.dumps(receipt, ensure_ascii=False, indent=None if compound_render_history else 2,
+            separators=(',', ':') if compound_render_history else None).encode('utf-8')
         assert len(body) <= 8 * 1024 * 1024, 'Legacy import receipt byte bound exceeded'
         output.parent.mkdir(parents=True, exist_ok=True)
         temporary = output.with_suffix('.tmp'); temporary.write_bytes(body); temporary.replace(output)

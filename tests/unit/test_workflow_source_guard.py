@@ -5170,7 +5170,7 @@ def test_compound_exact_rename_history_collector_retains_failed_independent_effe
     assert not any(uri.endswith('.redo') for uri, _, _ in writes)
 
 
-def _compound_render_history_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
+def _compound_render_history_runtime(tmp_path, workflow, *, fault=None, version='2025.1', native_metadata=False):
     from copy import deepcopy
     if version == '2025.1':
         runtime, commands, writes, task = _anonymous_effect_construction_runtime(tmp_path, workflow)
@@ -5181,6 +5181,8 @@ def _compound_render_history_runtime(tmp_path, workflow, *, fault=None, version=
         # getTypes has one exact row, rather than two identical fixture entries.
         task.types = list({(row['classId'], row['name'], row['type']): row for row in task.types}.values())
     original = task.call
+    if native_metadata:
+        task.metadata.update(deepcopy(_render_native_size_fixture()['slot_raw_metadata']))
     history, actions = {}, []
     def call(uri, args=None, options=None):
         if uri.endswith('isPropertyEnabled'):
@@ -5237,6 +5239,7 @@ def test_compound_render_history_collector_uses_existing_setup_and_public_source
     runtime, commands, writes, actions = _compound_render_history_runtime(tmp_path, workflow, version=version)
     category = workflow._collect_compound_render_history_acceptance(runtime, prefix='WAAPI_ANON_TEST')
     receipt = json.loads(Path(category['observation_path']).read_text())
+    _assert_render_phase_call_references(receipt)
     assert category['status'] == 'PASS' and receipt['history_complete'] is True
     assert receipt['history_before'] == receipt['history_undo']
     if version == '2025.1': assert receipt['history_after'] == receipt['history_redo']
@@ -5254,6 +5257,7 @@ def test_compound_render_history_collector_retains_failed_execute_without_verify
         workflow._collect_compound_render_history_acceptance(runtime, prefix='WAAPI_ANON_TEST')
     category = runtime.category_results[-1]
     receipt = json.loads(Path(category['observation_path']).read_text())
+    _assert_render_phase_call_references(receipt)
     assert category['status'] == 'FAIL' and receipt['business_effect_verified'] is False and receipt['history_complete'] is False
     source = receipt['transactions'][-1]
     assert source['phase'] == 'source' and source['execute']['exit_code'] == 2 and 'verify' not in source
@@ -5261,3 +5265,59 @@ def test_compound_render_history_collector_retains_failed_execute_without_verify
     assert actions.count('ak.wwise.core.object.setProperty') == 1
     assert actions[-1] == 'ak.wwise.core.undo.cancelGroup'
     assert not any(uri in actions for uri in ('ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'))
+
+
+def _render_native_size_fixture():
+    import gzip
+    path = Path(__file__).parents[1] / 'fixtures/metadata/render-history-2025-native-size.json.gz'
+    assert path.stat().st_size < 200 * 1024
+    with gzip.open(path, 'rb') as source:
+        body = source.read(2 * 1024 * 1024 + 1)
+    assert len(body) <= 2 * 1024 * 1024
+    return json.loads(body)
+
+
+def _assert_render_phase_call_references(receipt):
+    from wwise_waapi.canonical import canonical_sha256
+    for phase in receipt['transactions']:
+        if phase['phase'] not in {'source', 'undo', 'redo'}: continue
+        assert 'immutable_preview' not in phase and 'transaction' not in phase
+        for key, command in [('preview_call', 'transaction-show'), ('transaction_call', 'transaction-show'),
+                ('execute', 'execute'), ('verify', 'verify')]:
+            if key not in phase: continue
+            reference = phase[key]['call'] if key in {'execute', 'verify'} else phase[key]
+            index = reference['call_index']
+            assert type(index) is int and 0 <= index < len(receipt['calls'])
+            call = receipt['calls'][index]
+            assert reference['call_canonical_sha256'] == canonical_sha256(call)
+            assert call['argv'] == [command, phase['transaction_id']]
+            if key in {'execute', 'verify'}: assert phase[key]['exit_code'] == call['exit_code']
+        if 'transaction_call' in phase:
+            before = receipt['calls'][phase['preview_call']['call_index']]['payload']['artifact']
+            after = receipt['calls'][phase['transaction_call']['call_index']]['payload']['artifact']
+            assert before == after
+
+
+def test_compound_render_history_collector_keeps_native_metadata_and_complete_redo_within_existing_bounds(tmp_path, workflow):
+    runtime, commands, writes, actions = _compound_render_history_runtime(tmp_path, workflow, native_metadata=True)
+    category = workflow._collect_compound_render_history_acceptance(runtime, prefix='WAAPI_ANON_TEST')
+    path = Path(category['observation_path']); receipt = json.loads(path.read_text())
+    _assert_render_phase_call_references(receipt)
+    assert category['status'] == 'PASS' and receipt['history_complete'] is True
+    assert receipt['history_before'] == receipt['history_undo'] and receipt['history_after'] == receipt['history_redo']
+    assert len(receipt['calls']) == 227 < 256
+    assert path.stat().st_size < 4 * 1024 * 1024  # Leaves margin for larger actual native envelopes.
+    capture = _render_native_size_fixture()
+    assert capture['source_partial_calls'] == 193
+    # Actual native and fake source/undo/redo previews have the same indices;
+    # use exact captured blobs for the largest native journal/Preview replies.
+    modeled = json.loads(json.dumps(receipt))
+    for index, call in capture['calls'].items():
+        assert modeled['calls'][int(index)]['argv'][0] == call['argv'][0]
+        modeled['calls'][int(index)] = call
+    from wwise_waapi.canonical import canonical_json_bytes
+    # Native redo has not executed. Conservatively budget two largest captured
+    # native undo journal records for its verify and final transaction replies.
+    largest = capture['calls']['162']
+    modeled['calls'][202] = modeled['calls'][203] = largest
+    assert len(canonical_json_bytes(modeled)) < 5 * 1024 * 1024
