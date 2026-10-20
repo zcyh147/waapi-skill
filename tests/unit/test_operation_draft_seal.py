@@ -679,6 +679,12 @@ def draft_record_path(tmp_path: Path, draft_id: str) -> Path:
     )
 
 
+def transaction_tree(tmp_path: Path) -> dict[str, bytes | None]:
+    root = tmp_path / "state" / "transactions"
+    return {str(path.relative_to(root)): path.read_bytes() if path.is_file() else None
+            for path in root.rglob("*")}
+
+
 def test_preview_from_checked_draft_seals_one_canonical_transaction(
     tmp_path: Path,
 ) -> None:
@@ -986,6 +992,7 @@ def test_guard_drift_fails_before_reservation_or_transaction_store(
     draft_id, authority = checked_draft(tmp_path)
     record_path = draft_record_path(tmp_path, draft_id)
     before = record_path.read_bytes()
+    transactions_before = transaction_tree(tmp_path)
     changed_info = live_info()
     changed_project = project_row()
     if drift == "session":
@@ -1004,7 +1011,7 @@ def test_guard_drift_fails_before_reservation_or_transaction_store(
     assert code == 2
     assert payload["error_code"] == "OPERATION_DRAFT_BINDING_DRIFT"
     assert record_path.read_bytes() == before
-    assert not (tmp_path / "state" / "transactions").exists()
+    assert transaction_tree(tmp_path) == transactions_before
     assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.getProjectInfo",
@@ -1047,6 +1054,7 @@ def test_registry_or_composer_drift_is_byte_atomic_before_live_preparation(
     draft_id, authority = checked_draft(tmp_path)
     record_path = draft_record_path(tmp_path, draft_id)
     before = record_path.read_bytes()
+    transactions_before = transaction_tree(tmp_path)
     monkeypatch.setattr(
         waapi_gateway,
         binding_function,
@@ -1064,7 +1072,7 @@ def test_registry_or_composer_drift_is_byte_atomic_before_live_preparation(
     assert code == 2
     assert payload["error_code"] == "OPERATION_DRAFT_BINDING_DRIFT"
     assert record_path.read_bytes() == before
-    assert not (tmp_path / "state" / "transactions").exists()
+    assert transaction_tree(tmp_path) == transactions_before
     assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
@@ -1084,6 +1092,7 @@ def test_wrong_task_or_revision_cannot_reserve_or_create_a_transaction(
     draft_id, actual_authority = checked_draft(tmp_path)
     record_path = draft_record_path(tmp_path, draft_id)
     before = record_path.read_bytes()
+    transactions_before = transaction_tree(tmp_path)
     client = preview_client()
 
     code, payload, _client = seal_checked_draft(
@@ -1097,7 +1106,7 @@ def test_wrong_task_or_revision_cannot_reserve_or_create_a_transaction(
     assert code == 2
     assert payload["error_code"] == error_code
     assert record_path.read_bytes() == before
-    assert not (tmp_path / "state" / "transactions").exists()
+    assert transaction_tree(tmp_path) == transactions_before
     assert [call[0] for call in client.calls] == ([] if authority is not None else ["ak.wwise.core.getInfo"])
 
 
@@ -1107,6 +1116,7 @@ def test_detected_version_drift_cannot_reserve_or_create_a_transaction(
     draft_id, authority = checked_draft(tmp_path)
     record_path = draft_record_path(tmp_path, draft_id)
     before = record_path.read_bytes()
+    transactions_before = transaction_tree(tmp_path)
     changed_info = live_info()
     changed_info["version"] = {
         "year": 2025,
@@ -1131,7 +1141,7 @@ def test_detected_version_drift_cannot_reserve_or_create_a_transaction(
     assert payload["error_code"] == "GatewayInputError"
     assert "requested version is 2022.1" in payload["message"]
     assert record_path.read_bytes() == before
-    assert not (tmp_path / "state" / "transactions").exists()
+    assert transaction_tree(tmp_path) == transactions_before
     assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
