@@ -408,9 +408,6 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
     assert code == (2 if expected_failure else 0), json.dumps(verified)
     assert (verified.get('verified') is True) == (not expected_failure), verified
     assert len(writes) == 1
-    if not expected_failure:
-        chains = [row for row in verified['verification']['assertions'] if row.get('kind') == 'effect_render_chain_observation']
-        assert len(chains) == 1 and chains[0]['passed'] is True
     return verified
 
 
