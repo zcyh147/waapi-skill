@@ -1474,7 +1474,7 @@ def test_2021_active_source_preserves_parent_identity_across_native_reference_re
     assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
 
 
-def _legacy_multi_sound_client(tmp_path):
+def _legacy_multi_sound_client(tmp_path, *, extra_sounds=0, fault=None, notes=""):
     original, ids = _legacy_active_source_client(tmp_path)
     second_sound = "{88888888-8888-8888-8888-888888888888}"
     second_active = "{99999999-9999-9999-9999-999999999999}"
@@ -1499,20 +1499,45 @@ def _legacy_multi_sound_client(tmp_path):
         )
         for identity, name in sources
     ]
+    for index in range(extra_sounds):
+        owner_id = "{%08X-0000-0000-0000-000000000000}" % (0x10000000 + index)
+        source_id = "{%08X-0000-0000-0000-000000000000}" % (0x20000000 + index)
+        source_name = "Source" + str(index)
+        owner_path = r"\Sounds\Rain" + str(index)
+        original_file = "/owned/Originals/SFX/" + source_name + ".wav"
+        sounds.append({"id": owner_id, "name": "Rain" + str(index), "type": "Sound", "classId": 65552,
+                       "path": owner_path, "parent": {"id": parent}, "originalWavFilePath": original_file})
+        children.append({"id": source_id, "name": source_name, "type": "AudioFileSource", "classId": 16,
+                         "path": owner_path + "\\" + source_name, "parent": {"id": owner_id},
+                         "audioSource:language": {"id": ids["language"], "name": "SFX"},
+                         "originalWavFilePath": original_file})
+    for owner in sounds:
+        owner["notes"] = notes
 
     class MultiSoundClient(type(original)):
         include_container = False
+        owner_reads = 0
 
         def call(self, uri, args=None, options=None):
             query = (args or {}).get("waql", "")
             if uri == "ak.wwise.core.object.get" and (query.startswith("from type Sound")
                     or parent in query and "select children" in query):
                 rows = list(sounds)
+                self.owner_reads += 1
+                if fault == "owner-membership" and self.owner_reads == 2:
+                    rows.pop()
                 if self.include_container:
                     rows.insert(1, {"id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}", "name": "Layers",
                                     "type": "Folder", "path": r"\Sounds\Layers", "parent": {"id": parent}})
             elif uri == "ak.wwise.core.object.get" and "select children" in query:
-                rows = [row for row in children if row["parent"]["id"] in query]
+                rows = [dict(row) for row in children if row["parent"]["id"] in query]
+                self.child_reads += 1
+                if rows and fault == "alien-parent":
+                    rows[0]["parent"] = {"id": parent}
+                if self.inactive_file_changed:
+                    for row in rows:
+                        if row["name"] == "Alpha":
+                            row["originalWavFilePath"] = "/owned/Originals/SFX/Changed.wav"
             else:
                 return super().call(uri, args, options)
             self.calls.append((uri, dict(args), dict(options)))
@@ -1568,6 +1593,58 @@ def test_2021_active_source_preserves_non_sound_rows_with_existing_unavailable_p
         "type": "Folder", "path": r"\Sounds\Layers", "unavailable_fields": ["active_source"]}
     assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
     assert result["agent_result"][2]["active_source"]["id"] == ids["second_active"]
+
+
+def test_2021_active_source_internal_batches_do_not_cap_public_sound_results_at_64(tmp_path):
+    client, _ = _legacy_multi_sound_client(tmp_path, extra_sounds=63)
+    code, result = gateway.execute_gateway([
+        "query-object", "--kind", "all-sounds", "--max-results", "100",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert len(result["agent_result"]) == 65
+    assert result["agent_result"][-1]["active_source"] == {
+        "id": "{2000003E-0000-0000-0000-000000000000}", "name": "Source62"}
+    assert client.child_reads == 4  # Two complete batches observed twice, no per-child reads.
+    assert len(client.calls) <= 12
+
+
+@pytest.mark.parametrize("fault,expected", [
+    ("alien-parent", "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ("owner-membership", "ACTIVE_SOURCE_OBSERVATION_CHANGED"),
+])
+def test_2021_active_source_rejects_contaminated_or_changed_multi_sound_observation(tmp_path, fault, expected):
+    client, _ = _legacy_multi_sound_client(tmp_path, fault=fault)
+    code, result = gateway.execute_gateway([
+        "query-object", "--kind", "all-sounds", "--max-results", "10",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == expected, result
+    assert result.get("agent_result") is None
+
+
+def test_2021_active_source_query_fence_stops_before_scanning_child_batches(tmp_path):
+    client, _ = _legacy_multi_sound_client(tmp_path, extra_sounds=998)
+    code, result = gateway.execute_gateway([
+        "query-object", "--kind", "all-sounds", "--max-results", "1000",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == "ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", result
+    assert client.child_reads == 0
+
+
+def test_2021_multi_sound_result_continuation_rejects_changed_inactive_source_proof(tmp_path):
+    client, _ = _legacy_multi_sound_client(tmp_path, notes="声" * 24000)
+    env = _env(tmp_path, "2021.1")
+    code, first = gateway.execute_gateway([
+        "query-object", "--kind", "all-sounds", "--predicate", "name-contains", "Rain", "--max-results", "10",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source", "--include", "notes",
+    ], env=env, client_factory=lambda _: client)
+    assert code == 0 and first["status"] == "partial", first
+    continuation = first["agent_result"]["next_command"]["gateway_argv"]
+    client.inactive_file_changed = True
+    code, result = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == "QUERY_RESULT_CONTINUATION_CHANGED", result
 
 
 def test_2021_active_source_composes_with_live_selected_property_without_native_derived_accessor(tmp_path):

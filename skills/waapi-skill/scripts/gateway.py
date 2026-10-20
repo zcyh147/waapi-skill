@@ -15455,6 +15455,7 @@ def dispatch_command(
                     error_code=exc.code) from exc
             if configuration != selected_connection_binding(env):
                 raise GatewayResultShapeError("Query configuration changed", error_code="ACTIVE_SOURCE_OBSERVATION_CHANGED")
+            connection.deadline.require_remaining("complete active-source observation")
             args.query_project_observation = project_observation
             validate_exact_query_identity(args, native_rows)
             validate_query_business_view_result(args, native_rows)

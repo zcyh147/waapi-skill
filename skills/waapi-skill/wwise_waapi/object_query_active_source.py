@@ -204,6 +204,8 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "Source membership or selection facts changed during observation.")
     after_selector = selector if broad else {"object_id": owner_ids[0]}
     after, _ = rows(**after_selector, return_fields=fields, maximum=MAX_QUERY_TAKE if broad else 1, **view)
+    if broad and len(after) == MAX_QUERY_TAKE:
+        _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The repeated Sound query reached its observation fence.")
     def owner_facts(values):
         return [_sound_facts(row) if row.get("type") == "Sound" else dict(row) for row in values]
     if owner_facts(after) != owner_facts(before) or project() != before_project:
