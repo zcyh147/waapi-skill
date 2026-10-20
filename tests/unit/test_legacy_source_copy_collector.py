@@ -835,12 +835,17 @@ def selected_owned_probe_runtime(tmp_path, *, fault=None, version='2022.1'):
         task.objects[identity].update(name=node.get('Name', ''), notes=node.findtext('Comment') or '')
     runtime.sandbox.sandbox_project = task.project_file
     runtime.sandbox.sandbox_path = task.project_file.parent
+    if fault == 'source-rtpc-list':
+        task.objects[SOURCE]['@RTPC'] = [{'id': rtpc}]
+        task.metadata['RTPC'] = {'name': 'RTPC', 'type': 'List'}
     previous = task.call
     task.probe_native_calls = []
     def call(uri, args=None, options=None):
         args, options = args or {}, options or {}
         task.probe_native_calls.append((uri, deepcopy(args), deepcopy(options)))
         expression = args.get('waql', '')
+        if fault == 'source-rtpc-list' and uri.endswith('object.get') and '@RTPC' in options.get('return', []):
+            raise RuntimeError('Unknown property RTPC (61)')
         if uri.endswith('object.get') and ' select @' in expression:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             identity = {f'from object "{SOURCE}" select @RTPC take 2': rtpc,
@@ -913,3 +918,22 @@ def test_selected_source_probe_stops_on_incomplete_or_unexpected_read(tmp_path, 
         assert receipt['calls'][-1]['exit_code'] == 1
     else:
         assert 'public call bound' in receipt['failure']['message'] and len(commands) == 128
+
+
+def test_selected_source_probe_reserves_list_typed_rtpc_for_independent_candidate(tmp_path, workflow, request):
+    runtime, commands, writes, task = selected_owned_probe_runtime(tmp_path, fault='source-rtpc-list')
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='', selected_owned_probe=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    probe = receipt['selected_owned_probe']
+    assert receipt['collection_complete'] is True and category['status'] == 'blocked'
+    assert probe['fields']['source']['details']['RTPC']['header']['type'] == 'List'
+    assert not any('RTPC' in page['fields'] for page in probe['fields']['source']['values'])
+    assert probe['membership']['owner_array']['available'] is False
+    assert probe['membership']['traversal']['complete'] is True
+    array_calls = [argv for argv in commands if '--include-field' in argv and 'RTPC' in argv]
+    assert array_calls == [['query-object', '--exact-id', SOURCE, '--max-results', '2', '--include-field', 'RTPC']]
+    assert probe['fields']['source']['unavailable']['RTPC'] == 'independent owner-array candidate unavailable'
+    assert receipt['budget']['public_calls'] == len(commands) <= 128
+    assert receipt['budget']['native_calls'] == len(task.probe_native_calls)
+    request.node.user_properties.append(('probe_budget', receipt['budget']))
+    assert writes == []

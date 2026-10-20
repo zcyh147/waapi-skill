@@ -10179,7 +10179,13 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 # classifies whether public scalar/reference discovery can read it.
                 header = detail.get('metadata', detail.get('field')); assert header['name'] == name, detail
                 observation['details'][name] = {'call_indexes': detail_calls, 'snapshot': snapshot, 'entries': total, 'header': header}
-                if header.get('type') or header.get('constraints', header.get('restriction', {})).get('type') == 'reference': readable.append(name)
+                if role == 'source' and name == 'RTPC':
+                    # A truthy native List type does not establish public
+                    # projection support. Observe this only through the sealed
+                    # owner-array candidate so its boundary cannot suppress
+                    # the independently scheduled traversal and reference hops.
+                    observation.setdefault('independent_candidate_fields', []).append(name)
+                elif header.get('type') or header.get('constraints', header.get('restriction', {})).get('type') == 'reference': readable.append(name)
                 else: observation['unavailable'][name] = 'live metadata leaves type/reference semantics unavailable'
             for offset in range(0, len(readable), 8):
                 selected = readable[offset:offset + 8]
@@ -10220,6 +10226,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 assert [value['id'] for value in accessor] == [ids['rtpc']], accessor
                 array_observation.update(available=True, complete=True)
         probe['membership']['owner_array'] = array_observation
+        if 'RTPC' in probe['fields']['source']['names']:
+            probe['fields']['source']['independent_candidate_call_index'] = index
+            if not array_observation['available']:
+                probe['fields']['source']['unavailable']['RTPC'] = 'independent owner-array candidate unavailable'
         for token, role, owner in (('RTPC', 'rtpc', 'source'), ('ControlInput', 'lfo', 'rtpc'), ('Curve', 'curve', 'rtpc')):
             index = len(receipt['calls'])
             payload = candidate(['query-object', '--advanced-waql', f'from object "{ids[owner]}" select @{token}',
