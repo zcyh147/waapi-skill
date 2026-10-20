@@ -91,10 +91,12 @@ def project_save_preview(env, client):
         schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: client)
     assert code == 0, result
     if schema["input_shape"] == "business_declaration":
-        # Newer lanes require a closed save declaration before a Preview exists.
+        declaration = schema["business_adapter"]["declaration"]
+        save_fields = (["--value", "auto_check_out", "false"]
+            if "auto_check_out" in declaration["optional_fields"] else [])
         authority = result["task_authority"]
         for command, fields in (
-            ("draft-declare-core-plan", ["--value", "auto_check_out", "false"]),
+            ("draft-declare-core-plan", save_fields),
             ("draft-check", []),
             ("preview-from-draft", []),
         ):

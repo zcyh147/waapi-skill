@@ -138,7 +138,11 @@ def git_source_seals(candidate, names):
 
 
 def historical_sources():
-    return git_source_seals(ORIGINAL, metadata_source_seals())
+    names = metadata_source_seals()
+    # This explicitly reviewed Source-copy module did not exist in R51. Keep
+    # its absence in source_changes(before, current); never invent an old hash.
+    names.pop('skills/waapi-skill/wwise_waapi/source_copy_observations.py',None)
+    return git_source_seals(ORIGINAL, names)
 
 def source_changes(before, after):
     return {name: {'before': before.get(name), 'after': after.get(name)} for name in sorted(set(before)|set(after))

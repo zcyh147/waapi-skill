@@ -743,12 +743,13 @@ def materialize_core_business_request(
             ),
         }
     elif operation == "ak.wwise.core.project.save":
-        if set(plan) - {"auto_check_out"}:
+        optional_fields = contract["declaration"]["optional_fields"]
+        if set(plan) - set(optional_fields):
             raise business_repair(
                 "CORE_PLAN_FIELDS_INVALID",
                 field="core_plan",
                 required=[],
-                optional=["auto_check_out"],
+                optional=list(optional_fields),
                 supplied=sorted(str(key) for key in plan),
                 action="submit only the disclosed project save choice",
             )

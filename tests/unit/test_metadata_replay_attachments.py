@@ -297,7 +297,7 @@ def test_metadata_bridge_rejects_new_runtime_drift_even_with_full_changed_file_p
     assert outcome == 'missing' and 'runtime drift is not equivalent' in reason
 
 
-@pytest.mark.parametrize('damage',[None,'operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py','partial-bridge'])
+@pytest.mark.parametrize('damage',[None,'operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py','object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py','partial-bridge'])
 def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,inventory,tmp_path,monkeypatch,damage):
     import subprocess
     capture,replay,record,bindings,descriptor = controlled_attachment(tmp_path,original_root,inventory,'ControlInput')
@@ -307,9 +307,10 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    accepted = '7f3c360d701e24a0e33a9c8771109789cc7b4705'
+    accepted = 'ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90'
     packets = {}
-    for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py'):
+    for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
+                 'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py'):
         relative = ('skills/waapi-skill/scripts/' if name == 'gateway.py' else 'skills/waapi-skill/wwise_waapi/')+name
         raw = subprocess.check_output(['git','show',accepted+':'+relative],cwd=audit.ROOT)
         packets[audit.ROOT/relative] = raw
@@ -323,7 +324,8 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         record['replay'] = write(tmp_path/'tone-program.json',replay,nodeid=descriptor['nodeid'])
         return write(tmp_path/'tone-attachment.json',record,nodeid=descriptor['nodeid'])
     descriptor = resign()
-    assert result() == ('passed',None)  # Exact combined Tone baseline before every corruption.
+    assert result() == ('passed',None)  # Exact accepted Tone + Source-copy + Save baseline before every corruption.
+    assert record['source_bridge']['changed_files']['skills/waapi-skill/wwise_waapi/source_copy_observations.py']['before'] is None
     if damage is None:return
     target = next(path for path in packets if path.name == ('gateway.py' if damage == 'partial-bridge' else damage))
     if damage == 'partial-bridge':
