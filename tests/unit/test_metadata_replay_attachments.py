@@ -203,7 +203,11 @@ def test_r54_historical_replay_controls_start_from_valid_original_and_current_fl
         binding['category_inputs']['live_metadata']=record['category_inputs']
     elif damage=='attribution':record['source_bridge']['attribution']='current_native'
     elif damage=='product-git':
-        record['scope_kind']=program['scope_kind']='product';program['git_candidate']=producer.R54_ORIGINAL
+        # This committed source contains the newly added module too: rejection
+        # must prove different source bytes, not merely a missing historical file.
+        wrong='ee78f00baf06f1840228313ae1bb6b263fd95301'
+        assert producer.git_source_seals(wrong,program['relevant_sources'])!=program['relevant_sources']
+        record['scope_kind']=program['scope_kind']='product';program['git_candidate']=wrong
     elif damage=='teardown':
         program['invocation']['outcome']='FAIL';program['invocation']['node_outcomes'][0]['outcome']='FAIL'
         record['invocation']=deepcopy(program['invocation'])
