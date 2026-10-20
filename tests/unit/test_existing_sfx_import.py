@@ -24,11 +24,11 @@ class SfxReader(VoiceReader):
             original = self.originals_root / 'SFX' / 'Expansion' / name / 'Hit.wav'
             original.parent.mkdir(parents=True, exist_ok=True)
             original.write_bytes(name.encode())
-            self.owners.append({'id': guid, 'type': 'Sound', 'name': name, 'path': path,
+            self.owners.append({'id': guid, 'type': 'Sound', 'classId': 65552, 'name': name, 'path': path,
                                 'parent': {'id': PARENT}, 'notes': 'preserved',
                                 'activeSource': {'id': source_id, 'name': 'Hit'},
                                 'originalFilePath': str(original), 'sound:originalWavFilePath': str(original)})
-            self.sources.append({'id': source_id, 'type': 'AudioFileSource', 'name': 'Hit',
+            self.sources.append({'id': source_id, 'type': 'AudioFileSource', 'classId': 16, 'name': 'Hit',
                                  'path': path + r'\Hit', 'parent': {'id': guid},
                                  'originalFilePath': str(original), 'originalWavFilePath': str(original),
                                  'audioSource:language': {'name': 'SFX'}})
