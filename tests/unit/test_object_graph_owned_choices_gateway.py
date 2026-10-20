@@ -122,6 +122,7 @@ def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, 
     accessor = {"Metadata": "@Metadata", "RTPC": "@RTPC", "Effects": "@Effects"}[list_name]
     task.types = [{"classId": 65552, "name": "Sound", "type": "WObject"},
                   {"classId": element_class, "name": element_name, "type": "WObject"}]
+    task.objects[SECOND]["classId"] = 1638416
     task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
         "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "parent": {"id": SECOND},
         "notes": "Keep sound", accessor: [{"id": CHILD}]}
@@ -721,10 +722,10 @@ class OwnedGraphTask(FieldTask):
     def __init__(self, path: Path, version: str, operation: str) -> None:
         super().__init__(path, version, operation)
         self.objects = {
-            FIRST: {"id": FIRST, "name": "Weather", "type": "ActorMixer",
+            FIRST: {"id": FIRST, "name": "Weather", "type": "ActorMixer", "classId": 1,
                     "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
                     "parent": {"id": SECOND}, "notes": "Keep owner", "@CustomList": []},
-            SECOND: {"id": SECOND, "name": "Default Work Unit", "type": "WorkUnit",
+            SECOND: {"id": SECOND, "name": "Default Work Unit", "type": "WorkUnit", "classId": 3,
                      "path": r"\Actor-Mixer Hierarchy\Default Work Unit", "notes": "Keep parent"},
         }
         self.types = [{"classId": 1, "name": "ActorMixer", "type": "WObject"},
@@ -733,6 +734,8 @@ class OwnedGraphTask(FieldTask):
         if version == "2025.1":
             self.types[0]["name"] = "PropertyContainer"
             self.objects[FIRST]["type"] = "PropertyContainer"
+        # Stored native creation facts stay independent from mutable getTypes responses.
+        self.creation_classes = {"ActorMixer": 1, "PropertyContainer": 1, "Sound": 2, "WorkUnit": 3}
         self.bad_result: str | None = None
         self.conflict = "fail"
         self.list_mode = "append"
@@ -753,6 +756,8 @@ class OwnedGraphTask(FieldTask):
                "path": self.objects[parent]["path"] + "\\" + node["name"],
                "notes": node.get("notes", "" if existing is None else existing["notes"]),
                **({"owner": {"id": parent}, "parent": None} if owned else {"parent": {"id": parent}})}
+        if existing is None:
+            row["classId"] = self.creation_classes[row["type"]]
         self.objects[object_id] = row
         row.update({key: deepcopy(value) for key, value in node.items() if key.startswith("@") and key != "@CustomList"})
         children = [self._create(child, object_id) for child in node.get("children", [])]
@@ -795,9 +800,7 @@ class OwnedGraphTask(FieldTask):
                 else:
                     assert args["transform"] == [{"select": ["descendants"]}], args
                     rows = [row for row in self.objects.values() if row["path"].startswith(parent["path"] + "\\")]
-            if getattr(self, "require_class_projection", False) and "classId" not in options.get("return", []):
-                rows = [{key: value for key, value in row.items() if key != "classId"} for row in rows]
-            return {"return": deepcopy(rows)}
+            return {"return": self.project_rows(rows, options)}
         if uri.endswith("object.create"):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             self.conflict = args.get("onNameConflict", "fail")
@@ -985,13 +988,13 @@ class SetReplaceTask(OwnedGraphTask):
     def __init__(self, path: Path, version: str) -> None:
         super().__init__(path, version, "object.set")
         self.retain_old_descendant = False
-        self.objects[ROOT] = {"id": ROOT, "name": "LAYERS", "type": "Sound",
+        self.objects[ROOT] = {"id": ROOT, "name": "LAYERS", "type": "Sound", "classId": 2,
             "path": self.objects[FIRST]["path"] + r"\LAYERS", "parent": {"id": FIRST}, "notes": "Old root"}
-        self.objects[CHILD] = {"id": CHILD, "name": "Old child", "type": "Sound",
+        self.objects[CHILD] = {"id": CHILD, "name": "Old child", "type": "Sound", "classId": 2,
             "path": self.objects[ROOT]["path"] + r"\Old child", "parent": {"id": ROOT}, "notes": "Old child"}
         self.old_child = deepcopy(self.objects[CHILD])
         self.objects["{77777777-7777-7777-7777-777777777777}"] = {
-            "id": "{77777777-7777-7777-7777-777777777777}", "name": "Wind", "type": "Sound",
+            "id": "{77777777-7777-7777-7777-777777777777}", "name": "Wind", "type": "Sound", "classId": 2,
             "path": self.objects[FIRST]["path"] + r"\Wind", "parent": {"id": FIRST}, "notes": "Keep wind"}
 
     def call(self, uri: str, args: Any = None, options: Any = None) -> Any:

@@ -20,11 +20,12 @@ POINTS = [{"x": 0, "y": -48, "shape": "Linear"}, {"x": 50, "y": -6, "shape": "Li
 class InlineCurveTask(OwnedGraphTask):
     def __init__(self, path: Path, version: str) -> None:
         super().__init__(path, version, "object.set")
+        self.set_object_type(FIRST, "RTPC", 1441808)
         self.objects[FIRST].update({"type": "RTPC", "name": "", "notes": "Keep relation",
             "path": self.objects[FIRST]["path"] + r"\[RTPC: Voice Volume, Rain_Intensity]",
             "@Curve": {"id": CURVE, "points": deepcopy(POINTS), "@Flags": 3}})
         self.objects[FIRST]["@Curve"]["points"][1]["y"] = -12
-        self.objects[CURVE] = {"id": CURVE, "name": "", "type": "Curve", "parent": None,
+        self.objects[CURVE] = {"id": CURVE, "name": "", "type": "Curve", "classId": 917520, "parent": None,
             "owner": {"id": FIRST}, "path": self.objects[FIRST]["path"] + r"\[Curve]", "notes": ""}
         self.types.extend([{"classId": 917520, "name": "Curve", "type": "WObject"}])
         self.metadata["Curve"] = {"name": "Curve", "type": "Reference", "display": {"name": "Response curve"},
@@ -43,7 +44,7 @@ class InlineCurveTask(OwnedGraphTask):
                 if isinstance(curve, dict) and curve.get("type") == "Curve":
                     curve_id = "{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}"
                     row["@Curve"] = {"id": curve_id, "points": deepcopy(curve["points"])}
-                    self.objects[curve_id] = {"id": curve_id, "name": "", "type": "Curve", "notes": "",
+                    self.objects[curve_id] = {"id": curve_id, "name": "", "type": "Curve", "classId": 917520, "notes": "",
                         "path": row["path"] + r"\[Curve]", "parent": None, "owner": {"id": row["id"]}}
             if self.curve_failure == "wrong-points":
                 self.objects[FIRST]["@Curve"]["points"][1]["y"] = -99
@@ -186,6 +187,7 @@ def test_inline_curve_business_input_is_closed_and_bounded_without_draft_changes
 @pytest.mark.parametrize("version", VERSIONS[1:])
 def test_inline_curve_class_scoped_field_reaches_a_new_recursive_set_node(tmp_path: Path, version: str) -> None:
     task = InlineCurveTask(tmp_path, version)
+    task.set_object_type(FIRST, "PropertyContainer" if version == "2025.1" else "ActorMixer", 1)
     task.objects[FIRST].update({"name": "Weather", "type": "PropertyContainer" if version == "2025.1" else "ActorMixer",
                                 "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"})
     owner = task.bind(FIRST)

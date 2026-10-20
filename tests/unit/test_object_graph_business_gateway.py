@@ -2438,7 +2438,7 @@ def test_public_graph_preview_validates_reachable_native_definitions(
 ) -> None:
     root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
     parent = {
-        "id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+        "id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit", "classId": 3,
         "path": rf"\{root}\Default Work Unit", "@Volume": 0.0,
     }
     calls: list[str] = []
@@ -2454,6 +2454,7 @@ def test_public_graph_preview_validates_reachable_native_definitions(
                 return {"return": [
                     {"classId": 1, "name": "PropertyContainer" if version == "2025.1" else "ActorMixer", "type": "WObject"},
                     {"classId": 2, "name": "Sound", "type": "Sound"},
+                    {"classId": 3, "name": "WorkUnit", "type": "WObject"},
                 ]}
             if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
                 return {"return": ["Volume"]}
@@ -2464,7 +2465,7 @@ def test_public_graph_preview_validates_reachable_native_definitions(
                 if args == {"waql": "from type Project take 1"}:
                     return {"return": [{**_project(tmp_path), "type": "Project"}]}
                 if args.get("from", {}).get("id") == [PARENT_ID] and not args.get("transform"):
-                    return {"return": [parent]}
+                    return {"return": [{key: parent[key] for key in options["return"] if key in parent}]}
                 return {"return": []}
             raise AssertionError(f"Unexpected native dispatch: {uri} {args!r} {options!r}")
 
@@ -2899,16 +2900,16 @@ def _public_localized_inline_wav_verify(tmp_path, version, *, fault=None):
     project = {**_project_info(project_root, language="English(US)"), **project}
     project["languages"].append({"id": "{43000000-0000-0000-0000-000000000005}", "name": "French", "shortId": 32})
     root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
-    sound = {"id": PARENT_ID, "name": "Rain", "type": "Sound", "notes": "",
+    sound = {"id": PARENT_ID, "name": "Rain", "type": "Sound", "classId": 2, "notes": "",
              "path": rf"\{root}\Default Work Unit\Rain", "parent": {"id": SECOND_ACTION_ID}}
     english_file = project_root / "Originals" / "Voices" / "English(US)" / "English.wav"
     french_file = project_root / "Originals" / "Voices" / "French" / "Inline.wav"
     english_file.parent.mkdir(parents=True)
     english_file.write_bytes(base64.b64decode(INLINE_PCM_PADDED))
-    english = {"id": CONTROL_ID, "name": "English", "type": "AudioFileSource",
+    english = {"id": CONTROL_ID, "name": "English", "type": "AudioFileSource", "classId": 16,
                "path": sound["path"] + r"\English", "parent": {"id": PARENT_ID},
                "audioSource:language": project["languages"][0], "originalFilePath": str(english_file)}
-    french = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource",
+    french = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource", "classId": 16,
               "path": sound["path"] + r"\Inline", "parent": {"id": PARENT_ID},
               "audioSource:language": project["languages"][1], "originalFilePath": str(french_file)}
     executed = False
@@ -2924,7 +2925,8 @@ def _public_localized_inline_wav_verify(tmp_path, version, *, fault=None):
             if uri == "ak.wwise.core.getProjectInfo":
                 return project
             if uri == "ak.wwise.core.object.getTypes":
-                return {"return": [{"classId": 2, "name": "Sound", "type": "Sound"}]}
+                return {"return": [{"classId": 2, "name": "Sound", "type": "Sound"},
+                                   {"classId": 16, "name": "AudioFileSource", "type": "WObject"}]}
             if uri == "ak.wwise.core.object.get":
                 assert isinstance(options.get("return"), list), options
                 language = options.get("language", "English(US)")

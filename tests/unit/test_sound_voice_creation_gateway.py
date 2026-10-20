@@ -11,6 +11,7 @@ VERSIONS = ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']
 def voice_task(path, version='2025.1', operation='object.create', fault=None):
     task = OwnedGraphTask(path, version, operation)
     next(row for row in task.types if row['name'] == 'Sound')['classId'] = 65552
+    task.creation_classes['Sound'] = 65552
     # All five pinned Sound pages/WObjects publish this literal definition.
     # These native-boundary responses are fixtures, not native effect evidence.
     task.metadata.update(IsVoice={'name': 'IsVoice', 'type': 'bool', 'default': False, 'dependencies': []},
@@ -22,7 +23,6 @@ def voice_task(path, version='2025.1', operation='object.create', fault=None):
         if uri.endswith(('object.create', 'object.set')):
             for row in task.objects.values():
                 if row['type'] == 'Sound':
-                    row['classId'] = 65552
                     if fault == 'false':
                         row['@IsVoice'] = False
                     elif fault == 'numeric':
