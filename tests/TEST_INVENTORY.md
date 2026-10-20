@@ -5,6 +5,70 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R50 exact created-Topic evidence and original-only diagnostic
+
+Runtime merge `8bcd215f` combines only accepted Topic `8390ce8b` (including
+`b1617894`) and original-only diagnostic `cbd067c2` from `17c0ffd3`, without
+conflicts. All nine component files retain exact accepted blobs. The Program
+manifest adds `test_created_topic_branch_evidence.py` with its canonical
+required-entry assertion, for 266 manifest entries. No packaged runtime,
+resources, guidance, public contract or interface seal changed; exact interface
+artifact/policy proof justified skipping interface regeneration.
+
+Clean combined source `470b9248` received one existing 35-node capture:
+**35 passed in 6.88s** (wrapper 7.448s), comprising five actual public Topic
+nodes and the 30 existing metadata nodes. Metadata recapture was required by
+one actual changed whole-file seal, `branch_audit_completion.py`, and the
+changed requirements identity. Its 343-file closure and the Topic's 348-file
+closure remained exact; all 2,364 tracked files and HEAD stayed unchanged.
+
+The reviewed importers selected five Topic and 30 metadata entries, copying
+140 original JSON files byte-for-byte and changing only program locators in
+35 projections. All 469 prior evidence files, including R26/R47/R49, remain
+byte-identical. Topic artifacts occupy 37,625,113 bytes in 25 files; metadata
+artifacts occupy 5,383,723 bytes in 150 files (43,008,836 bytes total). These
+immutable archives were retained without format redesign or another capture.
+
+Branch generate/check each passed once after capture/import, in
+**37.722s / 37.078s**. Existing strict evaluation proves **559 exact Console
+object.created primitive publish leaves program passed / 559 native missing**
+(79/112/116/116/136 across 2021–2025) and **65 metadata program passed / 65
+live_metadata missing**. Injected callbacks establish no native emission,
+applicability, include/omission, co-occurrence or lifecycle behavior. All other
+4,343 created-Topic rows stay unproven. All 272,313 obligation IDs, shapes and
+owners, original R26, all 116 exclusions and 79/91 source/index memberships
+remain exact. Only the selected 624 rows' evidence/requirements/bindings change;
+complete=false, with 625 implemented_unverified and 271,572 unresolved.
+Current source identity is
+`e2c47fbef9e63023f219039924e86a59350e8a6d94b2cc3d933d639f147b0673`.
+
+On generated candidate `987fe1c2`, one deduplicated focus passed **5 tests in
+4.08s** (wrapper 4.702s): fixed manifest, exact Topic selection, existing metadata
+public-leaf compatibility, diagnostic first-hop failure/no-write/no-fallback,
+and the existing copy category's actual v3 validator. Strict current portable
+evaluation was already performed by branch generation/check and was not
+repeated by another broad pytest evaluation. All 2,539 tracked files and HEAD
+stayed unchanged; every owned process group ended empty. Original plans,
+process/source/output receipts, import/storage and preservation proofs are in
+`/tmp/waapi-r50-integration/`; fresh ignored capture roots are under
+`.waapi-skill-state/read-evidence-r50/`.
+
+The separately completed native root
+`r50-original-owned-read-cbd067c2-2021-r1` remains its original **FAIL, 5.98s**
+(wrapper 6.591s): the first bounded Source `@RTPC` query failed natively with
+`ak.wwise.query.invalid_query`, `Unknown property RTPC (61)`. Eight public calls,
+31 native archives, zero writes/transactions; all 18 Source fields were observed,
+but RTPC membership, ControlInput/LFO, Curve fields/points and copied graph
+were not reached. Source hash/size/mtime/tree and candidate stayed unchanged,
+owned processes ended, and the failed sandbox remains quarantined. This exact
+rejection proves neither native absence nor complete Source-copy semantics;
+no historical receipt or failed verdict was rewritten or regraded.
+
+No native, Fresh, CLI Agent, install, full Program/Non-live, local fixed
+preflight, push or PR edit ran in this integration. Root owns publication and
+exact-head hosted CI. Final implementation/evidence obligations remain open;
+no main merge or ticket closure occurred.
+
 ## 2026-10-21 R49 transfer admission and exact metadata-default evidence
 
 Runtime merge `c7b21ae9` integrates only frozen `4199c5d1`, `2c444f69`,

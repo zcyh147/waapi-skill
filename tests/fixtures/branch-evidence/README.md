@@ -57,7 +57,7 @@ its source seals are rewritten. The new bundle is also program-only evidence.
 The reader compatibility fixture that omits or nulls the metadata parent is a
 controlled synthetic corruption test and grants no product metadata credit.
 
-The current default index selects `product/metadata-default-r49-stable-r1-*`,
+The R49 default index selected `product/metadata-default-r49-stable-r1-*`,
 captured once on clean integrated source `e7ec62dee2571880b4f4f427d95cbff22dc807ae`.
 Its 30 public nodes prove the same 65 exact default-result facts with the
 unchanged 343-file dependency membership, after the accepted reader and runtime
@@ -67,3 +67,18 @@ and retain their historical candidates. Current program proof is 65 passed;
 all 65 live_metadata requirements remain missing and completion remains false.
 No native or full-copy proof is added. See the R49 test-inventory entry for the
 source identity, exact focused results and retained native limitations.
+
+The current index selects `product/created-topic-r50-stable-r1-*` (five versions,
+559 exact Console object.created primitive publish leaves) and
+`product/metadata-default-r50-stable-r1-*` (30 nodes, the same 65 exact defaults).
+Both were captured on clean combined source
+`470b9248319913d1ca03479736877d2a27753640`. Topic records independently freeze
+callbacks, ordered public sink records and original terminal/cleanup, without
+adding agent_result. Their 348-file closure retains the full 343-file metadata
+closure; metadata recapture follows the actual reader and requirements change.
+All original bytes and historical projections remain unchanged; new projections
+change only program locators. Current program proof is 559 Topic plus65 metadata;
+559 native and65 live_metadata requirements remain missing. Native Topic
+emission/applicability/include/omission/co-occurrence/lifecycle is not established.
+R26 remains its selected historical/stale receipt; completion remains false.
+See the R50 test-inventory entry for exact source identity, limits and archive size.

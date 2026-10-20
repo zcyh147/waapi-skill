@@ -800,3 +800,50 @@ No local fixed preflight, full Program/Non-live, native/Fresh/CLI Agent or
 installation ran in this batch. Root owns publication and exact-head hosted CI;
 no main merge or ticket closure is authorized. Remaining Source verification,
 native metadata and final acceptance obligations remain open.
+
+## R50 exact created-Topic evidence and original-only diagnostic integration
+
+Runtime merge `8bcd215f` integrates only accepted `8390ce8b` (including `b1617894`)
+and `cbd067c2` from `17c0ffd3`, without conflicts; all nine component blobs
+remain exact. The fixed Program roster adds the Topic evidence file and pins
+its required entry/count (266 entries). Packaged runtime/resources/guidance and
+interface artifacts/seals are unchanged, so no interface regeneration ran.
+
+One frozen-source capture on `470b9248` passed **35 nodes in 6.88s**: five public
+Topic nodes plus 30 metadata nodes. The latter recapture follows actual reader
+whole-file/requirements drift, not commit-ID-only staleness. Both complete
+source closures remain current (348 Topic / 343 metadata files). Reviewed
+imports copy 140 immutable originals and 35 locator-only projections; all 469
+older evidence files and R26 remain exact. New archives occupy 43,008,836 bytes
+(25 Topic files:37,625,113; 150 metadata files:5,383,723); storage optimization
+is separate future work, with no rewrite or extra capture in this batch.
+
+One branch generate/check pair passed (37.722s / 37.078s), proving **559 exact
+Console object.created program passed / 559 native missing**, plus **65 metadata
+program passed / 65 live_metadata missing**. Native emission, applicability,
+omission/co-occurrence and lifecycle remain unproved; other 4,343 created-Topic
+rows remain unproven. All 272,313 IDs/shapes/owners, R26, 116 exclusions and
+79/91 source memberships stay exact. Only 624 selected evidence rows change;
+complete=false, with 625 implemented_unverified and 271,572 unresolved. Current
+source identity is `e2c47fbef9e63023f219039924e86a59350e8a6d94b2cc3d933d639f147b0673`.
+
+On generated `987fe1c2`, one proportional shared focus passed **5 tests in
+4.08s**, covering manifest, exact selection, existing metadata compatibility,
+first-hop failure/no-write/no-fallback and the actual copy category validator.
+All 2,539 tracked files and HEAD stayed unchanged; owned groups ended empty.
+The current portable evaluation already ran in generation/check and was not
+repeated by another broad selection. Exact receipts/storage/preservation proof
+are in `/tmp/waapi-r50-integration/` and
+[the test inventory](../../../tests/TEST_INVENTORY.md).
+
+Original `r50-original-owned-read-cbd067c2-2021-r1` remains native **FAIL5.98s**:
+first Source `@RTPC` hop rejected with Unknown property RTPC (61), eight public
+calls, 31 native files and zero writes/transactions. Source/candidate closure,
+failed category and quarantine remain intact. Remaining RTPC/LFO/Curve/points
+and complete copy semantics are unobserved, not proven native absence. No
+historical evidence is rewritten or regraded.
+
+No native/Fresh/CLI Agent/install, full Program/Non-live, local fixed preflight,
+push or PR edit ran here. Root owns publication/exact-head hosted CI. The
+separately reviewed collector successor is outside this frozen batch; no main
+merge or ticket closure is authorized.
