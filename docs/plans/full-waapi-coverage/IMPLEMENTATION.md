@@ -18,6 +18,22 @@ references. No main merge is authorized.
 
 ## Active work
 
+- R37 integration `510a40f5` accepts exact-intent created-graph ancestor
+  history (#192) and portable evidence selection (#195), preserving both
+  component filesets. Source/history controls are staged fake-native evidence;
+  native-chosen rename suffixes, cross-child Render preservation and native
+  history acceptance remain open. Four serial inventory commands passed once.
+  All 272,313 obligation identities and 116 exclusions remain; only the exact
+  R26 move-single result row becomes `implemented_unverified`. Its required
+  program/native evidence is still missing, so the historical receipt gains no
+  current PASS credit.
+- The original fixed Program run on `c18225d9` ended **FAIL: 1,442 failed,
+  12,000 passed, 4 skipped in 4,891.23s**, exit 1. All 1,891 tracked files
+  remained unchanged and the owned process group ended. This earlier candidate
+  is not an R37 gate; neither its passing cases nor R37's focused checks establish
+  broad acceptance. Failure triage and final gates remain required. Exact
+  original evidence is recorded in [the test inventory](../../../tests/TEST_INVENTORY.md).
+
 - Integration `af637e20` repairs Tone WAV parsing for the observed reserved-zero
   field, restricted to explicit PCM16/16 and IEEE-float/32 pairs. Contradictory
   formats still fail; original bytes are LFS regression fixtures. Accepted

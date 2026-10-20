@@ -5,6 +5,38 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R37 focused integration and original Program failure
+
+R37 `510a40f5` merges accepted history `4a8fee72` and portable evidence
+`b9633fad` without component edits. Four serial inventory generation/check
+commands exited zero once; no pytest, native or Fresh run was added for the
+merge. All 272,313 obligation IDs and 116 exclusions remain. The sole changed
+R26 move-single result row is `implemented_unverified`, with both required
+program/native outcomes `missing` (reason `'artifact'`); the historical program
+candidate has no equivalence attachment. No historical PASS becomes current
+proof. All other obligation rows remain exact.
+
+History evidence remains staged: parent-proof/discovery controls passed
+**11 tests in 10.55s**; the later external-reference-only regression failed,
+then passed **1 test in 2.76s** after its activation repair. These public
+fake-native controls cover exact-intent ancestor/phase/history behavior across
+the supported lanes; native-chosen suffixes, cross-child Render preservation
+and native acceptance remain open. The portable default CLI control passed
+**1 test in 80.42s**, its four integrity controls passed **4 tests in 79.70s**,
+and the explicit missing-policy regression failed in **20.07s**, then passed
+**1 test in 26.90s**. No staged results are summed into an R37 gate.
+
+The separate original fixed Program run on exact `c18225d98ecc9f5be91da559a6f728042bec8b65`
+ended **1,442 failed, 12,000 passed, 4 skipped in 4,891.23s**, exit 1
+(wrapper 4,893.158s). Source snapshots and all 1,891 tracked files are unchanged;
+the owned process group is empty. Original `result.json`, `run.log`, process
+and before/after receipts remain under the Root checkout's
+`.waapi-skill-state/full-coverage/program-r36-c18225d9-r1/`.
+The log SHA-256 is `4d70acd3c944d7dfcd351b9530f93ed410601c7a573f8a5dd970485df6c2e309`.
+This is a failed earlier-candidate broad gate, not an R37 result. Failure triage
+and replacement broad acceptance remain open; passing individual cases grant
+no gate PASS credit.
+
 ## 2026-10-19 Tone writer compatibility and bounded operator observation
 
 Integration `af637e20` preserves the two accepted component filesets without
