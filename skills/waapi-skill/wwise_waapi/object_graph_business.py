@@ -1530,7 +1530,10 @@ def _materialize_set(
                 action="give every exact target at least one requested outcome",
             )
     settings = dict(session.settings)
-    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict", "platform"}
+    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict", "platform", "voice_source_completion"}
+    if "voice_source_completion" in settings and settings["voice_source_completion"] not in {"separate-previews", "atomic-required"}:
+        raise _repair(session, "FIELD_VALUE_UNAVAILABLE", field="voice_source_completion",
+            action="select separate-previews for explicitly staged Voice/Source completion")
     unexpected_settings = sorted(set(settings) - allowed_settings)
     if unexpected_settings:
         raise _repair(
@@ -1833,7 +1836,8 @@ def materialize_object_graph_business_request(
     if operation == "object.setRTPC":
         return _materialize_set_rtpc(session)
     if operation == "object.set":
-        return _materialize_set(session)
+        from .voice_source_staging import lower
+        return lower(_materialize_set(session), session)
     raise ValueError("object graph business operation is not migrated yet")
 
 

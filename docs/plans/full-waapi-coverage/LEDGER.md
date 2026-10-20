@@ -713,3 +713,24 @@ contract references refresh. Source membership stays 79/91 indexed entries,
 with 330 files in candidate closure. Policy formatting is unchanged apart from
 the single approved operation-contract hash. No merger pytest/native/Fresh ran;
 Root owns promotion and the next gate. No ticket is closed by this integration.
+
+## R44 scoped Source, staged completion and exact Render/history integration
+
+Runtime merge `f173d0c0` integrates only `4f869927`, `d8c55b4d` and `39b7cfc9`,
+including exact-history `cb0e6b3d`. It preserves the observed legacy Tone
+selection boundaries, the Gateway-owned two-Preview Voice/Source completion,
+exact existing-GUID rename/notes/history, and complete Render identity/context
+checks. Existing-GUID autosuffix branches remain excluded. The only manual
+conflicts were additive test helpers/cases; all independent collector modes and
+four version-build branches are retained.
+
+The central preflight passed **826 tests in 51.09s**; the deduplicated
+shared-conflict focus passed **7 tests in 25.30s**. The four serial inventory
+commands passed once. Three reviewed aggregate seals refresh while all
+272,313 native obligations, their compressed bytes, requirement/evidence policy
+and source/index memberships remain intact. Exact results and original separate
+native component receipts are recorded in [the test inventory](../../../tests/TEST_INVENTORY.md).
+
+Render native acceptance, ordinary Source graphs, broader #192 work and final
+#195 gates remain open. No native/Fresh run, push, main merge or ticket closure
+was performed by this integration. Root owns review and publication.

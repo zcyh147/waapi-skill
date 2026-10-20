@@ -159,6 +159,11 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         # Independent documented successful process outcome; this proves no
         # project/file effect. Older media-ID routes disclose no outcome field.
         expected_result = {} if earlier_void else {"result": 0}
+    if entry.uri == "ak.wwise.core.sound.setActiveSource":
+        # This Registry/dispatcher matrix uses explicit file-source state, not
+        # native Source-plugin acceptance or a synthesized shared role GUID.
+        args, options = {"sound": "{11111111-1111-1111-1111-111111111111}",
+                         "source": "{22222222-2222-2222-2222-222222222222}"}, {}
     if entry.uri == "ak.wwise.core.transport.create":
         # The reflected field is optional, but the business verifier requires
         # a real uint32 ID. Wwise 2022.1 may assign zero to the first transport.
@@ -472,6 +477,18 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         expected_version=entry.version,
     )
     def preparation_readback(uri, call_args, call_options):
+        if entry.uri == "ak.wwise.core.sound.setActiveSource" and uri == "ak.wwise.core.object.get":
+            objects = {
+                "{11111111-1111-1111-1111-111111111111}": {
+                    "id": "{11111111-1111-1111-1111-111111111111}", "name": "Program Sound", "type": "Sound",
+                    "classId": 65552, "path": r"\Program Sound"},
+                "{22222222-2222-2222-2222-222222222222}": {
+                    "id": "{22222222-2222-2222-2222-222222222222}", "name": "Program Source", "type": "AudioFileSource",
+                    "classId": 16, "path": r"\Program Sound\Program Source",
+                    "parent": {"id": "{11111111-1111-1111-1111-111111111111}"}},
+            }
+            return {"return": [{key: row[key] for key in call_options["return"] if key in row}
+                for identity in call_args["from"]["id"] if (row := objects.get(identity)) is not None]}
         if uri == "ak.wwise.core.remote.getConnectionStatus":
             return {"isConnected": False, "status": "Not connected"}
         return {}

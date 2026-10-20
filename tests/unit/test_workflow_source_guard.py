@@ -4693,12 +4693,12 @@ def test_multisource_collector_requires_two_sources_exact_xml_active_guid_and_or
         assert receipt['oracle']['ordering_discrimination'] is False
 
 
-def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
+def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     """Public Gateway plus independently stored native constructor results."""
     from copy import deepcopy
     import uuid
     from tests.unit.test_sound_voice_creation_gateway import planned_source_task, SOURCE_CLASS, JAPANESE, SECOND
-    task = planned_source_task(tmp_path, '2025.1')
+    task = planned_source_task(tmp_path, version)
     captured = json.loads((Path(__file__).resolve().parents[1] / 'fixtures/metadata/tone-source-2025.1-properties.json').read_text())
     assert captured['type'] == {'classId': SOURCE_CLASS, 'name': 'Wwise Tone Generator', 'type': 'Source'}
     task.metadata.pop('Frequency')
@@ -4714,7 +4714,7 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
     if fault == 'two-locales':
         task.languages.append({'id': french, 'name': 'French', 'shortId': 4})
         language_objects.append({'id': french, 'name': 'French', 'type': 'Language', 'path': 'French'})
-    task.objects[SECOND]['path'] = r'\Containers\Default Work Unit'
+    task.objects[SECOND]['path'] = (r'\Containers' if version == '2025.1' else r'\Actor-Mixer Hierarchy') + r'\Default Work Unit'
     native = tmp_path / 'native'; native.mkdir()
     task.env['WWISE_EVIDENCE_DIR'] = str(native)
     task.env['WWISE_CATEGORY_EVIDENCE_PATH'] = str(tmp_path / 'category.jsonl')
@@ -4783,10 +4783,11 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
                 'classId': SOURCE_CLASS, 'path': task.objects[original_owner]['path'] + r'\Unexpected retained child',
                 'parent': {'id': original_owner}, 'notes': 'Unexpected'}
         if uri.endswith('getInfo'):
-            result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+            minor, build = {'2022.1': (19, 8584), '2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}[version]
+            result['version'].update(minor=minor, build=build, displayName=f'v{version}.{minor}.{build}')
         return result
     task.call = call
-    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+    runtime = SimpleNamespace(version=version, candidate='a' * 40, category_results=[],
         state_dir=tmp_path / 'state', env=task.env, port=31337,
         sandbox=SimpleNamespace(source_project=task.project_file),
         lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
@@ -4858,8 +4859,10 @@ def test_staged_voice_source_language_stops_before_source_write_when_existing_vo
 
 @pytest.mark.parametrize('locales', ['captured-single', 'two-locales'])
 def test_planned_source_collector_preserves_three_transactions_and_original_source_identity(tmp_path, workflow, locales):
+    # Retain the atomic collector oracle on an older, native-unobserved lane;
+    # the known 2025 default must stop before that atomic Voice write.
     import hashlib
-    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='two-locales' if locales == 'two-locales' else None)
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='two-locales' if locales == 'two-locales' else None, version='2024.1')
     category = workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
     receipt_path = Path(category['observation_path'])
     receipt = json.loads(receipt_path.read_text())
@@ -4886,7 +4889,7 @@ def test_planned_source_collector_preserves_three_transactions_and_original_sour
         assert phase['independent_source']['properties']['StartFreq'] == 440
     assert receipt['phases'][2]['source_language'] is None
     assert receipt['phases'][2]['source_language_effect'] == 'observed_default_only_no_inheritance_claim'
-    assert receipt['get_info']['version']['build'] == 9143
+    assert receipt['get_info']['version']['build'] == 9056
     assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
     assert receipt['lifecycle_final_reference']['transaction_ids'] == [p['transaction_id'] for p in receipt['phases']]
     for evidence in receipt['native_evidence']:
@@ -4897,7 +4900,7 @@ def test_planned_source_collector_preserves_three_transactions_and_original_sour
 
 @pytest.mark.parametrize('fault', ['reuse', 'ignored-language', 'extra-child'])
 def test_planned_source_collector_preserves_failed_native_effect_and_never_retries(tmp_path, workflow, fault):
-    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault)
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault, version='2024.1')
     with pytest.raises(AssertionError):
         workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
     receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
@@ -4940,15 +4943,33 @@ def test_planned_source_collector_rejects_ignored_actual_start_frequency(tmp_pat
     assert receipt['native_evidence'] and receipt['failure']
 
 
-def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
+def test_planned_source_collector_retains_atomic_scope_at_2025_prewrite_boundary(tmp_path, workflow):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
+    assert receipt['phases'][0]['case'] == 'sfx'
+    assert receipt['phases'][0]['verify']['payload']['verified'] is True
+    assert receipt['calls'][-1]['payload']['error_code'] == 'VOICE_SOURCE_STAGED_COMPLETION_REQUIRED'
+    assert receipt['collection_complete'] is False and receipt['business_effect_verified'] is False
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert not any(argv[0] == 'continue-voice-source' for argv in commands)
+
+
+def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     """Reuse the public workflow producer, with exact retained Tone metadata."""
     from copy import deepcopy
-    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, version=version)
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native-catalog.json').read_text())
     task.types = deepcopy(fixture['catalog']['return'])
     from tests.unit.test_sound_voice_creation_gateway import SECOND
     task.objects[SECOND]['classId'] = 1638416
     task.objects[SECOND]['parent'] = None
+    platform = {'id': '{C0C0C0C0-C0C0-C0C0-C0C0-C0C0C0C0C0C0}', 'name': 'Observed Target',
+        'type': 'Platform', 'classId': 4522000, 'path': r'\Platforms\Observed Target', 'parent': None, 'notes': ''}
+    if version == '2022.1':
+        task.objects[platform['id']] = deepcopy(platform)
     create = task._create
     def create_source(node, parent, *, owned=False):
         result = create(node, parent, owned=owned)
@@ -4980,6 +5001,9 @@ def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
             return {}
         previous = set(task.objects)
         result = original(uri, args, options)
+        if version == '2022.1' and uri.endswith('getProjectInfo'):
+            result['currentPlatformId'] = platform['id']
+            result['platforms'] = [{'id': platform['id'], 'name': platform['name'], 'baseName': 'Mac'}]
         if uri.endswith('object.set'):
             # Model the valid omitted shape after the producer's fake defaults.
             for identity in set(task.objects) - previous:
@@ -5011,6 +5035,26 @@ def test_source_plugin_selection_collector_requires_distinct_guid_change_and_pre
         assert raw == Path(row['native_path']).read_bytes() and hashlib.sha256(raw).hexdigest() == row['sha256']
 
 
+def test_source_plugin_explicit_current_platform_probe_retains_setup_and_prewrite_boundary(tmp_path, workflow):
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, version='2022.1')
+    with pytest.raises(AssertionError):
+        workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_EXPLICIT', explicit_current_platform=True)
+    receipt = json.loads((runtime.state_dir / 'source-plugin-selection.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['collection_complete'] is False
+    assert receipt['platform']['id'] == '{C0C0C0C0-C0C0-C0C0-C0C0-C0C0C0C0C0C0}'
+    assert receipt['platform']['name'] == 'Observed Target'
+    assert len(commands) < receipt['limits']['calls'] == 72
+    assert len(writes) == len(receipt['transaction_ids']) == 3 and selections == []
+    assert all(phase['verify']['payload']['state'] == 'verified' for phase in receipt['phases'][:-1])
+    assert receipt['phases'][-1] == {'phase': 'select_other_source', 'execution_attempted': False}
+    rejected = receipt['calls'][-1]
+    assert rejected['argv'][0] == 'draft-check'
+    assert rejected['exit_code'] != 0 and rejected['payload']['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY'
+    assert len({argv[1] for argv in commands if argv[0] == 'execute'}) == 3
+    assert receipt['native_evidence'] and receipt['failure']
+
+
 @pytest.mark.parametrize('fault', ['ignored', 'source-field', 'extra-child'])
 def test_source_plugin_selection_collector_cannot_accept_ignored_effect_or_lost_preservation(tmp_path, workflow, fault):
     runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, fault=fault)
@@ -5030,6 +5074,63 @@ def test_source_plugin_selection_collector_cannot_accept_ignored_effect_or_lost_
         assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id']
         assert receipt['selection']['preserved_before'] != receipt['selection']['preserved_after']
         assert 'preserved' in receipt['failure']['message']
+    assert receipt['native_evidence'] and receipt['failure']
+
+
+def test_gateway_staged_source_collector_follows_owned_continuations_and_two_set_previews(tmp_path, workflow):
+    import hashlib
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='staged-atomic-order')
+    workflow.test_gateway_staged_voice_localized_source_console_acceptance(runtime)
+    category, = runtime.category_results
+    path = Path(category['observation_path']); receipt = json.loads(path.read_text())
+    assert category['status'] == 'PASS' and receipt['collection_complete'] is True
+    assert receipt['business_effect_verified'] is True and receipt['atomic_Source_language_unresolved'] is True
+    assert category['scope'] == 'one_Gateway_combined_Draft_completed_by_two_set_Previews'
+    assert len(commands) == receipt['planned_public_calls'] == 34 and receipt['limits']['calls'] == 74
+    assert [argv[1] for argv in commands if argv[0] == 'draft-start'] == ['object.set']
+    assert sum(argv[0] == 'execute' for argv in commands) == len(writes) == 2
+    voice_phase, source_phase = receipt['phases']
+    assert voice_phase['transaction_id'] != source_phase['transaction_id']
+    assert receipt['default_choice']['error_code'] == 'VOICE_SOURCE_STAGED_COMPLETION_REQUIRED'
+    assert receipt['default_choice']['next_command']['gateway_argv'] in commands
+    assert voice_phase['verify']['payload']['next_command']['gateway_argv'] in commands
+    for stage, phase in zip(('voice', 'source'), receipt['phases']):
+        request = phase['immutable_preview']['request']
+        assert request['operation'] == 'object.set' and request['arguments']['voice_source_staging']['stage'] == stage
+        assert phase['effect_verified'] is True
+    voice = voice_phase['independent_owner']
+    assert voice_phase['independent_children'] == [] and voice['properties']['IsVoice'] is True
+    assert writes[0]['objects'][0]['children'][0]['notes'] == 'Keep Gateway staged Voice'
+    assert 'children' not in writes[0]['objects'][0]['children'][0]
+    source, = writes[1]['objects'][0]['children']
+    assert writes[1]['objects'][0]['object'] == voice['id']
+    assert source['classId'] == 6684674 and source['@StartFreq'] == 440 and '@Frequency' not in source
+    assert source['language'] == source_phase['independent_source']['source_language']['name'] == 'English(US)'
+    assert source_phase['frequency_field']['metadata']['name'] == 'StartFreq'
+    assert source_phase['frequency_field']['metadata']['dependencies'][0]['property'] == 'WaveType'
+    assert source_phase['independent_owner']['properties'] == voice['properties']
+    assert len(source_phase['independent_children']) == 1
+    assert source_phase['verify']['payload']['staged_completion']['complete'] is True
+    assert category['observation_sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert receipt['lifecycle_final_reference']['transaction_ids'] == [phase['transaction_id'] for phase in receipt['phases']]
+    for evidence in receipt['native_evidence']:
+        raw = Path(evidence['archive_path']).read_bytes()
+        assert raw == Path(evidence['native_path']).read_bytes() and hashlib.sha256(raw).hexdigest() == evidence['sha256']
+    assert receipt['native_evidence']
+
+
+def test_gateway_staged_source_collector_stops_on_independent_voice_drift_before_source_continuation(tmp_path, workflow):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='staged-wrong-voice')
+    with pytest.raises(AssertionError):
+        workflow.test_gateway_staged_voice_localized_source_console_acceptance(runtime)
+    category, = runtime.category_results
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'FAIL' and receipt['collection_complete'] is False
+    assert receipt['business_effect_verified'] is False
+    assert sum(argv[0] == 'execute' for argv in commands) == len(writes) == 1
+    assert not any(argv[0] == 'continue-voice-source' for argv in commands)
+    phase, = receipt['phases']
+    assert phase['verify']['payload']['verified'] is True and phase['independent_owner']['properties']['IsVoice'] is False
     assert receipt['native_evidence'] and receipt['failure']
 
 

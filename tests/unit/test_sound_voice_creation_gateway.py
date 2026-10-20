@@ -587,6 +587,12 @@ def test_planned_source_versions_and_owner_language_alternatives(tmp_path, versi
     assert code == 0, voice
     code, source = declare_planned_source(task, voice['draft']['declared_object']['result_handle'], language=source_language)
     assert code == 0, source
+    if version == '2025.1' and source_language is not None:
+        code, checked = task.step('draft-check')
+        assert code == 2 and checked['error_code'] == 'VOICE_SOURCE_STAGED_COMPLETION_REQUIRED', checked
+        assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
+        assert checked['next_command']['gateway_argv'][-2:] == ['--voice-source-completion', 'separate-previews']
+        return
     tx, shown = task.preview()
     native_voice = shown['artifact']['prepared_operation']['dispatch']['args']['objects'][0]['children'][0]
     if nested:
