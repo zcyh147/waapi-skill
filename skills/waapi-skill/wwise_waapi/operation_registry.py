@@ -20979,6 +20979,10 @@ def verify_prepared_operation(
                 for before_child in parent_spec.get("preexisting_children", []):
                     if not isinstance(before_child, Mapping) or _identity_key(before_child.get("id")) in requested_ids | replaced_set_ids:
                         continue
+                    original_child = before_child
+                    if compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        before_child = project_compound_snapshot(before_child, compound_path_context)
                     matches = [row for row in actual_children if _same_identity(row.get("id"), before_child.get("id"))]
                     unchanged = len(matches) == 1 and all(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_child.get(field)))
@@ -20987,7 +20991,7 @@ def verify_prepared_operation(
                         for field in ("id", "name", "type", "parent", "notes", *(["path"] if kind == "object-create-graph" else [])) if field in before_child
                     )
                     check(f"{parent_path} unrequested pre-existing child identity and notes remain unchanged", unchanged,
-                          {"before": dict(before_child), "after": matches})
+                          {"before": dict(original_child), "expected": dict(before_child), "after": matches})
         list_roots_by_owner: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
         for list_spec in specs:
             collection = list_spec.get("collection")

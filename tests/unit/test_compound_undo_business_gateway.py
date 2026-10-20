@@ -3766,7 +3766,7 @@ def _start_parent_owned_graph_child(task, operation):
     task.draft, task.authority, task.revision = phase["draft"]["draft_id"], phase["task_authority"], phase["draft"]["revision"]
 
 
-def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion="object.setNotes", field=None, value="false", creation_first=True, rename_existing=False, notes_companion_id=None, additional_rename_id=None, additional_rename_name="Outer renamed", expected_verified=True, before_parent_check=None, notes_child_order=None, notes_child_operation="object.setNotes", prepared_only=False):
+def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion="object.setNotes", field=None, value="false", creation_first=True, rename_existing=False, notes_companion_id=None, additional_rename_id=None, additional_rename_name="Outer renamed", expected_verified=True, before_parent_check=None, notes_child_order=None, notes_child_operation="object.setNotes", notes_child_id=None, prepared_only=False):
     from copy import deepcopy
     before = deepcopy(task.objects)
     original = task.call
@@ -3832,7 +3832,7 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
             '--expected-revision', str(revision), '--operation', notes_child_operation)
         assert code == 0, phase
         task.draft, task.authority, task.revision = phase['draft']['draft_id'], phase['task_authority'], phase['draft']['revision']
-        notes_owner = task.bind(notes_id)
+        notes_owner = task.bind(notes_child_id or notes_id)
         if notes_child_operation == 'object.setNotes':
             assert task.step('draft-declare-object-change', '--notes', 'Earlier declared notes')[0] == 0
         else:
@@ -4178,7 +4178,7 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', prepared_only=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     task = OwnedGraphTask(tmp_path, version, 'object.create')
@@ -4253,7 +4253,7 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         assert task.step('draft-check')[0] == 0
         source, before, after = _compound_from_graph_task(task, notes_id=PROJECT_GROUP if external_ancestor_only else SECOND,
             companion=rename_operation, rename_existing=rename_operation == 'object.set', creation_first=creation_first,
-            notes_child_order=notes_child_order, notes_child_operation=notes_child_operation, prepared_only=prepared_only)
+            notes_child_order=notes_child_order, notes_child_operation=notes_child_operation, notes_child_id=notes_child_id, prepared_only=prepared_only)
         if prepared_only:
             return task, source, before, after
         if external_ancestor_only:
@@ -4809,3 +4809,14 @@ def test_exact_ancestor_notes_history_cannot_hide_false_effects(tmp_path, fault)
     code, failed = task.run('verify', source)
     assert code == 2 and failed['verified'] is False, failed
     _reject_created_graph_receipt(task, source)
+
+
+def test_exact_ancestor_rename_keeps_declared_notes_on_retained_existing_child(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import ROOT
+    task, source, before, after = _exercise_created_graph_internal_reference_history(
+        tmp_path, '2025.1', compound=True, creation_first=False, external=True,
+        rename_operation='object.set', notes_child_order='before', notes_child_id=ROOT)
+    assert before[ROOT]['notes'] == 'Keep external'
+    assert after[ROOT]['notes'] == 'Earlier declared notes'
+    assert after[ROOT]['name'] == before[ROOT]['name']
+    assert after[ROOT]['path'] == r'\Master-Mixer Hierarchy\Renamed parent\External'
