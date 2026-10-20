@@ -10811,16 +10811,31 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if source_guard is not None:
                 from .project_setting_business_contracts import active_source_native_limitations
                 for limitation in active_source_native_limitations(request.version):
-                    if source_guard["source"]["classId"] == limitation["source_class_id"] and "platform" not in call_args:
+                    if (source_guard["source"]["classId"] == limitation["source_class_id"]
+                            and ("platform" not in call_args or request.version == "2022.1")):
                         host = read(GET_INFO_URI, {}, {})
                         native_version = host.get("version")
                         build = (".".join(str(native_version.get(key)) for key in ("year", "major", "minor", "build"))
                                  if isinstance(native_version, Mapping) else None)
                         if host.get("isCommandLine") is True and build == limitation["observed_native_build"]:
+                            if "platform" in call_args:
+                                context = read(GET_PROJECT_INFO_URI, {}, {})
+                                current = context.get("currentPlatformId")
+                                if not _compound_project_platform(context, current):
+                                    raise OperationContractError("INVALID_READBACK",
+                                        "Current project platform requires one exact catalog identity.")
+                                platform = next(row for row in context["platforms"]
+                                    if isinstance(row, Mapping) and _same_identity(row.get("id"), current))
+                                name = platform.get("name")
+                                if not isinstance(name, str) or not name.strip():
+                                    raise OperationContractError("INVALID_READBACK",
+                                        "Current project platform requires its observed name.")
+                                if call_args["platform"] != name:
+                                    continue
                             raise OperationContractError(
                                 "VERSION_BEHAVIOR_BOUNDARY",
                                 "This Console build rejected Tone source selection in its current "
-                                "default platform view. This request made no change.",
+                                "platform view. This request made no change.",
                                 details={"api": api, "version": request.version, **limitation},
                             )
                 metadata["active_source_plugin_binding"] = source_guard

@@ -75,9 +75,12 @@ def active_source_native_limitations(version: str) -> list[dict[str, Any]]:
         "admission": "rejected_before_preview_only_in_observed_context",
         "observed_native_build": build,
         "observed_request_scope": "Console_current_default_platform_view",
+        "observed_platform_forms": (["omitted_platform", "explicit_current_platform_name"]
+            if version == "2022.1" else ["omitted_platform"]),
         "observed_native_error": "The object is not a source.",
         "other_plugin_classes": "not_classified_by_this_observation",
-        "unobserved_contexts": ["Authoring", "explicit_platform", "other_builds"],
+        "unobserved_contexts": (["Authoring", "other_platforms", "platform_GUID_spelling", "other_builds"]
+            if version == "2022.1" else ["Authoring", "explicit_platform", "other_builds"]),
         "alternative_status": "no_verified_method_for_same_selection_in_observed_context",
         "next_step": (
             "Leave the current selection unchanged. No verified alternate method is available "

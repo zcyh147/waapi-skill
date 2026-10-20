@@ -2160,11 +2160,18 @@ class _PluginSourceSelectionClient(_SourceControlDraftClient):
                 'path': sound_path + '\\' + name, 'parent': {'id': self.sound_id}}
         self.types = [{'name': 'Sound', 'type': 'WObject', 'classId': 65552},
             {'name': 'Wwise Tone Generator', 'type': 'Source', 'classId': 6684674}]
+        self.current_platform_id = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+        self.platforms = [
+            {'id': self.current_platform_id, 'name': 'Mac'},
+            {'id': '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}', 'name': 'Windows'}]
         self.ignore_selection = False
         self.copy = deepcopy
 
     def call(self, uri, args=None, options=None):
         self.calls.append((uri, self.copy(args), self.copy(options)))
+        if uri == 'ak.wwise.core.getProjectInfo':
+            return {**super().call(uri, args, options),
+                'currentPlatformId': self.current_platform_id, 'platforms': self.copy(self.platforms)}
         if uri == 'ak.wwise.core.object.getTypes':
             return {'return': self.copy(self.types)}
         if uri == 'ak.wwise.core.object.get':
@@ -2236,6 +2243,17 @@ def test_source_plugin_child_can_be_selected_through_public_project_setting_draf
     assert len(task.client.writes) == 1
 
 
+def test_2022_tone_selection_rejects_observed_explicit_current_platform_before_write(tmp_path):
+    task = _PluginSourceSelectionTask(tmp_path, '2022.1')
+    code, declared = task.declare(platform='Mac')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code != 0 and rejected['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY', rejected
+    assert rejected['details']['observed_native_build'] == '2022.1.19.8584'
+    assert task.client.writes == []
+    assert not list((task.state / 'transactions').glob('*'))
+
+
 def test_2022_tone_selection_reports_native_rejection_before_preview_or_write(tmp_path):
     task = _PluginSourceSelectionTask(tmp_path, '2022.1')
     code, declared = task.declare(platform=None)
@@ -2285,7 +2303,12 @@ def test_tone_native_selection_limitations_are_disclosed_before_binding(tmp_path
         assert limitation['observed_request_scope'] == 'Console_current_default_platform_view'
         assert limitation['other_plugin_classes'] == 'not_classified_by_this_observation'
         assert limitation['alternative_status'] == 'no_verified_method_for_same_selection_in_observed_context'
-        assert limitation['unobserved_contexts'] == ['Authoring', 'explicit_platform', 'other_builds']
+        if version == '2022.1':
+            assert limitation['observed_platform_forms'] == ['omitted_platform', 'explicit_current_platform_name']
+            assert limitation['unobserved_contexts'] == ['Authoring', 'other_platforms', 'platform_GUID_spelling', 'other_builds']
+        else:
+            assert limitation['observed_platform_forms'] == ['omitted_platform']
+            assert limitation['unobserved_contexts'] == ['Authoring', 'explicit_platform', 'other_builds']
         assert 'do not retry' in limitation['next_step']
     else:
         assert limits == []
@@ -2319,6 +2342,23 @@ def test_observed_tone_rejection_does_not_classify_other_source_plugin_classes(t
         task.client.objects[identity]['classId'] = 6619138
     task.preview(platform=None)
     assert task.client.writes == []
+
+
+@pytest.mark.parametrize('version,platform', [('2022.1', 'Windows'), ('2023.1', 'Mac')])
+def test_tone_selection_unobserved_explicit_platform_contexts_remain_admitted(tmp_path, version, platform):
+    task = _PluginSourceSelectionTask(tmp_path, version)
+    task.preview(platform=platform)
+    assert task.client.writes == []
+
+
+def test_tone_explicit_platform_requires_complete_current_platform_observation(tmp_path):
+    task = _PluginSourceSelectionTask(tmp_path, '2022.1')
+    task.client.platforms = []
+    code, declared = task.declare(platform='Mac')
+    assert code == 0, declared
+    code, rejected = task.step('draft-check')
+    assert code != 0 and rejected['error_code'] == 'INVALID_READBACK', rejected
+    assert task.client.writes == [] and not list((task.state / 'transactions').glob('*'))
 
 
 @pytest.mark.parametrize('context', ['Authoring', 'explicit-platform', 'other-build'])

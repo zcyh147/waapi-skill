@@ -4939,30 +4939,24 @@ def test_source_plugin_selection_collector_requires_distinct_guid_change_and_pre
         assert raw == Path(row['native_path']).read_bytes() and hashlib.sha256(raw).hexdigest() == row['sha256']
 
 
-def test_source_plugin_explicit_current_platform_probe_binds_public_identity_and_preserves_view(tmp_path, workflow):
+def test_source_plugin_explicit_current_platform_probe_retains_setup_and_prewrite_boundary(tmp_path, workflow):
     runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, version='2022.1')
-    category = workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_EXPLICIT', explicit_current_platform=True)
-    receipt = json.loads(Path(category['observation_path']).read_text())
-    assert category['status'] == 'PASS'
-    assert receipt['business_effect_verified'] is True and receipt['collection_complete'] is True
+    with pytest.raises(AssertionError):
+        workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_EXPLICIT', explicit_current_platform=True)
+    receipt = json.loads((runtime.state_dir / 'source-plugin-selection.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['collection_complete'] is False
     assert receipt['platform']['id'] == '{C0C0C0C0-C0C0-C0C0-C0C0-C0C0C0C0C0C0}'
     assert receipt['platform']['name'] == 'Observed Target'
-    assert len(commands) == receipt['limits']['calls'] == 72
-    assert len(writes) == 3 and len(selections) == 1 and len(receipt['transaction_ids']) == 4
-    phase = receipt['phases'][-1]
-    dispatch = phase['immutable_preview']['prepared_operation']['dispatch']['args']
-    assert selections == [dispatch] and dispatch['platform'] == 'Observed Target'
-    query_calls = [argv for argv in commands if argv[0] == 'query-object']
-    platform_query, = [argv for argv in query_calls if '--exact-id' in argv and argv[argv.index('--exact-id') + 1] == receipt['platform']['id']]
-    assert '--platform' not in platform_query
-    for argv in query_calls:
-        if argv != platform_query:
-            assert argv[argv.index('--platform') + 1] == receipt['platform']['id'], argv
-    assert phase['platform_before_execute']['project']['currentPlatformId'] == receipt['platform']['id']
-    assert receipt['platform_final']['project']['currentPlatformId'] == receipt['platform']['id']
-    assert receipt['selection']['before_active_id'] != receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id']
-    assert receipt['selection']['preserved_before'] == receipt['selection']['preserved_after']
-    assert len({argv[1] for argv in commands if argv[0] == 'execute'}) == 4
+    assert len(commands) < receipt['limits']['calls'] == 72
+    assert len(writes) == len(receipt['transaction_ids']) == 3 and selections == []
+    assert all(phase['verify']['payload']['state'] == 'verified' for phase in receipt['phases'][:-1])
+    assert receipt['phases'][-1] == {'phase': 'select_other_source', 'execution_attempted': False}
+    rejected = receipt['calls'][-1]
+    assert rejected['argv'][0] == 'draft-check'
+    assert rejected['exit_code'] != 0 and rejected['payload']['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY'
+    assert len({argv[1] for argv in commands if argv[0] == 'execute'}) == 3
+    assert receipt['native_evidence'] and receipt['failure']
 
 
 @pytest.mark.parametrize('fault', ['ignored', 'source-field', 'extra-child'])
