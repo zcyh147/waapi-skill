@@ -847,3 +847,50 @@ No native/Fresh/CLI Agent/install, full Program/Non-live, local fixed preflight,
 push or PR edit ran here. Root owns publication/exact-head hosted CI. The
 separately reviewed collector successor is outside this frozen batch; no main
 merge or ticket closure is authorized.
+
+## R52 saved-copy, Tone and exact historical metadata integration
+
+Accepted `56a7c376`, `7f3c360d` and metadata `5a5eeda4` merge cleanly at
+`191382e0`; the shared diagnostic collector combines the accepted additions.
+The Program roster gains the replay-attachment test file and canonical
+267-entry assertion. Interface generate/check passed once with unchanged
+artifacts. Clean source `d1d9dd64` receives one **38-test capture in 7.86s**,
+with exact 348 Topic / 343 metadata / 347 replay closures and all 343 historical
+sources retained. Existing importers select 35 entries and nine additive
+historical metadata attachments; all 630 older archive/projection files stay
+byte-identical. No original program, category, failure or quarantine changes.
+
+Branch generate/check passed **40.398s / 39.084s**. Strict accounting is
+**559 Topic program passed / 559 native missing**, and **65 metadata program
+passed / 9 live_metadata passed / 56 missing**. The nine leaves are only the
+original Console 2021.1 RTPC Color 0, ControlInput null and OverrideColor false
+reads, bound separately to current injected public replay. They prove no
+current-native or mutation behavior. All 272,313 IDs/shapes/owners, requirements,
+116 exclusions, 79/91 source memberships and interface artifacts remain exact;
+only 624 selected rows' evidence/bindings change. Complete=false: 9 verified,
+616 implemented_unverified and 271,572 unresolved. Current source identity is
+`32f90e32adca4c9cca68b7e831a3f0bba2ef9d93d4f08ffa1d5d84c1e6de8c76`.
+
+Generated `3973fb63` passes one **9-test focus in 12.11s**, including actual
+portable replay without the original-root environment (no skips), exact Tone
+bridge/damage checks, compact/large-marker terminal delivery, manifest/Topic
+selection and saved-copy protocol. HEAD/all 2,757 tracked files stay exact;
+owned groups end empty. Complete worker suites and broad gates are not repeated.
+Exact receipts, original native boundaries and archive sizes are in
+[the test inventory](../../../tests/TEST_INVENTORY.md) and
+`/tmp/waapi-r52-integration/`.
+
+Separately accepted native saved-copy `56a7c376` passes one 2021.1 diagnostic
+with complete saved-image/live-identity comparison: four separate transactions,
+Save phases `result_schema_checked`, create/copy phases verified. Its final
+collection stays diagnostic-only/business_effect_verified=false; one Synth
+fixture gives no generic copy/history or ObjectRef-remapping proof. Native Tone
+`7f3c360d` passes one 2025.1 anonymous 36-channel sine-envelope observation; its
+single transaction is verified under the fixed artifact policy, while the
+original collector category stays blocked, diagnostic and without coverage
+credit. Other waveforms, native 2023/2024, phase continuity/internal config type
+and Windows remain open. Original failures/quarantines remain unchanged.
+
+No native/Fresh/CLI Agent/install, full Program/Non-live, local fixed preflight,
+push or PR edit runs in this integration. Root owns publication and exact-head
+hosted CI. No main merge or ticket/family closure is authorized.
