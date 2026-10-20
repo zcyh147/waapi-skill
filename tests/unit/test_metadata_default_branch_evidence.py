@@ -52,12 +52,18 @@ def test_default_index_selects_exact_five_version_metadata_defaults_without_live
 @pytest.mark.parametrize('damage', ['missing-check', 'wrong-sibling', 'null-is-not-absence',
     'present-public-default', 'missing-public-parent', 'missing-whole-result-proof', 'source-drift'])
 def test_original_default_program_cannot_certify_unobserved_fact(product_defaults, tmp_path, damage):
+    """Historical reader controls; current-product evidence is evaluated separately."""
     inventory, _, bindings, base = product_defaults
     selected = selected_defaults(inventory['native_coverage']['obligations'])
     branch = next(row for row in selected if row['pointer'].endswith('/@presence/absent'))
     binding = deepcopy(bindings['bindings'][branch['id']])
     descriptor = binding['evidence']['program']
     record = completion.read_sealed_artifact(descriptor, base)
+    # A successor may honestly lack current proof. These structural controls
+    # must still start from a valid original receipt, never that stale failure.
+    original_candidate = record['candidate_sha256']
+    assert completion.evidence_result(descriptor, branch, original_candidate,
+        'program', 'product', base, binding, source_root=audit.ROOT) == ('passed', None)
     if damage == 'missing-check':
         record['branch_assertions'][branch['id']]['checks'] = [check for check in
             record['branch_assertions'][branch['id']]['checks'] if check['pointer'] != binding['observation_pointer']]
@@ -69,6 +75,11 @@ def test_original_default_program_cannot_certify_unobserved_fact(product_default
         record['gateway']['payload']['agent_result']['metadata']['default'] = None
     elif damage == 'missing-public-parent':
         del record['gateway']['payload']['agent_result']['metadata']
+        # Keep the whole-result assertion exact so only the missing containing
+        # object (not an unrelated stale assertion) can reject the omission.
+        for check in record['branch_assertions'][branch['id']]['checks']:
+            if check['pointer'] == '/gateway/payload/agent_result':
+                check['equals'] = deepcopy(record['gateway']['payload']['agent_result'])
     elif damage == 'missing-whole-result-proof':
         record['branch_assertions'][branch['id']]['checks'] = [check for check in
             record['branch_assertions'][branch['id']]['checks'] if check['pointer'] != '/gateway/payload/agent_result']
@@ -78,6 +89,6 @@ def test_original_default_program_cannot_certify_unobserved_fact(product_default
     path.write_text(json.dumps(record), encoding='utf-8')
     import hashlib
     changed = {**descriptor, 'artifact': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
-    result = completion.evidence_result(changed, branch, inventory['native_coverage']['candidate_sha256'],
+    result = completion.evidence_result(changed, branch, original_candidate,
         'program', 'product', base, binding, source_root=audit.ROOT)
     assert result[0] == 'missing'

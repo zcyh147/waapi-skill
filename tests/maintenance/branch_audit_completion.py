@@ -637,6 +637,8 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             metadata_context = read_metadata_run(record['metadata_run'], base)
             record['gateway'] = metadata_context['gateway']
             if (branch.get('route') or '').endswith('|function|ak.wwise.core.object.getPropertyInfo'):
+                if not branch['pointer'].startswith('/resultSchema/') and branch['pointer'] != '/resultSchema':
+                    raise ValueError('live metadata projection requires a reflected resultSchema branch')
                 # The same binding retains the program's exact native occurrence.
                 # A real metadata receipt observes its corresponding public leaf.
                 exact_observation_pointer(branch, binding, binding.get('dispatch_pointer', '/native_call'),

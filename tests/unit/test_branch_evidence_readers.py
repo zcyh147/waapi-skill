@@ -169,7 +169,7 @@ def test_metadata_branch_uses_original_receipt_and_reviewed_source_equivalence(t
 
 
 @pytest.mark.parametrize('damage', [None, 'public-sibling', 'native-sibling', 'reference-occurrence', 'absence', 'null',
-    'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'])
+    'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence', 'args-schema', 'options-schema'])
 def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispatch_pointer(tmp_path, damage):
     """Original reader compatibility only; this controlled receipt grants no product proof."""
     from tests.maintenance import branch_coverage_audit as audit
@@ -204,6 +204,11 @@ def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispat
         pointer = '/resultSchema/properties/default/@presence/absent'
         branch.update(id=route + '|' + pointer, pointer=pointer, kind='optional_presence', value='absent',
                       shape_sha256=audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')['branches'][route + '|' + pointer]['native_shape_sha256'])
+    elif damage in {'args-schema', 'options-schema'}:
+        from wwise_waapi.native_catalog import load_native_catalog
+        pointer = '/argsSchema' if damage == 'args-schema' else '/optionsSchema'
+        schema = load_native_catalog('2021.1', 'wwise-console')['schemas']['ak.wwise.core.object.getPropertyInfo'][pointer[1:]]
+        branch.update(id=route + '|' + pointer, pointer=pointer, kind='schema', shape_sha256=audit.digest(schema))
     edge_id = route + '|/resultSchema/properties/default/$ref'
     edges = {edge_id: {'route': route, 'pointer': '/resultSchema/properties/default/$ref',
                       'reference': {'target': route + '|' + target}}}
@@ -222,6 +227,9 @@ def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispat
         binding['observation_pointer'] = '/native_call/result/supports/unlink'
     elif damage == 'reference-occurrence':
         edges[edge_id]['pointer'] = '/resultSchema/properties/supports/properties/unlink/$ref'
+    elif damage in {'args-schema', 'options-schema'}:
+        binding.update(observation_pointer='/native_call/result',
+                       gateway_observation_pointer='/gateway/payload/agent_result/metadata', reference_chain=[])
     record = {'candidate_sha256': candidate, 'scope_kind': 'controlled', 'metadata_run': metadata_run,
         'invocation': {'phase': 'final', 'outcome': 'PASS', 'node_outcomes': [{'nodeid': 'preserved-metadata', 'outcome': 'PASS'}]},
         'branch_assertions': {branch['id']: {'native_shape_sha256': branch['shape_sha256'], 'native_route': route,
@@ -231,6 +239,8 @@ def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispat
             'pointer': binding['gateway_observation_pointer'], 'absent': True}
     elif damage == 'null':
         record['branch_assertions'][branch['id']]['checks'][0]['equals'] = None
+    elif damage in {'args-schema', 'options-schema'}:
+        record['branch_assertions'][branch['id']]['checks'][0]['equals'] = context['gateway']['payload']['agent_result']['metadata']
     path = tmp_path / 'mapped-default.json'; path.write_text(json.dumps(record))
     proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1',
         'reviewed_reason': 'Controlled original metadata reader compatibility, never product credit.',
@@ -245,7 +255,7 @@ def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispat
         'live_metadata', 'controlled', tmp_path, binding, source_root=original_root,
         reference_edges=edges)
     assert result == ('passed', None) if damage in {None, 'empty-parent-absence'} else result[0] == 'missing'
-    if damage != 'native-sibling':
+    if damage not in {'native-sibling', 'args-schema', 'options-schema'}:
         assert binding['observation_pointer'] == '/native_call/result/default'
 
 
