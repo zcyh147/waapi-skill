@@ -10230,6 +10230,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         children = saved_unit.find('ChildrenList')
         accepted_root_order = [(node.tag, dict(node.attrib)) for node in children]
         destination, = [node for node in children if node.get('ID') == destination_id]
+        if modern:
+            assert [(node.tag, dict(node.attrib)) for node in children if node is not destination] == pinned_root_order, 'Baseline Save changed pinned original root order or attributes'
         assert destination.tag == 'Sound' and destination.get('Name') == prefix and len(destination.findall('ChildrenList/*')) == 0, 'Actual destination not serialized empty in MIDI'
         live, fields = repeated_live(saved, fields=True)
         expected_scalars = validate_scalars(loaded_nodes, loaded_fields, allow_references=modern)
@@ -10533,6 +10535,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             loaded_nodes = source_graph([loaded_raw], source_id, old_owner, version=runtime.version if modern else None)
             declared_unit, = [node for node in xml(loaded_raw).iter('WorkUnit') if node.get('ID') == source_unit_id]
             assert declared_unit.get('PersistMode') == 'Standalone', 'Synthetic MIDI Work Unit identity differs'
+            if modern:
+                pinned_root_order = [(node.tag, dict(node.attrib)) for node in declared_unit.find('ChildrenList')]
             initial_children = query(source_unit_id, relation='children')
             assert len(initial_children) == 7 and {node.get('ID') for node in declared_unit.find('ChildrenList')} == {row['id'] for row in initial_children}, 'Loaded MIDI root childset differs'
             loaded_live, loaded_fields = repeated_live(loaded_nodes, fields=True)

@@ -34,6 +34,7 @@ def modern_collector_runtime(tmp_path, version='2022.1', *, fault=None):
             task.objects[node.get('ID')] = {'id': node.get('ID'), 'name': node.get('Name'),
                 'type': node.tag, 'classId': 1900560, 'parent': {'id': unit_id},
                 'path': task.objects[unit_id]['path'] + '\\' + node.get('Name'), 'notes': ''}
+    original_root_ids = {node.get('ID') for node in unit.find('ChildrenList')}
     mapping = {value[0]: value[1] for value in SAVED_ROLES.values()}
     # Accepted919 probe returns a named ControlInput reference; Curve instead
     # returns id/points/@Flags. Preserve these distinct native shapes.
@@ -62,6 +63,9 @@ def modern_collector_runtime(tmp_path, version='2022.1', *, fault=None):
                         if 'ShortID' in node.attrib: node.set('ShortID', str(task.objects[node.get('ID')]['shortId']))
                 destination = next(node for node in children if node.get('ID') == task.objects[COPIED]['parent']['id'])
                 ET.SubElement(destination, 'ChildrenList').append(copied)
+            if fault == 'baseline-reordered-root' and COPIED not in task.objects:
+                originals = [node for node in children if node.get('ID') in original_root_ids]
+                children[:] = list(reversed(originals)) + [node for node in children if node.get('ID') not in original_root_ids]
             if fault == 'reordered-root' and COPIED in task.objects:
                 children[:] = list(reversed(children))
             current.write(path)
@@ -250,3 +254,17 @@ def test_modern_independent_oracle_rejects_native_notes_change_that_xml_parsing_
     with pytest.raises(AssertionError, match='Copied native notes differ'):
         repeated_copy_oracle([raw], [after_raw], source_id=SOURCE, copied_id=COPIED,
             original_owner_id=SAVED_OWNER, destination_id=DEST, before_live=before_live, copied_live=copied_live, version='2025.1')
+
+
+def test_modern_baseline_save_rejects_original_root_reordering_before_copy_preview(tmp_path, workflow):
+    runtime, writes, task = modern_collector_runtime(tmp_path, fault='baseline-reordered-root')
+    with pytest.raises(AssertionError, match='Baseline Save changed pinned original root order or attributes'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='MODERN_SOURCE', saved_copy=True,
+            saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=PROFILE)
+    receipt = json.loads((runtime.state_dir / 'modern-source-copy-save-children.json').read_text())
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'save']
+    assert len(receipt['transaction_ids']) == 2
+    assert receipt['fixture_acceptance']['status'] == 'checking'
+    assert receipt['saved_copy_verified'] is False and receipt['collection_complete'] is False
+    assert len([row for row in receipt['calls'] if row['argv'][0] == 'preview-from-draft']) == 2
+    assert COPIED not in task.objects
