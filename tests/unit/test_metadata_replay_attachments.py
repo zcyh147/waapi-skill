@@ -55,6 +55,53 @@ def test_r54_original_class_reader_retains_full_8a_native_source_and_origin():
         completion.read_metadata_run(descriptor,audit.ROOT)
 
 
+
+def test_r54_original_index_anchor_rejects_self_consistently_rewritten_archive(tmp_path):
+    import shutil
+    originals=producer.r54_original_reads()
+    case='2022.1|Wwise Delay|DelayTime'
+    accepted=originals[case];original=Path(accepted['root']);altered=tmp_path/'altered-original'
+    shutil.copytree(original,altered)
+    index=audit.load(audit.ROOT/'docs/branch-coverage-evidence-index.json')
+    base=(audit.ROOT/'docs'/index['base']).resolve();attachments=[]
+    # Locator-only projection: every accepted seal hash stays unchanged.
+    for number,desc in enumerate(index['metadata_attachments']):
+        item=completion.read_sealed_artifact(desc,base)
+        record=completion.read_sealed_artifact(item['evidence'],base)
+        archive=record.get('metadata_run',{})
+        if item['contract']=='waapi-skill.class-metadata-attachment/v1' and (base/archive['root']).resolve()==original:
+            archive['root']=str(altered);archive['seal']['artifact']=str(altered/'evidence-seal.json')
+            item['evidence']=write(tmp_path/f'record-{number}.json',record,**{k:v for k,v in item['evidence'].items() if k not in {'artifact','sha256'}})
+            attachments.append(write(tmp_path/f'attachment-{number}.json',item))
+        else:
+            attachments.append(dict(desc,artifact=str(base/desc['artifact'])))
+    index.update(base=str(base),metadata_attachments=attachments)
+    path=tmp_path/'index.json';path.write_text(json.dumps(index))
+    baseline=producer.r54_original_reads(path)
+    assert len(baseline)==16
+    assert completion.read_metadata_run(baseline[case],audit.ROOT,historical_class=True)['native_result']['default']==0.5
+    targets=json.loads((altered/'targets.json').read_bytes());target=targets[0]
+    native_path=altered/target['native_receipt'];native=json.loads(native_path.read_bytes())
+    native['result']['default']=0.75;write(native_path,native)
+    for suffix in ('.stdout','.agent-result.json'):
+        receipt=altered/(target['detail_receipt']+suffix);value=json.loads(receipt.read_bytes())
+        result=value['agent_result'] if suffix=='.stdout' else value
+        result['metadata']['default']=0.75
+        write(receipt,value)
+    target.update(observed_default=0.75,native_sha256=hashlib.sha256(native_path.read_bytes()).hexdigest(),native_bytes=native_path.stat().st_size,
+        detail_agent_result_sha256=hashlib.sha256((altered/(target['detail_receipt']+'.agent-result.json')).read_bytes()).hexdigest())
+    write(altered/'targets.json',targets)
+    seal=json.loads((altered/'evidence-seal.json').read_bytes())
+    for entry in seal['files']:
+        source=altered/entry['path'];entry.update(sha256=hashlib.sha256(source.read_bytes()).hexdigest(),bytes=source.stat().st_size)
+    write(altered/'evidence-seal.json',seal)
+    # The rewrite is internally valid; only the ORIGINAL index/record seal anchor rejects it.
+    freshly_resealed=deepcopy(baseline[case]);freshly_resealed['seal']['sha256']=hashlib.sha256((altered/'evidence-seal.json').read_bytes()).hexdigest()
+    assert completion.read_metadata_run(freshly_resealed,audit.ROOT,historical_class=True)['native_result']['default']==0.75
+    with pytest.raises(ValueError,match='hash|digest|seal'):
+        producer.r54_original_reads(path)
+
+
 def r54_control(tmp_path,inventory,case='2022.1|Wwise Delay|DelayTime'):
     from tests.unit.test_metadata_discovery_gateway import _run_original_r54_metadata_replay
     from tests.maintenance.collect_class_metadata import collection_plan

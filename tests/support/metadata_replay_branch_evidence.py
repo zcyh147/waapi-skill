@@ -27,17 +27,33 @@ def r54_original_reads(index_path=None):
     from tests.maintenance import branch_audit_completion as completion
     from tests.maintenance.collect_class_metadata import metadata_descriptors
     path=Path(index_path) if index_path else audit.ROOT/'docs/branch-coverage-evidence-index.json'
-    index=audit.load(path);base=(path.parent/index['base']).resolve();roots=set()
+    index=audit.load(path);base=(path.parent/index['base']).resolve();roots={}
     for desc in index.get('metadata_attachments',[]):
         item=completion.read_sealed_artifact(desc,base)
         if item['contract'] != 'waapi-skill.class-metadata-attachment/v1':continue
         record=completion.read_sealed_artifact(item['evidence'],base)
-        root=(base/record['metadata_run']['root']).resolve()
-        plan=json.loads((root/'plan.json').read_bytes())
-        if plan['repositories'][0]['commit']==R54_ORIGINAL and plan.get('cohort','r54')=='r54':roots.add(root)
+        original=deepcopy(record['metadata_run']);root=(base/original['root']).resolve()
+        # The accepted index -> attachment -> record -> seal chain owns these
+        # original bytes. Never replace its hash with one computed from disk.
+        seal=completion.read_sealed_artifact(original['seal'],base)
+        plan_entry,=[entry for entry in seal['files'] if entry['path']=='plan.json']
+        raw=(root/'plan.json').read_bytes()
+        if len(raw)!=plan_entry['bytes'] or hashlib.sha256(raw).hexdigest()!=plan_entry['sha256']:
+            raise ValueError('Original index-bound plan seal changed')
+        plan=json.loads(raw)
+        if plan['repositories'][0]['commit']!=R54_ORIGINAL or plan.get('cohort','r54')!='r54':continue
+        original['root']=str(root)
+        original['seal']['artifact']=str((base/original['seal']['artifact']).resolve())
+        if root in roots:
+            if original['seal']!=roots[root]['seal']:raise ValueError('Conflicting original index-bound seal')
+        else:
+            completion.read_metadata_run(original,base,historical_class=True)
+            roots[root]=original
     originals={}
-    for root in sorted(roots):
-        originals.update(metadata_descriptors(root))
+    for root,original in sorted(roots.items()):
+        for case,descriptor in metadata_descriptors(root).items():
+            descriptor['seal']=deepcopy(original['seal'])
+            originals[case]=descriptor
     if len(originals)!=16:raise ValueError('Complete sixteen original R54 class reads required')
     return originals
 
@@ -86,8 +102,8 @@ def r54_replay_case(case,descriptor=None,*,base=None):
 
 
 def r54_current_sources():
-    from tests.maintenance.collect_class_metadata import source_links,REPO
-    return {str(Path(row['path']).relative_to(REPO)):row['sha256'] for row in source_links('',{})[1]}
+    from tests.maintenance.collect_class_metadata import source_links,collection_source_map,REPO
+    return collection_source_map(source_links('',{})[1],REPO)
 
 
 def make_r54_replay_receipt(capture,case,observed,reports):

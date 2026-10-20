@@ -29,6 +29,36 @@ def test_second_closed_cohort_keeps_r54_plans_and_selects_only_six_primary_field
     with pytest.raises(ValueError):collector.collection_plan('2025.1',cohort='r55')
 
 
+
+@pytest.mark.parametrize(('checkout','source'),[
+    ('/work space/声音 & repo','/work space/声音 & repo/tests/support/proof.py'),
+    (r'C:\work space\声音 & repo',r'C:\work space\声音 & repo\tests\support\proof.py'),
+    (r'\\server\share\声音 & repo',r'\\server\share\声音 & repo\tests\support\proof.py'),
+])
+def test_collection_source_map_keeps_portable_keys_for_producer_path_flavor(checkout,source,monkeypatch):
+    from tests.support import metadata_replay_branch_evidence as producer
+    rows=[{'path':source,'sha256':'a'*64}]
+    assert collector.collection_source_map(rows,checkout)=={'tests/support/proof.py':'a'*64}
+    with monkeypatch.context() as patch:
+        patch.setattr(collector,'REPO',checkout)
+        patch.setattr(collector,'source_links',lambda *_:([],rows))
+        assert producer.r54_current_sources()=={'tests/support/proof.py':'a'*64}
+    with pytest.raises(ValueError):collector.collection_source_map(rows+rows,checkout)
+    with pytest.raises(ValueError):collector.collection_source_map([{'path':source+'/../escape.py','sha256':'a'*64}],checkout)
+    with pytest.raises(ValueError):collector.collection_source_map([{'path':'/unrelated/proof.py','sha256':'a'*64}],checkout)
+
+
+def test_shared_metadata_source_seals_use_same_posix_keys_on_windows(monkeypatch):
+    from pathlib import PureWindowsPath
+    from tests.support.media_pool_branch_evidence import _source_seals
+    before=_source_seals();relative_to=Path.relative_to
+    with monkeypatch.context() as patch:
+        patch.setattr(Path,'relative_to',lambda self,*args:PureWindowsPath(*relative_to(self,*args).parts))
+        windows=_source_seals()
+    assert windows==before
+    assert all('\\' not in name for name in windows)
+
+
 def test_versioned_schedule_uses_only_owned_class_fields_and_keeps_unobserved_choices_missing():
     plans = {v:collector.collection_plan(v) for v in collector.BUILDS}
     assert plans['2022.1']['targets'] == {'Wwise Delay':['DelayTime','FeedbackEnabled'], 'Sound':['BypassEffect0','Effect0']}

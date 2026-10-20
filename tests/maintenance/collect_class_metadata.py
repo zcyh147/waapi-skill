@@ -152,6 +152,18 @@ def metadata_descriptors(root):
         for index,row in enumerate(targets) if row['status'] == 'captured'}
 
 
+
+def collection_source_map(rows, checkout):
+    """Source keys are portable identities; absolute paths retain producer flavor."""
+    from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
+    sources={}
+    for row in rows:
+        name=archive_relative_from_absolute(row['path'],checkout).canonical
+        if name in sources:raise ValueError('Duplicate collection source identity')
+        sources[name]=row['sha256']
+    return dict(sorted(sources.items()))
+
+
 def source_links(version, targets):
     from tests.support.metadata_replay_branch_evidence import source_seals
     sources = source_seals()

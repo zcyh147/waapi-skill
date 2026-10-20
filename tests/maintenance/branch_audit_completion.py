@@ -432,8 +432,8 @@ def read_metadata_run(descriptor, base, *, historical_class=False):
     if len(repositories) != 1 or len(repositories[0]['commit']) != 40:
         raise ValueError('metadata exact source candidate missing')
     repository = repositories[0]
-    sources = {r['path'][len(repository['checkout']) + 1:]: r['sha256'] for r in plan['source_seals']
-               if r['path'].startswith(repository['checkout'] + '/')}
+    from tests.maintenance.collect_class_metadata import collection_source_map
+    sources = collection_source_map(plan['source_seals'],repository['checkout'])
     if class_read:
         import math
         from tests.maintenance import collect_class_metadata as collector
@@ -486,8 +486,7 @@ def read_metadata_run(descriptor, base, *, historical_class=False):
             validate_r54_original_sources(repository['commit'],sources)
             required=sources
         else:
-            required = {str(Path(row['path']).relative_to(collector.REPO)):row['sha256']
-                        for row in collector.source_links(context['version'],selected['targets'])[1]}
+            required = collection_source_map(collector.source_links(context['version'],selected['targets'])[1],collector.REPO)
         if (not sources or len(sources) != len(plan['source_seals'])
                 or any(Path(name).is_absolute() or '..' in Path(name).parts or '\\' in name for name in sources)
                 or sources != required):
@@ -529,7 +528,8 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
     allowed = {'tests/maintenance/branch_audit_completion.py','tests/maintenance/branch_coverage_audit.py',
         'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_replay_attachments.py',
         'tests/support/metadata_replay_cases.json','tests/support/metadata_replay_branch_evidence.py',
-        'docs/branch-coverage-requirements.json','tests/unit/test_metadata_default_branch_evidence.py'}
+        'docs/branch-coverage-requirements.json','tests/unit/test_metadata_default_branch_evidence.py',
+        'tests/support/media_pool_branch_evidence.py'}
     # Reviewed combined Tone/Source-copy/Save source ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90.
     # This does not participate in the exact RTPC metadata read. All nine
     # exact old/new blobs occur together, including the explicit new-file
@@ -641,7 +641,8 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
     allowed={'tests/maintenance/collect_class_metadata.py','tests/maintenance/branch_audit_completion.py',
         'tests/maintenance/branch_coverage_audit.py','tests/support/metadata_replay_branch_evidence.py',
         'tests/unit/test_class_metadata_collection.py','tests/unit/test_metadata_replay_attachments.py',
-        'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_default_branch_evidence.py'}
+        'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_default_branch_evidence.py',
+        'tests/support/media_pool_branch_evidence.py'}
     changes=producer.source_changes(before,after)
     if (set(bridge)!={'contract','attribution','historical_candidate','historical_sources','current_sources','changed_files'}
             or bridge['contract']!='waapi-skill.r54-class-metadata-leaf-replay/v1'
