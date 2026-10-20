@@ -46,6 +46,7 @@ def _row(
         "path": path,
         "parent": {"id": parent},
         "notes": "before",
+        "classId": {"ActorMixer": 1, "Sound": 2, "Bus": 3}[object_type],
         **fields,
     }
 
@@ -132,6 +133,8 @@ def _create_reader(*, metadata: list[Mapping[str, Any]]) -> ScriptedReader:
         {
             "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.getPropertyInfo": list(metadata),
+            # Creation history may observe the current platform, without certifying it.
+            "ak.wwise.core.getProjectInfo": [{}],
             "ak.wwise.core.object.get": [
                 {"return": [_parent_row()]},
                 {"return": [_bus_row()]},
@@ -186,6 +189,7 @@ def test_object_create_nested_derives_activation_only_on_referencing_child() -> 
 def _set_reader(*, nested: bool = False) -> ScriptedReader:
     object_reads: list[Mapping[str, Any]] = [
         {"return": [_target_row()]},
+        {"return": [_target_row()]},  # Exact existing-target class read.
         {"return": [_bus_row()]},
     ]
     if nested:
@@ -206,6 +210,7 @@ def _set_reader(*, nested: bool = False) -> ScriptedReader:
     return ScriptedReader(
         {
             "ak.wwise.core.object.getTypes": [_types()],
+            "ak.wwise.core.getProjectInfo": [{}],  # Existing-field history view is unobserved.
             "ak.wwise.core.object.getPropertyInfo": [_reference_info(), _activation_info()],
             "ak.wwise.core.object.get": object_reads,
         }
@@ -291,7 +296,10 @@ def test_explicit_true_activation_is_deduplicated() -> None:
     assert proof["requirements"][0]["effective_value"] is True
     assert proof["requirements"][0]["source"] == "explicit"
     assert spec["references"] == [{"name": "OutputBus", "target_id": BUS_ID}]
-    assert len(reader.calls) == 7
+    assert len(reader.calls) == 8
+    assert [call for call in reader.calls if call[0] == "ak.wwise.core.getProjectInfo"] == [
+        ("ak.wwise.core.getProjectInfo", {}, {})
+    ]
 
 
 def test_explicit_false_activation_is_rejected() -> None:

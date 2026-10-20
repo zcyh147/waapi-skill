@@ -48,21 +48,22 @@ def _owner_row() -> dict[str, Any]:
         "path": OWNER_PATH,
         "parent": {"id": "{WORK-UNIT}"},
         "notes": "before",
+        "classId": 524304,
     }
 
 
 def _types() -> dict[str, Any]:
     return {
         "return": [
-            {"classId": 1, "name": "ActorMixer", "type": "ActorMixer"},
-            {"classId": 2, "name": "Sound", "type": "Sound"},
+            {"classId": 524304, "name": "ActorMixer", "type": "WObject"},
+            {"classId": 65552, "name": "Sound", "type": "WObject"},
             {
-                "classId": 3,
+                "classId": 16,
                 "name": "AudioFileSource",
-                "type": "AudioFileSource",
+                "type": "WObject",
             },
-            {"classId": 4, "name": "MusicSegment", "type": "MusicSegment"},
-            {"classId": 5, "name": "MusicTrack", "type": "MusicTrack"},
+            {"classId": 1769488, "name": "MusicSegment", "type": "WObject"},
+            {"classId": 1835024, "name": "MusicTrack", "type": "WObject"},
         ]
     }
 
@@ -475,7 +476,7 @@ def test_object_set_2023_child_language_and_import_are_closed_and_proven(
         {
             "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
+                {"return": [_owner_row()]}, {"return": [_owner_row()]},
                 {"return": []},
                 {"return": [_owner_row()]},
                 {"return": []},
@@ -579,7 +580,7 @@ def test_object_set_2023_inline_wav_import_is_canonicalized(
         {
             "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
+                {"return": [_owner_row()]}, {"return": [_owner_row()]},
                 {"return": []},
                 {"return": [_owner_row()]},
                 {"return": []},
@@ -662,7 +663,7 @@ def test_object_set_import_source_control_uses_effective_closed_default(
             {
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
+                    {"return": [_owner_row()]}, {"return": [_owner_row()]},
                     {"return": []},
                     {"return": [_owner_row()]},
                     {"return": []},
@@ -736,12 +737,12 @@ def test_object_set_import_and_language_respect_version_and_target_boundaries(
     reader = Reader(
         {
             "ak.wwise.core.object.getTypes": [_types()],
-            "ak.wwise.core.object.get": [{"return": [_owner_row()]}],
+            "ak.wwise.core.object.get": [{"return": [_owner_row()]}, {"return": [_owner_row()]}],
         }
     )
     with pytest.raises(
         ValueError,
-        match="meaningful only for a newly created Sound Voice",
+        match="explicit language without localized media",
     ):
         prepare_operation(bad_language, read_call=reader)
 
@@ -790,7 +791,7 @@ def test_object_set_import_file_type_and_language_fail_closed(
                 {
                     "ak.wwise.core.object.getTypes": [_types()],
                     "ak.wwise.core.object.get": [
-                        {"return": [_owner_row()]}
+                        {"return": [_owner_row()]}, {"return": [_owner_row()]}
                     ],
                 }
             ),
@@ -832,7 +833,7 @@ def test_object_set_import_file_type_and_language_fail_closed(
                 {
                     "ak.wwise.core.object.getTypes": [_types()],
                     "ak.wwise.core.object.get": [
-                        {"return": [_owner_row()]},
+                        {"return": [_owner_row()]}, {"return": [_owner_row()]},
                         {"return": []},
                         {"return": [_owner_row()]},
                         {"return": []},
@@ -868,6 +869,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
         "id": child_id,
         "name": "VoiceLine",
         "type": "Sound",
+        "classId": 65552,
         "path": child_path,
         "parent": {"id": OWNER_ID},
         "notes": None,
@@ -878,6 +880,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
         "id": source_id,
         "name": "voice",
         "type": "AudioFileSource",
+        "classId": 16,
         "path": child_path + r"\voice",
         "parent": {"id": child_id},
         "activeSource": None,
@@ -921,7 +924,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
             {
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
+                    {"return": [_owner_row()]}, {"return": [_owner_row()]},
                     {"return": []},
                     {"return": [_owner_row()]},
                     {"return": []},
@@ -932,6 +935,7 @@ def test_object_set_import_verification_hashes_the_copied_original(
     ).as_dict()
     verification_reader = Reader(
         {
+            "ak.wwise.core.object.getTypes": [_types()],
             "ak.wwise.core.object.get": [
                 {"return": [_owner_row()]},
                 {"return": [child_row]},
@@ -1019,6 +1023,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
             "id": object_id,
             "name": name,
             "type": "Sound",
+            "classId": 65552,
             "path": OWNER_PATH + "\\" + name,
             "parent": {"id": OWNER_ID},
             "activeSource": {"id": source_id},
@@ -1035,6 +1040,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
             "id": object_id,
             "name": name,
             "type": "AudioFileSource",
+            "classId": 16,
             "path": OWNER_PATH + "\\" + name + "\\" + name,
             "parent": {"id": parent_id},
             "activeSource": None,
@@ -1090,7 +1096,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
             {
                 "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
-                    {"return": [_owner_row()]},
+                    {"return": [_owner_row()]}, {"return": [_owner_row()]},
                     {"return": [_owner_row()]},
                     {"return": []},
                 ],
@@ -1145,6 +1151,7 @@ def test_object_set_row_import_verifies_implicit_topology_and_same_hash_files(
         },
         read_call=Reader(
             {
+                "ak.wwise.core.object.getTypes": [_types()],
                 "ak.wwise.core.object.get": [
                     {"return": [_owner_row()]},
                     {
@@ -1227,17 +1234,43 @@ def test_object_set_rejects_fictitious_list_instead_of_certifying_sound_list_mem
     assert {uri for uri, _, _ in calls} <= {"ak.wwise.core.object.getTypes", "ak.wwise.core.object.get"}
 
 
+def test_object_set_merge_no_media_japanese_intent_remains_unresolved() -> None:
+    # Required #180/#181 gap: language intent without Source media is not native absence.
+    reader = Reader({
+        "ak.wwise.core.object.getTypes": [_types()],
+        "ak.wwise.core.object.get": [{"return": [_owner_row()]}, {"return": [_owner_row()]}],
+    })
+    request = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2023.1", "operation": "object.set",
+        "arguments": {"platform": "Mac", "on_name_conflict": "merge", "objects": [{
+            "object": {"kind": "id", "value": OWNER_ID},
+            "children": [{"type": "Sound", "name": "MergedChild", "platform": "Windows", "language": "Japanese"}],
+        }]},
+    })
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(request, read_call=reader)
+    assert rejected.value.error_code == "OBJECT_SET_VOICE_LANGUAGE_EFFECT_UNRESOLVED"
+    assert str(rejected.value) == (
+        "An explicit language without localized media still needs Source effect evidence; "
+        "omit language for an empty Voice or add the requested media."
+    )
+    assert [uri for uri, _, _ in reader.calls] == [
+        "ak.wwise.core.object.getTypes", "ak.wwise.core.object.get", "ak.wwise.core.object.get",
+    ]
+
+
 def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
     tmp_path: Path,
 ) -> None:
-    # Retained from fixed R17: real child effective-view proof survives the
-    # documented-list fixture migration; no fictional List membership is used.
+    # Platform-only positive; the original no-media Japanese intent is retained
+    # separately above as unresolved #180/#181, with no native-effect credit.
     child_id = "{42000000-0000-0000-0000-000000000001}"
     child_path = OWNER_PATH + r"\MergedChild"
     child_row = {
         "id": child_id,
         "name": "MergedChild",
         "type": "Sound",
+        "classId": 65552,
         "path": child_path,
         "parent": {"id": OWNER_ID},
         "notes": None,
@@ -1267,6 +1300,8 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
             if isinstance(source, Mapping) and "path" in source:
                 return {"return": [child_row]}
             ids = source.get("id", []) if isinstance(source, Mapping) else []
+            if ids == [OWNER_ID, child_id]:
+                return {"return": [_owner_row(), child_row]}
             object_id = ids[0] if isinstance(ids, list) and ids else None
             transforms = args.get("transform", [])
             selected = (
@@ -1289,7 +1324,7 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
         "contract": OPERATION_REQUEST_CONTRACT, "version": "2023.1", "operation": "object.set",
         "arguments": {"platform": "Mac", "on_name_conflict": "merge", "objects": [{
             "object": {"kind": "id", "value": OWNER_ID},
-            "children": [{"type": "Sound", "name": "MergedChild", "platform": "Windows", "language": "Japanese"}],
+            "children": [{"type": "Sound", "name": "MergedChild", "platform": "Windows"}],
         }]},
     })
     preview_reader = ViewReader()
@@ -1306,15 +1341,16 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
         if row["path"] == child_path
     )
     assert path_snapshot["platform"] == "Windows"
-    assert path_snapshot["language"] == "Japanese"
+    assert path_snapshot["language"] is None
     preview_path_call = next(
         call
         for call in preview_reader.calls
         if call[0] == "ak.wwise.core.object.get"
         and call[1].get("from", {}).get("path") == [child_path]
+        and call[2].get("platform") == "Windows"
     )
     assert preview_path_call[2]["platform"] == "Windows"
-    assert preview_path_call[2]["language"] == "Japanese"
+    assert "language" not in preview_path_call[2]
     guard_reader = ViewReader()
     validation = validate_prepared_roles(
         prepared,
@@ -1327,4 +1363,4 @@ def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
         if call[1].get("from", {}).get("path") == [child_path]
     )
     assert guard_path_call[2]["platform"] == "Windows"
-    assert guard_path_call[2]["language"] == "Japanese"
+    assert "language" not in guard_path_call[2]

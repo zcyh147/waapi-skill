@@ -1275,6 +1275,9 @@ def test_dependent_field_requires_exact_object_scope_for_enabled_check(
         args: dict[str, object],
         options: dict[str, object],
     ) -> dict[str, object]:
+        if uri == "ak.wwise.core.object.getTypes":
+            assert args == {} and options == {}
+            return {"return": [{"classId": 65552, "name": "Sound", "type": "WObject"}]}
         if uri.endswith("getPropertyAndReferenceNames"):
             return {"return": ["Volume"]}
         if uri.endswith("getPropertyInfo"):

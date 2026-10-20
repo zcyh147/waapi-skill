@@ -7,7 +7,6 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
-    PREPARED_OPERATION_CONTRACT,
     OperationContractError,
     list_operation_specs,
     operation_request_machine_contract,
@@ -91,6 +90,8 @@ def _row(
         "path": path,
         "parent": {"id": parent},
         "notes": notes,
+        "classId": {"ActorMixer": 1, "Sound": 2, "PropertyContainer": 524304,
+                    "SwitchGroup": 3, "StateGroup": 3, "Switch": 1, "State": 1, "WorkUnit": 4}.get(object_type),
     }
 
 
@@ -172,10 +173,13 @@ def _prepare_merge(*, nested_row: Mapping[str, Any] | None = None) -> tuple[dict
             "ak.wwise.core.object.getTypes": [_type_catalog()],
             "ak.wwise.core.object.get": [
                 {"return": [_target_row()]},
-                {"return": [_root_collision_row()]},
+                {"return": [_target_row()]},  # Exact target class.
+                {"return": [_root_collision_row()]},  # Early merge identities.
                 {"return": [nested]},
+                {"return": [_root_collision_row()]},  # Full collision snapshots.
+                {"return": [nested]},  # Root's complete children.
                 {"return": [nested]},
-                {"return": []},
+                {"return": []},  # Nested child's complete children.
                 {"return": [_target_row()]},
                 {"return": [_root_collision_row()]},
             ],
@@ -206,7 +210,7 @@ def test_object_set_real_property_rejects_integer_outside_finite_waapi_range() -
     reader = ScriptedReader(
         {
             "ak.wwise.core.object.getTypes": [_type_catalog()],
-            "ak.wwise.core.object.get": [{"return": [_target_row()]}],
+            "ak.wwise.core.object.get": [{"return": [_target_row()]}, {"return": [_target_row()]}],
             "ak.wwise.core.object.getPropertyInfo": [
                 {
                     "name": "Volume",
@@ -227,6 +231,7 @@ def test_object_set_real_property_rejects_integer_outside_finite_waapi_range() -
     assert [call[0] for call in reader.calls] == [
         "ak.wwise.core.object.getTypes",
         "ak.wwise.core.object.get",
+        "ak.wwise.core.object.get",  # Exact target class read precedes field metadata.
         "ak.wwise.core.object.getPropertyInfo",
     ]
 
@@ -237,8 +242,9 @@ def _confirmation_responses(
 ) -> dict[str, list[Mapping[str, Any]]]:
     nested = dict(nested_row) if nested_row is not None else _nested_collision_row()
     return {
+        "ak.wwise.core.object.getTypes": [_type_catalog()],
         "ak.wwise.core.object.get": [
-            {"return": [_target_row()]},
+            {"return": [_target_row(), _root_collision_row(), _nested_collision_row()]},
             {"return": [_target_row()]},
             {"return": [_root_collision_row()]},
             {"return": [nested]},
@@ -276,6 +282,7 @@ def _execution_result(*, nested_id: str = NESTED_COLLISION_ID) -> dict[str, Any]
 
 def _postverify_responses(*, nested_id: str = NESTED_COLLISION_ID) -> dict[str, list[Mapping[str, Any]]]:
     return {
+        "ak.wwise.core.object.getTypes": [_type_catalog()],
         "ak.wwise.core.object.get": [
             {"return": [_target_row()]},
             {"return": [_root_collision_row()]},
@@ -288,63 +295,30 @@ def _postverify_responses(*, nested_id: str = NESTED_COLLISION_ID) -> dict[str, 
 
 
 def _sparse_set_prepared(*, include_child: bool) -> dict[str, Any]:
-    first_target = {
-        "request_path": "$.objects[0]",
-        "parent_request_path": None,
-        "existing_target": True,
-        "target_id": TARGET_ID,
-        "requested_name": "SetTarget",
-        "requested_type": "ActorMixer",
-        "canonical_type": "ActorMixer",
-        "notes_supplied": True,
-        "requested_notes": "after first",
-        "properties": [],
-        "references": [],
-        "preexisting_children": [],
-        "children_request_paths": [],
-    }
-    second_target = {
-        "request_path": "$.objects[1]",
-        "parent_request_path": None,
-        "existing_target": True,
-        "target_id": SECOND_TARGET_ID,
-        "requested_name": "SecondTarget",
-        "requested_type": "ActorMixer",
-        "canonical_type": "ActorMixer",
-        "notes_supplied": True,
-        "requested_notes": "after second",
-        "properties": [],
-        "references": [],
-        "preexisting_children": [],
-        "children_request_paths": ["$.objects[1].children[0]"] if include_child else [],
-    }
-    nodes = [first_target, second_target]
+    first, second = _sparse_target_rows()
+    first = {**first, "notes": "before first"}
+    second = {**second, "notes": "before second"}
+    objects = [
+        {"object": {"kind": "id", "value": TARGET_ID}, "notes": "after first"},
+        {"object": {"kind": "id", "value": SECOND_TARGET_ID}, "notes": "after second"},
+    ]
     if include_child:
-        nodes.append(
-            {
-                "request_path": "$.objects[1].children[0]",
-                "parent_request_path": "$.objects[1]",
-                "existing_target": False,
-                "requested_name": "NewChild",
-                "requested_type": "Sound",
-                "canonical_type": "Sound",
-                "notes_supplied": False,
-                "requested_notes": None,
-                "properties": [],
-                "references": [],
-                "expected_path": NEW_CHILD_PATH,
-            }
-        )
-    return {
-        "contract": PREPARED_OPERATION_CONTRACT,
-        "operation": "object.set",
-        "verification_plan": {
-            "kind": "object-set-batch",
-            "version": "2022.1",
-            "on_name_conflict": "fail",
-            "nodes": nodes,
-        },
-    }
+        objects[1]["children"] = [{"type": "Sound", "name": "NewChild"}]
+    reader = ScriptedReader({
+        "ak.wwise.core.object.getTypes": [_type_catalog()],
+        "ak.wwise.core.getProjectInfo": [{}, {}],  # One unobserved note-read view per root.
+        "ak.wwise.core.object.get": [
+            {"return": [first]}, {"return": [first]},  # Identity, then class.
+            {"return": [first]}, {"return": []},  # Fields and complete children.
+            {"return": [second]}, {"return": [second]},
+            *([{"return": []}] if include_child else []),  # New-child collision.
+            {"return": [second]}, {"return": []},
+        ],
+    })
+    return prepare_operation(parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1",
+        "operation": "object.set", "arguments": {"objects": objects},
+    }), read_call=reader).as_dict()
 
 
 def _sparse_target_rows() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -413,7 +387,7 @@ def _sparse_readback_responses(
             },
         ]
     )
-    return {"ak.wwise.core.object.get": responses}
+    return {"ak.wwise.core.object.getTypes": [_type_catalog()], "ak.wwise.core.object.get": responses}
 
 
 def test_set_field_only_result_may_omit_objects_and_reads_every_sealed_target() -> None:
@@ -427,7 +401,9 @@ def test_set_field_only_result_may_omit_objects_and_reads_every_sealed_target() 
 
     assert verification.status == "verified"
     assert all(item["passed"] for item in verification.assertions)
-    assert [call[1]["from"]["id"][0] for call in reader.calls[:2]] == [
+    assert reader.calls[0] == ("ak.wwise.core.object.getTypes", {}, {})
+    object_reads = [call for call in reader.calls if call[0] == "ak.wwise.core.object.get"]
+    assert [call[1]["from"]["id"][0] for call in object_reads[:2]] == [
         TARGET_ID,
         SECOND_TARGET_ID,
     ]
@@ -444,7 +420,9 @@ def test_set_sparse_result_binds_association_by_sealed_parent_guid_not_response_
 
     assert verification.status == "verified"
     assert all(item["passed"] for item in verification.assertions)
-    assert [call[1]["from"]["id"][0] for call in reader.calls[:3]] == [
+    assert reader.calls[0] == ("ak.wwise.core.object.getTypes", {}, {})
+    object_reads = [call for call in reader.calls if call[0] == "ak.wwise.core.object.get"]
+    assert [call[1]["from"]["id"][0] for call in object_reads[:3]] == [
         TARGET_ID,
         SECOND_TARGET_ID,
         NEW_CHILD_ID,
@@ -651,6 +629,7 @@ def test_set_accepts_2025_property_container_target_for_new_sound_child() -> Non
             ],
             "ak.wwise.core.object.get": [
                 {"return": [target]},
+                {"return": [target]},  # Exact target class.
                 {"return": []},
                 {"return": [target]},
                 {"return": []},
@@ -713,12 +692,14 @@ def test_set_accepts_closed_game_sync_children_across_supported_versions(
             "ak.wwise.core.object.getTypes": [
                 {
                     "return": [
-                        {"classId": 1, "name": child_type, "type": "WObject"}
+                        {"classId": 1, "name": child_type, "type": "WObject"},
+                        {"classId": 3, "name": parent_type, "type": "WObject"}
                     ]
                 }
             ],
             "ak.wwise.core.object.get": [
                 {"return": [target]},
+                {"return": [target]},  # Exact target class.
                 {"return": []},
                 {"return": [target]},
                 {"return": []},
@@ -884,13 +865,15 @@ def test_set_accepts_closed_game_sync_pairs_inside_recursive_children(
             "ak.wwise.core.object.getTypes": [
                 {
                     "return": [
-                        {"classId": 1, "name": group_type, "type": "WObject"},
+                        {"classId": 3, "name": group_type, "type": "WObject"},
+                        {"classId": 4, "name": "WorkUnit", "type": "WObject"},
                         {"classId": 2, "name": child_type, "type": "WObject"},
                     ]
                 }
             ],
             "ak.wwise.core.object.get": [
                 {"return": [target]},
+                {"return": [target]},  # Exact target class.
                 {"return": []},
                 {"return": [target]},
                 {"return": []},
@@ -940,7 +923,10 @@ def test_set_merge_snapshots_every_nested_collision_and_verifies_the_confirmed_r
         for call in preview_reader.calls
         if call[0] == "ak.wwise.core.object.get" and "path" in call[1].get("from", {})
     ]
-    assert preview_path_reads == [ROOT_COLLISION_PATH, NESTED_COLLISION_PATH]
+    # Early merge identity/class resolution and later complete view snapshots
+    # independently bind both exact paths.
+    assert preview_path_reads == [ROOT_COLLISION_PATH, NESTED_COLLISION_PATH,
+                                  ROOT_COLLISION_PATH, NESTED_COLLISION_PATH]
 
     confirmation = validate_prepared_roles(
         prepared,
@@ -999,7 +985,10 @@ def test_set_merge_rejects_a_nested_collision_with_the_wrong_type_during_preview
         _prepare_merge(nested_row=_nested_collision_row(object_type="ActorMixer"))
 
     assert rejected.value.error_code == "INVALID_TARGET_TYPE"
-    assert rejected.value.details["path"] == NESTED_COLLISION_PATH
+    assert rejected.value.details == {
+        "expected_class_id": 2, "relation": "parent", "owner_id": ROOT_COLLISION_ID,
+        "actual": _nested_collision_row(object_type="ActorMixer"),
+    }
 
 
 def test_set_merge_postverify_fails_if_nested_merge_returns_a_different_guid() -> None:
@@ -1075,10 +1064,12 @@ def test_set_rejects_distinct_descriptors_that_resolve_to_the_same_live_guid() -
     reader = ScriptedReader(
         {
             "ak.wwise.core.object.getTypes": [_type_catalog()],
+            "ak.wwise.core.getProjectInfo": [{}],
             "ak.wwise.core.object.get": [
-                {"return": [_target_row()]},
-                {"return": [_target_row()]},
-                {"return": []},
+                {"return": [_target_row()]},  # First descriptor identity.
+                {"return": [_target_row()]},  # Class.
+                {"return": [_target_row()]},  # Complete fields.
+                {"return": []},  # Complete children.
                 {"return": [_target_row()]},
             ],
         }
