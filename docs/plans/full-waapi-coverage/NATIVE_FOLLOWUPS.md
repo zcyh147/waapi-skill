@@ -5,6 +5,22 @@ These observations unblock implementation decisions. Each row stays open until
 the implementation and its required verification are complete. The full scope
 and existing obligations remain in SPEC.md and LEDGER.md.
 
+## R37 history and portable evidence limits
+
+Integration `510a40f5` supports exact-intent ancestor renames around ordinary
+created hierarchies, including phase-bound internal/existing references and
+receipt-backed history. Its controls use fake native effects; no new native
+history acceptance follows. Native-chosen ancestor suffix materialization and
+cross-child Render preservation remain same-parent implementation work, not
+native absence. Matching native effects still need separate acceptance.
+
+The committed R26 portable receipt preserves historical producer bytes and
+changes only the reviewed locator. Its selected row is `implemented_unverified`:
+program equivalence and native attachment remain missing. No recapture or
+native/Fresh run accompanied R37. The failed original `c18225d9` Program gate
+is recorded in [the test inventory](../../../tests/TEST_INVENTORY.md); focused
+checks and inventory reproducibility do not replace that outstanding gate.
+
 ## Current Soundcaster activation and Tone artifacts
 
 Successor `1e07d63f` repairs the observed Tone header interpretation and collects

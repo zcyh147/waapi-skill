@@ -248,6 +248,23 @@ def _compound_observations(prepared, execution, verification):
             or phases[0].get("phase") != "begin" or phases[-1].get("phase") != "end"):
         raise ValueError("Compound receipt phase order or successful acknowledgement is missing")
     assertions, readbacks = verification.get("assertions", []), verification.get("readbacks", [])
+    path_context = prepared['pre_state']['execution_plan'].get('path_context')
+    created_children = ()
+    if path_context is not None:
+        from .object_graph_paths import validate_compound_path_context, compound_context_result_matches
+        validate_compound_path_context(path_context, calls)
+        from .object_graph_paths import compound_created_child_roots
+        created_children = compound_created_child_roots(calls, phases)
+        from .object_graph_paths import compound_phase_arguments
+        if any(not lifecycle_snapshot_equal(call.get('args'), compound_phase_arguments(calls, index, path_context))
+                for index, call in enumerate(calls) if 'prepared_operation' in call):
+            raise ValueError('Compound phase args differ from their original child and prior rename intent')
+        witnesses = [row for row in assertions if row.get('kind') == 'compound_path_context']
+        context_reads = [row for row in readbacks if row.get('role') == 'compound-path-context']
+        if (len(witnesses) != 1 or witnesses[0].get('passed') is not True
+                or witnesses[0].get('evidence') != {'sha256': canonical_sha256(path_context)}
+                or len(context_reads) != 1 or not compound_context_result_matches(path_context, context_reads[0])):
+            raise ValueError('Compound path context lacks its actual final GUID ancestry observation')
     records = [row for row in assertions if row.get("kind") == "compound_child_observation"]
     if len(records) != len(calls):
         raise ValueError("Compound receipt lacks one actual verification association per child")
@@ -259,6 +276,10 @@ def _compound_observations(prepared, execution, verification):
                 or proof.get("prepared_sha256") != canonical_sha256(child)
                 or proof.get("dispatch_sha256") != canonical_sha256(phase["dispatch_result"])):
             raise ValueError("Compound child index, prepared proof or actual dispatch association differs")
+        if path_context is not None and (proof.get('path_context_sha256') != canonical_sha256(path_context)
+                or proof.get('phase_args_sha256') != canonical_sha256(call['args'])
+                or proof.get('created_children_sha256') != canonical_sha256(created_children)):
+            raise ValueError('Compound child path context differs from its immutable parent')
         header = proof.get("verification")
         if (not isinstance(header, Mapping) or header.get("contract") != verification.get("contract")
                 or header.get("operation") != child.get("operation")
@@ -282,7 +303,7 @@ def _compound_observations(prepared, execution, verification):
                 raise ValueError("Compound child observation range belongs to another typed child index")
             used.update(range(start, start + count))
             sections[name] = rows
-        observations.extend(_source_observations(child, phase["dispatch_result"], {**header, **sections}))
+        observations.extend(_source_observations(child, phase["dispatch_result"], {**header, **sections}, compound_path_context=path_context))
     if not 1 <= len(observations) <= MAX_OBSERVATIONS:
         raise ValueError("Compound history receipt exceeds its observation bound")
     before_by_id, after_by_id = {}, {}
@@ -312,7 +333,10 @@ def _compound_observations(prepared, execution, verification):
         # A rename changes the native hierarchy path of observed descendants
         # too. Apply deepest ancestors first, always using the sealed before
         # path to distinguish hierarchy segments from matching name prefixes.
-        for object_id in sorted(after_by_id, key=lambda key: len(before_by_id[key]["path"]), reverse=True):
+        if path_context:
+            from .object_graph_paths import project_compound_path
+            after['path'] = project_compound_path(row['object_before']['path'], path_context)
+        for object_id in (() if path_context else sorted(after_by_id, key=lambda key: len(before_by_id[key]["path"]), reverse=True)):
             before_path = before_by_id[object_id]["path"]
             if row["object_before"]["path"].startswith(before_path + "\\"):
                 after["path"] = after_by_id[object_id]["path"] + after["path"][len(before_path):]
@@ -321,7 +345,7 @@ def _compound_observations(prepared, execution, verification):
 
 
 
-def _source_observations(prepared, execution, verification) -> list[dict[str, Any]]:
+def _source_observations(prepared, execution, verification, *, compound_path_context=None) -> list[dict[str, Any]]:
     """Interpret actual source outcomes, including explicit parent-owned children."""
     if (execution.get("ok") is not True or verification.get("business_state_verified") is not True
             or verification.get("status") != "verified"):
@@ -335,13 +359,13 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
         observations, covered = render_observations(prepared, verification)
         if plan["kind"] == "object-set-batch":
             from .existing_field_observations import receipt_observations
-            observations.extend(receipt_observations(prepared, verification, exclude_fields=covered))
+            observations.extend(receipt_observations(prepared, verification, exclude_fields=covered, path_context=compound_path_context))
         elif plan["field"] not in covered.get((str(plan["object_id"]).upper(), _receipt_platform(plan, prepared["pre_state"])), set()):
             raise ValueError("Render source selected field is missing from its complete chain observation")
         return observations
     if plan.get("kind") == "object-set-batch":
         from .existing_field_observations import receipt_observations
-        return receipt_observations(prepared, verification)
+        return receipt_observations(prepared, verification, path_context=compound_path_context)
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
         raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":
@@ -353,6 +377,10 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
     from .operation_registry import _object_type_matches
     nodes, expected_paths = ordinary_creation_graph(plan, prepared.get("pre_state", {}),
         parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"), max_observations=MAX_OBSERVATIONS)
+    original_paths = expected_paths
+    if compound_path_context:
+        from .object_graph_paths import project_compound_path
+        expected_paths = {key: project_compound_path(value, compound_path_context) for key, value in original_paths.items()}
     returned = flatten_create_result(execution.get("result"))
     if [row.request_path for row in returned] != [node["request_path"] for node in nodes]:
         raise ValueError("Creation history requires every actual returned graph node exactly once")
@@ -392,7 +420,11 @@ def _source_observations(prepared, execution, verification) -> list[dict[str, An
                 or not _object_type_matches(identity["type"], node, actual_class_id=node.get("class_id"))):
             raise ValueError("Creation history node differs from its actual result and independently observed declaration")
         observations.extend(_created_node_observations(node, identity, parent_id, platform,
-            materialized_fields, prepared, verification, ids if graph else {}, ids["$"]))
+            materialized_fields, prepared, verification, ids if graph else {}, ids["$"],
+            compound_path_context=compound_path_context))
+        if original_paths[node['request_path']] != identity['path']:
+            presence = next(row for row in reversed(observations) if row.get('kind') == 'creation_presence')
+            presence['absence_paths'] = [original_paths[node['request_path']], identity['path']]
     if graph:
         retained = [row for row in verification.get("readbacks", []) if row.get("role") == "created-graph-history-membership"]
         expected_args = {"from": {"id": [ids["$"]]}, "transform": [{"select": ["descendants"]}]}
@@ -422,7 +454,7 @@ def _created_membership_matches(result, observations):
         for expected in nodes)
 
 
-def _created_node_observations(node, identity, parent_id, platform, materialized_fields, prepared, verification, graph_ids, graph_root_id):
+def _created_node_observations(node, identity, parent_id, platform, materialized_fields, prepared, verification, graph_ids, graph_root_id, *, compound_path_context=None):
     fields = [*IDENTITY, "parent", "notes"]
     reads = [row for row in verification.get("readbacks", []) if isinstance(row, Mapping)
         and row.get("uri") == GET and row.get("args") == {"from": {"id": [identity["id"]]}}
@@ -492,9 +524,17 @@ def _created_node_observations(node, identity, parent_id, platform, materialized
                     if not targets or any(target != targets[0] for target in targets):
                         raise ValueError("Creation reference requires its exact source existing-target role")
                     target_identity = targets[0]
+                    target_before = dict(target_identity)
+                    if compound_path_context:
+                        from .object_graph_paths import project_compound_path
+                        target_identity = {**target_identity, 'path': project_compound_path(target_identity['path'], compound_path_context)}
+                        edit = next((item for item in compound_path_context['edits'] if item['target_id'].upper() == actual), None)
+                        if edit:
+                            target_identity['name'] = edit['requested_name']
             captured.append({"field": token, "field_kind": field["kind"], "value": actual,
                 "metadata_type": info.type, "field_info": info.as_dict(include_raw=True),
-                **({"reference_target": target_identity} if target_identity is not None else {}),
+                **({"reference_target": target_identity,
+                    **({'reference_target_before': target_before} if target_before != target_identity else {})} if target_identity is not None else {}),
                 **({"internal_reference_target_id": actual} if "target_request_path" in field else {})})
         observation.update(platform=platform, class_id=row["classId"])
         return [observation, *({"kind": "creation_field", "object_id": identity["id"], "before": False, "after": True,
@@ -505,7 +545,7 @@ def _created_node_observations(node, identity, parent_id, platform, materialized
 def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable[..., Any]) -> dict[str, Any]:
     identity = expected["object"]
     observations = []
-    targets = {item["reference_target"]["id"]: item["reference_target"]
+    targets = {item["reference_target"]["id"]: item.get('reference_target_before', item['reference_target']) if not present else item['reference_target']
         for item in expected.get("fields", []) if "reference_target" in item}
     if targets:
         result = read(GET, {"from": {"id": list(targets)}}, {"return": list(IDENTITY)})
@@ -523,7 +563,8 @@ def _observe_presence(expected: Mapping[str, Any], present: bool, read: Callable
                 field_token=field["field"], available_names=names)
             if info.name != field["field"] or not lifecycle_snapshot_equal(info.as_dict(include_raw=True), field["field_info"]):
                 raise ValueError("Created-object history field metadata changed")
-    for selector in ({"id": [identity["id"]]}, {"path": [identity["path"]]}):
+    paths = [identity['path']] if present else expected.get('absence_paths', [identity['path']])
+    for selector in ({'id': [identity['id']]}, *({'path': [path]} for path in paths)):
         result = read(GET, {"from": selector}, {"return": [*IDENTITY, "parent", "notes",
             *(["classId", *(item["field"] for item in fields)] if fields else ["classId"] if "graph_root_id" in expected else [])],
             **({"platform": expected["platform"]} if fields else {})})

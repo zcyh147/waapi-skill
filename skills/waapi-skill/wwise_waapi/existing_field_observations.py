@@ -149,7 +149,7 @@ def capture_after(proof, *, read):
         return {**record, "reason": "optional_source_postread_failed", "error": _read_error(exc)}
 
 
-def receipt_observations(prepared, verification, *, exclude_fields=None):
+def receipt_observations(prepared, verification, *, exclude_fields=None, path_context=None):
     """Associate every ordinary existing-field outcome with actual source reads."""
     from .edit_history_business import _identity, _scalar_matches, _reference_value, NAMES, INFO, GET
     from .builders.metadata import bind_get_property_info_result, parse_property_and_reference_names_result
@@ -210,14 +210,18 @@ def receipt_observations(prepared, verification, *, exclude_fields=None):
             raise ValueError("Existing-field source postread lacks its exact original GUID/class")
         before, after = proof["before"], rows[0]
         targets_before, targets_after = proof["reference_targets"], observed.get("reference_targets", [])
+        from .object_graph_paths import project_compound_snapshot
+        expected_targets = [project_compound_snapshot(row, path_context) for row in targets_before]
         if (not isinstance(targets_after, list) or len(targets_before) != len(targets_after)
                 or {row["id"].upper() for row in targets_before} != {row.get("id", "").upper() for row in targets_after}
-                or any(not any(lifecycle_snapshot_equal(row, actual) for actual in targets_after) for row in targets_before)):
+                or any(not any(lifecycle_snapshot_equal(row, actual) for actual in targets_after) for row in expected_targets)):
             raise ValueError("Existing-reference source target identities/classes were not preserved")
         expected_identity = _identity(before)
         if "name" in declared:
             expected_identity.update(name=declared["name"][1],
                 path=before["path"].rsplit("\\", 1)[0] + "\\" + declared["name"][1])
+        if path_context:
+            expected_identity = _identity(project_compound_snapshot(before, path_context))
         if _identity(after) != expected_identity:
             raise ValueError("Existing-field source postread identity differs from its declared outcome")
         for field in fields:

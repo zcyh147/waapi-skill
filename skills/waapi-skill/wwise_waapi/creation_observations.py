@@ -91,8 +91,8 @@ def require_compound_creation_scope(calls):
     prepared = [row.get('prepared_operation', {}) for row in calls]
     if not any(child.get('verification_plan', {}).get('kind') == 'object-create-graph' for child in prepared):
         return
-    graphs, renames, known_count = [], [], 0
-    for index, child in enumerate(prepared):
+    graphs, known_count = [], 0
+    for child in prepared:
         plan, state = child.get('verification_plan', {}), child.get('pre_state', {})
         kind = plan.get('kind')
         chains = state.get('effect_render_chains', [])
@@ -105,24 +105,16 @@ def require_compound_creation_scope(calls):
                 key = (str(item['scope'].get('object_id')).upper(), chain.get('platform'))
                 covered.setdefault(key, set()).add(item['field'])
         if kind == 'object-create-graph':
-            nodes, paths = ordinary_creation_graph(plan, state,
+            nodes, _ = ordinary_creation_graph(plan, state,
                 parent=child.get('resolved_roles', {}).get('parent', {}).get('row'), max_observations=MAX_OBSERVATIONS)
-            graphs.append((index, paths))
+            graphs.append(True)
             known_count += len(nodes) + sum(len(ordinary_creation_fields(node)) for node in nodes)
         elif kind == 'same-guid-renamed':
-            renames.append((index, plan['old_path']))
             known_count += 1
         elif kind in {'same-guid-notes', 'same-guid-property', 'same-guid-reference'} and not state.get('effect_render_chains'):
             known_count += 1
         elif kind == 'object-set-batch':
             for node in plan.get('nodes', []):
-                if node.get('requested_name') != node.get('original_name'):
-                    paths = {role['row']['path'] for role in child.get('resolved_roles', {}).values()
-                        if str(role.get('object')).upper() == str(node.get('target_id')).upper()}
-                    if len(paths) != 1:
-                        raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
-                            'Compound graph ancestry needs the exact renamed object path.')
-                    renames.append((index, next(iter(paths))))
                 proofs = [proof for proof in state.get('existing_field_observations', [])
                     if proof.get('request_path') == node.get('request_path')]
                 view = proofs[0].get('field_read_platform', {}).get('platform_id') if len(proofs) == 1 else None
@@ -136,13 +128,6 @@ def require_compound_creation_scope(calls):
     if known_count > MAX_OBSERVATIONS:
         raise OperationContractError('UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED',
             'Compound created graph and known companion outcomes exceed the complete history observation bound.')
-    for graph_index, paths in graphs:
-        for rename_index, old_path in renames:
-            if rename_index != graph_index and any(path.casefold().startswith(old_path.casefold().rstrip('\\') + '\\') for path in paths.values()):
-                raise OperationContractError('UNDO_GROUP_GRAPH_PATH_DEPENDENCY_UNPROVEN',
-                    'Compound creation with an ancestor rename requires the next graph path-dependency algebra; this is an implementation gap, not native absence.',
-                    details={'creation_index': graph_index, 'rename_index': rename_index,
-                        'implementation_obligation': 'created_graph_ancestor_rename_path_algebra'})
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:

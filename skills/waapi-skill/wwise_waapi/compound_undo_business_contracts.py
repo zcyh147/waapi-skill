@@ -81,7 +81,7 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
                     if version != "2021.1" else {}),
                 "render_effects": "explicit_and_induced_existing_fields_plus_complete_original_chain",
                 "graph_list_merge_replace_restoration": "remaining_same_parent_implementation_obligation",
-                "created_graph_ancestor_rename": "remaining_same_parent_path_dependency_algebra;_prewrite_rejection_is_not_native_absence",
+                "created_graph_ancestor_rename": "exact_intent_GUID_bound_ancestor_components_and_phase_reference_arguments;_native_chosen_suffix_phase_dependency_remains_same_parent",
                 "history_receipt": "actual_parent_execution_phase_and_child_verification_range_hash_association",
             },
             "prohibited_generic_child_operations": prohibited_generic,
