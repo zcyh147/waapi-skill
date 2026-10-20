@@ -8701,7 +8701,7 @@ def query_business_schema_payload(
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
             "return_scope": _query_return_scope_contract(),
             "result_presence": _query_result_presence_contract(),
-            "business_outputs": list(available_query_outputs(version)),
+            "business_outputs": [name for name, binding in available_query_outputs(version).items() if binding[0] is not None],
             "output_detail": "query-schema --output <business-output>",
             "custom_outputs": {
                 "available": False,

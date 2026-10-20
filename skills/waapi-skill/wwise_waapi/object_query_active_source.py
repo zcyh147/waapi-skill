@@ -26,6 +26,10 @@ def _fail(code, message):
     raise ActiveSourceQueryError(code, message)
 
 
+def _class_matches(value, expected):
+    return type(value) is int and 0 < value <= 0xFFFFFFFF and value == expected
+
+
 def _guid(value):
     if isinstance(value, Mapping):
         value = value.get("id")
@@ -117,7 +121,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
         expected = pinned.by_name(name)
         matching = [row for row in catalog if expected and row.get("classId") == expected.class_id]
         if (len(matching) != 1 or any(matching[0].get(key) != value for key, value in expected.as_dict().items())
-                or isinstance(matching[0]["classId"], bool)):
+                or not _class_matches(matching[0]["classId"], expected.class_id)):
             _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Actual source classes require the pinned semantic identity and matching live catalog.")
         classes[name] = expected.class_id
 
@@ -134,7 +138,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
         return [], preview, {"method": "unique_same_view_original_path", "sound_count": 0}
     owner = before[0]
     identity = _identity(owner)
-    if identity["type"] != "Sound" or isinstance(owner.get("classId"), bool) or owner.get("classId") != classes["Sound"]:
+    if identity["type"] != "Sound" or not _class_matches(owner.get("classId"), classes["Sound"]):
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Active-source derivation requires an actual class-proven Sound.")
     if "object_id" in selector and _guid(selector["object_id"]) != identity["id"] or "path" in selector and selector["path"] != identity["path"]:
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "The exact Sound selector returned another object.")
@@ -155,7 +159,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, str], p
                 _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child's actual hierarchy path differs from its direct parent.")
             if actual["type"] != "AudioFileSource":
                 _fail("ACTIVE_SOURCE_SELECTION_UNRESOLVED", "Non-file source selection remains unresolved.")
-            if isinstance(row.get("classId"), bool) or row.get("classId") != classes["AudioSource"]:
+            if not _class_matches(row.get("classId"), classes["AudioSource"]):
                 _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "A source child's actual class differs from its semantic class.")
             source_language = row.get("audioSource:language")
             if not isinstance(source_language, Mapping) or not isinstance(source_language.get("name"), str):

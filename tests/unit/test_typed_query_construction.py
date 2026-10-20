@@ -1368,11 +1368,14 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
     platform = "{44444444-4444-4444-4444-444444444444}"
     language = "{55555555-5555-5555-5555-555555555555}"
     project = "{66666666-6666-6666-6666-666666666666}"
-    project_file = tmp_path / "Fixture.wproj"
+    project_file = tmp_path / "project" / "Fixture.wproj"
+    project_file.parent.mkdir()
     project_file.write_text("<Project />")
     class Client(_AdvancedQueryClient):
         child_reads = 0
         sound_reads = 0
+        notes = ""
+        inactive_file_changed = False
 
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.getInfo":
@@ -1396,6 +1399,8 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                     "audioSource:language": {"id": language, "name": language_name},
                     "originalWavFilePath": "/owned/Originals/SFX/" + name + ".wav"}
                     for identity, name in ((inactive, "Alpha"), (active, "Beta"))]
+                if self.inactive_file_changed:
+                    rows[0]["originalWavFilePath"] = "/owned/Originals/SFX/Changed.wav"
                 if language_name != "SFX":
                     rows[0]["audioSource:language"] = {"id": project, "name": "French(France)"}
                 if fault == "duplicate-path":
@@ -1404,6 +1409,8 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                     rows[1]["parent"] = {"id": project}
                 elif fault == "missing-class":
                     del rows[1]["classId"]
+                elif fault == "float-class":
+                    rows[1]["classId"] = 16.0
                 elif fault == "plugin":
                     rows[1]["type"] = "SourcePlugin"
                 elif fault == "membership-drift" and self.child_reads == 2:
@@ -1411,9 +1418,11 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                 elif fault == "fence":
                     rows = [{**rows[0], "id": "{%08X-0000-0000-0000-000000000000}" % index} for index in range(1, 1001)]
             else:
-                assert sound in query, query
+                assert sound in query or "Rain" in query, query
                 self.sound_reads += 1
                 rows = [{"id": sound, "name": "Rain", "type": "Sound", "classId": 65552,
+                    "notes": self.notes,
+                    "OverrideOutput": False, "OutputBus": {"id": project, "name": "Master Audio Bus"},
                     "path": r"\Sounds\Rain", "parent": {"id": project},
                     "originalWavFilePath": "/owned/Originals/SFX/Beta.wav",
                     "audioSource:language": {"id": language, "name": language_name}}]
@@ -1454,6 +1463,35 @@ def test_2021_active_source_preserves_parent_identity_across_native_reference_re
     assert result["agent_result"][0]["active_source"]["id"] == ids["active"]
 
 
+def test_2021_active_source_pages_bind_the_complete_candidate_observation(tmp_path):
+    client, ids = _legacy_active_source_client(tmp_path)
+    client.notes = "声" * 24000
+    env = _env(tmp_path, "2021.1")
+    code, first = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"], "--platform", "Mac",
+        "--language", "SFX", "--include", "active-source", "--include", "notes"], env=env, client_factory=lambda _: client)
+    assert code == 0 and first["status"] == "partial", first
+    continuation = first["agent_result"]["next_command"]["gateway_argv"]
+    client.inactive_file_changed = True
+    code, rejected = gateway.execute_gateway(continuation, env=env, client_factory=lambda _: client)
+    assert code == 2 and rejected["error_code"] == "QUERY_RESULT_CONTINUATION_CHANGED", rejected
+
+
+def test_2021_routing_view_reuses_derived_active_source_and_retains_other_native_fields(tmp_path):
+    client, ids = _legacy_active_source_client(tmp_path)
+    code, result = gateway.execute_gateway(["query-object", "--path-segment", "Sounds", "--path-segment", "Rain",
+        "--platform", "Mac", "--language", "SFX", "--view", "sound-routing-diagnostics"],
+        env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    row = result["agent_result"][0]
+    assert row["active_source"] == {"id": ids["active"], "name": "Beta"}
+    assert row["override_output"] is False and row["output_bus"]["name"] == "Master Audio Bus"
+    next_read = result["continuations"][0]["next_command"]["gateway_argv"]
+    assert next_read == ["query-object", "--platform", "Mac", "--language", "SFX", "--exact-id", ids["active"],
+                         "--include", "original-file-path", "--include", "source-language"]
+    code, schema = gateway.execute_gateway(["query-schema", "--advanced"], env=_env(tmp_path, "2021.1"))
+    assert code == 0 and "active-source" not in schema["business_outputs"]
+
+
 @pytest.mark.parametrize("fault,expected", [
     ("duplicate-path", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
     ("wrong-path", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
@@ -1462,6 +1500,7 @@ def test_2021_active_source_preserves_parent_identity_across_native_reference_re
     ("plugin", "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
     ("wrong-parent", "ACTIVE_SOURCE_INVALID_OBSERVATION"),
     ("missing-class", "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ("float-class", "ACTIVE_SOURCE_INVALID_OBSERVATION"),
     ("membership-drift", "ACTIVE_SOURCE_OBSERVATION_CHANGED"),
     ("sound-drift", "ACTIVE_SOURCE_OBSERVATION_CHANGED"),
     ("fence", "ACTIVE_SOURCE_OBSERVATION_INCOMPLETE"),
