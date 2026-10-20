@@ -125,3 +125,77 @@ def test_existing_source_owner_rejects_invalid_or_unresolved_intent_without_writ
         'source-conflict': 'SOURCE_CONFLICT_UNRESOLVED'}[fault]
     assert any(row['error_code'] == expected for row in rejected.get('details', {}).get('issues', [])), rejected
     assert writes == []
+
+
+@pytest.mark.parametrize('fault', [None, 'original-path', 'class'])
+def test_source_append_preserves_file_backed_source_observations(tmp_path, workflow, fault):
+    task, writes = existing_source_task(tmp_path, workflow, voice=False)
+    file_id = '{ACACACAC-ACAC-ACAC-ACAC-ACACACACACAC}'
+    from wwise_waapi.metadata_catalog import ObjectTypeCatalogStore
+    source_class = ObjectTypeCatalogStore().load('2025.1').by_name('AudioFileSource')
+    assert source_class.class_id == 16 and source_class.type == 'WObject'
+    # Boundary observations only: no media file existence/content is fabricated.
+    task.objects[file_id] = {'id': file_id, 'name': 'Retained recording', 'type': 'AudioFileSource', 'classId': 16,
+        'path': task.objects[FIRST]['path'] + r'\Retained recording', 'parent': {'id': FIRST},
+        'notes': 'Keep recording', 'audioSource:language': {'name': 'SFX'},
+        'originalFilePath': '/fixtures/originals/Retained recording.wav'}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('getPropertyAndReferenceNames') and (args or {}).get('object') == file_id:
+            return {'return': []}
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            if fault == 'original-path': task.objects[file_id]['originalFilePath'] = '/fixtures/changed.wav'
+            elif fault == 'class': task.objects[file_id]['classId'] = 6684674
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    code, result = task.run('verify', tx)
+    assert code == (0 if fault is None else 2) and (result.get('verified') is True) == (fault is None), result
+    assert len(writes) == 1
+
+
+@pytest.mark.parametrize('corrupt_later_page', [False, True])
+def test_retained_source_fields_use_bounded_projection_pages(tmp_path, workflow, monkeypatch, corrupt_later_page):
+    import wwise_waapi.builders.query as query
+    # Exercise pagination with genuine Tone field names and a smaller injected
+    # Gateway projection budget; this is not a claimed native field-count limit.
+    monkeypatch.setattr(query, 'MAX_STRUCTURED_RETURN_FIELDS', 16)
+    task, writes = existing_source_task(tmp_path, workflow)
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native-catalog.json').read_text())
+    metadata = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025.1-properties.json').read_text())['metadata']
+    last_field = next(name for name in reversed(fixture['property_names']['return']) if name in metadata)
+    observed = metadata[last_field]['default']
+    task.objects[RETAINED]['@' + last_field] = observed
+    original = task.call
+    projections = []
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and (args or {}).get('from', {}).get('id') == [RETAINED]:
+            fields = options['return']
+            assert len(fields) <= 16, fields
+            if any(field.startswith('@') for field in fields): projections.append(fields)
+        result = original(uri, args, options)
+        if uri.endswith('object.set') and corrupt_later_page:
+            task.objects[RETAINED]['@' + last_field] = observed + 1
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    if corrupt_later_page:
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, executed = task.run('execute', tx)
+        assert code == 0, executed
+        code, result = task.run('verify', tx)
+        assert code == 2 and result.get('verified') is not True, result
+    else:
+        finish(task, tx, shown)
+    assert len(writes) == 1 and len(projections) > 1
+    projected = {name for fields in projections for name in fields}
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native-catalog.json').read_text())
+    assert {'@' + name for name in fixture['property_names']['return']} <= projected
+    first_field = fixture['property_names']['return'][0]
+    assert any('@' + last_field in fields and '@' + first_field not in fields for fields in projections)

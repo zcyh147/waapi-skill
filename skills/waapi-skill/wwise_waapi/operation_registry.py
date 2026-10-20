@@ -6930,7 +6930,7 @@ def _prepare_object_set(
         )
         child_rows = _read_direct_children(target.object, fields=IDENTITY_RETURN_FIELDS, read=read)
         if live_source_parent:
-            field_snapshots.extend(_capture_retained_source_state(child_rows, owner=target, catalog=type_catalog, read=read, platform=platform))
+            field_snapshots.extend(_capture_retained_source_state(child_rows, owner=target, catalog=type_catalog, read=read, platform=platform, version=request.version))
         children_snapshots.append(
             {"object_id": target.object, "fields": list(IDENTITY_RETURN_FIELDS), "rows": child_rows}
         )
@@ -7990,26 +7990,40 @@ def _resolve_merge_node_target(
         resolution="live-exact-merge-collision", row=row)
 
 
-def _capture_retained_source_state(children, *, owner, catalog, read, platform):
-    """Seal observed existing Source fields without selecting a mutation token."""
+def _capture_retained_source_state(children, *, owner, catalog, read, platform, version):
+    """Seal every observed Source field through bounded projection pages."""
+    from .builders.query import MAX_STRUCTURED_RETURN_FIELDS
     snapshots = []
     for child in children:
-        if child.get("type") not in {"Source", "SourcePlugin"}:
+        file_source = child.get("type") == "AudioFileSource"
+        if child.get("type") not in {"Source", "SourcePlugin"} and not file_source:
             continue
+        file_class = _resolve_import_audio_source_class(version, catalog=catalog) if file_source else None
         names = parse_property_and_reference_names_result(read(GET_PROPERTY_AND_REFERENCE_NAMES_URI,
             {"object": child["id"]}, {}))
-        if len(names) > 256:
-            raise OperationContractError("LIMIT_EXCEEDED", "Retained Source field discovery exceeds its 256-field preservation bound.")
-        fields = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId", "audioSource:language", *("@" + row.name for row in names)])
-        rows = _read_object_id_rows(child["id"], fields=fields, read=read, platform=platform)
-        if (len(rows) != 1 or any(not _native_snapshot_equal(rows[0].get(key), child.get(key)) for key in IDENTITY_RETURN_FIELDS)
-                or not _same_identity(_parent_value(rows[0].get("parent")), owner.object)):
-            raise OperationContractError("INVALID_READBACK", "Retained Source identity and parent must remain exact during preparation.")
-        class_id = rows[0].get("classId")
-        if type(class_id) is not int or len([row for row in catalog if row.class_id == class_id and row.type.casefold() == "source"]) != 1:
-            raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "Retained Source class requires one actual live Source-category row.")
-        snapshots.append({"object_id": child["id"], "fields": fields, "platform": platform,
-            "rows": rows, "preserve_after_write": True})
+        base_fields = [*IDENTITY_RETURN_FIELDS, "classId", "audioSource:language", *(["originalFilePath"] if file_source else [])]
+        page_size = MAX_STRUCTURED_RETURN_FIELDS - len(base_fields)
+        if page_size < 1:
+            raise OperationContractError("LIMIT_EXCEEDED", "The Gateway projection budget cannot hold the Source identity frame.")
+        observed_fields = _dedupe_fields(["@" + row.name for row in names])
+        pages = [observed_fields[offset:offset + page_size] for offset in range(0, len(observed_fields), page_size)] or [[]]
+        identity_frame = None
+        for page in pages:
+            fields = [*base_fields, *page]
+            rows = _read_object_id_rows(child["id"], fields=fields, read=read, platform=platform)
+            if (len(rows) != 1 or any(not _native_snapshot_equal(rows[0].get(key), child.get(key)) for key in IDENTITY_RETURN_FIELDS)
+                    or not _same_identity(_parent_value(rows[0].get("parent")), owner.object)):
+                raise OperationContractError("INVALID_READBACK", "Retained Source identity and parent must remain exact during preparation.")
+            class_id = rows[0].get("classId")
+            if (type(class_id) is not int or (class_id != file_class.class_id if file_source else
+                    len([row for row in catalog if row.class_id == class_id and row.type.casefold() == "source"]) != 1)):
+                raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "Retained Source class must match its exact live versioned type.")
+            current_frame = {key: rows[0][key] for key in base_fields if key in rows[0]}
+            if identity_frame is not None and not _native_snapshot_equal(current_frame, identity_frame):
+                raise OperationContractError("INVALID_READBACK", "Retained Source identity frame changed between projection pages.")
+            identity_frame = current_frame
+            snapshots.append({"object_id": child["id"], "fields": fields, "platform": platform,
+                "rows": rows, "preserve_after_write": True})
     return snapshots
 
 
