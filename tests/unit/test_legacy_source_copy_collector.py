@@ -53,6 +53,7 @@ def legacy_runtime(tmp_path, *, fault=None):
             task.objects[COPIED] = row
             if fault == 'copied-class': task.objects[COPIED]['classId'] = 6619138
             if fault == 'original-field': task.objects[SOURCE]['@Osc1Transpose'] = 0
+            if fault == 'owner-voice': task.objects[FIRST]['@IsVoice'] = True
             return {'id': COPIED, 'name': row['name']}
         if uri.endswith('getPropertyAndReferenceNames'):
             row = task.objects.get(args['object'], {})
@@ -107,7 +108,7 @@ def test_legacy_source_copy_fresh_lifecycle_initializes_state(tmp_path, workflow
     assert (runtime.state_dir / 'legacy-source-copy-feasibility.json').is_file()
 
 
-@pytest.mark.parametrize('fault', [None, 'original-field'])
+@pytest.mark.parametrize('fault', [None, 'original-field', 'owner-voice'])
 def test_legacy_source_copy_pages_all_documented_synth_read_fields(tmp_path, workflow, fault):
     runtime, commands, writes, task = legacy_runtime(tmp_path, fault=fault)
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/synth-one-2021-sdk-read-fields.json').read_text())
@@ -124,12 +125,29 @@ def test_legacy_source_copy_pages_all_documented_synth_read_fields(tmp_path, wor
     if fault is None:
         category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_SYNTH_FIELDS')
         assert category['status'] == 'PASS'
+        # Full Source observations stay paged; owners need only exact frames.
+        assert len(commands) == 55
+        receipt = json.loads(Path(category['observation_path']).read_text())
+        owner_ids = {FIRST, receipt['destination_id']}
+        assert not any(argv[:2] == ['metadata', 'list'] and any(identity in argv for identity in owner_ids)
+            for argv in commands)
+        owner_reads = [argv for argv in commands if argv[0] == 'query-object' and '--include-field' in argv
+            and any(identity in argv for identity in owner_ids)]
+        assert len(owner_reads) == 4 and all(argv.count('--include-field') == 1
+            and argv[argv.index('--include-field') + 1] == 'IsVoice' for argv in owner_reads)
     else:
-        # Osc1Transpose lies on the second page of the genuine SDK field list.
-        assert names.index('Osc1Transpose') >= 8
+        if fault == 'original-field':
+            # Osc1Transpose lies on page2 of the genuine SDK field list.
+            assert names.index('Osc1Transpose') >= 8
         with pytest.raises(AssertionError, match='Original Source/owner/observed owned objects changed'):
             workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_SYNTH_FIELDS')
         assert len([uri for uri, _ in writes if uri.endswith('object.copy')]) == 1
+        if fault == 'owner-voice':
+            receipt = json.loads((runtime.state_dir / 'legacy-source-copy-feasibility.json').read_text())
+            owner_reads = [json.loads(Path(row['reply']['path']).read_text()) for row in receipt['calls']
+                if row['argv'][0] == 'query-object' and FIRST in row['argv'] and '--include-field' in row['argv']]
+            assert [row['objects'][0]['properties']['IsVoice'] for row in owner_reads] == [False, True]
+            assert task.objects[SOURCE]['@Osc1Transpose'] == -1200
     pages = [argv for argv in commands if argv[0] == 'query-object' and SOURCE in argv and '--include-field' in argv]
     assert len(pages) >= 3 and all(argv.count('--include-field') <= 8 for argv in pages)
     assert {argv[index + 1] for argv in pages for index, token in enumerate(argv) if token == '--include-field'} == set(names)

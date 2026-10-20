@@ -9319,7 +9319,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             'source_line': 12173, 'source_id': source_id, 'owned_ids': original_owned_ids,
             'shape': 'OutputLevel RTPC owns Curve and custom ControlInput ModulatorLfo; copied IDs may differ'},
         'scope_exclusions': ['deep_owned_copy_mapping', 'all_plugin_copy_business_coverage',
-            'empty_project_constructor', 'Tone_constructor', 'other_versions', 'audio_effect', 'locale_or_platform_changes'],
+            'all_owner_properties', 'known_owned_fields', 'empty_project_constructor', 'Tone_constructor',
+            'other_versions', 'audio_effect', 'locale_or_platform_changes'],
         'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
             'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
             'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
@@ -9377,6 +9378,13 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     def exact(identity):
         rows = query(identity); assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
         return rows[0]
+    def owner_frame(identity):
+        rows = query(identity, fields=['IsVoice'])
+        assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        row = rows[0]
+        assert row['type'] == 'Sound' and row['class_id'] == 65552, row
+        assert type(row.get('properties', {}).get('IsVoice')) is bool, 'Owner needs its actual Boolean IsVoice'
+        return {'identity': row, 'scope': 'identity/class/parent/name/notes/IsVoice only; other owner properties unobserved'}
     def snapshot(identity):
         row = exact(identity); names, page = [], None
         while True:
@@ -9414,8 +9422,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         observations = {}
         for identity in original_owned_ids:
             rows = query(identity)
-            observations[identity] = snapshot(identity) if len(rows) == 1 else {'identity_rows': rows,
-                'scope': 'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
+            assert len(rows) <= 1 and (not rows or uuid.UUID(rows[0]['id']) == uuid.UUID(identity)), rows
+            observations[identity] = {'identity_rows': rows, 'scope':
+                'observed topology/class/notes only; fields and copied GUID mapping unverified' if rows else
+                'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
         return observations
     def complete(preview, label):
         tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
@@ -9446,7 +9456,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         source_before = save_observation('source-before', snapshot(source_id))
         assert source_before['identity']['type'] in {'Source', 'SourcePlugin'} and source_before['identity']['class_id'] == 9699330
         old_owner = source_before['identity']['parent']['id']
-        owner_before = save_observation('original-owner-before', snapshot(old_owner))
+        owner_before = save_observation('original-owner-before', owner_frame(old_owner))
         assert owner_before['identity']['type'] == 'Sound' and owner_before['identity']['class_id'] == 65552
         source_children = save_observation('original-owner-children-before', query(old_owner, relation='children'))
         save_observation('source-descendants-before', query(source_id, relation='descendants'))
@@ -9462,9 +9472,9 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         rows = gateway.gateway(['query-object', *[arg for segment in (*ACTOR_MIXER_PARENT_SEGMENTS, prefix)
             for arg in ('--path-segment', segment)], '--include', 'parent', '--include', 'class-id', '--max-results', '2'], live=True)['objects']
         destination, = rows; destination_id = receipt['destination_id'] = destination['id']
-        destination_before = save_observation('destination-before', snapshot(destination_id))
+        destination_before = save_observation('destination-before', owner_frame(destination_id))
         assert destination['type'] == 'Sound' and destination['class_id'] == 65552
-        flag = query(destination_id, fields=['IsVoice']); assert flag[0]['properties']['IsVoice'] is False, flag
+        assert destination_before['identity']['properties']['IsVoice'] is False, destination_before
         assert query(destination_id, relation='children') == [], 'Copy destination must be empty'
         preview = create_object_lifecycle_business_preview(lambda argv: gateway.gateway(argv,
             live=argv[0] in {'draft-bind-object', 'draft-check', 'preview-from-draft'}),
@@ -9481,14 +9491,14 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         copied_state = save_observation('copied-source', snapshot(copied['id']))
         save_observation('copied-descendants', query(copied['id'], relation='descendants'))
         source_after = save_observation('source-after', snapshot(source_id))
-        owner_after = save_observation('original-owner-after', snapshot(old_owner))
-        destination_after = save_observation('destination-after', snapshot(destination_id))
+        owner_after = save_observation('original-owner-after', owner_frame(old_owner))
+        destination_after = save_observation('destination-after', owner_frame(destination_id))
         owned_after = save_observation('known-owned-after', known_owned())
         assert source_after == source_before and owner_after == owner_before and owned_after == owned_before, 'Original Source/owner/observed owned objects changed'
         assert query(old_owner, relation='children') == source_children, 'Original owner childset changed'
-        assert destination_after == destination_before, 'Destination observed fields changed'
-        receipt['preservation'] = {'original_source_observed_state': True, 'original_owner_observed_state': True,
-            'original_owner_children': True, 'destination_observed_fields': True, 'known_owned_observations': True,
+        assert destination_after == destination_before, 'Destination identity/Voice frame changed'
+        receipt['preservation'] = {'original_source_observed_state': True, 'original_owner_identity_voice_frame': True,
+            'original_owner_children': True, 'destination_identity_voice_frame': True, 'known_owned_topology_observations': True,
             'unresolvable_owned_ID_scope': 'equal unavailable observations do not prove owned object preservation'}
         before_fields = {key: value for row in source_before['field_pages'] for key, value in row.get('properties', {}).items()}
         after_fields = {key: value for row in copied_state['field_pages'] for key, value in row.get('properties', {}).items()}
