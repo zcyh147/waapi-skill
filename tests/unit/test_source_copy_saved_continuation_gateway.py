@@ -993,3 +993,79 @@ def test_unreviewed_owned_class_keeps_source_copy_partial(tmp_path, unreviewed):
     assert result['verification']['verification_scope']['complete_copy_preservation'] is False
     assert 'next_command' not in result
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_modern_saved_source_parser_retains_versioned_list_and_both_custom_references(version):
+    """Pinned saved syntax is evidence for parsing, never native selector support."""
+    from wwise_waapi.source_copy_proof import source_nodes, graph_edges
+    folder = 'Containers' if version == '2025.1' else 'Actor-Mixer Hierarchy'
+    path = Path(__file__).parents[1] / '_org' / version / folder / 'MIDI.wwu'
+    nodes = source_nodes({str(path): ET.parse(path)}, SOURCE, SAVED_OWNER, version=version)
+    assert [(node.tag, node.get('ID')) for node in nodes.values()] == [
+        ('SourcePlugin', SOURCE),
+        ('RTPC', '{CE99046D-D354-422D-A7BB-F1305FF00B2F}'),
+        ('ModulatorLfo', '{E323F786-253F-48C6-86B9-AB0335804E9F}'),
+        ('Curve', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}'),
+    ]
+    owners, controls = graph_edges(nodes)
+    roles = {node.tag: role for role, node in nodes.items()}
+    assert owners == {roles['RTPC']: 'source', roles['ModulatorLfo']: roles['RTPC'],
+        roles['Curve']: roles['RTPC']}
+    assert controls == {roles['RTPC']: roles['ModulatorLfo']}
+
+
+@pytest.mark.parametrize('saved_version,claimed_version', [
+    ('2021.1', '2022.1'), ('2025.1', '2022.1'), ('2022.1', '2025.1'),
+])
+def test_saved_source_parser_rejects_another_versions_wrapper_family(saved_version, claimed_version):
+    from wwise_waapi.source_copy_proof import source_nodes, UnsupportedSavedShape
+    folder = 'Containers' if saved_version == '2025.1' else 'Actor-Mixer Hierarchy'
+    path = Path(__file__).parents[1] / '_org' / saved_version / folder / 'MIDI.wwu'
+    with pytest.raises(UnsupportedSavedShape):
+        source_nodes({str(path): ET.parse(path)}, SOURCE, SAVED_OWNER, version=claimed_version)
+
+
+@pytest.mark.parametrize('version,minor,build', [
+    ('2022.1', 19, 8584), ('2023.1', 19, 8928), ('2024.1', 13, 9056), ('2025.1', 7, 9143),
+])
+def test_saved_source_origin_validates_exact_modern_runtime_without_enabling_admission(tmp_path, version, minor, build):
+    from wwise_waapi.source_copy_proof import final_origin, validate_origin, supported
+    from wwise_waapi.transactions import TransactionStore
+    runtime, writes, task = saved_source_task(tmp_path)
+    transaction = TransactionStore(runtime.state_dir).load_snapshot(public_copy(task))
+    origin = deepcopy(final_origin(transaction))
+    origin['version'] = version
+    guard = origin['context']['project_guard']
+    guard['version'] = version
+    guard['wwise']['version'].update(year=int(version[:4]), minor=minor, build=build, displayName='v' + version + f'.{minor}.{build}')
+    validate_origin(origin, version)
+    assert not supported({'project_guard': guard}), 'The selected Source probe still gates modern admission'
+
+
+def test_final_source_origin_preserves_its_parent_version(tmp_path):
+    from dataclasses import replace
+    from wwise_waapi.source_copy_proof import final_origin
+    from wwise_waapi.transactions import TransactionStore
+    runtime, writes, task = saved_source_task(tmp_path)
+    transaction = TransactionStore(runtime.state_dir).load_snapshot(public_copy(task))
+    # Isolate the origin constructor's version propagation; no modern live claim.
+    artifact = deepcopy(transaction.preview.artifact)
+    artifact['request']['version'] = '2025.1'
+    parent = replace(transaction, preview=replace(transaction.preview, artifact=artifact))
+    assert final_origin(parent)['version'] == '2025.1'
+
+
+def test_baseline_source_decision_preserves_its_exact_modern_version_binding(tmp_path):
+    from wwise_waapi.operation_drafts import OperationDraftStore
+    from wwise_waapi.source_copy_proof import ORIGIN, validate_origin, validate_decision
+    runtime, writes, task = saved_source_task(tmp_path)
+    checked = checked_dirty_parent(task)
+    code, child = task.run(*checked['next_command']['gateway_argv']); assert code == 0, child
+    record = OperationDraftStore(runtime.state_dir).inspect(child['draft']['draft_id'], task_authority=child['task_authority'])
+    origin = deepcopy(record.composition[ORIGIN])
+    origin['version'] = origin['context']['project_guard']['version'] = '2023.1'
+    origin['context']['project_guard']['wwise']['version'].update(year=2023, minor=19, build=8928)
+    validate_origin(origin, '2023.1')
+    validate_decision({'status': 'declined', 'request_digest': origin['parent']['request_digest'],
+        'origin': origin, 'receipt': None})

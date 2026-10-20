@@ -237,7 +237,7 @@ def test_source_later_selection_without_explicit_user_intent_rejected_before_sav
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
 
 
-def test_source_protocol_rejects_unknown_command_role_fields_and_other_versions():
+def test_source_protocol_rejects_unknown_command_role_fields_and_unpinned_versions():
     from dataclasses import replace
     from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol
     from tests.semantic.support.codex_gateway_broker import validate_operation_draft_protocol_steps
@@ -251,7 +251,7 @@ def test_source_protocol_rejects_unknown_command_role_fields_and_other_versions(
     archive['steps'][marked]['source_copy_proof_role']['unknown_authority'] = True
     with pytest.raises(PromptProvenanceError):
         deserialize_protocol(archive)
-    for version in ('2022.1', '2023.1', '2024.1', '2025.1'):
+    for version in ('2020.1', '2022.2', '2026.1'):
         with pytest.raises(ValueError):
             build_source_copy_saved_proof_protocol({**source_request(), 'version': version})
 
@@ -615,9 +615,30 @@ def test_source_read_only_admission_requires_exact_existing_schema_topology():
     assert is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', protocol)
     wrong_schema = replace(protocol.steps[0], arguments=('object.delete',))
     assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', replace(protocol, steps=(wrong_schema,)))
-    assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2022.1', protocol)
+    # This schema-only refusal has no executable request; the outer runner
+    # binds its selected supported version. It cannot enable a Source proof.
+    assert is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2022.1', protocol)
+    assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2026.1', protocol)
     assert not is_source_copy_proof_protocol('ak.wwise.core.object.delete', '2021.1', protocol)
     assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', V3GatewayProtocol(protocol.steps, (1,)))
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_source_protocol_preserves_matching_version_for_copy_and_both_generated_saves(version):
+    """Closed scheduling proves no native Source applicability or copy effect."""
+    from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol, is_source_copy_proof_protocol
+    request = {**source_request(), 'version': version}
+    protocol = build_source_copy_saved_proof_protocol(request, dirty_baseline=True)
+    previews = [step.expected_operation_request for step in protocol.steps if step.subcommand == 'preview-from-draft']
+    assert previews == [
+        {'contract': 'waapi-skill.operation-request/v1', 'version': version,
+            'operation': 'waapi.call', 'arguments': {'api': 'ak.wwise.core.project.save', 'args': {}, 'options': {}}},
+        request,
+        {'contract': 'waapi-skill.operation-request/v1', 'version': version,
+            'operation': 'waapi.call', 'arguments': {'api': 'ak.wwise.core.project.save', 'args': {}, 'options': {}}},
+    ]
+    assert is_source_copy_proof_protocol('ak.wwise.core.object.copy', version, protocol)
+    assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', protocol)
 
 
 

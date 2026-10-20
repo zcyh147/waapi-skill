@@ -26,6 +26,13 @@ SOURCE_CLASS = 9699330
 # Native-proven declaration classes are independent of address/cardinality.
 OWNED_CLASSES = {'RTPC': 1441808, 'ModulatorLfo': 4194320, 'Curve': 917520}
 GRAPH_FORMAT = 'waapi-skill.source-copy-owned-declarations/v1'
+MATCHING_BUILDS = {
+    '2021.1': (2021, 1, 14, 8108),
+    '2022.1': (2022, 1, 19, 8584),
+    '2023.1': (2023, 1, 19, 8928),
+    '2024.1': (2024, 1, 13, 9056),
+    '2025.1': (2025, 1, 7, 9143),
+}
 # Concrete GUID-pointer encodings in the matching 2021 saved SampleProject.
 # They are not declarations. Unknown encodings are never admitted by suffix.
 SAVED_POINTER_TAGS = frozenset({
@@ -84,17 +91,24 @@ def secure_path(raw, *, directory=False):
     return path
 
 
-def supported(context):
+def matching_runtime(context):
     if not isinstance(context, dict): return False
     guard = context.get('project_guard', {})
     info = guard.get('wwise', {})
     version = info.get('version', {})
-    return (guard.get('version') == '2021.1' and info.get('isCommandLine') is True
-        and tuple(version.get(k) for k in ('year', 'major', 'minor', 'build')) == (2021, 1, 14, 8108)
+    expected = MATCHING_BUILDS.get(guard.get('version'))
+    return (expected is not None and info.get('isCommandLine') is True
+        and tuple(version.get(k) for k in ('year', 'major', 'minor', 'build')) == expected
         and is_loopback_waapi_host(guard.get('endpoint', {}).get('host', ''))
         and isinstance(info.get('sessionId'), str) and bool(info['sessionId'])
         and type(info.get('processId')) is int and info['processId'] > 0
         and isinstance(info.get('processPath'), str) and bool(info['processPath']))
+
+
+def supported(context):
+    # Modern saved syntax and runtime origins are independently classified;
+    # selected Source membership/field observations still gate their admission.
+    return matching_runtime(context) and context['project_guard']['version'] == '2021.1'
 
 
 def authority(context, source_id, destination_id, read):
@@ -140,7 +154,7 @@ def read_documents(binding):
     return documents, proofs
 
 
-def source_nodes(documents, identity, owner_id):
+def source_nodes(documents, identity, owner_id, *, version='2021.1'):
     found = []
     for document in documents.values():
         parents = {child: node for node in document.iter() for child in node}
@@ -173,13 +187,45 @@ def source_nodes(documents, identity, owner_id):
     ids = [guid(node.get('ID')) for node in nodes.values()]
     require(len(set(ids)) == len(ids) and all(all_ids.count(x) == 1 for x in ids),
         'Saved owned GUIDs alias another declaration')
-    # Only the independently observed canonical ControlInput hop currently has
-    # native authority. Other reference encodings remain required work.
+    # Saved wrapper grammar is versioned independently of live selector
+    # applicability. Parsing a matching original never establishes that proof.
+    require_shape(version in {'2021.1', '2022.1', '2023.1', '2024.1', '2025.1'},
+        'Saved Source version grammar is unfinished')
+    parents = {child: node for node in source.iter() for child in node}
+    for node in nodes.values():
+        if node.tag != 'RTPC': continue
+        container = parents.get(node)
+        if version == '2021.1':
+            require_shape(container is not None and container.tag == 'RTPCList'
+                and parents.get(container) is not None and parents[container].tag == 'Property',
+                'Saved RTPC membership wrapper differs from its version')
+        else:
+            if version != '2025.1':
+                require_shape(container is not None and container.tag == 'Local'
+                    and len(container) == 1 and parents.get(container) is not None
+                    and parents[container].tag == 'Reference',
+                    'Saved RTPC membership wrapper differs from its version')
+                container = parents.get(parents[container])
+            require_shape(container is not None and container.tag == 'ObjectList'
+                and container.attrib == {'Name': 'RTPC'} and parents.get(container) is not None
+                and parents[container].tag == 'ObjectLists',
+                'Saved RTPC membership wrapper differs from its version')
     for reference in source.iter('Reference'):
         custom = reference.find('Custom')
-        require_shape(reference.get('Name') == 'ControlInput'
-            and len(reference) == 1 and custom is not None and len(custom) == 1
-            and custom[0] in nodes.values(), 'Saved owned reference semantics are unfinished')
+        local = reference.find('Local')
+        owner_list = parents.get(reference)
+        local_member = (version in {'2022.1', '2023.1', '2024.1'} and not reference.attrib
+            and owner_list is not None and owner_list.tag == 'ObjectList'
+            and owner_list.attrib == {'Name': 'RTPC'} and len(reference) == 1
+            and local is not None and not local.attrib and len(local) == 1
+            and local[0].tag == 'RTPC' and local[0] in nodes.values())
+        allowed = {'ControlInput'} if version == '2021.1' else {'ControlInput', 'Curve'}
+        custom_member = (reference.get('Name') in allowed
+            and set(reference.attrib) == {'Name'} and len(reference) == 1
+            and custom is not None and not custom.attrib and len(custom) == 1
+            and custom[0] in nodes.values()
+            and custom[0].tag == ('ModulatorLfo' if reference.get('Name') == 'ControlInput' else 'Curve'))
+        require_shape(local_member or custom_member, 'Saved owned reference semantics are unfinished')
     return nodes
 
 
@@ -348,7 +394,8 @@ def baseline_summary(baseline):
 
 
 def validate_origin(origin, version):
-    require(isinstance(origin, dict) and origin.get('contract') == CONTRACT and origin.get('version') == version == '2021.1', 'Save child origin/version is invalid')
+    require(isinstance(origin, dict) and origin.get('contract') == CONTRACT
+        and origin.get('version') == version and version in MATCHING_BUILDS, 'Save child origin/version is invalid')
     expected = {'contract', 'version', 'stage', 'parent', 'context', 'baseline_digest'}
     if origin.get('stage') == 'baseline': expected.add('file_binding')
     require(set(origin) == expected, 'Save child origin fields are invalid')
@@ -372,7 +419,8 @@ def validate_origin(origin, version):
         hashes.extend(parent[key] for key in ('authority_digest', 'request_digest', 'audit_event_hash'))
     require(all(isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) for value in hashes), 'Save origin hash binding is invalid')
     require(set(origin['context']) == {'project_guard', 'connection_configuration'}
-        and supported({'project_guard': origin['context']['project_guard']}), 'Save origin requires its exact supported runtime context')
+        and origin['context']['project_guard'].get('version') == version
+        and matching_runtime({'project_guard': origin['context']['project_guard']}), 'Save origin requires its exact supported runtime context')
 
 
 def child_capability(origin):
@@ -397,7 +445,8 @@ def final_origin(snapshot):
     baseline = snapshot.preview.artifact['prepared_operation']['pre_state'][KEY]
     require_graph_format(baseline)
     require(baseline['status'] == 'ready', 'Copy has no certified saved baseline')
-    return {'contract': CONTRACT, 'version': '2021.1', 'stage': 'final', 'baseline_digest': baseline['digest'],
+    return {'contract': CONTRACT, 'version': snapshot.preview.artifact['request']['version'],
+        'stage': 'final', 'baseline_digest': baseline['digest'],
         'context': baseline['context'], 'parent': {'transaction_id': snapshot.record.transaction_id,
             'artifact_hash': snapshot.preview.artifact_hash, 'execution_event_hash': execution(snapshot)['event_hash'],
             'copied_id': copied_id(snapshot)}}
@@ -580,7 +629,7 @@ def validate_return(envelope, origin):
 def validate_decision(decision):
     require(isinstance(decision, dict) and set(decision) == {'status', 'request_digest', 'origin', 'receipt'}
         and decision['status'] in {'declined', 'baseline_saved'}, 'Baseline decision is invalid')
-    validate_origin(decision['origin'], '2021.1')
+    validate_origin(decision['origin'], decision['origin'].get('version') if isinstance(decision['origin'], dict) else None)
     require(decision['origin']['stage'] == 'baseline' and decision['request_digest'] == decision['origin']['parent']['request_digest'], 'Baseline decision request differs')
     require((decision['receipt'] is None) == (decision['status'] == 'declined'), 'Baseline decision receipt differs')
 
@@ -610,7 +659,7 @@ def without_dirty(value):
 
 
 def validate_file_binding(binding, version):
-    require(version == '2021.1' and isinstance(binding, dict)
+    require(version in MATCHING_BUILDS and isinstance(binding, dict)
         and set(binding) in ({'source_id', 'destination_id', 'authority', 'files'},
             {'graph_format', 'source_id', 'destination_id', 'authority', 'files'}), 'Baseline file binding is invalid')
     source, destination = guid(binding['source_id']), guid(binding['destination_id'])

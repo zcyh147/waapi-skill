@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 SAVE = 'ak.wwise.core.project.save'
+SOURCE_PROTOCOL_VERSIONS = frozenset({'2021.1', '2022.1', '2023.1', '2024.1', '2025.1'})
 DECLINE_SAVE_PROMPT = ('Do not save the project for this proof. Decline the additional Save '
     'and finish with the available copy verification scope.')
 RESUME_SAVE_PROMPT = ('Resume the same optional Source-proof Save using the earlier Gateway-issued '
@@ -274,8 +275,9 @@ def build_source_copy_saved_proof_protocol(request: Mapping[str, Any], *, dirty_
     """Schedule the existing copy declaration and separately authorized Saves."""
     from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep as Step, ResponseBinding as Bound
     from tests.semantic.support.codex_eval_protocol_v3 import build_object_lifecycle_business_transaction_steps, V3GatewayProtocol
-    if request.get('version') != '2021.1' or request.get('operation') != 'object.copy':
-        raise ValueError('saved Source proof is restricted to the pinned 2021.1 copy lane')
+    version = request.get('version')
+    if version not in SOURCE_PROTOCOL_VERSIONS or request.get('operation') != 'object.copy':
+        raise ValueError('saved Source proof requires a pinned copy version')
     if request.get('arguments', {}).get('on_name_conflict') == 'replace':
         raise ValueError('replace has no complete saved Source proof')
     if (type(dirty_baseline) is not bool or decline_stage not in {None, 'baseline', 'final'}
@@ -320,7 +322,7 @@ def build_source_copy_saved_proof_protocol(request: Mapping[str, Any], *, dirty_
         prefix = (Bound(issue, '/draft/draft_id'), '--task-authority', Bound(issue, '/task_authority'), '--expected-revision')
         steps.append(Step(label + '.check', 'draft-check', (*prefix, Bound(issue, '/draft/revision'))))
         steps.append(Step(label + '.preview', 'preview-from-draft', (*prefix, Bound(label + '.check', '/draft/revision')),
-            expected_operation_request={'contract': 'waapi-skill.operation-request/v1', 'version': '2021.1',
+            expected_operation_request={'contract': 'waapi-skill.operation-request/v1', 'version': version,
                 'operation': 'waapi.call', 'arguments': {'api': SAVE, 'args': {}, 'options': {}}}))
         if policy == 'ask_before_changes' or decline_stage == stage:
             prefixes.append(len(steps))
@@ -355,8 +357,8 @@ def build_source_copy_saved_proof_protocol(request: Mapping[str, Any], *, dirty_
 
 
 def is_source_copy_proof_protocol(api, version, protocol):
-    """Admit only the closed Source-owned 2021 copy protocol to provenance."""
-    if api != 'ak.wwise.core.object.copy' or version != '2021.1':
+    """Admit a version-bound closed protocol, without asserting native support."""
+    if api != 'ak.wwise.core.object.copy' or version not in SOURCE_PROTOCOL_VERSIONS:
         return False
     try:
         steps = protocol.steps
@@ -377,13 +379,13 @@ def is_source_copy_proof_protocol(api, version, protocol):
                 continue
             owner = step.arguments[0].step
             request = step.expected_operation_request
-            if owner in previews or not isinstance(request, Mapping) or request.get('version') != '2021.1':
+            if owner in previews or not isinstance(request, Mapping) or request.get('version') != version:
                 return False
             if owner == root.name:
                 if request.get('operation') != 'object.copy' or request.get('arguments', {}).get('on_name_conflict') == 'replace':
                     return False
             elif owner in issuers:
-                if request != {'contract': 'waapi-skill.operation-request/v1', 'version': '2021.1',
+                if request != {'contract': 'waapi-skill.operation-request/v1', 'version': version,
                         'operation': 'waapi.call', 'arguments': {'api': SAVE, 'args': {}, 'options': {}}}:
                     return False
             else:
