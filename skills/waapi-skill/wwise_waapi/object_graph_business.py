@@ -341,9 +341,10 @@ def _compile_set_new_node(
     placement = extension_fields.get("plugin_placement")
     if placement is not None:
         kind = session.handles.resolve_type(declaration.target.kind)
-        if kind.type_category.casefold() != "effect" or placement not in {"shareset", "owner"}:
-            raise _repair(session, "TYPE_HANDLE_ROLE_MISMATCH", field="plugin_placement", action="select an Effect Type Handle and a disclosed plugin placement")
-        node["plugin"] = {"kind": "effect", "placement": placement, "name": declaration.target.name,
+        role = kind.type_category.casefold()
+        if role not in {"effect", "source"} or placement not in ({"owner"} if role == "source" else {"shareset", "owner"}):
+            raise _repair(session, "TYPE_HANDLE_ROLE_MISMATCH", field="plugin_placement", action="select an Effect Type Handle with a disclosed placement or a Source Type Handle with owner placement")
+        node["plugin"] = {"kind": role, "placement": placement, "name": declaration.target.name,
             "class_id": kind.class_id, "properties": node.get("properties", []),
             **({"notes": node["notes"]} if "notes" in node else {})}
     if isinstance(declaration.target, AnonymousListTarget):
@@ -368,7 +369,7 @@ def _compile_set_new_node(
             not isinstance(language, str)
             or not language
             or language.casefold() == "sfx"
-            or not is_sound
+            or (not is_sound and node.get("plugin", {}).get("kind") != "source")
             or semantic_kind == "sound-sfx"
         ):
             raise _repair(
@@ -377,7 +378,12 @@ def _compile_set_new_node(
                 field="language",
                 action="provide one exact non-SFX Project language for a Sound Voice",
             )
-        node["language"] = language
+        if node.get("plugin", {}).get("kind") == "source":
+            node["plugin"]["language"] = language
+        else:
+            node["language"] = language
+    if node.get("plugin", {}).get("kind") == "source" and platform is not None:
+        node["plugin"]["platform"] = platform
     if "media_files" in extension_fields:
         node["import"] = _compile_object_set_import(
             session,
@@ -490,7 +496,7 @@ def _resolve_native_object_type(
                 ),
             )
         bound = session.handles.resolve_type(kind_name)
-        return "Effect" if bound.type_category.casefold() == "effect" else native_type
+        return {"effect": "Effect", "source": "Source"}.get(bound.type_category.casefold(), native_type)
     version = session.context.wwise_version
     kind = resolve_semantic_kind(kind_name, version=version)
     if kind.name in {"sound-sfx", "sound-voice"}:
@@ -1431,6 +1437,12 @@ def _materialize_set(
                 if child_list is None:
                     if "plugin" not in child_node:
                         _validate_specialized_relationship(session, parent_type=node["type"], child_type=child_node["type"])
+                    elif child_node["plugin"]["kind"] == "source":
+                        if node["type"] != "Sound":
+                            raise _repair(session, "INVALID_SOURCE_TARGET", field="parent_handle", action="attach the Source plugin to a planned Sound or Voice")
+                        if child_node["plugin"].get("language") is not None and not any(
+                                prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in node.get("properties", [])):
+                            raise _repair(session, "PLUGIN_LANGUAGE_UNAVAILABLE", field="language", action="select a Voice owner for a localized Source")
                     node.setdefault("children", []).append(child_node)
                 else:
                     lists = node.setdefault("lists", [])

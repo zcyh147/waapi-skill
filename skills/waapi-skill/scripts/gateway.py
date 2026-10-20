@@ -3862,6 +3862,16 @@ def _execute_gateway_unconstrained(
             "message": normalized["message"],
             "details": details,
         }
+        if normalized["error_code"] == "UNKNOWN_PROJECT_LANGUAGE" or (
+            isinstance(details, Mapping) and isinstance(details.get("issues"), list) and any(
+                isinstance(issue, Mapping) and issue.get("error_code") == "UNKNOWN_PROJECT_LANGUAGE"
+                for issue in details["issues"]
+            )
+        ):
+            error_payload["next_command"] = transaction_next_command(
+                "metadata", ["metadata", "types", "--meaning", "Language", "--page-size", "64"],
+                state_dir=args.state_dir,
+            )
         if getattr(args, "command", None) == "transaction-show" and isinstance(
             details, Mapping
         ):
@@ -15542,8 +15552,12 @@ def dispatch_command(
                 if page.get("next_page"):
                     page["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", page["next_page"]])
                 for row in page["types"]:
+                    if row.get("details_complete") is False or row.get("name") == "Language":
+                        # Cover the admitted 64-row Project inventory and any
+                        # additional native Language rows within the public cap.
+                        maximum = "1000" if row.get("name") == "Language" else "20"
+                        row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", maximum])
                     if row.get("details_complete") is False:
-                        row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", "20"])
                         row["detail_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", row["selection"]])
                         if isinstance(row.get("classId"), int):
                             row["fields_command"] = transaction_next_command("metadata", ["metadata", "list", "--type-selection", row["selection"]])
@@ -28657,6 +28671,7 @@ def _business_next_action_binding(
                 },
                 "declare_new": {
                     **operation_draft_prefix_copy_binding(declare_new_prefix),
+                    "source_plugin_details": "operation-schema object.set",
                     "anonymous_list_member": {
                         **operation_draft_prefix_copy_binding(declare_new_prefix),
                         "append": ["--declaration-id", "<task-local-id>", "--parent-handle", "<bound-or-planned-owner-handle>",

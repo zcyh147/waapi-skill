@@ -59,7 +59,7 @@ def _sound_semantics(operation):
         "generic_Sound_Type_Handle": "explicit_class_fields_remain_available",
         "verification": "actual_Boolean_IsVoice_and_bound_fields_identity_and_metadata",
         "language_and_media": ("use_audio_import_for_localized_media" if operation == "object.create"
-            else "requested_media_language_independently_verified;new_empty_Voice_language_is_validated_native_construction_context_not_persisted_language_or_localized_Source;existing_merge_language_effect_unresolved"),
+            else "requested_media_language_independently_verified;new_empty_Voice_language_is_validated_native_construction_context_not_persisted_language_or_localized_Source;existing_merge_language_effect_unresolved;declared_Source_plugins_have_separate_language_and_closed_childset_verification"),
     }
 
 
@@ -294,7 +294,13 @@ def object_graph_business_contract_data(
                             if version in CLEAR_SUFFIX_OBSERVATIONS else "pending_native_suffix_observation; reject_before_write"),
                     },
                 },
-                "graph_plugin": {"type": "effect_Type_Handle", "plugin_placement": ["shareset", "owner"], "shareset_parent": "bound_Effects_WorkUnit_or_fresh_source_proven_Folder", "native_class_id": "Gateway_owned_from_Type_Handle"},
+                "graph_plugin": {"types": {"effect": "effect_Type_Handle", "source": "source_Type_Handle"},
+                    "plugin_placement": {"effect": ["shareset", "owner"], "source": ["owner"]},
+                    "shareset_parent": "bound_Effects_WorkUnit_or_fresh_source_proven_Folder",
+                    "source_parent": "planned_Sound_or_Voice_result_handle; ordinary_child_not_Effect_slot",
+                    "source_language": "separate_from_Voice_construction_context; exact_selected_Project_language_on_Voice_owner",
+                    "source_verification": "actual_graph_GUID_class_parent_owner_fields_and_requested_language; closed_declared_childset",
+                    "native_class_id": "Gateway_owned_from_Type_Handle"},
                 "optional_fields": [
                     "field_values",
                     "language",

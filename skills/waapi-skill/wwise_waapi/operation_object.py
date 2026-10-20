@@ -1339,7 +1339,7 @@ class _NormalizationState:
             disallow_path_separator=False,
         )
         plugin = normalize_plugin_creation(mapping["plugin"]) if "plugin" in mapping else None
-        if plugin is not None and (plugin.kind != "effect" or object_type != "Effect" or plugin.name != mapping.get("name")):
+        if plugin is not None and (plugin.kind not in {"effect", "source"} or object_type != plugin.object_type or plugin.name != mapping.get("name")):
             raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN", "Typed graph plugins retain their selected kind and name")
         anonymous = mapping.get("anonymous", False)
         if type(anonymous) is not bool or (anonymous and (collection != "Effects" or object_type != "EffectSlot" or mapping.get("name") != "")):
@@ -1445,7 +1445,7 @@ class _NormalizationState:
             )
             for index, child in enumerate(raw_children)
         )
-        owned = [child for child in children if child.plugin is not None and child.plugin.placement == "owner"]
+        owned = [child for child in children if child.plugin is not None and child.plugin.kind == "effect" and child.plugin.placement == "owner"]
         if owned:
             if not anonymous or object_type != "EffectSlot" or collection != "Effects" or len(owned) != 1 or any(ref.name == "Effect" for ref in references):
                 raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "One new local Effect belongs to one new anonymous slot and cannot conflict with another Effect target")

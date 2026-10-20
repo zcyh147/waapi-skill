@@ -158,7 +158,7 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             parent_native_path, parent_identity = parent["path"], parent["result_handle"]
         else:
             parent_native_path, parent_identity = root_path(prefix, root), root[0].object
-        if node.rtpc is not None or node.anonymous or (node.plugin is not None and node.plugin.placement == "owner"):
+        if node.rtpc is not None or node.anonymous or (node.plugin is not None and node.plugin.kind == "effect" and node.plugin.placement == "owner"):
             if path in selected:
                 raise ObjectOperationContractError("PLANNED_REFERENCE_TARGET_UNAVAILABLE", "Unnamed RTPC result has no source-proven native reference expression")
             info = resolve_type(node)
