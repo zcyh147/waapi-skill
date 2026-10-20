@@ -1,0 +1,68 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-0.json",
+      "sha256": "3edb2a96a0cbdde9da483c80c4173be3b8b0528a4f7eefe3235e9d8bcdf898ac"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-1.json",
+      "sha256": "fc23dc0de8511ade62e6c3d564c3c1d78cd80358af5eecf67523daaeadc28578"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-2.json",
+      "sha256": "256332f03b38096f702b682467336340bc8540c8c0fd5432d3b12011494ca76e"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-3.json",
+      "sha256": "9e2182b8d02c58c6fcb19d13505f7ab1335ca189bbe5854eb2aab1762ce196b2"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-4.json",
+      "sha256": "ddac594f47f469ca714f3499665db7dc2a7d85e7f37ca5139360c877fc416fb4"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-5.json",
+      "sha256": "a146b9c13dffe58f55bd4a8344066d768407a7162810d98be9bd45f5ebb81208"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-6.json",
+      "sha256": "76660b82b90cf622d2cfbfabf8c0f96a1aed9cf6cf8d5ef0274d564f14d45cf8"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-7.json",
+      "sha256": "990adec503f024a79fd50e5d52b13623112f440a61c8907aa11a88e7e2198291"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-8.json",
+      "sha256": "d0cb75608efa47fc42e8e956d2b2980a5f1124fc4cfcbaa80754d3dfbfd28f4b"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-9.json",
+      "sha256": "38d8108e80045199620aadcea092842c6509772b48712f79dc2be94314bf7594"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-10.json",
+      "sha256": "600ca114b3892e4197a7bd4380a3cb39656a881b20bcc2aebe91d18e00953424"
+    },
+    {
+      "artifact": "r54-class-metadata-8a8d5f8e-2025-r1/branch-attachments/attachment-11.json",
+      "sha256": "44e7c023be71c94e86b08b501992aa59a187a68770207bb13b88335f3280f425"
+    }
+  ],
+  "observed_branch_ids": [
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present"
+  ],
+  "assigned_unobserved_branch_ids": [],
+  "attribution": "current_native_public_metadata_not_fresh"
+}

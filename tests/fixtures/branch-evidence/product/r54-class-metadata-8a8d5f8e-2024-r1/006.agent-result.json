@@ -1,0 +1,109 @@
+{
+  "selection": "mf1.1792523882.3.7e7fdc669ced78f5dae1f56e35eb8560890601ba8e7b40d05a3988ae0d60e9c2",
+  "scope": {
+    "kind": "object_type",
+    "requested": "Sound",
+    "resolved": {
+      "classId": 65552,
+      "name": "Sound",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "type": "Real32",
+    "name": "AttenuationDistanceScaling",
+    "default": 1.0,
+    "audioEngineId": 56,
+    "supports": {
+      "rtpc": "Multiplicative",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Distance Scaling %",
+      "index": 1461,
+      "group": "Listener Relative Routing/Attenuation"
+    },
+    "dependencies": [
+      {
+        "type": "isMasterBus",
+        "action": "Show",
+        "value": false,
+        "context": "Self"
+      },
+      {
+        "type": "reference",
+        "action": "Enable",
+        "property": "Attenuation",
+        "context": "Self",
+        "conditions": [
+          {
+            "referenceIsSet": true
+          }
+        ]
+      },
+      {
+        "type": "property",
+        "action": "Enable",
+        "property": "ListenerRelativeRouting",
+        "context": "Self",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "True",
+                  "value": true
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "override",
+        "action": "Enable",
+        "property": "OverridePositioning",
+        "context": "Self"
+      }
+    ],
+    "restriction": {
+      "type": "range",
+      "max": 100.0,
+      "min": 0.009999999776482582
+    },
+    "ui": {
+      "value": {
+        "max": 4.0,
+        "min": 0.25,
+        "decimals": 2,
+        "step": 0.05,
+        "fine": 0.01,
+        "infinity": 0.0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false,
+        "percentage": true
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}
