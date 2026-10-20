@@ -8486,6 +8486,15 @@ def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime
     def active(row):
         value = row.get('active_source'); assert isinstance(value, Mapping) and isinstance(value.get('id'), str), row
         return str(uuid.UUID(value['id']))
+    def preserved_sound(row):
+        result = {key: value for key, value in row.items() if key != 'active_source'}
+        if 'unavailable_fields' in result:
+            fields = [field for field in result['unavailable_fields'] if field != 'active_source']
+            if fields:
+                result['unavailable_fields'] = fields
+            else:
+                del result['unavailable_fields']
+        return result
     def complete(draft, label):
         phase: dict[str, Any] = {'phase': label, 'execution_attempted': False}; receipt['phases'].append(phase)
         _update_business_draft(gateway, draft, 'draft-check', live=True)
@@ -8567,12 +8576,12 @@ def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime
             sources.append(source); phase['independent_source'] = source
         def preservation():
             current_target = exact(target_id, sound=True)
-            return {'sound': {key: value for key, value in current_target.items() if key != 'active_source'},
+            return {'sound': preserved_sound(current_target),
                 'sources': [exact(row['id'], source=True) for row in sources], 'children': children(target_id),
                 'sentinel': exact(sentinel_id, sound=True), 'sentinel_children': children(sentinel_id), 'parent': exact(parent['id'])}, current_target
         before, owner = preservation()
         assert before['sources'] == sources and before['sentinel'] == sentinel and before['parent'] == parent
-        assert before['sound'] == {key: value for key, value in target.items() if key != 'active_source'}, 'Source setup changed the original Sound fields'
+        assert before['sound'] == preserved_sound(target), 'Source setup changed the original Sound fields'
         assert before['sentinel_children'] == [], 'Source setup changed the unrelated Sound child set'
         assert len(before['children']) == 2 and {uuid.UUID(row['id']) for row in before['children']} == {uuid.UUID(row['id']) for row in sources}, before
         initial = active(owner); assert initial in {str(uuid.UUID(row['id'])) for row in sources}, owner

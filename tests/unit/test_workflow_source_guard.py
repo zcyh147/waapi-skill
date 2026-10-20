@@ -4804,7 +4804,7 @@ def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
         if node['type'] == 'Source':
             row = task.objects[result['id']]
             # Native default is modeled independently of the requested setter.
-            if task.objects[parent]['activeSource'] is None:
+            if task.objects[parent].get('activeSource') is None:
                 task.objects[parent]['activeSource'] = {'id': row['id'], 'name': row['name']}
         return result
     task._create = create_source
@@ -4827,7 +4827,14 @@ def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
                 identity = '{FEFEFEFE-FEFE-FEFE-FEFE-FEFEFEFEFEFE}'
                 task.objects[identity] = dict(source, id=identity, name='Unexpected', path=owner['path'] + r'\Unexpected')
             return {}
-        return original(uri, args, options)
+        previous = set(task.objects)
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            # Model the valid omitted shape after the producer's fake defaults.
+            for identity in set(task.objects) - previous:
+                if task.objects[identity]['type'] == 'Sound':
+                    task.objects[identity].pop('activeSource')
+        return result
     task.call = call
     return runtime, commands, writes, selections, task
 
