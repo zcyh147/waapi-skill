@@ -144,27 +144,28 @@ def test_request_schema_routes_project_save_to_one_business_draft(tmp_path: Path
     assert "typed-call" not in json.dumps(payload, sort_keys=True)
 
 
-def test_project_save_keeps_its_zero_input_route_before_business_fields_exist(
-    tmp_path: Path,
+@pytest.mark.parametrize("version", ["2021.1", "2022.1"])
+def test_project_save_older_versions_disclose_one_empty_business_plan(
+    tmp_path: Path, version: str,
 ) -> None:
     operation = "ak.wwise.core.project.save"
 
     exit_code, payload = gateway.execute_gateway(
-        ["--version", "2022.1", "request-schema", operation],
+        ["--version", version, "request-schema", operation],
         env=_env(tmp_path),
         client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"),
     )
 
     assert exit_code == 0, payload
-    assert payload["contract"] == "waapi-skill.typed-request-schema/v1"
-    assert payload["input_shape"] == "zero"
-    assert payload["continuation"]["gateway_argv"] == [
-        "typed-zero-call",
-        operation,
-        "--schema-digest",
-        payload["schema_digest"],
-        "--apply",
-    ]
+    assert payload["contract"] == "waapi-skill.core-business-route/v1"
+    assert payload["input_shape"] == "business_declaration"
+    declaration = payload["business_adapter"]["declaration"]
+    assert declaration["required_fields"] == []
+    assert declaration["optional_fields"] == []
+    assert declaration["field_types"] == {}
+    assert declaration["input_forms"] == {}
+    assert "field_semantics" not in declaration
+    assert payload["continuation"]["gateway_argv"] == ["draft-start", operation]
 
 
 @pytest.mark.parametrize("operation", sorted(gateway.core_business_operations()))

@@ -4033,12 +4033,15 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> dict[str, Mapping
             "copy_exactly": True,
             "append_arguments": "forbidden",
         }, continuation
+        declaration = schema["business_adapter"]["declaration"]
+        save_fields = (["--value", "auto_check_out", "false"]
+            if "auto_check_out" in declaration["optional_fields"] else [])
         draft = _start_business_draft(runtime, api)
         _update_business_draft(
             runtime,
             draft,
             "draft-declare-core-plan",
-            ["--value", "auto_check_out", "false"],
+            save_fields,
             live=True,
         )
         saved = _complete_core_result_schema_draft(runtime, draft)

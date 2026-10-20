@@ -32,7 +32,7 @@ VERSIONS_BY_OPERATION = {
     "ak.wwise.core.object.isLinked": ("2023.1", "2024.1", "2025.1"),
     "ak.wwise.core.object.setStateGroups": ("2023.1", "2024.1", "2025.1"),
     "ak.wwise.core.object.setStateProperties": ("2023.1", "2024.1", "2025.1"),
-    "ak.wwise.core.project.save": ("2023.1", "2024.1", "2025.1"),
+    "ak.wwise.core.project.save": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
     "ak.wwise.core.audio.convert": ("2024.1", "2025.1"),
     "ak.wwise.core.audio.setConversionPlugin": ("2024.1", "2025.1"),
     "ak.wwise.core.blendContainer.addAssignment": ("2024.1", "2025.1"),
@@ -56,12 +56,15 @@ def test_exact_issue_84_version_surface_has_one_core_business_contract_per_lane(
         for version in versions
         if core_business_contract_data(operation, version)
     }
-    assert len(observed) == 55
+    assert len(observed) == 57
     for operation, version in observed:
         contract = core_business_contract_data(operation, version)
         assert contract["legacy_typed_call_public"] is False
         assert contract["execution_shape"] in {"bounded_read", "draft_mutation"}
-        assert contract["declaration"]["field_types"]
+        if operation == "ak.wwise.core.project.save" and version in {"2021.1", "2022.1"}:
+            assert contract["declaration"]["field_types"] == {}
+        else:
+            assert contract["declaration"]["field_types"]
     history_lanes = {
         (operation, version)
         for operation, versions in history_versions.items()
@@ -836,7 +839,7 @@ def test_core_business_repair_rejects_native_enum_spelling_and_invalid_range() -
     assert range_error.value.error_code == "BUSINESS_RANGE_INVALID"
 
 
-def test_core_business_rejects_hostile_name_and_unavailable_version() -> None:
+def test_core_business_rejects_hostile_name_and_unavailable_save_choice() -> None:
     session, handles, _ids = _role_session(("blend_container",))
     session = session.with_settings(
         {
@@ -871,9 +874,10 @@ def test_core_business_rejects_hostile_name_and_unavailable_version() -> None:
     assert plugin_error.value.error_code == "BUSINESS_VALUE_INVALID"
 
     unsupported, _handles, _ids = _role_session((), version="2022.1")
-    unsupported = unsupported.with_settings({"core_plan": {}})
-    with pytest.raises(ValueError, match="unavailable"):
+    unsupported = unsupported.with_settings({"core_plan": {"auto_check_out": False}})
+    with pytest.raises(BusinessDeclarationError) as save_error:
         materialize_core_business_request(
             "ak.wwise.core.project.save",
             unsupported,
         )
+    assert save_error.value.error_code == "CORE_PLAN_FIELDS_INVALID"

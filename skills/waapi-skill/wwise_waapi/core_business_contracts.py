@@ -177,7 +177,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "execution_shape": "draft_mutation",
     },
     "ak.wwise.core.project.save": {
-        "versions": ("2023.1", "2024.1", "2025.1"),
+        "versions": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
         "roles": (),
         "required_fields": (),
         "optional_fields": ("auto_check_out",),
@@ -463,6 +463,10 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         raise ValueError("unsupported generic Core business operation") from exc
     if version not in row["versions"]:
         raise ValueError("generic Core business operation is unavailable in this version")
+    if operation == "ak.wwise.core.project.save" and version in {"2021.1", "2022.1"}:
+        # These reflected lanes accept only an empty Save request. Keep the
+        # business lifecycle while withholding the later checkout choice.
+        row = {**row, "optional_fields": (), "field_types": {}, "field_semantics": None}
     bounded_read = row["execution_shape"] == "bounded_read"
     read_declaration = _READ_DECLARATIONS.get(operation) if bounded_read else None
     public_field_types = (
