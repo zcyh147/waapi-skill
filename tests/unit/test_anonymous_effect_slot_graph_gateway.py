@@ -339,8 +339,27 @@ def test_anonymous_constructor_revalidates_source_and_target_before_one_write(tm
     assert not writes
 
 
-def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
+def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, equivalent_view=None):
     task = anonymous_task(tmp_path)
+    windows = '{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}'
+    reference_platform = ('Windows' if equivalent_view == 'name' else windows if equivalent_view == 'guid'
+                          else 'Mac' if fault == 'other-platform' else None)
+    if equivalent_view is not None:
+        original_project = task.call
+        def project_call(uri, args=None, options=None):
+            result = original_project(uri, args, options)
+            if uri.endswith('getProjectInfo'):
+                return {**result, 'displayTitle': 'SampleProject', 'isDirty': False,
+                    'currentLanguageId': EFFECT_PARENT, 'referenceLanguageId': EFFECT_PARENT,
+                    'languages': [{'id': EFFECT_PARENT, 'name': 'English(US)', 'shortId': 1}],
+                    'defaultConversion': {'id': EFFECT_B, 'name': 'Default'},
+                    'directories': {name: '/project/' + name for name in
+                        ('root', 'cache', 'originals', 'soundBankOutputRoot', 'commands', 'properties')},
+                    'currentPlatformId': windows,
+                    'platforms': [{'id': windows, 'name': 'Windows', 'baseName': 'Windows',
+                        'baseDisplayName': 'Windows', 'soundBankPath': '/project/SoundBanks', 'copiedMediaPath': '/project/Media'}]}
+            return result
+        task.call = project_call
     # Retained f4 native receipt returns EffectSlot for this exact binding.
     # The independent class-verified construction controls also cover generic
     # PluginInnerObject projections without rewriting their returned type.
@@ -358,8 +377,8 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
         planned_handle = declared['draft']['declared_object']['result_handle']
     declare_slots(task)
     slot = task.bind(ROOT)
-    if fault == 'other-platform':
-        scope = ['--object-handle', slot, '--platform', 'Mac']
+    if reference_platform is not None:
+        scope = ['--object-handle', slot, '--platform', reference_platform]
         code, listed = task.step('draft-discover-fields', *scope, '--list')
         assert code == 0, listed
         selection = next(row['selection'] for row in listed['agent_result']['fields'] if row['name'] == 'Effect')
@@ -374,15 +393,15 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
     assert code == 0, declared
     original, writes = task.call, []
     def call(uri, args=None, options=None):
-        if fault == 'other-platform' and uri.endswith('object.isPropertyEnabled'):
-            assert args == {'object': ROOT, 'property': 'Effect', 'platform': 'Mac'}
+        if reference_platform is not None and uri.endswith('object.isPropertyEnabled'):
+            assert args == {'object': ROOT, 'property': 'Effect', 'platform': reference_platform}
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             return {'return': True}
         if uri.endswith('object.set'):
             writes.append(deepcopy(args))
             rows = {row['object']: row for row in args['objects']}
             assert rows[ROOT] == {'object': ROOT, '@Effect': planned_path if planned else EFFECT_B if value == 'retarget' else None,
-                **({'platform': 'Mac'} if fault == 'other-platform' else {})}
+                **({'platform': reference_platform} if reference_platform is not None else {})}
             if planned:
                 task.objects[new_effect] = {'id': new_effect, 'name': 'New ShareSet', 'type': 'Effect', 'classId': 8454147,
                     'parent': {'id': EFFECT_PARENT}, 'path': planned_path, 'notes': ''}
@@ -410,6 +429,13 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
+    if equivalent_view is not None:
+        prepared_state = shown['artifact']['prepared_operation']['pre_state']
+        assert prepared_state['effect_render_chains'][0]['field_read_platform']['platform_id'] == windows
+        proofs = [proof for proof in prepared_state['existing_field_observations'] if proof['object_id'] == ROOT]
+        assert len(proofs) == 1 and proofs[0]['field_read_platform']['status'] == 'certified'
+        assert proofs[0]['field_read_platform']['selector'] == reference_platform
+        assert proofs[0]['field_read_platform']['platform_id'] == windows
     if fault == 'other-platform':
         assert shown['artifact']['prepared_operation']['pre_state']['effect_render_chains'][0]['platform'] is None
     code, unauthorized = task.run('execute', tx)
@@ -444,6 +470,12 @@ def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value)
 def test_append_reference_intent_uses_actual_effect_and_owned_result_association(tmp_path, planned, fault):
     _append_reference_edit_case(tmp_path, 'retarget', planned=planned, fault=fault)
 
+
+
+
+@pytest.mark.parametrize('view', ['name', 'guid'])
+def test_append_reference_equivalent_certified_view_matches_omitted_chain(tmp_path, view):
+    _append_reference_edit_case(tmp_path, 'retarget', equivalent_view=view)
 
 def test_existing_nested_shareset_reference_uses_actual_parent_chain_not_constructor_destination(tmp_path):
     task = anonymous_task(tmp_path)
