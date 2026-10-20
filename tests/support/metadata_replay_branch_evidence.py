@@ -270,9 +270,10 @@ def git_source_seals(candidate, names):
 
 def historical_sources():
     names = metadata_source_seals()
-    # This explicitly reviewed Source-copy module did not exist in R51. Keep
-    # its absence in source_changes(before, current); never invent an old hash.
-    names.pop('skills/waapi-skill/wwise_waapi/source_copy_observations.py',None)
+    # These exact reviewed Source-copy modules did not exist in R51. Keep
+    # both explicit absences in source_changes; never invent historical hashes.
+    for name in ('source_copy_observations.py','source_copy_proof.py'):
+        names.pop('skills/waapi-skill/wwise_waapi/'+name,None)
     return git_source_seals(ORIGINAL, names)
 
 def source_changes(before, after):

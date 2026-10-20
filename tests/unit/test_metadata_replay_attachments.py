@@ -150,7 +150,7 @@ def test_r54_assigns_only_observed_versioned_leaves_to_sixteen_original_scenario
 
 
 @pytest.mark.parametrize('damage',['native-git','native-source','native-origin','native-field','raw-result','raw-input',
-    'current-source','changed-file-proof','runtime-drift','current-field','leaf','whole','reference','category-input',
+    'current-source','changed-file-proof','runtime-drift','runtime-new-file-drift','partial-runtime-bridge','current-field','leaf','whole','reference','category-input',
     'attribution','product-git','teardown'])
 def test_r54_historical_replay_controls_start_from_valid_original_and_current_flow(inventory,tmp_path,monkeypatch,damage):
     capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory)
@@ -179,9 +179,16 @@ def test_r54_historical_replay_controls_start_from_valid_original_and_current_fl
     elif damage=='changed-file-proof':
         assert 'tests/unit/test_metadata_default_branch_evidence.py' in record['source_bridge']['changed_files']
         record['source_bridge']['changed_files'].pop('tests/unit/test_metadata_default_branch_evidence.py')
-    elif damage=='runtime-drift':
-        before=Path.read_bytes;path=audit.ROOT/'skills/waapi-skill/scripts/gateway.py'
-        monkeypatch.setattr(Path,'read_bytes',lambda p:before(p)+b'\n# unreviewed change\n' if p==path else before(p))
+    elif damage in {'runtime-drift','runtime-new-file-drift','partial-runtime-bridge'}:
+        import subprocess
+        before=Path.read_bytes
+        relative=('skills/waapi-skill/wwise_waapi/source_copy_proof.py' if damage=='runtime-new-file-drift'
+            else 'skills/waapi-skill/scripts/gateway.py')
+        path=audit.ROOT/relative
+        if damage=='runtime-new-file-drift':assert relative not in record['source_bridge']['historical_sources']
+        changed=(subprocess.check_output(['git','show',producer.R54_ORIGINAL+':'+relative],cwd=audit.ROOT)
+            if damage=='partial-runtime-bridge' else before(path)+b'\n# unreviewed change\n')
+        monkeypatch.setattr(Path,'read_bytes',lambda p:changed if p==path else before(p))
         current=producer.r54_current_sources();record['source_bridge']['current_sources']=current
         record['source_bridge']['changed_files']=producer.source_changes(record['source_bridge']['historical_sources'],current)
         program['relevant_sources']=current
@@ -204,7 +211,7 @@ def test_r54_historical_replay_controls_start_from_valid_original_and_current_fl
     descriptor=write(tmp_path/'altered-r54-attachment.json',record,nodeid=descriptor['nodeid'])
     outcome,reason=result('product' if damage=='product-git' else 'controlled')
     assert outcome=='missing',reason
-    if damage=='runtime-drift':assert 'unreviewed runtime drift' in reason
+    if damage in {'runtime-drift','runtime-new-file-drift','partial-runtime-bridge'}:assert 'unreviewed runtime drift' in reason
     if damage=='product-git':assert 'Git/source ownership' in reason
 
 
@@ -509,7 +516,7 @@ def test_metadata_bridge_rejects_new_runtime_drift_even_with_full_changed_file_p
     assert outcome == 'missing' and 'runtime drift is not equivalent' in reason
 
 
-@pytest.mark.parametrize('damage',[None,'operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py','object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py','partial-bridge'])
+@pytest.mark.parametrize('damage',[None,'operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py','object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py','operation_composer.py','operation_drafts.py','transaction_runtime.py','source_copy_proof.py','partial-bridge'])
 def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,inventory,tmp_path,monkeypatch,damage):
     import subprocess
     capture,replay,record,bindings,descriptor = controlled_attachment(tmp_path,original_root,inventory,'ControlInput')
@@ -519,11 +526,14 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    accepted = 'ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90'
+    source_pin = 'ee78f00baf06f1840228313ae1bb6b263fd95301'
+    tone_pin = '8d0157647035504a6ab4e4d9e9b06e8b6ec8985d'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
-                 'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py'):
+                 'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
+                 'operation_composer.py','operation_drafts.py','transaction_runtime.py','source_copy_proof.py'):
         relative = ('skills/waapi-skill/scripts/' if name == 'gateway.py' else 'skills/waapi-skill/wwise_waapi/')+name
+        accepted = tone_pin if name in ('operation_tone.py','host_ui_debug_business_contracts.py') else source_pin
         raw = subprocess.check_output(['git','show',accepted+':'+relative],cwd=audit.ROOT)
         packets[audit.ROOT/relative] = raw
     read_bytes = Path.read_bytes
@@ -536,12 +546,13 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         record['replay'] = write(tmp_path/'tone-program.json',replay,nodeid=descriptor['nodeid'])
         return write(tmp_path/'tone-attachment.json',record,nodeid=descriptor['nodeid'])
     descriptor = resign()
-    assert result() == ('passed',None)  # Exact accepted Tone + Source-copy + Save baseline before every corruption.
+    assert result() == ('passed',None)  # Exact accepted combined runtime baseline before every corruption.
     assert record['source_bridge']['changed_files']['skills/waapi-skill/wwise_waapi/source_copy_observations.py']['before'] is None
+    assert record['source_bridge']['changed_files']['skills/waapi-skill/wwise_waapi/source_copy_proof.py']['before'] is None
     if damage is None:return
     target = next(path for path in packets if path.name == ('gateway.py' if damage == 'partial-bridge' else damage))
     if damage == 'partial-bridge':
-        relative = str(target.relative_to(audit.ROOT))
+        relative = target.relative_to(audit.ROOT).as_posix()
         packets[target] = subprocess.check_output(['git','show',producer.ORIGINAL+':'+relative],cwd=audit.ROOT)
     else:packets[target] += b'\n# unapproved drift\n'
     descriptor = resign()
