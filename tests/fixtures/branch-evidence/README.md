@@ -48,7 +48,7 @@ must remain stale unless independently justified by the existing exact source
 equivalence rules. Original receipts are immutable and are never relabeled as
 proof for a successor. The default product ledger remains incomplete.
 
-The default index now selects `product/metadata-default-r47r2-*`, captured after
+The R47 default index selected `product/metadata-default-r47r2-*`, captured after
 the missing-metadata-parent reader repair on source candidate
 `1d3be0862774691d78a51a5dd1bb7e0f91f9ea87`. Its 30 original nodes again observe
 the same 65 facts with the same 343-file dependency membership. The first R47
@@ -56,3 +56,14 @@ bundle remains unchanged as original, now-stale evidence; neither its PASS nor
 its source seals are rewritten. The new bundle is also program-only evidence.
 The reader compatibility fixture that omits or nulls the metadata parent is a
 controlled synthetic corruption test and grants no product metadata credit.
+
+The current default index selects `product/metadata-default-r49-stable-r1-*`,
+captured once on clean integrated source `e7ec62dee2571880b4f4f427d95cbff22dc807ae`.
+Its 30 public nodes prove the same 65 exact default-result facts with the
+unchanged 343-file dependency membership, after the accepted reader and runtime
+changes. The originals are copied byte-for-byte; projections change only the
+program locator. R26 and both R47 original/projection bundles remain unchanged
+and retain their historical candidates. Current program proof is 65 passed;
+all 65 live_metadata requirements remain missing and completion remains false.
+No native or full-copy proof is added. See the R49 test-inventory entry for the
+source identity, exact focused results and retained native limitations.

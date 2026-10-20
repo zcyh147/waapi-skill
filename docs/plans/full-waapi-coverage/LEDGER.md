@@ -766,8 +766,8 @@ uses the existing finalizer's required field. No original native outcome changes
 
 One existing 30-node capture on clean `e7ec62de` passed **30 tests in 5.83s**;
 all 343 source seals stayed exact. Thirty fresh portable entries select these
-originals with locator-only projections; all 320 older fixture files and R26
-remain byte-identical. The fixed Program roster gains the metadata-default
+originals with locator-only projections; all 319 older evidence fixture files and R26
+remain byte-identical. The README records the current index selection. The fixed Program roster gains the metadata-default
 file and its canonical required-entry/count assertion (265 manifest entries).
 The final generated candidate `16ead09b` passed one deduplicated focus:
 **11 tests in 27.27s**, including query/all-call immutability, actual legacy

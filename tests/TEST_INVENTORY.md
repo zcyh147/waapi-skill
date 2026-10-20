@@ -22,8 +22,9 @@ After interface generation/check, clean source `e7ec62de` received one existing
 30-node metadata capture: **30 passed in 5.83s** (wrapper 6.435s). All 343
 source seals and 2,210 tracked files stayed unchanged, with no owned process
 remaining. Thirty new portable entries retain byte-identical originals and only
-relocate the program locator in projections. All 320 pre-existing fixture files,
-including R26 and R47 r1/r2, remain byte-identical. The fixed Program manifest
+relocate the program locator in projections. All 319 pre-existing evidence fixture files,
+including R26 and R47 r1/r2, remain byte-identical; the bundle README updates
+only its current-index description. The fixed Program manifest
 now includes the metadata-default test file and contains 265 entries; this is a
 manifest count, not a passing-test count.
 
