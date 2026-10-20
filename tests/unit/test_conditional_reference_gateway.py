@@ -31,6 +31,7 @@ def test_product_slew_rate_show_condition_changes_only_the_selected_field(tmp_pa
                   "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}]}
     task.metadata = {"SlewRateUp": {"name": "SlewRateUp", "type": "Real64", "dependencies": [dependency]},
                      "RTPCRamping": {"name": "RTPCRamping", "type": "int16"}}
+    task.set_object_type(FIRST, "GameParameter", 20)
     task.objects[FIRST].update(type="GameParameter", name="OwnedVisibilityTarget",
         path=r"\Game Parameters\Default Work Unit\OwnedVisibilityTarget", RTPCRamping=0, SlewRateUp=0.0)
     before = deepcopy(task.objects[FIRST])
@@ -118,9 +119,9 @@ class AttenuationTask(FieldTask):
         super().__init__(path, version, operation)
         self.operation = operation
         self.objects = {
-            FIRST: {"id": FIRST, "name": "Rain", "type": kind, "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "parent": {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"}, "notes": "preserve",
+            FIRST: {"id": FIRST, "name": "Rain", "type": kind, "classId": {"Sound": 1, "RandomSequenceContainer": 2}[kind], "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "parent": {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"}, "notes": "preserve",
                     "Attenuation": None, "ListenerRelativeRouting": False, "OverridePositioning": False, "Volume": -7.0, "@RandomOrSequence": 0},
-            SECOND: {"id": SECOND, "name": "Near", "type": "Attenuation", "path": r"\Attenuations\Default Work Unit\Near"},
+            SECOND: {"id": SECOND, "name": "Near", "type": "Attenuation", "classId": 3, "path": r"\Attenuations\Default Work Unit\Near"},
         }
         self.metadata = {
             "Attenuation": {"name": "Attenuation", "type": "", "restriction": {"type": "reference", "restrictions": [{"sharedOnlyTypes": [], "type": ["Attenuation"]}]},
@@ -167,6 +168,23 @@ class AttenuationTask(FieldTask):
         code, payload = self.step("draft-declare-existing", "--object-handle", source,
                                    "--declaration-id", "attenuation", "--field-value", field, target)
         assert code == 0, payload
+
+
+@pytest.mark.parametrize("damage", ["missing", "malformed", "mismatched"])
+def test_condition_preview_requires_observed_class_identity_without_fixture_repair(tmp_path, damage):
+    task = AttenuationTask(tmp_path, "2025.1")
+    task.declare()
+    if damage == "missing":
+        del task.objects[FIRST]["classId"]
+    else:
+        task.objects[FIRST]["classId"] = True if damage == "malformed" else 2
+    before = deepcopy(task.objects)
+    code, rejected = task.step("draft-check")
+    assert code == 2 and rejected["error_code"] == "OPERATION_DRAFT_CHECK_FAILED", rejected
+    expected_issue = "INVALID_TARGET_TYPE" if damage == "mismatched" else "INVALID_READBACK"
+    assert rejected["details"]["issues"][0]["error_code"] == expected_issue, rejected
+    assert task.objects == before
+    assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
@@ -456,9 +474,9 @@ class PlatformConditionTask(ScalarPropertyTask):
         if uri.endswith("object.get") and options and options.get("platform") == self.platform:
             for row in result.get("return", []):
                 if row.get("id") == FIRST:
-                    row.update(getattr(self, "platform_values", {FIRST: {"LfoWaveform": 2}}).get(FIRST, {}))
+                    row.update({key: value for key, value in getattr(self, "platform_values", {FIRST: {"LfoWaveform": 2}}).get(FIRST, {}).items() if key in options["return"]})
                 else:
-                    row.update(getattr(self, "platform_values", {}).get(row.get("id"), {}))
+                    row.update({key: value for key, value in getattr(self, "platform_values", {}).get(row.get("id"), {}).items() if key in options["return"]})
         return result
 
 
@@ -664,6 +682,7 @@ class ReferencePresenceTask(AttenuationTask):
             }},
         }
         self.objects[FIRST].update(UserAuxSendVolume0=0.0, UserAuxSend0={"id": SECOND})
+        self.set_object_type(SECOND, "AuxBus", 4)
         self.objects[SECOND].update(type="AuxBus", path=r"\Master-Mixer Hierarchy\Default Work Unit\Near")
 
     def call(self, uri, args=None, options=None):
@@ -680,7 +699,7 @@ class PlatformPresenceTask(ReferencePresenceTask):
         result = super().call(uri, args, options)
         if uri.endswith("object.get") and options and options.get("platform") == self.platform:
             for row in result.get("return", []):
-                if row.get("id") == FIRST:
+                if row.get("id") == FIRST and "UserAuxSend0" in options["return"]:
                     row["UserAuxSend0"] = {"id": SECOND}
         return result
 
@@ -925,6 +944,8 @@ def test_association_parent_condition_uses_exact_owner_and_guards_it(tmp_path, d
         }]},
         "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16"},
     }
+    task.set_object_type(FIRST, "ObjectSettingAssociation", 5)
+    task.set_object_type(SECOND, "SwitchContainer", 6)
     task.objects[FIRST].update(name="", type="ObjectSettingAssociation",
         path=r"\Containers\Minigun\Shells\<Unnamed Object Setting Association>",
         parent=None, owner={"id": SECOND}, ContinuePlay=False)
@@ -1123,6 +1144,8 @@ def test_association_owner_satisfied_recursive_condition_is_guarded_without_owne
         "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16", "dependencies": [condition("OverridePlayback")]},
         "OverridePlayback": {"name": "OverridePlayback", "type": "bool"},
     }
+    task.set_object_type(FIRST, "ObjectSettingAssociation", 5)
+    task.set_object_type(SECOND, "SwitchContainer", 6)
     task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
     task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, OverridePlayback=True)
     if prerequisite_kind == "reference":
@@ -1208,6 +1231,8 @@ def test_association_owner_condition_depth_budget_includes_the_original_field(tm
     for index in range(16):
         name = f"Step{index}"
         task.metadata[name] = {"name": name, "type": "bool", "dependencies": [condition(f"Step{index + 1}")] if index < 15 else []}
+    task.set_object_type(FIRST, "ObjectSettingAssociation", 5)
+    task.set_object_type(SECOND, "SwitchContainer", 6)
     task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
     task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, **{f"Step{index}": True for index in range(16)})
     target = task.bind(FIRST)
@@ -1234,6 +1259,8 @@ def test_atomic_related_condition_large_repair_retains_exact_owner_at_output_bou
     task.metadata["SwitchBehavior"]["dependencies"][0]["conditions"][0]["restriction"]["values"] = [
         {"value": index + 1, "displayName": "Native enumerated prerequisite " + "x" * 100} for index in range(600)
     ]
+    task.set_object_type(FIRST, "ObjectSettingAssociation", 5)
+    task.set_object_type(SECOND, "SwitchContainer", 6)
     task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
     task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, OwnerMode=0)
     target = task.bind(FIRST)
@@ -1449,8 +1476,8 @@ class MasterBusDeviceTask(AttenuationTask):
         super().__init__(path, version, operation=operation)
         self.enabled = enabled
         self.enabled_reads = []
-        self.objects[FIRST].update(name="Main Mix", type="Bus", path=r"\Master-Mixer Hierarchy\Default Work Unit\Main Mix", AudioDevice=None)
-        self.objects[SECOND].update(name="System", type="AudioDevice", path=r"\Audio Devices\Default Work Unit\System")
+        self.objects[FIRST].update(classId=1, name="Main Mix", type="Bus", path=r"\Master-Mixer Hierarchy\Default Work Unit\Main Mix", AudioDevice=None)
+        self.objects[SECOND].update(classId=2, name="System", type="AudioDevice", path=r"\Audio Devices\Default Work Unit\System")
         self.metadata = {"AudioDevice": {"name": "AudioDevice", "type": "",
             "restriction": {"type": "reference", "restrictions": [{"type": ["AudioDevice"]}, "notNull"]},
             "dependencies": [{"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}]}}
@@ -1555,8 +1582,7 @@ def test_product_master_bus_audio_device_show_condition_changes_only_the_selecte
 def test_master_bus_device_reference_retains_target_restrictions_and_enabled_proof(tmp_path, version, operation, failure):
     task = MasterBusDeviceTask(tmp_path, version, operation)
     if failure == "wrong-target-class":
-        task.objects[SECOND]["type"] = "Sound"
-        task.types.append({"classId": 3, "name": "Sound", "type": "WObject"})
+        task.set_object_type(SECOND, "Sound", 3)
     source, target = task.bind(FIRST), task.bind(SECOND)
     field = task.discover(source, "AudioDevice")
     code, declared = (task.step("draft-declare-field-change", "--object-handle", source,

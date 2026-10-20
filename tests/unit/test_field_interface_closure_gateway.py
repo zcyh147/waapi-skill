@@ -31,10 +31,12 @@ class FieldTask:
             },
         }
         self.objects = {
-            value: {"id": value, "name": "", "type": "Action",
+            value: {"id": value, "name": "", "type": "Action", "classId": 1,
                     "path": f"\\Events\\Default Work Unit\\Event{index}\\[Play]"}
             for index, value in enumerate((FIRST, SECOND))
         }
+        self.types = [{"classId": 1, "name": "Action", "type": "Action"},
+                      {"classId": 2, "name": "Sound", "type": "Sound"}]
         config = path / "config.json"
         config.write_text(json.dumps({"wwise_version": version, "waapi_port": 31337, "waapi_host": "127.0.0.1",
                                       "project_modification_policy": "ask_before_changes"}))
@@ -62,19 +64,32 @@ class FieldTask:
             return {"id": PROJECT, "name": "Fixture", "path": str(self.project_file)}
         if uri.endswith("object.get"):
             if args.get("waql") == "from type Project take 1":
-                return {"return": [{"id": PROJECT, "name": "Fixture", "type": "Project",
-                                    "path": "\\", "filePath": str(self.project_file)} ]}
-            return {"return": [self.objects[value] for value in args["from"]["id"]]}
+                return {"return": self.project_rows([{"id": PROJECT, "name": "Fixture", "type": "Project",
+                                    "path": "\\", "filePath": str(self.project_file)}], options)}
+            return {"return": self.project_rows(
+                [self.objects[value] for value in args["from"]["id"] if value in self.objects], options)}
         if uri.endswith("getPropertyAndReferenceNames"):
             return {"return": list(self.metadata)}
         if uri.endswith("getPropertyInfo"):
             return self.metadata[args["property"]]
         if uri.endswith("getTypes"):
-            if hasattr(self, "types"):
-                return {"return": self.types}
-            return {"return": [{"classId": 1, "name": "Action", "type": "Action"},
-                               {"classId": 2, "name": "Sound", "type": "Sound"}]}
+            return {"return": deepcopy(self.types)}
         raise AssertionError((uri, args, options))
+
+    @staticmethod
+    def project_rows(rows, options):
+        fields = options["return"]
+        return [{key: deepcopy(row[key] if key in row else row["@" + key])
+                 for key in fields if key in row or "@" + key in row} for row in rows]
+
+    def set_object_type(self, object_id, name, class_id):
+        """Explicitly model a native type change, including its independent catalog."""
+        existing = [row for row in self.types if row["name"] == name]
+        if existing:
+            assert len(existing) == 1 and existing[0]["classId"] == class_id
+        else:
+            self.types.append({"classId": class_id, "name": name, "type": "WObject"})
+        self.objects[object_id].update(type=name, classId=class_id)
 
     def disconnect(self) -> None:
         pass
@@ -111,9 +126,9 @@ class CreateTask(FieldTask):
         super().__init__(path, version, operation)
         parent_path = r"\Events\Default Work Unit\Owned"
         self.objects = {
-            FIRST: {"id": FIRST, "name": "Owned", "type": "Folder",
+            FIRST: {"id": FIRST, "name": "Owned", "type": "Folder", "classId": 1,
                     "path": parent_path, "parent": {"id": PROJECT}},
-            SECOND: {"id": SECOND, "name": "Play_Weather", "type": "Event",
+            SECOND: {"id": SECOND, "name": "Play_Weather", "type": "Event", "classId": 2,
                      "path": parent_path + r"\Play_Weather", "parent": {"id": FIRST}},
         }
         self.types = [
@@ -145,7 +160,7 @@ class CreateTask(FieldTask):
                     assert args["transform"] == [{"select": ["descendants"]}], args
                     rows = [row for row in self.objects.values()
                             if row["path"].startswith(parent["path"] + "\\")]
-            return {"return": deepcopy(rows)}
+            return {"return": self.project_rows(rows, options)}
         return super().call(uri, args, options)
 
     def discover_kind(self, meaning: str) -> str:
@@ -484,7 +499,7 @@ def test_time_suffix_has_action_scope_not_just_a_matching_token(
     tmp_path: Path, version: str, object_type: str,
 ) -> None:
     task = FieldTask(tmp_path, version, "object.setProperty")
-    task.objects[FIRST]["type"] = object_type
+    task.set_object_type(FIRST, object_type, 1 if object_type == "Action" else 2)
     if object_type == "Sound":
         task.objects[FIRST]["name"] = "FixtureSound"
         task.objects[FIRST]["path"] = "\\Actor-Mixer Hierarchy\\Default Work Unit\\FixtureSound"
