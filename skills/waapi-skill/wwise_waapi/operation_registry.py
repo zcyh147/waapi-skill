@@ -10735,15 +10735,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             request.version,
             arguments,
         )
+        call_metadata = {"execution_contract": execution_contract, "model_authored_code": False}
+        if api == "ak.wwise.core.sound.setActiveSource":
+            from .project_setting_business_contracts import active_source_linkage_disclosure
+            call_metadata["source_linkage"] = active_source_linkage_disclosure()
+            warnings.append("Active-source selection uses existing source linkage and may affect other linked platforms; this operation does not unlink or establish platform isolation.")
         preview = SemanticPreview(
             envelope=SemanticEnvelope(
                 uri=api,
                 args=call_args,
                 options=call_options,
-                metadata={
-                    "execution_contract": execution_contract,
-                    "model_authored_code": False,
-                },
+                metadata=call_metadata,
             ),
             source_note_family="public-execution-contract",
             version=request.version,

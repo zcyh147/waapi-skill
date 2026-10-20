@@ -134,20 +134,41 @@ def _return_properties(version: str) -> Mapping[str, Any]:
     return graph.documents["waapi_definitions.json"]["definitions"]["objectReturn"]["properties"]
 
 
-def available_query_outputs(version: str) -> dict[str, tuple[str, str]]:
+def available_query_outputs(version: str) -> dict[str, tuple[str | None, str]]:
     properties = _return_properties(version)
     outputs = {name: binding for name, binding in QUERY_BUSINESS_OUTPUTS.items()
                if name in LEGACY_OUTPUTS or binding[0] in properties}
     if version == "2021.1":
         # The pinned 2021 object.get return contract uses the older WAV accessor.
-        # The pinned Console rejects activeSource as a return accessor and as
-        # a traversal despite SDK documentation. Do not advertise either form.
+        # None marks an owned derivation, never a native return accessor.
         outputs["original-file-path"] = ("originalWavFilePath", "original_file_path")
-        outputs.pop("active-source")
+        outputs["active-source"] = (None, "active_source")
     return outputs
 
 
 def query_output_detail(version: str, name: str) -> dict[str, Any]:
+    if version == "2021.1" and name == "active-source":
+        return {
+            "name": name, "output_field": "active_source", "available": True,
+            "supported_versions": list(SUPPORTED_WWISE_VERSION_KEYS),
+            "description": "Derive each file-backed Sound active source by its unique full original path in one explicit platform/language view.",
+            "native_definition": None,
+            "result_schema": {"type": "object", "required": ["id", "name"],
+                              "properties": {"id": {"type": "string"}, "name": {"type": "string"}}},
+            "derivation": {
+                "source": "bounded closed business query, including predicates and relationships; advanced expressions remain unresolved",
+                "non_sound_rows": "preserved with active_source in unavailable_fields; no invented null or source",
+                "view": "explicit platform and language, resolved once and shared by every read",
+                "proof": "complete class/parent/language-checked direct children; unique full-path match; repeated Sound and child observations",
+                "child_scan_take": 1000, "child_scan_at_fence": "incomplete",
+                "budget": {"exact_read_calls": 10, "multi_read_calls": 40,
+                    "internal_owner_batch_ids": 64, "per_read_bytes": 1024 * 1024,
+                    "aggregate_bytes": 40 * 1024 * 1024, "deadline": "existing Gateway invocation deadline"},
+                "unresolved": "missing/no-file/plugin/ambiguous paths never mean no active source",
+                "evidence_scope": "linked two-source SFX and explicit Voice observed; unlinked characterization still required under #181",
+                "runtime_xml": False,
+            },
+        }
     native, output = available_query_outputs(version).get(name, QUERY_BUSINESS_OUTPUTS[name])
     supported = [item for item in SUPPORTED_WWISE_VERSION_KEYS if name in available_query_outputs(item)]
     schema = _return_properties(version).get(native)

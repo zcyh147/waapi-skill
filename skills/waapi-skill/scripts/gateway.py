@@ -5830,7 +5830,7 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}"
                                     + (f"; {alternative}" if alternative else ""))
         native, output = available_query_outputs(version)[name]
-        bindings.append(("business", native, output))
+        bindings.append(("derived" if native is None else "business", native or output, output))
 
     def bounded_custom_meaning(value: Any) -> str:
         if (
@@ -5853,12 +5853,16 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         raise GatewayInputError("query-object --include-field meanings must be unique")
     args.query_custom_field_meanings = tuple(normalized_meanings)
 
-    native_fields = [binding[1] for binding in bindings]
+    native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
     if len(set(native_fields)) != len(native_fields):
         raise GatewayInputError(
             "query-object requested the same native result field more than once"
         )
     args.query_output_bindings = tuple(bindings)
+    args.query_derived_outputs = tuple(binding[2] for binding in bindings if binding[0] == "derived")
+    if args.query_derived_outputs:
+        if (args.advanced_waql is not None or args.query_platform is None or args.query_language is None):
+            raise GatewayInputError("2021.1 active-source derivation requires a closed business query and explicit platform and language; advanced shapes remain #181 work")
     args.query_return_fields = (
         *SELECTED_REQUIRED_RETURN_FIELDS,
         *native_fields,
@@ -8705,7 +8709,7 @@ def query_business_schema_payload(
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
             "return_scope": _query_return_scope_contract(),
             "result_presence": _query_result_presence_contract(),
-            "business_outputs": list(available_query_outputs(version)),
+            "business_outputs": [name for name, binding in available_query_outputs(version).items() if binding[0] is not None],
             "output_detail": "query-schema --output <business-output>",
             "custom_outputs": {
                 "available": False,
@@ -15418,6 +15422,74 @@ def dispatch_command(
         where = typed_query_predicates(args)
         return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
+        if getattr(args, "query_derived_outputs", ()):
+            from wwise_waapi.object_query_active_source import ActiveSourceQueryError, resolve_2021_active_source
+            from wwise_waapi.canonical import canonical_json_bytes
+            _require_explicit_query_bound(args)
+            broad = not ((args.object_id is not None or args.path is not None) and not args.select and not where)
+            selector = ({"object_id": args.object_id} if args.object_id is not None else {"path": args.path})
+            if broad:
+                selector = {"path": args.path, "object_id": args.object_id, "object_ids": args.object_ids,
+                    "type": args.object_type, "search": args.search, "query": args.query,
+                    "where": where, "select": tuple(args.select or ()), "take": args.take}
+            read_limit = 40 if broad else 10
+            calls = []
+            observed_bytes = 0
+            configuration = selected_connection_binding(env)
+            def read_active_source(api, native_args, native_options):
+                nonlocal observed_bytes
+                if len(calls) >= read_limit:
+                    raise GatewayResultShapeError("Active-source observation exceeded its owned read budget",
+                        details={"completed_calls": len(calls), "limit_calls": read_limit,
+                                 "observed_bytes": observed_bytes},
+                        error_code="ACTIVE_SOURCE_OBSERVATION_INCOMPLETE")
+                call = dispatch(dispatcher, api, connection=connection, version=detected_version,
+                    args=native_args, options=native_options)
+                result_bytes = len(canonical_json_bytes(call.get("result")))
+                if result_bytes > read_limit * MAX_GATEWAY_RESULT_JSON_BYTES - observed_bytes:
+                    raise GatewayResultShapeError("Active-source observation exceeded its aggregate byte budget",
+                        details={"completed_calls": len(calls), "observed_bytes": observed_bytes},
+                        error_code="ACTIVE_SOURCE_OBSERVATION_INCOMPLETE")
+                observed_bytes += result_bytes
+                calls.append(dispatch_call_summary(call))
+                if not call.get("ok"):
+                    raise GatewayResultShapeError("Active-source observation failed", details={"calls": calls},
+                        error_code="ACTIVE_SOURCE_OBSERVATION_FAILED")
+                return call["result"]
+            try:
+                native_rows, preview, source_proof, project_observation = resolve_2021_active_source(read=read_active_source,
+                    selector=selector, broad=broad,
+                    maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
+                    platform=args.query_platform, language=args.query_language,
+                    return_fields=tuple(return_fields), live_info=live_info,
+                    project_before=getattr(args, "query_project_observation", None))
+            except ActiveSourceQueryError as exc:
+                raise GatewayResultShapeError(str(exc), details={"calls": calls, "native_absence_proven": False, **exc.details},
+                    error_code=exc.code) from exc
+            if configuration != selected_connection_binding(env):
+                raise GatewayResultShapeError("Query configuration changed",
+                    details={"reason": "configuration_changed", "completed_calls": len(calls)},
+                    error_code="ACTIVE_SOURCE_OBSERVATION_CHANGED")
+            connection.deadline.require_remaining("complete active-source observation")
+            args.query_project_observation = project_observation
+            validate_exact_query_identity(args, native_rows)
+            validate_query_business_view_result(args, native_rows)
+            business_rows = _project_query_business_rows(args, native_rows)
+            query_payload = {"ok": True, "status": "ok", **common, "semantic_preview": preview.as_dict(),
+                "query_bound": _query_bound_summary(args), "calls": calls, "active_source_resolution": source_proof,
+                "count": len(business_rows), "objects": business_rows,
+                **_query_incomplete_identity_observation({"result": {"return": native_rows}}, business_rows),
+                **({"mutation_selection": selection} if (selection := _query_mutation_selection(args, business_rows)) else {}),
+                "agent_result": business_rows}
+            continuations = _query_business_continuations(args, business_rows)
+            if continuations:
+                terminal_result = query_payload.pop("agent_result")
+                query_payload["continuations"] = continuations
+                query_payload["agent_result"] = terminal_result
+            return _finish_object_query_result(args, query_payload,
+                native={"result": {"return": native_rows, "active_source_resolution": source_proof}},
+                envelope=preview.envelope, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info)
         preview = build_object_get_query(
             path=args.path,
             object_id=args.object_id,
@@ -24756,7 +24828,7 @@ def _bind_query_custom_fields_from_live_metadata(
             "unresolved": unresolved,
             "repair": "refine each --include-field meaning until one live field matches",
         }
-    native_fields = [binding[1] for binding in bindings]
+    native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
     if len(set(native_fields)) != len(native_fields):
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
@@ -24768,20 +24840,25 @@ def _bind_query_custom_fields_from_live_metadata(
 
 
 def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info):
-    project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
-        connection=connection, version=detected_version,
-        **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
-           if detected_version == "2021.1" else {}))
-    if not project_call.get("ok"):
-        raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
-            details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-    if detected_version == "2021.1":
-        project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
-            maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
-            error_code="QUERY_RESULT_CONTINUATION_CHANGED")
-    else:
-        project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    # Reuse only this invocation's already observed project. A continuation's
+    # stored context never populates this attribute or substitutes for a read.
+    project = getattr(args, "query_project_observation", None)
+    if project is None:
+        project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
+            connection=connection, version=detected_version,
+            **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
+               if detected_version == "2021.1" else {}))
+        if not project_call.get("ok"):
+            raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
+                details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+        if detected_version == "2021.1":
+            project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
+                maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
+                error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+        else:
+            project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
     project = require_project_identity(project, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    args.query_project_observation = project
     require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
     return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
         "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
@@ -24872,6 +24949,7 @@ def project_successful_query_object_payload(
         "query_contract",
         "query_bound",
         "source_resolution",
+        "active_source_resolution",
         "count",
         "limit_reached",
         "projection_complete",
@@ -31352,6 +31430,9 @@ def transaction_show_summary(
     # Required user notice survives every compact variant; the existing byte
     # ceiling fails closed if the complete change list cannot fit.
     derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
+    source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
+    if isinstance(source_linkage, Mapping):
+        derived_notice["source_linkage"] = dict(source_linkage)
     if isinstance(request, Mapping) and isinstance(request.get("arguments"), Mapping):
         history_binding = prepared.get("pre_state", {}).get("history_binding")
         if isinstance(history_binding, Mapping):
