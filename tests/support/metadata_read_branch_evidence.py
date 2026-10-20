@@ -25,7 +25,9 @@ NODE = "tests/unit/test_metadata_discovery_gateway.py::test_public_metadata_resu
 def source_seals():
     seals = _source_seals()
     for name in ("tests/support/metadata_result_case_bank.py", "tests/support/metadata_read_branch_evidence.py",
-                 "tests/unit/test_metadata_discovery_gateway.py", "tests/unit/test_branch_evidence_readers.py"):
+                 "tests/unit/test_metadata_discovery_gateway.py", "tests/unit/test_branch_evidence_readers.py",
+                 "tests/unit/test_metadata_default_branch_evidence.py",
+                 "tests/unit/test_branch_coverage_completion_cli.py"):
         seals[name] = hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest()
     return dict(sorted(seals.items()))
 
@@ -35,18 +37,21 @@ def _context(branch, edges):
     pointer = branch["pointer"]
     if "/@definition/" not in pointer:
         return completion.native_observation_pattern(pointer), []
-    chains = {
-        "/resultSchema/@definition/common_definitions.json/definitions/uint32": "/resultSchema/properties/audioEngineId/$ref",
-        "/resultSchema/@definition/common_definitions.json/definitions/propertyValue": "/resultSchema/properties/default/$ref",
-        "/resultSchema/@definition/waapi_definitions.json/definitions/propertyName": "/resultSchema/properties/dependencies/items/properties/property/$ref",
-        "/resultSchema/@definition/<schema>/properties/restriction": "/resultSchema/properties/dependencies/items/properties/conditions/items/properties/restriction/$ref",
-    }
-    for target, source in chains.items():
+    # Follow each selected pinned edge, including the older waapi_definitions
+    # propertyValue/uint32 homes. URI equality never substitutes for its target.
+    sources = (
+        "/resultSchema/properties/audioEngineId/$ref",
+        "/resultSchema/properties/default/$ref",
+        "/resultSchema/properties/dependencies/items/properties/property/$ref",
+        "/resultSchema/properties/dependencies/items/properties/conditions/items/properties/restriction/$ref",
+    )
+    for source in sources:
+        edge_id = branch["route"] + "|" + source
+        edge = edges[edge_id]
+        route, target = edge["reference"]["target"].rsplit("|", 1)
+        if route != branch["route"]:
+            raise ValueError("Reviewed native reference route changed")
         if pointer == target or pointer.startswith(target + "/"):
-            edge_id = branch["route"] + "|" + source
-            edge = edges[edge_id]
-            if edge["reference"]["target"] != branch["route"] + "|" + target:
-                raise ValueError("Reviewed native reference target changed")
             return (completion.native_observation_pattern(source)
                     + completion.native_observation_pattern(pointer[len(target):])), [edge_id]
     raise ValueError("Unreviewed metadata reference occurrence")
@@ -94,7 +99,7 @@ def _witness(branch, native, edges):
     return None
 
 
-def prepare_metadata_capture(root: Path):
+def prepare_metadata_capture(root: Path, *, selected_branch_ids=None, reviewed_requirements=None):
     """One frozen inventory before pytest; no committed inventory is written."""
     import json
     from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
@@ -105,11 +110,29 @@ def prepare_metadata_capture(root: Path):
     with gzip.open(root / "frozen-inventory.json.gz", "wt", encoding="utf-8") as stream:
         json.dump(inventory, stream, ensure_ascii=False, separators=(",", ":"))
     owned = [row for row in inventory["native_coverage"]["obligations"] if row["owner_issue"] == 181]
+    selected = None
+    if selected_branch_ids is not None:
+        selected = set(selected_branch_ids)
+        if (not selected or len(selected) != len(selected_branch_ids)
+                or reviewed_requirements is None
+                or reviewed_requirements.get("contract") != "waapi-skill.branch-evidence-requirements/v1"
+                or set(reviewed_requirements.get("branches", {})) != selected):
+            raise ValueError("Exact selected metadata branches need their reviewed requirements")
+        available = {row["id"]: row for row in owned if "|wwise-console|" in row["route"]
+                     and row["route"].endswith("|" + URI) and row["pointer"].startswith("/resultSchema")}
+        for identity in selected:
+            policy = reviewed_requirements["branches"][identity]
+            if (identity not in available or policy.get("native_shape_sha256") != available[identity]["shape_sha256"]
+                    or policy.get("categories") != ["program", "live_metadata"] or not policy.get("reason")):
+                raise ValueError("Reviewed selected metadata shape or evidence policy changed")
+    elif reviewed_requirements is not None:
+        raise ValueError("Reviewed metadata requirements need an exact branch selection")
     edges = {row["id"]: row for row in owned if row["kind"] == "reference"}
     groups, mapped = {}, set()
     for version in SUPPORTED_WWISE_VERSION_KEYS:
         branches = [row for row in owned if row["route"].startswith(version + "|wwise-console|")
-                    and row["route"].endswith("|" + URI) and row["pointer"].startswith("/resultSchema")]
+                    and row["route"].endswith("|" + URI) and row["pointer"].startswith("/resultSchema")
+                    and (selected is None or row["id"] in selected)]
         public = next(row for row in inventory["routes"] if row["id"] == version + "|function|" + URI)
         for name, native in metadata_result_cases(version).items():
             witnesses = []
@@ -120,12 +143,15 @@ def prepare_metadata_capture(root: Path):
                 if witness is not None:
                     witnesses.append(witness)
                     mapped.add(branch["id"])
-            groups[version + "|" + name] = {"version": version, "case_name": name, "branches": witnesses, "public": public}
+            if witnesses or selected is None:
+                groups[version + "|" + name] = {"version": version, "case_name": name, "branches": witnesses, "public": public}
     context = {"contract": "waapi-skill.metadata-result-program-context/v1", "root": str(root.resolve()),
         "candidate_sha256": inventory["native_coverage"]["candidate_sha256"], "git_candidate": _git_candidate(),
-        "relevant_sources": source_seals(), "groups": groups}
+        "relevant_sources": source_seals(), "groups": groups,
+        "reviewed_requirements": deepcopy(reviewed_requirements)}
     _write(root / "owned-planning-index.json", {"obligations": owned, "candidate_sha256": context["candidate_sha256"],
         "selected_branch_ids": sorted(mapped), "residual_branch_ids": sorted(row["id"] for row in owned if row["id"] not in mapped),
+        "selected_unobserved_branch_ids": sorted((selected or set()) - mapped),
         "mapping_is_not_execution_credit": True})
     _write(root / "context.json", context)
     return root / "context.json"
@@ -152,7 +178,9 @@ def finish_metadata_capture(capture, reports, observed):
     bindings, requirements = {}, {}
     for witness in group["branches"]:
         branch, public = witness["branch"], group["public"]
-        checks = [witness["check"], *({"pointer": pointer, "equals": _observation(record, pointer)} for pointer in (
+        public_pointer = witness["observation_pointer"].replace("/native_call/result", "/gateway/payload/agent_result/metadata", 1)
+        public_check = {**witness["check"], "pointer": public_pointer}
+        checks = [witness["check"], public_check, *({"pointer": pointer, "equals": _observation(record, pointer)} for pointer in (
             "/gateway/payload/agent_result", "/native_metadata_dispatch_count", "/rejected_read/payload/error_code"))]
         record["branch_assertions"][branch["id"]] = {"native_shape_sha256": branch["shape_sha256"], "native_route": branch["route"], "checks": checks}
         bindings[branch["id"]] = {"branch_id": branch["id"], "native_shape_sha256": branch["shape_sha256"],
@@ -163,10 +191,13 @@ def finish_metadata_capture(capture, reports, observed):
             "verifier": {"source": "skills/waapi-skill/wwise_waapi/metadata_discovery.py#browse_metadata", "selector": branch["pointer"]},
             "dispatch_pointer": "/native_call", "observation_pointer": witness["observation_pointer"],
             **({"reference_chain": witness["reference_chain"]} if witness["reference_chain"] else {}),
-            "gateway_observation_pointer": "/gateway/payload/agent_result", "native_hosts": ["wwise-console"],
+            "gateway_observation_pointer": public_pointer if capture.get("reviewed_requirements") else "/gateway/payload/agent_result",
+            "native_hosts": ["wwise-console"],
             "relevant_sources": list(capture["relevant_sources"]), "evidence": {}}
-        requirements[branch["id"]] = {"native_shape_sha256": branch["shape_sha256"], "categories": ["program", "native"],
-            "reason": "Exact selected metadata result read. Raw disclosure proves no condition activation or write effect; matching native version/host/build read remains required."}
+        requirements[branch["id"]] = (deepcopy(capture["reviewed_requirements"]["branches"][branch["id"]])
+            if capture.get("reviewed_requirements") else
+            {"native_shape_sha256": branch["shape_sha256"], "categories": ["program", "native"],
+             "reason": "Exact selected metadata result read. Raw disclosure proves no condition activation or write effect; matching native version/host/build read remains required."})
     root = Path(capture["root"]) / capture["version"] / capture["case_name"]
     root.mkdir(parents=True, exist_ok=False)
     descriptor = _write(root / "program.json", record)

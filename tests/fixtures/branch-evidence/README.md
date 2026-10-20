@@ -27,3 +27,32 @@ and no source seal is narrowed. The relative descriptor and common bundle base
 allow default and explicit audit inputs to evaluate without the original
 workstation's ignored files. Adding other producer evidence requires reviewing
 its full reader artifact closure before a portable attachment is selected.
+
+`product/metadata-default-r47-*` contains 30 original public metadata program
+captures from source candidate `d2abd4293f8391dac6d273a74a033f6269049536`.
+Six existing cases per Wwise lane observe 65 exact Console `getPropertyInfo`
+default-result obligations across 2021.1–2025.1: presence/absence, the selected
+reference occurrence, scalar alternatives, null, empty string and both Boolean
+values. The older three lanes reference `waapi_definitions.json`; the newer two
+reference `common_definitions.json`. Each original preserves actual public
+list/detail selection, exact native/public facts, stale-selection rejection,
+all three pytest phase outcomes and 343 whole-file source seals. The portable
+projection changes only its program artifact locator. Original argv and paths
+remain inert data; these program receipts have no nested reader dependencies.
+
+The reviewed policy requires `program` plus `live_metadata` for every selected
+row. On the captured source all 65 program proofs pass; all 65 real metadata
+proofs are missing and every row remains implemented but unverified. No native,
+Fresh, other-host, descendant or whole-family proof follows. Source changes
+must remain stale unless independently justified by the existing exact source
+equivalence rules. Original receipts are immutable and are never relabeled as
+proof for a successor. The default product ledger remains incomplete.
+
+The default index now selects `product/metadata-default-r47r2-*`, captured after
+the missing-metadata-parent reader repair on source candidate
+`1d3be0862774691d78a51a5dd1bb7e0f91f9ea87`. Its 30 original nodes again observe
+the same 65 facts with the same 343-file dependency membership. The first R47
+bundle remains unchanged as original, now-stale evidence; neither its PASS nor
+its source seals are rewritten. The new bundle is also program-only evidence.
+The reader compatibility fixture that omits or nulls the metadata parent is a
+controlled synthetic corruption test and grants no product metadata credit.

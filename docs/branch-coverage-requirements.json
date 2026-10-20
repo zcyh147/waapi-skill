@@ -40,6 +40,526 @@
         "native"
       ],
       "reason": "Exact 2025.1 Console Media Pool fixed return options through a closed public read and lossless projection. Injected program evidence does not establish real native host behavior; native remains required. This fixed-enum slice needs no live metadata or separate Fresh interaction."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo explicit presence of the selected field default, including null and false without truthiness loss. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default": {
+      "native_shape_sha256": "9a14d1334f5f8ff1b254295c32a51aa1861f8b429b0b044705bf36df871afa0c",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref": {
+      "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact reference alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue": {
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0": {
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable": {
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact nullable alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1": {
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact empty_string alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2": {
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3": {
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true": {
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2021.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo explicit presence of the selected field default, including null and false without truthiness loss. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default": {
+      "native_shape_sha256": "9a14d1334f5f8ff1b254295c32a51aa1861f8b429b0b044705bf36df871afa0c",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref": {
+      "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact reference alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue": {
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0": {
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable": {
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact nullable alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1": {
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact empty_string alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2": {
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3": {
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true": {
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2022.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo explicit presence of the selected field default, including null and false without truthiness loss. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default": {
+      "native_shape_sha256": "9a14d1334f5f8ff1b254295c32a51aa1861f8b429b0b044705bf36df871afa0c",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref": {
+      "native_shape_sha256": "a04a6b3a933a767581af4230e5dbb37001d54701c6b2cadc672cd0b6a8ad4146",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact reference alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue": {
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0": {
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/0/@nullable": {
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact nullable alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1": {
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/1/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact empty_string alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/2": {
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3": {
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true": {
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2023.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo explicit presence of the selected field default, including null and false without truthiness loss. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default": {
+      "native_shape_sha256": "0bb4d988158a9ec4b15c46a8a508ee640137cb8bb1a400e825d85a953898a6f9",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref": {
+      "native_shape_sha256": "b2bb1aa4e219428ee22fed20e92dbeea36f33df1cb10427c557175f0a4ddf2b4",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact reference alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue": {
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0": {
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable": {
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact nullable alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1": {
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact empty_string alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2": {
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3": {
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true": {
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2024.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
+      "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo explicit presence of the selected field default, including null and false without truthiness loss. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default": {
+      "native_shape_sha256": "0bb4d988158a9ec4b15c46a8a508ee640137cb8bb1a400e825d85a953898a6f9",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/$ref": {
+      "native_shape_sha256": "b2bb1aa4e219428ee22fed20e92dbeea36f33df1cb10427c557175f0a4ddf2b4",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact reference alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue": {
+      "native_shape_sha256": "22847d91f3637d43e6327275c2fe13d383d09228d57cd19b1312998ccc8f07ab",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0": {
+      "native_shape_sha256": "42b09415fddee82f32b0357566fe8e53f3cf8f67d699e484a619527f6052e767",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/0/@nullable": {
+      "native_shape_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact nullable alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1": {
+      "native_shape_sha256": "69d888691b4f11baf8639ef0933567057d6a67a741d3cc8b7853dc617d8130d3",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/1/@empty/string": {
+      "native_shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact empty_string alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/2": {
+      "native_shape_sha256": "58a1b0b1e43666d40400a2b0b13e1fbcf176ed74218eed18a01ae44587d98b2e",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3": {
+      "native_shape_sha256": "32d547ec133f5b88dbf85d1ccd09c4ea7faf6c4f2a97c5125c6928d555abfbbf",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact schema alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/false": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/@definition/common_definitions.json/definitions/propertyValue/anyOf/3/@boolean/true": {
+      "native_shape_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "categories": [
+        "program",
+        "live_metadata"
+      ],
+      "reason": "Exact 2025.1 Console getPropertyInfo the selected field default scalar/reference occurrence, preserving the exact boolean_value alternative. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
     }
   }
 }

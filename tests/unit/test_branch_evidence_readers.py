@@ -168,6 +168,97 @@ def test_metadata_branch_uses_original_receipt_and_reviewed_source_equivalence(t
     assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding, source_root=original_root)[0] == 'missing'
 
 
+@pytest.mark.parametrize('damage', [None, 'public-sibling', 'native-sibling', 'reference-occurrence', 'absence', 'null',
+    'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence', 'args-schema', 'options-schema'])
+def test_metadata_default_uses_exact_public_leaf_without_changing_program_dispatch_pointer(tmp_path, damage):
+    """Original reader compatibility only; this controlled receipt grants no product proof."""
+    from tests.maintenance import branch_coverage_audit as audit
+    metadata_run = metadata_descriptor()
+    if damage in {'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'}:
+        # Deliberately corrupted/resealed reader fixtures, never native evidence.
+        # Original external receipts remain byte-identical in FIXTURES.
+        import shutil
+        copied = tmp_path / 'synthetic-metadata'
+        shutil.copytree(FIXTURES / 'metadata', copied)
+        seal = json.loads((copied / 'seal.json').read_bytes())
+        for name in ('006.stdout', '006.agent-result.json'):
+            path = copied / name
+            payload = json.loads(path.read_bytes())
+            result = payload['agent_result'] if name.endswith('.stdout') else payload
+            if damage == 'missing-parent-absence':
+                del result['metadata']
+            else:
+                result['metadata'] = {} if damage == 'empty-parent-absence' else None
+            path.write_text(json.dumps(payload), encoding='utf-8')
+            entry = next(row for row in seal['files'] if row['path'] == name)
+            entry.update(sha256=hashlib.sha256(path.read_bytes()).hexdigest(), bytes=len(path.read_bytes()))
+        (copied / 'seal.json').write_text(json.dumps(seal), encoding='utf-8')
+        metadata_run = {**metadata_run, 'root': str(copied), 'seal': sealed(copied / 'seal.json')}
+    context = completion.read_metadata_run(metadata_run, tmp_path)
+    route = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo'
+    target = '/resultSchema/@definition/waapi_definitions.json/definitions/propertyValue'
+    pointer = target + '/anyOf/3/@boolean/false'
+    branch = {'id': route + '|' + pointer, 'route': route, 'pointer': pointer,
+              'kind': 'boolean_value', 'value': False, 'shape_sha256': audit.digest(False)}
+    if damage in {'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'}:
+        pointer = '/resultSchema/properties/default/@presence/absent'
+        branch.update(id=route + '|' + pointer, pointer=pointer, kind='optional_presence', value='absent',
+                      shape_sha256=audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')['branches'][route + '|' + pointer]['native_shape_sha256'])
+    elif damage in {'args-schema', 'options-schema'}:
+        from wwise_waapi.native_catalog import load_native_catalog
+        pointer = '/argsSchema' if damage == 'args-schema' else '/optionsSchema'
+        schema = load_native_catalog('2021.1', 'wwise-console')['schemas']['ak.wwise.core.object.getPropertyInfo'][pointer[1:]]
+        branch.update(id=route + '|' + pointer, pointer=pointer, kind='schema', shape_sha256=audit.digest(schema))
+    edge_id = route + '|/resultSchema/properties/default/$ref'
+    edges = {edge_id: {'route': route, 'pointer': '/resultSchema/properties/default/$ref',
+                      'reference': {'target': route + '|' + target}}}
+    candidate = 'c' * 64
+    sources = ['skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py']
+    original_root = isolated_original_sources(tmp_path / 'original-source-context', context, sources)
+    binding = {'input': {'gateway_argv': context['gateway']['argv']}, 'native_hosts': ['wwise-console'],
+        'dispatch_pointer': '/native_call', 'observation_pointer': '/native_call/result/default',
+        'gateway_observation_pointer': '/gateway/payload/agent_result/metadata/default',
+        'reference_chain': [edge_id], 'relevant_sources': sources,
+        **{key: {'source': 'skills/waapi-skill/scripts/gateway.py#execute_gateway', 'selector': pointer}
+           for key in ('construction', 'validation', 'verifier')}}
+    if damage == 'public-sibling':
+        binding['gateway_observation_pointer'] = '/gateway/payload/agent_result/metadata/supports/unlink'
+    elif damage == 'native-sibling':
+        binding['observation_pointer'] = '/native_call/result/supports/unlink'
+    elif damage == 'reference-occurrence':
+        edges[edge_id]['pointer'] = '/resultSchema/properties/supports/properties/unlink/$ref'
+    elif damage in {'args-schema', 'options-schema'}:
+        binding.update(observation_pointer='/native_call/result',
+                       gateway_observation_pointer='/gateway/payload/agent_result/metadata', reference_chain=[])
+    record = {'candidate_sha256': candidate, 'scope_kind': 'controlled', 'metadata_run': metadata_run,
+        'invocation': {'phase': 'final', 'outcome': 'PASS', 'node_outcomes': [{'nodeid': 'preserved-metadata', 'outcome': 'PASS'}]},
+        'branch_assertions': {branch['id']: {'native_shape_sha256': branch['shape_sha256'], 'native_route': route,
+          'checks': [{'pointer': binding['gateway_observation_pointer'], 'equals': False}]}}}
+    if damage == 'absence' or damage in {'empty-parent-absence', 'missing-parent-absence', 'null-parent-absence'}:
+        record['branch_assertions'][branch['id']]['checks'][0] = {
+            'pointer': binding['gateway_observation_pointer'], 'absent': True}
+    elif damage == 'null':
+        record['branch_assertions'][branch['id']]['checks'][0]['equals'] = None
+    elif damage in {'args-schema', 'options-schema'}:
+        record['branch_assertions'][branch['id']]['checks'][0]['equals'] = context['gateway']['payload']['agent_result']['metadata']
+    path = tmp_path / 'mapped-default.json'; path.write_text(json.dumps(record))
+    proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1',
+        'reviewed_reason': 'Controlled original metadata reader compatibility, never product credit.',
+        'from_candidate': context['candidate'], 'to_candidate': candidate, 'branch_id': branch['id'],
+        'native_shape_sha256': branch['shape_sha256'], 'native_route': route,
+        'evidence_sha256': context['receipt_sha256'],
+        'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)),
+        'sources': {name: context['relevant_sources'][name] for name in sources}}
+    proof_path = tmp_path / 'default-reuse.json'; proof_path.write_text(json.dumps(proof))
+    binding['native_equivalence'] = sealed(proof_path)
+    result = completion.evidence_result(sealed(path, nodeid='preserved-metadata'), branch, candidate,
+        'live_metadata', 'controlled', tmp_path, binding, source_root=original_root,
+        reference_edges=edges)
+    assert result == ('passed', None) if damage in {None, 'empty-parent-absence'} else result[0] == 'missing'
+    if damage not in {'native-sibling', 'args-schema', 'options-schema'}:
+        assert binding['observation_pointer'] == '/native_call/result/default'
+
+
 def test_native_absence_requires_omission_in_each_exact_host_observation():
     hosts = {'wwise-console', 'wwise-authoring'}
     binding = {'absence_observation_pointers': {host: f'/observations/{host}/capabilities/field' for host in hosts}}
