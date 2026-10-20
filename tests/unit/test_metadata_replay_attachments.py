@@ -159,6 +159,44 @@ def test_r55_original_and_current_replay_keep_distinct_sources_inputs_and_ten_le
         source_root=audit.ROOT,reference_edges=capture['edges'])==('passed',None)
 
 
+
+@pytest.mark.parametrize('cohort',('r54','r55'))
+@pytest.mark.parametrize('damage',('future-tone','future-contract','future-aux','future-helper',
+    'unknown-aux','omitted-aux','false-helper-before'))
+def test_class_bridge_requires_exact_accepted_runtime_and_auxiliary_blobs(inventory,tmp_path,monkeypatch,cohort,damage):
+    case='2022.1|Wwise Delay|DelayTime' if cohort=='r54' else '2021.1|MusicStinger|CustomCueMatchName'
+    capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory,case,cohort=cohort)
+    def result():
+        return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
+            source_root=audit.ROOT,reference_edges=capture['edges'])
+    assert result()==('passed',None)
+    bridge=record['source_bridge'];helper='tests/semantic/support/codex_source_copy_protocol.py'
+    assert bridge['attribution']=='historical_native_current_program_not_current_native'
+    assert len(bridge['historical_sources'])==(560 if cohort=='r54' else 561)
+    assert len(bridge['current_sources'])==562
+    assert helper not in bridge['historical_sources']
+    assert bridge['changed_files'][helper]=={'before':None,
+        'after':'f1aa72085e2985f8b93a1c399c17282743d716977529d9b7a00e4c5d860dffbe'}
+    assert all(name not in bridge['current_sources'] for name in ('ci/program-test-nodes.txt',
+        'tests/unit/test_ci_test_bat.py','tests/unit/test_class_metadata_product_attachments.py'))
+    if damage=='omitted-aux':bridge['changed_files'].pop(helper)
+    elif damage=='false-helper-before':bridge['changed_files'][helper]['before']='0'*64
+    else:
+        relative={'future-tone':'skills/waapi-skill/wwise_waapi/operation_tone.py',
+            'future-contract':'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py',
+            'future-aux':'tests/semantic/support/codex_gateway_broker.py',
+            'future-helper':helper,'unknown-aux':'tests/semantic/support/codex_archive_paths.py'}[damage]
+        path=audit.ROOT/relative;read_bytes=Path.read_bytes
+        monkeypatch.setattr(Path,'read_bytes',lambda p:read_bytes(p)+b'\n# unreviewed future source\n' if p==path else read_bytes(p))
+        current=producer.r54_current_sources();bridge['current_sources']=current
+        bridge['changed_files']=producer.source_changes(bridge['historical_sources'],current)
+        program['relevant_sources']=current
+    record['replay']=write(tmp_path/'changed-class-program.json',program,nodeid=descriptor['nodeid'])
+    descriptor=write(tmp_path/'changed-class-attachment.json',record,nodeid=descriptor['nodeid'])
+    outcome,reason=result()
+    assert outcome=='missing' and 'unreviewed runtime drift' in reason
+
+
 def test_r54_assigns_only_observed_versioned_leaves_to_sixteen_original_scenarios(inventory):
     from tests.maintenance.collect_class_metadata import collection_plan
     originals=producer.r54_original_reads()
@@ -312,6 +350,8 @@ def controlled_attachment(tmp_path, original_root, inventory, field):
 
 @pytest.mark.parametrize('field',producer.CASES)
 def test_original_metadata_and_current_replay_have_separate_exact_inputs(original_root, inventory, tmp_path, field):
+    assert not any(name.startswith('tests/semantic/') for name in producer.source_seals())
+    assert not any(name.startswith('tests/semantic/') for name in producer.historical_sources())
     capture,replay,record,replay_bindings,descriptor = controlled_attachment(tmp_path,original_root,inventory,field)
     assert record['category_inputs']['historical'] != record['category_inputs']['replay']
     for branch in capture['branches']:
@@ -638,7 +678,7 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
     source_pin = 'ee78f00baf06f1840228313ae1bb6b263fd95301'
-    tone_pin = '8d0157647035504a6ab4e4d9e9b06e8b6ec8985d'
+    tone_pin = '4521245a87c754baed9595db71df9e5510548c0f'
     gateway_pin = '4a6208a15d19f847b3bac848a075229eb3547585'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
