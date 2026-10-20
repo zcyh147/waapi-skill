@@ -4368,3 +4368,188 @@ def test_stationary_tone_diagnostic_uses_matching_pinned_console_catalog_without
     assert len(set(receipt['lifecycle_final_reference']['transaction_ids'])) == 4
     assert receipt['collection_complete'] is True and receipt['business_effect_verified'] is False
     assert category['status'] == 'blocked' and category['diagnostic_only'] is True
+
+
+def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
+    """Fake public replies exercise collector protocol/oracle only, not native admission."""
+    from copy import deepcopy
+    import shutil
+    import uuid
+    import xml.etree.ElementTree as ET
+    sandbox = tmp_path / 'sandbox'; sandbox.mkdir()
+    project = sandbox / 'Fixture.wproj'; project.write_text('<WwiseDocument/>')
+    unit_path = sandbox / 'Actor-Mixer Hierarchy' / 'Default Work Unit.wwu'; unit_path.parent.mkdir()
+    guid = lambda value: '{' + str(uuid.UUID(int=value)).upper() + '}'
+    unit, platform = guid(1), guid(2)
+    objects = {unit: {'id': unit, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'class_id': 1638416,
+        'path': workflow.ACTOR_MIXER_PARENT, 'parent': None, 'notes': '', 'file_path': str(unit_path)},
+        platform: {'id': platform, 'name': 'Mac', 'type': 'Platform', 'class_id': 4, 'path': r'\Platforms\Mac', 'parent': None, 'notes': ''}}
+    commands, drafts, transactions = [], {}, {}
+    state = {'copies': 0, 'copy_attempts': 0, 'imports': 0, 'deletes': 0, 'active': {}}
+    def saved_xml():
+        root = ET.Element('WwiseDocument'); work = ET.SubElement(root, 'WorkUnit', ID=unit)
+        children = ET.SubElement(work, 'ChildrenList')
+        for row in list(objects.values()):
+            if row['type'] != 'Sound': continue
+            sound = ET.SubElement(children, 'Sound', ID=row['id'], Name=row['name'])
+            sources = ET.SubElement(sound, 'ChildrenList')
+            members = [item for item in objects.values() if item['type'] == 'AudioFileSource' and item['parent']['id'] == row['id']]
+            for source in members:
+                node = ET.SubElement(sources, 'AudioFileSource', ID=source['id'], Name=source['name'])
+                ET.SubElement(node, 'Language').text = source['source_language']['name']
+                ET.SubElement(node, 'AudioFile').text = Path(source['original_file_path']).name
+            active = state['active'][row['id']]
+            refs = ET.SubElement(sound, 'ActiveSourceList')
+            ET.SubElement(refs, 'ActiveSource', ID=guid(999) if fault == 'xml-guid' else active,
+                Name=objects[active]['name'], Platform='Linked')
+        unit_path.write_bytes(ET.tostring(root))
+    def raw(argv):
+        argv = list(argv); commands.append(argv)
+        payload = {'ok': True, 'detected_version': '2021.1',
+            'endpoint': {'host': '127.0.0.1', 'port': 31337, 'url': 'ws://127.0.0.1:31337/waapi'}}
+        command = argv[0]
+        if command == 'metadata':
+            payload['agent_result'] = {'complete': True, 'types': [
+                {'name': name, 'classId': value, 'type': 'WObject', 'selection': name}
+                for name, value in [('Sound', 65552), ('AudioSource', 16), ('WorkUnit', 1638416), ('Platform', 4)]]}
+        elif command == 'query-object':
+            if '--type-selection' in argv: found = [objects[platform]]
+            elif '--path-segment' in argv:
+                path = '\\' + '\\'.join(argv[i + 1] for i, arg in enumerate(argv) if arg == '--path-segment')
+                found = [row for row in objects.values() if row['path'] == path]
+            else: found = [objects[argv[argv.index('--exact-id') + 1]]] if argv[argv.index('--exact-id') + 1] in objects else []
+            if '--relationship' in argv:
+                owner = argv[argv.index('--exact-id') + 1]
+                found = [row for row in objects.values() if isinstance(row.get('parent'), dict) and row['parent']['id'] == owner]
+                if fault != 'same-order': found = sorted(found, key=lambda row: row['name'])
+            includes = [argv[i + 1].replace('-', '_') for i, arg in enumerate(argv) if arg == '--include']
+            keys = {'id', 'name', 'type', 'path', *includes}
+            found = [{key: deepcopy(value) for key, value in row.items()
+                if key in keys or key == 'properties' and '--include-field' in argv} for row in found]
+            if fault == 'scalar-parent':
+                for row in found:
+                    for key in ('parent', 'work_unit'):
+                        if isinstance(row.get(key), dict): row[key] = row[key]['id']
+            payload.update(objects=found, count=len(found), projection_complete=True, limit_reached=False)
+        elif command == 'request-schema':
+            payload.update(input_shape='business_declaration', continuation={'subcommand': 'draft-start',
+                'gateway_argv': ['draft-start', 'ak.wwise.core.project.save'], 'copy_exactly': True, 'append_arguments': 'forbidden'})
+        elif command == 'draft-start':
+            identity = 'draft-' + str(len(drafts)); drafts[identity] = {'operation': argv[1], 'revision': 1, 'roles': {}, 'rows': []}
+            payload.update(draft={'draft_id': identity, 'revision': 1}, task_authority='authority')
+        elif command in {'draft-bind-object', 'draft-declare-new', 'draft-declare-object-change', 'draft-declare-core-plan', 'draft-check', 'preview-from-draft'}:
+            draft = drafts[argv[1]]
+            if command == 'draft-check' and draft['operation'] == 'object.copy' and fault == 'preparation':
+                return 2, {**payload, 'ok': False, 'error_code': 'INVALID_TARGET',
+                    'recovery': {'project_write_outcome': 'no_project_write_in_this_invocation'}}
+            if command == 'draft-bind-object':
+                role = argv[argv.index('--role') + 1] if '--role' in argv else 'object'
+                draft['roles'][role] = argv[argv.index('--object-id') + 1]
+                payload['bound_object'] = {'handle': 'handle-' + role}
+            elif command == 'draft-declare-new': draft['rows'].append(argv)
+            elif command == 'preview-from-draft':
+                identity = 'tx-' + str(len(transactions)); transactions[identity] = draft
+                payload.update(transaction_id=identity, artifact_hash='hash-' + identity)
+            draft['revision'] += 1
+            payload['draft'] = {'draft_id': argv[1], 'revision': draft['revision']}
+        elif command == 'transaction-show': payload['confirmation'] = {'token': 'token'}
+        elif command == 'confirm': pass
+        elif command in {'execute', 'verify'}:
+            draft = transactions[argv[1]]; operation = draft['operation']
+            if command == 'verify':
+                payload.update(state='result_schema_checked' if operation == 'ak.wwise.core.project.save' else 'verified',
+                    verified=operation != 'ak.wwise.core.project.save', verification={'status': 'result_schema_checked' if operation == 'ak.wwise.core.project.save' else 'verified',
+                        'business_state_verified': operation != 'ak.wwise.core.project.save'})
+            else:
+                payload.update(state='executed_unverified', automatic_retry=False)
+                if operation == 'ak.wwise.core.project.save': saved_xml()
+                elif operation == 'audio.import':
+                    state['imports'] += 1
+                    assert len(draft['rows']) == 6
+                    for index, row in enumerate(draft['rows']):
+                        fields = {row[i + 1]: row[i + 2] for i, arg in enumerate(row) if arg == '--field'}
+                        language, source_file = fields['language'], Path(fields['media_file'])
+                        voice = row[row.index('--kind') + 1] == 'sound-voice'
+                        assert voice == (language == 'English(US)')
+                        assert row[row.index('--parent-handle') + 1] == 'handle-object'
+                        destination = sandbox / 'Originals' / ('Voices/English(US)' if voice else 'SFX') / source_file.name
+                        destination.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(source_file, destination)
+                        owner_id, source_id = guid(100 + index), guid(200 + index)
+                        name = row[row.index('--name') + 1]
+                        objects[owner_id] = {'id': owner_id, 'name': name, 'type': 'Sound', 'class_id': 65552,
+                            'path': workflow.ACTOR_MIXER_PARENT + '\\' + name, 'parent': {'id': unit}, 'notes': '',
+                            'properties': {'IsVoice': voice}, 'work_unit': {'id': unit}, 'original_file_path': str(destination)}
+                        objects[source_id] = {'id': source_id, 'name': source_file.stem, 'type': 'AudioFileSource', 'class_id': 16,
+                            'path': objects[owner_id]['path'] + '\\' + source_file.stem, 'parent': {'id': owner_id}, 'notes': '',
+                            'source_language': {'name': language}, 'original_file_path': str(destination)}
+                        state['active'][owner_id] = source_id
+                elif operation == 'object.copy':
+                    state['copy_attempts'] += 1
+                    if fault in {'native', 'indeterminate'}:
+                        dispatch = {'ok': False, 'failure_origin': 'exception' if fault == 'native' else 'missing_response'}
+                        if fault == 'native': dispatch['waapi_error_uri'] = 'ak.wwise.invalid_arguments'
+                        return 2, {**payload, 'ok': False, 'state': 'indeterminate', 'dispatch_result': dispatch}
+                    source = objects[draft['roles']['object']]; parent = objects[draft['roles']['parent']]
+                    assert source['type'] == 'AudioFileSource' and parent['type'] == 'Sound'
+                    state['copies'] += 1
+                    if fault == 'original-source-reset':
+                        objects[state['active'][parent['id']]]['notes'] = 'Unexpected reset'
+                    if fault != 'one-child':
+                        identity = guid(300 + state['copies'])
+                        objects[identity] = {**deepcopy(source), 'id': identity, 'parent': {'id': parent['id']},
+                            'path': parent['path'] + '\\' + source['name']}
+                elif operation == 'object.delete':
+                    state['deletes'] += 1
+                    identity = draft['roles']['object']
+                    for key in list(objects):
+                        if key == identity or objects[key].get('parent') == {'id': identity}: del objects[key]
+                else: raise AssertionError(operation)
+        else: raise AssertionError(argv)
+        return 0, payload
+    runtime = SimpleNamespace(version='2021.1', state_dir=tmp_path / 'state', candidate='program-fixture',
+        category_results=[], raw_gateway=raw, lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'),
+        port=31337, sandbox=SimpleNamespace(sandbox_path=sandbox, sandbox_project=project))
+    return runtime, commands, state
+
+
+@pytest.mark.parametrize('fault', [None, 'scalar-parent'])
+def test_multisource_collector_public_setup_saved_oracle_and_cleanup(tmp_path, workflow, fault):
+    runtime, commands, state = _multisource_public_runtime(tmp_path, workflow, fault=fault)
+    category = workflow._collect_2021_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_MULTI_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS', receipt.get('failure')
+    assert state == {**state, 'imports': 1, 'copies': 3, 'copy_attempts': 3, 'deletes': 6}
+    assert len([row for row in commands if row[0] == 'draft-declare-new']) == 6
+    assert receipt['oracle']['ordering_counterexample'] == {'public': True, 'xml': False}
+    assert receipt['path_join_matches_saved_oracle'] is True and receipt['object_cleanup'] == 'verified'
+    assert receipt['generic_active_source_mapping'] is False and receipt['native_absence_proven'] is False
+    assert sum(receipt['call_counts'].values()) == len(commands) <= receipt['limits']['public_calls']
+    assert not any('active-source' in item or 'activeSource' in item for command in commands for item in command)
+
+
+@pytest.mark.parametrize('fault,outcome,attempts', [('preparation', 'skill_preparation_rejected', 0),
+    ('native', 'native_copy_rejection_reported', 1), ('indeterminate', 'execution_indeterminate', 1)])
+def test_multisource_collector_stops_after_distinct_copy_setup_failures(tmp_path, workflow, fault, outcome, attempts):
+    runtime, commands, state = _multisource_public_runtime(tmp_path, workflow, fault=fault)
+    category = workflow._collect_2021_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_MULTI_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'blocked' and receipt['outcome'] == outcome, receipt.get('failure')
+    assert state['copy_attempts'] == attempts and state['deletes'] == 0
+    assert len([row for row in commands if row[:2] == ['draft-start', 'object.copy']]) == 1
+    assert receipt['collection_complete'] is False and receipt['native_absence_proven'] is False
+
+
+@pytest.mark.parametrize('fault,outcome', [('one-child', 'setup_cardinality_blocked'),
+    ('xml-guid', 'saved_oracle_blocked'), ('same-order', 'ordering_counterexample_unproven'),
+    ('original-source-reset', 'setup_cardinality_blocked')])
+def test_multisource_collector_requires_two_sources_exact_xml_active_guid_and_order_counterexample(tmp_path, workflow, fault, outcome):
+    runtime, _commands, state = _multisource_public_runtime(tmp_path, workflow, fault=fault)
+    category = workflow._collect_2021_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_MULTI_TEST')
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'blocked' and receipt['outcome'] == outcome, receipt.get('failure')
+    assert state['deletes'] == 0 and receipt['collection_complete'] is False
+    if fault == 'one-child':
+        assert state['copy_attempts'] == 1 and 'oracle' not in receipt
+    elif fault == 'same-order':
+        assert receipt['path_join_matches_saved_oracle'] is True
+        assert receipt['oracle']['ordering_discrimination'] is False
