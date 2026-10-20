@@ -11555,7 +11555,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             verification["verification_scope"] = source_copy_scope(snapshot)
             if copy_proof_context is not None:
                 from .source_copy_proof import KEY, capture_baseline, baseline_summary
-                saved = capture_baseline(copy_proof_context, snapshot, read)
+                saved = ({'status': 'unavailable', 'reason': 'replace_saved_graph_preservation_unfinished'}
+                    if conflict == 'replace' else capture_baseline(copy_proof_context, snapshot, read))
                 metadata[KEY] = saved
                 verification[KEY] = baseline_summary(saved)
         cleanup = {
@@ -11810,6 +11811,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         metadata["voice_source_staging"] = prepare_staging(arguments["voice_source_staging"], read)
         preview = replace(preview, evidence_plan=(*preview.evidence_plan,
             {"staged_completion": staging_projection(arguments["voice_source_staging"])}))
+    if isinstance(copy_proof_context, Mapping) and copy_proof_context.get('save_origin') is not None:
+        from .source_copy_proof import ORIGIN, SAVE, revalidate_origin
+        origin = copy_proof_context['save_origin']
+        if request.operation != 'waapi.call' or request.arguments != {'api': SAVE, 'args': {}, 'options': {}}:
+            raise OperationContractError('INVALID_SOURCE_COPY_SAVE', 'Generated Save cannot alter the fixed versioned request')
+        revalidate_origin(origin, copy_proof_context, read=read)
+        metadata[ORIGIN] = origin
     return PreparedOperation(
         request=request,
         semantic_preview=preview,
@@ -16020,6 +16028,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
 
     if prepared.get("contract") != PREPARED_OPERATION_CONTRACT:
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation contract is missing or unsupported.")
+    from .source_copy_proof import ORIGIN, revalidate_origin
+    save_origin = prepared.get('pre_state', {}).get(ORIGIN)
+    if save_origin is not None:
+        revalidate_origin(save_origin, copy_proof_context, read=read_call)
     operation = prepared.get("operation")
     roles = prepared.get("resolved_roles")
     if not isinstance(operation, str) or not isinstance(roles, Mapping):

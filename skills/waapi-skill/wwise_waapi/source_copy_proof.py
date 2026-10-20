@@ -4,6 +4,7 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 import uuid
+import re
 
 from .canonical import canonical_sha256
 from .console_project_operations import _read_xml_artifact, _project_io_root_identity
@@ -14,6 +15,8 @@ from .transaction_locality import is_loopback_waapi_host
 
 KEY = 'source_copy_saved_proof'
 ORIGIN = 'source_copy_save_origin'
+RETURN = 'source_copy_parent_return'
+DECISION = 'source_copy_proof_decision'
 CONTRACT = 'waapi-skill.source-copy-saved-proof/v1'
 CHILD_PREFIX = 'od1-f54c50'
 SAVE = 'ak.wwise.core.project.save'
@@ -25,6 +28,14 @@ class SavedCopyProofError(ValueError):
     error_code = 'SOURCE_COPY_SAVED_PROOF_INVALID'
     def as_dict(self):
         return {'error_code': self.error_code, 'message': str(self)}
+
+
+class UnsupportedSavedShape(SavedCopyProofError):
+    error_code = 'SOURCE_COPY_SAVED_SHAPE_UNFINISHED'
+
+
+def require_shape(condition, message):
+    if not condition: raise UnsupportedSavedShape(message)
 
 
 def require(condition, message):
@@ -125,16 +136,16 @@ def source_nodes(documents, identity, owner_id):
             found.append(node)
     require(len(found) == 1, 'Saved Source is missing or duplicated')
     source = found[0]
-    require(source.get('PluginName') == 'Wwise Synth One' and source.get('PluginID') == '148'
+    require_shape(source.get('PluginName') == 'Wwise Synth One' and source.get('PluginID') == '148'
         and source.get('CompanyID') == '0' and not list(source.iter('ObjectRef')), 'Serialized plugin/reference shape is not certified')
     base = "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC"
     selections = {'source': [source], 'rtpc': source.findall(base),
         'control_input': source.findall(base + "/ReferenceList/Reference[@Name='ControlInput']/Custom/ModulatorLfo"),
         'curve': source.findall(base + '/Curve')}
-    require(all(len(rows) == 1 for rows in selections.values()), 'Saved owned roles are missing or ambiguous')
+    require_shape(all(len(rows) == 1 for rows in selections.values()), 'Saved owned roles are missing or ambiguous')
     nodes = {key: value[0] for key, value in selections.items()}
     declarations = [node for node in source.iter() if 'ID' in node.attrib]
-    require(set(declarations) == set(nodes.values()), 'Saved owned declaration shape is unclassified')
+    require_shape(set(declarations) == set(nodes.values()), 'Saved owned declaration shape is unclassified')
     ids = [guid(node.get('ID')) for node in declarations]
     require(len(set(ids)) == 4 and all(all_ids.count(x) == 1 for x in ids), 'Saved owned GUIDs alias another declaration')
     return nodes
@@ -150,7 +161,7 @@ def serialized(node, nodes=None, *, rename_root=None):
     text, tail = node.text, node.tail
     if len(node) and text is not None and not text.strip() and '\n' in text: text = None
     if tail is not None and not tail.strip() and '\n' in tail: tail = None
-    return [node.tag, sorted(attrs.items()), text, tail, [serialized(child, nodes) for child in node]]
+    return [node.tag, [[key, value] for key, value in sorted(attrs.items())], text, tail, [serialized(child, nodes) for child in node]]
 
 
 def live_roles(nodes, owner, read):
@@ -166,6 +177,19 @@ def live_roles(nodes, owner, read):
             require(type(row.get('shortId')) is int and str(row['shortId']) == node.get('ShortID'), 'Saved ShortID is not independently live-bound')
         else:
             require(role == 'curve', 'Unclassified missing serialized ShortID')
+        if role != 'source':
+            fields = capture_lifecycle_fields(row['id'], read=read, strict=False)
+            for metadata in fields['field_metadata'].values():
+                metadata.pop('scope', None)
+                metadata.pop('available_names', None)
+            # The first complete serialized shape has only this documented
+            # owned reference hop. Unclassified live values remain ordinary
+            # copy scope, never a stronger preservation claim.
+            allowed = {'ControlInput'} if role == 'rtpc' else set()
+            require_shape(set(fields['unreadable_fields']) <= allowed
+                and set(fields['reference_fields']) <= allowed,
+                'Owned live field/reference scope is not certified by this serialized shape')
+            row['default_fields'] = fields
         rows[role] = row
     rtpc = rows['rtpc']['id']
     hop = read(GET, {'waql': f'from object "{rtpc}" select @ControlInput take 2'}, {'return': ['id']}).get('return')
@@ -177,11 +201,27 @@ def capture_baseline(context, snapshot, read):
     if not supported(context): return {'status': 'unavailable', 'reason': 'version_host_or_local_runtime_authority_unavailable'}
     source = snapshot['source']['frame']; destination = snapshot['destination']
     if source.get('classId') != 9699330: return {'status': 'unavailable', 'reason': 'serialized_source_shape_not_certified'}
+    if snapshot['source']['unreadable_fields'] or snapshot['source']['reference_fields']:
+        return {'status': 'unavailable', 'reason': 'source_live_field_scope_unfinished'}
+    if not all(owner['children_complete'] for owner in snapshot['owners'].values()):
+        return {'status': 'unavailable', 'reason': 'owner_childset_scope_unfinished'}
     try:
         binding = authority(context, source['id'], destination, read)
         dirty = binding['project']['workunitIsDirty'] or any(row['workunitIsDirty'] for row in binding['units'].values())
+        decision = context.get('proof_decision')
+        if decision and decision.get('request_digest') == context.get('request_digest'):
+            require(decision['origin']['context'] == context['binding'], 'Baseline decision context changed')
+            if decision['status'] == 'declined':
+                return {'status': 'unavailable', 'reason': 'baseline_Save_declined'}
+            require(resolve_save_receipt(decision['origin'], context) == decision['receipt'], 'Baseline Save receipt changed')
+            require(not dirty, 'Authorized baseline Save did not establish clean selected documents')
+            require(lifecycle_snapshot_equal(without_dirty(binding), without_dirty(decision['origin']['file_binding']['authority'])),
+                'Baseline Save file membership changed before copy Preview')
+        else:
+            decision = None
         if dirty:
-            return {'status': 'baseline_save_pending', 'authority': binding, 'context': context['binding']}
+            return {'status': 'baseline_save_pending', 'authority': binding, 'context': context['binding'],
+                'source_id': guid(source['id']), 'destination_id': guid(destination)}
         documents, proofs = read_documents(binding)
         nodes = source_nodes(documents, source['id'], guid(source['parent']))
         live = live_roles(nodes, guid(source['parent']), read)
@@ -189,13 +229,19 @@ def capture_baseline(context, snapshot, read):
         require(lifecycle_snapshot_equal(binding, after), 'Model authority changed during baseline observation')
         _, proof_after = read_documents(after)
         require(proofs == proof_after, 'Model files changed during baseline observation')
-        body = {'contract': CONTRACT, 'status': 'ready', 'origin': 'already_clean',
+        body = {'contract': CONTRACT, 'status': 'ready', 'origin': 'authorized_baseline_Save' if decision else 'already_clean',
+            **({'baseline_save_receipt': decision['receipt']} if decision else {}),
             'authority': binding, 'context': context['binding'], 'files': proofs,
             'source_id': guid(source['id']), 'source_owner': guid(source['parent']), 'destination_id': destination,
-            'source_exact': serialized(nodes['source']), 'source_normalized': serialized(nodes['source'], nodes),
+            'source_exact_digest': canonical_sha256(serialized(nodes['source'])),
+            'source_normalized_digest': canonical_sha256(serialized(nodes['source'], nodes)),
             'roles': live, 'role_ids': {key: guid(node.get('ID')) for key, node in nodes.items()}}
         return {**body, 'digest': canonical_sha256(body)}
+    except UnsupportedSavedShape as exc:
+        return {'status': 'unavailable', 'reason': exc.error_code, 'message': str(exc)}
     except Exception as exc:
+        if context.get('proof_decision') and context['proof_decision'].get('request_digest') == context.get('request_digest'):
+            raise SavedCopyProofError('Persisted baseline decision could not be revalidated: ' + str(exc)) from exc
         # This optional observer has not established authority. No Save is
         # offered to repair malformed/inaccessible/unsupported file semantics.
         return {'status': 'unavailable', 'reason': getattr(exc, 'error_code', type(exc).__name__), 'message': str(exc)[:512]}
@@ -205,11 +251,291 @@ def validate_baseline(baseline, context, read):
     require(supported(context) and baseline['context'] == context['binding'], 'Saved-copy context drifted')
     observed = authority(context, baseline['source_id'], baseline['destination_id'], read)
     require(lifecycle_snapshot_equal(observed, baseline['authority']), 'Saved-copy clean file authority drifted before dispatch')
-    _, proofs = read_documents(observed)
+    documents, proofs = read_documents(observed)
     require(proofs == baseline['files'], 'Saved-copy baseline files changed before dispatch')
+    nodes = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
+    require(lifecycle_snapshot_equal(live_roles(nodes, baseline['source_owner'], read), baseline['roles']),
+        'Original owned live state drifted before copy dispatch')
 
 
 def baseline_summary(baseline):
     return {'status': baseline['status'], 'complete_copy_preservation': False,
         **({'baseline_origin': baseline['origin'], 'baseline_digest': baseline['digest'],
             'read_only_paths': list(baseline['files'])} if baseline['status'] == 'ready' else {'reason': baseline.get('reason', 'selected_documents_dirty')})}
+
+
+def validate_origin(origin, version):
+    require(isinstance(origin, dict) and origin.get('contract') == CONTRACT and origin.get('version') == version == '2021.1', 'Save child origin/version is invalid')
+    expected = {'contract', 'version', 'stage', 'parent', 'context', 'baseline_digest'}
+    if origin.get('stage') == 'baseline': expected.add('file_binding')
+    require(set(origin) == expected, 'Save child origin fields are invalid')
+    require(origin['stage'] in {'baseline', 'final'} and isinstance(origin['parent'], dict)
+        and isinstance(origin['context'], dict), 'Save child stage/parent is invalid')
+    parent = origin['parent']
+    if origin['stage'] == 'final':
+        require(set(parent) == {'transaction_id', 'artifact_hash', 'execution_event_hash', 'copied_id'}, 'Final Save parent fields are invalid')
+        guid(parent['copied_id'])
+        from .transactions import validate_transaction_id
+        validate_transaction_id(parent['transaction_id'])
+    else:
+        require(set(parent) == {'draft_id', 'authority_digest', 'source_revision', 'request_digest', 'audit_event_hash'}, 'Baseline Save parent fields are invalid')
+        require(type(parent['source_revision']) is int and parent['source_revision'] > 0, 'Baseline Save revision is invalid')
+        validate_file_binding(origin['file_binding'], version)
+    hashes = [origin['baseline_digest']]
+    if origin['stage'] == 'final':
+        hashes.extend(parent[key] for key in ('artifact_hash', 'execution_event_hash'))
+    else:
+        require(isinstance(parent['draft_id'], str) and re.fullmatch(r'od1-[0-9a-f]{32}', parent['draft_id']), 'Baseline parent ID is invalid')
+        hashes.extend(parent[key] for key in ('authority_digest', 'request_digest', 'audit_event_hash'))
+    require(all(isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) for value in hashes), 'Save origin hash binding is invalid')
+    require(set(origin['context']) == {'project_guard', 'connection_configuration'}
+        and supported({'project_guard': origin['context']['project_guard']}), 'Save origin requires its exact supported runtime context')
+
+
+def child_capability(origin):
+    digest = canonical_sha256({'contract': CONTRACT, 'origin': origin})
+    return CHILD_PREFIX + digest[:26], 'da1-' + canonical_sha256({'authority': digest})[:40]
+
+
+def execution(snapshot):
+    events = [row for row in snapshot.events if row['event_type'] == 'execution_completed']
+    require(len(events) == 1, 'Copy/Save requires exactly one durable execution completion')
+    return events[0]
+
+
+def copied_id(snapshot):
+    result = execution(snapshot)['details']['dispatch_result']['result']
+    return guid(result.get('id'))
+
+
+def final_origin(snapshot):
+    from .transactions import TransactionState
+    require(snapshot.record.state is TransactionState.EXECUTED_UNVERIFIED, 'Final Save requires its still-unverified executed copy')
+    baseline = snapshot.preview.artifact['prepared_operation']['pre_state'][KEY]
+    require(baseline['status'] == 'ready', 'Copy has no certified saved baseline')
+    return {'contract': CONTRACT, 'version': '2021.1', 'stage': 'final', 'baseline_digest': baseline['digest'],
+        'context': baseline['context'], 'parent': {'transaction_id': snapshot.record.transaction_id,
+            'artifact_hash': snapshot.preview.artifact_hash, 'execution_event_hash': execution(snapshot)['event_hash'],
+            'copied_id': copied_id(snapshot)}}
+
+
+def validate_pending_files(baseline, context, read):
+    require(supported(context) and context['binding'] == baseline['context'], 'Saved proof runtime/configuration changed')
+    binding = authority(context, baseline['source_id'], baseline['destination_id'], read)
+    def without_dirty(value):
+        if isinstance(value, dict): return {k: without_dirty(v) for k, v in value.items() if k != 'workunitIsDirty'}
+        return value
+    require(lifecycle_snapshot_equal(without_dirty(binding), without_dirty(baseline['authority'])), 'Saved proof live file membership/root changed')
+    _, proofs = read_documents(binding)
+    require(proofs == baseline['files'], 'Unexpected baseline disk changes block the optional Save')
+    return binding
+
+
+def revalidate_origin(origin, context, *, read=None, before_write=True):
+    from .transactions import TransactionStore, TransactionState
+    validate_origin(origin, context['project_guard']['version'])
+    require(context['binding'] == origin['context'], 'Generated Save context changed')
+    if origin['stage'] == 'final':
+        snapshot = TransactionStore(context['state_dir']).load_snapshot(origin['parent']['transaction_id'])
+        require(final_origin(snapshot) == origin, 'Generated final Save differs from its executed parent')
+        if read is not None and before_write:
+            baseline = snapshot.preview.artifact['prepared_operation']['pre_state'][KEY]
+            binding = validate_pending_files(baseline, context, read)
+            documents, _ = read_documents(binding)
+            nodes = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
+            require(lifecycle_snapshot_equal(live_roles(nodes, baseline['source_owner'], read), baseline['roles']), 'Original owned live state changed before optional Save')
+            from .operation_registry import verify_prepared_operation
+            require(verify_prepared_operation(snapshot.preview.artifact['prepared_operation'],
+                execution_result=execution(snapshot)['details']['dispatch_result'], read_call=read).status == 'verified',
+                'Source/owner preservation changed before optional Save')
+    else:
+        from .operation_drafts import OperationDraftStore
+        OperationDraftStore(context['state_dir']).inspect_source_copy_parent(origin)
+        if read is not None and before_write:
+            file_binding = origin['file_binding']
+            observed = authority(context, file_binding['source_id'], file_binding['destination_id'], read)
+            require(lifecycle_snapshot_equal(without_dirty(observed), without_dirty(file_binding['authority'])),
+                'Baseline Save selected file authority changed')
+    return True
+
+
+def resolve_save_receipt(origin, context, *, child=None):
+    from .operation_drafts import OperationDraftStore, OperationDraftNotAvailable
+    from .transactions import TransactionStore, TransactionState
+    child_id, authority_token = child_capability(origin)
+    if child is None:
+        try:
+            child = OperationDraftStore(context['state_dir']).inspect(child_id, task_authority=authority_token)
+        except OperationDraftNotAvailable:
+            return None
+    require(child.composition.get(ORIGIN) == origin, 'Save child origin changed')
+    if child.seal is None: return None
+    saved = TransactionStore(context['state_dir']).load_snapshot(child.seal['transaction_id'])
+    if saved.record.state not in {TransactionState.RESULT_SCHEMA_CHECKED, TransactionState.VERIFIED}: return None
+    artifact = saved.preview.artifact
+    require(artifact['prepared_operation']['pre_state'].get(ORIGIN) == origin, 'Save receipt is unrelated to this copy')
+    require(artifact['request']['operation'] == 'waapi.call' and artifact['request']['arguments'] == {'api': SAVE, 'args': {}, 'options': {}}, 'Save receipt is not the fixed versioned closed request')
+    require(artifact['connection_configuration'] == origin['context']['connection_configuration']
+        and artifact['project_guard'] == origin['context']['project_guard'], 'Save receipt connection/runtime/project differs')
+    execution_event = execution(saved)
+    verifications = [x for x in saved.events if x['event_type'] == 'verification_recorded']
+    require(len(verifications) == 1 and any(x['event_type'] in {'confirmed', 'policy_authorized'} for x in saved.events), 'Save receipt completion/authorization is incomplete')
+    return {'transaction_id': saved.record.transaction_id, 'artifact_hash': saved.preview.artifact_hash,
+        'execution_event_hash': execution_event['event_hash'], 'verification_event_hash': verifications[0]['event_hash']}
+
+
+def verify_saved(baseline, context, snapshot, read):
+    origin = final_origin(snapshot)
+    receipt = resolve_save_receipt(origin, context)
+    if receipt is None: return None
+    binding = authority(context, baseline['source_id'], baseline['destination_id'], read)
+    require(binding['root_identity'] == baseline['authority']['root_identity'], 'Saved proof read-root identity changed')
+    require(not binding['project']['workunitIsDirty'] and not any(x['workunitIsDirty'] for x in binding['units'].values()), 'Saved documents remain dirty')
+    def membership(value):
+        return {k: v for k, v in value.items() if k not in {'workunitIsDirty'}}
+    require(membership(binding['project']) == membership(baseline['authority']['project'])
+        and binding['objects'] == baseline['authority']['objects']
+        and {k: membership(v) for k, v in binding['units'].items()} == {k: membership(v) for k, v in baseline['authority']['units'].items()}, 'Saved proof file/identity membership changed')
+    documents, proofs = read_documents(binding)
+    original = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
+    copied = source_nodes(documents, origin['parent']['copied_id'], baseline['destination_id'])
+    require(canonical_sha256(serialized(original['source'])) == baseline['source_exact_digest'], 'Original saved Source/owned state changed')
+    original_ids, new_ids = baseline['role_ids'], {k: guid(v.get('ID')) for k, v in copied.items()}
+    require(set(original_ids.values()).isdisjoint(new_ids.values()) and len(set(new_ids.values())) == 4, 'Copied GUID mapping aliases original/owned identities')
+    rename = snapshot.preview.artifact['prepared_operation']['verification_plan']['on_name_conflict'] == 'rename'
+    expected_name = original['source'].get('Name') if rename else None
+    require(canonical_sha256(serialized(copied['source'], copied, rename_root=expected_name)) == baseline['source_normalized_digest'], 'Copied serialized fields/attributes/text/order/points differ')
+    original_live = live_roles(original, baseline['source_owner'], read)
+    require(lifecycle_snapshot_equal(original_live, baseline['roles']), 'Original live owned identities or fields changed')
+    copied_live = live_roles(copied, baseline['destination_id'], read)
+    for role in ROLES:
+        if role == 'source': continue  # Shared Source observer already compares all observed Source scalars.
+        def mapped_fields(fields, role_ids):
+            fields = deepcopy(fields)
+            aliases = {identity: 'owned:' + name for name, identity in role_ids.items()}
+            def mapped(value):
+                if isinstance(value, dict): return {key: mapped(item) for key, item in value.items()}
+                if isinstance(value, list): return [mapped(item) for item in value]
+                return aliases.get(value.upper(), value) if isinstance(value, str) else value
+            for name in fields['reference_fields']:
+                if name in fields['field_values']:
+                    fields['field_values'][name] = mapped(fields['field_values'][name])
+            return fields
+        require(lifecycle_snapshot_equal(mapped_fields(original_live[role]['default_fields'], original_ids),
+            mapped_fields(copied_live[role]['default_fields'], new_ids)), 'Copied live owned default fields differ')
+    after = authority(context, baseline['source_id'], baseline['destination_id'], read)
+    require(after == binding, 'Saved proof authority changed during final observation')
+    _, after_proofs = read_documents(after)
+    require(proofs == after_proofs, 'Saved model changed during final observation')
+    return {'complete_copy_preservation': True, 'supported_shape': '2021.1.14.8108_Synth_RTPC_LFO_Curve_zero_ObjectRefs',
+        'baseline_digest': baseline['digest'], 'final_save_receipt': receipt, 'model_proofs_digest': canonical_sha256(proofs),
+        'owned_guid_mapping': {original_ids[k]: new_ids[k] for k in ROLES}, 'owned_role_count': 3,
+        'ordered_point_count': len(copied['curve'].findall('PointList/Point')),
+        'live_role_digest': canonical_sha256(copied_live)}
+
+
+def unexecuted_child(origin, context):
+    from .operation_drafts import OperationDraftStore, OperationDraftNotAvailable
+    from .transactions import TransactionStore
+    child_id, token = child_capability(origin)
+    try:
+        child = OperationDraftStore(context['state_dir']).inspect_source_copy_child(origin, include_expired=True)
+    except OperationDraftNotAvailable:
+        return {'draft_id': child_id, 'state': 'not_allocated_or_unavailable', 'save_prevention_claim': False}
+    require(child.composition.get(ORIGIN) == origin, 'Save child refusal origin differs')
+    if child.seal is None:
+        return {'draft_id': child_id, 'state': child.state.value}
+    saved = TransactionStore(context['state_dir']).load_snapshot(child.seal['transaction_id'])
+    require(not any(x['event_type'] == 'execution_started' for x in saved.events),
+        'The optional Save already has an execution attempt; refusal cannot claim it was prevented')
+    return {'draft_id': child_id, 'transaction_id': saved.record.transaction_id,
+        'artifact_hash': saved.preview.artifact_hash, 'state': saved.record.state.value}
+
+
+def _validate_decline_observed(baseline, context, snapshot, read):
+    # A refusal never hides an observable original/copied graph contradiction.
+    binding = authority(context, baseline['source_id'], baseline['destination_id'], read)
+    documents, _ = read_documents(binding)
+    original = source_nodes(documents, baseline['source_id'], baseline['source_owner'])
+    require(canonical_sha256(serialized(original['source'])) == baseline['source_exact_digest'], 'Original saved graph changed before refusal')
+    require(lifecycle_snapshot_equal(live_roles(original, baseline['source_owner'], read), baseline['roles']), 'Original owned state changed before refusal')
+    identity = copied_id(snapshot)
+    present = [node for doc in documents.values() for node in doc.iter('SourcePlugin') if guid(node.get('ID')) == identity]
+    if present:
+        copied = source_nodes(documents, identity, baseline['destination_id'])
+        rename = snapshot.preview.artifact['prepared_operation']['verification_plan']['on_name_conflict'] == 'rename'
+        require(canonical_sha256(serialized(copied['source'], copied, rename_root=original['source'].get('Name') if rename else None))
+            == baseline['source_normalized_digest'], 'Copied saved graph corruption cannot become scoped success')
+        live_roles(copied, baseline['destination_id'], read)
+    return True
+
+
+def baseline_origin(record, request_digest, context):
+    from .operation_drafts import OperationDraftState
+    require(record.operation == 'object.copy' and record.state is OperationDraftState.EDITABLE
+        and isinstance(record.check, dict) and record.check['request_digest'] == request_digest
+        and record.check['source_revision'] == record.revision - 1, 'Baseline Save requires the current checked copy Draft')
+    require(record.check['project_guard'] == context['project_guard'], 'Checked parent runtime changed')
+    return {'contract': CONTRACT, 'version': record.version, 'stage': 'baseline',
+        'parent': {'draft_id': record.draft_id, 'authority_digest': record.authority_digest,
+            'source_revision': record.revision, 'request_digest': request_digest,
+            'audit_event_hash': record.audit[-1]['event_hash']},
+        'context': context['binding'], 'baseline_digest': record.check['prepared_digest'],
+        'file_binding': record.check['source_copy_file_binding']}
+
+
+def validate_return(envelope, origin):
+    require(isinstance(origin, dict) and origin.get('stage') == 'baseline' and isinstance(envelope, dict)
+        and set(envelope) == {'draft_id', 'task_authority', 'source_revision', 'origin_digest'}, 'Private baseline return envelope is invalid')
+    token = envelope['task_authority']
+    require(isinstance(token, str) and token.startswith('da1-') and len(token) == 44
+        and envelope['draft_id'] == origin['parent']['draft_id']
+        and envelope['source_revision'] == origin['parent']['source_revision']
+        and envelope['origin_digest'] == canonical_sha256(origin), 'Private baseline return binding differs')
+    # Use the same capability digest as the Draft store, including its domain.
+    from .operation_drafts import operation_draft_authority_digest
+    require(operation_draft_authority_digest(token) == origin['parent']['authority_digest'], 'Private baseline return authority differs')
+
+
+def validate_decision(decision):
+    require(isinstance(decision, dict) and set(decision) == {'status', 'request_digest', 'origin', 'receipt'}
+        and decision['status'] in {'declined', 'baseline_saved'}, 'Baseline decision is invalid')
+    validate_origin(decision['origin'], '2021.1')
+    require(decision['origin']['stage'] == 'baseline' and decision['request_digest'] == decision['origin']['parent']['request_digest'], 'Baseline decision request differs')
+    require((decision['receipt'] is None) == (decision['status'] == 'declined'), 'Baseline decision receipt differs')
+
+
+def validate_decline(baseline, context, snapshot, read):
+    try:
+        _validate_decline_observed(baseline, context, snapshot, read)
+        return {'status': 'available_observations_preserved'}
+    except Exception as exc:
+        # Explicit refusal may finish the independently verified live scope if
+        # optional bytes are inaccessible. Semantic/identity/XML/graph failures
+        # have no I/O cause and must never be converted to scoped success.
+        cause, seen = exc, set()
+        while cause is not None and id(cause) not in seen:
+            seen.add(id(cause))
+            if isinstance(cause, OSError):
+                return {'status': 'read_authority_unavailable',
+                    'reason': getattr(exc, 'error_code', type(exc).__name__)}
+            cause = cause.__cause__
+        raise
+
+
+def without_dirty(value):
+    if isinstance(value, dict): return {key: without_dirty(item) for key, item in value.items() if key != 'workunitIsDirty'}
+    if isinstance(value, list): return [without_dirty(item) for item in value]
+    return value
+
+
+def validate_file_binding(binding, version):
+    require(version == '2021.1' and isinstance(binding, dict)
+        and set(binding) == {'source_id', 'destination_id', 'authority'}, 'Baseline file binding is invalid')
+    source, destination = guid(binding['source_id']), guid(binding['destination_id'])
+    observed = binding['authority']
+    require(isinstance(observed, dict) and set(observed) == {'project', 'project_path', 'root', 'root_identity', 'units', 'objects'}
+        and isinstance(observed['objects'], dict) and set(observed['objects']) == {source, destination}
+        and isinstance(observed['units'], dict) and 1 <= len(observed['units']) <= 2, 'Baseline file membership is invalid')
+    require(all(isinstance(observed[key], str) and observed[key] for key in ('project_path', 'root')),
+        'Baseline project read paths are invalid')
