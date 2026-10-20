@@ -9671,13 +9671,17 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_QUERIES
     from wwise_waapi.native_catalog import load_native_catalog
 
-    assert selected_owned_probe or runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
+    from tests.destructive.support.source_copy_fixture import MODERN_PROFILE, MODERN_ORIGINALS
+    modern = fixture_profile == MODERN_PROFILE
+    assert selected_owned_probe or modern or runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
     assert not selected_owned_probe or (runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'} and not (owned_read_only or saved_copy or saved_copy_protocol)), 'Selected Source probe is read-only and pinned to modern versions'
     assert not (owned_read_only and saved_copy)
     assert saved_copy_protocol in {None, 'gateway-owned-save-children/v1'}, 'Unknown saved-copy protocol'
     from tests.destructive.support.source_copy_fixture import PROFILE as REPEATED_PROFILE
-    assert fixture_profile in {None, REPEATED_PROFILE}, 'Unknown closed Source fixture profile'
-    repeated = fixture_profile is not None
+    assert fixture_profile in {None, REPEATED_PROFILE, MODERN_PROFILE}, 'Unknown closed Source fixture profile'
+    repeated = fixture_profile == REPEATED_PROFILE
+    selected_fixture = repeated or modern
+    assert not modern or (runtime.version in MODERN_ORIGINALS and saved_copy and saved_copy_protocol and not (owned_read_only or selected_owned_probe)), 'Modern collector requires its matching generated Save profile'
     successor = saved_copy_protocol is not None
     assert not repeated or (successor and saved_copy), 'Repeated fixture requires generated Save children'
     indexed_native = not owned_read_only
@@ -9690,6 +9694,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     if selected_owned_probe: stem = 'selected-source-owned-probe'
     if saved_copy: stem = 'source-copy-save-children' if successor else 'legacy-source-saved-copy'
     if repeated: stem = 'repeated-source-copy-save-children'
+    if modern: stem = 'modern-source-copy-save-children'
     output = runtime.state_dir / (stem + '.json')
     assert not output.exists(), 'Never replace an earlier feasibility attempt'
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -9768,9 +9773,19 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             scope_exclusions=['copy_admission', 'copy_effect', 'Save_effect', 'constructors', 'audio_effect',
                 '2021.1 retains its original diagnostic and native evidence'])
         receipt['lifecycle_final_reference']['category'] = category['category']
+    if modern:
+        category.update(category='modern-source-copy-save-children-oracle', coverage_credit='none; exact modern fixture requires native copy/Save oracle')
+        receipt.update(contract='waapi-skill.modern-source-copy-save-children-collector/v1', fixture_profile=fixture_profile,
+            scope_exclusions=['history', 'other_Source_classes', 'shared_ObjectRefs', 'Voice', 'constructors', 'media', 'audio_effect'])
+        receipt['lifecycle_final_reference']['category'] = category['category']
+        # Root-approved closed modern fixture envelope after the retained128/1004 failure.
+        # Historical/public/byte limits remain unchanged.
+        receipt['limits'].update(calls=160, native_files=1280)
+        receipt['fixture_profile_limit_scope'] = 'developer-only modern four-transaction original fixture; historical/public/byte limits unchanged'
     attempted: set[str] = set()
     active_save = None
     saved_model_indexes = []
+    accepted_fields, accepted_root_order = None, None
     def persist():
         if (successor or selected_owned_probe) and 'budget' in receipt:
             # Include the final receipt itself, including this size field.
@@ -9918,12 +9933,12 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 'observed topology/class/notes only; fields and copied GUID mapping unverified' if rows else
                 'fixture-owned ID not independently resolvable; no owned-state preservation claim'}
         return observations
-    def owned_hop(identity, token, bound):
+    def owned_hop(identity, token, bound, *, extra=()):
         # The fixed ControlInput hop follows matching SDK reference semantics;
         # its acceptance on 2021 is precisely the pending native observation.
         result = gateway.gateway(['query-object', '--advanced-waql', f'from object "{identity}" select @{token}',
             '--max-results', str(bound), '--include', 'class-id', '--include', 'owner',
-            '--include', 'parent', '--include', 'notes', *(['--include', 'short-id'] if saved_copy else [])], live=True)
+            '--include', 'parent', '--include', 'notes', *(['--include', 'short-id'] if saved_copy else []), *extra], live=True)
         assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
         rows = result['objects']; assert result['count'] == len(rows) and len(rows) < bound, result
         assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
@@ -10003,6 +10018,34 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     def saved_copy_result(before_images, copied, old_owner, before_live):
         if not successor: explicit_save('save_final')
         after_images = model_images('after', [source_id, copied['id']])
+        if modern:
+            from tests.destructive.support.source_copy_fixture import source_graph, repeated_copy_oracle, saved_midi, validate_scalars
+            after_index, = [index for index in saved_model_indexes if index.phase == 'after']
+            unit = saved_midi(after_images, index=after_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
+            assert [(node.tag, dict(node.attrib)) for node in unit.find('ChildrenList')] == accepted_root_order, 'Saved MIDI root order changed'
+            nodes = source_graph(after_images, copied['id'], destination_id, version=runtime.version)
+            live, fields = repeated_live(nodes, fields=True, owner_id=destination_id)
+            retained = source_graph(after_images, source_id, old_owner, version=runtime.version)
+            retained_live, retained_fields = repeated_live(retained, fields=True)
+            assert retained_live == before_live and scalar_facts(retained_fields) == scalar_facts(accepted_fields), 'Original native typed graph changed'
+            assert validate_scalars(nodes, fields, allow_references=True) == validate_scalars(loaded_nodes, loaded_fields, allow_references=True), 'Copied serialized scalar authority differs'
+            receipt['oracle'] = repeated_copy_oracle(before_images, after_images, source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner, destination_id=destination_id, before_live=before_live, copied_live=live, version=runtime.version)
+            mapping = receipt['oracle']['owned_guid_mapping']
+            expected_fields = scalar_facts(accepted_fields)
+            for snapshot in expected_fields.values():
+                for name, value in snapshot['values'].items():
+                    if snapshot['metadata'][name].get('restriction', {}).get('type') == 'reference':
+                        value['id'] = mapping[value['id']]
+            assert scalar_facts(fields) == expected_fields, 'Copied native typed scalar/reference fields changed'
+            receipt['oracle'].update(saved_file_identity=source_archive_identity, saved_work_unit_id=source_unit_id,
+                persisted_root_child_ids=sorted(row['id'] for row in setup_children),
+                original_native_fields_preserved=True, copied_native_fields_preserved=True,
+                native_notes_comparison='exact before/after; CRLF-to-LF equivalence only against parsed XML Comment')
+            receipt['copied_scalar_observation'] = archive('copied-live-fields.json', json.dumps(fields, ensure_ascii=False).encode('utf-8'))
+            receipt['retained_scalar_observation'] = archive('retained-live-fields.json', json.dumps(retained_fields, ensure_ascii=False).encode('utf-8'))
+            assert query(source_unit_id, relation='children') == setup_children, 'Copy changed MIDI root childset'
+            receipt['saved_copy_verified'] = True
+            return retained_live
         if repeated:
             from tests.destructive.support.source_copy_fixture import source_graph, repeated_copy_oracle, saved_midi
             after_index, = [index for index in saved_model_indexes if index.phase == 'after']
@@ -10103,9 +10146,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert unit['type'] == 'WorkUnit' and unit['class_id'] == 1638416 and unit['work_unit_type'] == 'rootFile', 'Repeated fixture requires its standalone Work Unit'
         assert type(unit.get('work_unit_is_dirty')) is bool and Path(localize_waapi_host_path(unit['file_path'])).resolve() == source_file.resolve(), 'Repeated Work Unit file/dirty authority changed'
         return unit
-    def repeated_live(nodes, *, fields):
+    def repeated_live(nodes, *, fields, owner_id=None):
         from tests.destructive.support.source_copy_fixture import validate_frames
         live, snapshots = {}, {}
+        owner_id = old_owner if owner_id is None else owner_id
         if fields:
             for role, node in nodes.items():
                 identity = node.get('ID')
@@ -10114,7 +10158,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 readable, unavailable = [], {}
                 for field in names['fields']:
                     name = field['name']; assert name not in readable and name not in unavailable, 'Duplicate fixture field'
-                    if role.endswith('.rtpc') and name == 'ControlInput':
+                    if not modern and role.endswith('.rtpc') and name == 'ControlInput':
                         detail = gateway.gateway(['metadata', 'detail', '--exact-id', identity, '--selection', field['selection']], live=True)['agent_result']
                         assert detail['complete'] is True and detail['metadata']['name'] == name, 'ControlInput metadata incomplete'
                         metadata = detail['metadata']
@@ -10129,7 +10173,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                     # discovery. Retain its own native packets, never reuse a
                     # prior phase or add duplicate metadata-detail calls.
                     metadata_before = set(native_root.glob('*getPropertyInfo.json'))
-                    row, = query(identity, fields=selected)
+                    row, = query(identity, fields=selected, extra=['--include', 'curve-points'] if modern and role == 'curve' else [])
                     packets = set(native_root.glob('*getPropertyInfo.json')) - metadata_before
                     assert len(packets) <= receipt['limits']['native_files'], 'Fixture metadata packet bound exceeded'
                     page_authority = {}
@@ -10147,38 +10191,56 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                     if role not in live:
                         live[role] = {key: value for key, value in row.items() if key not in {'properties', 'references'}}
                     assert all(row.get(key) == live[role].get(key) for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes', 'short_id')), 'Fixture field-read identity drift'
-                    assert not row.get('references') and set(row.get('properties', {})) == set(selected), 'Fixture scalar field scope incomplete or changed'
-                    values.update(row['properties'])
+                    assert (modern or not row.get('references')) and set(row.get('properties', {})) | set(row.get('references', {})) == set(selected), 'Fixture scalar field scope incomplete or changed'
+                    values.update(row.get('properties', {})); values.update(row.get('references', {}))
                 snapshots[role] = {'names': [field['name'] for field in names['fields']], 'values': values, 'metadata': metadata, 'native_metadata_authority': authority, 'untyped_reference_metadata': unavailable}
-        validate_frames(nodes, live, old_owner)
-        for prop in ('OutputLevel', 'Osc1Level'):
+        validate_frames(nodes, live, owner_id, xml_notes_crlf=modern)
+        if modern:
+            assert {role: len(snapshot['names']) for role, snapshot in snapshots.items()} == {'source': 18, 'rtpc': 5, 'control_input': 10, 'curve': 1}, 'Modern typed inventory differs'
+            for token, role, owner in (('RTPC', 'rtpc', 'source'), ('ControlInput', 'control_input', 'rtpc'), ('Curve', 'curve', 'rtpc')):
+                assert owned_hop(live[owner]['id'], token, 2, extra=['--include', 'curve-points'] if role == 'curve' else []) == [live[role]], 'Modern canonical membership/reference hop differs: ' + token
+            points = live['curve']['curve_points']
+            saved_points = nodes['curve'].findall('PointList/Point')
+            assert isinstance(points, list) and len(points) == len(saved_points) and all(
+                isinstance(point, dict) and set(point) == {'x', 'y', 'shape'} and
+                all(type(point[axis]) in (int, float) and math.isfinite(point[axis]) for axis in ('x', 'y'))
+                for point in points), 'Modern native curve points require finite numbers'
+            assert [(point['x'], point['y']) for point in points] == [(float(node.findtext('XPos')), float(node.findtext('YPos'))) for node in saved_points], 'Modern saved/native curve coordinates differ'
+            assert [point['shape'] for point in points] == ['Linear', 'Linear'], 'Modern native curve shape differs'
+            assert snapshots['rtpc']['values']['ControlInput'] == {'id': live['control_input']['id'], 'name': live['control_input']['name']}, 'Modern typed ControlInput differs'
+            curve = snapshots['rtpc']['values']['Curve']
+            assert curve == {'id': live['curve']['id'], 'points': points, '@Flags': snapshots['curve']['values']['Flags']}, 'Modern typed Curve reference differs'
+        for prop in (() if modern else ('OutputLevel', 'Osc1Level')):
             assert owned_hop(nodes[prop + '.rtpc'].get('ID'), 'ControlInput', 2) == [live[prop + '.control']], 'Repeated ControlInput hop differs'
         return live, snapshots
+    def scalar_facts(snapshots):
+        return json.loads(json.dumps({role: {key: value for key, value in snapshot.items() if key != 'native_metadata_authority'} for role, snapshot in snapshots.items()}))
     def accept_repeated_fixture(images, checked):
         from tests.destructive.support.source_copy_fixture import source_graph, canonical, saved_midi, validate_scalars, sha
+        nonlocal accepted_fields, accepted_root_order
         receipt['fixture_acceptance'] = {'status': 'checking', 'before_copy_preview': True}
         unit = repeated_unit()
         assert unit['work_unit_is_dirty'] is False, 'Baseline Save did not clean selected MIDI Work Unit'
         assert query(source_unit_id, relation='children') == setup_children, 'Baseline Save changed setup childset'
         assert len(images) == 1 and sha(images[0]) != pre_save_observed['file_proof']['sha256'], 'Baseline Save lacks a real MIDI serialization witness'
-        saved = source_graph(images, source_id, old_owner)
+        saved = source_graph(images, source_id, old_owner, version=runtime.version if modern else None)
         assert canonical(saved['source']) == canonical(loaded_nodes['source']), 'Baseline Save lost or changed synthetic Source graph'
         before_index, = [index for index in saved_model_indexes if index.phase == 'before']
         saved_unit = saved_midi(images, index=before_index, relative=source_archive_identity, work_unit_id=source_unit_id, root_children=setup_children)
         children = saved_unit.find('ChildrenList')
+        accepted_root_order = [(node.tag, dict(node.attrib)) for node in children]
         destination, = [node for node in children if node.get('ID') == destination_id]
         assert destination.tag == 'Sound' and destination.get('Name') == prefix and len(destination.findall('ChildrenList/*')) == 0, 'Actual destination not serialized empty in MIDI'
         live, fields = repeated_live(saved, fields=True)
-        expected_scalars = validate_scalars(loaded_nodes, loaded_fields)
-        assert validate_scalars(saved, fields) == expected_scalars, 'Saved fixture scalar authority differs'
-        def scalar_facts(snapshots):
-            return {role: {key: value for key, value in snapshot.items() if key != 'native_metadata_authority'} for role, snapshot in snapshots.items()}
+        expected_scalars = validate_scalars(loaded_nodes, loaded_fields, allow_references=modern)
+        assert validate_scalars(saved, fields, allow_references=modern) == expected_scalars, 'Saved fixture scalar authority differs'
+        accepted_fields = fields
         assert live == loaded_live and scalar_facts(fields) == scalar_facts(loaded_fields), 'Native baseline Save changed loaded Source declarations or scalar fields'
         assert owner_frame(old_owner) == owner_before and query(old_owner, relation='children') == source_children, 'Baseline Save changed original owner frame/children'
         assert observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)['file_proof'] == before_index.files[source_archive_identity]['file_proof'], 'Saved native fixture changed during acceptance observations'
-        receipt['fixture_acceptance'] = {'status': 'accepted', 'scope': 'exact 2021 native Load and generated baseline Save only; no constructor or copy-effect credit',
+        receipt['fixture_acceptance'] = {'status': 'accepted', 'scope': 'exact ' + runtime.version + ' native Load and generated baseline Save only; no constructor or copy-effect credit',
             'before_copy_preview': True, 'accepted_at_call_index': len(receipt['calls']) - 1,
-            'prelaunch_output_sha256': runtime.source_copy_prelaunch['output_sha256'],
+            'prelaunch_output_sha256': sha(loaded_raw),
             'pre_save_file_proof': pre_save_observed['file_proof'], 'saved_sha256': sha(images[0]),
             'saved_model_index': receipt['model_images']['before'], 'native_build': receipt['native_build'], 'endpoint': endpoint,
             'baseline_Save': receipt['continuation_links'][0], 'parent_draft_id': checked['draft']['draft_id'],
@@ -10422,7 +10484,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
         info = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
         assert info['isCommandLine'] is True
-        assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == (2021, 1, 14, 8108), info
+        expected_build = MODERN_ORIGINALS[runtime.version][0] if modern else '2021.1.14.8108'
+        assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == tuple(map(int, expected_build.split('.'))), info
         receipt['native_build'] = catalog['provenance']['build']
         types = gateway.gateway(['metadata', 'types', '--meaning', 'Wwise Synth One', '--page-size', '64'], live=True)['agent_result']
         assert types['complete'] is True, types
@@ -10442,11 +10505,19 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert owner_before['identity']['type'] == 'Sound' and owner_before['identity']['class_id'] == 65552
         source_children = save_observation('original-owner-children-before', query(old_owner, relation='children'))
         if not saved_copy: save_observation('source-descendants-before', query(source_id, relation='descendants'))
-        if repeated:
+        if selected_fixture:
             from tests.destructive.support.source_copy_fixture import source_graph, sha, xml, MIDI, ORIGINAL_SHA, SPAN_SHA
-            prelaunch = runtime.source_copy_prelaunch
-            assert prelaunch['profile'] == fixture_profile and prelaunch['native_acceptance'] is False and prelaunch['input_sha256'] == ORIGINAL_SHA and prelaunch['donor']['rtpc_list_sha256'] == SPAN_SHA, 'Missing synthetic prelaunch authority'
-            receipt['prelaunch'] = archive('prelaunch.json', json.dumps(prelaunch, ensure_ascii=False).encode('utf-8'))
+            if repeated:
+                prelaunch = runtime.source_copy_prelaunch
+                assert prelaunch['profile'] == fixture_profile and prelaunch['native_acceptance'] is False and prelaunch['input_sha256'] == ORIGINAL_SHA and prelaunch['donor']['rtpc_list_sha256'] == SPAN_SHA, 'Missing synthetic prelaunch authority'
+                receipt['prelaunch'] = archive('prelaunch.json', json.dumps(prelaunch, ensure_ascii=False).encode('utf-8'))
+            else:
+                _, relative, pinned_sha = MODERN_ORIGINALS[runtime.version]
+                MIDI = Path(relative)
+                original = observe_console_file(REPO_ROOT / 'tests/_org' / runtime.version / MIDI, io_root=REPO_ROOT / 'tests/_org' / runtime.version)
+                assert original['file_proof']['sha256'] == pinned_sha, 'Modern original MIDI drift'
+                receipt['fixture_topology'].update(file='tests/_org/' + runtime.version + '/' + relative, sha256=pinned_sha)
+                receipt['original_midi'] = archive('original-midi.wwu', base64.b64decode(original['content_base64'], validate=True))
             source_binding = exact(source_id, extra=['--include', 'work-unit', '--include', 'file-path'])
             source_unit_id = source_binding['work_unit']['id']
             source_file = runtime.sandbox.sandbox_project.parent / MIDI
@@ -10458,28 +10529,28 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             loaded_unit = repeated_unit()
             loaded_observed = observe_console_file(source_file, io_root=runtime.sandbox.sandbox_path)
             loaded_raw = base64.b64decode(loaded_observed['content_base64'], validate=True)
-            assert sha(loaded_raw) == prelaunch['output_sha256'], 'Loaded synthetic file drift'
-            loaded_nodes = source_graph([loaded_raw], source_id, old_owner)
+            assert sha(loaded_raw) == (prelaunch['output_sha256'] if repeated else pinned_sha), 'Loaded synthetic file drift'
+            loaded_nodes = source_graph([loaded_raw], source_id, old_owner, version=runtime.version if modern else None)
             declared_unit, = [node for node in xml(loaded_raw).iter('WorkUnit') if node.get('ID') == source_unit_id]
             assert declared_unit.get('PersistMode') == 'Standalone', 'Synthetic MIDI Work Unit identity differs'
             initial_children = query(source_unit_id, relation='children')
             assert len(initial_children) == 7 and {node.get('ID') for node in declared_unit.find('ChildrenList')} == {row['id'] for row in initial_children}, 'Loaded MIDI root childset differs'
             loaded_live, loaded_fields = repeated_live(loaded_nodes, fields=True)
             original_owned_ids = [node.get('ID') for role, node in loaded_nodes.items() if role != 'source']
-        owned_before = save_observation('known-owned-before', {identity: {'identity_rows': [next(row for row in loaded_live.values() if row['id'] == identity)], 'scope': 'observed topology/class/notes only; fields and copied GUID mapping unverified'} for identity in original_owned_ids} if repeated else known_owned())
+        owned_before = save_observation('known-owned-before', {identity: {'identity_rows': [next(row for row in loaded_live.values() if row['id'] == identity)], 'scope': 'observed topology/class/notes only; fields and copied GUID mapping unverified'} for identity in original_owned_ids} if selected_fixture else known_owned())
         if saved_copy:
             if not successor: before_images = model_images('before', [source_id])
-            before_live = loaded_live if repeated else {'source': source_before['identity'], **{role: owned_before[identity]['identity_rows'][0]
+            before_live = loaded_live if selected_fixture else {'source': source_before['identity'], **{role: owned_before[identity]['identity_rows'][0]
                 for role, identity in zip(('rtpc', 'control_input', 'curve'), original_owned_ids)}}
         # Existing classic Gateway creation; no field/default or locale changes.
         draft = _start_business_draft(gateway, 'object.create')
-        parent = _bind_business_object(gateway, draft, object_id=source_unit_id) if repeated else _bind_business_object(gateway, draft, path_segments=ACTOR_MIXER_PARENT_SEGMENTS)
+        parent = _bind_business_object(gateway, draft, object_id=source_unit_id) if selected_fixture else _bind_business_object(gateway, draft, path_segments=ACTOR_MIXER_PARENT_SEGMENTS)
         _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'destination',
             '--parent-handle', parent, '--name', prefix, '--kind', 'sound-sfx', '--field', 'notes', 'Owned copy feasibility destination'], live=False)
         _update_business_draft(gateway, draft, 'draft-check', live=True)
         setup = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
         complete(setup, 'create_empty_destination')
-        if repeated:
+        if selected_fixture:
             setup_children = query(source_unit_id, relation='children')
             added = [row for row in setup_children if row['id'] not in {old['id'] for old in initial_children}]
             assert len(setup_children) == 8 and [row for row in setup_children if row not in added] == initial_children, 'Create must add exactly one sibling Sound'
@@ -10510,20 +10581,23 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 checked = gateway.gateway(continuation(parent, 'draft-check'), live=True)
                 assert checked['draft']['draft_id'] == receipt['copy_draft_id'] and checked['draft']['revision'] > payload['draft']['revision'], 'Baseline return did not advance exact parent'
                 before_images = model_images('before', [source_id])
-                if repeated: before_live = accept_repeated_fixture(before_images, checked)
+                if selected_fixture: before_live = accept_repeated_fixture(before_images, checked)
                 return checked
             return payload
         preview = create_object_lifecycle_business_preview(copy_gateway,
             version=runtime.version, operation='object.copy', object_id=source_id, parent_id=destination_id, name_conflict='fail')
         # Full immutable artifact stays in its single archived reply, not duplicated in the receipt.
         shown = gateway.gateway(['transaction-show', preview['transaction_id']], live=False)
-        assert shown['artifact']['prepared_operation']['dispatch']['args'] == {
-            'object': source_id, 'parent': destination_id, 'onNameConflict': 'fail'}, shown
+        expected_copy_args = {'object': source_id, 'parent': destination_id, 'onNameConflict': 'fail'}
+        if modern and runtime.version in {'2023.1', '2024.1', '2025.1'}:
+            # Matching reflected copy schemas introduce the two closed safety defaults.
+            expected_copy_args.update(autoAddToSourceControl=False, autoCheckOutToSourceControl=False)
+        assert shown['artifact']['prepared_operation']['dispatch']['args'] == expected_copy_args, shown
         if successor:
             baseline = shown['artifact']['prepared_operation']['pre_state']['source_copy_saved_proof']
-            if repeated:
+            if selected_fixture:
                 assert receipt['fixture_acceptance']['status'] == 'accepted' and baseline['status'] == 'ready' and baseline['graph_format'] == 'waapi-skill.source-copy-owned-declarations/v1', 'Copy Preview requires accepted ready graph'
-                assert len(baseline['role_ids']) == 7 and set(baseline['role_ids'].values()) == {node.get('ID') for node in loaded_nodes.values()} and len(baseline['authority']['units']) == 1, 'Copy baseline differs from accepted seven-node same-WWU graph'
+                assert len(baseline['role_ids']) == (4 if modern else 7) and set(baseline['role_ids'].values()) == {node.get('ID') for node in loaded_nodes.values()} and len(baseline['authority']['units']) == 1, 'Copy baseline differs from accepted same-WWU graph'
             assert baseline['baseline_save_receipt'] == receipt['continuation_links'][0]['save_receipt'], 'Copy baseline differs from generated Save receipt'
         pending = complete(preview, 'copy_source_only')
         if successor:
@@ -10531,7 +10605,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             assert final['transaction_id'] == preview['transaction_id'] and final.get('state') == 'verified', 'Final Save must verify original copy'
             scope = final.get('verification', {}).get('verification_scope', {})
             assert scope.get('complete_copy_preservation') is True and final.get('verification_strength') == 'saved_source_graph_and_live_roles', 'Original copy lacks complete supported shape proof'
-            assert scope.get('supported_shape') == '2021.1.14.8108_Synth_owned_declaration_graph_zero_ObjectRefs', 'Original copy proof exceeds reviewed owned declaration graph'
+            assert scope.get('supported_shape') == expected_build + '_Synth_owned_declaration_graph_zero_ObjectRefs', 'Original copy proof exceeds reviewed owned declaration graph'
             phase, = [row for row in receipt['phases'] if row['name'] == 'copy_source_only']
             assert scope['final_save_receipt'] == receipt['continuation_links'][1]['save_receipt'], 'Original copy used an unrelated final Save receipt'
             terminal = gateway.gateway(['transaction-show', preview['transaction_id'], '--summary-only'], live=False)
@@ -10542,13 +10616,13 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert uuid.UUID(copied['id']) != uuid.UUID(source_id) and copied['class_id'] == 9699330
         assert copied['type'] in {'Source', 'SourcePlugin'} and copied['parent']['id'] == destination_id, copied
         receipt['native_admission_verified'] = True
-        copied_state = save_observation('copied-source', {'identity': exact(copied['id'])} if saved_copy else snapshot(copied['id']))
+        copied_state = save_observation('copied-source', {'identity': copied if modern else exact(copied['id'])} if saved_copy else snapshot(copied['id']))
         if not saved_copy: save_observation('copied-descendants', query(copied['id'], relation='descendants'))
-        if saved_copy: saved_copy_result(before_images, copied, old_owner, before_live)
-        source_after = save_observation('source-after', {'identity': exact(source_id)} if saved_copy else snapshot(source_id))
+        retained_live = saved_copy_result(before_images, copied, old_owner, before_live) if saved_copy else None
+        source_after = save_observation('source-after', {'identity': retained_live['source'] if modern else exact(source_id)} if saved_copy else snapshot(source_id))
         owner_after = save_observation('original-owner-after', owner_frame(old_owner))
         destination_after = save_observation('destination-after', owner_frame(destination_id))
-        owned_after = save_observation('known-owned-after', known_owned())
+        owned_after = save_observation('known-owned-after', {identity: {'identity_rows': [next(row for row in retained_live.values() if row['id'] == identity)], 'scope': 'observed topology/class/notes only; fields and copied GUID mapping unverified'} for identity in original_owned_ids} if modern else known_owned())
         assert source_after == source_before and owner_after == owner_before and owned_after == owned_before, 'Original Source/owner/observed owned objects changed'
         assert query(old_owner, relation='children') == source_children, 'Original owner childset changed'
         assert destination_after == destination_before, 'Destination identity/Voice frame changed'
@@ -10707,3 +10781,15 @@ def test_selected_source_owned_graph_console_probe(workflow_sandbox_runtime: _Wo
         pytest.skip('Modern selected Source probe covers2022–2025;2021 retains its original owned diagnostic')
     category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='', selected_owned_probe=True)
     assert category['status'] in {'PASS', 'blocked'}, category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_modern_source_copy_generated_save_children_console_oracle(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version == '2021.1':
+        pytest.skip('Modern original Source collector covers 2022–2025; 2021 profiles remain unchanged')
+    from tests.destructive.support.source_copy_fixture import MODERN_PROFILE
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime,
+        prefix='WAAPI_MODERN_SOURCE_' + uuid.uuid4().hex[:10], saved_copy=True,
+        saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=MODERN_PROFILE)
+    assert category['status'] == 'PASS', category

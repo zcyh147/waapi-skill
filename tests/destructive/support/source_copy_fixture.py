@@ -1,4 +1,4 @@
-"""Closed developer-only 2021 synthetic input and independent saved graph oracle."""
+"""Closed developer Source fixtures and independent saved graph guards."""
 import hashlib
 import json
 import math
@@ -10,6 +10,13 @@ from tests.semantic.support.codex_filesystem_security import read_bounded_exclus
 from tests.semantic.support.codex_project_prelaunch_v3 import _require_owned_path, _reject_symlink_chain, _replace_closed_file_batch
 
 PROFILE = '2021-native-donor-two-properties/v1'
+MODERN_PROFILE = 'modern-original-owned-source/v1'
+MODERN_ORIGINALS = {
+    '2022.1': ('2022.1.19.8584', 'Actor-Mixer Hierarchy/MIDI.wwu', '41784c1030c678d9a7f19a105dfb48e46fb8b76b044e9a3bdb8f2da885f61c3a'),
+    '2023.1': ('2023.1.19.8928', 'Actor-Mixer Hierarchy/MIDI.wwu', '09970d6126a6867f4535f9273b99873af4d044bccd591d7b1414029ffaf317d7'),
+    '2024.1': ('2024.1.13.9056', 'Actor-Mixer Hierarchy/MIDI.wwu', '9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3'),
+    '2025.1': ('2025.1.7.9143', 'Containers/MIDI.wwu', 'b8fc20794cc3d6b7ac17f5bd67fd57d297098830c52e985d44318f459da9c0df')}
+
 SOURCE = '{95DDA32B-B666-4269-A54C-5ABF4E201C99}'
 SOURCE_OWNER = '{63E5A1E6-4265-463E-A5C5-322F742423E1}'
 MIDI = Path('Actor-Mixer Hierarchy/MIDI.wwu')
@@ -49,7 +56,7 @@ def guid(value):
     return '{' + str(result).upper() + '}'
 
 
-def source_graph(images, source_id, owner_id):
+def source_graph(images, source_id, owner_id, *, version=None):
     assert len(images) == 1, 'Repeated fixture requires exactly one MIDI image'
     found, declarations = [], []
     for raw in images:
@@ -66,17 +73,27 @@ def source_graph(images, source_id, owner_id):
     assert source.get('PluginName') == 'Wwise Synth One' and source.get('PluginID') == '148' and source.get('CompanyID') == '0'
     assert not list(source.iter('ObjectRef')), 'Unreviewed fixture reference'
     nodes = {'source': source}
-    for prop in ('OutputLevel', 'Osc1Level'):
-        rtpcs = source.findall("PropertyList/Property[@Name='" + prop + "']/RTPCList/RTPC")
-        assert len(rtpcs) == 1, 'Repeated fixture property RTPC group missing or duplicated: ' + prop
-        rtpc, = rtpcs
-        control, = rtpc.findall("ReferenceList/Reference[@Name='ControlInput']/Custom/ModulatorLfo")
-        curve, = rtpc.findall('Curve')
-        nodes.update({prop + '.rtpc': rtpc, prop + '.control': control, prop + '.curve': curve})
+    if version is not None:
+        assert version in MODERN_ORIGINALS, 'Unreviewed modern fixture version'
+        path = 'ObjectLists/ObjectList[@Name="RTPC"]/' + ('RTPC' if version == '2025.1' else 'Reference/Local/RTPC')
+        rtpc, = source.findall(path)
+        prop, = rtpc.findall('PropertyList/Property[@Name="PropertyName"]')
+        assert prop.attrib == {'Name': 'PropertyName', 'Type': 'string', 'Value': 'OutputLevel'}, 'Modern RTPC PropertyName differs'
+        control, = rtpc.findall('ReferenceList/Reference[@Name="ControlInput"]/Custom/ModulatorLfo')
+        curve, = rtpc.findall('ReferenceList/Reference[@Name="Curve"]/Custom/Curve')
+        nodes.update(rtpc=rtpc, control_input=control, curve=curve)
+    else:
+        for prop in ('OutputLevel', 'Osc1Level'):
+            rtpcs = source.findall("PropertyList/Property[@Name='" + prop + "']/RTPCList/RTPC")
+            assert len(rtpcs) == 1, 'Repeated fixture property RTPC group missing or duplicated: ' + prop
+            rtpc, = rtpcs
+            control, = rtpc.findall("ReferenceList/Reference[@Name='ControlInput']/Custom/ModulatorLfo")
+            curve, = rtpc.findall('Curve')
+            nodes.update({prop + '.rtpc': rtpc, prop + '.control': control, prop + '.curve': curve})
     assert {node for node in source.iter() if 'ID' in node.attrib} == set(nodes.values()), 'Unclassified fixture declaration'
     ids = [guid(node.get('ID')) for node in nodes.values()]
-    assert len(set(ids)) == 7 and all(sum(guid(row.get('ID')) == identity for row in declarations) == 1 for identity in ids), 'Fixture declaration alias'
-    assert sum(len(node.findall('PointList/Point')) for key, node in nodes.items() if key.endswith('.curve')) == 4
+    assert len(set(ids)) == (4 if version else 7) and all(sum(guid(row.get('ID')) == identity for row in declarations) == 1 for identity in ids), 'Fixture declaration alias'
+    assert sum(len(node.findall('PointList/Point')) for node in nodes.values() if node.tag == 'Curve') == (2 if version else 4)
     return nodes
 
 
@@ -92,20 +109,22 @@ def canonical(node, nodes=None):
     return [node.tag, sorted(attrs.items()), text, tail, [canonical(child, nodes) for child in node]]
 
 
-def validate_frames(nodes, live, owner_id):
+def validate_frames(nodes, live, owner_id, *, xml_notes_crlf=False):
     assert set(nodes) == set(live), 'Incomplete live fixture graph'
     for role, node in nodes.items():
         row = live[role]
         assert guid(row['id']) == guid(node.get('ID')) and row['class_id'] == CLASSES[node.tag], 'Fixture live class or GUID differs'
         assert row['type'] in ({'Source', 'SourcePlugin'} if role == 'source' else {node.tag})
-        owner = owner_id if role == 'source' else nodes['source' if role.endswith('.rtpc') else role.split('.')[0] + '.rtpc'].get('ID')
+        owner_role = ('source' if role == 'rtpc' else 'rtpc') if role in {'rtpc', 'control_input', 'curve'} else ('source' if role.endswith('.rtpc') else role.split('.')[0] + '.rtpc')
+        owner = owner_id if role == 'source' else nodes[owner_role].get('ID')
         assert guid(row.get('parent' if role == 'source' else 'owner')) == guid(owner), 'Fixture live owner differs'
-        assert row['name'] == node.get('Name') and row.get('notes', '') == node.findtext('Comment', '')
+        notes = row.get('notes', '')
+        assert row['name'] == node.get('Name') and (notes.replace('\r\n', '\n') if xml_notes_crlf else notes) == node.findtext('Comment', ''), 'Fixture native name/notes differ from parsed XML'
         if 'ShortID' in node.attrib:
             assert type(row.get('short_id')) is int and str(row['short_id']) == node.get('ShortID'), 'Fixture live ShortID differs'
 
 
-def validate_scalars(nodes, snapshots):
+def validate_scalars(nodes, snapshots, *, allow_references=False):
     """Bind typed live observations to explicit, byte-pinned XML properties."""
     from wwise_waapi.metadata_discovery import metadata_typed_value_type
     expected = {}
@@ -114,6 +133,10 @@ def validate_scalars(nodes, snapshots):
         values, metadata = snapshot['values'], snapshot['metadata']
         assert set(values) == set(metadata), 'Incomplete fixture typed field authority'
         for name, value in values.items():
+            if metadata[name].get('restriction', {}).get('type') == 'reference':
+                assert allow_references and not metadata[name].get('type') and isinstance(value, dict), 'Fixture typed reference differs'
+                guid(value)
+                continue
             kind = metadata_typed_value_type(metadata[name].get('type', ''))
             valid = (type(value) is bool if kind == 'boolean' else
                 type(value) is int if kind == 'integer' else
@@ -221,16 +244,18 @@ def prepare_repeated_source_fixture(sandbox, *, owned_root, io_root):
     return report
 
 
-def repeated_copy_oracle(before_images, after_images, *, source_id, copied_id, original_owner_id, destination_id, before_live, copied_live):
-    before = source_graph(before_images, source_id, original_owner_id)
-    retained = source_graph(after_images, source_id, original_owner_id)
-    copied = source_graph(after_images, copied_id, destination_id)
-    validate_frames(before, before_live, original_owner_id)
-    validate_frames(copied, copied_live, destination_id)
+def repeated_copy_oracle(before_images, after_images, *, source_id, copied_id, original_owner_id, destination_id, before_live, copied_live, version=None):
+    before = source_graph(before_images, source_id, original_owner_id, version=version)
+    retained = source_graph(after_images, source_id, original_owner_id, version=version)
+    copied = source_graph(after_images, copied_id, destination_id, version=version)
+    validate_frames(before, before_live, original_owner_id, xml_notes_crlf=version is not None)
+    validate_frames(copied, copied_live, destination_id, xml_notes_crlf=version is not None)
+    if version:
+        assert all(copied_live[role].get('notes', '') == before_live[role].get('notes', '') for role in before), 'Copied native notes differ'
     old_ids, new_ids = ({key: node.get('ID') for key, node in graph.items()} for graph in (before, copied))
     assert set(old_ids.values()).isdisjoint(new_ids.values()), 'Copied fixture aliases original'
     assert canonical(before['source']) == canonical(retained['source']), 'Original fixture changed'
     assert canonical(before['source'], before) == canonical(copied['source'], copied), 'Copied fixture values or order differ'
-    return {'original_preserved': True, 'serialized_subtree_preserved': True, 'ordered_point_count': 4,
+    return {'original_preserved': True, 'serialized_subtree_preserved': True, 'ordered_point_count': 2 if version else 4,
         'object_ref_count': 0, 'owned_guid_mapping': {old_ids[key]: new_ids[key] for key in before},
-        'scope': 'native-donor synthetic fixture; exact 2021 two-property graph only'}
+        'scope': ('exact ' + version + ' original owned Source graph' if version else 'native-donor synthetic fixture; exact 2021 two-property graph only')}
