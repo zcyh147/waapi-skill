@@ -247,6 +247,7 @@ tests/unit/test_native_catalog_gateway.py
 tests/unit/test_branch_coverage_audit.py
 tests/unit/test_branch_coverage_completion_cli.py
 tests/unit/test_metadata_default_branch_evidence.py
+tests/unit/test_metadata_replay_attachments.py
 tests/unit/test_created_topic_branch_evidence.py
 
 tests/unit/test_condition_scalar_batch_evidence.py
