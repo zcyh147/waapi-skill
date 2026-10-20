@@ -7288,21 +7288,170 @@ def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSand
 
 
 
+def _collect_ordinary_existing_source_case(runtime, gateway, receipt, *, prefix, parent, complete, persist):
+    """One ordinary Source append, using the shared Source collector and lifecycle."""
+    from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'AudioFileSource',
+        '--meaning', 'Wwise Tone Generator', '--page-size', '64'], live=True)['agent_result']
+    assert types.get('complete') is True, types
+    classes = {}
+    for name, category in [('Sound', 'WObject'), ('AudioFileSource', 'WObject'), ('Wwise Tone Generator', 'Source')]:
+        selected, = [row for row in types['types'] if row.get('name') == name and row.get('type') == category]
+        assert type(selected.get('classId')) is int, selected
+        classes[name] = selected['classId']
+    receipt['live_classes'] = classes
+    base = ['--include', 'class-id', '--include', 'parent', '--include', 'owner', '--include', 'notes']
+    def rows(argv, *, fields=(), source=False, file=False):
+        payload = gateway.gateway(['query-object', *argv, *base,
+            *(['--include', 'source-language'] if source else []),
+            *(['--include', 'original-file-path'] if file else []),
+            *(arg for field in fields for arg in ('--include-field', field)), '--max-results', '8'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        values = payload['objects']; assert isinstance(values, list) and payload['count'] == len(values) < 8, payload
+        assert len({uuid.UUID(row['id']) for row in values}) == len(values), values
+        return values
+    def exact(identity, **view):
+        row, = rows(['--exact-id', identity], **view)
+        assert uuid.UUID(row['id']) == uuid.UUID(identity), row
+        return row
+    def children(identity):
+        return sorted(rows(['--exact-id', identity, '--relationship', 'children']), key=lambda row: uuid.UUID(row['id']))
+    parent_before = exact(parent['id'])
+    assert all((key in parent_before) == (key in parent) and parent_before.get(key) == parent.get(key)
+        for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), (parent_before, parent)
+    receipt['parent_before'] = parent_before
+    def metadata(identity):
+        names, fields, page = [], [], None
+        while True:  # The shared public-call/byte limits bound all pages.
+            listed = gateway.gateway(['metadata', 'list', '--exact-id', identity, '--page-size', '64',
+                *(['--page', page] if page else [])], live=True)['agent_result']
+            for field in listed['fields']:
+                assert isinstance(field.get('name'), str) and field['name'] not in names, listed
+                names.append(field['name'])
+                # Expiring selection authority is retained in full calls, but
+                # is not a property fact that must equal a later observation.
+                fields.append({key: value for key, value in field.items() if key != 'selection'})
+            if listed.get('complete') is True:
+                assert listed['total_count'] == len(names), listed
+                return names, fields
+            next_page = _required_string(listed, 'next_page'); assert next_page != page, listed
+            page = next_page
+    def snapshot(owner_id):
+        owner = exact(owner_id, fields=['IsVoice'])
+        assert owner['type'] == 'Sound' and owner['class_id'] == classes['Sound'], owner
+        assert type(owner['properties']['IsVoice']) is bool and owner['properties']['IsVoice'] is False, owner
+        result = {'owner': owner, 'children': children(owner_id), 'sources': [], 'metadata': {}}
+        for child in result['children']:
+            file = child['type'] == 'AudioFileSource'
+            assert child['class_id'] == classes['AudioFileSource' if file else 'Wwise Tone Generator'], child
+            assert file or child['type'] in {'Source', 'SourcePlugin'}, child
+            assert child['parent']['id'] == owner_id, child
+            names, details = metadata(child['id']); result['metadata'][child['id']] = details
+            # Query includes 4 mandatory and 4 identity fields, Source locale,
+            # and optionally the original file path; repeat that exact frame.
+            # Existing business field discovery admits eight meanings per call.
+            width = min(8, MAX_STRUCTURED_RETURN_FIELDS - 8 - 1 - int(file))
+            row = exact(child['id'], source=True, file=file, fields=names[:width])
+            for start in range(width, len(names), width):
+                page = exact(child['id'], source=True, file=file, fields=names[start:start + width])
+                assert {key: value for key, value in page.items() if key not in {'properties', 'references', 'unavailable_fields'}} == {
+                    key: value for key, value in row.items() if key not in {'properties', 'references', 'unavailable_fields'}}, (row, page)
+                for key in ('properties', 'references'):
+                    if key in page: row.setdefault(key, {}).update(page[key])
+                if 'unavailable_fields' in page:
+                    row['unavailable_fields'] = sorted(set(row.get('unavailable_fields', [])) | set(page['unavailable_fields']))
+            assert all((key in child) == (key in row) and child.get(key) == row.get(key)
+                for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'owner', 'notes')), (child, row)
+            result['sources'].append(row)
+        return result
+    def phase(label):
+        result = {'case': label, 'setup_no_credit': label.startswith('setup-'), 'execution_attempted': False, 'effect_verified': False}
+        receipt['phases'].append(result); persist()
+        return result
+    def tone_fields(draft):
+        kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+        found = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Start Frequency'], live=True)
+        field, = [candidate for meaning in found['meaning_results'] for candidate in meaning['candidates']
+            if candidate.get('metadata', {}).get('name') == 'StartFreq' and candidate.get('field_kind') == 'property'
+            and candidate.get('value_type') == 'number' and candidate['metadata'].get('type') == 'Real32'
+            and candidate['metadata'].get('display', {}).get('name') == 'Start Frequency']
+        return kind, field
+    name = prefix + '_Sound'
+    setup = phase('setup-import')
+    audio = _write_fixture_wav(runtime.sandbox.sandbox_path / (prefix + '_Audio'), 'Retained recording')
+    receipt['fixture_input'] = {'path': str(audio), 'bytes': audio.stat().st_size, 'sha256': hashlib.sha256(audio.read_bytes()).hexdigest()}
+    draft = _start_business_draft(gateway, 'audio.import')
+    bound = _bind_business_object(gateway, draft, object_id=parent['id'])
+    _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'sound', '--parent-handle', bound,
+        '--name', name, '--kind', 'sound-sfx', '--field', 'media_file', str(audio), '--field', 'language', 'SFX',
+        '--field', 'notes', 'Keep existing Sound'], live=False)
+    complete(draft, setup, lambda prepared: None)
+    owner, = rows([arg for segment in (*('Containers', 'Default Work Unit'), name) for arg in ('--path-segment', segment)], fields=['IsVoice'])
+    assert owner['type'] == 'Sound' and owner['class_id'] == classes['Sound'] and owner['parent']['id'] == parent['id'], owner
+    assert owner['notes'] == 'Keep existing Sound' and type(owner['properties']['IsVoice']) is bool and owner['properties']['IsVoice'] is False, owner
+    file, = children(owner['id']); assert file['type'] == 'AudioFileSource' and file['class_id'] == classes['AudioFileSource'], file
+    setup['effect_verified'] = True
+    setup = phase('setup-retained-tone')
+    draft = _start_business_draft(gateway, 'object.createPlugin')
+    bound = _bind_business_object(gateway, draft, object_id=owner['id'])
+    kind, field = tone_fields(draft)
+    _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'retained', '--object-handle', bound,
+        '--field', 'plugin_role', 'source', '--field', 'plugin_type_handle', kind, '--field', 'plugin_name', 'Retained Tone',
+        '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep retained Tone', '--field-value', field['handle'], '660'], live=False)
+    complete(draft, setup, lambda prepared: None)
+    before = receipt['before'] = snapshot(owner['id'])
+    assert len(before['sources']) == 2 and before['owner'] == owner, before
+    retained, = [row for row in before['sources'] if row['id'] != file['id']]
+    assert retained['name'] == 'Retained Tone' and retained['notes'] == 'Keep retained Tone' and retained['properties']['StartFreq'] == 660, retained
+    setup['effect_verified'] = True
+    target = phase('ordinary-existing-source')
+    draft = _start_business_draft(gateway, 'object.set')
+    bound = _bind_business_object(gateway, draft, object_id=owner['id'])
+    kind, field = tone_fields(draft)
+    _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'new-source', '--parent-handle', bound,
+        '--name', 'New Tone', '--kind', kind, '--field', 'plugin_placement', 'owner', '--field', 'notes', 'New ordinary Tone',
+        '--field-value', field['handle'], '440'], live=False)
+    def inspect(prepared):
+        native, = prepared['dispatch']['args']['objects']; source, = native['children']
+        assert native == {'object': owner['id'], 'children': [source]}, native
+        assert source == {'type': 'Source', 'classId': classes['Wwise Tone Generator'], 'name': 'New Tone',
+            'notes': 'New ordinary Tone', '@StartFreq': 440}, source
+        assert prepared['dispatch']['args']['onNameConflict'] == 'fail'
+    complete(draft, target, inspect)
+    after = receipt['after'] = snapshot(owner['id'])
+    assert after['owner'] == before['owner'], 'Ordinary Source append changed the existing owner'
+    assert len(after['sources']) == 3, after
+    for source in before['sources']:
+        assert source == next(row for row in after['sources'] if row['id'] == source['id']), 'Ordinary append changed a retained Source'
+        assert before['metadata'][source['id']] == after['metadata'][source['id']], 'Ordinary append changed retained Source metadata'
+    for child in before['children']:
+        assert child in after['children'], 'Ordinary append changed the retained complete childset'
+    new, = [row for row in after['sources'] if row['id'] not in {source['id'] for source in before['sources']}]
+    receipt['new_source'] = new
+    assert new['id'] not in {owner['id'], parent['id']} and new['name'] == 'New Tone' and new['notes'] == 'New ordinary Tone', new
+    assert new['class_id'] == classes['Wwise Tone Generator'] and new['parent']['id'] == owner['id'] and new['path'] == owner['path'] + '\\New Tone', new
+    assert new['properties']['StartFreq'] == 440, new
+    assert exact(parent['id']) == parent_before, 'Ordinary Source work changed the parent'
+    target['effect_verified'] = True
+
+
 def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *, prefix: str,
-        staged_voice_source_language: bool = False, gateway_staged_completion: bool = False) -> dict[str, Any]:
-    """Atomic, manual staged, or explicitly selected public staged completion."""
+        staged_voice_source_language: bool = False, gateway_staged_completion: bool = False,
+        ordinary_existing_source: bool = False) -> dict[str, Any]:
+    """Explicit atomic, staged, or ordinary existing-owner Source collection."""
     from wwise_waapi.native_catalog import load_native_catalog
     assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}
-    assert not (staged_voice_source_language and gateway_staged_completion), 'Source modes are explicit and exclusive'
+    assert sum((staged_voice_source_language, gateway_staged_completion, ordinary_existing_source)) <= 1, 'Source modes are explicit and exclusive'
+    if ordinary_existing_source: assert runtime.version == '2025.1', 'Ordinary existing Source acceptance is explicitly2025-only'
     if gateway_staged_completion:
         assert runtime.version == '2025.1', 'Initial Gateway staged acceptance is Console2025-only'
     catalog = load_native_catalog(runtime.version, 'wwise-console')
     endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
-    output = runtime.state_dir / ('gateway-staged-voice-source.json' if gateway_staged_completion else
+    output = runtime.state_dir / ('ordinary-existing-source-acceptance.json' if ordinary_existing_source else 'gateway-staged-voice-source.json' if gateway_staged_completion else
         'staged-voice-source-language.json' if staged_voice_source_language else 'planned-source-characterization.json')
     assert not output.exists(), 'Never overwrite original Source evidence'
     output.parent.mkdir(parents=True, exist_ok=True)
-    artifacts = runtime.state_dir / ('gateway-staged-voice-source-artifacts' if gateway_staged_completion else
+    artifacts = runtime.state_dir / ('ordinary-existing-source-artifacts' if ordinary_existing_source else 'gateway-staged-voice-source-artifacts' if gateway_staged_completion else
         'staged-voice-source-artifacts' if staged_voice_source_language else 'planned-source-artifacts'); artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
     previous_native = set(native_root.glob('*.json'))
@@ -7318,6 +7467,8 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
     if gateway_staged_completion:
         category.update(category='gateway-staged-voice-localized-source',
             scope='one_Gateway_combined_Draft_completed_by_two_set_Previews', atomic_Source_language_unresolved=True)
+    if ordinary_existing_source:
+        category.update(category='ordinary-existing-source', scope='one_2025_ordinary_object_set_Source_append_with_retained_file_and_plugin_Source')
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.planned-source-characterization/v1',
         'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'phases': [], 'native_evidence': [],
@@ -7338,9 +7489,13 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
     if gateway_staged_completion:
         receipt.update(scope=category['scope'], atomic_Source_language_unresolved=True, planned_public_calls=34)
         receipt['scope_exclusions'].append('atomic_Voice_Source_language')
+    if ordinary_existing_source:
+        receipt.update(scope=category['scope'], setup_coverage_credit=False)
+        receipt['scope_exclusions'] += ['other_Source_classes', 'nonfail_collision_modes', 'staged_origin', 'media_content_or_existence_claim']
     attempted: set[str] = set()
     def persist():
-        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        raw = json.dumps(receipt, ensure_ascii=False, indent=None if ordinary_existing_source else 2,
+            separators=(',', ':') if ordinary_existing_source else None).encode('utf-8')
         assert len(raw) <= receipt['limits']['receipt_bytes'], 'Source receipt exceeds bound'
         temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
         category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
@@ -7368,6 +7523,12 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
                 assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
             return payload
     gateway = Gateway()
+    def call_reference(payload):
+        from wwise_waapi.canonical import canonical_sha256
+        index = len(receipt['calls']) - 1
+        assert type(index) is int and 0 <= index < len(receipt['calls'])
+        call = receipt['calls'][index]; assert call['payload'] == payload
+        return {'call_index': index, 'call_canonical_sha256': canonical_sha256(call)}
     def query(argv, *, source=False, voice=False, language=None, source_field=None):
         projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
         if source:
@@ -7395,17 +7556,26 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
         assert tx not in transactions; transactions.append(tx)
         try:
             shown = gateway.gateway(['transaction-show', tx], live=False)
-            phase['immutable_preview'] = shown['artifact']
+            phase['preview_call' if ordinary_existing_source else 'immutable_preview'] = call_reference(shown) if ordinary_existing_source else shown['artifact']
+            if ordinary_existing_source:
+                phase['artifact_hash'] = preview['artifact_hash']
+                assert 'voice_source_staging' not in shown['artifact']['request']['arguments']
             inspect_preview(shown['artifact']['prepared_operation'])
             gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
             phase['execution_attempted'] = True; persist()
-            code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+            code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code,
+                'call' if ordinary_existing_source else 'payload': call_reference(executed) if ordinary_existing_source else executed}
             assert code == 0 and executed.get('state') == 'executed_unverified', executed
-            code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+            code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code,
+                'call' if ordinary_existing_source else 'payload': call_reference(verified) if ordinary_existing_source else verified}
             assert code == 0 and verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
             return executed
         finally:
-            phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False)
+            final = gateway.gateway(['transaction-show', tx], live=False)
+            if ordinary_existing_source:
+                assert final['artifact'] == shown['artifact'], 'Source flow changed an immutable Preview'
+                phase['transaction_call'] = call_reference(final)
+            else: phase['final_transaction'] = final
             persist()
     persist()
     try:
@@ -7426,25 +7596,36 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
         assert len(project_language_keys) == len(project_languages) and all(isinstance(name, str) and name for _, name in project_language_keys), project_languages
         receipt['project_language_authority'] = {'project_id': project_info['id'], 'languages': project_languages,
             'native_evidence_path': project_call['evidence_path'], 'file_proof': project_observation['file_proof']}
-        listed = gateway.gateway(['metadata', 'types', '--meaning', 'Language', '--page-size', '64'], live=True)['agent_result']
-        language_type, = [row for row in listed['types'] if row.get('name') == 'Language']
-        languages = gateway.gateway(language_type['query_command']['gateway_argv'], live=True)
-        assert languages.get('status') != 'partial' and languages.get('limit_reached') is not True, languages
-        choices = sorted((row for row in languages['objects'] if row.get('type') == 'Language'
-            and (uuid.UUID(row['id']), row.get('name')) in project_language_keys), key=lambda row: row['name'])
+        if ordinary_existing_source:
+            # This SFX case makes no locale selection; status already retained
+            # the native Project authority, so no Language object lookup is needed.
+            choices = sorted(project_languages, key=lambda row: row['name'])
+        else:
+            listed = gateway.gateway(['metadata', 'types', '--meaning', 'Language', '--page-size', '64'], live=True)['agent_result']
+            language_type, = [row for row in listed['types'] if row.get('name') == 'Language']
+            languages = gateway.gateway(language_type['query_command']['gateway_argv'], live=True)
+            assert languages.get('status') != 'partial' and languages.get('limit_reached') is not True, languages
+            choices = sorted((row for row in languages['objects'] if row.get('type') == 'Language'
+                and (uuid.UUID(row['id']), row.get('name')) in project_language_keys), key=lambda row: row['name'])
         assert len(choices) == len(project_languages) and len({uuid.UUID(row['id']) for row in choices}) == len(choices), choices
         receipt['language_choices'] = choices
         construction_language = choices[0]['name']
-        one_stage_case = staged_voice_source_language or gateway_staged_completion
+        one_stage_case = staged_voice_source_language or gateway_staged_completion or ordinary_existing_source
         source_language = choices[1 if not one_stage_case and len(choices) > 1 else 0]['name']
         receipt['distinct_language_disambiguation'] = not one_stage_case and len(choices) > 1
         receipt['distinct_language_prerequisite'] = ('not_exercised_staged_no_construction_context' if one_stage_case
             else 'established' if len(choices) > 1 else 'second_existing_language_absent_no_cross_language_credit')
+        if ordinary_existing_source:
+            receipt['distinct_language_prerequisite'] = 'not_exercised_SFX_case_no_locale_selection'
         root_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
         parent_rows = query([value for segment in root_segments for value in ('--path-segment', segment)])
         assert len(parent_rows) == 1, parent_rows
         parent = parent_rows[0]
         seen = {uuid.UUID(parent['id'])}
+        if ordinary_existing_source:
+            _collect_ordinary_existing_source_case(runtime, gateway, receipt, prefix=prefix, parent=parent,
+                complete=complete_staged, persist=persist)
+            assert len(transactions) == len(attempted) == 3
         if staged_voice_source_language:
             name = prefix + '_existing-voice'
             empty_phase = {'case': 'empty-voice', 'execution_attempted': False, 'effect_verified': False,
@@ -7628,7 +7809,7 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             assert exact(parent['id']) == parent, 'Gateway Source stage changed the bound parent'
             phase['effect_verified'] = True; persist()
             assert len(transactions) == len(attempted) == 2
-        for case in (() if staged_voice_source_language or gateway_staged_completion else ('sfx', 'voice-explicit-source', 'voice-default-source')):
+        for case in (() if staged_voice_source_language or gateway_staged_completion or ordinary_existing_source else ('sfx', 'voice-explicit-source', 'voice-default-source')):
             phase: dict[str, Any] = {'case': case, 'construction_language': None if case == 'sfx' else construction_language,
                 'source_language': source_language if case == 'voice-explicit-source' else None,
                 'source_language_effect': 'explicit_exact_name' if case == 'voice-explicit-source' else 'observed_default_only_no_inheritance_claim',
@@ -7739,6 +7920,16 @@ def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *
             raise
         finally:
             persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_ordinary_existing_source_append_preservation_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('One explicitly scoped2025 ordinary Source append; other lanes remain separate')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime,
+        prefix='WAAPI_EXISTING_SOURCE_' + uuid.uuid4().hex[:10], ordinary_existing_source=True)
+    assert category['status'] == 'PASS', category
 
 
 @pytest.mark.live
