@@ -4338,11 +4338,14 @@ def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certif
     for phase in receipt['phases']:
         assert phase['signal_verified'] is False
         assert phase['verification']['business_state_verified'] is False
-        assert phase['verification']['verification_strength'] == 'partial_tone_artifact'
+        expected_state = 'verification_failed' if phase['business_values']['waveform'] == 'sine' else 'result_schema_checked'
+        assert phase['verification']['state'] == expected_state
+        if expected_state == 'result_schema_checked':
+            assert phase['verification']['verification_strength'] == 'partial_tone_artifact'
         assert Path(phase['wav']['archive_path']).read_bytes() == native_files[phase['output_path']]
         shown = json.loads(Path(phase['transaction']['path']).read_text())
         assert shown['artifact']['request']['arguments']['args'] == next(row for row in writes if row['path'] == phase['output_path'])
-        assert shown['state'] == 'result_schema_checked'
+        assert shown['state'] == expected_state
     from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
     monkeypatch.setenv('WWISE_CATEGORY_EVIDENCE_PATH', runtime.env['WWISE_CATEGORY_EVIDENCE_PATH'])
     node = 'fixture::remaining_tone_characterization'
@@ -4361,7 +4364,7 @@ def test_remaining_tone_diagnostic_archives_exact_public_requests_without_certif
     assert final['residual_state']['process_cleanup'] == 'cleaned'
     assert final['residual_state']['residual_processes'] == []
     assert len(final['transactions']) == 6
-    assert all(row['state'] == 'result_schema_checked' for row in final['transactions'])
+    assert sorted(row['state'] for row in final['transactions']) == ['result_schema_checked'] * 3 + ['verification_failed'] * 3
     calls_before = len(commands)
     with pytest.raises(AssertionError, match='overwrite'):
         workflow._collect_tone_waveform_envelope_characterization(runtime)

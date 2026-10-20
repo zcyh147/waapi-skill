@@ -112,3 +112,11 @@ leave its category blocked, `signal_verified=false`,
 are retained unchanged with their verification failures. Subsequent verifier
 work requires source-reviewed interpretation and public positive plus
 wrong-effect negatives; current native verification is not relabelled.
+
+The original 2025.1.7.9143 collection subsequently completed as characterization
+only on `005afc69`: 57 public calls, six separate transactions and six immutable
+WAVs, with full lifecycle closure. Its envelope durations are commensurate with
+440 Hz, so the phase continuity/reset question remains unobserved. See the
+[bounded sine-envelope successor](TONE_SINE_ENVELOPE.md) for the reviewed
+phase-independent numerical policy and separate program evidence. The original
+collection's partial outcomes and all earlier failures remain unchanged.

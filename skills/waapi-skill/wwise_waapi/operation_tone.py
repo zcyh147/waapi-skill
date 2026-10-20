@@ -237,7 +237,7 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
             unresolved = _check_requested_format(observed, args) + marker_unresolved
             observed["nonzero_samples_by_channel"], signal = _scan_samples(stream, data, observed, args)
             if signal is not None:
-                observed["stationary_sine"] = signal
+                observed["sine_envelope" if 'segments' in signal else "stationary_sine"] = signal
             if args.get("waveform", "silence") != "silence" and args.get("waveformChannelMask") != 0:
                 if signal is None or signal['observability_reason'] is not None:
                     unresolved.append("active waveform, frequency and envelope postconditions" + (
@@ -362,7 +362,10 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
     nonzero = [0] * channels
     stationary = (args.get('waveform') == 'sine' and not args.get('attackTime', 0)
         and not args.get('releaseTime', 0) and silence_mask != (1 << channels) - 1)
-    signal = _stationary_sine_policy(observed, args) if stationary else None
+    sine_requested = args.get('waveform') == 'sine' and silence_mask != (1 << channels) - 1
+    signal = _sine_signal_policy(observed, args, enveloped=not stationary) if sine_requested else None
+    envelope_stats = [{'gram': [0.0, 0.0, 0.0], 'projections': [[0.0, 0.0] for _ in range(channels)]}
+        for _ in signal['segments']] if signal is not None and 'segments' in signal else None
     ss = cc = sc = 0.0
     projections = [[0.0, 0.0] for _ in range(channels)]
     scale = 32768 if observed['sample_format'] == 'int16' else 1
@@ -378,44 +381,85 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
             if channel == 0:
                 phase = math.remainder(signal['angular_step'] * (sample_index // channels), math.tau)
                 sine, cosine = math.sin(phase), math.cos(phase)
-                ss += sine * sine
-                cc += cosine * cosine
-                sc += sine * cosine
-            projections[channel][0] += sample / scale * sine
-            projections[channel][1] += sample / scale * cosine
+                if envelope_stats is not None:
+                    segment_index, segment, amplitude = _envelope_at(signal, sample_index // channels)
+                    sine, cosine = sine * amplitude, cosine * amplitude
+                    gram = envelope_stats[segment_index]['gram']
+                    gram[0] += sine * sine
+                    gram[1] += cosine * cosine
+                    gram[2] += sine * cosine
+                else:
+                    ss += sine * sine
+                    cc += cosine * cosine
+                    sc += sine * cosine
+            target = envelope_stats[segment_index]['projections'] if envelope_stats is not None else projections
+            target[channel][0] += sample / scale * sine
+            target[channel][1] += sample / scale * cosine
     if signal is not None and signal['observability_reason'] is None:
-        _check_stationary_sine(stream, data, observed, silence_mask, projections, (ss, cc, sc), signal)
+        if envelope_stats is not None:
+            _check_sine_envelope(stream, data, observed, silence_mask, envelope_stats, signal)
+        else:
+            _check_stationary_sine(stream, data, observed, silence_mask, projections, (ss, cc, sc), signal)
     return nonzero, signal
 
 
-def _stationary_sine_policy(observed, args):
+def _sine_signal_policy(observed, args, *, enveloped=False):
     # Explicit numerical conformance, not a claim of a sample-exact native DSP
     # algorithm. SDK AkSineOsc uses an approximate sine; IAkPlugin.h defines the
-    # mathematical dB reference. Retained 2023/24/25 WAVs independently exercise
-    # these bounds. Neither source establishes utility-wide native error bounds.
+    # mathematical dB reference. Retained stationary 2023/24/25 WAVs independently
+    # exercise these bounds; the 2025 envelope captures reuse this same policy.
+    # Neither source establishes utility-wide native error bounds.
     # Reviewed policy: .02 dB gain, .2% shape, two representation units. Native
     # residual maxima were .00123 at unity / .00063 at -6 dB, gain offset <.009 dB;
     # these rounded conformance choices are not a fitted per-file oracle.
     frequency, rate = float(args.get('frequency', 440)), observed['sample_rate']
     gain = 10 ** (float(args.get('sustainLevel', 0)) / 20)
     quantum = 1 / 32768 if observed['sample_format'] == 'int16' else gain * 2 ** -23
+    segment_frames = [Decimal(str(args.get(key, default))) * observed['sample_rate'] for key, default in
+        (('attackTime', 0), ('sustainTime', 1), ('releaseTime', 0))]
     reason = None
     if float(args.get('sampleRate', 48000)) != rate:
         reason = 'fractional native sample-rate interpretation remains unresolved'
-    elif Decimal(str(args.get('sustainTime', 1))) * rate != observed['frames']:
+    elif enveloped and (any(frames != frames.to_integral_value() for frames in segment_frames)
+            or sum(segment_frames) != observed['frames']):
+        reason = 'fractional native envelope segment/frame interpretation remains unresolved'
+    elif not enveloped and Decimal(str(args.get('sustainTime', 1))) * rate != observed['frames']:
         reason = 'fractional native sustain/frame interpretation remains unresolved'
     elif frequency >= rate / 2:
         reason = 'sampled frequency is aliased or at the Nyquist degeneracy'
-    return {'policy': 'stationary-sine-numerical-conformance-v1',
+    signal = {'policy': 'stationary-sine-numerical-conformance-v1',
         'reference': 'requested digital sine; phase is unparameterized; not bit-exact or unique analog origin',
         'frequency_hz': frequency, 'angular_step': math.tau * frequency / rate,
         'requested_gain': gain, 'gain_tolerance_db': 0.02, 'shape_tolerance_relative': 0.002,
         'representation_error': 2 * quantum,
         'sample_error_limit': gain * (0.002 + 10 ** (0.02 / 20) - 1) + 2 * quantum,
         'observability_reason': reason, 'channels': []}
+    if enveloped:
+        signal.update(policy='sine-envelope-numerical-conformance-v1',
+            reference='requested fixed-frequency/gain digital sine with linear-amplitude segments; independent unparameterized phase per segment; not a bit-exact native algorithm',
+            phase_relationship_checked=False,
+            envelope_model='attack n/N; sustain 1; release 1-n/N for integral-frame segments')
+        start = 0
+        signal['segments'] = []
+        for name, frames in zip(('attack', 'sustain', 'release'), segment_frames):
+            count = int(frames)
+            signal['segments'].append({'name': name, 'start_frame': start, 'frames': count,
+                'observability_reason': None, 'channels': []})
+            start += count
+    return signal
 
 
-def _check_stationary_sine(stream, data, observed, silence_mask, projections, gram, signal):
+def _envelope_at(signal, frame):
+    for index, segment in enumerate(signal['segments']):
+        if segment['start_frame'] <= frame < segment['start_frame'] + segment['frames']:
+            offset = frame - segment['start_frame']
+            amplitude = offset / segment['frames'] if segment['name'] == 'attack' else (
+                1 - offset / segment['frames'] if segment['name'] == 'release' else 1)
+            return index, segment, amplitude
+    raise _invalid('Tone WAV frame lies outside the requested integral envelope segments.')
+
+
+def _fit_sine_channels(observed, silence_mask, projections, gram, signal, target, frames):
     ss, cc, sc = gram
     determinant = ss * cc - sc * sc
     # Small eigenvalue gives the actual coefficient sensitivity to bounded
@@ -423,14 +467,14 @@ def _check_stationary_sine(stream, data, observed, silence_mask, projections, gr
     largest = (ss + cc + math.hypot(ss - cc, 2 * sc)) / 2
     smallest = determinant / largest if largest else 0
     if smallest <= largest * 1e-12:
-        signal['observability_reason'] = 'sampled sine/cosine reference is numerically rank deficient'
-        return
-    uncertainty = signal['representation_error'] * math.sqrt(observed['frames'] / smallest)
-    signal['gain_representation_error'] = uncertainty
+        target['observability_reason'] = 'sampled sine/cosine reference is numerically rank deficient'
+        return None
+    uncertainty = signal['representation_error'] * math.sqrt(frames / smallest)
+    target['gain_representation_error'] = uncertainty
     gain = signal['requested_gain']
     if gain <= uncertainty:
-        signal['observability_reason'] = 'requested amplitude cannot be distinguished from sample quantization'
-        return
+        target['observability_reason'] = 'requested amplitude cannot be distinguished from sample quantization'
+        return None
     rows = {}
     for channel, (ys, yc) in enumerate(projections):
         if silence_mask & (1 << channel):
@@ -440,12 +484,21 @@ def _check_stationary_sine(stream, data, observed, silence_mask, projections, gr
         lower, upper = gain * 10 ** (-0.02 / 20) - uncertainty, gain * 10 ** (0.02 / 20) + uncertainty
         if not lower <= amplitude <= upper:
             raise SoundBankContractError('INVALID_TONE_WAV',
-                f'Tone stationary sine channel {channel} gain differs from requested dB within the numerical policy.',
-                details={'stationary_sine': signal, 'channel': channel,
+                f'Tone sine channel {channel} gain differs from requested dB within the numerical policy.',
+                details={'sine_envelope' if 'segments' in signal else 'stationary_sine': signal,
+                    'segment': target.get('name'), 'channel': channel,
                     'measured_gain': amplitude, 'gain_interval': [lower, upper]})
         row = {'channel': channel, 'measured_gain': amplitude, 'gain_interval': [lower, upper],
             'phase_radians': math.atan2(b, a), 'max_sample_error': 0.0, 'rms_sample_error': 0.0}
         rows[channel] = row
+    return rows
+
+
+def _check_stationary_sine(stream, data, observed, silence_mask, projections, gram, signal):
+    rows = _fit_sine_channels(observed, silence_mask, projections, gram, signal, signal, observed['frames'])
+    if rows is None:
+        return
+    gain = signal['requested_gain']
     squares = [0.0] * observed['channels']
     phase_components = {channel: (math.cos(row['phase_radians']), math.sin(row['phase_radians']))
         for channel, row in rows.items()}
@@ -471,6 +524,59 @@ def _check_stationary_sine(stream, data, observed, silence_mask, projections, gr
     for channel, row in rows.items():
         row['rms_sample_error'] = math.sqrt(squares[channel] / observed['frames'])
     signal['channels'] = list(rows.values())
+
+
+def _check_sine_envelope(stream, data, observed, silence_mask, statistics, signal):
+    # Fixed envelope-weighted bases: only phase is free, separately per segment.
+    # Fit gain is compared to requested dB, never used as the sample reference.
+    fitted = []
+    for segment, stats in zip(signal['segments'], statistics):
+        rows = _fit_sine_channels(observed, silence_mask, stats['projections'], stats['gram'],
+            signal, segment, segment['frames']) if segment['frames'] else {}
+        fitted.append(rows)
+        if rows is None:
+            signal['observability_reason'] = signal['observability_reason'] or (
+                segment['name'] + ': ' + segment['observability_reason'])
+        else:
+            segment['channels'] = list(rows.values())
+    squares = [[0.0] * observed['channels'] for _ in signal['segments']]
+    components = [{channel: (math.cos(row['phase_radians']), math.sin(row['phase_radians']))
+        for channel, row in (rows or {}).items()} for rows in fitted]
+    for index, (sample,) in enumerate(_audio_samples(stream, data, observed)):
+        channel = index % observed['channels']
+        if channel == 0:
+            segment_index, segment, amplitude = _envelope_at(signal, index // observed['channels'])
+            phase = math.remainder(signal['angular_step'] * (index // observed['channels']), math.tau)
+            sine, cosine = math.sin(phase), math.cos(phase)
+        actual = sample / 32768 if observed['sample_format'] == 'int16' else sample
+        limit = (signal['sample_error_limit'] - signal['representation_error']) * amplitude + signal['representation_error']
+        # Phase uncertainty cannot conceal a magnitude impossible for any phase,
+        # particularly a nonzero sample at a zero-weight attack frame.
+        if abs(actual) > signal['requested_gain'] * amplitude + limit:
+            raise SoundBankContractError('INVALID_TONE_WAV',
+                f'Tone sine {segment["name"]} channel {channel} sample {index} exceeds the requested envelope magnitude for every unparameterized phase.',
+                details={'sine_envelope': signal, 'channel': channel, 'segment': segment['name'],
+                    'sample_index': index, 'sample_magnitude': abs(actual),
+                    'maximum_magnitude': signal['requested_gain'] * amplitude + limit})
+        if channel not in components[segment_index]:
+            continue
+        cos_phase, sin_phase = components[segment_index][channel]
+        expected = signal['requested_gain'] * amplitude * (sine * cos_phase + cosine * sin_phase)
+        error = abs(actual - expected)
+        # Same stationary numerical policy, scaled by the fixed envelope; the
+        # two representation units remain absolute at quiet segment boundaries.
+        if not math.isfinite(error) or error > limit:
+            raise SoundBankContractError('INVALID_TONE_WAV',
+                f'Tone sine {segment["name"]} channel {channel} sample {index} differs from the requested fixed-frequency/gain/linear-amplitude envelope within the numerical policy.',
+                details={'sine_envelope': signal, 'channel': channel, 'segment': segment['name'],
+                    'sample_index': index, 'sample_error': error if math.isfinite(error) else 'non-finite',
+                    'sample_error_limit': limit})
+        row = fitted[segment_index][channel]
+        row['max_sample_error'] = max(row['max_sample_error'], error)
+        squares[segment_index][channel] += error * error
+    for segment_index, segment in enumerate(signal['segments']):
+        for row in segment['channels']:
+            row['rms_sample_error'] = math.sqrt(squares[segment_index][row['channel']] / segment['frames'])
 
 
 
