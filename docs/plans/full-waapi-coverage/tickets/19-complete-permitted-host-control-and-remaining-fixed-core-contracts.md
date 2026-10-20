@@ -250,3 +250,32 @@ largest 36-channel anonymous configuration. Triangle/noise/nonstationary square,
 other native settings/builds/hosts, fractional rounding, remaining representation
 and marker work, #193/#188 completion and downstream #194 acceptance remain
 separate obligations. No native, Fresh, full gate or coverage credit is added.
+
+## Bounded successor: stationary triangle sufficient witnesses
+
+The existing public Gateway artifact verifier now checks at most two fixed
+first-sample inverse phase witnesses per active stationary triangle channel.
+Every sample uses exact requested cadence and requested gain; a separate signed
+gain projection cannot replace that gain. The existing .02 dB/.002/two-unit
+policy is unchanged. Exact rational phase, sample, residual and gain arithmetic
+holds O(channels) state and scans the full descriptor-owned record. The
+[mathematical/source note](../TONE_STATIONARY_TRIANGLE.md) records its bounds.
+
+This proves sufficient digital conformance only. A record may have a feasible
+phase that neither seed finds; public program controls retain this case as
+partial, never complete phase infeasibility or native fault. Unknown utility
+phase precision, short/quantization/alias/fractional observations stay explicit.
+Known outside-level, nonfinite and requested-silent-channel contradictions fail
+even after witnesses become partial. Nearby generating frequencies may be
+indistinguishable within the unchanged finite-record tolerance; the exact
+requested frequency remains the reference and dispatched request.
+
+The byte-identical retained Console 2025.1.7.9143 triangle and its original
+provenance are copied for program regression only. Its original diagnostic
+receipt/category/transaction are unchanged. Independent phase/depth/version
+controls exercise 2023/2024/2025 public contracts and preserve pinned 2021/2022
+reflection boundaries. Largest 36-channel anonymous actual-main controls retain
+the exact final machine result inside the ordinary output ceiling. No new
+native, Windows, Fresh, full gate or coverage credit follows. Complete triangle
+phase-search behavior, triangle/non-sine envelopes, noise, other native settings,
+builds/hosts and the rest of #193/#188/#194 remain owned unfinished work.
