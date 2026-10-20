@@ -677,3 +677,39 @@ Root's separate full Program on `e80d9250` remains pending at this handoff.
 R41 staged controls are separate receipts in the test inventory, not an
 aggregate gate. No merger pytest, native, Fresh or publication ran. Root owns
 review and the next single 2025 Source acceptance attempt on the fixed stage.
+
+## R42 Source-plugin selection, staged Voice and exact evidence requirements
+
+Runtime merge `779823d3` combines exact accepted `8664cfb6`, `1a1b3b03` and
+`bba85da9` from `e80d9250`; the separate #192 suffix/history candidate is not
+included. Shared files retain clean component composition, with no merger
+runtime fixups. Source selection now admits the closed AudioFileSource/Source
+role union with independent class/catalog/direct-parent proof. The existing
+linkage disclosure still promises neither unlinking nor platform isolation.
+
+Root's original full Program on `e80d9250` ended **13,529 passed, 7 failed,
+4 skipped in 5,044.89s**. The seven repaired nodes separately passed in
+**8.74s**; the portable RTPC continuation follow-up passed **3 tests in 2.37s**,
+including a Windows-shaped envelope on macOS, not native Windows evidence.
+The original full result is retained and is not a final-candidate gate PASS.
+
+On 2025.1.7.9143 macOS Console, Source-plugin A→B selection on `d64e0db7`
+passed in **8.58s** (70 public calls, four previewed transactions, 170 native
+archives), with independent active GUID change and retained-state proof.
+Staged Voice creation then Source creation on its bound GUID on `1a1b3b03`
+passed in **6.10s** (33 calls, two transactions, 86 archives), diagnostic-only.
+Atomic planned Voice+Source language remains unresolved. The three original
+atomic Source failures remain FAIL, with quarantined sandboxes; neither these
+passes nor those failures grant whole-family, other-version or native-absence
+credit. Source hash/mtime/tree remained unchanged and no owned process remained.
+
+Four exact 2025 Media Pool return-option requirement rows retain both program
+and native requirements. No capture/index entry or new coverage credit is added;
+#195 population and missing native proof remain open. Four serial inventory
+commands passed once (16.605s / 16.775s / 23.544s / 22.241s). All 153 Registry
+machine seals, 272,313 native obligation rows and compressed obligation bytes
+remain exact; requirements digest/source candidate and only reviewed public
+contract references refresh. Source membership stays 79/91 indexed entries,
+with 330 files in candidate closure. Policy formatting is unchanged apart from
+the single approved operation-contract hash. No merger pytest/native/Fresh ran;
+Root owns promotion and the next gate. No ticket is closed by this integration.

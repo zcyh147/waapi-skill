@@ -5,6 +5,40 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R42 scoped Source selection and staged Voice integration
+
+Runtime merge `779823d3` combines accepted `8664cfb6`, `1a1b3b03` and
+`bba85da9` from `e80d9250`. The separate #192 suffix/history candidate is
+excluded. These original results are separate receipts, not a combined gate:
+
+| Candidate and lane | Original result | Scope |
+| --- | --- | --- |
+| `e80d9250`, full Program | **13,529 passed / 7 failed / 4 skipped, 5,044.89s** | Retained failed gate; no regrading |
+| `6f25cfd0`, seven selected repairs | **7 passed, 8.74s** | Only the original failed nodes |
+| `8664cfb6`, RTPC portability follow-up | **3 passed, 2.37s** | Windows-shaped continuation on macOS; no Windows host credit |
+| `d64e0db7`, 2025 Console Source-plugin selection | **1 passed, 8.58s** | 70 calls, four previewed transactions, 170 native archives; current-view A→B plus preservation |
+| `1a1b3b03`, 2025 Console staged Voice/Source | **1 passed, 6.10s** | Diagnostic-only; 33 calls, two transactions, 86 archives; atomic language unresolved |
+
+Exact native roots are `r42-source-selection-d64e0db7-2025-r2` and
+`r41-planned-source-staged-1a1b3b03-2025-r1` under Root's
+`.waapi-skill-state/full-coverage/`. The three original atomic Source r1/r2/r3
+failures remain FAIL with quarantined sandboxes. Source-plugin r1 stopped at a
+prerequisite before host launch and remains separate. Passing native runs kept
+source full hash/mtime/tree unchanged, left no owned process, and deleted only
+the passing sandbox. No family, other-version, native Windows or Fresh credit
+is inferred. Selected program chronology remains in
+`/tmp/waapi-r42-seven-program-repairs/handoff.md`.
+
+Four serial interface/branch generate/check commands passed once in
+**16.605s / 16.775s / 23.544s / 22.241s**. All 153 Registry machine seals and
+272,313 native obligation rows, including their compressed bytes, are exact.
+Only reviewed public disclosure references, the one operation aggregate seal,
+source/hash/line/candidate data and four exact requirement rows change.
+#195 adds requirements only, preserving program+native policy and historical
+entries; there is no capture/index entry or new PASS. Source membership remains
+79/91 indexed entries and full candidate closure 330 files. No merger pytest,
+native, Fresh or new final-candidate gate ran; Root owns promotion and validation.
+
 ## 2026-10-20 R41 scoped Source, active-selection and reimport integration
 
 Runtime merge `edbc24cb` combines accepted `aaa91777`, `8ec0925d` and `01a65041`
