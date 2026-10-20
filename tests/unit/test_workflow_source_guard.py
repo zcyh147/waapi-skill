@@ -4613,12 +4613,12 @@ def test_multisource_collector_requires_two_sources_exact_xml_active_guid_and_or
         assert receipt['oracle']['ordering_discrimination'] is False
 
 
-def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
+def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     """Public Gateway plus independently stored native constructor results."""
     from copy import deepcopy
     import uuid
     from tests.unit.test_sound_voice_creation_gateway import planned_source_task, SOURCE_CLASS, JAPANESE, SECOND
-    task = planned_source_task(tmp_path, '2025.1')
+    task = planned_source_task(tmp_path, version)
     captured = json.loads((Path(__file__).resolve().parents[1] / 'fixtures/metadata/tone-source-2025.1-properties.json').read_text())
     assert captured['type'] == {'classId': SOURCE_CLASS, 'name': 'Wwise Tone Generator', 'type': 'Source'}
     task.metadata.pop('Frequency')
@@ -4634,7 +4634,7 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
     if fault == 'two-locales':
         task.languages.append({'id': french, 'name': 'French', 'shortId': 4})
         language_objects.append({'id': french, 'name': 'French', 'type': 'Language', 'path': 'French'})
-    task.objects[SECOND]['path'] = r'\Containers\Default Work Unit'
+    task.objects[SECOND]['path'] = (r'\Containers' if version == '2025.1' else r'\Actor-Mixer Hierarchy') + r'\Default Work Unit'
     native = tmp_path / 'native'; native.mkdir()
     task.env['WWISE_EVIDENCE_DIR'] = str(native)
     task.env['WWISE_CATEGORY_EVIDENCE_PATH'] = str(tmp_path / 'category.jsonl')
@@ -4703,10 +4703,11 @@ def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
                 'classId': SOURCE_CLASS, 'path': task.objects[original_owner]['path'] + r'\Unexpected retained child',
                 'parent': {'id': original_owner}, 'notes': 'Unexpected'}
         if uri.endswith('getInfo'):
-            result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+            minor, build = {'2022.1': (19, 8584), '2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}[version]
+            result['version'].update(minor=minor, build=build, displayName=f'v{version}.{minor}.{build}')
         return result
     task.call = call
-    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+    runtime = SimpleNamespace(version=version, candidate='a' * 40, category_results=[],
         state_dir=tmp_path / 'state', env=task.env, port=31337,
         sandbox=SimpleNamespace(source_project=task.project_file),
         lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
@@ -4860,15 +4861,19 @@ def test_planned_source_collector_rejects_ignored_actual_start_frequency(tmp_pat
     assert receipt['native_evidence'] and receipt['failure']
 
 
-def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
+def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None, version='2025.1'):
     """Reuse the public workflow producer, with exact retained Tone metadata."""
     from copy import deepcopy
-    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, version=version)
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native-catalog.json').read_text())
     task.types = deepcopy(fixture['catalog']['return'])
     from tests.unit.test_sound_voice_creation_gateway import SECOND
     task.objects[SECOND]['classId'] = 1638416
     task.objects[SECOND]['parent'] = None
+    platform = {'id': '{C0C0C0C0-C0C0-C0C0-C0C0-C0C0C0C0C0C0}', 'name': 'Observed Target',
+        'type': 'Platform', 'classId': 4522000, 'path': r'\Platforms\Observed Target', 'parent': None, 'notes': ''}
+    if version == '2022.1':
+        task.objects[platform['id']] = deepcopy(platform)
     create = task._create
     def create_source(node, parent, *, owned=False):
         result = create(node, parent, owned=owned)
@@ -4900,6 +4905,9 @@ def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
             return {}
         previous = set(task.objects)
         result = original(uri, args, options)
+        if version == '2022.1' and uri.endswith('getProjectInfo'):
+            result['currentPlatformId'] = platform['id']
+            result['platforms'] = [{'id': platform['id'], 'name': platform['name'], 'baseName': 'Mac'}]
         if uri.endswith('object.set'):
             # Model the valid omitted shape after the producer's fake defaults.
             for identity in set(task.objects) - previous:
@@ -4929,6 +4937,26 @@ def test_source_plugin_selection_collector_requires_distinct_guid_change_and_pre
     for row in receipt['native_evidence']:
         raw = Path(row['archive_path']).read_bytes()
         assert raw == Path(row['native_path']).read_bytes() and hashlib.sha256(raw).hexdigest() == row['sha256']
+
+
+def test_source_plugin_explicit_current_platform_probe_retains_setup_and_prewrite_boundary(tmp_path, workflow):
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, version='2022.1')
+    with pytest.raises(AssertionError):
+        workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_EXPLICIT', explicit_current_platform=True)
+    receipt = json.loads((runtime.state_dir / 'source-plugin-selection.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['collection_complete'] is False
+    assert receipt['platform']['id'] == '{C0C0C0C0-C0C0-C0C0-C0C0-C0C0C0C0C0C0}'
+    assert receipt['platform']['name'] == 'Observed Target'
+    assert len(commands) < receipt['limits']['calls'] == 72
+    assert len(writes) == len(receipt['transaction_ids']) == 3 and selections == []
+    assert all(phase['verify']['payload']['state'] == 'verified' for phase in receipt['phases'][:-1])
+    assert receipt['phases'][-1] == {'phase': 'select_other_source', 'execution_attempted': False}
+    rejected = receipt['calls'][-1]
+    assert rejected['argv'][0] == 'draft-check'
+    assert rejected['exit_code'] != 0 and rejected['payload']['error_code'] == 'VERSION_BEHAVIOR_BOUNDARY'
+    assert len({argv[1] for argv in commands if argv[0] == 'execute'}) == 3
+    assert receipt['native_evidence'] and receipt['failure']
 
 
 @pytest.mark.parametrize('fault', ['ignored', 'source-field', 'extra-child'])
