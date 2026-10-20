@@ -339,11 +339,12 @@ def test_anonymous_constructor_revalidates_source_and_target_before_one_write(tm
     assert not writes
 
 
-def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, equivalent_view=None):
+def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, equivalent_view=None, view_drift=None):
     task = anonymous_task(tmp_path)
     windows = '{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}'
     reference_platform = ('Windows' if equivalent_view == 'name' else windows if equivalent_view == 'guid'
                           else 'Mac' if fault == 'other-platform' else None)
+    project_view = {'current': windows, 'name': 'Windows'}
     if equivalent_view is not None:
         original_project = task.call
         def project_call(uri, args=None, options=None):
@@ -355,8 +356,8 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, e
                     'defaultConversion': {'id': EFFECT_B, 'name': 'Default'},
                     'directories': {name: '/project/' + name for name in
                         ('root', 'cache', 'originals', 'soundBankOutputRoot', 'commands', 'properties')},
-                    'currentPlatformId': windows,
-                    'platforms': [{'id': windows, 'name': 'Windows', 'baseName': 'Windows',
+                    'currentPlatformId': project_view['current'],
+                    'platforms': [{'id': windows, 'name': project_view['name'], 'baseName': 'Windows',
                         'baseDisplayName': 'Windows', 'soundBankPath': '/project/SoundBanks', 'copiedMediaPath': '/project/Media'}]}
             return result
         task.call = project_call
@@ -442,7 +443,12 @@ def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None, e
     assert code == 2 and not writes, unauthorized
     code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
     assert code == 0, confirmed
+    if view_drift == 'current': project_view['current'] = EFFECT_PARENT
+    if view_drift == 'name': project_view['name'] = 'Renamed Windows'
     code, executed = task.run('execute', tx)
+    if view_drift is not None:
+        assert code == 2 and not writes and executed.get('executed') is not True, executed
+        return executed
     if code == 0:
         code, verified = task.run('verify', tx)
     else:
@@ -476,6 +482,12 @@ def test_append_reference_intent_uses_actual_effect_and_owned_result_association
 @pytest.mark.parametrize('view', ['name', 'guid'])
 def test_append_reference_equivalent_certified_view_matches_omitted_chain(tmp_path, view):
     _append_reference_edit_case(tmp_path, 'retarget', equivalent_view=view)
+
+
+
+@pytest.mark.parametrize('drift', ['name', 'current'])
+def test_append_reference_equivalent_view_drift_stops_before_one_write(tmp_path, drift):
+    _append_reference_edit_case(tmp_path, 'retarget', equivalent_view='name', view_drift=drift)
 
 def test_existing_nested_shareset_reference_uses_actual_parent_chain_not_constructor_destination(tmp_path):
     task = anonymous_task(tmp_path)

@@ -228,11 +228,16 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                 snapshot["after_changes"]["Render"] = change["after"]
         # Explicit changes to existing members are included in the same complete
         # chain proof. Native coupling is expected, never inferred as a pass.
+        reference_views = []
         for spec in specs:
-            if spec.get("platform") != members[0].get("platform"):
-                continue
             for snapshot in snapshots:
                 if r._same_identity(snapshot["object_id"], spec.get("preexisting_id", spec.get("target_id"))):
+                    intent_view, intent_platform = view_for(spec.get("platform"))
+                    if intent_platform != platform:
+                        continue
+                    if (spec.get("platform") != members[0].get("platform")
+                            and intent_view["status"] == "certified" and intent_view not in reference_views):
+                        reference_views.append(intent_view)
                     snapshot["after_changes"].update({prop["name"]: prop["value"] for prop in spec["properties"]})
                     references = snapshot.setdefault("reference_changes", {})
                     for reference in spec["references"]:
@@ -249,7 +254,8 @@ def prepare_graph(specs, native_nodes, *, version, read, root_parent=None, root_
                     spec["properties"].append({"name": name, "value": value, "metadata_type": "bool", "observed_class_default": True})
         chains.append({**planned, "authority": source_authority(version), "version": version, "platform": platform, "source": source,
             "field_read_platform": view, "owner_id": owner_id, "mode": mode, "before_order": [row["id"] for row in before],
-            "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets})
+            "metadata": metadata, "snapshots": snapshots, "slot_type": slot_types[0], "targets": targets,
+            "reference_view_proofs": reference_views})
     chains.extend(prepare_legacy(specs, native_nodes, version=version, read=read))
     return chains
 
@@ -398,6 +404,11 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
                 if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]]
             observed["slot_types"] = types
             passed = source_match and chain["authority"] == source_authority(chain["version"]) and types == [chain["slot_type"]]
+            from .edit_history_business import capture_field_read_platform
+            for proof in chain.get("reference_view_proofs", []):
+                actual_view = capture_field_read_platform(proof["version"], proof["selector"], read=read)
+                observed.setdefault("reference_views", []).append({"expected": proof, "actual": actual_view})
+                passed = passed and r._native_snapshot_equal(proof, actual_view)
             if not legacy and chain["owner_id"] and (not after_write or chain["mode"] == "existing"):
                 rows = r._read_object_list(chain["owner_id"], "Effects", fields=r.OBJECT_LIST_SNAPSHOT_FIELDS,
                     read=read, platform=chain["platform"], version=chain["version"])
