@@ -37,16 +37,31 @@ def test_default_index_selects_exact_five_version_metadata_defaults_without_live
     selected_ids = {row['id'] for row in selected}
     actual = [row for row in result['obligations'] if row['id'] in selected_ids]
     assert len(actual) == 65
-    assert {row['state'] for row in actual} == {'implemented_unverified'}
     for row in actual:
-        receipt = completion.read_sealed_artifact(bindings['bindings'][row['id']]['evidence']['program'], base)
-        expected = 'passed' if receipt['candidate_sha256'] == result['candidate_sha256'] else 'missing'
+        import hashlib
+        binding=bindings['bindings'][row['id']]
+        receipt = completion.read_sealed_artifact(binding['evidence']['program'], base)
+        current_sources=all(hashlib.sha256((audit.ROOT/name).read_bytes()).hexdigest()==value
+            for name,value in receipt['relevant_sources'].items())
+        expected = 'passed' if receipt['candidate_sha256'] == result['candidate_sha256'] and current_sources else 'missing'
         assert row['evidence_results']['program']['outcome'] == expected
-    assert {row['evidence_results']['live_metadata']['outcome'] for row in actual} == {'missing'}
+        native=row['evidence_results']['live_metadata']['outcome']
+        if 'live_metadata' not in binding['evidence']:
+            assert native=='missing'  # Assigned unobserved alternatives remain required.
+        else:
+            original=completion.read_sealed_artifact(binding['evidence']['live_metadata'],base)
+            assert original['evidence_kind'] in {'historical_metadata_current_program_replay',
+                'current_public_class_metadata','historical_class_metadata_current_program_replay'}
+            assert native in {'passed','missing'}  # Current source drift is honestly missing.
+        assert (row['state']=='verified') == (expected=='passed' and native=='passed')
     assert result['completion']['obligations'] == 272313
     assert result['completion']['complete'] is False
     unrelated = [row for row in result['obligations'] if row['id'] not in selected_ids]
-    assert not any(row['state'] == 'verified' for row in unrelated)
+    assert len(unrelated)==result['completion']['obligations']-len(selected)
+    for row in unrelated:
+        if row['state']=='verified':
+            assert row['id'] in bindings['bindings'] and all(
+                value['outcome']=='passed' for value in row['evidence_results'].values())
 
 
 @pytest.mark.parametrize('damage', ['missing-check', 'wrong-sibling', 'null-is-not-absence',

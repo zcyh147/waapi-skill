@@ -1,0 +1,207 @@
+{
+  "contract": "waapi-skill.test-native-source-owned-fields/v1",
+  "version": "2021.1.14.8108",
+  "source_candidate": "90c1089b77e9a9d5695224d312bff9a3ab8b5c18",
+  "source_observation": ".waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/bounded-observations.json",
+  "source_observation_sha256": "5eeb8fc8ca21fd935d350718c7c2bb1e971d7e9f04462f5bdfb03784d19131d2",
+  "roles": {
+    "rtpc": {
+      "class_id": 1441808,
+      "metadata": {
+        "Color": {
+          "name": "Color",
+          "type": "int16",
+          "default": 0,
+          "restriction": {
+            "type": "range",
+            "min": 0,
+            "max": 26
+          }
+        },
+        "ControlInput": {
+          "name": "ControlInput",
+          "type": "",
+          "default": null,
+          "restriction": {}
+        },
+        "OverrideColor": {
+          "name": "OverrideColor",
+          "type": "bool",
+          "default": false,
+          "restriction": {}
+        }
+      },
+      "fields": {
+        "Color": 0,
+        "OverrideColor": false
+      }
+    },
+    "control_input": {
+      "class_id": 4194320,
+      "metadata": {
+        "Color": {
+          "name": "Color",
+          "type": "int16",
+          "default": 0,
+          "restriction": {
+            "type": "range",
+            "min": 0,
+            "max": 26
+          }
+        },
+        "LfoAttack": {
+          "name": "LfoAttack",
+          "type": "Real64",
+          "default": 0.0,
+          "restriction": {
+            "type": "range",
+            "min": 0.0,
+            "max": 100000.0
+          }
+        },
+        "LfoDepth": {
+          "name": "LfoDepth",
+          "type": "Real64",
+          "default": 100.0,
+          "restriction": {
+            "type": "range",
+            "min": 0.0,
+            "max": 100.0
+          }
+        },
+        "LfoFrequency": {
+          "name": "LfoFrequency",
+          "type": "Real64",
+          "default": 1.0,
+          "restriction": {
+            "type": "range",
+            "min": 0.0,
+            "max": 20000.0
+          }
+        },
+        "LfoInitialPhase": {
+          "name": "LfoInitialPhase",
+          "type": "Real64",
+          "default": 0.0,
+          "restriction": {
+            "type": "range",
+            "min": -180.0,
+            "max": 180.0
+          }
+        },
+        "LfoPWM": {
+          "name": "LfoPWM",
+          "type": "Real64",
+          "default": 50.0,
+          "restriction": {
+            "type": "range",
+            "min": 0.0,
+            "max": 100.0
+          }
+        },
+        "LfoSmoothing": {
+          "name": "LfoSmoothing",
+          "type": "Real64",
+          "default": 0.0,
+          "restriction": {
+            "type": "range",
+            "min": 0.0,
+            "max": 100.0
+          }
+        },
+        "LfoWaveform": {
+          "name": "LfoWaveform",
+          "type": "int32",
+          "default": 0,
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Sine",
+                "value": 0
+              },
+              {
+                "displayName": "Triangle",
+                "value": 1
+              },
+              {
+                "displayName": "Square",
+                "value": 2
+              },
+              {
+                "displayName": "Saw up",
+                "value": 3
+              },
+              {
+                "displayName": "Saw down",
+                "value": 4
+              },
+              {
+                "displayName": "Random",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "ModulatorScope": {
+          "name": "ModulatorScope",
+          "type": "int32",
+          "default": 1,
+          "restriction": {
+            "type": "enum",
+            "values": [
+              {
+                "displayName": "Voice",
+                "value": 0
+              },
+              {
+                "displayName": "Note or Event",
+                "value": 1
+              },
+              {
+                "displayName": "Game Object",
+                "value": 2
+              },
+              {
+                "displayName": "Global",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "OverrideColor": {
+          "name": "OverrideColor",
+          "type": "bool",
+          "default": false,
+          "restriction": {}
+        }
+      },
+      "fields": {
+        "Color": 0,
+        "LfoAttack": 2.0,
+        "LfoDepth": 90.0,
+        "LfoFrequency": 4.0,
+        "LfoInitialPhase": 0.0,
+        "LfoPWM": 50.0,
+        "LfoSmoothing": 5.0,
+        "LfoWaveform": 2,
+        "ModulatorScope": 1,
+        "OverrideColor": false
+      }
+    },
+    "curve": {
+      "class_id": 917520,
+      "metadata": {
+        "Flags": {
+          "name": "Flags",
+          "type": "int32",
+          "default": 0,
+          "restriction": {}
+        }
+      },
+      "fields": {
+        "Flags": 3
+      }
+    }
+  }
+}

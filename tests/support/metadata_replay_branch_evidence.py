@@ -17,6 +17,137 @@ OBJECT = '{CE99046D-D354-422D-A7BB-F1305FF00B2F}'
 URI = 'ak.wwise.core.object.getPropertyInfo'
 NODE = 'tests/unit/test_metadata_discovery_gateway.py::test_original_r51_metadata_default_replays_through_current_public_gateway'
 CASES = {'Color': 'Color-0', 'ControlInput': 'ControlInput-None', 'OverrideColor': 'OverrideColor-False'}
+R54_ORIGINAL = '8a8d5f8e006fd56dd5c78ebe6429ee24450abf26'
+R54_SOURCE_MAP_SHA256 = 'd747725b40ad86c1c7fbaa515f441b7b3b8137b6845faf0983a1282783d9a929'
+R54_NODE = 'tests/unit/test_metadata_discovery_gateway.py::test_original_r54_class_metadata_replays_through_current_public_gateway'
+
+
+def r54_original_reads(index_path=None):
+    """Existing portable originals; historical absolute locations are opaque."""
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.maintenance.collect_class_metadata import metadata_descriptors
+    path=Path(index_path) if index_path else audit.ROOT/'docs/branch-coverage-evidence-index.json'
+    index=audit.load(path);base=(path.parent/index['base']).resolve();roots={}
+    for desc in index.get('metadata_attachments',[]):
+        item=completion.read_sealed_artifact(desc,base)
+        if item['contract'] != 'waapi-skill.class-metadata-attachment/v1':continue
+        record=completion.read_sealed_artifact(item['evidence'],base)
+        original=deepcopy(record['metadata_run']);root=(base/original['root']).resolve()
+        # The accepted index -> attachment -> record -> seal chain owns these
+        # original bytes. Never replace its hash with one computed from disk.
+        seal=completion.read_sealed_artifact(original['seal'],base)
+        plan_entry,=[entry for entry in seal['files'] if entry['path']=='plan.json']
+        raw=(root/'plan.json').read_bytes()
+        if len(raw)!=plan_entry['bytes'] or hashlib.sha256(raw).hexdigest()!=plan_entry['sha256']:
+            raise ValueError('Original index-bound plan seal changed')
+        plan=json.loads(raw)
+        if plan['repositories'][0]['commit']!=R54_ORIGINAL or plan.get('cohort','r54')!='r54':continue
+        original['root']=str(root)
+        original['seal']['artifact']=str((base/original['seal']['artifact']).resolve())
+        if root in roots:
+            if original['seal']!=roots[root]['seal']:raise ValueError('Conflicting original index-bound seal')
+        else:
+            completion.read_metadata_run(original,base,historical_class=True)
+            roots[root]=original
+    originals={}
+    for root,original in sorted(roots.items()):
+        for case,descriptor in metadata_descriptors(root).items():
+            descriptor['seal']=deepcopy(original['seal'])
+            originals[case]=descriptor
+    if len(originals)!=16:raise ValueError('Complete sixteen original R54 class reads required')
+    return originals
+
+
+def validate_r54_original_sources(candidate,sources):
+    """Independent original map seal prevents silently omitting dependencies."""
+    digest=hashlib.sha256(json.dumps(sources,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    if (candidate != R54_ORIGINAL or len(sources)!=560 or digest!=R54_SOURCE_MAP_SHA256
+            or git_source_seals(R54_ORIGINAL,sources)!=sources):
+        raise ValueError('Exact full original R54 Git/source map changed')
+
+
+def r54_replay_case(case,descriptor=None,*,base=None):
+    """Raw original response objects only, never normalized public reconstruction."""
+    from tests.maintenance import branch_audit_completion as completion
+    base=Path(base) if base else audit.ROOT
+    descriptor=deepcopy(descriptor or r54_original_reads()[case])
+    context=completion.read_metadata_run(descriptor,base,historical_class=True)
+    if case!='|'.join((context['version'],context['class_name'],context['field'])):
+        raise ValueError('Exact original R54 class/field occurrence changed')
+    root=Path(descriptor['root']);root=root if root.is_absolute() else base/root
+    seal=completion.read_sealed_artifact(descriptor['seal'],base)
+    entries={row['path']:row for row in seal['files']}
+    def read(name):
+        raw=(root/name).read_bytes();entry=entries[name]
+        if len(raw)!=entry['bytes'] or hashlib.sha256(raw).hexdigest()!=entry['sha256']:
+            raise ValueError('Original R54 replay dependency digest/size changed')
+        return json.loads(raw)
+    target=read('targets.json')[descriptor['target_index']]
+    listed=read(target['list_receipt']+'.stdout')
+    name_dispatch,=[row for row in listed['calls'] if row['api']=='ak.wwise.core.object.getPropertyAndReferenceNames']
+    packets={};hashes={}
+    for name in entries:
+        if not name.startswith('dispatcher-evidence/'):continue
+        packet=read(name);api=packet['api']
+        if api not in {'ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo','ak.wwise.core.object.get',
+                'ak.wwise.core.object.getTypes','ak.wwise.core.object.getPropertyAndReferenceNames'}:continue
+        if api=='ak.wwise.core.object.getPropertyAndReferenceNames' and packet['evidence_path']!=name_dispatch['evidence_path']:continue
+        if api not in packets:
+            packets[api]=packet;hashes[api]=entries[name]['sha256']
+    if ('ak.wwise.core.getInfo' not in packets or 'ak.wwise.core.object.getTypes' not in packets
+            or 'ak.wwise.core.object.getPropertyAndReferenceNames' not in packets
+            or context['field'] not in packets['ak.wwise.core.object.getPropertyAndReferenceNames']['result']['return']):
+        raise ValueError('Original raw host/class/field replay inputs missing')
+    return {'context':context,'packets':packets,'packet_sha256s':hashes,'descriptor':descriptor}
+
+
+def r54_current_sources():
+    from tests.maintenance.collect_class_metadata import source_links,collection_source_map,REPO
+    return collection_source_map(source_links('',{})[1],REPO)
+
+
+def make_r54_replay_receipt(capture,case,observed,reports):
+    from tests.support.metadata_read_branch_evidence import _witness
+    outcome='PASS' if all(reports.get(p)=='passed' for p in ('setup','call','teardown')) else 'FAIL'
+    record={'candidate_sha256':capture['candidate_sha256'],'scope_kind':capture.get('scope_kind','product'),
+        'evidence_kind':'injected_client_program','git_candidate':capture['git_candidate'],
+        'relevant_sources':deepcopy(capture['relevant_sources']),
+        'invocation':{'phase':'final','outcome':outcome,'node_outcomes':[{'nodeid':R54_NODE+'['+case+']','outcome':outcome}]},
+        **deepcopy(observed),'branch_assertions':{}}
+    bindings={}
+    for branch in capture['branches']:
+        if branch['id'] not in capture['case_branch_ids'][case]:continue
+        witness=_witness(branch,observed['native_call']['result'],capture['edges'])
+        if witness is None:raise ValueError('Current replay did not observe original R54 leaf')
+        public=witness['observation_pointer'].replace('/native_call/result','/gateway/payload/agent_result/metadata',1)
+        record['branch_assertions'][branch['id']]={'native_shape_sha256':branch['shape_sha256'],'native_route':branch['route'],
+            'checks':[witness['check'],{**witness['check'],'pointer':public},
+                {'pointer':'/gateway/payload/agent_result','equals':deepcopy(observed['gateway']['payload']['agent_result'])}]}
+        bindings[branch['id']]={'branch_id':branch['id'],'native_shape_sha256':branch['shape_sha256'],
+            'input':{'gateway_argv':deepcopy(observed['gateway']['argv']),'selector':'original_R54_class_field_replay'},
+            'dispatch_pointer':'/native_call','observation_pointer':witness['observation_pointer'],
+            'gateway_observation_pointer':public,'reference_chain':witness['reference_chain']}
+    return record,bindings
+
+
+def make_r54_attachment_record(capture,case,replay_descriptor,replay_record,replay_bindings,*,base):
+    from tests.maintenance import branch_audit_completion as completion
+    context=completion.read_metadata_run(capture['originals'][case],base,historical_class=True)
+    record={'candidate_sha256':capture['candidate_sha256'],'scope_kind':capture.get('scope_kind','product'),
+        'evidence_kind':'historical_class_metadata_current_program_replay','metadata_run':deepcopy(capture['originals'][case]),
+        'invocation':deepcopy(replay_record['invocation']),'replay':deepcopy(replay_descriptor),
+        'replay_bindings':deepcopy(replay_bindings),'source_bridge':{'contract':'waapi-skill.r54-class-metadata-leaf-replay/v1',
+            'attribution':'historical_native_current_program_not_current_native','historical_candidate':R54_ORIGINAL,
+            'historical_sources':deepcopy(capture['historical_sources']),'current_sources':deepcopy(capture['relevant_sources']),
+            'changed_files':source_changes(capture['historical_sources'],capture['relevant_sources'])},
+        'branch_assertions':{},'category_inputs':{'historical':context['gateway']['argv'],'replay':replay_record['gateway']['argv']}}
+    for branch in capture['branches']:
+        if branch['id'] not in replay_bindings:continue
+        record['branch_assertions'][branch['id']]={'native_shape_sha256':branch['shape_sha256'],'native_route':branch['route'],
+            'checks':[{'pointer':replay_bindings[branch['id']]['gateway_observation_pointer'],
+                'equals':deepcopy(context['native_result']['default'])},
+                {'pointer':'/gateway/payload/agent_result','equals':deepcopy(context['gateway']['payload']['agent_result'])}]}
+    return record
 
 
 def replay_case(field):
@@ -139,9 +270,10 @@ def git_source_seals(candidate, names):
 
 def historical_sources():
     names = metadata_source_seals()
-    # This explicitly reviewed Source-copy module did not exist in R51. Keep
-    # its absence in source_changes(before, current); never invent an old hash.
-    names.pop('skills/waapi-skill/wwise_waapi/source_copy_observations.py',None)
+    # These exact reviewed Source-copy modules did not exist in R51. Keep
+    # both explicit absences in source_changes; never invent historical hashes.
+    for name in ('source_copy_observations.py','source_copy_proof.py'):
+        names.pop('skills/waapi-skill/wwise_waapi/'+name,None)
     return git_source_seals(ORIGINAL, names)
 
 def source_changes(before, after):
@@ -286,3 +418,84 @@ def finish_capture(capture, reports, observed):
     _write(dest/'capture.json',{'outcome':replay['invocation']['outcome'],'source_unchanged':unchanged,
         'phase_reports':reports,'observed_branch_ids':sorted(bindings),
         'attribution':'historical_native_current_program_not_current_native'})
+
+
+
+def r54_case_assignments(branches,edges,contexts):
+    from tests.support.metadata_read_branch_evidence import _witness
+    used=set();owners={}
+    for case,context in contexts.items():
+        owned=[r['id'] for r in branches if r['id'] not in used and r['route'].split('|')[0]==context['version']
+            and _witness(r,context['native_result'],edges) is not None]
+        owners[case]=owned;used.update(owned)
+    if used!={r['id'] for r in branches}:raise ValueError('Original R54 facts do not witness all exact assigned leaves')
+    return owners
+
+
+def prepare_r54_capture(root):
+    """After source review: existing finalizer/context transport, sixteen public nodes."""
+    import subprocess,shutil,gzip
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.maintenance.collect_class_metadata import collection_plan
+    from tests.support.media_pool_branch_evidence import _git_candidate,_write
+    if subprocess.check_output(['git','status','--porcelain'],cwd=audit.ROOT,text=True).strip():
+        raise ValueError('Current R54 replay requires a clean source pin')
+    root=Path(root).resolve();root.mkdir(parents=True,exist_ok=False)
+    inventory=audit.build_inventory();source_originals=r54_original_reads();originals={};contexts={}
+    copied={}
+    for case,descriptor in source_originals.items():
+        context=completion.read_metadata_run(descriptor,audit.ROOT,historical_class=True);contexts[case]=context
+        original_root=Path(descriptor['root'])
+        if original_root not in copied:
+            dest=root/'originals'/original_root.name;dest.mkdir(parents=True,exist_ok=False)
+            seal=completion.read_sealed_artifact(descriptor['seal'],audit.ROOT)
+            for entry in seal['files']:
+                path=original_root/entry['path'];raw=path.read_bytes()
+                if len(raw)!=entry['bytes'] or hashlib.sha256(raw).hexdigest()!=entry['sha256']:
+                    raise ValueError('Original R54 archive changed before replay preparation')
+                target=dest/entry['path'];target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,target)
+            shutil.copyfile(original_root/'evidence-seal.json',dest/'evidence-seal.json');copied[original_root]=dest
+        item=deepcopy(descriptor);item['root']=root.name+'/originals/'+original_root.name
+        item['seal']['artifact']=item['root']+'/evidence-seal.json';originals[case]=item
+    assigned=set().union(*(set(collection_plan(v)['eligible_branch_ids']) for v in ('2021.1','2022.1','2023.1','2024.1','2025.1')))
+    branches=[r for r in inventory['native_coverage']['obligations'] if r['id'] in assigned]
+    if len(branches)!=41:raise ValueError('Original41 R54 requirements changed')
+    edges={r['id']:r for r in inventory['native_coverage']['obligations'] if r['kind']=='reference'}
+    owners=r54_case_assignments(branches,edges,contexts)
+    context={'contract':'waapi-skill.r54-metadata-replay-context/v1','root':str(root),
+        'candidate_sha256':inventory['native_coverage']['candidate_sha256'],'git_candidate':_git_candidate(),
+        'relevant_sources':r54_current_sources(),'historical_sources':next(iter(contexts.values()))['relevant_sources'],
+        'originals':originals,'case_branch_ids':owners,'branches':branches,'edges':edges}
+    with gzip.open(root/'frozen-inventory.json.gz','wt',encoding='utf-8') as stream:json.dump(inventory,stream)
+    _write(root/'context.json',context);return root/'context.json'
+
+
+def load_r54_capture(path,nodeid,case):
+    from tests.support.media_pool_branch_evidence import _git_candidate
+    capture=json.loads(Path(path).read_bytes())
+    if (capture['contract']!='waapi-skill.r54-metadata-replay-context/v1' or case not in capture['originals']
+            or nodeid!=R54_NODE+'['+case+']' or capture['git_candidate']!=_git_candidate()
+            or capture['relevant_sources']!=r54_current_sources()):
+        raise ValueError('Current R54 public replay source/node changed')
+    validate_r54_original_sources(R54_ORIGINAL,capture['historical_sources'])
+    return capture
+
+
+def finish_r54_capture(capture,reports,case,observed):
+    from tests.support.media_pool_branch_evidence import _git_candidate,_write
+    root=Path(capture['root']);unchanged=capture['git_candidate']==_git_candidate() and capture['relevant_sources']==r54_current_sources()
+    program,bindings=make_r54_replay_receipt(capture,case,observed,reports if unchanged else {})
+    dest=root/('case-'+str(list(capture['originals']).index(case)));dest.mkdir(exist_ok=False)
+    descriptor=_write(dest/'program.json',program);descriptor.update(artifact=root.name+'/'+dest.name+'/program.json',nodeid=R54_NODE+'['+case+']')
+    record=make_r54_attachment_record(capture,case,descriptor,program,bindings,base=root.parent)
+    evidence=_write(dest/'live-metadata.json',record);evidence.update(artifact=root.name+'/'+dest.name+'/live-metadata.json',nodeid=descriptor['nodeid'])
+    attachments=[]
+    for branch in capture['branches']:
+        if branch['id'] not in bindings:continue
+        item={'contract':'waapi-skill.class-metadata-attachment/v1','branch_id':branch['id'],
+            'native_shape_sha256':branch['shape_sha256'],'category_inputs':record['category_inputs'],'evidence':evidence}
+        desc=_write(dest/('attachment-'+str(len(attachments))+'.json'),item)
+        desc['artifact']=root.name+'/'+dest.name+'/'+Path(desc['artifact']).name;attachments.append(desc)
+    _write(dest/'attachments.json',{'metadata_attachments':attachments})
+    _write(dest/'capture.json',{'outcome':program['invocation']['outcome'],'source_unchanged':unchanged,
+        'phase_reports':reports,'observed_branch_ids':sorted(bindings),'attribution':'historical_native_current_program_not_current_native'})

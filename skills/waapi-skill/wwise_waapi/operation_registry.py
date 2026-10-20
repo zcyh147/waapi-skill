@@ -10771,7 +10771,7 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     return scopes
 
 
-def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None) -> PreparedOperation:
+def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None, copy_proof_context=None) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
     spec = describe_operation(request.operation)
@@ -11553,6 +11553,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             metadata["source_copy_observation"] = snapshot
             verification["source_copy_live_fields"] = True
             verification["verification_scope"] = source_copy_scope(snapshot)
+            if copy_proof_context is not None:
+                from .source_copy_proof import KEY, capture_baseline, baseline_summary
+                saved = ({'status': 'unavailable', 'reason': 'replace_saved_graph_preservation_unfinished'}
+                    if conflict == 'replace' else capture_baseline(copy_proof_context, snapshot, read))
+                metadata[KEY] = saved
+                verification[KEY] = baseline_summary(saved)
         cleanup = {
             "kind": "delete-created-copy" if request.operation == "object.copy" else "move-back-to-original-parent",
             "source_snapshot": dict(source.row),
@@ -11805,6 +11811,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         metadata["voice_source_staging"] = prepare_staging(arguments["voice_source_staging"], read)
         preview = replace(preview, evidence_plan=(*preview.evidence_plan,
             {"staged_completion": staging_projection(arguments["voice_source_staging"])}))
+    if isinstance(copy_proof_context, Mapping) and copy_proof_context.get('save_origin') is not None:
+        from .source_copy_proof import ORIGIN, SAVE, revalidate_origin
+        origin = copy_proof_context['save_origin']
+        if request.operation != 'waapi.call' or request.arguments != {'api': SAVE, 'args': {}, 'options': {}}:
+            raise OperationContractError('INVALID_SOURCE_COPY_SAVE', 'Generated Save cannot alter the fixed versioned request')
+        revalidate_origin(origin, copy_proof_context, read=read)
+        metadata[ORIGIN] = origin
     return PreparedOperation(
         request=request,
         semantic_preview=preview,
@@ -16010,11 +16023,15 @@ def _prepare_switch_assignment(
     return preview, roles, state, verification, cleanup
 
 
-def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall, history_resolver=None) -> Mapping[str, Any]:
+def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall, history_resolver=None, copy_proof_context=None) -> Mapping[str, Any]:
     """Re-read every canonical role and prove it still matches the preview snapshot."""
 
     if prepared.get("contract") != PREPARED_OPERATION_CONTRACT:
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation contract is missing or unsupported.")
+    from .source_copy_proof import ORIGIN, revalidate_origin
+    save_origin = prepared.get('pre_state', {}).get(ORIGIN)
+    if save_origin is not None:
+        revalidate_origin(save_origin, copy_proof_context, read=read_call)
     operation = prepared.get("operation")
     roles = prepared.get("resolved_roles")
     if not isinstance(operation, str) or not isinstance(roles, Mapping):
@@ -16870,6 +16887,17 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             observed = {"error": str(exc)}
         assertions.append({"name": "Source-copy fields and owner frames are unchanged before execution",
             "passed": lifecycle_snapshot_equal(observed, source_copy_before)})
+
+    from .source_copy_proof import KEY, validate_baseline
+    saved_baseline = pre_state.get(KEY) if isinstance(pre_state, Mapping) else None
+    if isinstance(saved_baseline, Mapping) and saved_baseline.get('status') == 'ready':
+        try:
+            validate_baseline(saved_baseline, copy_proof_context, read_call)
+            passed, message = True, None
+        except Exception as exc:
+            passed, message = False, str(exc)
+        assertions.append({'name': 'Saved-copy baseline authority remains clean and unchanged', 'passed': passed,
+            'evidence': {'message': message}})
 
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
     if isinstance(linked_before, Mapping):

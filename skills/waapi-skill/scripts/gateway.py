@@ -3246,6 +3246,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     staged_source = subparsers.add_parser("continue-voice-source", help="Continue one verified staged Voice with its sealed Source intent")
     staged_source.add_argument("transaction_id")
+    copy_proof = subparsers.add_parser('continue-source-copy-proof', help='Continue optional operation-owned saved Source preservation')
+    copy_proof.add_argument('owner_id')
+    copy_proof.add_argument('--task-authority')
+    copy_proof.add_argument('--expected-revision', type=int)
+    copy_proof.add_argument('--decline-save', action='store_true')
     preview_from_draft = subparsers.add_parser(
         "preview-from-draft",
         help=(
@@ -14329,6 +14334,9 @@ def dispatch_command(
     if args.command == "continue-voice-source":
         return dispatch_voice_source_continuation(args, env=env, connection=connection,
             detected_version=detected_version, live_info=live_info, dispatcher=dispatcher, common=common)
+    if args.command == 'continue-source-copy-proof':
+        return dispatch_source_copy_proof(args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher, common=common)
     if args.command == "draft-check":
         # One domain continuation; native writes still use ordinary Previews.
         return dispatch_operation_draft_check(
@@ -16843,6 +16851,161 @@ def dispatch_voice_source_continuation(args, *, env, connection, detected_versio
     return payload
 
 
+def dispatch_source_copy_proof(args, *, env, connection, detected_version, live_info, dispatcher, common):
+    try:
+        return _dispatch_source_copy_proof(args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher, common=common)
+    except TransactionExecutionInProgress:
+        return {'ok': False, 'status': 'execution_in_progress', **common,
+            'transaction_id': args.owner_id, 'error_code': 'TRANSACTION_EXECUTION_IN_PROGRESS',
+            'message': 'The copy/Save flow is executing; refusal has not been recorded.', 'automatic_retry': False}
+
+
+def _dispatch_source_copy_proof(args, *, env, connection, detected_version, live_info, dispatcher, common):
+    from wwise_waapi.source_copy_proof import ORIGIN, SAVE, final_origin, revalidate_origin
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    transactions = TransactionStore(state_dir)
+    if args.owner_id.startswith('od1-'):
+        return _dispatch_source_copy_baseline(args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher, common=common, state_dir=state_dir)
+    with transactions.execution_lease(args.owner_id):
+        parent = transactions.load_snapshot(args.owner_id)
+        project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+        guard = build_project_guard(endpoint=common['endpoint'], version=detected_version, live_info=live_info, project=project)
+        context = source_copy_proof_context(env=env, project_guard=guard, state_dir=state_dir)
+        origin = final_origin(parent)
+        if args.decline_save:
+            from wwise_waapi.source_copy_proof import unexecuted_child
+            refused_child = unexecuted_child(origin, context)
+            verify_args = argparse.Namespace(**vars(args))
+            verify_args.command, verify_args.transaction_id = 'verify', args.owner_id
+            verify_args.source_copy_decline = refused_child
+            return _dispatch_transaction_command_with_execution_lease(verify_args, env=env, connection=connection,
+                detected_version=detected_version, live_info=live_info, dispatcher=dispatcher, common=common, store=transactions)
+        revalidate_origin(origin, context, before_write=False)
+        store = OperationDraftStore(state_dir)
+        try:
+            child = store.inspect_source_copy_child(origin, include_expired=True)
+        except OperationDraftNotAvailable:
+            child = None
+        if child is not None:
+            return _source_copy_child_payload(args, child, origin, state_dir=state_dir, common=common,
+                detected_version=detected_version, store=store, project=project, live_info=live_info)
+        started = store.start(operation=SAVE, version=detected_version,
+            schema_digest=operation_draft_schema_digest(SAVE, detected_version),
+            composer_digest=operation_composer_digest(SAVE, detected_version),
+            connection_binding={'configuration': selected_connection_binding(env),
+                'live': {'version': dict(live_info['version']), 'project_id': project['id']}},
+            source_copy_save_origin=origin)
+        return _source_copy_child_payload(args, started.record, origin, state_dir=state_dir, common=common,
+            detected_version=detected_version, store=store, project=project, live_info=live_info)
+
+
+def _dispatch_source_copy_baseline(args, *, env, connection, detected_version, live_info, dispatcher, common, state_dir):
+    from wwise_waapi.source_copy_proof import (ORIGIN, RETURN, SAVE, CHILD_PREFIX, KEY, require,
+        baseline_origin, child_capability, resolve_save_receipt, validate_return)
+    store = OperationDraftStore(state_dir)
+    project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+    guard = build_project_guard(endpoint=common['endpoint'], version=detected_version, live_info=live_info, project=project)
+    context = source_copy_proof_context(env=env, project_guard=guard, state_dir=state_dir)
+    if args.owner_id.startswith(CHILD_PREFIX):
+        # This child capability is deterministic only from its durable origin;
+        # the parent token stays private until a successful parent CAS.
+        child = store.load_source_copy_return_child(args.owner_id)
+        origin = child.composition[ORIGIN]
+        require(origin['context'] == context['binding'], 'Baseline receipt context changed')
+        receipt = resolve_save_receipt(origin, context, child=child)
+        require(receipt is not None, 'Baseline Save has not completed its normal verification')
+        started = store.bind_source_copy_decision(origin, receipt=receipt)
+        parent = started.record
+        payload = operation_draft_payload(args.command, parent, offline=False, state_dir=args.state_dir)
+        payload['next_command'] = transaction_next_command('draft-check', ['draft-check', parent.draft_id,
+            '--task-authority', started.task_authority, '--expected-revision', str(parent.revision)], state_dir=args.state_dir)
+        return payload
+    parent = store.inspect(args.owner_id, task_authority=args.task_authority)
+    require(parent.revision == args.expected_revision, 'Baseline parent revision changed')
+    materialized = store.materialize_request(parent.draft_id, task_authority=args.task_authority,
+        expected_revision=args.expected_revision, schema_digest=operation_draft_schema_digest(parent.operation, detected_version),
+        composer_digest=operation_composer_digest(parent.operation, detected_version))
+    origin = baseline_origin(parent, materialized.request_digest, context)
+    if not args.decline_save:
+        try:
+            child = store.inspect_source_copy_child(origin, include_expired=True)
+        except OperationDraftNotAvailable:
+            child = None
+        if child is not None:
+            return _source_copy_child_payload(args, child, origin, state_dir=state_dir, common=common,
+                detected_version=detected_version, store=store, project=project, live_info=live_info)
+    observed = build_transaction_preview_artifact(materialized.request, live_version=detected_version,
+        read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version), project_guard=guard,
+        copy_proof_context=source_copy_proof_context(env=env, project_guard=guard, state_dir=state_dir, draft=parent),
+        skill_root=SKILL_ROOT, ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS).as_dict()['prepared_operation']
+    require(observed['pre_state'].get(KEY, {}).get('status') == 'baseline_save_pending'
+        and canonical_sha256(observed) == parent.check['prepared_digest'], 'Checked dirty baseline state changed; check the parent Draft again')
+    if args.decline_save:
+        started = store.bind_source_copy_decision(origin, task_authority=args.task_authority, expected_revision=args.expected_revision)
+        payload = operation_draft_payload(args.command, started.record, offline=False, state_dir=args.state_dir)
+        payload['next_command'] = transaction_next_command('draft-check', ['draft-check', parent.draft_id,
+            '--task-authority', args.task_authority, '--expected-revision', str(started.record.revision)], state_dir=args.state_dir)
+        return payload
+    envelope = {'draft_id': parent.draft_id, 'task_authority': args.task_authority,
+        'source_revision': parent.revision, 'origin_digest': canonical_sha256(origin)}
+    started = store.start(operation=SAVE, version=detected_version,
+        schema_digest=operation_draft_schema_digest(SAVE, detected_version), composer_digest=operation_composer_digest(SAVE, detected_version),
+        connection_binding={'configuration': selected_connection_binding(env),
+            'live': {'version': dict(live_info['version']), 'project_id': project['id']}},
+        source_copy_save_origin=origin, source_copy_parent_return=envelope)
+    return _source_copy_child_payload(args, started.record, origin, state_dir=state_dir, common=common,
+        detected_version=detected_version, store=store, project=project, live_info=live_info)
+
+
+def _source_copy_child_payload(args, child, origin, *, state_dir, common, detected_version, store, project, live_info):
+    from wwise_waapi.source_copy_proof import child_capability
+    _, token = child_capability(origin)
+    if child.state is OperationDraftState.EDITABLE and child.composition.get('business_session') is None:
+        business_context = _business_context_from_live(task_authority=token, project=project,
+            detected_version=detected_version, live_info=live_info)
+        child = store.apply_business_update(child.draft_id, task_authority=token, expected_revision=child.revision,
+            schema_digest=child.schema_digest, composer_digest=child.composer_digest, context=business_context,
+            update=lambda session: session.with_settings({'core_plan': {}}), event_type='settings.revised')
+    payload = operation_draft_payload(args.command, child, offline=False, state_dir=args.state_dir, task_authority=token)
+    payload.update(task_authority=token, endpoint=dict(common['endpoint']), detected_version=detected_version)
+    if child.state is OperationDraftState.EDITABLE:
+        command = ['draft-check', child.draft_id, '--task-authority', token, '--expected-revision', str(child.revision)]
+    elif child.seal is not None:
+        saved = TransactionStore(state_dir).load_snapshot(child.seal['transaction_id'])
+        if saved.record.state in {TransactionState.RESULT_SCHEMA_CHECKED, TransactionState.VERIFIED}:
+            command = (['verify', origin['parent']['transaction_id']] if origin['stage'] == 'final'
+                else ['continue-source-copy-proof', child.draft_id])
+        elif saved.record.state is TransactionState.EXECUTED_UNVERIFIED:
+            command = ['verify', saved.record.transaction_id]
+        else:
+            command = ['transaction-show', saved.record.transaction_id, '--summary-only']
+    else:
+        command = None
+    if command is not None:
+        payload['next_command'] = transaction_next_command(command[0], command, state_dir=args.state_dir)
+    payload['source_copy_saved_proof'] = {'stage': origin['stage'],
+        'parent': {key: value for key, value in origin['parent'].items() if key in {'draft_id', 'transaction_id'}},
+        'save_notice': 'Save persists all pending changes in the current project, including changes outside this copy.',
+        'complete_copy_preservation': False, 'automatic_retry': False}
+    return payload
+
+
+def source_copy_proof_context(*, env, project_guard, state_dir, draft=None, args=None):
+    if draft is None and args is not None and getattr(args, "draft_id", None):
+        draft = OperationDraftStore(state_dir).inspect(args.draft_id, task_authority=args.task_authority)
+    if draft is not None and draft.operation not in {'object.copy', 'ak.wwise.core.project.save'}:
+        draft = None
+    return {'project_guard': dict(project_guard), 'state_dir': Path(state_dir),
+        'binding': {'project_guard': dict(project_guard), 'connection_configuration': selected_connection_binding(env)},
+        **({'save_origin': draft.composition.get('source_copy_save_origin'), 'draft': draft,
+            'proof_decision': draft.composition.get('source_copy_proof_decision'),
+            'request_digest': canonical_sha256(business_adapter(draft.operation).materialize(
+                BusinessDeclarationSession.from_dict(draft.composition['business_session']), history_state_dir=state_dir))
+                if draft.composition.get('business_session') is not None else None} if draft is not None else {})}
+
+
 def dispatch_operation_draft_check(
     args: argparse.Namespace,
     *,
@@ -17144,6 +17307,7 @@ def dispatch_operation_draft_check(
         read_call=read_call,
         project_guard=project_guard,
         history_resolver=gateway_history_resolver(TransactionStore(state_dir), project_guard),
+        copy_proof_context=source_copy_proof_context(env=env, project_guard=project_guard, state_dir=state_dir, draft=materialized.record),
         skill_root=SKILL_ROOT,
         ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS,
     ).as_dict()
@@ -17185,6 +17349,9 @@ def dispatch_operation_draft_check(
         project_guard=project_guard,
         runtime_guard_fingerprint=runtime_fingerprint,
         prepared_digest=canonical_sha256(prepared),
+        source_copy_file_binding=(
+            {key: prepared['pre_state']['source_copy_saved_proof'][key] for key in ('source_id', 'destination_id', 'authority', 'files')}
+            if prepared.get('pre_state', {}).get('source_copy_saved_proof', {}).get('status') == 'baseline_save_pending' else None),
         business_preview=(
             None if compiled_business is None else compiled_business.preview
         ),
@@ -17230,6 +17397,13 @@ def dispatch_operation_draft_check(
         preview_arguments,
         state_dir=args.state_dir,
     )
+    saved_baseline = prepared.get('pre_state', {}).get('source_copy_saved_proof', {})
+    if saved_baseline.get('status') == 'baseline_save_pending':
+        payload['source_copy_saved_proof'] = {'status': 'baseline_save_pending', 'complete_copy_preservation': False,
+            'save_notice': 'Save persists all pending changes in the current project, including changes outside this copy.'}
+        payload['next_command'] = transaction_next_command('continue-source-copy-proof',
+            ['continue-source-copy-proof', record.draft_id, '--task-authority', args.task_authority,
+                '--expected-revision', str(record.revision)], state_dir=args.state_dir)
     return payload
 
 
@@ -20967,6 +21141,7 @@ def create_transaction_preview(
         read_call=read_call,
         project_guard=project_guard,
         history_resolver=gateway_history_resolver(store, project_guard),
+        copy_proof_context=source_copy_proof_context(env=env, project_guard=project_guard, state_dir=state_dir, args=args),
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
@@ -20992,6 +21167,8 @@ def create_transaction_preview(
         prepared.get("pre_state"),
         "prepared pre-state",
     )
+    if pre_state.get('source_copy_saved_proof', {}).get('status') == 'baseline_save_pending':
+        raise GatewayInputError('Selected project documents are dirty; follow the checked Draft baseline Save continuation or explicitly decline it before copy Preview.')
     sealed_contract = pre_state.get("execution_contract")
     if (
         isinstance(sealed_contract, Mapping)
@@ -21382,7 +21559,10 @@ def dispatch_transaction_command(
         resource_lease = AuthoringResourceStore(store.state_dir).lease() if api in MODEL_OPERATIONS else nullcontext()
         runtime_resource_lease = (RuntimeTransportHandleStore(store.state_dir).lease() if str(api).startswith("ak.wwise.core.transport.") else
             soundengine_resource_lease(store.state_dir) if api in soundengine_control_business_operations() else nullcontext())
-        with store.execution_lease(transaction_id), resource_lease, runtime_resource_lease:
+        save_origin = sealed.get('prepared_operation', {}).get('pre_state', {}).get('source_copy_save_origin')
+        parent_lease = (store.execution_lease(save_origin['parent']['transaction_id'])
+            if isinstance(save_origin, Mapping) and save_origin.get('stage') == 'final' else nullcontext())
+        with parent_lease, store.execution_lease(transaction_id), resource_lease, runtime_resource_lease:
             return _dispatch_transaction_command_with_execution_lease(
                 args,
                 env=env,
@@ -21570,7 +21750,8 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         role_validation = validate_prepared_roles(prepared, read_call=read_call,
-            history_resolver=gateway_history_resolver(store, artifact["project_guard"]))
+            history_resolver=gateway_history_resolver(store, artifact["project_guard"]),
+            copy_proof_context=source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir))
         if role_validation.get("ok") is not True:
             repreview = store.require_repreview(
                 transaction_id,
@@ -22758,6 +22939,53 @@ def _dispatch_transaction_command_with_execution_lease(
                     execution_result=execution_result,
                 ),
             )
+        saved_baseline = prepared.get('pre_state', {}).get('source_copy_saved_proof', {})
+        if verification.status == 'verified' and saved_baseline.get('status') == 'ready':
+            from wwise_waapi.source_copy_proof import verify_saved, SavedCopyProofError
+            try:
+                proof_context = source_copy_proof_context(env=env, project_guard=current_guard, state_dir=store.state_dir)
+                if getattr(args, 'source_copy_decline', None) is not None:
+                    from wwise_waapi.source_copy_proof import validate_decline
+                    declined_observation = validate_decline(saved_baseline, proof_context, store.load_snapshot(transaction_id), read_call)
+                    saved_outcome = None
+                    verification = VerificationResult(verification.operation, verification.status, verification.assertions,
+                        verification.readbacks, 'Live copy scope passed; optional final Save declined; complete preservation remains unfinished.',
+                        verification.verification_strength, verification.business_state_verified,
+                        {**dict(verification.verification_scope), 'saved_proof_incomplete_reason': 'final_Save_declined',
+                            'declined_save_child': args.source_copy_decline, 'declined_saved_observation': declined_observation})
+                else:
+                    saved_outcome = verify_saved(saved_baseline, proof_context, store.load_snapshot(transaction_id), read_call)
+            except SavedCopyProofError as exc:
+                verification = VerificationResult(verification.operation, 'verification_failed',
+                    (*verification.assertions, {'name': 'Strict saved Source preservation', 'passed': False,
+                        'evidence': exc.as_dict()}), verification.readbacks, str(exc),
+                    'saved_source_graph_and_live_roles', False, verification.verification_scope)
+                saved_outcome = None
+            except Exception as exc:  # A missing file/transport/lock is not a failed graph comparison.
+                payload = verification_deferred_payload(common, transaction_id=transaction_id, state=record.state.value,
+                    exc=exc, cleanup=transaction_cleanup_payload(prepared, phase='executed', execution_result=execution_result))
+                payload['next_command'] = transaction_next_command('verify', ['verify', transaction_id], state_dir=args.state_dir)
+                return payload
+            if saved_outcome is not None:
+                verification = VerificationResult(verification.operation, verification.status,
+                    (*verification.assertions, {'name': 'Strict saved Source preservation', 'passed': True,
+                        'evidence': saved_outcome}), verification.readbacks,
+                    'Live Source checks and the bound complete supported serialized Source graph passed.',
+                    'saved_source_graph_and_live_roles', True,
+                    {**dict(verification.verification_scope), **saved_outcome, 'unobserved': ['media_bytes_and_audio_effect']})
+        if verification.status == 'verified' and saved_baseline.get('status') == 'ready' and saved_outcome is None and getattr(args, 'source_copy_decline', None) is None:
+            next_command = transaction_next_command('continue-source-copy-proof',
+                ['continue-source-copy-proof', transaction_id], state_dir=args.state_dir)
+            cleanup = transaction_cleanup_payload(prepared, phase='executed', execution_result=execution_result)
+            return {'ok': True, 'status': 'source_copy_saved_proof_pending', **common,
+                'transaction_id': transaction_id, 'state': record.state.value, 'executed': True,
+                'verified': False, 'automatic_retry': False, 'verification': successful_verification_result_summary(verification.as_dict()),
+                'source_copy_saved_proof': {'baseline_origin': saved_baseline['origin'], 'baseline_digest': saved_baseline['digest'],
+                    'complete_copy_preservation': False, 'remaining': 'separately authorized final Save then strict saved readback'},
+                'next_command': next_command, 'cleanup': cleanup,
+                'agent_result': transaction_agent_result(request=request_payload, transaction_id=transaction_id,
+                    artifact_hash=preview.artifact_hash, state=record.state.value, executed=True, verified=False,
+                    cleanup=cleanup, next_command=next_command)}
         outcome = {
             "verified": TransactionState.VERIFIED,
             "result_schema_checked": TransactionState.RESULT_SCHEMA_CHECKED,
@@ -22819,6 +23047,14 @@ def _dispatch_transaction_command_with_execution_lease(
                 agent_result["business_result"] = _created_root_business_result(verification.as_dict(), transaction_id)
             elif staged_voice:
                 agent_result["business_result"] = dict(payload["creation_result"])
+            save_origin = prepared.get('pre_state', {}).get('source_copy_save_origin')
+            if isinstance(save_origin, Mapping) and save_origin.get('stage') == 'final':
+                payload['next_command'] = transaction_next_command('verify', ['verify', save_origin['parent']['transaction_id']], state_dir=args.state_dir)
+            elif isinstance(save_origin, Mapping) and save_origin.get('stage') == 'baseline':
+                from wwise_waapi.source_copy_proof import child_capability
+                child_id, _ = child_capability(save_origin)
+                payload['next_command'] = transaction_next_command('continue-source-copy-proof',
+                    ['continue-source-copy-proof', child_id], state_dir=args.state_dir)
             transaction_arguments = transaction_request.get("arguments")
             if transaction_arguments.get("voice_source_staging") is not None:
                 from wwise_waapi.voice_source_staging import projection as stage_projection
@@ -31936,6 +32172,8 @@ def transaction_verification_summary(
     plan = value if isinstance(value, Mapping) else {}
     if isinstance(plan.get("verification_scope"), Mapping):
         summary["verification_scope"] = dict(plan["verification_scope"])
+    if isinstance(plan.get("source_copy_saved_proof"), Mapping):
+        summary["source_copy_saved_proof"] = dict(plan["source_copy_saved_proof"])
     for key in (
         "kind",
         "strategy",

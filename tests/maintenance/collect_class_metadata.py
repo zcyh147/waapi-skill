@@ -32,7 +32,15 @@ SCHEDULE = {
     '2025.1': {'Sound': {'Weight': 50.0}, 'EffectSlot': {'Bypass': False, 'Effect': None},
                'ModulatorTime': {'EnvelopeStopPlayback': True}, 'MediaPoolFilter': {'FieldName': ''}},
 }
-CLASS_IDS = {'Sound':65552, 'Wwise Delay':6946819, 'Action':327696, 'EffectSlot':5505040,
+COMPLETION_SCHEDULE = {v:{'MusicStinger':{'CustomCueMatchName':''}, **({'ModulatorTime':{'EnvelopeStopPlayback':True}}
+    if v in ('2023.1','2024.1') else {})} for v in ('2021.1','2022.1','2023.1','2024.1')}
+# Matching installed primary declarations select reads, never replace native proof.
+COMPLETION_PRIMARY_XML_SHA256 = {
+    '2021.1':'6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d',
+    '2022.1':'018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6',
+    '2023.1':'bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468',
+    '2024.1':'28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f'}
+CLASS_IDS = {'MusicStinger':2490384, 'Sound':65552, 'Wwise Delay':6946819, 'Action':327696, 'EffectSlot':5505040,
              'ModulatorTime':5111824, 'MediaPoolFilter':5767184}
 SELECTION_ORIGINS = {
     '2021.1':['condition-metadata-2021-r1:014 (ModulatorTime true)'],
@@ -88,11 +96,12 @@ def write_final_seal(root, scenario):
         {'contract':'waapi-skill.class-metadata-seal/v1','files':files},ensure_ascii=False,indent=2,allow_nan=False)+'\n')
 
 
-def collection_plan(version):
-    if version not in SCHEDULE:
+def collection_plan(version, *, cohort='r54'):
+    schedule = SCHEDULE if cohort == 'r54' else COMPLETION_SCHEDULE if cohort == 'r55' else {}
+    if version not in schedule:
         raise ValueError('Unreviewed class metadata version')
     types = json.loads((REPO/'skills/waapi-skill/resources/metadata'/version/'object-types.json').read_bytes())
-    expected = SCHEDULE[version]
+    expected = schedule[version]
     for scope in expected:
         rows = [row for row in types['types'] if row['name'] == scope]
         if len(rows) != 1 or rows[0]['classId'] != CLASS_IDS[scope]:
@@ -108,15 +117,21 @@ def collection_plan(version):
         if any(type(item) is bool and item is value for item in values):pointers += [definition+'/anyOf/3/@boolean/'+str(value).lower()]
     if any(type(value) is str for value in values):pointers += [definition+'/anyOf/1',definition+'/anyOf/1/@empty/string']
     if version == '2021.1':pointers = [definition+'/anyOf/3/@boolean/true'] # Nine other observed leaves already retained.
+    if cohort == 'r55':
+        pointers = [definition+'/anyOf/1',definition+'/anyOf/1/@empty/string']
+        if version in ('2023.1','2024.1'):pointers += [definition+'/anyOf/3/@boolean/true']
     prefix = version+'|wwise-console|'+BUILDS[version]+'|function|ak.wwise.core.object.getPropertyInfo|'
     identities = sorted(prefix+pointer for pointer in pointers)
     requirements = json.loads((REPO/'docs/branch-coverage-requirements.json').read_bytes())['branches']
     if any(requirements.get(identity,{}).get('categories') != ['program','live_metadata'] for identity in identities):
         raise ValueError('Exact default requirement assignment changed')
-    return {'kind':'class_metadata_only','agent_started':False,'project_mutation_commands':0,
+    return {**({'cohort':'r55'} if cohort == 'r55' else {}),'kind':'class_metadata_only','agent_started':False,'project_mutation_commands':0,
         'version':version,'host':'wwise-console','build':BUILDS[version],
-        'collector_nodeid':'tests/maintenance/collect_class_metadata.py::class_metadata['+version+']',
-        'selection_origins_not_evidence':SELECTION_ORIGINS[version],
+        'collector_nodeid':'tests/maintenance/collect_class_metadata.py::class_metadata'+('_completion' if cohort == 'r55' else '')+'['+version+']',
+        'selection_origins_not_evidence':SELECTION_ORIGINS[version] if cohort == 'r54' else [
+            'Matching primary WObjects.xml SHA256 '+COMPLETION_PRIMARY_XML_SHA256[version]+
+            ': MusicStinger.CustomCueMatchName Type=string/empty DefaultValue'+
+            ('; ModulatorTime.EnvelopeStopPlayback Type=bool/DefaultValue=true' if version in ('2023.1','2024.1') else '')],
         'targets':{scope:list(fields) for scope,fields in expected.items()},'expected_defaults':expected,
         'class_ids':{scope:CLASS_IDS[scope] for scope in expected},'eligible_branch_ids':identities,
         'limits':{'gateway_invocations':MAX_CALLS,'pages_per_scope':MAX_PAGES,'page_size':PAGE_SIZE,
@@ -137,6 +152,18 @@ def metadata_descriptors(root):
         for index,row in enumerate(targets) if row['status'] == 'captured'}
 
 
+
+def collection_source_map(rows, checkout):
+    """Source keys are portable identities; absolute paths retain producer flavor."""
+    from tests.semantic.support.codex_archive_paths import archive_relative_from_absolute
+    sources={}
+    for row in rows:
+        name=archive_relative_from_absolute(row['path'],checkout).canonical
+        if name in sources:raise ValueError('Duplicate collection source identity')
+        sources[name]=row['sha256']
+    return dict(sorted(sources.items()))
+
+
 def source_links(version, targets):
     from tests.support.metadata_replay_branch_evidence import source_seals
     sources = source_seals()
@@ -151,7 +178,7 @@ def source_links(version, targets):
     return [], [{'path':str(REPO/name),'sha256':value} for name,value in sorted(sources.items())]
 
 
-def validate_native_detail(root, payload, version, scope, field):
+def validate_native_detail(root, payload, version, scope, field, *, cohort='r54'):
     """Exact current public/native bytes; never manufacture a native response."""
     result = payload['agent_result']
     resolved = result['scope']
@@ -167,15 +194,15 @@ def validate_native_detail(root, payload, version, scope, field):
         raise HostFailure('Native dispatcher path/byte bound changed')
     raw = path.read_bytes()
     native = json.loads(raw,parse_constant=lambda value:(_ for _ in ()).throw(ValueError(value)))
-    validate_native_pair(payload,native,version,scope,field)
+    validate_native_pair(payload,native,version,scope,field,cohort=cohort)
     return {'native_receipt':path.relative_to(root).as_posix(),'native_path':str(path),'native_sha256':hashlib.sha256(raw).hexdigest(),
         'native_bytes':len(raw),'default_present':'default' in native['result'],
         **({'observed_default':native['result']['default']} if 'default' in native['result'] else {})}
 
 
 
-def validate_native_pair(payload,native,version,scope,field):
-    if version not in SCHEDULE or field not in SCHEDULE[version].get(scope,{}):
+def validate_native_pair(payload,native,version,scope,field,*,cohort='r54'):
+    if field not in collection_plan(version,cohort=cohort)['targets'].get(scope,[]):
         raise HostFailure('Unreviewed native metadata scope/field')
     result = payload['agent_result']
     resolved = result['scope']
@@ -192,8 +219,8 @@ def validate_native_pair(payload,native,version,scope,field):
                 {key:metadata[key] for key in native['result']},sort_keys=True,allow_nan=False)):
         raise HostFailure('Exact native/public metadata packet mismatch')
 
-def collect_scope(gateway, version, scope, fields, root, status_check):
-    if version not in SCHEDULE or scope not in SCHEDULE[version] or fields != list(SCHEDULE[version][scope]):
+def collect_scope(gateway, version, scope, fields, root, status_check, *, cohort='r54'):
+    if fields != collection_plan(version,cohort=cohort)['targets'].get(scope):
         raise HostFailure('Unreviewed class/field schedule')
     pages_used = 0
     # One explicit restart for a stale locator, never a blind write replay.
@@ -286,7 +313,7 @@ def collect_scope(gateway, version, scope, fields, root, status_check):
             pending.append({'scope':scope,'field':field,'status':'captured',
                 'list_receipt':list_receipt,'detail_receipt':receipt,'whole_inventory_complete':cursor is None,
                 'detail_agent_result_sha256':sha(root/(receipt+'.agent-result.json')),
-                **validate_native_detail(root,payload,version,scope,field)})
+                **validate_native_detail(root,payload,version,scope,field,cohort=cohort)})
         if restart and attempt == 0:
             status_check()
             continue
@@ -300,6 +327,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-reviewed-collection', action='store_true', required=True)
     parser.add_argument('--version', choices=BUILDS, required=True)
+    parser.add_argument('--cohort',choices=('r54','r55'),default='r54')
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--repo', type=Path, default=REPO)
     parser.add_argument('--gateway-root', type=Path, default=REPO)
@@ -326,7 +354,7 @@ def main():
     if repo != REPO.resolve() or gateway_root != repo:
         parser.error('Closed collector uses its own immutable repository/Skill only')
     sys.path[:0]=[str(repo),str(repo/'skills/waapi-skill')]
-    selected_plan = collection_plan(args.version)
+    selected_plan = collection_plan(args.version,cohort=args.cohort)
     targets = selected_plan['targets']
     links, sources = source_links(args.version, targets)
     # Only read repository identity. Refuse dirty candidates rather than seal a moving source.
@@ -482,7 +510,7 @@ def main():
         write('initial-status.json',{'receipt':status_check()})
         for scope, fields in targets.items():
             status_check()
-            results.extend(collect_scope(gateway,args.version,scope,fields,root,status_check))
+            results.extend(collect_scope(gateway,args.version,scope,fields,root,status_check,cohort=args.cohort))
             write('targets.json', results)
         status_check()
         requested = 'PASS' if all(row['status']=='captured' for row in results) else 'BLOCKED'
@@ -555,7 +583,7 @@ def write_branch_attachments(root, inventory, *, scope_kind='product'):
     root=Path(root)
     descriptors=metadata_descriptors(root)
     plan=json.loads((root/'plan.json').read_bytes())
-    allowed=set(collection_plan(plan['version'])['eligible_branch_ids'])
+    allowed=set(collection_plan(plan['version'],cohort=plan.get('cohort','r54'))['eligible_branch_ids'])
     branches=[row for row in inventory['native_coverage']['obligations'] if row['id'] in allowed]
     if {row['id'] for row in branches} != allowed:raise ValueError('Exact class default obligations changed')
     edges={row['id']:row for row in inventory['native_coverage']['obligations'] if row['kind']=='reference'}
