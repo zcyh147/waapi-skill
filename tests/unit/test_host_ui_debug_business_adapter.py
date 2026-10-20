@@ -1681,6 +1681,286 @@ def test_tone_older_pinned_routes_remain_unavailable_without_native_calls(tmp_pa
     assert 'continuation' not in rejected
 
 
+def test_stationary_triangle_retained_native_bytes_verify_without_relabelling_original_collection(tmp_path):
+    import hashlib
+    fixtures = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/waveforms'
+    manifest = json.loads((fixtures / 'manifest.json').read_text())
+    specimen = manifest['files']['triangle-stationary.wav']
+    raw = (fixtures / 'triangle-stationary.wav').read_bytes()
+    assert len(raw) == specimen['size'] and hashlib.sha256(raw).hexdigest() == specimen['sha256']
+    assert manifest['native_business_acceptance'] is False
+    assert manifest['original_verification_state'] == 'result_schema_checked'
+    env, state, client, _, schema, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={key: str(value) for key, value in specimen['request'].items()})
+    client.artifact_bytes = raw
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['verification_strength'] == 'tone_wav_artifact'
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    signal = journal['readbacks'][0]['wav']['stationary_triangle']
+    assert signal['policy'] == 'stationary-triangle-numerical-conformance-v1'
+    assert signal['feasibility_search_complete'] is False
+    assert signal['channels'][0]['sufficient_witness_found'] is True
+    assert signal['channels'][0]['measured_gain'] == pytest.approx(.5006684064865112, abs=2e-6)
+    assert signal['channels'][0]['max_sample_error'] <= signal['sample_error_limit']
+    assert signal['observability_reason'] is None
+    disclosure = schema['business_adapter']['safety']['tone_artifact_verification']['stationary_triangle_checks']
+    assert disclosure['maximum_phase_candidates_per_channel'] == 2
+    assert disclosure['feasibility_search_complete'] is False
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('floating', [True, False], ids=['float32', 'pcm16'])
+@pytest.mark.parametrize('frequency,phase,db', [(800, .13, -6), (125.5, .73, 0), (1000, .25, 0)])
+def test_stationary_triangle_phase_varied_independent_signals_verify_through_versioned_gateway(tmp_path, version, floating, frequency, phase, db):
+    import math
+    channels = 1 if version == '2023.1' else 2
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version,
+        [] if channels == 1 else ['--item', 'waveform_channels', '0'],
+        is_command_line=version != '2024.1',
+        values={'waveform': 'triangle', 'channel_layout': '1.0' if channels == 1 else '2.0',
+            'frequency_hz': str(frequency), 'sample_rate_hz': '8000', 'sustain_seconds': '0.1',
+            'bit_depth': 'float32' if floating else 'int16', 'sustain_db': str(db)})
+    gain = 1 if db == 0 else .5011872336272722
+    samples = []
+    for frame in range(800):
+        # Independent trigonometric identity, not the production piecewise inverse.
+        sample = gain * 2 / math.pi * math.asin(math.sin(math.tau * (frequency * frame / 8000 + phase)))
+        if not floating:
+            sample = max(-32768, min(32767, round(sample * 32768)))
+        samples.extend([sample] + [0] * (channels - 1))
+    client.artifact_bytes = _tone_wav_bytes(floating=floating, channels=channels, samples=samples)
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['verification_strength'] == 'tone_wav_artifact'
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    signal = journal['readbacks'][0]['wav']['stationary_triangle']
+    assert signal['observability_reason'] is None
+    assert signal['feasibility_search_complete'] is False
+    assert [row['channel'] for row in signal['channels']] == [0]
+    row = signal['channels'][0]
+    assert row['sufficient_witness_found'] is True
+    assert 1 <= len(row['candidate_checks']) <= 2
+    assert row['max_sample_error'] <= signal['sample_error_limit']
+    assert row['candidate_checks'][row['witness_candidate']]['gain_matches'] is True
+
+
+@pytest.mark.parametrize('defect', ['frequency', 'sine', 'square', 'sawtooth', 'dc', 'ramp',
+    'silence', 'gain-only', 'large-gain', 'late-sample', 'late-level-after-no-witness', 'late-nonfinite', 'late-silent'])
+def test_stationary_triangle_wrong_effects_never_verify_and_known_contradictions_cannot_hide(tmp_path, defect):
+    import math
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--item', 'waveform_channels', '0'],
+        values={'waveform': 'triangle', 'frequency_hz': '800', 'sample_rate_hz': '8000',
+            'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
+    gain = .5011872336272722
+    samples = []
+    for frame in range(80):
+        angle = math.tau * (frame / 10 + .13)
+        sample = gain * 2 / math.pi * math.asin(math.sin(angle))
+        if defect in {'frequency', 'late-level-after-no-witness'}:
+            sample = gain * 2 / math.pi * math.asin(math.sin(2 * angle))
+        elif defect == 'sine':
+            sample = gain * math.sin(angle)
+        elif defect == 'square':
+            sample = gain if math.sin(angle) >= 0 else -gain
+        elif defect == 'sawtooth':
+            sample = gain * (2 * ((frame / 10 + .13) % 1) - 1)
+        elif defect == 'dc':
+            sample = .02
+        elif defect == 'ramp':
+            sample *= frame / 79
+        elif defect == 'silence':
+            sample = 0
+        elif defect == 'gain-only':
+            sample *= 1.003
+        elif defect == 'large-gain':
+            sample *= 1.1
+        elif defect == 'late-sample' and frame == 79:
+            sample += .02
+        if defect == 'late-level-after-no-witness' and frame == 79:
+            sample = 2 * gain
+        if defect == 'late-nonfinite' and frame == 79:
+            sample = float('nan')
+        samples.extend([sample, .1 if defect == 'late-silent' and frame == 79 else 0])
+    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=samples)
+    known = defect in {'large-gain', 'late-level-after-no-witness', 'late-nonfinite', 'late-silent'}
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=known)
+    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
+    assert len(writes) == 1 and writes[0][1] == preview['agent_result']['request']['arguments']['args']
+    if known:
+        assert any(text in str(verified['verification']) for text in ('gain bound', 'non-finite', 'silent channel'))
+    else:
+        assert verified['verification_strength'] == 'partial_tone_artifact'
+        _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+        journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+        row = journal['readbacks'][0]['wav']['stationary_triangle']['channels'][0]
+        assert row['sufficient_witness_found'] is False
+        assert 'complete phase feasibility is not searched' in row['observability_reason']
+        if defect == 'gain-only':
+            assert any(check['first_sample_mismatch_frame'] is None and check['gain_matches'] is False
+                for check in row['candidate_checks'])
+        if defect == 'late-sample':
+            assert any(check['first_sample_mismatch_frame'] == 79 for check in row['candidate_checks'])
+
+
+def test_stationary_triangle_near_equal_frequency_is_bounded_conformance_without_request_rounding(tmp_path):
+    import math
+    frequency = '800.0000000000001'
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'waveform': 'triangle', 'channel_layout': '1.0', 'frequency_hz': frequency,
+            'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
+    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1,
+        samples=[.5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + .13))) for frame in range(80)])
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    writes = [call for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
+    assert len(writes) == 1 and writes[0][1]['frequency'] == float(frequency)
+    assert writes[0][1] == preview['agent_result']['request']['arguments']['args']
+    assert verified['agent_result']['request'] == preview['agent_result']['request']
+
+
+@pytest.mark.parametrize('case', ['short', 'empty', 'quantized', 'aliased', 'fractional-frames', 'fractional-rate', 'triangle-envelope'])
+def test_stationary_triangle_inconclusive_observations_keep_their_partial_attribution(tmp_path, case):
+    import math
+    values = {'waveform': 'triangle', 'channel_layout': '1.0', 'frequency_hz': '800',
+        'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'}
+    frames = 80
+    if case == 'short':
+        frames, values['sustain_seconds'] = 1, '0.000125'
+    elif case == 'empty':
+        frames, values['sustain_seconds'] = 0, '0'
+    elif case == 'quantized':
+        values.update(bit_depth='int16', sustain_db='-96')
+    elif case == 'aliased':
+        values['frequency_hz'] = '4000'
+    elif case == 'fractional-frames':
+        values['sustain_seconds'] = '0.01001'
+    elif case == 'fractional-rate':
+        values['sample_rate_hz'] = '8000.5'
+    elif case == 'triangle-envelope':
+        values.update(attack_seconds='0.002', sustain_seconds='0.008')
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [], values=values)
+    samples = ([0] * frames if case == 'quantized' else
+        [.5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + (.13 if case == 'short' else 0)))) for frame in range(frames)])
+    client.artifact_bytes = _tone_wav_bytes(floating=case != 'quantized', channels=1, samples=samples)
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert verified['verification_strength'] == 'partial_tone_artifact'
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    wav = journal['readbacks'][0]['wav']
+    if case == 'triangle-envelope':
+        assert 'stationary_triangle' not in wav
+        assert 'active waveform' in str(journal['readbacks'][0]['unresolved'])
+    else:
+        reason = wav['stationary_triangle']['observability_reason']
+        assert {'short': 'recurrence', 'empty': 'empty', 'quantized': 'quantization', 'aliased': 'Nyquist',
+            'fractional-frames': 'fractional', 'fractional-rate': 'fractional'}[case] in reason
+
+
+def test_stationary_triangle_missing_seed_witness_never_claims_complete_phase_infeasibility(tmp_path):
+    import math
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'waveform': 'triangle', 'channel_layout': '1.0', 'frequency_hz': '800',
+            'sample_rate_hz': '8000', 'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
+    gain = .5011872336272722
+    samples = [gain * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + .13))) for frame in range(80)]
+    # The original phase has <=.004 G error at both altered samples and the
+    # opposite projection perturbations cancel. Seeding from the first altered
+    # sample instead gives a phase whose error at frame 10 is about .008 G.
+    samples[0] += .004 * gain
+    samples[10] -= .004 * gain
+    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=1, samples=samples)
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert verified['verification_strength'] == 'partial_tone_artifact'
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    signal = journal['readbacks'][0]['wav']['stationary_triangle']
+    assert .004 * gain < signal['sample_error_limit'] < .008 * gain
+    assert signal['feasibility_search_complete'] is False
+    row = signal['channels'][0]
+    assert row['sufficient_witness_found'] is False
+    assert 'complete phase feasibility is not searched' in row['observability_reason']
+    assert 'exact_cadence_conforms' not in row
+    assert any(check['first_sample_mismatch_frame'] == 10 for check in row['candidate_checks'])
+
+
+@pytest.mark.parametrize('defect', [None, 'late-independent-level'])
+def test_stationary_triangle_partial_channel_keeps_another_channel_checks(tmp_path, defect):
+    import math
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'waveform': 'triangle', 'frequency_hz': '800', 'sample_rate_hz': '8000',
+            'bit_depth': 'float32', 'sustain_seconds': '0.01', 'sustain_db': '-6'})
+    samples = []
+    for frame in range(80):
+        sample = .5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau * (frame / 10 + .13)))
+        samples.extend([0, 2 if defect and frame == 79 else sample])
+    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=samples)
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=defect is not None)
+    if defect:
+        assert 'gain bound' in str(verified['verification'])
+        return
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+    journal = next(row['details']['verification'] for row in shown['events'] if row['event_type'] == 'verification_recorded')
+    rows = journal['readbacks'][0]['wav']['stationary_triangle']['channels']
+    assert rows[0]['sufficient_witness_found'] is False and rows[0]['observability_reason']
+    assert rows[1]['sufficient_witness_found'] is True and rows[1]['observability_reason'] is None
+    assert verified['verification_strength'] == 'partial_tone_artifact'
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_stationary_triangle_36_anonymous_channels_preserve_exact_terminal_result(tmp_path, monkeypatch, capsys, version):
+    import math
+    import struct
+    from wwise_waapi.transactions import TransactionStore
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version, [],
+        values={'waveform': 'triangle', 'channel_layout': 'Ambisonics 5th order', 'anonymous_channels': 'true',
+            'frequency_hz': '800.0000000000001', 'sample_rate_hz': '8000', 'bit_depth': 'float32',
+            'sustain_db': '-6', 'sustain_seconds': '0.01'})
+    samples = [.5011872336272722 * 2 / math.pi * math.asin(math.sin(math.tau *
+        (800.0000000000001 * frame / 8000 + .137 + channel / 997)))
+        for frame in range(80) for channel in range(36)]
+    fmt = struct.pack('<HHIIHHHHI', 65534, 36, 8000, 1152000, 144, 32, 22, 32, 0)
+    fmt += bytes.fromhex('0300000000001000800000aa00389b71')
+    client.artifact_bytes = _tone_wav_bytes(floating=True, channels=36, samples=samples, fmt_override=fmt)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+        '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    actual_execute = gateway.execute_gateway
+    observed_payloads = []
+    def observe_actual_gateway(argv):
+        result = actual_execute(argv)
+        observed_payloads.append(result[1])
+        return result
+    with monkeypatch.context() as emitting:
+        emitting.setenv('WAAPI_SKILL_CONFIG_PATH', env['WAAPI_SKILL_CONFIG_PATH'])
+        emitting.setattr(gateway, 'default_client_factory', lambda _: client)
+        emitting.setattr(gateway, 'execute_gateway', observe_actual_gateway)
+        assert gateway.main([*state, 'verify', tx]) == 0
+    rendered = capsys.readouterr().out
+    decoded = json.loads(rendered)
+    assert decoded['verified'] is True
+    assert decoded['stdout_projection']['stdout_budget_bytes'] == 24576
+    assert len(rendered.encode('utf-8')) <= 24576
+    assert decoded['agent_result'] == observed_payloads[0]['agent_result']
+    assert decoded['agent_result']['request'] == preview['agent_result']['request']
+    assert list(decoded)[-1] == 'agent_result'
+    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
+        if event['event_type'] == 'verification_recorded')
+    wav = journal['readbacks'][0]['wav']
+    assert (wav['channels'], wav['speaker_mask']) == (36, 0)
+    signal = wav['stationary_triangle']
+    assert [row['channel'] for row in signal['channels']] == list(range(36))
+    assert all(row['sufficient_witness_found'] and row['observability_reason'] is None for row in signal['channels'])
+    assert all(1 <= len(row['candidate_checks']) <= 2 for row in signal['channels'])
+    assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
+    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    (tmp_path / 'triangle-36-terminal.stdout.json').write_text(rendered, encoding='utf-8')
+
+
 def test_stationary_square_does_not_certify_retained_wrong_requested_frequency_after_one_execution(tmp_path):
     import hashlib
     fixtures = Path(__file__).resolve().parents[1] / 'fixtures/tone/console-2025.1.7.9143/waveforms'

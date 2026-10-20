@@ -19,6 +19,16 @@
         "sample_rate_hz": 48000, "bit_depth": "float32", "sustain_db": -6,
         "attack_seconds": 0, "sustain_seconds": 0.25, "release_seconds": 0
       }
+    },
+    "triangle-stationary.wav": {
+      "sha256": "9ce8be11208ef9f8b5923f5e1439cdd1641390056285f26eed9d7b802bff18d2",
+      "size": 48092,
+      "transaction_id": "tx1-avygzzwdkaa3h2twp1tn",
+      "request": {
+        "waveform": "triangle", "frequency_hz": 440, "channel_layout": "1.0",
+        "sample_rate_hz": 48000, "bit_depth": "float32", "sustain_db": -6,
+        "attack_seconds": 0, "sustain_seconds": 0.25, "release_seconds": 0
+      }
     }
   }
 }

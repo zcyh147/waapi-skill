@@ -126,5 +126,10 @@ square original for program regression. It checks requested gain and full-sample
 exact digital cadence under a disclosed numerical policy. An incompatible
 exact cadence remains partial because utility phase arithmetic precision is not
 specified; it is never rounded into acceptance or labelled native invalidity.
-Triangle, noise and non-sine envelopes remain unfinished. No new collection or
-relabelled original native outcome follows from this successor.
+The [stationary triangle successor](TONE_STATIONARY_TRIANGLE.md) checks at most
+two deterministic phase witnesses against fixed requested gain/cadence and an
+independent signed gain projection. It supplies sufficient numerical proof;
+missing witnesses remain partial without claiming complete phase infeasibility
+or native fault. Complete triangle phase-search behavior, triangle envelopes,
+noise and other non-sine envelopes remain unfinished. No new collection or
+relabelled original native outcome follows from these successors.

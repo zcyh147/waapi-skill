@@ -238,8 +238,9 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
             unresolved = _check_requested_format(observed, args) + marker_unresolved
             observed["nonzero_samples_by_channel"], signal = _scan_samples(stream, data, observed, args)
             if signal is not None:
-                observed['stationary_square' if args.get('waveform') == 'square' else
-                    ("sine_envelope" if 'segments' in signal else "stationary_sine")] = signal
+                observed['stationary_triangle' if args.get('waveform') == 'triangle' else
+                    ('stationary_square' if args.get('waveform') == 'square' else
+                    ("sine_envelope" if 'segments' in signal else "stationary_sine"))] = signal
             if args.get("waveform", "silence") != "silence" and args.get("waveformChannelMask") != 0:
                 if signal is None or signal['observability_reason'] is not None:
                     unresolved.append("active waveform, frequency and envelope postconditions" + (
@@ -367,8 +368,14 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
     sine_requested = args.get('waveform') == 'sine' and silence_mask != (1 << channels) - 1
     square_requested = (args.get('waveform') == 'square' and not args.get('attackTime', 0)
         and not args.get('releaseTime', 0) and silence_mask != (1 << channels) - 1)
+    triangle_requested = (args.get('waveform') == 'triangle' and not args.get('attackTime', 0)
+        and not args.get('releaseTime', 0) and silence_mask != (1 << channels) - 1)
     signal = _sine_signal_policy(observed, args, enveloped=not stationary) if sine_requested else (
-        _square_signal_policy(observed, args) if square_requested else None)
+        _square_signal_policy(observed, args) if square_requested else (
+            _triangle_signal_policy(observed, args) if triangle_requested else None))
+    triangle = _triangle_arithmetic(observed, args, signal) if triangle_requested else None
+    triangle_rows = {channel: {'candidates': [], 'previous_sign': None, 'sign_transitions': 0}
+        for channel in range(channels) if not silence_mask & (1 << channel)} if triangle_requested else None
     square_rows = {channel: {'phase_intervals': [[0, signal['phase_half_cycle_units']]], 'anchor': None,
         'magnitude_sum': 0.0, 'previous_sign': None, 'sign_transitions': 0, 'max_sample_error': 0.0}
         for channel in range(channels) if not silence_mask & (1 << channel)} if square_requested else None
@@ -385,6 +392,9 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
             nonzero[channel] += 1
             if silence_mask & (1 << channel):
                 raise _invalid(f"Tone WAV contains a nonzero sample in requested silent channel {channel} at sample {sample_index}.")
+        if triangle_rows is not None and channel in triangle_rows:
+            _observe_triangle_sample(sample, sample_index // channels, triangle_rows[channel], triangle,
+                signal, channel)
         if square_rows is not None and channel in square_rows:
             row = square_rows[channel]
             magnitude = abs(sample / scale)
@@ -427,7 +437,111 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
             _check_stationary_sine(stream, data, observed, silence_mask, projections, (ss, cc, sc), signal)
     if square_rows is not None:
         _finish_square_channels(square_rows, observed['frames'], signal)
+    if triangle_rows is not None:
+        _finish_triangle_channels(triangle_rows, triangle, signal)
     return nonzero, signal
+
+
+def _triangle_signal_policy(observed, args):
+    signal = _sine_signal_policy(observed, args)
+    signal.pop('angular_step')
+    signal.update(policy='stationary-triangle-numerical-conformance-v1',
+        reference='requested digital triangle; at most two first-sample inverse phase witnesses per active channel; fixed requested gain/cadence; not a complete feasible-phase solver or native DSP theorem',
+        feasibility_search_complete=False, maximum_phase_candidates_per_channel=2)
+    return signal
+
+
+def _triangle_arithmetic(observed, args, signal):
+    # See TONE_STATIONARY_TRIANGLE.md. These rationals describe the numerical
+    # policy, never a guessed native input/accumulator type. All sample, phase,
+    # projection and acceptance arithmetic below is exact and fixed-size.
+    gain, error = Fraction(signal['requested_gain']), Fraction(signal['sample_error_limit'])
+    maximum_level = gain + error
+    return {'step': Fraction(str(args.get('frequency', 440))) / observed['sample_rate'],
+        'scale': 32768 if observed['sample_format'] == 'int16' else 2 ** 149,
+        'gain': gain, 'error': error,
+        'maximum_level_numerator': maximum_level.numerator, 'maximum_level_denominator': maximum_level.denominator,
+        'representation': Fraction(signal['representation_error']),
+        'gain_lower': Fraction(signal['requested_gain'] * 10 ** (-0.02 / 20)),
+        'gain_upper': Fraction(signal['requested_gain'] * 10 ** (0.02 / 20))}
+
+
+def _observe_triangle_sample(sample, frame, row, arithmetic, signal, channel):
+    scale, gain, error = arithmetic['scale'], arithmetic['gain'], arithmetic['error']
+    numerator, denominator = sample.as_integer_ratio()
+    value = numerator if scale == 32768 else numerator * (scale // denominator)
+    if abs(value) * arithmetic['maximum_level_denominator'] > arithmetic['maximum_level_numerator'] * scale:
+        raise SoundBankContractError('INVALID_TONE_WAV',
+            'Tone stationary triangle sample exceeds the phase-independent requested gain bound.',
+            details={'stationary_triangle': signal, 'channel': channel, 'frame': frame})
+    positive = sample >= 0
+    if row['previous_sign'] is not None and positive != row['previous_sign']:
+        row['sign_transitions'] += 1
+    row['previous_sign'] = positive
+    if not row['candidates']:
+        seed = min(Fraction(1), max(Fraction(-1), Fraction(value, scale) / gain))
+        phases = dict.fromkeys(((seed / 4) % 1, (Fraction(1, 2) - seed / 4) % 1))
+        step = arithmetic['step']
+        for phase in phases:
+            units = math.lcm(4, step.denominator, phase.denominator)
+            row['candidates'].append({'units': units, 'position': phase.numerator * (units // phase.denominator),
+                'step': step.numerator * (units // step.denominator), 'phase': float(phase),
+                'projection': 0, 'energy': 0, 'absolute_basis': 0,
+                'max_error': 0, 'first_sample_mismatch_frame': None})
+    for candidate in row['candidates']:
+        units = candidate['units']
+        basis = units - 4 * abs((candidate['position'] + units // 4) % units - units // 2)
+        residual = abs(value * gain.denominator * units - gain.numerator * basis * scale)
+        candidate['max_error'] = max(candidate['max_error'], residual)
+        if (candidate['first_sample_mismatch_frame'] is None
+                and residual * error.denominator > error.numerator * scale * gain.denominator * units):
+            candidate['first_sample_mismatch_frame'] = frame
+        candidate['projection'] += value * basis
+        candidate['energy'] += basis * basis
+        candidate['absolute_basis'] += abs(basis)
+        candidate['position'] = (candidate['position'] + candidate['step']) % units
+
+
+def _finish_triangle_channels(rows, arithmetic, signal):
+    common_reason = signal['observability_reason']
+    for channel, row in rows.items():
+        checks = []
+        witness = None
+        for index, candidate in enumerate(row['candidates']):
+            units, energy = candidate['units'], candidate['energy']
+            uncertainty = (arithmetic['representation'] * units * candidate['absolute_basis'] / energy
+                if energy else None)
+            amplitude = Fraction(units * candidate['projection'], arithmetic['scale'] * energy) if energy else None
+            observable = uncertainty is not None and uncertainty < arithmetic['gain']
+            lower = arithmetic['gain_lower'] - uncertainty if observable else None
+            upper = arithmetic['gain_upper'] + uncertainty if observable else None
+            gain_matches = observable and lower <= amplitude <= upper
+            passed = candidate['first_sample_mismatch_frame'] is None and gain_matches
+            checks.append({'phase_cycles': candidate['phase'],
+                'max_sample_error': float(Fraction(candidate['max_error'], arithmetic['scale'] * arithmetic['gain'].denominator * units)),
+                'first_sample_mismatch_frame': candidate['first_sample_mismatch_frame'],
+                'measured_gain': float(amplitude) if amplitude is not None else None,
+                'gain_representation_error': float(uncertainty) if uncertainty is not None else None,
+                'gain_interval': [float(lower), float(upper)] if observable else None,
+                'gain_matches': bool(gain_matches), 'gain_observable': observable})
+            if passed and witness is None:
+                witness = index
+        reason = common_reason
+        if reason is None:
+            if not checks:
+                reason = 'empty triangle record has no observable periodic recurrence'
+            elif not any(check['gain_observable'] for check in checks):
+                reason = 'requested triangle gain cannot be distinguished from sample quantization'
+            elif witness is None:
+                reason = 'no sufficient triangle phase witness; complete phase feasibility is not searched and native phase arithmetic precision is unspecified'
+            elif row['sign_transitions'] < 2:
+                reason = 'triangle record has no observable periodic recurrence (fewer than two sign transitions)'
+        selected = checks[witness] if witness is not None else {}
+        signal['channels'].append({'channel': channel, 'sufficient_witness_found': witness is not None,
+            'witness_candidate': witness, 'sign_transitions': row['sign_transitions'],
+            'candidate_checks': checks, 'observability_reason': reason,
+            **{key: selected[key] for key in ('measured_gain', 'max_sample_error') if key in selected}})
+        signal['observability_reason'] = signal['observability_reason'] or reason
 
 
 def _square_signal_policy(observed, args):

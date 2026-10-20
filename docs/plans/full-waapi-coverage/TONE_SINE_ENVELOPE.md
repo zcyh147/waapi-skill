@@ -5,6 +5,8 @@ Gateway artifact verifier. It does not complete Tone waveform coverage.
 Triangle, noise, nonstationary square, fractional rate/segment rounding and
 remaining marker or channel-representation obligations stay open. Stationary
 square has its own [bounded conformance successor](TONE_STATIONARY_SQUARE.md).
+Stationary triangle has a separate [sufficient-witness successor](TONE_STATIONARY_TRIANGLE.md);
+complete triangle phase search and native precision remain unresolved.
 
 ## Observed model and accepted verification policy
 
