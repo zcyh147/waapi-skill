@@ -388,8 +388,13 @@ def test_construction_language_selection_cannot_drift_between_preview_and_effect
 
 
 @pytest.mark.parametrize('fault', ['unknown', 'duplicate', 'malformed', 'sfx'])
-def test_construction_language_admission_requires_valid_project_language_and_voice(tmp_path, fault):
+def test_construction_language_admission_requires_valid_project_language_and_voice(tmp_path, fault, monkeypatch):
     task = language_voice_task(tmp_path)
+    if fault == 'unknown':
+        task.languages.extend({'id': '{' + f'{index:08X}-1111-1111-1111-111111111111' + '}',
+            'name': f'Project Language {index:02}', 'shortId': index + 10} for index in range(63))
+        # Exercise the same bounded repair path without huge native fixture names.
+        monkeypatch.setattr('wwise_waapi.operation_registry.MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES', 1024)
     if fault == 'duplicate':
         task.languages.append({'id': SECOND, 'name': 'Japanese', 'shortId': 3})
     elif fault == 'malformed':
@@ -409,15 +414,18 @@ def test_construction_language_admission_requires_valid_project_language_and_voi
     if fault == 'unknown':
         details = checked['details']['issues'][0]['details']
         assert details['field'] == 'language' and details['requested'] == 'Unknown'
-        assert details['available'] == [{'id': JAPANESE, 'name': 'Japanese'}]
-        assert details['available_total'] == 1 and details['available_returned'] == 1
-        assert details['available_truncated'] is False
+        assert details['available'][0] == {'id': JAPANESE, 'name': 'Japanese'}
+        assert details['available_total'] == 64 and 0 < details['available_returned'] < 64
+        assert details['available_truncated'] is True
+        assert details['language_discovery']['available'] is True
         task.types.append({'name': 'Language'})
         original = task.call
         def call(uri, args=None, options=None):
             if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from type Language '):
                 task.calls.append((uri, args, options))
-                return {'return': [{'id': JAPANESE, 'name': 'Japanese', 'type': 'Language', 'path': r'\Languages\Japanese'}]}
+                limit = int(args['waql'].rsplit(' take ', 1)[1])
+                return {'return': [{'id': row['id'], 'name': row['name'], 'type': 'Language',
+                    'path': '\\Languages\\' + row['name']} for row in task.languages[:limit]]}
             return original(uri, args, options)
         task.call = call
         code, types = task.run(*checked['next_command']['gateway_argv'])
@@ -425,7 +433,8 @@ def test_construction_language_admission_requires_valid_project_language_and_voi
         language_type, = [row for row in types['agent_result']['types'] if row.get('name') == 'Language']
         code, languages = task.run(*language_type['query_command']['gateway_argv'])
         assert code == 0, languages
-        assert [(row['id'], row['name']) for row in languages['objects']] == [(JAPANESE, 'Japanese')]
+        assert len(languages['objects']) == 64
+        assert {'id': task.languages[-1]['id'], 'name': 'Project Language 62'}.items() <= languages['objects'][-1].items()
     assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
 
 

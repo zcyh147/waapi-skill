@@ -15551,7 +15551,10 @@ def dispatch_command(
                     page["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", page["next_page"]])
                 for row in page["types"]:
                     if row.get("details_complete") is False or row.get("name") == "Language":
-                        row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", "20"])
+                        # Cover the admitted 64-row Project inventory and any
+                        # additional native Language rows within the public cap.
+                        maximum = "1000" if row.get("name") == "Language" else "20"
+                        row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", maximum])
                     if row.get("details_complete") is False:
                         row["detail_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", row["selection"]])
                         if isinstance(row.get("classId"), int):

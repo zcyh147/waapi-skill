@@ -11674,7 +11674,7 @@ def prepare_object_set_batch_check(
                     issue["details"] = {"field": "language", "available": [],
                         "available_total": exc.details["available_total"], "available_returned": 0,
                         "available_truncated": True,
-                        "language_discovery": {"available": True, "source": "metadata_types_exact_Language", "follow": "query_command_then_result_page_next_command"},
+                        "language_discovery": {"available": True, "source": "metadata_types_exact_Language", "membership_bound": 1000, "follow": "query_command_then_result_detail_next_command"},
                         "repair_details": "aggregate_repair_budget_exhausted", "mutation_dispatched": False}
             if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
                 # Preserve the exact owner and staged repair at this public
@@ -12336,7 +12336,7 @@ def _bounded_language_choice_details(details, *, byte_budget):
         if bounded["available_truncated"]:
             # Exact live Language type selections disclose bounded query/result
             # continuations; status deliberately omits this inventory.
-            bounded["language_discovery"] = {"available": False, "missing_seam": "paginated_project_language_choices"}
+            bounded["language_discovery"] = {"available": True, "source": "metadata_types_exact_Language", "membership_bound": 1000, "follow": "query_command_then_result_detail_next_command"}
         if len(canonical_json_bytes(bounded)) <= byte_budget:
             return bounded
         if not bounded["available"]:
