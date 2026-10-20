@@ -1,0 +1,1464 @@
+{
+  "origin": {
+    "candidate": "b50f80078ed722d069adaa7459f94adb511f4a18",
+    "version": "2025.1",
+    "build": "2025.1.7.9143",
+    "receipt_sha256": "2200b6e23a49525be4e8ae4470a15341cab45357aa53f82b9b17c061b15a324e"
+  },
+  "catalog": {
+    "return": [
+      {
+        "classId": 12451843,
+        "name": "Wwise 3D Audio Bed Mixer",
+        "type": "Effect"
+      },
+      {
+        "classId": 8257539,
+        "name": "Wwise Guitar Distortion",
+        "type": "Effect"
+      },
+      {
+        "classId": 1572880,
+        "name": "ObjectSettingAssoc",
+        "type": "WObject"
+      },
+      {
+        "classId": 8912899,
+        "name": "Wwise Pitch Shifter",
+        "type": "Effect"
+      },
+      {
+        "classId": 13107202,
+        "name": "Wwise Audio Input",
+        "type": "Source"
+      },
+      {
+        "classId": 3932176,
+        "name": "MusicClip",
+        "type": "WObject"
+      },
+      {
+        "classId": 7077891,
+        "name": "Wwise Compressor",
+        "type": "Effect"
+      },
+      {
+        "classId": 8192003,
+        "name": "Wwise Flanger",
+        "type": "Effect"
+      },
+      {
+        "classId": 7143427,
+        "name": "Wwise Expander",
+        "type": "Effect"
+      },
+      {
+        "classId": 6946819,
+        "name": "Wwise Delay",
+        "type": "Effect"
+      },
+      {
+        "classId": 9109507,
+        "name": "Wwise Gain",
+        "type": "Effect"
+      },
+      {
+        "classId": 9043971,
+        "name": "Wwise Harmonizer",
+        "type": "Effect"
+      },
+      {
+        "classId": 11730951,
+        "name": "Controller Speaker",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 7536643,
+        "name": "Wwise Matrix Reverb",
+        "type": "Effect"
+      },
+      {
+        "classId": 65537,
+        "name": "PCM",
+        "type": "Conversion"
+      },
+      {
+        "classId": 12648451,
+        "name": "Ak Sidechain Send",
+        "type": "Effect"
+      },
+      {
+        "classId": 8454147,
+        "name": "Wwise Meter",
+        "type": "Effect"
+      },
+      {
+        "classId": 262145,
+        "name": "Vorbis",
+        "type": "Conversion"
+      },
+      {
+        "classId": 8650755,
+        "name": "Wwise Recorder",
+        "type": "Effect"
+      },
+      {
+        "classId": 12845059,
+        "name": "Wwise Multiband Meter",
+        "type": "Effect"
+      },
+      {
+        "classId": 6881283,
+        "name": "Wwise Parametric EQ",
+        "type": "Effect"
+      },
+      {
+        "classId": 4063248,
+        "name": "MusicClipMidi",
+        "type": "WObject"
+      },
+      {
+        "classId": 11403271,
+        "name": "System",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 7208963,
+        "name": "Wwise Peak Limiter",
+        "type": "Effect"
+      },
+      {
+        "classId": 12976131,
+        "name": "Wwise Recorder (ADM)",
+        "type": "Effect"
+      },
+      {
+        "classId": 2490384,
+        "name": "MusicStinger",
+        "type": "WObject"
+      },
+      {
+        "classId": 11927559,
+        "name": "Remote System",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 7733251,
+        "name": "Wwise RoomVerb",
+        "type": "Effect"
+      },
+      {
+        "classId": 5373968,
+        "name": "Marker",
+        "type": "WObject"
+      },
+      {
+        "classId": 131073,
+        "name": "ADPCM",
+        "type": "Conversion"
+      },
+      {
+        "classId": 8519683,
+        "name": "Wwise Time Stretch",
+        "type": "Effect"
+      },
+      {
+        "classId": 12713987,
+        "name": "Ak Sidechain Receive",
+        "type": "Effect"
+      },
+      {
+        "classId": 5439504,
+        "name": "MultiSwitchEntry",
+        "type": "WObject"
+      },
+      {
+        "classId": 8585219,
+        "name": "Wwise Tremolo",
+        "type": "Effect"
+      },
+      {
+        "classId": 12779522,
+        "name": "Ak Sidechain Source",
+        "type": "Source"
+      },
+      {
+        "classId": 6619138,
+        "name": "Wwise Silence",
+        "type": "Source"
+      },
+      {
+        "classId": 6553602,
+        "name": "Wwise Sine",
+        "type": "Source"
+      },
+      {
+        "classId": 8847363,
+        "name": "Wwise Stereo Delay",
+        "type": "Effect"
+      },
+      {
+        "classId": 262160,
+        "name": "Event",
+        "type": "WObject"
+      },
+      {
+        "classId": 1310721,
+        "name": "WEM Opus",
+        "type": "Conversion"
+      },
+      {
+        "classId": 9699330,
+        "name": "Wwise Synth One",
+        "type": "Source"
+      },
+      {
+        "classId": 327696,
+        "name": "Action",
+        "type": "WObject"
+      },
+      {
+        "classId": 5570560,
+        "name": "MetadataSlot",
+        "type": "Inner"
+      },
+      {
+        "classId": 58982409,
+        "name": "Wwise System Output Settings",
+        "type": "Metadata"
+      },
+      {
+        "classId": 6684674,
+        "name": "Wwise Tone Generator",
+        "type": "Source"
+      },
+      {
+        "classId": 11468807,
+        "name": "DVR Bypass",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 11534343,
+        "name": "Communication",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 11599879,
+        "name": "Controller Headphones",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 2359312,
+        "name": "MusicPlaylistItem",
+        "type": "WObject"
+      },
+      {
+        "classId": 11796487,
+        "name": "Auxiliary",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 2424848,
+        "name": "MusicTransition",
+        "type": "WObject"
+      },
+      {
+        "classId": 11862023,
+        "name": "No Output",
+        "type": "AudioDevice"
+      },
+      {
+        "classId": 5636096,
+        "name": "PlaylistSlot",
+        "type": "Inner"
+      },
+      {
+        "classId": 5767168,
+        "name": "EntryPathSlot",
+        "type": "Inner"
+      },
+      {
+        "classId": 2752528,
+        "name": "Panner",
+        "type": "WObject"
+      },
+      {
+        "classId": 4980752,
+        "name": "ActionException",
+        "type": "WObject"
+      },
+      {
+        "classId": 786448,
+        "name": "Position",
+        "type": "WObject"
+      },
+      {
+        "classId": 720912,
+        "name": "Path2D",
+        "type": "WObject"
+      },
+      {
+        "classId": 917520,
+        "name": "Curve",
+        "type": "WObject"
+      },
+      {
+        "classId": 2555920,
+        "name": "MusicFade",
+        "type": "WObject"
+      },
+      {
+        "classId": 3866640,
+        "name": "MusicCue",
+        "type": "WObject"
+      },
+      {
+        "classId": 16,
+        "name": "AudioFileSource",
+        "type": "WObject"
+      },
+      {
+        "classId": 5242896,
+        "name": "MidiFileSource",
+        "type": "WObject"
+      },
+      {
+        "classId": 5046288,
+        "name": "MusicEventCue",
+        "type": "WObject"
+      },
+      {
+        "classId": 5701632,
+        "name": "ArgumentsSlot",
+        "type": "Inner"
+      },
+      {
+        "classId": 3014672,
+        "name": "DialogueEvent",
+        "type": "WObject"
+      },
+      {
+        "classId": 1179664,
+        "name": "SoundBank",
+        "type": "WObject"
+      },
+      {
+        "classId": 1245200,
+        "name": "SwitchGroup",
+        "type": "WObject"
+      },
+      {
+        "classId": 1310736,
+        "name": "Switch",
+        "type": "WObject"
+      },
+      {
+        "classId": 458768,
+        "name": "StateGroup",
+        "type": "WObject"
+      },
+      {
+        "classId": 393232,
+        "name": "State",
+        "type": "WObject"
+      },
+      {
+        "classId": 5177360,
+        "name": "CustomState",
+        "type": "WObject"
+      },
+      {
+        "classId": 5570576,
+        "name": "StateGroupInfo",
+        "type": "WObject"
+      },
+      {
+        "classId": 1507344,
+        "name": "GameParameter",
+        "type": "WObject"
+      },
+      {
+        "classId": 4128784,
+        "name": "MidiParameter",
+        "type": "WObject"
+      },
+      {
+        "classId": 2621456,
+        "name": "Trigger",
+        "type": "WObject"
+      },
+      {
+        "classId": 1048592,
+        "name": "SourcePlugin",
+        "type": "WObject"
+      },
+      {
+        "classId": 1114128,
+        "name": "Effect",
+        "type": "WObject"
+      },
+      {
+        "classId": 5308432,
+        "name": "Metadata",
+        "type": "WObject"
+      },
+      {
+        "classId": 2686992,
+        "name": "Attenuation",
+        "type": "WObject"
+      },
+      {
+        "classId": 3604496,
+        "name": "Conversion",
+        "type": "WObject"
+      },
+      {
+        "classId": 4259856,
+        "name": "ModulatorEnvelope",
+        "type": "WObject"
+      },
+      {
+        "classId": 4194320,
+        "name": "ModulatorLfo",
+        "type": "WObject"
+      },
+      {
+        "classId": 5111824,
+        "name": "ModulatorTime",
+        "type": "WObject"
+      },
+      {
+        "classId": 4653072,
+        "name": "AudioDevice",
+        "type": "WObject"
+      },
+      {
+        "classId": 4718608,
+        "name": "AcousticTexture",
+        "type": "WObject"
+      },
+      {
+        "classId": 3473424,
+        "name": "MixingSession",
+        "type": "WObject"
+      },
+      {
+        "classId": 1703952,
+        "name": "SoundcasterSession",
+        "type": "WObject"
+      },
+      {
+        "classId": 4325392,
+        "name": "ControlSurfaceSession",
+        "type": "WObject"
+      },
+      {
+        "classId": 4390928,
+        "name": "ControlSurfaceBinding",
+        "type": "WObject"
+      },
+      {
+        "classId": 4456464,
+        "name": "ControlSurfaceBindingGroup",
+        "type": "WObject"
+      },
+      {
+        "classId": 5701648,
+        "name": "MediaPoolQuery",
+        "type": "WObject"
+      },
+      {
+        "classId": 5767184,
+        "name": "MediaPoolFilter",
+        "type": "WObject"
+      },
+      {
+        "classId": 2097168,
+        "name": "Query",
+        "type": "WObject"
+      },
+      {
+        "classId": 2162704,
+        "name": "SearchCriteria",
+        "type": "WObject"
+      },
+      {
+        "classId": 983056,
+        "name": "Modifier",
+        "type": "WObject"
+      },
+      {
+        "classId": 1376272,
+        "name": "Bus",
+        "type": "WObject"
+      },
+      {
+        "classId": 3997712,
+        "name": "AuxBus",
+        "type": "WObject"
+      },
+      {
+        "classId": 65552,
+        "name": "Sound",
+        "type": "WObject"
+      },
+      {
+        "classId": 524304,
+        "name": "PropertyContainer",
+        "type": "WObject"
+      },
+      {
+        "classId": 589840,
+        "name": "RandomSequenceContainer",
+        "type": "WObject"
+      },
+      {
+        "classId": 655376,
+        "name": "SwitchContainer",
+        "type": "WObject"
+      },
+      {
+        "classId": 1900560,
+        "name": "BlendContainer",
+        "type": "WObject"
+      },
+      {
+        "classId": 1966096,
+        "name": "BlendTrack",
+        "type": "WObject"
+      },
+      {
+        "classId": 2228240,
+        "name": "MusicPlaylistContainer",
+        "type": "WObject"
+      },
+      {
+        "classId": 5832704,
+        "name": "MusicArgumentsSlot",
+        "type": "Inner"
+      },
+      {
+        "classId": 2293776,
+        "name": "MusicSwitchContainer",
+        "type": "WObject"
+      },
+      {
+        "classId": 1769488,
+        "name": "MusicSegment",
+        "type": "WObject"
+      },
+      {
+        "classId": 1835024,
+        "name": "MusicTrack",
+        "type": "WObject"
+      },
+      {
+        "classId": 3801104,
+        "name": "MusicTrackSequence",
+        "type": "WObject"
+      },
+      {
+        "classId": 3342352,
+        "name": "UserProjectSettings",
+        "type": "WObject"
+      },
+      {
+        "classId": 65011712,
+        "name": "BatchRenameSettings",
+        "type": "Inner"
+      },
+      {
+        "classId": 196624,
+        "name": "Project",
+        "type": "WObject"
+      },
+      {
+        "classId": 4522000,
+        "name": "Platform",
+        "type": "WObject"
+      },
+      {
+        "classId": 4915216,
+        "name": "Language",
+        "type": "WObject"
+      },
+      {
+        "classId": 3538960,
+        "name": "PluginDataSource",
+        "type": "WObject"
+      },
+      {
+        "classId": 1441808,
+        "name": "RTPC",
+        "type": "WObject"
+      },
+      {
+        "classId": 3670032,
+        "name": "ExternalSourceFile",
+        "type": "WObject"
+      },
+      {
+        "classId": 3735568,
+        "name": "ExternalSource",
+        "type": "WObject"
+      },
+      {
+        "classId": 1638416,
+        "name": "WorkUnit",
+        "type": "WObject"
+      },
+      {
+        "classId": 131088,
+        "name": "Folder",
+        "type": "WObject"
+      },
+      {
+        "classId": 5505040,
+        "name": "EffectSlot",
+        "type": "WObject"
+      },
+      {
+        "classId": 5636112,
+        "name": "SidechainMix",
+        "type": "WObject"
+      },
+      {
+        "classId": 5898240,
+        "name": "MediaPoolDatabasePath",
+        "type": "Inner"
+      },
+      {
+        "classId": 5832720,
+        "name": "MediaPoolDatabase",
+        "type": "WObject"
+      }
+    ]
+  },
+  "property_names": {
+    "return": [
+      "StartFreqRandMax",
+      "AttackTime",
+      "ReleaseTime",
+      "WaveGain",
+      "DecayTime",
+      "ChannelMask",
+      "SweepFreqType",
+      "SweepFreq",
+      "StartFreq",
+      "WaveType",
+      "StartFreqRandMin",
+      "StopFreq",
+      "FixDur",
+      "StopFreqRandMin",
+      "DurMode",
+      "SustainTime",
+      "StopFreqRandMax",
+      "SustainLevel"
+    ]
+  },
+  "properties": {
+    "StartFreq": {
+      "audioEngineId": 1,
+      "default": 1000.0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency",
+        "index": 1454,
+        "name": "Start Frequency"
+      },
+      "name": "StartFreq",
+      "restriction": {
+        "max": 20000.0,
+        "min": 20.0,
+        "type": "range"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "Exclusive",
+        "unlink": false
+      },
+      "type": "Real32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "Frequency",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 1,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 20000.0,
+          "min": 20.0,
+          "step": 0.0
+        }
+      }
+    },
+    "StartFreqRandMax": {
+      "audioEngineId": 3,
+      "default": 0.0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency",
+        "index": 1456,
+        "name": "Start Frequency Random Max"
+      },
+      "name": "StartFreqRandMax",
+      "restriction": {
+        "max": 12000.0,
+        "min": 0.0,
+        "type": "range"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "Real32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 1000.0,
+          "min": 0.0,
+          "step": 0.0
+        }
+      }
+    },
+    "StartFreqRandMin": {
+      "audioEngineId": 2,
+      "default": 0.0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency",
+        "index": 1455,
+        "name": "Start Frequency Random Min"
+      },
+      "name": "StartFreqRandMin",
+      "restriction": {
+        "max": 0.0,
+        "min": -12000.0,
+        "type": "range"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "Real32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 0.0,
+          "min": -1000.0,
+          "step": 0.0
+        }
+      }
+    },
+    "StopFreq": {
+      "audioEngineId": 6,
+      "default": 1000.0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "True",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "SweepFreq",
+          "type": "property"
+        },
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency/Sweep Frequency",
+        "index": 1459,
+        "name": "Stop Frequency"
+      },
+      "name": "StopFreq",
+      "restriction": {
+        "max": 20000.0,
+        "min": 20.0,
+        "type": "range"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "Exclusive",
+        "unlink": false
+      },
+      "type": "Real32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "Frequency",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 1,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 20000.0,
+          "min": 20.0,
+          "step": 0.0
+        }
+      }
+    },
+    "StopFreqRandMax": {
+      "audioEngineId": 8,
+      "default": 0.0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "True",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "SweepFreq",
+          "type": "property"
+        },
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency/Sweep Frequency",
+        "index": 1461,
+        "name": "Start Frequency Random Max"
+      },
+      "name": "StopFreqRandMax",
+      "restriction": {
+        "max": 12000.0,
+        "min": 0.0,
+        "type": "range"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "Real32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 1000.0,
+          "min": 0.0,
+          "step": 0.0
+        }
+      }
+    },
+    "StopFreqRandMin": {
+      "audioEngineId": 7,
+      "default": 0.0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "True",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "SweepFreq",
+          "type": "property"
+        },
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency/Sweep Frequency",
+        "index": 1460,
+        "name": "Stop Frequency Random Min"
+      },
+      "name": "StopFreqRandMin",
+      "restriction": {
+        "max": 0.0,
+        "min": -12000.0,
+        "type": "range"
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "Real32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 0.0,
+          "min": -1000.0,
+          "step": 0.0
+        }
+      }
+    },
+    "SweepFreq": {
+      "audioEngineId": 4,
+      "default": false,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency/Sweep Frequency",
+        "index": 1457,
+        "name": "Sweep Frequency"
+      },
+      "name": "SweepFreq",
+      "restriction": {},
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "bool",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 0.0,
+          "min": 0.0,
+          "step": 0.0
+        }
+      }
+    },
+    "SweepFreqType": {
+      "audioEngineId": 5,
+      "default": 0,
+      "dependencies": [
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "True",
+                    "value": true
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "SweepFreq",
+          "type": "property"
+        },
+        {
+          "action": "Enable",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "displayName": "0",
+                    "value": 0
+                  },
+                  {
+                    "displayName": "1",
+                    "value": 1
+                  },
+                  {
+                    "displayName": "2",
+                    "value": 2
+                  },
+                  {
+                    "displayName": "3",
+                    "value": 3
+                  }
+                ]
+              }
+            }
+          ],
+          "context": "Self",
+          "property": "WaveType",
+          "type": "property"
+        }
+      ],
+      "display": {
+        "group": "Frequency/Sweep Frequency",
+        "index": 1458,
+        "name": "Sweep Frequency Type"
+      },
+      "name": "SweepFreqType",
+      "restriction": {
+        "type": "enum",
+        "values": [
+          {
+            "displayName": "Linear",
+            "value": 0
+          },
+          {
+            "displayName": "Logarithmic",
+            "value": 1
+          }
+        ]
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "int32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 0.0,
+          "min": 0.0,
+          "step": 0.0
+        }
+      }
+    },
+    "WaveType": {
+      "audioEngineId": 9,
+      "default": 0,
+      "dependencies": [],
+      "display": {
+        "group": "Waveform",
+        "index": 1462,
+        "name": "Waveform"
+      },
+      "name": "WaveType",
+      "restriction": {
+        "type": "enum",
+        "values": [
+          {
+            "displayName": "Sine",
+            "value": 0
+          },
+          {
+            "displayName": "Triangular",
+            "value": 1
+          },
+          {
+            "displayName": "Square",
+            "value": 2
+          },
+          {
+            "displayName": "Sawtooth",
+            "value": 3
+          },
+          {
+            "displayName": "White noise",
+            "value": 4
+          },
+          {
+            "displayName": "Pink noise",
+            "value": 5
+          }
+        ]
+      },
+      "supports": {
+        "randomizer": false,
+        "rtpc": "None",
+        "unlink": false
+      },
+      "type": "int32",
+      "ui": {
+        "autoUpdate": false,
+        "dataMeaning": "None",
+        "displayAs": {
+          "bitfield": false,
+          "lrMix": false,
+          "musicNote": false,
+          "percentage": false
+        },
+        "value": {
+          "decimals": 0,
+          "fine": 0.0,
+          "infinity": 0,
+          "max": 0.0,
+          "min": 0.0,
+          "step": 0.0
+        }
+      }
+    }
+  },
+  "native_members": [
+    {
+      "archive_name": "native-2.json",
+      "api": "ak.wwise.core.object.getTypes",
+      "sha256": "e845e22ef01ae585b447df48f938ff07fe4053a1a041785ead8c28220b5319b4"
+    },
+    {
+      "archive_name": "native-11.json",
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "sha256": "baa1210ece02ba29028cd56523a3c7d48986aef488713d01d2c30dad58be8ade"
+    },
+    {
+      "archive_name": "native-12.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "cf382a4afe557d6794a82cd0832f9292610e1ffc64f909adc277419a9c8a473e"
+    },
+    {
+      "archive_name": "native-13.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "580b98e0b590902c15888f4b2cc1832e50f7d332db311317f9728d94141d761a"
+    },
+    {
+      "archive_name": "native-14.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "5d475be6856ccc301d5976b68d4327c7da6dc63b92fb262b79d6f38a4fb27af8"
+    },
+    {
+      "archive_name": "native-15.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "72f5af16b752e184e65beb24a91ae2dd2717bac3cfee13cd8b5c0e1d4a5f2e48"
+    },
+    {
+      "archive_name": "native-16.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "934f961213fa269b31b9bb70eb9ed5657dc1358b8748a683d8bf1b6c15697318"
+    },
+    {
+      "archive_name": "native-17.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "f6c699c9794fc58642e687a1ba91dd74ca387f9b62c5d9c31af34ae199598b7e"
+    },
+    {
+      "archive_name": "native-18.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "5d16986269285ff1bdbd155ebf4934e471fcdda913840bd1b981bee08964abe3"
+    },
+    {
+      "archive_name": "native-19.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "b02155dddccae41014924011b44bf724da04df67444a1c8828a7cbbcce3fec55"
+    },
+    {
+      "archive_name": "native-20.json",
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "sha256": "e8f6fdea0440df819c6ef16fb1cf992ee1503613aaa6c7581032e0467868c4c8"
+    }
+  ],
+  "languages": [
+    {
+      "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+      "name": "English(US)",
+      "type": "Language",
+      "path": "English(US)"
+    },
+    {
+      "id": "{A16779F6-31AE-49D7-8073-75A9B6A7712E}",
+      "name": "External",
+      "type": "Language",
+      "path": "External"
+    },
+    {
+      "id": "{E78A31D1-1469-4D88-86B4-45E6C18DF445}",
+      "name": "Mixed",
+      "type": "Language",
+      "path": "Mixed"
+    },
+    {
+      "id": "{85A66963-A627-476E-91C1-2770B39D245A}",
+      "name": "SFX",
+      "type": "Language",
+      "path": "SFX"
+    }
+  ]
+}

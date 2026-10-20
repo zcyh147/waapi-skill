@@ -4734,3 +4734,95 @@ def test_planned_source_collector_preserves_failed_native_effect_and_never_retri
     if fault == 'extra-child':
         assert 'changed the original owner/Source' in receipt['failure']['message']
     assert receipt['native_evidence'] and receipt['failure']
+
+
+def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
+    """Reuse the public workflow producer, with exact retained Tone metadata."""
+    from copy import deepcopy
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native.json').read_text())
+    task.types = deepcopy(fixture['catalog']['return'])
+    from tests.unit.test_sound_voice_creation_gateway import SECOND
+    task.objects[SECOND]['classId'] = 1638416
+    task.objects[SECOND]['parent'] = None
+    task.languages = deepcopy(fixture['languages'])
+    task.metadata.pop('Frequency')
+    task.metadata.update(deepcopy(fixture['properties']))
+    create = task._create
+    def create_source(node, parent, *, owned=False):
+        result = create(node, parent, owned=owned)
+        if node['type'] == 'Source':
+            row = task.objects[result['id']]
+            row.pop('@Frequency', None)
+            row.setdefault('@StartFreq', 1000.0)
+            row.setdefault('@WaveType', 0)
+            # Native default is modeled independently of the requested setter.
+            if task.objects[parent]['activeSource'] is None:
+                task.objects[parent]['activeSource'] = {'id': row['id'], 'name': row['name']}
+        return result
+    task._create = create_source
+    original = task.call
+    selections = []
+    def call(uri, args=None, options=None):
+        scope = (args or {}).get('object')
+        source_scope = scope == 6684674 or task.objects.get(scope, {}).get('type') in {'Source', 'SourcePlugin'}
+        if uri.endswith('getPropertyAndReferenceNames') and source_scope:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return deepcopy(fixture['property_names'])
+        if uri == 'ak.wwise.core.sound.setActiveSource':
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); selections.append(deepcopy(args))
+            owner, source = task.objects[args['sound']], task.objects[args['source']]
+            if fault != 'ignored': owner['activeSource'] = {'id': source['id'], 'name': source['name']}
+            if fault == 'source-field':
+                other = next(r for r in task.objects.values() if r['type'] == 'SourcePlugin' and r['id'] != source['id'])
+                other['@StartFreq'] = 999
+            if fault == 'extra-child':
+                identity = '{FEFEFEFE-FEFE-FEFE-FEFE-FEFEFEFEFEFE}'
+                task.objects[identity] = dict(source, id=identity, name='Unexpected', path=owner['path'] + r'\Unexpected')
+            return {}
+        return original(uri, args, options)
+    task.call = call
+    return runtime, commands, writes, selections, task
+
+
+def test_source_plugin_selection_collector_requires_distinct_guid_change_and_preserves_original_bytes(tmp_path, workflow):
+    import hashlib
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow)
+    category = workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_TEST')
+    path = Path(category['observation_path']); receipt = json.loads(path.read_text())
+    assert category['status'] == 'PASS' and receipt['business_effect_verified'] is True
+    assert len(writes) == 3 and len(selections) == 1 and len(receipt['transaction_ids']) == 4
+    assert len(commands) == receipt['limits']['calls'] == 70
+    assert len({argv[1] for argv in commands if argv[0] == 'execute'}) == 4
+    assert receipt['selection']['before_active_id'] != receipt['selection']['requested_active_id']
+    assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id']
+    assert receipt['selection']['preserved_before'] == receipt['selection']['preserved_after']
+    assert category['observation_sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+    assert receipt['metadata_selection']['frequency']['metadata']['name'] == 'StartFreq'
+    assert receipt['metadata_selection']['waveform']['metadata']['name'] == 'WaveType'
+    for row in receipt['native_evidence']:
+        raw = Path(row['archive_path']).read_bytes()
+        assert raw == Path(row['native_path']).read_bytes() and hashlib.sha256(raw).hexdigest() == row['sha256']
+
+
+@pytest.mark.parametrize('fault', ['ignored', 'source-field', 'extra-child'])
+def test_source_plugin_selection_collector_cannot_accept_ignored_effect_or_lost_preservation(tmp_path, workflow, fault):
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_TEST')
+    receipt = json.loads((runtime.state_dir / 'source-plugin-selection.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['collection_complete'] is False
+    assert len(writes) == 3 and len(selections) == 1
+    executes = [argv[1] for argv in commands if argv[0] == 'execute']
+    assert len(executes) == len(set(executes)) == 4
+    assert receipt['selection']['before_active_id'] != receipt['selection']['requested_active_id']
+    phase = receipt['phases'][-1]
+    expected = 'verification_failed' if fault == 'ignored' else 'verified'
+    assert phase['verify']['payload']['state'] == phase['final_transaction']['state'] == expected
+    if fault != 'ignored':
+        assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id']
+        assert receipt['selection']['preserved_before'] != receipt['selection']['preserved_after']
+        assert 'preserved' in receipt['failure']['message']
+    assert receipt['native_evidence'] and receipt['failure']
