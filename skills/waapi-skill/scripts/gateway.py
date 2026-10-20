@@ -16851,6 +16851,29 @@ def dispatch_voice_source_continuation(args, *, env, connection, detected_versio
     return payload
 
 
+def source_copy_save_choice(next_command, *, stage, state_dir):
+    """Disclose refusal without changing the normal policy-owned continuation."""
+    return {
+        'contract': 'waapi-skill.source-copy-save-choice/v1',
+        'stage': stage,
+        'selection_source': 'explicit_decline_otherwise_existing_policy',
+        'save_notice': 'Save persists all pending changes in the current project, including changes outside this copy.',
+        'evaluate_in_order': [
+            {'choice': 'decline_save', 'condition': 'user_explicitly_declines_save',
+                'command_pointer': '/continuation/next_command'},
+            {'choice': 'prepare_save', 'condition': 'otherwise_continue_under_existing_policy',
+                'command_pointer': '/next_command'},
+        ],
+        'first_true_choice_is_the_only_next_action': True,
+        'decline_outcome': {'executes_save': False, 'complete_copy_preservation': False,
+            'remaining_scope': 'ordinary_live_copy_observations',
+            'remaining_action': ('normal_copy_preview_and_authorization' if stage == 'baseline'
+                else 'finalize_existing_copy_without_complete_saved_proof')},
+        'next_command': transaction_next_command('continue-source-copy-proof',
+            [*next_command['gateway_argv'], '--decline-save'], state_dir=state_dir),
+    }
+
+
 def dispatch_source_copy_proof(args, *, env, connection, detected_version, live_info, dispatcher, common):
     try:
         return _dispatch_source_copy_proof(args, env=env, connection=connection, detected_version=detected_version,
@@ -16988,6 +17011,9 @@ def _source_copy_child_payload(args, child, origin, *, state_dir, common, detect
     payload['source_copy_saved_proof'] = {'stage': origin['stage'],
         'parent': {key: value for key, value in origin['parent'].items() if key in {'draft_id', 'transaction_id'}},
         'save_notice': 'Save persists all pending changes in the current project, including changes outside this copy.',
+        'decline_choice_source': {'response': 'earlier_source_copy_save_choice',
+            'command_pointer': '/continuation/next_command', 'may_use_prior_command': True,
+            'current_backend_guards_apply': True, 'valid_only_before_save_attempt': True},
         'complete_copy_preservation': False, 'automatic_retry': False}
     return payload
 
@@ -17404,6 +17430,7 @@ def dispatch_operation_draft_check(
         payload['next_command'] = transaction_next_command('continue-source-copy-proof',
             ['continue-source-copy-proof', record.draft_id, '--task-authority', args.task_authority,
                 '--expected-revision', str(record.revision)], state_dir=args.state_dir)
+        payload['continuation'] = source_copy_save_choice(payload['next_command'], stage='baseline', state_dir=args.state_dir)
     return payload
 
 
@@ -22982,6 +23009,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 'verified': False, 'automatic_retry': False, 'verification': successful_verification_result_summary(verification.as_dict()),
                 'source_copy_saved_proof': {'baseline_origin': saved_baseline['origin'], 'baseline_digest': saved_baseline['digest'],
                     'complete_copy_preservation': False, 'remaining': 'separately authorized final Save then strict saved readback'},
+                'continuation': source_copy_save_choice(next_command, stage='final', state_dir=args.state_dir),
                 'next_command': next_command, 'cleanup': cleanup,
                 'agent_result': transaction_agent_result(request=request_payload, transaction_id=transaction_id,
                     artifact_hash=preview.artifact_hash, state=record.state.value, executed=True, verified=False,

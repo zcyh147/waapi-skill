@@ -157,7 +157,7 @@ def test_declined_unexecuted_allowed_save_finalizes_live_scope_and_blocks_stale_
     assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
     preview = final_save_preview(task, pending)
     assert preview['state'] == 'policy_authorized'
-    code, declined = task.run('continue-source-copy-proof', tx, '--decline-save')
+    code, declined = task.run(*disclosed_decline(pending, 'final'))
     assert code == 0 and declined['state'] == 'verified', declined
     scope = declined['verification']['verification_scope']
     assert scope['complete_copy_preservation'] is False
@@ -190,7 +190,7 @@ def test_refusal_cannot_finalize_parent_while_owned_save_is_executing(tmp_path):
         execution = executor.submit(task.run, 'execute', preview['transaction_id'])
         try:
             assert started.wait(5)
-            code, refusal = task.run('continue-source-copy-proof', tx, '--decline-save')
+            code, refusal = task.run(*disclosed_decline(pending, 'final'))
             assert code == 2 and refusal['error_code'] == 'TRANSACTION_EXECUTION_IN_PROGRESS', refusal
             code, parent = task.run('transaction-show', tx, '--summary-only')
             assert code == 0 and parent['state'] == 'executed_unverified'
@@ -199,7 +199,7 @@ def test_refusal_cannot_finalize_parent_while_owned_save_is_executing(tmp_path):
         code, result = execution.result(timeout=5)
         assert code == 0, result
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy', 'save']
-    assert task.run('continue-source-copy-proof', tx, '--decline-save')[0] == 2
+    assert task.run(*disclosed_decline(pending, 'final'))[0] == 2
 
 
 def checked_dirty_parent(task):
@@ -227,6 +227,119 @@ def authorize_execute_verify(task, tx):
     code, executed = task.run('execute', tx); assert code == 0, executed
     code, verified = task.run('verify', tx); assert code == 0, verified
     return verified
+
+
+def disclosed_decline(payload, stage):
+    """Select the public refusal; never append a flag to an accepted command."""
+    choice = payload['continuation']
+    assert choice['contract'] == 'waapi-skill.source-copy-save-choice/v1'
+    assert choice['stage'] == stage
+    assert choice['selection_source'] == 'explicit_decline_otherwise_existing_policy'
+    assert choice['first_true_choice_is_the_only_next_action'] is True
+    assert choice['evaluate_in_order'] == [
+        {'choice': 'decline_save', 'condition': 'user_explicitly_declines_save',
+         'command_pointer': '/continuation/next_command'},
+        {'choice': 'prepare_save', 'condition': 'otherwise_continue_under_existing_policy',
+         'command_pointer': '/next_command'},
+    ]
+    assert choice['decline_outcome']['complete_copy_preservation'] is False
+    assert choice['decline_outcome']['executes_save'] is False
+    command = choice['next_command']
+    assert command['contract'] == payload['next_command']['contract']
+    assert command['copy_exactly'] is True
+    assert command['gateway_argv'][-1] == '--decline-save'
+    assert not payload['next_command'].get('requires_explicit_user_confirmation')
+    assert not payload['next_command'].get('requires_later_user_message')
+    return command['gateway_argv']
+
+
+@pytest.mark.parametrize('stage', ['baseline', 'final'])
+def test_optional_source_save_discloses_exact_refusal_valid_after_child_issue(tmp_path, stage):
+    runtime, writes, task = saved_source_task(tmp_path)
+    if stage == 'baseline':
+        pending = checked_dirty_parent(task)
+    else:
+        tx = public_copy(task)
+        code, pending = task.run('verify', tx)
+        assert code == 0, pending
+    decline = disclosed_decline(pending, stage)
+    code, child = task.run(*pending['next_command']['gateway_argv'])
+    assert code == 0, child
+    assert child['source_copy_saved_proof']['decline_choice_source'] == {
+        'response': 'earlier_source_copy_save_choice',
+        'command_pointer': '/continuation/next_command',
+        'may_use_prior_command': True,
+        'current_backend_guards_apply': True,
+        'valid_only_before_save_attempt': True,
+    }
+    # The previously issued command remains valid after child issuance. Child
+    # projection itself must not disclose the private baseline parent token.
+    if stage == 'baseline':
+        parent_token = decline[decline.index('--task-authority') + 1]
+        assert parent_token not in json.dumps(child)
+    code, refused = task.run(*decline)
+    assert code == 0, refused
+    if stage == 'baseline':
+        code, checked = task.run(*refused['next_command']['gateway_argv'])
+        assert code == 0, checked
+        code, preview = task.run(*checked['next_command']['gateway_argv'])
+        assert code == 0, preview
+        refused = authorize_execute_verify(task, preview['transaction_id'])
+    assert refused['verified'] is True
+    assert refused['verification']['verification_scope']['complete_copy_preservation'] is False
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_disclosed_choice_preserves_save_preview_policy_and_exact_incomplete_refusal(tmp_path, policy):
+    runtime, writes, task = saved_source_task(tmp_path)
+    tx = public_copy(task)
+    assert task.run('config-set', '--project-modification-policy', policy)[0] == 0
+    code, pending = task.run('verify', tx)
+    assert code == 0, pending
+    decline = disclosed_decline(pending, 'final')
+    code, child = task.run(*pending['next_command']['gateway_argv'])
+    assert code == 0, child
+    code, checked = task.run(*child['next_command']['gateway_argv'])
+    assert code == 0, checked
+    code, preview = task.run(*checked['next_command']['gateway_argv'])
+    if policy == 'read_only':
+        assert code == 2, preview
+    else:
+        assert code == 0, preview
+        assert preview['state'] == ('policy_authorized' if policy == 'allow_changes' else 'awaiting_confirmation')
+        if policy == 'ask_before_changes':
+            assert task.run('execute', preview['transaction_id'])[0] == 2
+    code, scoped = task.run(*decline)
+    assert code == 0 and scoped['verified'], scoped
+    assert scoped['verification']['verification_scope']['complete_copy_preservation'] is False
+    if policy != 'read_only':
+        assert task.run('execute', preview['transaction_id'])[0] == 2
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
+
+
+@pytest.mark.parametrize('field', ['owner', 'authority', 'revision'])
+def test_tampered_disclosed_baseline_refusal_cannot_change_parent_or_execute_save(tmp_path, field):
+    runtime, writes, task = saved_source_task(tmp_path)
+    pending = checked_dirty_parent(task)
+    decline = disclosed_decline(pending, 'baseline')
+    code, child = task.run(*pending['next_command']['gateway_argv'])
+    assert code == 0, child
+    tampered = list(decline)
+    if field == 'owner':
+        tampered[1] = 'od1-' + '0' * 32
+    elif field == 'authority':
+        tampered[tampered.index('--task-authority') + 1] = 'da1-' + '0' * 40
+    else:
+        index = tampered.index('--expected-revision') + 1
+        tampered[index] = str(int(tampered[index]) + 1)
+    code, rejected = task.run(*tampered)
+    assert code == 2 and 'next_command' not in rejected, rejected
+    # The original exact command is still valid: tampering neither changed its
+    # parent binding nor cancelled the operation-owned child on another scope.
+    code, refused = task.run(*decline)
+    assert code == 0 and refused['draft']['draft_id'] == pending['draft']['draft_id'], refused
+    assert writes == []
 
 
 def test_dirty_baseline_save_returns_exact_parent_after_gateway_restart_then_completes_copy(tmp_path):
@@ -319,7 +432,7 @@ def test_baseline_refusal_invalidates_previously_allowed_save_and_keeps_ordinary
     checked = checked_dirty_parent(task)
     assert task.run('config-set', '--project-modification-policy', 'allow_changes')[0] == 0
     save = final_save_preview(task, checked)
-    code, refusal = task.run(*checked['next_command']['gateway_argv'], '--decline-save')
+    code, refusal = task.run(*disclosed_decline(checked, 'baseline'))
     assert code == 0, refusal
     assert task.run('execute', save['transaction_id'])[0] == 2
     code, parent = task.run(*refusal['next_command']['gateway_argv']); assert code == 0, parent
@@ -346,7 +459,7 @@ def test_saved_graph_corruption_cannot_finish_or_downgrade_copy(tmp_path, fault)
     elif fault == 'missing-member': source.find('.//Reference/Custom').clear()
     else: task.objects[SAVED_ROLES['control_input'][1]]['shortId'] += 1
     tree.write(model)
-    code, failed = task.run('continue-source-copy-proof', tx, '--decline-save')
+    code, failed = task.run(*disclosed_decline(pending, 'final'))
     assert code == 2, failed  # Save already ran: refusal cannot claim prevention.
     code, failed = task.run('verify', tx)
     assert code == 2 and failed['status'] == 'verification_failed', failed
@@ -371,13 +484,13 @@ def test_baseline_refusal_is_atomic_with_owned_save_execution(tmp_path):
         execution = executor.submit(task.run, 'execute', preview['transaction_id'])
         try:
             assert started.wait(5)
-            code, refusal = task.run(*checked['next_command']['gateway_argv'], '--decline-save')
+            code, refusal = task.run(*disclosed_decline(checked, 'baseline'))
             assert code == 2 and refusal['error_code'] == 'TRANSACTION_EXECUTION_IN_PROGRESS', refusal
         finally:
             release.set()
         code, result = execution.result(timeout=5); assert code == 0, result
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save']
-    assert task.run(*checked['next_command']['gateway_argv'], '--decline-save')[0] == 2
+    assert task.run(*disclosed_decline(checked, 'baseline'))[0] == 2
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
@@ -423,7 +536,7 @@ def test_read_only_final_save_offer_cannot_dispatch_and_decline_keeps_exact_live
     code, child = task.run(*pending['next_command']['gateway_argv']); assert code == 0, child
     code, checked = task.run(*child['next_command']['gateway_argv']); assert code == 0, checked
     code, denied = task.run(*checked['next_command']['gateway_argv']); assert code == 2, denied
-    code, scoped = task.run('continue-source-copy-proof', tx, '--decline-save')
+    code, scoped = task.run(*disclosed_decline(pending, 'final'))
     assert code == 0 and scoped['verified'] and not scoped['verification']['verification_scope']['complete_copy_preservation'], scoped
     assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['copy']
 
@@ -521,7 +634,7 @@ def test_decline_distinguishes_unavailable_optional_file_from_observed_graph_cor
         source, = [row for row in tree.iter('SourcePlugin') if row.get('ID') == SOURCE]
         source.find('.//Curve/PointList/Point/YPos').text = '99'
         tree.write(file)
-    code, result = task.run('continue-source-copy-proof', tx, '--decline-save')
+    code, result = task.run(*disclosed_decline(pending, 'final'))
     if fault == 'missing-original-file':
         assert code == 0 and result['verified'], result
         scope = result['verification']['verification_scope']
@@ -623,7 +736,7 @@ def test_decline_after_independent_save_never_waives_observed_copied_owned_scala
     if fault:
         role, field, value = fault
         task.objects[SAVED_ROLES[role][1]]['@' + field] = value
-    code, result = task.run('continue-source-copy-proof', tx, '--decline-save')
+    code, result = task.run(*disclosed_decline(pending, 'final'))
     if fault:
         assert code == 2 and result['status'] == 'verification_failed', result
     else:
