@@ -64,12 +64,16 @@ def _owner(chain, model):
     return identity, scope["class_id"]
 
 
-def project_model(model, context):
+def project_model(model, context, *, edits=()):
     """Project only proved owner/member/retained-target identities, never metadata."""
-    from .object_graph_paths import project_compound_snapshot
+    from .object_graph_paths import expected_snapshot, project_compound_snapshot
     projected = deepcopy(model)
+    def declared_name(object_id):
+        return {"name": next(node["requested_name"] for node in edits
+            if str(node.get("target_id", node.get("preexisting_id"))).casefold() == object_id.casefold())}
     def identity(row):
         expected = project_compound_snapshot(row, context)
+        expected = expected_snapshot(expected, edits=edits, read_row=declared_name)
         return {key: expected[key] for key in row}
     source = projected.get("source", {})
     if isinstance(source.get("scope", {}).get("owner"), dict):
@@ -112,7 +116,7 @@ def receipt_observations(prepared, verification, *, path_context=None):
         if path_context and records[0].get("compound_path_context_sha256") != canonical_sha256(path_context):
             raise ValueError("Render observation differs from its sealed parent identity context")
         before, after = _before_model(chain), _model(chain, records[0]["observation"])
-        expected = project_model(before, path_context)
+        expected = project_model(before, path_context, edits=state.get("object_set_nodes", []))
         for original, projected in zip(chain["snapshots"], expected["snapshots"], strict=True):
             for name, value in original["after_changes"].items():
                 row = projected["rows"][0]

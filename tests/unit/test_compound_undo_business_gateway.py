@@ -4991,3 +4991,89 @@ def test_compound_render_receipt_requires_its_exact_parent_context_association(t
     _rewrite_created_graph_verification(task, source, wrong_context)
     rejected = _reject_created_graph_receipt(task, source)
     assert 'Render observation differs from its sealed parent identity context' in json.dumps(rejected), rejected
+
+
+@pytest.mark.parametrize('contradictory_class_type', [False, True], ids=['exact-reflection', 'contradictory-type'])
+def test_render_graph_revalidation_preserves_original_retained_target_before_declared_rename_and_notes(tmp_path, contradictory_class_type):
+    from copy import deepcopy
+    from tests.unit.test_list_merge_existing_conditions_gateway import list_task, select_field, EFFECT
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    task, _ = list_task(tmp_path, operation='object.set')
+    # Exact getTypes row from the pinned 2025.1 object-types inventory.
+    task.types.append({'name': 'Wwise Meter', 'classId': 8454147,
+        'type': 'Source' if contradictory_class_type else 'Effect'})
+    task.require_class_projection = True
+    before = deepcopy(task.objects)
+    after = None
+    original = task.call
+    writes = []
+    def call(uri, args=None, options=None):
+        nonlocal after
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects = deepcopy(before if uri.endswith('.undo') else after)
+            return {}
+        if uri == 'ak.wwise.core.object.set':
+            writes.append(deepcopy(args))
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            task.objects[ROOT]['@Render'] = task.objects[CHILD]['@Render'] = True
+            effect = task.objects[EFFECT]
+            effect.update(name='Renamed effect', notes='Declared effect notes',
+                path=r'\Effects\Default Work Unit\Renamed effect')
+            after = deepcopy(task.objects)
+            return {'objects': [{'id': row['object'], 'name': task.objects[row['object']]['name']}
+                for row in args['objects']]}
+        result = original(uri, args, options)
+        if uri.endswith('getProjectInfo'):
+            result.update(currentPlatformId='{44444444-4444-4444-4444-444444444444}', platforms=[
+                {'id': '{44444444-4444-4444-4444-444444444444}', 'name': 'Windows'}])
+        return result
+    task.call = call
+    slot = task.bind(CHILD)
+    render = select_field(task, owner=slot, token='Render')
+    assert task.step('draft-declare-existing', '--declaration-id', 'render', '--object-handle', slot,
+        '--field-value', render, 'true')[0] == 0
+    target = task.bind(EFFECT)
+    assert task.step('draft-declare-existing', '--declaration-id', 'effect', '--object-handle', target,
+        '--field', 'new_name', 'Renamed effect', '--field', 'notes', 'Declared effect notes')[0] == 0
+    source, shown = task.preview()
+    code, verified = task.finish(source, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(writes) == 1
+    assert task.objects[FIRST] == before[FIRST]
+    assert task.objects[EFFECT] == {**before[EFFECT], 'name': 'Renamed effect',
+        'path': r'\Effects\Default Work Unit\Renamed effect', 'notes': 'Declared effect notes'}
+    assert task.objects[ROOT]['@Render'] is True and task.objects[CHILD]['@Render'] is True
+    if contradictory_class_type:
+        rejected = _reject_created_graph_receipt(task, source)
+        assert 'Existing-field receipt original view/before/verified-after observations are unavailable' in rejected['message']
+        return
+    for direction, expected in (('undo', before), ('redo', after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == expected
+
+
+def test_render_source_without_compound_context_rejects_undeclared_opaque_member_owner_path_change(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, SECOND
+    task, source, _, _, _ = _render_history_case(tmp_path, prepared_only=True, opaque_members=True)
+    original = task.call
+    def changed_ancestor(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.setProperty':
+            task.objects[SECOND].update(name='Unexpected ancestor', path=r'\Actor-Mixer Hierarchy\Unexpected ancestor')
+            task.objects[FIRST]['path'] = r'\Actor-Mixer Hierarchy\Unexpected ancestor\Sender'
+        return result
+    task.call = changed_ancestor
+    assert task.run('confirm', source, '--confirmation-token', task.source_preview['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    code, rejected = task.run('verify', source)
+    assert code == 2 and rejected['verified'] is False, rejected
+    observations = [row for row in rejected['verification']['assertions']
+        if row.get('kind') == 'effect_render_chain_observation']
+    assert len(observations) == 1 and observations[0]['evidence']['source_matches'] is False, observations

@@ -396,13 +396,15 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
             else:
                 current = (resolve_live_list_evidence(chain["version"], chain["owner_id"], "Effects", read=read)
                 if chain["owner_id"] else resolve_class_list_evidence(chain["version"], source["scope"]["class_id"], "Effects"))
-            # Owner names/paths can change only through the ordinary prepared
-            # identity/path guards; the source class/declaration remains exact.
-                source_match = all(current[key] == source[key] for key in source if key != "scope") and current["scope"]["class_id"] == source["scope"]["class_id"]
-                if after_write and compound_path_context:
+                expected_source = deepcopy(source)
+                if after_write:
                     from .render_history_observations import project_model
                     expected_source = project_model({"source": source}, compound_path_context)["source"]
-                    source_match = source_match and r._native_snapshot_equal(current, expected_source)
+                    owner = expected_source["scope"].get("owner")
+                    if isinstance(owner, dict):
+                        projected = expected_snapshot(owner, edits=edits, read_row=read_identity)
+                        expected_source["scope"]["owner"] = {key: projected[key] for key in owner}
+                source_match = r._native_snapshot_equal(current, expected_source)
                 observed["source"] = current
             types = [row.as_dict() for row in r._read_object_type_catalog(read)
                 if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]]
@@ -481,7 +483,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
                     expected = target["before"]
                     if after_write:
                         expected = project_compound_snapshot(expected, compound_path_context)
-                    expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
+                        expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
                     target_matches = r._native_snapshot_equal(actual, [expected])
                     if optional_targets:
                         observed["targets_complete"] = observed["targets_complete"] and target_matches
