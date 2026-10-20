@@ -477,13 +477,13 @@ def read_metadata_run(descriptor, base):
         if (listed['scope'] != exact['scope'] or not any(row['name'] == target['field'] and row['selection'] == exact['selection']
                 for row in listed['fields'])):
             raise ValueError('Original class selection did not come from its own live inventory')
-        # Every current/native dependency is retained, not an intersection of
-        # the archived and newer producer closures. Source drift stays missing.
+        # Capture and reader use the same complete deduplicated collection map,
+        # including lifecycle imports. Omitted extras and source drift stay missing.
         required = {str(Path(row['path']).relative_to(collector.REPO)):row['sha256']
                     for row in collector.source_links(context['version'],selected['targets'])[1]}
-        if (not sources or any(Path(name).is_absolute() or '..' in Path(name).parts or '\\' in name for name in sources)
-                or any(sources.get(name) != value for name,value in required.items())
-                or any(hashlib.sha256((collector.REPO/name).read_bytes()).hexdigest() != value for name,value in sources.items())):
+        if (not sources or len(sources) != len(plan['source_seals'])
+                or any(Path(name).is_absolute() or '..' in Path(name).parts or '\\' in name for name in sources)
+                or sources != required):
             raise ValueError('Full class metadata source closure changed')
         return dict(context,candidate=repository['commit'],relevant_sources=sources,
             gateway={'argv':command['gateway_arguments'],'exit_code':result['exit_code'],'payload':payload},

@@ -116,7 +116,7 @@ def test_existing_scenario_reader_accepts_exact_sealed_class_native_and_public_p
 
 
 @pytest.mark.parametrize('damage',['native-bytes','wrong-class','wrong-sibling','wrong-selection','missing-default',
-    'true-vs-one','missing-parent','cleanup','source-omission','session','target-occurrence','extra-descriptor'])
+    'true-vs-one','missing-parent','cleanup','source-omission','lifecycle-source-omission','session','target-occurrence','extra-descriptor'])
 def test_class_reader_corruption_starts_from_valid_sealed_public_baseline(tmp_path,damage):
     import json,hashlib
     from tests.maintenance import branch_audit_completion as reader
@@ -139,8 +139,13 @@ def test_class_reader_corruption_starts_from_valid_sealed_public_baseline(tmp_pa
         elif damage=='true-vs-one':payload['agent_result']['metadata']['default']=native['result']['default']=1
         elif damage=='missing-parent':del payload['agent_result']['metadata']
         elif damage=='cleanup':(tmp_path/'cleanup.json').write_text(json.dumps({'process_exited':True,'residual_processes':[1]}))
-        elif damage=='source-omission':
-            plan=json.loads((tmp_path/'plan.json').read_bytes());plan['source_seals']=plan['source_seals'][1:]
+        elif damage in {'source-omission','lifecycle-source-omission'}:
+            plan=json.loads((tmp_path/'plan.json').read_bytes())
+            if damage=='lifecycle-source-omission':
+                dependency=str(collector.REPO/'tests/destructive/support/live_environment.py')
+                assert any(row['path']==dependency for row in plan['source_seals'])
+                plan['source_seals']=[row for row in plan['source_seals'] if row['path']!=dependency]
+            else:plan['source_seals']=plan['source_seals'][1:]
             (tmp_path/'plan.json').write_text(json.dumps(plan))
         elif damage=='session':
             ready=json.loads((tmp_path/'ready.json').read_bytes());ready['get_info']['processId']+=1

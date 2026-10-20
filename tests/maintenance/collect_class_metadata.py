@@ -47,6 +47,7 @@ SELECTION_ORIGINS = {
 MAX_CALLS, MAX_PAGES, PAGE_SIZE, MAX_BYTES = 48, 8, 64, 1_048_576
 MAX_NATIVE_FILES, MAX_NATIVE_BYTES = 128, 32 * 1024 * 1024
 MAX_SEALED_FILES, MAX_SEALED_BYTES = 512, 128 * 1024 * 1024
+COLLECTION_SOURCE_SCOPES = ('skills/waapi-skill','tests/semantic/support','tests/support','tests/destructive/support')
 STALE = {'METADATA_SELECTION_SCOPE_CHANGED', 'METADATA_SELECTION_EXPIRED'}
 UNRESOLVED = {'METADATA_DETAIL_TOO_LARGE', 'LIVE_METADATA_LIMIT_EXCEEDED', 'DISCOVERY_RESULT_LIMIT_EXCEEDED'}
 
@@ -139,6 +140,12 @@ def metadata_descriptors(root):
 def source_links(version, targets):
     from tests.support.metadata_replay_branch_evidence import source_seals
     sources = source_seals()
+    # One deduplicated exact closure for both capture and admission. Preserve
+    # the original tracked scopes and the lifecycle's destructive support imports.
+    tracked=subprocess.check_output(['git','ls-files','-z','--',*COLLECTION_SOURCE_SCOPES],cwd=REPO)
+    for name in tracked.decode('utf-8').split('\0'):
+        if name and name not in sources and (REPO/name).is_file():
+            sources[name]=sha(REPO/name)
     for name in ('tests/maintenance/collect_class_metadata.py','tests/unit/test_class_metadata_collection.py'):
         sources[name] = sha(REPO/name)
     return [], [{'path':str(REPO/name),'sha256':value} for name,value in sorted(sources.items())]
@@ -330,12 +337,6 @@ def main():
             parser.error('candidate checkout must be clean before launch: ' + str(checkout))
         commit = subprocess.run(['git','rev-parse','HEAD'], cwd=checkout, capture_output=True, text=True, check=True).stdout.strip()
         identities.append({'checkout': str(checkout), 'commit': commit})
-        tracked = subprocess.run(['git','ls-files','-z','skills/waapi-skill','tests/semantic/support','tests/support'],
-                                 cwd=checkout, capture_output=True, check=True).stdout
-        for name in tracked.decode('utf-8').split('\0'):
-            if name and (checkout/name).is_file():
-                sources.append({'path': str(checkout/name), 'sha256': sha(checkout/name)})
-    sources.append({'path': str(Path(__file__).absolute()), 'sha256': sha(Path(__file__))})
     sys.path[:0] = [str(repo), str(repo/'skills/waapi-skill')]
     from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
     root.mkdir(mode=0o700)
