@@ -8561,6 +8561,41 @@ def _resolve_import_audio_source_class(version, *, catalog):
     return matches[0]
 
 
+def _prepare_source_transfer_parent(source, parent, *, version, read):
+    """Certify an existing Source/Sound transfer, without a constructor claim."""
+    if parent.row.get("type") != "Sound":
+        raise OperationContractError("INVALID_TRANSFER_PARENT_TYPE", "An existing Source requires an exact Sound destination.")
+    batch = _bounded_multi_identity_read([source.object, parent.object], fields=(*IDENTITY_RETURN_FIELDS, "classId"),
+        read=read, context="Source transfer class identities")
+    if not batch["exact"]:
+        raise OperationContractError("INVALID_READBACK", "Source transfer class identities must resolve exactly once.")
+    resolved = []
+    for target in (source, parent):
+        row, = batch["rows_by_key"][_identity_key(target.object)]
+        if any(not _native_snapshot_equal(row.get(key), target.row.get(key)) for key in IDENTITY_RETURN_FIELDS):
+            raise OperationContractError("INVALID_READBACK", "Source transfer identity changed during preparation.")
+        _require_object_class_id(row.get("classId"))
+        resolved.append(replace(target, row=dict(row)))
+    source, parent = resolved
+    catalog = _read_object_type_catalog(read)
+    selected = []
+    for target in resolved:
+        matches = [row for row in catalog if row.class_id == target.row["classId"]]
+        if len(matches) != 1:
+            raise OperationContractError("INVALID_OBJECT_TYPE", "A Source transfer class must have one exact live getTypes row.")
+        selected.append(matches[0])
+    source_class, parent_class = selected
+    if parent_class.name != "Sound" or parent_class.type != "WObject":
+        raise OperationContractError("INVALID_TARGET_TYPE", "Source destination type contradicts its live Sound class.")
+    if source.row["type"] == "AudioFileSource":
+        if source_class != _resolve_import_audio_source_class(version, catalog=catalog):
+            raise OperationContractError("INVALID_TARGET_TYPE", "File Source contradicts its version-pinned live class.")
+    elif source_class.type != "Source":
+        raise OperationContractError("INVALID_TARGET_TYPE", "Source/SourcePlugin requires its exact live Source category class.")
+    return source, parent, {"class_metadata": [row.as_dict() for row in selected],
+        "objects": [{key: target.row[key] for key in ("id", "type", "classId")} for target in resolved]}
+
+
 def _prepare_object_set_import(
     descriptor: ObjectImportDescriptor,
     *,
@@ -9007,6 +9042,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     assertions, seen = [], set()
     class_bindings = [node["class_metadata"] for node in nodes if "class_metadata" in node]
     class_bindings.extend(pre_state.get("import_guard", {}).get("class_metadata", []))
+    class_bindings.extend(pre_state.get("source_transfer_parent_guard", {}).get("class_metadata", []))
     for node in nodes:
         if isinstance(node.get("import"), Mapping):
             class_bindings.extend(node["import"].get("class_metadata", []))
@@ -9043,6 +9079,14 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    transfer = pre_state.get("source_transfer_parent_guard") if isinstance(pre_state, Mapping) else None
+    if after_write and isinstance(transfer, Mapping):
+        expected = transfer["objects"]
+        batch = _bounded_multi_identity_read([row["id"] for row in expected], fields=("id", "type", "classId"),
+            read=read, context="Source transfer verified class identities")
+        assertions.append({"name": "Source and destination class identities unchanged", "passed": batch["exact"] and all(
+            batch["rows_by_key"].get(_identity_key(row["id"])) == [row] for row in expected),
+            "evidence": {"expected": expected, "actual": batch["result"]}})
     for node in (pre_state.get("object_set_nodes", []) if isinstance(pre_state, Mapping) else ()):
         owner = node.get("source_owner")
         if owner is None:
@@ -11381,6 +11425,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 },
             )
         _reject_protected_delete(source)
+        if source.row.get("type") in {"Source", "SourcePlugin", "AudioFileSource"}:
+            source, parent, metadata["source_transfer_parent_guard"] = _prepare_source_transfer_parent(
+                source, parent, version=request.version, read=read)
         roles.update({"object": source, "parent": parent})
         conflict = str(arguments.get("on_name_conflict", "fail"))
         source_name = source.row.get("name")
@@ -11482,6 +11529,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             "expected_parent_id": parent.object,
             "expected_parent_path": parent.row.get("path"),
             "on_name_conflict": conflict,
+            **({"source_class_id": source.row["classId"], "source_type": source.row["type"]}
+               if "source_transfer_parent_guard" in metadata else {}),
             **({"source_subtree_rows": lifecycle_source,
                 "replaced_subtree_rows": lifecycle_replaced,
                 "snapshot_version": request.version,
@@ -16579,6 +16628,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 },
             ]
         )
+    pre_state = prepared.get("pre_state")
     role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
     for role, snapshot_value in roles.items():
         if not isinstance(snapshot_value, Mapping):
@@ -16594,6 +16644,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
     short_id_roles = {str(role) for role, snapshot in roles.items() if snapshot.get("resolution") == "live-short-id"}
     if role_snapshots:
         role_fields = list(IDENTITY_RETURN_FIELDS)
+        if isinstance(pre_state, Mapping) and "source_transfer_parent_guard" in pre_state:
+            role_fields.append("classId")
         if short_id_roles:
             role_fields.append("shortId")
         role_batch = _bounded_multi_identity_read(
@@ -16640,6 +16692,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             continue
         actual = rows[0]
         comparison_fields = (*IDENTITY_RETURN_FIELDS, "shortId") if role in short_id_roles else IDENTITY_RETURN_FIELDS
+        if isinstance(pre_state, Mapping) and "source_transfer_parent_guard" in pre_state:
+            comparison_fields = (*comparison_fields, "classId")
         for field_name in comparison_fields:
             if field_name not in expected_row:
                 continue
@@ -16648,7 +16702,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             unchanged = observed == expected
             if field_name in {"id", "parent"}:
                 unchanged = _same_identity(observed, expected)
-            elif field_name == "shortId":
+            elif field_name in {"shortId", "classId"}:
                 unchanged = type(observed) is int and observed == expected
             assertions.append(
                 {
@@ -16658,7 +16712,6 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 }
             )
 
-    pre_state = prepared.get("pre_state")
     related = pre_state.get("related_conditions", []) if isinstance(pre_state, Mapping) else []
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
@@ -21452,10 +21505,14 @@ def verify_prepared_operation(
         )
         if object_id is None:
             return _verification(operation, assertions, readbacks)
-        rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
+        rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent",
+            *(("classId",) if "source_class_id" in plan else ())))
         check("result GUID resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
             row = rows[0]
+            if "source_class_id" in plan:
+                check("transferred Source retains its certified class and type",
+                    _object_class_matches(row.get("classId"), plan["source_class_id"]) and row.get("type") == plan["source_type"], row)
             check("result GUID is stable", _same_identity(row.get("id"), object_id), row.get("id"))
             if is_copy:
                 check("copy GUID differs from source", not _same_identity(object_id, plan.get("source_id")), object_id)
