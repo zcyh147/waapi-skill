@@ -5,6 +5,86 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R54 Source-copy, closed Save and five-version class metadata
+
+Conflict-free merge `55865039` incorporates accepted class source `8a8d5f8e`,
+including Source-copy `a8d30c5b` and Save `ae7e6e29`. Source-only copy now reports
+its certified default-view fields/owner-frame scope explicitly; complete-copy
+preservation stays false. Closed project Save is available on all five versions:
+2021.1/2022.1 accept an empty business plan; 2023.1–2025.1 preserve optional
+Boolean checkout choices and omission. Normal authorization/execute-once rules
+and the `result_schema_checked` Save boundary remain intact.
+
+The fixed Program roster now has **271 entries**: the three new worker modules
+plus the actual portable product-attachment integration module. This is a roster
+count, not a full Program run. Accepted worker-focused evidence remains bound
+to its original source and was not repeated wholesale.
+
+Interface generate/check passed once in **17.879s / 17.277s**, with unchanged
+artifacts. The complete native class closure is **560/560 byte-identical** from
+frozen `8a8d5f8e` to clean capture source `e860aed1`; the standalone integration
+test and roster edits are outside that closure. One existing 38-node capture
+then passed **38 in 7.56s** (wrapper 8.175s): five Topic cases, 30 metadata
+cases and three R51-native/current-public replays. HEAD/all 2,763 tracked files
+stayed exact. Fresh source closures contain 349 Topic / 344 metadata /
+348 current replay files; the historical closure remains separately retained.
+Current source identity is
+`199e696ed430594a5c39b518082ee2e5bca2d9b812aa2f49facd0a0636325e9c`.
+
+Root separately reviewed one sequential native class attempt per version on
+frozen `8a8d5f8e`; all five passed with source/fixture/cleanup proof. Exact
+builds are 2021.1.14.8108, 2022.1.19.8584, 2023.1.19.8928, 2024.1.13.9056 and
+2025.1.7.9143. Sixteen actual field reads provide **41 exact leaf witnesses**,
+by version **1 / 10 / 9 / 9 / 12**: Boolean true/false, null, number and empty
+string alternatives as actually returned. All defaults were present; no absence
+proof follows. The original five runs used 59 public Gateway calls and sealed
+474 files / 2,646,283 bytes. Root's independent receipt is
+`.waapi-skill-state/full-coverage/r54-root-class-native-review.json`.
+
+Import `253ed73d` uses the existing portable importers and accepted class
+attachment writer. All 838 earlier archive/projection files and non-replaced
+index entries remain exact. Thirty-five fresh Topic/metadata entries and nine
+fresh historical replay attachments replace only their selected predecessors;
+41 class descriptors are additive. Each native original/seal is copied
+byte-identically, with its native input and full original/current source proof;
+program evidence remains independent. Additive storage is **749 files /
+58,728,162 bytes**: Topic 25 / 37,704,043; metadata 150 / 5,397,147;
+replay 33 / 11,443,951; class originals/attachments 541 / 4,183,021.
+
+Branch generate/check passed once in **46.113s / 45.709s**. All 272,313 native
+IDs/shapes/owners, 116 exclusions, requirements/native policy, interface bytes
+and 79/91 source/index memberships remain exact. The 625 selected bindings
+comprise 559 Topic + 65 metadata + one unchanged Move binding; only the 624
+refreshed Topic/metadata rows change evidence/binding fields. Current accounting:
+**559 Topic program passed / 559 native missing**; **65 metadata program
+passed / 50 live_metadata passed / 15 missing**. The 50 retain nine historical
+R51 witnesses separately from 41 current-native class witnesses. Remaining
+alternatives stay assigned and required. Completion remains false:
+50 verified, 575 implemented_unverified, 271,572 unresolved and 116 exclusions.
+
+Generated candidate `25372579` passed one final **3-test focus in 16.43s**
+(wrapper 17.158s): roster assertion, portable R51 originals and the actual
+committed class product attachments. The actual product test blocked all
+machine-local `.waapi-skill-state` reads, unset the original-root environment,
+validated exact native/runtime source binding through the strict product reader
+and independently required all 65 program facts. No skips; HEAD/all 3,512
+tracked files stayed exact and every owned group exited. No synthetic class
+positive substitutes for this actual archive check.
+
+The earlier R53 production Source-only native diagnostic also remains bound to
+`a8d30c5b`: one 2021.1.14.8108 attempt, **1 passed in 11.39s**, 67 public calls,
+four separate transactions and 18 scoped runtime assertions. Its independent
+saved-image oracle proves the genuine Synth fixture's serialized owned graph;
+runtime full-copy authority/history remains open. Save reply validation alone
+does not establish persistence, and ObjectRef remapping was not exercised.
+
+Plans, exact commands, process/source/output and storage/preservation receipts
+are in `/tmp/waapi-r54-integration/`; current captures are under
+`.waapi-skill-state/read-evidence-r54/`. This merger launched no native, Fresh,
+full Program/Non-live gate, local fixed preflight, install, push or PR edit.
+Root owns publication and exact-head hosted CI; no main merge or ticket/family
+completion is claimed. Original evidence and failed quarantines are retained.
+
 ## 2026-10-21 R52 saved-copy, Tone and exact metadata attachments
 
 Runtime merge `191382e0` combines only accepted saved-copy `56a7c376`

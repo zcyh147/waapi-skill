@@ -894,3 +894,56 @@ and Windows remain open. Original failures/quarantines remain unchanged.
 No native/Fresh/CLI Agent/install, full Program/Non-live, local fixed preflight,
 push or PR edit runs in this integration. Root owns publication and exact-head
 hosted CI. No main merge or ticket/family closure is authorized.
+
+## R54: scoped Source-copy/Save and actual five-version class attachments
+
+Conflict-free merge `55865039` accepts `8a8d5f8e`, including Source-copy
+`a8d30c5b` and all-five closed Save `ae7e6e29`. Source copy exposes certified
+field/owner-frame scope with complete-copy preservation false. Save retains its
+normal policy/Preview/execute-once chain and result-schema-only boundary;
+2021/2022 disclose an empty business plan, later lanes optional checkout.
+The fixed Program roster is 271 entries including an actual portable
+product-attachment integration test; no full Program run is claimed.
+
+Interface generate/check pass once, unchanged. All 560 class collection source
+bytes match frozen `8a8d5f8e` at stable capture `e860aed1`; test/roster edits are
+outside the closure. One 38-node capture passes **38 in 7.56s**, preserving
+HEAD/all 2,763 files. Root independently reviews five sequential frozen-source
+native PASS runs: 16 actual field reads / 41 exact leaves (1/10/9/9/12), 59
+public calls, 474 sealed files / 2,646,283 bytes, source/fixture/cleanup exact.
+All observed defaults are present; no absence proof or mutation credit follows.
+
+Import `253ed73d` retains all 838 earlier archive/projection bytes and every
+non-replaced entry. Existing importers select 35 fresh program entries and
+nine historical replay descriptors; the accepted writer adds 41 actual class
+descriptors from byte-identical originals/seals. Native and program inputs stay
+independent. Additive storage is 749 files / 58,728,162 bytes. No old receipt,
+archive or failed sandbox is deleted.
+
+Branch generate/check pass once. All 272,313 native IDs/shapes/owners, 116
+exclusions, requirements/native policy, interface bytes and 79/91 source/index
+memberships stay exact. There are 625 selected bindings: 559 Topic + 65 metadata
++ one unchanged Move binding. Only the refreshed 624 Topic/metadata rows change
+evidence/binding fields. Current results are **559 Topic program passed / 559
+native missing**, **65 metadata program passed / 50 live_metadata passed /
+15 missing**. Nine historical R51 facts remain separately attributed from 41
+current-native class witnesses; the 15 remaining alternatives stay assigned.
+Complete=false: 50 verified, 575 implemented_unverified, 271,572 unresolved,
+116 exclusions. Current source identity:
+`199e696ed430594a5c39b518082ee2e5bca2d9b812aa2f49facd0a0636325e9c`.
+
+Generated `25372579` passes one **3-test focus in 16.43s**, no skips, with
+HEAD/all 3,512 files exact and owned groups empty. The actual product-attachment
+test forbids machine-local evidence reads, validates the portable originals and
+exact native/runtime source binding through the strict reader, and independently
+requires program proof. Portable R51 originals and roster assertions also pass;
+worker corruption suites are not repeated. Full commands/caps/source/process
+receipts are in `/tmp/waapi-r54-integration/`; the precise native scope and
+storage breakdown are in [the test inventory](../../../tests/TEST_INVENTORY.md).
+
+The stale [2021 Curve note](../../research/legacy-2021-curve-read-boundary.md)
+now records completed R52/R53 fixture-scoped saved-graph proof and the newer
+closed all-five Save route while preserving the historical zero-input request.
+Production complete-copy/owned-state authority and history remain unfinished.
+No merger native/Fresh/full gate/local fixed preflight/install/push/PR edit or
+main merge occurs. Root owns publication/exact-head CI and remaining acceptance.
