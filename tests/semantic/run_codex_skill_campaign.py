@@ -5043,6 +5043,12 @@ def _steps_in_consumed_order(
             "broker consumed names cannot linearize the sealed protocol"
         )
     ordered = [by_name[name] for name in consumed_names]
+    if any(step.source_copy_proof_role is not None for step in ordered):
+        # Generated Save capabilities and the parent CAS have independent,
+        # explicit revision chains. Never flatten them into one Draft chain.
+        from tests.semantic.support.codex_source_copy_protocol import validate_source_copy_steps
+        validate_source_copy_steps(ordered)
+        return tuple(ordered)
     latest_revision_step: str | None = None
     rebound: list[Any] = []
     for step in ordered:
@@ -6393,6 +6399,7 @@ def _validate_heavy_v3_task_result(
         options=options,
         version=str(getattr(expected_unit, "version", "")),
         expected_consumed_count=previous_prefix,
+        user_prompts=prompt_evidence.provenance.prompts,
         expected_project_modification_policy=getattr(
             expected_unit,
             "project_modification_policy",
@@ -6475,6 +6482,7 @@ def _validate_heavy_v3_broker_result(
     version: str,
     expected_consumed_count: int | None = None,
     expected_project_modification_policy: str | None = None,
+    user_prompts: Sequence[str] = (),
 ) -> None:
     top_keys = {
         "expected_step_names",
@@ -6608,6 +6616,8 @@ def _validate_heavy_v3_broker_result(
         options=options,
         version=version,
         label="passing heavy",
+        user_prompts=user_prompts,
+        turn_prefix_counts=protocol.turn_prefix_counts,
         expected_project_modification_policy=(
             expected_project_modification_policy
         ),
@@ -6936,6 +6946,8 @@ def _validate_heavy_v3_broker_records(
     commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
     commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
     expected_project_modification_policy: str | None = None,
+    user_prompts: Sequence[str] = (),
+    turn_prefix_counts: Sequence[int] = (),
 ) -> None:
     """Replay one exact broker prefix and bind it to Codex JSONL commands."""
 
@@ -6948,6 +6960,12 @@ def _validate_heavy_v3_broker_records(
     # CodexGatewayBroker intentionally rejects an empty full protocol.
     if not steps:
         return
+    from tests.semantic.support.codex_source_copy_protocol import source_copy_selection_bindings
+    try:
+        source_selections = source_copy_selection_bindings(steps, records,
+            user_prompts=user_prompts, turn_prefix_counts=turn_prefix_counts)
+    except ValueError as exc:
+        raise CampaignEvidenceError(f'{label} Source-copy user choice is invalid: {exc}') from exc
     compound_children = any(step.subcommand == "draft-start-undo-child" for step in steps)
     continuation_groups = (tuple(steps),)
     if compound_children:
@@ -6972,6 +6990,7 @@ def _validate_heavy_v3_broker_records(
             ),
             windows_powershell_core_host=options.windows_powershell_core_host,
             allow_compound_checked_child_handoff=any(step.subcommand == "draft-start-undo-child" for step in group),
+            source_copy_save_selections=source_selections,
         )
         if continuation_errors:
             raise CampaignEvidenceError(
@@ -7002,13 +7021,16 @@ def _validate_heavy_v3_broker_records(
     )
     archive_draft_ids: list[str] = []
     for step, record in zip(steps, records, strict=True):
-        if step.subcommand not in {"draft-start", "draft-start-undo-child"}:
+        if step.subcommand not in {"draft-start", "draft-start-undo-child"} and not (
+            step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save
+        ):
             continue
         source_payload = record.get("payload") if isinstance(record, Mapping) else None
         issued = source_payload.get("draft") if isinstance(source_payload, Mapping) else None
         if not isinstance(issued, Mapping) or not isinstance(issued.get("draft_id"), str):
             raise CampaignEvidenceError("archived Draft start lacks its issued record identity")
         archive_draft_ids.append(issued["draft_id"])
+    replay._source_copy_archive_draft_ids = tuple(archive_draft_ids)  # noqa: SLF001
     record_keys = {
         "sequence",
         "step_name",
@@ -7040,6 +7062,9 @@ def _validate_heavy_v3_broker_records(
         zip(records, command_records, steps, strict=True),
         start=1,
     ):
+        if step.source_copy_proof_role is not None and step.source_copy_proof_role.is_selection:
+            role = step.source_copy_proof_role
+            replay.bind_source_copy_user_turn(role.user_turn, user_prompts[role.user_turn - 1])
         if (
             not isinstance(record, Mapping)
             or set(record) != record_keys
@@ -7262,6 +7287,7 @@ def _validate_heavy_v3_broker_records(
         if (
             step.subcommand.startswith("draft-")
             or step.subcommand == "preview-from-draft"
+            or step.source_copy_proof_role is not None
         ):
             try:
                 replay._validate_operation_draft_payload(  # noqa: SLF001
@@ -7395,8 +7421,17 @@ def _validate_heavy_v3_compact_policy_binding(
         if draft_delta or child_start:
             start = replay._draft_start_for_step(step)
             source = payload if child_start else replay._payloads_by_step.get(start.name)
-            if not isinstance(source, Mapping) or start.subcommand not in DRAFT_START_SUBCOMMANDS:
+            source_owned_save = (start.source_copy_proof_role is not None
+                and start.source_copy_proof_role.issues_save
+                and start.subcommand == 'continue-source-copy-proof')
+            if not isinstance(source, Mapping) or not (
+                start.subcommand in DRAFT_START_SUBCOMMANDS or source_owned_save
+            ):
                 raise ValueError("compact Draft lacks its own validated start")
+            if source_owned_save:
+                # Generated children are admitted only after the same origin,
+                # parent, capability and durable association check as live use.
+                replay._validate_operation_draft_payload(start, source)
             issued = source.get("draft")
             if not isinstance(issued, Mapping):
                 raise ValueError("compact Draft lacks its issued binding")

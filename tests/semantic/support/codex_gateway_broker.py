@@ -46,6 +46,7 @@ from tests.semantic.support.codex_draft_commands import (
     DRAFT_REVISION_SUBCOMMANDS,
     DRAFT_START_SUBCOMMANDS,
 )
+from tests.semantic.support.codex_source_copy_protocol import SourceCopyProofRole
 from wwise_waapi.operation_composer import (
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -1961,12 +1962,18 @@ class ExpectedGatewayStep:
     commutative_boolean_flags: tuple[str, ...] = ()
     allow_explicit_derived_sfx_language: bool = False
     expected_operation_request: Mapping[str, Any] | None = None
+    source_copy_proof_role: SourceCopyProofRole | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("ExpectedGatewayStep.name must be non-empty")
         if not self.subcommand or not self.subcommand.strip():
             raise ValueError("ExpectedGatewayStep.subcommand must be non-empty")
+        if self.source_copy_proof_role is not None and (
+            not isinstance(self.source_copy_proof_role, SourceCopyProofRole)
+            or self.subcommand != 'continue-source-copy-proof'
+        ):
+            raise ValueError('Source-copy role is restricted to its exact continuation')
         if self.expected_operation_request is not None:
             if self.subcommand != "preview-from-draft":
                 raise ValueError(
@@ -3462,6 +3469,10 @@ def validate_operation_draft_protocol_steps(
     """Fail closed unless every Draft flow binds authority to prior responses."""
 
     steps = tuple(expected_steps)
+    if any(step.source_copy_proof_role is not None for step in steps):
+        from tests.semantic.support.codex_source_copy_protocol import validate_source_copy_steps
+        validate_source_copy_steps(steps)
+        return
     draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
     if not draft_steps:
         return
@@ -10945,7 +10956,9 @@ class CodexGatewayBroker:
     ) -> ExpectedGatewayStep:
         """Resolve a Draft command to its exact owning draft-start step."""
 
-        if step.subcommand in DRAFT_START_SUBCOMMANDS:
+        if step.subcommand in DRAFT_START_SUBCOMMANDS or (
+            step.source_copy_proof_role is not None and step.source_copy_proof_role.issues_save
+        ):
             return step
         binding = step.arguments[0] if step.arguments else None
         if (
@@ -10961,7 +10974,8 @@ class CodexGatewayBroker:
                 : self._execution_steps.index(step) + 1
             ]
             if candidate.name == binding.step
-            and candidate.subcommand in DRAFT_START_SUBCOMMANDS
+            and (candidate.subcommand in DRAFT_START_SUBCOMMANDS or (
+                candidate.source_copy_proof_role is not None and candidate.source_copy_proof_role.issues_save))
         )
         if len(matches) != 1:
             raise GatewayInvocationError(
@@ -12991,12 +13005,30 @@ class CodexGatewayBroker:
             ),
         )
 
+    def bind_source_copy_user_turn(self, index: int, prompt: str) -> None:
+        """Bind the existing trusted turn input for Source-choice grading only."""
+        if not any(step.source_copy_proof_role is not None for step in self.expected_steps):
+            return
+        if type(index) is not int or index < 1 or not isinstance(prompt, str) or len(prompt.encode('utf-8')) > 65536:
+            raise ValueError('Source-copy user turn is invalid')
+        self._source_copy_user_turn = (index, prompt)
+
     def _validate_step(
         self,
         step: ExpectedGatewayStep,
         actual: Sequence[str],
     ) -> tuple[str, tuple[str, ...]]:
         actual_values = tuple(str(value) for value in actual)
+        if step.source_copy_proof_role is not None and step.source_copy_proof_role.is_selection:
+            from tests.semantic.support.codex_source_copy_protocol import source_copy_decline_command
+            role = step.source_copy_proof_role
+            if getattr(self, '_source_copy_user_turn', None) != (role.user_turn, role.user_prompt):
+                raise GatewayInvocationError('Source-copy selection has no bound explicit user turn')
+            choice = self._payloads_by_step.get(role.choice_step)
+            decline = source_copy_decline_command(choice, stage=role.kind.split('_')[0])
+            selected = decline if role.is_decline else choice['next_command']
+            if tuple(selected['gateway_argv']) != actual_values:
+                raise GatewayInvocationError('Source-copy selection differs from its earlier exact disclosed command')
         supplied_version = ""
         version_selector_seen = False
         if actual_values and self.expected_wwise_version:
@@ -14246,7 +14278,7 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         f"gateway payload command must be exactly {step.subcommand!r}"
                     )
-                if step.subcommand in _DRAFT_SUBCOMMANDS and not (
+                if (step.subcommand in _DRAFT_SUBCOMMANDS or step.source_copy_proof_role is not None) and not (
                     expansion_preparation and payload.get("status") == "needs_clarification"
                 ):
                     self._validate_operation_draft_payload(step, payload)
@@ -14427,6 +14459,11 @@ class CodexGatewayBroker:
     ) -> None:
         """Bind every successful Draft response to the reviewed Draft flow."""
 
+        if step.source_copy_proof_role is not None:
+            from tests.semantic.support.codex_source_copy_protocol import validate_source_copy_role_payload
+            validate_source_copy_role_payload(self, step, payload)
+            return
+
         if "task_authority" in payload and step.subcommand not in DRAFT_START_SUBCOMMANDS:
             raise GatewayInvocationError(
                 "only draft-start may disclose the task authority"
@@ -14604,6 +14641,8 @@ class CodexGatewayBroker:
     def _draft_start_operation(start: ExpectedGatewayStep) -> str:
         """Read the operation from the validated ordinary or parent-owned start."""
 
+        if start.source_copy_proof_role is not None and start.source_copy_proof_role.issues_save:
+            return 'ak.wwise.core.project.save'
         value = start.arguments[6 if start.subcommand == "draft-start-undo-child" else 0]
         if not isinstance(value, str):
             raise GatewayInvocationError("Draft start has no exact operation")
@@ -14939,7 +14978,9 @@ class CodexGatewayBroker:
                 )
             start = self._draft_start_for_step(preview_step)
             draft_operation = (
-                start.arguments[0] if len(start.arguments) == 1 else None
+                self._draft_start_operation(start)
+                if start.source_copy_proof_role is not None and start.source_copy_proof_role.issues_save
+                else start.arguments[0] if len(start.arguments) == 1 else None
             )
             if not isinstance(draft_operation, str) or not (
                 _business_request_matches_draft_operation(

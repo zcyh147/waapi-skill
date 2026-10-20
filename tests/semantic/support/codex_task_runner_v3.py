@@ -2147,6 +2147,7 @@ def run_v3_codex_task(
                     zip(prompt_values, protocol.turn_prefix_counts, strict=True),
                     start=1,
                 ):
+                    broker.bind_source_copy_user_turn(turn_index, prompt)
                     output_dir = root / "turns" / f"turn-{turn_index:02d}"
                     try:
                         result = (
@@ -2271,6 +2272,8 @@ def run_v3_codex_task(
                             windows_powershell_core_host=(
                                 windows_powershell_core_host
                             ),
+                            source_copy_protocol=protocol,
+                            source_copy_user_prompts=prompt_values,
                         )
                     terminal_execute_exit2_count = _terminal_execute_exit2_count(
                         protocol,
@@ -3123,21 +3126,34 @@ def _bind_gateway_prefix_reconciliation(
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     platform_name: str | None = None,
     allow_expansion_read_interleaving: bool = False,
+    source_copy_protocol: Any | None = None,
+    source_copy_user_prompts: Sequence[str] = (),
 ) -> GatewayBrokerReconciliation:
     """Add exact response-derived command binding to argv reconciliation."""
 
+    source_selections, source_errors = {}, ()
+    if source_copy_protocol is not None:
+        from tests.semantic.support.codex_source_copy_protocol import source_copy_selection_bindings
+        try:
+            source_selections = source_copy_selection_bindings(
+                source_copy_protocol.steps[:len(broker_evidence.accepted_records)], broker_evidence.accepted_records,
+                user_prompts=source_copy_user_prompts, turn_prefix_counts=source_copy_protocol.turn_prefix_counts)
+        except ValueError as exc:
+            source_errors = (f'Source-copy user choice is invalid: {exc}',)
     continuation_errors = gateway_continuation_binding_errors(
         command_records,
         broker_evidence.accepted_records,
         platform_name=platform_name,
         windows_powershell_core_host=windows_powershell_core_host,
         allow_expansion_read_interleaving=allow_expansion_read_interleaving and raw_reconciliation.passed,
+        source_copy_save_selections=source_selections,
     )
     return GatewayBrokerReconciliation(
         passed=(
             raw_reconciliation.passed
             and not prefix_errors
             and not continuation_errors
+            and not source_errors
         ),
         observed_command_count=raw_reconciliation.observed_command_count,
         accepted_record_count=raw_reconciliation.accepted_record_count,
@@ -3145,6 +3161,7 @@ def _bind_gateway_prefix_reconciliation(
             *raw_reconciliation.errors,
             *prefix_errors,
             *continuation_errors,
+            *source_errors,
         ),
     )
 

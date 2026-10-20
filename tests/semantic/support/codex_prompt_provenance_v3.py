@@ -990,6 +990,9 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
             "value": request,
             "sha256": _sha256_json(request),
         }
+    if step.source_copy_proof_role is not None:
+        from dataclasses import asdict
+        serialized['source_copy_proof_role'] = asdict(step.source_copy_proof_role)
     return serialized
 
 
@@ -1012,7 +1015,7 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
         or not required_fields.issubset(value)
         or set(value)
         - required_fields
-        - {"expected_operation_request", "allow_explicit_derived_sfx_language"}
+        - {"expected_operation_request", "allow_explicit_derived_sfx_language", 'source_copy_proof_role'}
     ):
         raise PromptProvenanceError("protocol step schema is invalid")
     raw_arguments = value.get("arguments")
@@ -1050,6 +1053,16 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
     ):
         raise PromptProvenanceError("protocol step metadata binding is invalid")
     raw_request_witness = value.get("expected_operation_request")
+    raw_source_role = value.get('source_copy_proof_role')
+    source_role = None
+    if raw_source_role is not None:
+        from tests.semantic.support.codex_source_copy_protocol import SourceCopyProofRole
+        if not isinstance(raw_source_role, Mapping) or set(raw_source_role) != {'kind', 'parent_start', 'choice_step', 'user_turn'}:
+            raise PromptProvenanceError('Source-copy role fields are not closed')
+        try:
+            source_role = SourceCopyProofRole(**raw_source_role)
+        except (TypeError, ValueError) as exc:
+            raise PromptProvenanceError('Source-copy role is invalid') from exc
     if raw_request_witness is not None and (
         not isinstance(raw_request_witness, Mapping)
         or set(raw_request_witness) != {"value", "sha256"}
@@ -1654,6 +1667,7 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 if raw_request_witness is None
                 else _json_clone(raw_request_witness["value"])
             ),
+            source_copy_proof_role=source_role,
         )
     except (TypeError, ValueError) as exc:
         raise PromptProvenanceError(f"protocol step is invalid: {exc}") from exc
