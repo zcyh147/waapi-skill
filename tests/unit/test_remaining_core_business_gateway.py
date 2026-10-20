@@ -585,6 +585,7 @@ def test_project_setting_gateway_binds_exact_roles_then_seals_readback_preview(
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
+    assert previewed["preview_summary"]["source_linkage"] == linkage
     artifact = TransactionStore(state_dir).load_preview(
         previewed["transaction_id"]
     ).artifact

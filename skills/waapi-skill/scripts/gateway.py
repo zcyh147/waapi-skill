@@ -31410,6 +31410,9 @@ def transaction_show_summary(
     # Required user notice survives every compact variant; the existing byte
     # ceiling fails closed if the complete change list cannot fit.
     derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
+    source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
+    if isinstance(source_linkage, Mapping):
+        derived_notice["source_linkage"] = dict(source_linkage)
     if isinstance(request, Mapping) and isinstance(request.get("arguments"), Mapping):
         history_binding = prepared.get("pre_state", {}).get("history_binding")
         if isinstance(history_binding, Mapping):
