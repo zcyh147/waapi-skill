@@ -235,9 +235,13 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
             observed["frames"] = data[1] // observed["block_align"]
             observed["markers"], marker_unresolved = _check_requested_markers(cues or {}, labels, args)
             unresolved = _check_requested_format(observed, args) + marker_unresolved
-            observed["nonzero_samples_by_channel"] = _scan_samples(stream, data, observed, args)
+            observed["nonzero_samples_by_channel"], signal = _scan_samples(stream, data, observed, args)
+            if signal is not None:
+                observed["stationary_sine"] = signal
             if args.get("waveform", "silence") != "silence" and args.get("waveformChannelMask") != 0:
-                unresolved.append("active waveform, frequency and envelope postconditions")
+                if signal is None or signal['observability_reason'] is not None:
+                    unresolved.append("active waveform, frequency and envelope postconditions" + (
+                        ': ' + signal['observability_reason'] if signal is not None else ''))
             after = os.fstat(stream.fileno())
             _require_stable_artifact(path, root, path_proof, before, after)
             return {**observed, "unresolved": unresolved, "path_proof": path_proof,
@@ -336,31 +340,137 @@ def _check_requested_format(observed: Mapping[str, Any], args: Mapping[str, Any]
     return unresolved
 
 
-def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, Any]) -> list[int]:
+def _audio_samples(stream, data, observed):
+    """Descriptor-owned fixed-block iterator, also used for the second signal pass."""
     stream.seek(data[0])
     remaining = data[1]
-    channels, alignment = observed["channels"], observed["block_align"]
-    silence_mask = (1 << channels) - 1 if args.get("waveform", "silence") == "silence" else (
-        ((1 << channels) - 1) ^ args.get("waveformChannelMask", (1 << channels) - 1))
-    nonzero = [0] * channels
+    alignment = observed["block_align"]
     encoding = "<h" if observed["sample_format"] == "int16" else "<f"
-    sample_index = 0
     while remaining:
         count = min(remaining, max(alignment, (65536 // alignment) * alignment))
         values = stream.read(count)
         if len(values) != count:
             raise _invalid("Tone WAV changed or truncated during its full sample scan.")
-        for (sample,) in struct.iter_unpack(encoding, values):
-            channel = sample_index % channels
-            if not math.isfinite(sample):
-                raise _invalid("Tone WAV contains a non-finite sample.")
-            if sample != 0:
-                nonzero[channel] += 1
-                if silence_mask & (1 << channel):
-                    raise _invalid(f"Tone WAV contains a nonzero sample in requested silent channel {channel} at sample {sample_index}.")
-            sample_index += 1
+        yield from struct.iter_unpack(encoding, values)
         remaining -= count
-    return nonzero
+
+
+def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, Any]):
+    channels = observed['channels']
+    silence_mask = (1 << channels) - 1 if args.get("waveform", "silence") == "silence" else (
+        ((1 << channels) - 1) ^ args.get("waveformChannelMask", (1 << channels) - 1))
+    nonzero = [0] * channels
+    stationary = (args.get('waveform') == 'sine' and not args.get('attackTime', 0)
+        and not args.get('releaseTime', 0) and silence_mask != (1 << channels) - 1)
+    signal = _stationary_sine_policy(observed, args) if stationary else None
+    ss = cc = sc = 0.0
+    projections = [[0.0, 0.0] for _ in range(channels)]
+    scale = 32768 if observed['sample_format'] == 'int16' else 1
+    for sample_index, (sample,) in enumerate(_audio_samples(stream, data, observed)):
+        channel = sample_index % channels
+        if not math.isfinite(sample):
+            raise _invalid("Tone WAV contains a non-finite sample.")
+        if sample != 0:
+            nonzero[channel] += 1
+            if silence_mask & (1 << channel):
+                raise _invalid(f"Tone WAV contains a nonzero sample in requested silent channel {channel} at sample {sample_index}.")
+        if signal is not None and signal['observability_reason'] is None:
+            if channel == 0:
+                phase = math.remainder(signal['angular_step'] * (sample_index // channels), math.tau)
+                sine, cosine = math.sin(phase), math.cos(phase)
+                ss += sine * sine
+                cc += cosine * cosine
+                sc += sine * cosine
+            projections[channel][0] += sample / scale * sine
+            projections[channel][1] += sample / scale * cosine
+    if signal is not None and signal['observability_reason'] is None:
+        _check_stationary_sine(stream, data, observed, silence_mask, projections, (ss, cc, sc), signal)
+    return nonzero, signal
+
+
+def _stationary_sine_policy(observed, args):
+    # Explicit numerical conformance, not a claim of a sample-exact native DSP
+    # algorithm. SDK AkSineOsc uses an approximate sine; IAkPlugin.h defines the
+    # mathematical dB reference. Retained 2023/24/25 WAVs independently exercise
+    # these bounds. Neither source establishes utility-wide native error bounds.
+    # Reviewed policy: .02 dB gain, .2% shape, two representation units. Native
+    # residual maxima were .00123 at unity / .00063 at -6 dB, gain offset <.009 dB;
+    # these rounded conformance choices are not a fitted per-file oracle.
+    frequency, rate = float(args.get('frequency', 440)), observed['sample_rate']
+    gain = 10 ** (float(args.get('sustainLevel', 0)) / 20)
+    quantum = 1 / 32768 if observed['sample_format'] == 'int16' else gain * 2 ** -23
+    reason = None
+    if float(args.get('sampleRate', 48000)) != rate:
+        reason = 'fractional native sample-rate interpretation remains unresolved'
+    elif Decimal(str(args.get('sustainTime', 1))) * rate != observed['frames']:
+        reason = 'fractional native sustain/frame interpretation remains unresolved'
+    elif frequency >= rate / 2:
+        reason = 'sampled frequency is aliased or at the Nyquist degeneracy'
+    return {'policy': 'stationary-sine-numerical-conformance-v1',
+        'reference': 'requested digital sine; phase is unparameterized; not bit-exact or unique analog origin',
+        'frequency_hz': frequency, 'angular_step': math.tau * frequency / rate,
+        'requested_gain': gain, 'gain_tolerance_db': 0.02, 'shape_tolerance_relative': 0.002,
+        'representation_error': 2 * quantum,
+        'sample_error_limit': gain * (0.002 + 10 ** (0.02 / 20) - 1) + 2 * quantum,
+        'observability_reason': reason, 'channels': []}
+
+
+def _check_stationary_sine(stream, data, observed, silence_mask, projections, gram, signal):
+    ss, cc, sc = gram
+    determinant = ss * cc - sc * sc
+    # Small eigenvalue gives the actual coefficient sensitivity to bounded
+    # quantization. No request rate/frequency/gain is prohibited by this check.
+    largest = (ss + cc + math.hypot(ss - cc, 2 * sc)) / 2
+    smallest = determinant / largest if largest else 0
+    if smallest <= largest * 1e-12:
+        signal['observability_reason'] = 'sampled sine/cosine reference is numerically rank deficient'
+        return
+    uncertainty = signal['representation_error'] * math.sqrt(observed['frames'] / smallest)
+    signal['gain_representation_error'] = uncertainty
+    gain = signal['requested_gain']
+    if gain <= uncertainty:
+        signal['observability_reason'] = 'requested amplitude cannot be distinguished from sample quantization'
+        return
+    rows = {}
+    for channel, (ys, yc) in enumerate(projections):
+        if silence_mask & (1 << channel):
+            continue
+        a, b = (cc * ys - sc * yc) / determinant, (ss * yc - sc * ys) / determinant
+        amplitude = math.hypot(a, b)
+        lower, upper = gain * 10 ** (-0.02 / 20) - uncertainty, gain * 10 ** (0.02 / 20) + uncertainty
+        if not lower <= amplitude <= upper:
+            raise SoundBankContractError('INVALID_TONE_WAV',
+                f'Tone stationary sine channel {channel} gain differs from requested dB within the numerical policy.',
+                details={'stationary_sine': signal, 'channel': channel,
+                    'measured_gain': amplitude, 'gain_interval': [lower, upper]})
+        row = {'channel': channel, 'measured_gain': amplitude, 'gain_interval': [lower, upper],
+            'phase_radians': math.atan2(b, a), 'max_sample_error': 0.0, 'rms_sample_error': 0.0}
+        rows[channel] = row
+    squares = [0.0] * observed['channels']
+    phase_components = {channel: (math.cos(row['phase_radians']), math.sin(row['phase_radians']))
+        for channel, row in rows.items()}
+    for index, (sample,) in enumerate(_audio_samples(stream, data, observed)):
+        channel = index % observed['channels']
+        if channel == 0:
+            phase = math.remainder(signal['angular_step'] * (index // observed['channels']), math.tau)
+            sine, cosine = math.sin(phase), math.cos(phase)
+        if channel not in rows:
+            continue
+        cos_phase, sin_phase = phase_components[channel]
+        expected = gain * (sine * cos_phase + cosine * sin_phase)
+        actual = sample / 32768 if observed['sample_format'] == 'int16' else sample
+        error = abs(actual - expected)
+        if not math.isfinite(error) or error > signal['sample_error_limit']:
+            raise SoundBankContractError('INVALID_TONE_WAV',
+                f'Tone stationary sine channel {channel} sample {index} differs from the requested fixed-frequency/gain waveform within the numerical policy.',
+                details={'stationary_sine': signal, 'channel': channel, 'sample_index': index,
+                    'measured_gain': rows[channel]['measured_gain'],
+                    'sample_error': error if math.isfinite(error) else 'non-finite'})
+        rows[channel]['max_sample_error'] = max(rows[channel]['max_sample_error'], error)
+        squares[channel] += error * error
+    for channel, row in rows.items():
+        row['rms_sample_error'] = math.sqrt(squares[channel] / observed['frames'])
+    signal['channels'] = list(rows.values())
 
 
 
