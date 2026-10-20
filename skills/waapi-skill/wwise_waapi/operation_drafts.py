@@ -39,6 +39,7 @@ from .operation_composer import (
     composition_projection,
     materialize_operation_request,
     new_composition,
+    operation_composer_digest,
 )
 from .operation_registry import (
     operation_uses_business_declaration,
@@ -526,6 +527,9 @@ class OperationDraftStore:
                 )
             for _attempt in range(16):
                 draft_id = child_id if voice_source_origin is not None else f"od1-{secrets.token_hex(16)}"
+                from .voice_source_staging import CHILD_DRAFT_PREFIX
+                if voice_source_origin is None and draft_id.startswith(CHILD_DRAFT_PREFIX):
+                    continue  # Ordinary tasks cannot allocate the staged-child namespace.
                 task_authority = child_authority if voice_source_origin is not None else f"da1-{secrets.token_hex(20)}"
                 record = OperationDraftRecord(
                     draft_id=draft_id,
@@ -2827,6 +2831,14 @@ def _record_from_mapping(
             allow_cleaned_file_evidence=cleaned_file_replay,
             allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
+        from .voice_source_staging import CHILD_DRAFT_PREFIX
+        # Older ordinary IDs may coincidentally occupy the new namespace.
+        # Apply it only to the current Composer contract; historical bindings
+        # remain inspectable and normal live binding checks reject drift.
+        if (payload["operation"] == "object.set" and payload["draft_id"].startswith(CHILD_DRAFT_PREFIX)
+                and composer_digest == operation_composer_digest(payload["operation"], payload["version"])
+                and composition.get("voice_source_origin") is None):
+            raise ValueError("Generated Source child Draft is missing its required staged origin.")
         check = _validate_durable_check(
             payload["check"],
             revision=revision,
