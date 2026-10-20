@@ -9290,6 +9290,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     """One diagnostic public Source-only copy; deliberately not a deep-copy oracle."""
     from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
     from wwise_waapi.dispatcher import MAX_LIVE_RESULT_JSON_BYTES
+    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_QUERIES
     from wwise_waapi.native_catalog import load_native_catalog
 
     assert runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
@@ -9299,6 +9300,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}']
     output = runtime.state_dir / 'legacy-source-copy-feasibility.json'
     assert not output.exists(), 'Never replace an earlier feasibility attempt'
+    output.parent.mkdir(parents=True, exist_ok=True)
     artifacts = runtime.state_dir / 'legacy-source-copy-artifacts'; artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); old_native = set(native_root.glob('*.json'))
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
@@ -9389,8 +9391,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             next_page = result['next_page']; assert next_page and next_page != page, result
             page = next_page
         pages = []
-        # Public query projection owns identity fields as well as explicit fields.
-        size = MAX_STRUCTURED_RETURN_FIELDS - 8
+        # Public custom outputs first traverse bounded lexical discovery. The
+        # native projection ceiling alone cannot size this public request.
+        size = min(MAX_METADATA_DISCOVERY_QUERIES, waapi_gateway.MAX_QUERY_CUSTOM_OUTPUTS,
+            MAX_STRUCTURED_RETURN_FIELDS - 8)
         for offset in range(0, len(names), size):
             rows = query(identity, fields=names[offset:offset + size]); assert len(rows) == 1, rows
             assert all(rows[0].get(key) == row.get(key) for key in ('id', 'name', 'type', 'path', 'parent', 'owner', 'class_id', 'notes')), rows

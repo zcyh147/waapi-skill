@@ -97,6 +97,44 @@ def test_existing_2021_public_copy_admits_bound_source_and_sound(tmp_path, workf
     assert preview['transaction_id'] and writes == []
 
 
+def test_legacy_source_copy_fresh_lifecycle_initializes_state(tmp_path, workflow):
+    import shutil
+    runtime, commands, writes, task = legacy_runtime(tmp_path)
+    shutil.rmtree(runtime.state_dir)  # Only this test's preliminary fake Draft.
+    assert not runtime.state_dir.exists()
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_FRESH_STATE')
+    assert category['status'] == 'PASS'
+    assert (runtime.state_dir / 'legacy-source-copy-feasibility.json').is_file()
+
+
+@pytest.mark.parametrize('fault', [None, 'original-field'])
+def test_legacy_source_copy_pages_all_documented_synth_read_fields(tmp_path, workflow, fault):
+    runtime, commands, writes, task = legacy_runtime(tmp_path, fault=fault)
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/synth-one-2021-sdk-read-fields.json').read_text())
+    assert fixture['class'] == {'name': 'Wwise Synth One', 'classId': 9699330, 'type': 'Source'}
+    names = []
+    for row in fixture['properties']:
+        name, kind, value = row['name'], row['type'], row['sdk_default_text']
+        names.append(name)
+        task.metadata[name] = {'name': name, 'type': kind, 'display': {'name': row['display_name']}}
+        # Fake read observations from matching SDK values, not production defaults.
+        task.objects[SOURCE].setdefault('@' + name, bool(int(value)) if kind == 'bool' else
+            int(value) if kind == 'int32' else float(value))
+    assert len(names) == 18
+    if fault is None:
+        category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_SYNTH_FIELDS')
+        assert category['status'] == 'PASS'
+    else:
+        # Osc1Transpose lies on the second page of the genuine SDK field list.
+        assert names.index('Osc1Transpose') >= 8
+        with pytest.raises(AssertionError, match='Original Source/owner/observed owned objects changed'):
+            workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_SYNTH_FIELDS')
+        assert len([uri for uri, _ in writes if uri.endswith('object.copy')]) == 1
+    pages = [argv for argv in commands if argv[0] == 'query-object' and SOURCE in argv and '--include-field' in argv]
+    assert len(pages) >= 3 and all(argv.count('--include-field') <= 8 for argv in pages)
+    assert {argv[index + 1] for argv in pages for index, token in enumerate(argv) if token == '--include-field'} == set(names)
+
+
 def test_legacy_source_copy_collector_records_admission_without_full_copy_claim(tmp_path, workflow):
     runtime, commands, writes, task = legacy_runtime(tmp_path)
     category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_LEGACY_COPY')
