@@ -585,8 +585,8 @@ staged program controls do not grant a branch transition, family/leaf credit or
 native acceptance. Exact staged results are recorded in the test inventory.
 
 Root's original `695344f1` failed subset ended 976 passed / 466 failed, distinct
-from the retained earlier full Program failure on `c18225d9`. No replacement
-broad gate or merger pytest ran. The no-media Japanese merge intent remains
+from the retained earlier full Program failure on `c18225d9`. At that handoff,
+no replacement broad gate or merger pytest ran. The no-media Japanese merge intent remains
 required unimplemented/unproved #180/#181 work; its original request and exact
 boundary are retained beside a platform-only positive. Source-anchored follow-up:
 `/tmp/waapi-r39-language-followup.md`.
@@ -601,3 +601,33 @@ implemented or generic coverage credited by this diagnostic. Plugin/no-file,
 equal-path, unlinked-view and active-choice-transition cases remain #181 work;
 neither current boundaries nor this result prove native absence. See the
 retained native follow-up.
+
+## R40 scoped successors and unchanged completion accounting
+
+Runtime merge `495f8a7f` combines accepted graph `026f9181`, Voice `89d0ef9f`
+and Tone `49e4b69e` without fixups; all nine component blobs match. Root's
+original R39 failed subset remains **456 passed / 10 failed in 103.95s**.
+The ten graph fixes and Voice/Tone controls have separate staged receipts in
+the test inventory; they are not a replacement broad gate or aggregate PASS.
+
+New empty Voice language is validated native construction context, with
+before/after selected-language and actual empty-Source proof. It is not a
+persisted Sound language or localized Source. Existing-merge language effects
+remain required #180/#181 work. Staged Voice creation followed by Source-plugin
+creation on the real bound GUID already exists; atomic planned-parent Source
+construction/native validity remains #179/#180/#181 work, not native absence.
+
+Stationary sine verification uses frozen requested frequency/dB gain, bounded
+streaming comparison and an explicit numerical policy. Retained native samples
+are offline controls; their original outcomes are not regraded. No new native
+or Fresh acceptance follows. Other waveforms/envelopes and all remaining #193
+obligations stay open; no active-source component is included.
+
+Only four object.set 2022–2025 business-disclosure leaves change, describing
+the construction-context boundary. The reviewed aggregate public seal and its
+contract references refresh; all 153 Registry machine seals remain exact.
+Four serial generate/check commands passed once. Source membership remains
+79 entries / 91 indexed entries / 329 full-file closure entries; all 272,313
+native obligation bytes, ownership, requirements, statuses and evidence remain
+unchanged. Inventory reproducibility grants no branch/family/leaf transition.
+Root owns publication and the next settled gate; no merger pytest ran.
