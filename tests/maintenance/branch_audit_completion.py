@@ -379,11 +379,20 @@ def read_metadata_run(descriptor, base):
     from pathlib import Path
     if descriptor.get('contract') == 'waapi-skill.r51-metadata-read/v1':
         return read_r51_metadata_run(descriptor, base)
+    class_read = descriptor.get('contract') == 'waapi-skill.class-metadata-read/v1'
+    if class_read and (set(descriptor) != {'contract','root','seal','status_receipt','receipt','target_index'}
+            or set(descriptor['seal']) != {'artifact','sha256'}
+            or type(descriptor['target_index']) is not int or descriptor['target_index'] < 0):
+        raise ValueError('Closed class metadata original descriptor required')
     seal = read_sealed_artifact(descriptor['seal'], base)
     root = Path(descriptor['root'])
     if not root.is_absolute():
         root = base / root
     files = {r['path']: r for r in seal['files']}
+    if class_read and (seal.get('contract') != 'waapi-skill.class-metadata-seal/v1'
+            or len(files) != len(seal['files']) or len(files) > 512
+            or any(set(entry) != {'path','bytes','sha256'} for entry in seal['files'])):
+        raise ValueError('Closed bounded class metadata archive required')
     def read(name):
         path = (root / name).resolve()
         if not path.is_relative_to(root.resolve()):
@@ -425,6 +434,61 @@ def read_metadata_run(descriptor, base):
     repository = repositories[0]
     sources = {r['path'][len(repository['checkout']) + 1:]: r['sha256'] for r in plan['source_seals']
                if r['path'].startswith(repository['checkout'] + '/')}
+    if class_read:
+        import math
+        from tests.maintenance import collect_class_metadata as collector
+        targets = read('targets.json')
+        target = targets[descriptor['target_index']]
+        selected = collector.collection_plan(context['version'])
+        expected_fields = {(scope,field) for scope,fields in selected['targets'].items() for field in fields}
+        if (any(plan[key] != value for key,value in selected.items())
+                or any(character not in '0123456789abcdef' for character in repository['commit'])
+                or set(plan['actual_deadlines']) != {'readiness_seconds','total_seconds'}
+                or any(type(value) not in (int,float) or not math.isfinite(value) or not 0 < value <= 3600
+                    for value in plan['actual_deadlines'].values())
+                or len(targets) != len(expected_fields)
+                or {(row['scope'],row['field']) for row in targets} != expected_fields
+                or any(row['status'] != 'captured' for row in targets)
+                or summary['project_mutation_commands'] != 0 or summary['agent_started'] is not False
+                or target['status'] != 'captured' or target['detail_receipt'] != prefix
+                or target['field'] not in selected['targets'].get(target['scope'],[])
+                or command['gateway_arguments'] != ['metadata','detail','--custom-kind',target['scope'],'--selection',exact['selection']]
+                or payload['endpoint'] != status['endpoint']
+                or payload['session_context']['endpoint'] != status['endpoint']
+                or payload['session_context']['project_modification_policy'] != 'read_only'
+                or status['session_context']['project_modification_policy'] != 'read_only'
+                or type(status['wwise'].get('processId')) is not int or status['wwise']['processId'] <= 0
+                or not isinstance(status['wwise'].get('sessionId'),str) or not status['wwise']['sessionId']
+                or status['endpoint']['host'] != ready['host'] or status['endpoint']['port'] != ready['port']
+                or any(status['wwise'].get(key) != ready['get_info'].get(key) for key in ('processId','sessionId'))
+                or files[target['native_receipt']]['sha256'] != target['native_sha256']
+                or files[target['native_receipt']]['bytes'] != target['native_bytes']):
+            raise ValueError('Exact class metadata schedule/input/native link changed')
+        native = read(target['native_receipt'])
+        if native['evidence_path'] != target['native_path']:
+            raise ValueError('Original class native/public path identity changed')
+        collector.validate_native_pair(payload,native,context['version'],target['scope'],target['field'])
+        if (target['default_present'] is not ('default' in native['result'])
+                or ('default' in native['result'] and json.dumps(target['observed_default'],allow_nan=False)
+                    != json.dumps(native['result']['default'],allow_nan=False))):
+            raise ValueError('Original typed class default witness changed')
+        listed = read(target['list_receipt']+'.stdout')['agent_result']
+        if (listed['scope'] != exact['scope'] or not any(row['name'] == target['field'] and row['selection'] == exact['selection']
+                for row in listed['fields'])):
+            raise ValueError('Original class selection did not come from its own live inventory')
+        # Every current/native dependency is retained, not an intersection of
+        # the archived and newer producer closures. Source drift stays missing.
+        required = {str(Path(row['path']).relative_to(collector.REPO)):row['sha256']
+                    for row in collector.source_links(context['version'],selected['targets'])[1]}
+        if (not sources or any(Path(name).is_absolute() or '..' in Path(name).parts or '\\' in name for name in sources)
+                or any(sources.get(name) != value for name,value in required.items())
+                or any(hashlib.sha256((collector.REPO/name).read_bytes()).hexdigest() != value for name,value in sources.items())):
+            raise ValueError('Full class metadata source closure changed')
+        return dict(context,candidate=repository['commit'],relevant_sources=sources,
+            gateway={'argv':command['gateway_arguments'],'exit_code':result['exit_code'],'payload':payload},
+            receipt_sha256=files[prefix+'.stdout']['sha256'],format=descriptor['contract'],
+            native_result=native['result'],native_sha256=target['native_sha256'],class_name=target['scope'],
+            class_id=selected['class_ids'][target['scope']],field=target['field'],invocation=summary['invocation'])
     return dict(context, candidate=repository['commit'], relevant_sources=sources,
                 gateway={'argv': command['gateway_arguments'], 'exit_code': result['exit_code'], 'payload': payload},
                 receipt_sha256=files[prefix + '.stdout']['sha256'])
@@ -457,27 +521,32 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_replay_attachments.py',
         'tests/support/metadata_replay_cases.json','tests/support/metadata_replay_branch_evidence.py',
         'docs/branch-coverage-requirements.json'}
-    # Reviewed Tone-only delta at 7f3c360d701e24a0e33a9c8771109789cc7b4705.
-    # This does not participate in the exact RTPC metadata read. Retain both
-    # full closures and require all four exact old/new blobs together; a later
-    # edit or a partially combined runtime is not this reviewed source bridge.
-    reviewed_tone = {
-        'skills/waapi-skill/wwise_waapi/operation_tone.py': {
-            'before':'34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912',
-            'after':'73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
-        'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {
-            'before':'40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6',
-            'after':'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
-        'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py': {
-            'before':'55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177',
-            'after':'a392d1a2bc4665dd1ac64a83d88bb89561c2cd8570e3ebd7ab6355c5d62300ba'},
-        'skills/waapi-skill/scripts/gateway.py': {
-            'before':'1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca',
-            'after':'3d6bd7a0859008dfabc7bc210c661571911679999cf8d859d354d5c2912b6245'}}
-    if set(changes) & set(reviewed_tone):
-        if any(changes.get(name) != expected for name,expected in reviewed_tone.items()):
+    # Reviewed combined Tone/Source-copy/Save source ae7e6e2981df0f2c9c8bc43fe3026f6d4962ff90.
+    # This does not participate in the exact RTPC metadata read. All nine
+    # exact old/new blobs occur together, including the explicit new-file
+    # before=None. Later edits and partially combined runtimes are not this bridge.
+    reviewed_runtime = {'skills/waapi-skill/wwise_waapi/operation_tone.py': {'before': '34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912',
+                                                          'after': '73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
+     'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'before': '40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6',
+                                                                            'after': 'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
+     'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py': {'before': '55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177',
+                                                                  'after': 'a392d1a2bc4665dd1ac64a83d88bb89561c2cd8570e3ebd7ab6355c5d62300ba'},
+     'skills/waapi-skill/wwise_waapi/object_lifecycle_graph.py': {'before': '97c3eef5097e66d34c5ecc87b56c787969c7bfe10c88d7a7f2ba3b2eef983c72',
+                                                                  'after': '8f2df48a3089554996730ad1a074db35bea444316408d0c2f366686a646e226f'},
+     'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '20be86428b6e1ae9fb6cab954ee7ada6b8092406bf33b8bc148b869853539b14',
+                                                              'after': 'ae7d8430d03548ce8b42601d99dbc303ed2f99210a0d1d6e090b7fd7b1b3aade'},
+     'skills/waapi-skill/wwise_waapi/source_copy_observations.py': {'before': None,
+                                                                    'after': '78759d095e860f22b0c0ca85b98c3bb7913feb47b6cbc503940a9f62ea287b3e'},
+     'skills/waapi-skill/scripts/gateway.py': {'before': '1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca',
+                                               'after': '9fead77024b8646db90fa6d80a16933c5bbe05c3f83f10c6d40ef8b8f7b86ebe'},
+     'skills/waapi-skill/wwise_waapi/core_business.py': {'before': '2cbf4c4aa6aeca19af2bad665f36d1b0f3bbbcdc148e7da360973574ae0a2f46',
+         'after': '62e361dd638a53af8b62455ec5c414bff7e5e9a9fdf6a2a419edb44a6f970bb6'},
+     'skills/waapi-skill/wwise_waapi/core_business_contracts.py': {'before': 'c0a66082248ef5c1a23020dafc90f1a9eb08ac3dfe5073bc6e9f75f2171fa65f',
+         'after': 'f9fe51a42199b137420dc906e3ceea57a64e6f3d302940887747d7616f61d61a'}}
+    if set(changes) & set(reviewed_runtime):
+        if any(changes.get(name) != expected for name,expected in reviewed_runtime.items()):
             raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
-        allowed.update(reviewed_tone)
+        allowed.update(reviewed_runtime)
     if bridge['changed_files'] != changes or not set(changes) <= allowed:
         raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
     replay = read_sealed_artifact(record['replay'], base)
@@ -523,6 +592,30 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         record['replay_bindings'][branch['id']],source_root=root,reference_edges=reference_edges)
     if result != ('passed',None):
         raise ValueError('Current public replay did not prove this exact leaf: '+str(result))
+
+
+def validate_current_class_metadata(record,branch,binding,context,scope_kind):
+    """Current-source native metadata only; independent program evidence stays required."""
+    from tests.maintenance import collect_class_metadata as collector
+    from tests.support.metadata_replay_branch_evidence import git_source_seals
+    plan=collector.collection_plan(context['version'])
+    expected={'native_candidate':context['candidate'],'relevant_sources':context['relevant_sources']}
+    if (branch['id'] not in plan['eligible_branch_ids']
+            or record.get('evidence_kind') != 'current_public_class_metadata'
+            or record.get('source_context') != expected
+            or record['invocation'] != context['invocation']
+            or context['invocation'] != {'phase':'final','outcome':'PASS','node_outcomes':[
+                {'nodeid':plan['collector_nodeid'],'outcome':'PASS'}]}
+            or record['category_inputs'] != {'native':context['gateway']['argv']}
+            or binding.get('category_inputs',{}).get('live_metadata') != record['category_inputs']
+            or not any(check['pointer']=='/gateway/payload/agent_result' and 'equals' in check
+                for check in record['branch_assertions'][branch['id']]['checks'])):
+        raise ValueError('Exact current native class input/source/final result proof missing')
+    # The reader has checked every archived source against current bytes and
+    # requires its complete metadata/collector closure. Product also proves the
+    # original native source pin owns those exact bytes; controls cannot grant it.
+    if scope_kind == 'product' and git_source_seals(context['candidate'],context['relevant_sources']) != context['relevant_sources']:
+        raise ValueError('Current native class source pin differs from its full sealed closure')
 
 
 def binding_semantics(binding):
@@ -1081,6 +1174,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                 contexts = [(metadata_context, {'sha256': metadata_context['receipt_sha256']})]
                 if metadata_context.get('format') == 'waapi-skill.r51-metadata-read/v1':
                     validate_r51_metadata_replay(record,branch,candidate,binding,metadata_context,base,root,scope_kind,reference_edges or {})
+                    metadata_replay = True
+                elif metadata_context.get('format') == 'waapi-skill.class-metadata-read/v1':
+                    validate_current_class_metadata(record,branch,binding,metadata_context,scope_kind)
                     metadata_replay = True
                 elif record['gateway']['argv'] != binding.get('input', {}).get('gateway_argv'):
                     raise ValueError('metadata public input mismatch')
