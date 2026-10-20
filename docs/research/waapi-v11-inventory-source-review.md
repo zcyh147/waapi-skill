@@ -112,3 +112,24 @@ After the portability merge, 29 focused source-identity, depth-inventory and
 profile-schema attribution checks passed in 58.51s. Both generator `--check`
 commands again returned 0. Runtime seals and all structural counts above stayed
 unchanged; the refreshed branch ledger adds the portable helper's source seal.
+
+## Saved Source continuation parser review
+
+At `c4c56351`, the parser projection adds only `continue-source-copy-proof`.
+Removing that row reproduces the prior reviewed parser hash
+`dce2f9c49744069a16be79a3e145bbdb0dfee2190d3d53e1e2836ebb343d46b0` exactly;
+the complete projection hashes to
+`26fc00e581429d36a11c09c9f66d51e21f24ae5e0968d7acc5a8e37dad998cb7`.
+All prior command/parameter rows and the other three source-contract seals are
+unchanged. The first integration generation stopped on this stale policy seal
+before writing derived files or starting the evidence capture.
+
+The command consumes the Gateway-issued owner identity and, for a checked parent
+Draft, its issued task authority and revision. The disclosed `--decline-save`
+choice records explicit refusal; it does not execute Save. Generated Save
+children retain separate Preview and policy/confirmation authorization, durable
+parent bindings, configuration checks and execute-once guards. Callers copy the
+issued continuation; they do not construct a native request or choose another
+project. This review admits the parser contract only. Complete saved-graph proof
+remains restricted to the eligible 2021.1 Source shape; it grants no new native,
+Fresh or exhaustive business-coverage credit.
