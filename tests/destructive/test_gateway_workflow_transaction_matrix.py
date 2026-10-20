@@ -9660,6 +9660,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     assert not (owned_read_only and saved_copy)
     assert saved_copy_protocol in {None, 'gateway-owned-save-children/v1'}, 'Unknown saved-copy protocol'
     successor = saved_copy_protocol is not None
+    indexed_native = not owned_read_only
     assert not successor or saved_copy, 'Save-child protocol requires saved-copy collection'
     catalog = load_native_catalog(runtime.version, 'wwise-console')
     source_id = '{95DDA32B-B666-4269-A54C-5ABF4E201C99}'
@@ -9708,6 +9709,9 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         'limits': {'calls': 128, 'reply_bytes': MAX_LIVE_RESULT_JSON_BYTES, 'total_reply_bytes': 16 * 1024 * 1024,
             'receipt_bytes': 256 * 1024, 'archive_bytes': 64 * 1024 * 1024, 'native_files': 512},
         'archive_bytes': 0, 'total_reply_bytes': 0}
+    if not saved_copy and not owned_read_only:
+        receipt.update(contract='waapi-skill.legacy-source-copy-feasibility/v2',
+            native_evidence_storage='indexed-native-file-proofs/v1')
     if owned_read_only:
         receipt.update(contract='waapi-skill.legacy-source-owned-read/v1', read_only=True,
             curve_points={'status': 'unavailable_in_2021_public_contract',
@@ -9769,7 +9773,11 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 receipt['total_reply_bytes'] += len(raw)
                 assert receipt['total_reply_bytes'] <= receipt['limits']['total_reply_bytes']
                 row.update(exit_code=code, reply=archive('reply-' + str(len(receipt['calls'])) + '.json', raw))
-                if active_save and argv[0] == 'typed-zero-call':
+                if active_save and argv[0] in {'typed-zero-call', 'preview-from-draft'}:
+                    if argv[0] == 'preview-from-draft':
+                        summary = payload.get('preview_summary', {})
+                        request = summary.get('request', {})
+                        assert request.get('operation') == 'waapi.call' and request.get('arguments', {}).get('api') == 'ak.wwise.core.project.save' and summary.get('dispatch', {}).get('uri') == 'ak.wwise.core.project.save', 'Active Save Preview must identify exact project.save operation'
                     tx = payload.get('transaction_id')
                     assert code == 0 and tx and tx not in transactions, payload
                     transactions.append(tx)
@@ -10168,19 +10176,19 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     finally:
         try:
             paths = sorted(set(native_root.glob('*.json')) - old_native)
-            assert len(paths) + int(saved_copy) <= receipt['limits']['native_files']
+            assert len(paths) + int(indexed_native) <= receipt['limits']['native_files']
             native_proofs = []
             for index, path in enumerate(paths):
                 observed = observe_console_file(path, io_root=native_root)
                 raw = base64.b64decode(observed['content_base64'], validate=True)
                 link = archive('native-' + str(index) + '.json', raw)
-                if saved_copy:
+                if indexed_native:
                     receipt['native_evidence'].append(link)
                     native_proofs.append({'archive': link, 'native_file_proof': observed['file_proof']})
                 else:
                     receipt['native_evidence'].append({'native_path': str(path), **link,
                         'native_file_proof': observed['file_proof']})
-            if saved_copy:
+            if indexed_native:
                 receipt['native_file_proofs'] = archive('native-proofs.json', json.dumps({
                     'contract': 'waapi-skill.legacy-source-native-file-proofs/v1',
                     'count': len(native_proofs), 'files': native_proofs}, ensure_ascii=False).encode('utf-8'))
@@ -10190,7 +10198,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 index_document = json.loads(base64.b64decode(index_observed['content_base64'], validate=True))
                 assert index_document['count'] == len(receipt['native_evidence'])
                 assert [row['archive'] for row in index_document['files']] == receipt['native_evidence'], 'Native proof index archive bindings changed'
-                if successor:
+                if successor or not saved_copy:
                     assert index_document == {'contract': 'waapi-skill.legacy-source-native-file-proofs/v1',
                         'count': len(native_proofs), 'files': native_proofs}, 'Native proof index content changed'
                     for indexed in index_document['files']:

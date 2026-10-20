@@ -132,6 +132,19 @@ def test_legacy_source_copy_pages_all_documented_synth_read_fields(tmp_path, wor
         assert category['status'] == 'PASS'
         # Full Source observations stay paged; owners need only exact frames.
         assert len(commands) == 55
+        receipt_path = Path(category['observation_path'])
+        receipt = json.loads(receipt_path.read_text())
+        index = json.loads(Path(receipt['native_file_proofs']['path']).read_text())
+        assert receipt['contract'] == 'waapi-skill.legacy-source-copy-feasibility/v2'
+        assert index['count'] == len(receipt['native_evidence'])
+        assert len(receipt['native_evidence']) + 1 <= receipt['limits']['native_files'] == 512
+        assert receipt_path.stat().st_size <= receipt['limits']['receipt_bytes'] == 256 * 1024
+        assert [row['archive'] for row in index['files']] == receipt['native_evidence']
+        for row in index['files']:
+            raw = Path(row['archive']['path']).read_bytes()
+            assert raw == Path(row['native_file_proof']['path']).read_bytes()
+            assert row['archive']['sha256'] == row['native_file_proof']['sha256']
+        print('R55 normal indexed receipt:', receipt_path.stat().st_size, 'bytes;', index['count'], 'native proofs')
         receipt = json.loads(Path(category['observation_path']).read_text())
         owner_ids = {FIRST, receipt['destination_id']}
         assert not any(argv[:2] == ['metadata', 'list'] and any(identity in argv for identity in owner_ids)
@@ -144,14 +157,20 @@ def test_legacy_source_copy_pages_all_documented_synth_read_fields(tmp_path, wor
         if fault == 'original-field':
             # Osc1Transpose lies on page2 of the genuine SDK field list.
             assert names.index('Osc1Transpose') >= 8
-        with pytest.raises(AssertionError, match='Original Source/owner/observed owned objects changed'):
+        with pytest.raises(AssertionError):
             workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_SYNTH_FIELDS')
         assert len([uri for uri, _ in writes if uri.endswith('object.copy')]) == 1
+        receipt = json.loads((runtime.state_dir / 'legacy-source-copy-feasibility.json').read_text())
+        failed = _failed_source_copy_verify(receipt)
+        expected = ('original Source fields and frame are unchanged' if fault == 'original-field' else 'Source-copy owner frame unchanged: ' + FIRST)
+        assert any(row['name'] == expected and row['passed'] is False for row in failed['verification']['assertions'])
+        assert receipt['native_admission_verified'] is False and receipt['collection_complete'] is False
         if fault == 'owner-voice':
             receipt = json.loads((runtime.state_dir / 'legacy-source-copy-feasibility.json').read_text())
             owner_reads = [json.loads(Path(row['reply']['path']).read_text()) for row in receipt['calls']
                 if row['argv'][0] == 'query-object' and FIRST in row['argv'] and '--include-field' in row['argv']]
-            assert [row['objects'][0]['properties']['IsVoice'] for row in owner_reads] == [False, True]
+            # The production verifier catches corruption before collector re-read.
+            assert [row['objects'][0]['properties']['IsVoice'] for row in owner_reads] == [False]
             assert task.objects[SOURCE]['@Osc1Transpose'] == -1200
     pages = [argv for argv in commands if argv[0] == 'query-object' and SOURCE in argv and '--include-field' in argv]
     assert len(pages) >= 3 and all(argv.count('--include-field') <= 8 for argv in pages)
@@ -164,6 +183,8 @@ def test_legacy_source_copy_collector_records_admission_without_full_copy_claim(
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert category['status'] == 'PASS' and receipt['native_admission_verified'] is True
     assert receipt['business_effect_verified'] is False and receipt['diagnostic_only'] is True
+    assert receipt['contract'] == 'waapi-skill.legacy-source-copy-feasibility/v2'
+    assert receipt['native_evidence_storage'] == 'indexed-native-file-proofs/v1'
     assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'copy']
     assert writes[1][1] == {'object': SOURCE, 'parent': receipt['destination_id'], 'onNameConflict': 'fail'}
     assert receipt['copy_observation']['new_id'] == COPIED
@@ -187,13 +208,26 @@ def test_legacy_source_copy_collector_records_admission_without_full_copy_claim(
     assert record['categories'][0]['business_effect_verified'] is False
 
 
+def _failed_source_copy_verify(receipt):
+    failed_call, = [row for row in receipt['calls'] if row['argv'][0] == 'verify' and row.get('exit_code') == 2]
+    failed = json.loads(Path(failed_call['reply']['path']).read_text())
+    assert failed['state'] == 'verification_failed' and failed['verification']['status'] == 'verification_failed'
+    assert failed['transaction_id'] == receipt['phases'][-1]['transaction_id']
+    assert len([row for row in receipt['calls'] if row['argv'] == ['execute', failed['transaction_id']]]) == 1
+    return failed
+
+
 @pytest.mark.parametrize('fault', ['native-error', 'copied-class', 'original-field'])
 def test_legacy_source_copy_failure_preserves_attempt_without_fallback(tmp_path, workflow, fault):
     runtime, commands, writes, task = legacy_runtime(tmp_path, fault=fault)
     with pytest.raises(AssertionError):
         workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WAAPI_LEGACY_COPY')
     receipt = json.loads((runtime.state_dir / 'legacy-source-copy-feasibility.json').read_text())
-    assert receipt['native_admission_verified'] is (fault == 'original-field')
+    assert receipt['native_admission_verified'] is False
+    if fault == 'original-field':
+        failed = _failed_source_copy_verify(receipt)
+        assert any(row['name'] == 'original Source fields and frame are unchanged' and row['passed'] is False
+            for row in failed['verification']['assertions'])
     assert receipt['collection_complete'] is False
     assert len([uri for uri, _ in writes if uri.endswith('object.copy')]) == 1
     assert len([argv for argv in commands if argv[0] == 'execute']) == 2
@@ -546,7 +580,10 @@ def test_legacy_saved_copy_refuses_save_outside_exact_owned_project(tmp_path, wo
         assert writes == [] and not any(argv[0] in {'typed-zero-call', 'draft-start', 'execute'} for argv in commands)
     else:
         assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy']
-        assert len([argv for argv in commands if argv[0] == 'typed-zero-call']) == 1
+        receipt = json.loads((runtime.state_dir / 'legacy-source-saved-copy.json').read_text())
+        saves = [row for row in receipt['phases'] if row['name'].startswith('save_')]
+        assert len(saves) == 1 and saves[0]['name'] == 'save_baseline' and saves[0]['execution_attempted']
+        assert len([argv for argv in commands if argv == ['execute', saves[0]['transaction_id']]]) == 1
 
 
 def test_legacy_saved_copy_rejects_tampered_native_proof_index_without_replay(tmp_path, workflow, monkeypatch):
@@ -707,3 +744,60 @@ def test_saved_copy_successor_rejects_invalid_generated_continuation(tmp_path, w
     attempted = [row['argv'][1] for row in receipt['calls'] if row['argv'][0] == 'execute']
     assert len(attempted) == len(set(attempted)) == len(expected_writes)
     assert not any(row['argv'] == ['verify', 'tx1-unrelated'] for row in receipt['calls'])
+
+
+@pytest.mark.parametrize('fault', ['missing', 'tampered'])
+def test_normal_source_copy_diagnostic_rejects_invalid_native_index(tmp_path, workflow, monkeypatch, fault):
+    runtime, commands, writes, task = legacy_runtime(tmp_path)
+    observe = workflow.observe_console_file
+    def invalid(path, *, io_root):
+        if Path(path).name == 'native-proofs.json':
+            if fault == 'missing': Path(path).unlink()
+            else: Path(path).write_text('{}')
+        return observe(path, io_root=io_root)
+    monkeypatch.setattr(workflow, 'observe_console_file', invalid)
+    with pytest.raises(Exception):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='INDEX_CONTROL')
+    receipt = json.loads((runtime.state_dir / 'legacy-source-copy-feasibility.json').read_text())
+    assert receipt['contract'] == 'waapi-skill.legacy-source-copy-feasibility/v2'
+    assert receipt['collection_complete'] is False and receipt['archive_failure']
+    assert runtime.category_results[0]['status'] == 'FAIL'
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'copy']
+    assert len([argv for argv in commands if argv[0] == 'execute']) == 2
+
+
+def test_legacy_saved_copy_rejects_other_operation_in_active_save_preview(tmp_path, workflow):
+    runtime, commands, writes, task = saved_copy_runtime(tmp_path)
+    invoke = runtime.raw_gateway
+    def wrong_operation(argv):
+        code, payload = invoke(argv)
+        if argv[0] == 'preview-from-draft':
+            payload = deepcopy(payload)
+            payload['preview_summary']['request']['arguments']['api'] = 'ak.wwise.core.project.close'
+        return code, payload
+    runtime.raw_gateway = wrong_operation
+    with pytest.raises(AssertionError, match='Active Save Preview must identify exact project.save operation'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='WRONG_SAVE', saved_copy=True)
+    receipt = json.loads((runtime.state_dir / 'legacy-source-saved-copy.json').read_text())
+    assert writes == [] and receipt['phases'] == [] and receipt['transaction_ids'] == []
+    assert not any(argv[0] == 'execute' for argv in commands)
+    assert receipt['failure'] and receipt['collection_complete'] is False
+
+
+def test_normal_source_copy_diagnostic_retains_original_failure_when_index_fails(tmp_path, workflow, monkeypatch):
+    runtime, commands, writes, task = legacy_runtime(tmp_path, fault='original-field')
+    observe = workflow.observe_console_file
+    def tampered(path, *, io_root):
+        if Path(path).name == 'native-proofs.json': Path(path).write_text('{}')
+        return observe(path, io_root=io_root)
+    monkeypatch.setattr(workflow, 'observe_console_file', tampered)
+    with pytest.raises(AssertionError, match='Native proof index hash/size changed'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='DOUBLE_FAILURE')
+    receipt = json.loads((runtime.state_dir / 'legacy-source-copy-feasibility.json').read_text())
+    assert receipt['failure'] and receipt['archive_failure']
+    failed = _failed_source_copy_verify(receipt)
+    assert any(row['name'] == 'original Source fields and frame are unchanged' and row['passed'] is False
+        for row in failed['verification']['assertions'])
+    assert receipt['collection_complete'] is False and receipt['native_admission_verified'] is False
+    assert runtime.category_results[0]['status'] == 'FAIL'
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'copy']
