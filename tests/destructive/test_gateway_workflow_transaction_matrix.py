@@ -9480,8 +9480,118 @@ def test_source_plugin_explicit_current_platform_alternative(workflow_sandbox_ru
     assert category['status'] == 'PASS', category
 
 
+def _legacy_saved_source_nodes(images, source_id, owner_id):
+    """Read only the retained 2021 Synth shape; unknown owned declarations fail closed."""
+    def guid(value):
+        assert isinstance(value, str) and uuid.UUID(value).int, 'Missing saved GUID'
+        return '{' + str(uuid.UUID(value)).upper() + '}'
+    assert 1 <= len(images) <= 2, 'Only exact Source/destination Work Units are observed'
+    matches, known_declarations = [], []
+    for raw in images:
+        assert len(raw) <= ConsoleModelImageIndex.MAX_FILE_BYTES and b'<!DOCTYPE' not in raw.upper(), 'Unsafe saved XML'
+        root = ET.fromstring(raw)
+        stack, count, parents = [(root, 0)], 0, {}
+        while stack:
+            node, depth = stack.pop(); count += 1
+            assert count <= 32768 and depth <= 64, 'Saved XML node/depth bound exceeded'
+            for child in node:
+                parents[child] = node; stack.append((child, depth + 1))
+        known_declarations.extend(node for node in root.iter() if node.tag in {'SourcePlugin', 'RTPC', 'ModulatorLfo', 'Curve'})
+        for node in root.iter('SourcePlugin'):
+            if guid(node.get('ID')) != guid(source_id): continue
+            children = parents.get(node); owner = parents.get(children)
+            assert children is not None and children.tag == 'ChildrenList' and owner is not None and owner.tag == 'Sound', 'Saved Source parent shape changed'
+            assert guid(owner.get('ID')) == guid(owner_id), 'Saved Source owner differs'
+            matches.append(node)
+    assert len(matches) == 1, 'Saved Source missing or duplicated'
+    source = matches[0]
+    paths = {'rtpc': "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC",
+        'control_input': "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC/ReferenceList/Reference[@Name='ControlInput']/Custom/ModulatorLfo",
+        'curve': "PropertyList/Property[@Name='OutputLevel']/RTPCList/RTPC/Curve"}
+    nodes = {'source': source}
+    for role, path in paths.items():
+        rows = source.findall(path)
+        assert len(rows) == 1, 'Missing or ambiguous saved owned member: ' + role
+        nodes[role] = rows[0]
+    declarations = [node for node in source.iter() if 'ID' in node.attrib and node.tag != 'ObjectRef']
+    assert set(declarations) == set(nodes.values()), 'Unclassified saved owned declaration'
+    ids = [guid(node.get('ID')) for node in declarations]
+    assert len(set(ids)) == 4, 'Saved owned identities alias'
+    assert all(sum(guid(node.get('ID')) == identity for node in known_declarations) == 1 for identity in ids), 'Saved owned GUID aliases another declaration'
+    return nodes
+
+
+def _legacy_saved_source_copy_oracle(before_images, after_images, *, source_id, copied_id,
+        original_owner_id, destination_id, before_live, copied_live):
+    """Fixture-only complete saved subtree comparison, never production copy authority."""
+    def guid(value):
+        if isinstance(value, Mapping): value = value.get('id')
+        assert isinstance(value, str) and uuid.UUID(value).int, 'Missing live/saved GUID'
+        return '{' + str(uuid.UUID(value)).upper() + '}'
+    before = _legacy_saved_source_nodes(before_images, source_id, original_owner_id)
+    retained = _legacy_saved_source_nodes(after_images, source_id, original_owner_id)
+    copied = _legacy_saved_source_nodes(after_images, copied_id, destination_id)
+    roles = {'source': ('SourcePlugin', 9699330), 'rtpc': ('RTPC', 1441808),
+        'control_input': ('ModulatorLfo', 4194320), 'curve': ('Curve', 917520)}
+    expected_original = {'source': '{95DDA32B-B666-4269-A54C-5ABF4E201C99}',
+        'rtpc': '{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
+        'control_input': '{E323F786-253F-48C6-86B9-AB0335804E9F}',
+        'curve': '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}'}
+    old_ids = {role: guid(node.get('ID')) for role, node in before.items()}
+    new_ids = {role: guid(node.get('ID')) for role, node in copied.items()}
+    assert old_ids == expected_original, 'Retained fixture owned identities changed'
+    assert set(old_ids.values()).isdisjoint(new_ids.values()), 'Copied owned GUID aliases original graph'
+    mapping = {old_ids[role]: new_ids[role] for role in roles}
+    assert len(mapping) == len(set(mapping.values())) == 4, 'Owned GUID mapping must be bijective'
+    for nodes, live, owner_id, ids in ((before, before_live, original_owner_id, old_ids),
+            (copied, copied_live, destination_id, new_ids)):
+        assert set(live) == set(roles), 'Independent live owned bindings incomplete'
+        for role, (tag, cls) in roles.items():
+            node, row = nodes[role], live[role]
+            assert node.tag == tag and row['class_id'] == cls and guid(row['id']) == ids[role], 'Saved/live class or GUID differs'
+            assert row['type'] in ({'Source', 'SourcePlugin'} if role == 'source' else {tag}), 'Saved/live object type differs'
+            owner = owner_id if role == 'source' else ids['source' if role == 'rtpc' else 'rtpc']
+            assert guid(row.get('parent' if role == 'source' else 'owner')) == guid(owner), 'Saved/live owner differs'
+            assert row['name'] == node.get('Name') and row.get('notes', '') == node.findtext('Comment', ''), 'Saved/live name or notes differs'
+            if 'ShortID' in node.attrib:
+                short = row.get('short_id')
+                assert type(short) is int and 0 <= short <= 0xffffffff and str(short) == node.get('ShortID'), 'Serialized ShortID lacks matching independent live binding'
+    def canonical(node, *, ids=None):
+        attributes = dict(node.attrib)
+        if ids:
+            if node in ids['nodes'].values():
+                role = next(role for role, value in ids['nodes'].items() if value is node)
+                attributes['ID'] = 'owned:' + role
+                if 'ShortID' in attributes: attributes['ShortID'] = 'live-bound:' + role
+            elif node.tag == 'ObjectRef' and 'ID' in attributes:
+                identity = guid(attributes['ID'])
+                attributes['ID'] = ids['roles'].get(identity, identity)
+        # Only formatting whitespace may disappear. Preserve unknown attributes,
+        # semantic text/tails, all child order and every ordered Curve point.
+        text = node.text
+        if len(node) and text is not None and not text.strip() and '\n' in text: text = None
+        tail = node.tail
+        if tail is not None and not tail.strip() and '\n' in tail: tail = None
+        return (node.tag, sorted(attributes.items()), text, tail,
+            [canonical(child, ids=ids) for child in node])
+    assert canonical(before['source']) == canonical(retained['source']), 'Original saved Source/owned state changed'
+    old_tokens = {identity: 'owned:' + role for role, identity in old_ids.items()}
+    new_tokens = {identity: 'owned:' + role for role, identity in new_ids.items()}
+    assert canonical(before['source'], ids={'nodes': before, 'roles': old_tokens}) == canonical(
+        copied['source'], ids={'nodes': copied, 'roles': new_tokens}), 'Copied serialized fields/references/ordered points differ'
+    points = before['curve'].findall('PointList/Point')
+    assert len(points) == 2, 'Retained genuine Curve point cardinality changed'
+    return {'original_preserved': True, 'owned_guid_mapping': mapping, 'ordered_point_count': len(points),
+        'serialized_subtree_preserved': True, 'external_references': 'exact; only proven internal ObjectRef IDs map',
+        'object_ref_count': sum(1 for node in before['source'].iter('ObjectRef')),
+        'short_ids': {role: {'original': before_live[role]['short_id'], 'copied': copied_live[role]['short_id']}
+            for role in roles if 'ShortID' in before[role].attrib},
+        'short_id_classification': 'serialized declaration identity bound independently to live short_id',
+        'scope': 'one retained 2021 Synth Source serialized graph; no production/history authority'}
+
+
 def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *, prefix: str,
-        owned_read_only: bool = False) -> dict[str, Any]:
+        owned_read_only: bool = False, saved_copy: bool = False) -> dict[str, Any]:
     """Existing bounded diagnostic, optionally stopping at original owned reads."""
     from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
     from wwise_waapi.dispatcher import MAX_LIVE_RESULT_JSON_BYTES
@@ -9489,15 +9599,18 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     from wwise_waapi.native_catalog import load_native_catalog
 
     assert runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
+    assert not (owned_read_only and saved_copy)
     catalog = load_native_catalog(runtime.version, 'wwise-console')
     source_id = '{95DDA32B-B666-4269-A54C-5ABF4E201C99}'
     original_owned_ids = ['{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
         '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}']
     stem = 'legacy-source-owned-read' if owned_read_only else 'legacy-source-copy-feasibility'
+    if saved_copy: stem = 'legacy-source-saved-copy'
     output = runtime.state_dir / (stem + '.json')
     assert not output.exists(), 'Never replace an earlier feasibility attempt'
     output.parent.mkdir(parents=True, exist_ok=True)
-    artifacts = runtime.state_dir / ('legacy-source-owned-read-artifacts' if owned_read_only else 'legacy-source-copy-artifacts')
+    artifacts = runtime.state_dir / (stem + '-artifacts' if saved_copy else
+        'legacy-source-owned-read-artifacts' if owned_read_only else 'legacy-source-copy-artifacts')
     artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); old_native = set(native_root.glob('*.json'))
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
@@ -9511,6 +9624,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         category.update(category='legacy-original-source-owned-read',
             coverage_credit='none; original read-only metadata diagnostic',
             verifier_strength='read_only_original_live_metadata_fields_and_owned_edges; no_copy_or_curve_points_credit')
+    if saved_copy:
+        category.update(category='legacy-source-saved-copy-oracle',
+            coverage_credit='none; fixture-scoped diagnostic, no production copy authority',
+            verifier_strength='independent_saved_subtree_all_fields_ordered_points_bijective_owned_IDs_live_class_owner_ShortID_ControlInput')
     runtime.category_results.append(category)
     receipt: dict[str, Any] = {'contract': 'waapi-skill.legacy-source-copy-feasibility/v1',
         'candidate': runtime.candidate, 'version': runtime.version, 'diagnostic_only': True,
@@ -9536,7 +9653,13 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 'native_getter': 'not established; inspect actual metadata, no guessed Points accessor'},
             scope_exclusions=['copy_admission', 'copied_owned_mapping', 'curve_points', 'history', 'audio_effect',
                 'Source_RTPC_membership', 'Source_field_reobservation'])
+    if saved_copy:
+        receipt.update(contract='waapi-skill.legacy-source-saved-copy/v1', model_images={}, saved_copy_verified=False,
+            scope_exclusions=['production_copy_authority', 'history', 'all_plugin_copy_business_coverage',
+                'all_owner_properties', 'empty_project_constructor', 'other_versions', 'audio_effect'])
     attempted: set[str] = set()
+    active_save = None
+    saved_model_indexes = []
     def persist():
         raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
         assert len(raw) <= receipt['limits']['receipt_bytes'], 'Diagnostic receipt bound exceeded'
@@ -9560,6 +9683,9 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             if argv[0] == 'execute':
                 assert argv[1] not in attempted, 'Never retry setup or Source-only copy'
                 attempted.add(argv[1])
+                if active_save:
+                    phase, = [phase for phase in receipt['phases'] if phase['transaction_id'] == argv[1]]
+                    phase['execution_attempted'] = True
             row = {'argv': list(argv)}; receipt['calls'].append(row)
             try:
                 code, payload = runtime.raw_gateway(argv)
@@ -9567,6 +9693,14 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 receipt['total_reply_bytes'] += len(raw)
                 assert receipt['total_reply_bytes'] <= receipt['limits']['total_reply_bytes']
                 row.update(exit_code=code, reply=archive('reply-' + str(len(receipt['calls'])) + '.json', raw))
+                if active_save and argv[0] == 'typed-zero-call':
+                    tx = payload.get('transaction_id')
+                    assert code == 0 and tx and tx not in transactions, payload
+                    transactions.append(tx)
+                    receipt['phases'].append({'name': active_save, 'transaction_id': tx, 'execution_attempted': False})
+                if active_save and argv[0] in {'execute', 'verify'}:
+                    phase, = [phase for phase in receipt['phases'] if phase['transaction_id'] == argv[1]]
+                    phase[argv[0] + '_state'] = payload.get('state')
                 return code, payload
             except Exception as exc:
                 row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}; raise
@@ -9577,17 +9711,18 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             if live: assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
             return payload
     gateway = Gateway()
-    def query(identity, *, relation=None, fields=()):
+    def query(identity, *, relation=None, fields=(), extra=()):
         result = gateway.gateway(['query-object', '--exact-id', identity,
             *(['--relationship', relation] if relation else []), '--include', 'class-id', '--include', 'parent',
-            '--include', 'owner', '--include', 'notes', *[arg for field in fields for arg in ('--include-field', field)],
+            '--include', 'owner', '--include', 'notes', *(['--include', 'short-id'] if saved_copy else []),
+            *extra, *[arg for field in fields for arg in ('--include-field', field)],
             '--max-results', '128' if relation else '2'], live=True)
         assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
         rows = result['objects']; assert result['count'] == len(rows), result
         assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
         return sorted(rows, key=lambda row: uuid.UUID(row['id']))
-    def exact(identity):
-        rows = query(identity); assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+    def exact(identity, *, extra=()):
+        rows = query(identity, extra=extra); assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
         return rows[0]
     def owner_frame(identity):
         rows = query(identity, fields=['IsVoice'])
@@ -9662,7 +9797,7 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         # its acceptance on 2021 is precisely the pending native observation.
         result = gateway.gateway(['query-object', '--advanced-waql', f'from object "{identity}" select @{token}',
             '--max-results', str(bound), '--include', 'class-id', '--include', 'owner',
-            '--include', 'parent', '--include', 'notes'], live=True)
+            '--include', 'parent', '--include', 'notes', *(['--include', 'short-id'] if saved_copy else [])], live=True)
         assert result.get('projection_complete') is not False and result.get('limit_reached') is not True and result.get('status') != 'partial', result
         rows = result['objects']; assert result['count'] == len(rows) and len(rows) < bound, result
         assert len({uuid.UUID(row['id']) for row in rows}) == len(rows), rows
@@ -9696,6 +9831,62 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         controls = owned_hop(rtpc_id, 'ControlInput', 2)
         assert len(controls) == 1 and controls[0] == lfo['identity'], controls
         receipt['owned_observation']['control_input_hop'] = 'canonical_id_read_verified'
+    def explicit_save(label):
+        nonlocal active_save
+        # status.path is the Wwise hierarchy path, not a filesystem authority.
+        # Rebind the actual project file before each separately previewed Save.
+        project = exact(status['project']['id'], extra=['--include', 'file-path'])
+        assert project['type'] == 'Project', project
+        current = Path(localize_waapi_host_path(project['file_path']))
+        assert current.resolve() == runtime.sandbox.sandbox_project.resolve() and path_is_under(
+            current, runtime.sandbox.sandbox_path) and not path_is_link_or_reparse(current), 'Save requires the exact owned sandbox project'
+        active_save = label
+        try:
+            saved = _save_sandbox_project(gateway)
+            assert saved['preview']['transaction_id'] in transactions
+            # Result-schema checking is not the saved-file effect oracle.
+            assert saved['verify']['state'] in {'verified', 'result_schema_checked'}, saved
+        finally:
+            active_save = None
+    def model_images(phase, identities):
+        paths = set()
+        for identity in identities:
+            row = exact(identity, extra=['--include', 'work-unit'])
+            unit = exact(row['work_unit']['id'], extra=['--include', 'file-path'])
+            assert unit['type'] == 'WorkUnit' and unit['class_id'] == 1638416, unit
+            path = Path(localize_waapi_host_path(unit['file_path']))
+            assert path.suffix.casefold() == '.wwu' and path_is_under(path, runtime.sandbox.sandbox_path) and not path_is_link_or_reparse(path), 'Unowned saved Work Unit'
+            paths.add(path)
+        root = artifacts / 'model-images'; root.mkdir(exist_ok=True)
+        index = ConsoleModelImageIndex(root=root, project=runtime.sandbox.sandbox_project, phase=phase,
+            link=receipt['model_images'].setdefault(phase, {}))
+        images = []
+        try:
+            for path in sorted(paths):
+                observed = observe_console_file(path, io_root=runtime.sandbox.sandbox_path)
+                assert receipt['archive_bytes'] + observed['file_proof']['size'] <= receipt['limits']['archive_bytes'], 'Model images exceed diagnostic archive bound'
+                images.append(index.save(path, observed)); receipt['archive_bytes'] += len(images[-1])
+            index.finish()
+            saved_model_indexes.append(index)
+            receipt['archive_bytes'] += index.link['size']
+            assert receipt['archive_bytes'] <= receipt['limits']['archive_bytes'], 'Model index exceeds diagnostic archive bound'
+            persist()
+            return images
+        except Exception as exc:
+            index.error(None, exc); raise
+    def saved_copy_result(before_images, copied, old_owner, before_live):
+        explicit_save('save_final')
+        after_images = model_images('after', [source_id, copied['id']])
+        nodes = _legacy_saved_source_nodes(after_images, copied['id'], destination_id)
+        live = {role: exact(node.get('ID')) for role, node in nodes.items()}
+        controls = owned_hop(live['rtpc']['id'], 'ControlInput', 2)
+        assert controls == [live['control_input']], 'Copied ControlInput hop differs from independently bound LFO'
+        receipt['oracle'] = _legacy_saved_source_copy_oracle(before_images, after_images,
+            source_id=source_id, copied_id=copied['id'], original_owner_id=old_owner,
+            destination_id=destination_id, before_live=before_live, copied_live=live)
+        receipt['independent_copied_control_input'] = 'canonical reference hop equals exact live LFO class/owner/ShortID frame'
+        # The normal runtime verifier remains unchanged and does not consume XML.
+        receipt['saved_copy_verified'] = True
     def complete(preview, label):
         tx = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
         phase = {'name': label, 'transaction_id': tx, 'execution_attempted': False}; receipt['phases'].append(phase)
@@ -9722,7 +9913,8 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert types['complete'] is True, types
         selected = [row for row in types['types'] if row['name'] == 'Wwise Synth One']
         assert len(selected) == 1 and selected[0]['classId'] == 9699330 and selected[0]['type'] == 'Source', selected
-        source_before = save_observation('source-before', {'identity': exact(source_id)} if owned_read_only else snapshot(source_id))
+        if saved_copy: explicit_save('save_baseline')
+        source_before = save_observation('source-before', {'identity': exact(source_id)} if owned_read_only or saved_copy else snapshot(source_id))
         assert source_before['identity']['type'] in {'Source', 'SourcePlugin'} and source_before['identity']['class_id'] == 9699330
         if owned_read_only:
             original_owned_read()
@@ -9734,8 +9926,12 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         owner_before = save_observation('original-owner-before', owner_frame(old_owner))
         assert owner_before['identity']['type'] == 'Sound' and owner_before['identity']['class_id'] == 65552
         source_children = save_observation('original-owner-children-before', query(old_owner, relation='children'))
-        save_observation('source-descendants-before', query(source_id, relation='descendants'))
+        if not saved_copy: save_observation('source-descendants-before', query(source_id, relation='descendants'))
         owned_before = save_observation('known-owned-before', known_owned())
+        if saved_copy:
+            before_images = model_images('before', [source_id])
+            before_live = {'source': source_before['identity'], **{role: owned_before[identity]['identity_rows'][0]
+                for role, identity in zip(('rtpc', 'control_input', 'curve'), original_owned_ids)}}
         # Existing classic Gateway creation; no field/default or locale changes.
         draft = _start_business_draft(gateway, 'object.create')
         parent = _bind_business_object(gateway, draft, path_segments=ACTOR_MIXER_PARENT_SEGMENTS)
@@ -9763,9 +9959,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         assert uuid.UUID(copied['id']) != uuid.UUID(source_id) and copied['class_id'] == 9699330
         assert copied['type'] in {'Source', 'SourcePlugin'} and copied['parent']['id'] == destination_id, copied
         receipt['native_admission_verified'] = True
-        copied_state = save_observation('copied-source', snapshot(copied['id']))
-        save_observation('copied-descendants', query(copied['id'], relation='descendants'))
-        source_after = save_observation('source-after', snapshot(source_id))
+        copied_state = save_observation('copied-source', {'identity': exact(copied['id'])} if saved_copy else snapshot(copied['id']))
+        if not saved_copy: save_observation('copied-descendants', query(copied['id'], relation='descendants'))
+        if saved_copy: saved_copy_result(before_images, copied, old_owner, before_live)
+        source_after = save_observation('source-after', {'identity': exact(source_id)} if saved_copy else snapshot(source_id))
         owner_after = save_observation('original-owner-after', owner_frame(old_owner))
         destination_after = save_observation('destination-after', owner_frame(destination_id))
         owned_after = save_observation('known-owned-after', known_owned())
@@ -9775,6 +9972,18 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         receipt['preservation'] = {'original_source_observed_state': True, 'original_owner_identity_voice_frame': True,
             'original_owner_children': True, 'destination_identity_voice_frame': True, 'known_owned_topology_observations': True,
             'unresolvable_owned_ID_scope': 'equal unavailable observations do not prove owned object preservation'}
+        if saved_copy:
+            assert query(destination_id, relation='children') == children, 'Saved destination childset changed'
+            after_index, = [index for index in saved_model_indexes if index.phase == 'after']
+            for relative, image in after_index.files.items():
+                assert observe_console_file(runtime.sandbox.sandbox_project.parent / relative,
+                    io_root=runtime.sandbox.sandbox_path)['file_proof'] == image['file_proof'], 'Saved model changed during public observations'
+            receipt['copy_observation'] = {'new_id': copied['id'], 'class_id': copied['class_id'],
+                'parent_id': destination_id, 'saved_subtree': 'independent full serialized graph oracle',
+                'runtime_verifier': 'unchanged identity verifier; no production complete-copy authority'}
+            assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash
+            receipt['collection_complete'] = True; category['status'] = 'PASS'
+            return category
         before_fields = {key: value for row in source_before['field_pages'] for key, value in row.get('properties', {}).items()}
         after_fields = {key: value for row in copied_state['field_pages'] for key, value in row.get('properties', {}).items()}
         before_refs = {key: value for row in source_before['field_pages'] for key, value in row.get('references', {}).items()}
@@ -9824,3 +10033,13 @@ def test_legacy_original_source_owned_read_console_diagnostic(workflow_sandbox_r
         pytest.skip('Original owned metadata observation is pinned to Console2021.1.14.8108')
     category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='', owned_read_only=True)
     assert category['status'] == 'blocked', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_legacy_source_only_copy_saved_graph_console_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2021.1':
+        pytest.skip('Saved Source graph diagnostic is pinned to Console2021.1.14.8108')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime,
+        prefix='WAAPI_SAVED_SOURCE_COPY_' + uuid.uuid4().hex[:10], saved_copy=True)
+    assert category['status'] == 'PASS', category

@@ -176,3 +176,51 @@ must remain that precise failure; do not try alternate aliases or infer absence.
 Even a successful RTPC/Curve query would certify only that scoped class, not the
 entire Source-owned closure. No such query is added to this successor and no new
 native launch is authorized by this note.
+
+
+## R52: fixture-scoped saved-copy diagnostic (native pending)
+
+R51's accepted 28-read result proves the documented ControlInput hop and exact
+RTPC/LFO/Curve owner/class frames, not a points getter. Its immutable evidence is
+`/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r51-exact-owned-read-90c1089-2021-r1/diagnostic-result.md`.
+The next diagnostic reuses the existing collector and lifecycle, with four
+separate public transactions: baseline `project.save`, empty SFX Sound setup,
+Source-only copy, final `project.save`. Matching 2021.1.14 SDK/reflection and
+closed `request-schema` snapshots are `/tmp/waapi-r51-copy-save-primary/`.
+Save's schema digest is
+`3ba730f37f73a10ca133846b3604783903adc088d29bc8cfce9b414568c2c89e`;
+its public continuation is zero-input, not a 2025 auto-check-out declaration.
+The existing `_save_sandbox_project` follows preview/confirmation/one execution/
+verification; result-schema checking alone never establishes saved state.
+
+Before each Save, an exact Project GUID query with file-path must equal the owned
+sandbox project; status.path is only the Wwise hierarchy path. Only exact public
+Work Unit/file-path observations select the owned sandbox WWUs.
+`ConsoleModelImageIndex` and existing file observations retain each image once,
+inside the unchanged aggregate archive ceiling. XML guards remain 8 MiB/file,
+no DOCTYPE, 32768 nodes and depth64. The fixture-only oracle compares the entire
+Source subtree and original preservation, including unknown attributes, text,
+all fields and ordered Curve PointList, with a bijection for the four known
+owned declarations. Other GUID/reference changes remain exact or fail closed;
+new/ambiguous/missing owned declarations are rejected. The current fixture has
+no ObjectRef nodes; future native evidence must not imply that external or
+internal ObjectRef remapping was exercised. ControlInput is serialized as the
+actual nested Custom ModulatorLfo and independently checked through the
+R51-supported canonical reference hop.
+
+Every serialized declaration ShortID must equal its independent live `short-id`
+read (the matching fixed objectReturn accessor); its original/copied values are
+recorded explicitly. They are classified as live-bound identity values without
+requiring equality or change. Curve has no serialized ShortID in the retained
+fixture; adding one only to the copy is an unexplained difference. Independent
+exact copied GUID/class/type/name/notes/owner reads and actual Boolean IsVoice/
+complete childsets for both Sounds remain mandatory. No R51 metadata detail
+campaign or Source-field paging is duplicated to populate the receipt.
+
+The new node is `test_legacy_source_only_copy_saved_graph_console_diagnostic`.
+Fake protocol completion and pure XML controls do not prove native copy. The
+category remains diagnostic-only with `business_effect_verified=false`; the
+production verifier and its authority/history boundary are unchanged. No user
+project is implicitly saved, no original quarantine is opened, and this test
+oracle is never a runtime filesystem fallback. Native execution requires its
+own reviewed frozen candidate and explicit authorization.
