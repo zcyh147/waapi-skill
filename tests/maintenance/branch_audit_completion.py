@@ -457,6 +457,27 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_replay_attachments.py',
         'tests/support/metadata_replay_cases.json','tests/support/metadata_replay_branch_evidence.py',
         'docs/branch-coverage-requirements.json'}
+    # Reviewed Tone-only delta at 7f3c360d701e24a0e33a9c8771109789cc7b4705.
+    # This does not participate in the exact RTPC metadata read. Retain both
+    # full closures and require all four exact old/new blobs together; a later
+    # edit or a partially combined runtime is not this reviewed source bridge.
+    reviewed_tone = {
+        'skills/waapi-skill/wwise_waapi/operation_tone.py': {
+            'before':'34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912',
+            'after':'73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
+        'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {
+            'before':'40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6',
+            'after':'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
+        'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py': {
+            'before':'55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177',
+            'after':'a392d1a2bc4665dd1ac64a83d88bb89561c2cd8570e3ebd7ab6355c5d62300ba'},
+        'skills/waapi-skill/scripts/gateway.py': {
+            'before':'1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca',
+            'after':'3d6bd7a0859008dfabc7bc210c661571911679999cf8d859d354d5c2912b6245'}}
+    if set(changes) & set(reviewed_tone):
+        if any(changes.get(name) != expected for name,expected in reviewed_tone.items()):
+            raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
+        allowed.update(reviewed_tone)
     if bridge['changed_files'] != changes or not set(changes) <= allowed:
         raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
     replay = read_sealed_artifact(record['replay'], base)

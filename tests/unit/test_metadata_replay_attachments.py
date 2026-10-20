@@ -29,7 +29,7 @@ def original_read(root,field):
 
 def test_original_r51_metadata_adapter_preserves_blocked_business_and_exact_read(original_root):
     descriptor = original_read(original_root, 'ControlInput')
-    context = completion.read_metadata_run(descriptor, original_root)
+    context = completion.read_metadata_run(descriptor, audit.ROOT)
     assert context['host'] == 'wwise-console' and context['build'] == '2021.1.14.8108'
     assert context['business_category_status'] == 'blocked'
     assert context['gateway']['payload']['agent_result']['metadata']['default'] is None
@@ -293,6 +293,44 @@ def test_metadata_bridge_rejects_new_runtime_drift_even_with_full_changed_file_p
     replay['relevant_sources'] = current
     record['replay'] = write(tmp_path/'drifted-program.json',replay,nodeid=descriptor['nodeid'])
     descriptor = write(tmp_path/'drifted-attachment.json',record,nodeid=descriptor['nodeid'])
+    outcome,reason = result()
+    assert outcome == 'missing' and 'runtime drift is not equivalent' in reason
+
+
+@pytest.mark.parametrize('damage',[None,'operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py','partial-bridge'])
+def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,inventory,tmp_path,monkeypatch,damage):
+    import subprocess
+    capture,replay,record,bindings,descriptor = controlled_attachment(tmp_path,original_root,inventory,'ControlInput')
+    branch = next(row for row in capture['branches'] if row['id'] in bindings)
+    binding = {**bindings[branch['id']],'category_inputs':{'live_metadata':record['category_inputs']}}
+    def result():
+        return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
+            source_root=audit.ROOT,reference_edges=capture['edges'])
+    assert result() == ('passed',None)
+    accepted = '7f3c360d701e24a0e33a9c8771109789cc7b4705'
+    packets = {}
+    for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py'):
+        relative = ('skills/waapi-skill/scripts/' if name == 'gateway.py' else 'skills/waapi-skill/wwise_waapi/')+name
+        raw = subprocess.check_output(['git','show',accepted+':'+relative],cwd=audit.ROOT)
+        packets[audit.ROOT/relative] = raw
+    read_bytes = Path.read_bytes
+    monkeypatch.setattr(Path,'read_bytes',lambda path:packets[path] if path in packets else read_bytes(path))
+    def resign():
+        current = producer.source_seals()
+        record['source_bridge']['current_sources'] = current
+        record['source_bridge']['changed_files'] = producer.source_changes(record['source_bridge']['historical_sources'],current)
+        replay['relevant_sources'] = current
+        record['replay'] = write(tmp_path/'tone-program.json',replay,nodeid=descriptor['nodeid'])
+        return write(tmp_path/'tone-attachment.json',record,nodeid=descriptor['nodeid'])
+    descriptor = resign()
+    assert result() == ('passed',None)  # Exact combined Tone baseline before every corruption.
+    if damage is None:return
+    target = next(path for path in packets if path.name == ('gateway.py' if damage == 'partial-bridge' else damage))
+    if damage == 'partial-bridge':
+        relative = str(target.relative_to(audit.ROOT))
+        packets[target] = subprocess.check_output(['git','show',producer.ORIGINAL+':'+relative],cwd=audit.ROOT)
+    else:packets[target] += b'\n# unapproved drift\n'
+    descriptor = resign()
     outcome,reason = result()
     assert outcome == 'missing' and 'runtime drift is not equivalent' in reason
 
