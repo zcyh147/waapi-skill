@@ -64,7 +64,23 @@ def _owner(chain, model):
     return identity, scope["class_id"]
 
 
-def receipt_observations(prepared, verification):
+def project_model(model, context):
+    """Project only proved owner/member/retained-target identities, never metadata."""
+    from .object_graph_paths import project_compound_snapshot
+    projected = deepcopy(model)
+    def identity(row):
+        expected = project_compound_snapshot(row, context)
+        return {key: expected[key] for key in row}
+    source = projected.get("source", {})
+    if isinstance(source.get("scope", {}).get("owner"), dict):
+        source["scope"]["owner"] = identity(source["scope"]["owner"])
+    for key in ("snapshots", "targets"):
+        for item in projected.get(key, []):
+            item["rows"] = [identity(row) for row in item["rows"]]
+    return projected
+
+
+def receipt_observations(prepared, verification, *, path_context=None):
     """Return shared changed-field rows plus full ordered preservation witnesses."""
     from .edit_history_business import _GUID, _identity, _scalar_matches, _receipt_platform
     from .operation_registry import _has_field, _field_value
@@ -93,8 +109,10 @@ def receipt_observations(prepared, verification):
         if (len(records) != 1 or not lifecycle_snapshot_equal(records[0].get("chain"), chain)
                 or records[0].get("source_matches") is not True):
             raise ValueError("Render receipt requires one actual verified-after chain association")
+        if path_context and records[0].get("compound_path_context_sha256") != canonical_sha256(path_context):
+            raise ValueError("Render observation differs from its sealed parent identity context")
         before, after = _before_model(chain), _model(chain, records[0]["observation"])
-        expected = deepcopy(before)
+        expected = project_model(before, path_context)
         for original, projected in zip(chain["snapshots"], expected["snapshots"], strict=True):
             for name, value in original["after_changes"].items():
                 row = projected["rows"][0]
@@ -127,14 +145,16 @@ def receipt_observations(prepared, verification):
         preservation.append({"kind": KIND, "object_before": owner_before, "object_after": owner_after,
             "class_id": owner_class, "field": "render_chain_preservation", "platform": platform,
             "before": before, "after": after, "chain": chain,
-            "edits": state.get("object_set_nodes", [])})
+            "edits": state.get("object_set_nodes", []),
+            **({"path_context": path_context} if path_context else {})})
     return [*fields, *preservation], covered
 
 
 def observe_chain(expected, side, *, read):
     """Reuse the source chain reader; raw replies stay in the owning read journal."""
     from .effect_render_conditions import chain_assertions
-    actual, = chain_assertions([expected["chain"]], read=read, after_write=side == "after", edits=expected["edits"])
+    actual, = chain_assertions([expected["chain"]], read=read, after_write=side == "after", edits=expected["edits"],
+        compound_path_context=expected.get("path_context") if side == "after" else None)
     evidence = actual["evidence"]
     model = _model(expected["chain"], evidence["observation"]) if actual["passed"] else None
     return {"object": expected["object_" + side], "field": "render_chain_preservation",

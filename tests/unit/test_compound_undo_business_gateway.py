@@ -4820,3 +4820,22 @@ def test_exact_ancestor_rename_keeps_declared_notes_on_retained_existing_child(t
     assert after[ROOT]['notes'] == 'Earlier declared notes'
     assert after[ROOT]['name'] == before[ROOT]['name']
     assert after[ROOT]['path'] == r'\Master-Mixer Hierarchy\Renamed parent\External'
+
+
+def test_compound_render_owner_exact_rename_restores_full_chain_and_history(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import FIRST, ROOT, CHILD
+    from tests.unit.test_list_merge_existing_conditions_gateway import EFFECT
+    task, _, _, _, _ = _render_history_case(tmp_path, compound=True)
+    _install_created_graph_rename_client(task)
+    source, before, after = _compound_from_graph_task(task, notes_id=FIRST, companion='object.setName')
+    assert after[FIRST]['name'] == 'Renamed parent'
+    assert after[ROOT]['path'] == r'\Actor-Mixer Hierarchy\Default Work Unit\Renamed parent\Slot'
+    assert after[ROOT]['@Render'] is True and after[CHILD]['@Render'] is True
+    assert after[ROOT]['@Bypass'] == before[ROOT]['@Bypass']
+    assert after[ROOT]['@Effect'] == after[CHILD]['@Effect'] == {'id': EFFECT}
+    for direction, expected in (('undo', before), ('redo', after)):
+        tx = _created_leaf_history_preview(task, source, direction)
+        assert task.run('execute', tx)[0] == 0
+        code, verified = task.run('verify', tx)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects == expected

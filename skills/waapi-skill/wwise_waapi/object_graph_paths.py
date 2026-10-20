@@ -179,15 +179,29 @@ def prepare_compound_path_context(calls, *, read):
     edits = compound_rename_edits(calls)
     graphs = [call['prepared_operation'] for call in calls
         if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph']
-    if not edits or not any(any(isinstance(role.get('row'), dict)
-            and (role['row']['path'] == node['pre_state']['path']
-                or role['row']['path'].startswith(node['pre_state']['path'] + '\\'))
-            for node in edits) for child in graphs for role in child.get('resolved_roles', {}).values()):
+    def affected(row):
+        return isinstance(row, dict) and isinstance(row.get('path'), str) and any(
+            row['path'] == node['pre_state']['path'] or row['path'].startswith(node['pre_state']['path'] + '\\')
+            for node in edits)
+    render_chains = [chain for call in calls
+        for chain in call.get('prepared_operation', {}).get('pre_state', {}).get('effect_render_chains', [])]
+    owned_members = {item['object_id'].casefold() for chain in render_chains for item in chain.get('snapshots', [])
+        if isinstance(parent_id(item.get('before', {}).get('owner')), str)
+        and parent_id(item['before']['owner']).casefold() == str(chain.get('owner_id')).casefold()}
+    render_rows = [row for chain in render_chains
+        for row in [chain.get('source', {}).get('scope', {}).get('owner'),
+            *(item.get('before') for item in chain.get('snapshots', [])),
+            *(item.get('before') for item in chain.get('targets', []))]]
+    if not edits or not (any(affected(role.get('row')) for child in graphs
+            for role in child.get('resolved_roles', {}).values()) or any(affected(row) for row in render_rows)):
         return None
     identities = {}
     def collect(value):
         if isinstance(value, dict):
-            if all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path')) and _GUID.fullmatch(value['id']):
+            # Owned List members retain their opaque path/owner proof in the
+            # complete Render model, not an invented ordinary parent chain.
+            if (all(isinstance(value.get(key), str) for key in ('id', 'name', 'type', 'path'))
+                    and _GUID.fullmatch(value['id']) and value['id'].casefold() not in owned_members):
                 if any(value['path'] == node['pre_state']['path'] or value['path'].startswith(node['pre_state']['path'] + '\\') for node in edits):
                     key = value['id'].casefold()
                     if key in identities and any(identities[key][field] != value[field] for field in ('id', 'name', 'type', 'path')):

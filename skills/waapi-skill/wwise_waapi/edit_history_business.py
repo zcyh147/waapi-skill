@@ -356,7 +356,7 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
     if (prepared.get("pre_state", {}).get("effect_render_chains")
             and plan.get("kind") in {"same-guid-property", "object-set-batch"}):
         from .render_history_observations import receipt_observations as render_observations
-        observations, covered = render_observations(prepared, verification)
+        observations, covered = render_observations(prepared, verification, path_context=compound_path_context)
         if plan["kind"] == "object-set-batch":
             from .existing_field_observations import receipt_observations
             observations.extend(receipt_observations(prepared, verification, exclude_fields=covered, path_context=compound_path_context))

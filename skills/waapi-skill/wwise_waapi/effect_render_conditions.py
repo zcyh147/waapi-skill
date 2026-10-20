@@ -373,10 +373,10 @@ def prepare_property(*, object_id, field, value, version, platform, read):
     return prepare_graph([spec], {}, version=version, read=read)
 
 
-def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=None):
+def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=None, compound_path_context=None):
     from . import operation_registry as r
     from .documented_list_fields import resolve_class_list_evidence, resolve_live_list_evidence
-    from .object_graph_paths import expected_snapshot
+    from .object_graph_paths import expected_snapshot, project_compound_snapshot
     assertions = []
     def read_identity(identity):
         rows = r._read_object_id_rows(identity, fields=r.IDENTITY_RETURN_FIELDS, read=read)
@@ -399,6 +399,10 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
             # Owner names/paths can change only through the ordinary prepared
             # identity/path guards; the source class/declaration remains exact.
                 source_match = all(current[key] == source[key] for key in source if key != "scope") and current["scope"]["class_id"] == source["scope"]["class_id"]
+                if after_write and compound_path_context:
+                    from .render_history_observations import project_model
+                    expected_source = project_model({"source": source}, compound_path_context)["source"]
+                    source_match = source_match and r._native_snapshot_equal(current, expected_source)
                 observed["source"] = current
             types = [row.as_dict() for row in r._read_object_type_catalog(read)
                 if row.class_id == chain["slot_type"]["classId"] and row.name == chain["slot_type"]["name"]]
@@ -428,6 +432,7 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
                 observed["snapshots"].append({"object_id": snapshot["object_id"], "rows": actual})
                 expected = deepcopy(snapshot["before"])
                 if after_write:
+                    expected = project_compound_snapshot(expected, compound_path_context)
                     expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
                     for name, value in snapshot["after_changes"].items():
                         expected[name if name in expected else "@" + name] = value
@@ -475,7 +480,8 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
                     observed["targets"].append({"object_id": target["before"]["id"], "rows": actual})
                     expected = target["before"]
                     if after_write:
-                        expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
+                        expected = project_compound_snapshot(expected, compound_path_context)
+                    expected = expected_snapshot(expected, edits=edits, read_row=read_identity)
                     target_matches = r._native_snapshot_equal(actual, [expected])
                     if optional_targets:
                         observed["targets_complete"] = observed["targets_complete"] and target_matches
@@ -490,7 +496,9 @@ def chain_assertions(chains, *, read, after_write=False, edits=(), resolved_ids=
             passed = passed and all(item["passed"] for item in target_conditions)
             evidence = {"source_matches": source_match, "chain": chain, "target_conditions": target_conditions,
                 "prepared_chain_sha256": canonical_sha256(chain), "after_write": after_write,
-                "observation": observed}
+                "observation": observed,
+                **({"compound_path_context_sha256": canonical_sha256(compound_path_context)}
+                    if after_write and compound_path_context else {})}
         except (r.OperationContractError, ValueError, KeyError, TypeError) as exc:
             passed, evidence = False, {"error": str(exc)}
         assertions.append({"name": "Effect Render chain metadata and complete stored state match prepared intent",

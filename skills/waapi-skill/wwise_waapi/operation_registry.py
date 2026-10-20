@@ -8964,7 +8964,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     return assertions
 
 
-def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
+def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
     language_contexts = [node[key] for node in pre_state.get("object_set_nodes", [])
@@ -9020,7 +9020,8 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
         from .effect_render_conditions import chain_assertions
         assertions.extend(chain_assertions([chain for chain in pre_state["effect_render_chains"]
             if chain not in deferred_render_chains], read=read, after_write=after_write,
-            edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", []))))
+            edits=pre_state.get("object_set_nodes", pre_state.get("object_create_nodes", [])),
+            compound_path_context=compound_path_context))
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
@@ -18208,7 +18209,7 @@ def verify_prepared_operation(
     if deferred_render_chains:
         assertions.append(render_association)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True,
-        deferred_render_chains=deferred_render_chains))
+        deferred_render_chains=deferred_render_chains, compound_path_context=compound_path_context))
     assertions.extend(_effect_shareset_placement_assertions(pre_state, read=read_call, after_write=True))
     from .edit_history_business import observe_field_read_platform
     platform_observation = observe_field_read_platform(pre_state or {}, read=read_call)
@@ -20893,7 +20894,7 @@ def verify_prepared_operation(
         if deferred_render_chains:
             from .effect_render_conditions import chain_assertions
             assertions.extend(chain_assertions(deferred_render_chains, read=read_call, after_write=True,
-                edits=specs, resolved_ids=resolved_id_by_path))
+                edits=specs, resolved_ids=resolved_id_by_path, compound_path_context=compound_path_context))
             render_association["passed"] = True
         replaced_set_rows: list[Any] = []
         if kind == "object-set-batch":
