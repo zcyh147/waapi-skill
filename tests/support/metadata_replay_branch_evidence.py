@@ -32,6 +32,30 @@ R55_ORIGINAL_SEALS = {
     '2024.1':'bb0588f23f9af5a8df9ce33c1dc8c1b903affa3dd5e2558fb629380ed8bb574b'}
 
 
+
+# Accepted20c8dcc8b37a951b76584a560a4529d69b9ceea9 Source consumers,
+# present in integrationa106ad52d2924c1cbaecb7d297c55b85bdade3fd.
+# R54 and R55 independently checked original Git maps have these same before
+# blobs; the new helper is explicitly absent in both originals. These auxiliary
+# pairs permit historical-native/current-program attribution only.
+CLASS_AUXILIARY_CHANGES = {'tests/semantic/support/codex_business_oracle_plan_v3.py': {'after': 'acdc65339374bf5109e7e4d8ba13ddab3a5367f10c87b95db64f251aaf97ce2c',
+                                                             'before': '65f7943443a91520e535570345e6b43ac4d09e72b519f5ffd57c7c9be51b5eb9'},
+ 'tests/semantic/support/codex_eval_protocol_v3.py': {'after': '8350a1f08c70468d84c62b74711454354d78bd8c30d24fbe043110d9fee04ca1',
+                                                      'before': 'aa0593dee563fa000c026460825cbaa4ae250f7ae567117906fe68a098ee3b4d'},
+ 'tests/semantic/support/codex_gateway_broker.py': {'after': '06afa360d56dc3227300289fe6867783060578c064240fe5e982a9af7a7a777b',
+                                                    'before': '10806fd223d22c199aa3ebcc0a10391854e73ccfff6b91de1356b75ecf77e210'},
+ 'tests/semantic/support/codex_harness.py': {'after': 'd711cb6978e310407e69e22882eec93dd8275d45a4056a4c4caf9e0860b1ddea',
+                                             'before': '44b8888ee682a37d46882bdfbbf5c701a7b2108f310cc40cdd4f14e1658934b2'},
+ 'tests/semantic/support/codex_prompt_provenance_v3.py': {'after': 'e1a85408dd2f0ed25e75bda00c82d0c3180172ff885ab23d602404da6c478bb1',
+                                                          'before': '38a6082b6a95e485dc62f5a52d74e50592a5424d7aa1b1b86500b5a07161e669'},
+ 'tests/semantic/support/codex_source_copy_protocol.py': {'after': 'f1aa72085e2985f8b93a1c399c17282743d716977529d9b7a00e4c5d860dffbe',
+                                                          'before': None},
+ 'tests/semantic/support/codex_task_runner_v3.py': {'after': '8250851354409dca2c6f789f776951f7174927279e5e495f0e7b01dc7e76bcef',
+                                                    'before': 'b33e240e3c20ff5999e7ef773ade357a10222af9fb2b7f47ff3ff94015fc5e02'},
+ 'tests/semantic/support/codex_typed_draft_evidence_v3.py': {'after': '37841446878515c1484dfecf0cf35ac304c87b9f13ee39c6e0ec35c66d3d4189',
+                                                             'before': '05205d05f9c0bf56939297081e69f7db107f50f1808eb9a0274df3d11c06a588'}}
+
+
 def class_original_profile(cohort):
     if cohort not in ('r54','r55'):raise ValueError('Unreviewed original class cohort')
     return {'candidate':R54_ORIGINAL if cohort=='r54' else R55_ORIGINAL,
