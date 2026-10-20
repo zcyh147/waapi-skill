@@ -4371,7 +4371,7 @@ def test_stationary_tone_diagnostic_uses_matching_pinned_console_catalog_without
     assert category['status'] == 'blocked' and category['diagnostic_only'] is True
 
 
-def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
+def _multisource_public_runtime(tmp_path, workflow, *, fault=None, version='2021.1'):
     """Fake public replies exercise collector protocol/oracle only, not native admission."""
     from copy import deepcopy
     import shutil
@@ -4381,12 +4381,15 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
     project = sandbox / 'Fixture.wproj'; project.write_text('<WwiseDocument/>')
     unit_path = sandbox / 'Actor-Mixer Hierarchy' / 'Default Work Unit.wwu'; unit_path.parent.mkdir()
     guid = lambda value: '{' + str(uuid.UUID(int=value)).upper() + '}'
-    unit, platform = guid(1), guid(2)
+    unit, platform, windows = guid(1), guid(2), guid(3)
     objects = {unit: {'id': unit, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'class_id': 1638416,
         'path': workflow.ACTOR_MIXER_PARENT, 'parent': None, 'notes': '', 'file_path': str(unit_path)},
         platform: {'id': platform, 'name': 'Mac', 'type': 'Platform', 'class_id': 4, 'path': r'\Platforms\Mac', 'parent': None, 'notes': ''}}
+    if version == '2022.1':
+        objects[windows] = {'id': windows, 'name': 'Windows', 'type': 'Platform', 'class_id': 4,
+            'path': r'\Platforms\Windows', 'parent': None, 'notes': ''}
     commands, drafts, transactions = [], {}, {}
-    state = {'copies': 0, 'copy_attempts': 0, 'imports': 0, 'deletes': 0, 'active': {}}
+    state = {'copies': 0, 'copy_attempts': 0, 'imports': 0, 'deletes': 0, 'active': {}, 'platform_active': {}, 'selections': 0, 'selection_attempts': 0}
     def saved_xml():
         root = ET.Element('WwiseDocument'); work = ET.SubElement(root, 'WorkUnit', ID=unit)
         children = ET.SubElement(work, 'ChildrenList')
@@ -4401,20 +4404,22 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 ET.SubElement(node, 'AudioFile').text = Path(source['original_file_path']).name
             active = state['active'][row['id']]
             refs = ET.SubElement(sound, 'ActiveSourceList')
-            ET.SubElement(refs, 'ActiveSource', ID=guid(999) if fault == 'xml-guid' else active,
-                Name=objects[active]['name'], Platform='Linked')
+            choices = [(name, source) for (owner, name), source in state['platform_active'].items() if owner == row['id']]
+            for name, source in choices or [('Linked', active)]:
+                ET.SubElement(refs, 'ActiveSource', ID=guid(999) if fault == 'xml-guid' else source,
+                    Name=objects[source]['name'], Platform=name)
         unit_path.write_bytes(ET.tostring(root))
     def raw(argv):
         argv = list(argv); commands.append(argv)
-        payload = {'ok': True, 'detected_version': '2021.1',
+        payload = {'ok': True, 'detected_version': version,
             'endpoint': {'host': '127.0.0.1', 'port': 31337, 'url': 'ws://127.0.0.1:31337/waapi'}}
         command = argv[0]
         if command == 'metadata':
             payload['agent_result'] = {'complete': True, 'types': [
                 {'name': name, 'classId': value, 'type': 'WObject', 'selection': name}
-                for name, value in [('Sound', 65552), ('AudioSource', 16), ('WorkUnit', 1638416), ('Platform', 4)]]}
+                for name, value in [('Sound', 65552), ('AudioSource' if version == '2021.1' else 'AudioFileSource', 16), ('WorkUnit', 1638416), ('Platform', 4)]]}
         elif command == 'query-object':
-            if '--type-selection' in argv: found = [objects[platform]]
+            if '--type-selection' in argv: found = [row for row in objects.values() if row['type'] == 'Platform']
             elif '--path-segment' in argv:
                 path = '\\' + '\\'.join(argv[i + 1] for i, arg in enumerate(argv) if arg == '--path-segment')
                 found = [row for row in objects.values() if row['path'] == path]
@@ -4423,6 +4428,13 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 owner = argv[argv.index('--exact-id') + 1]
                 found = [row for row in objects.values() if isinstance(row.get('parent'), dict) and row['parent']['id'] == owner]
                 if fault != 'same-order': found = sorted(found, key=lambda row: row['name'])
+            if version == '2022.1':
+                name = 'Windows' if '--platform' in argv and argv[argv.index('--platform') + 1] in {windows, 'Windows'} else 'Mac'
+                found = [deepcopy(row) for row in found]
+                for row in found:
+                    if row['type'] == 'Sound':
+                        source = state['platform_active'].get((row['id'], name), state['active'][row['id']])
+                        row.update(original_file_path=objects[source]['original_file_path'], active_source={'id': source, 'name': objects[source]['name']})
             includes = [argv[i + 1].replace('-', '_') for i, arg in enumerate(argv) if arg == '--include']
             keys = {'id', 'name', 'type', 'path', *includes}
             found = [{key: deepcopy(value) for key, value in row.items()
@@ -4438,9 +4450,12 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
         elif command == 'draft-start':
             identity = 'draft-' + str(len(drafts)); drafts[identity] = {'operation': argv[1], 'revision': 1, 'roles': {}, 'rows': []}
             payload.update(draft={'draft_id': identity, 'revision': 1}, task_authority='authority')
-        elif command in {'draft-bind-object', 'draft-declare-new', 'draft-declare-object-change', 'draft-declare-core-plan', 'draft-check', 'preview-from-draft'}:
+        elif command in {'draft-bind-object', 'draft-declare-new', 'draft-declare-object-change', 'draft-declare-core-plan', 'draft-declare-project-setting-plan', 'draft-check', 'preview-from-draft'}:
             draft = drafts[argv[1]]
             if command == 'draft-check' and draft['operation'] == 'object.copy' and fault == 'preparation':
+                return 2, {**payload, 'ok': False, 'error_code': 'INVALID_TARGET',
+                    'recovery': {'project_write_outcome': 'no_project_write_in_this_invocation'}}
+            if command == 'draft-check' and draft['operation'] == 'ak.wwise.core.sound.setActiveSource' and fault == 'select-preparation':
                 return 2, {**payload, 'ok': False, 'error_code': 'INVALID_TARGET',
                     'recovery': {'project_write_outcome': 'no_project_write_in_this_invocation'}}
             if command == 'draft-bind-object':
@@ -4448,6 +4463,7 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 draft['roles'][role] = argv[argv.index('--object-id') + 1]
                 payload['bound_object'] = {'handle': 'handle-' + role}
             elif command == 'draft-declare-new': draft['rows'].append(argv)
+            elif command == 'draft-declare-project-setting-plan': draft['platform_name'] = argv[argv.index('--platform-name') + 1]
             elif command == 'preview-from-draft':
                 identity = 'tx-' + str(len(transactions)); transactions[identity] = draft
                 payload.update(transaction_id=identity, artifact_hash='hash-' + identity)
@@ -4466,7 +4482,7 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 if operation == 'ak.wwise.core.project.save': saved_xml()
                 elif operation == 'audio.import':
                     state['imports'] += 1
-                    assert len(draft['rows']) == 6
+                    assert len(draft['rows']) == (6 if version == '2021.1' else 2)
                     for index, row in enumerate(draft['rows']):
                         fields = {row[i + 1]: row[i + 2] for i, arg in enumerate(row) if arg == '--field'}
                         language, source_file = fields['language'], Path(fields['media_file'])
@@ -4499,6 +4515,16 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                         identity = guid(300 + state['copies'])
                         objects[identity] = {**deepcopy(source), 'id': identity, 'parent': {'id': parent['id']},
                             'path': parent['path'] + '\\' + source['name']}
+                elif operation == 'ak.wwise.core.sound.setActiveSource':
+                    state['selection_attempts'] += 1
+                    if fault in {'select-native', 'select-indeterminate'}:
+                        dispatch = {'ok': False, 'failure_origin': 'exception' if fault == 'select-native' else 'missing_response'}
+                        if fault == 'select-native': dispatch['waapi_error_uri'] = 'ak.wwise.invalid_arguments'
+                        return 2, {**payload, 'ok': False, 'state': 'indeterminate', 'dispatch_result': dispatch}
+                    state['selections'] += 1
+                    owner, source = draft['roles']['sound'], draft['roles']['source']
+                    if fault == 'linked-selection': state['active'][owner] = source
+                    else: state['platform_active'][(owner, draft['platform_name'])] = source
                 elif operation == 'object.delete':
                     state['deletes'] += 1
                     identity = draft['roles']['object']
@@ -4507,10 +4533,41 @@ def _multisource_public_runtime(tmp_path, workflow, *, fault=None):
                 else: raise AssertionError(operation)
         else: raise AssertionError(argv)
         return 0, payload
-    runtime = SimpleNamespace(version='2021.1', state_dir=tmp_path / 'state', candidate='program-fixture',
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / 'state', candidate='program-fixture',
         category_results=[], raw_gateway=raw, lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'),
         port=31337, sandbox=SimpleNamespace(sandbox_path=sandbox, sandbox_project=project))
     return runtime, commands, state
+
+
+def test_platform_active_source_characterizer_reuses_one_pair_and_saves_distinct_view_choices(tmp_path, workflow):
+    runtime, commands, state = _multisource_public_runtime(tmp_path, workflow, version='2022.1')
+    category = workflow._collect_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_PLATFORM_TEST', platform_characterization=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'PASS', receipt.get('failure')
+    assert state['imports'] == 1 and state['copies'] == 1 and state['selections'] == 2 and state['deletes'] == 2
+    assert len([row for row in commands if row[0] == 'draft-declare-new']) == 2
+    assert receipt['oracle']['platform_choices_diverge'] is True
+    assert receipt['path_join_matches_saved_oracle'] is True
+    assert sum(receipt['call_counts'].values()) == len(commands) <= receipt['limits']['public_calls'] == 111
+    assert receipt['generic_active_source_mapping'] is False and receipt['native_absence_proven'] is False
+
+
+@pytest.mark.parametrize('fault,outcome,attempts', [
+    ('select-preparation', 'skill_preparation_rejected', 0),
+    ('select-native', 'native_rejection_reported', 1),
+    ('select-indeterminate', 'execution_indeterminate', 1),
+    ('linked-selection', 'saved_oracle_blocked', 2),
+    ('xml-guid', 'saved_oracle_blocked', 2),
+])
+def test_platform_active_source_characterizer_preserves_rejections_and_never_replays_linked_surrogate(tmp_path, workflow, fault, outcome, attempts):
+    runtime, commands, state = _multisource_public_runtime(tmp_path, workflow, version='2022.1', fault=fault)
+    category = workflow._collect_multisource_active_selection_diagnostic(runtime, prefix='WAAPI_PLATFORM_TEST', platform_characterization=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['status'] == 'blocked' and receipt['outcome'] == outcome, receipt.get('failure')
+    assert state['selection_attempts'] == attempts and state['deletes'] == 0
+    assert state['imports'] == 1 and state['copies'] == 1
+    assert receipt['collection_complete'] is False and receipt['native_absence_proven'] is False
+    assert len([row for row in commands if row[:2] == ['draft-start', 'ak.wwise.core.sound.setActiveSource']]) <= 2
 
 
 @pytest.mark.parametrize('fault', [None, 'scalar-parent'])
@@ -4554,3 +4611,272 @@ def test_multisource_collector_requires_two_sources_exact_xml_active_guid_and_or
     elif fault == 'same-order':
         assert receipt['path_join_matches_saved_oracle'] is True
         assert receipt['oracle']['ordering_discrimination'] is False
+
+
+def _planned_source_characterization_runtime(tmp_path, workflow, *, fault=None):
+    """Public Gateway plus independently stored native constructor results."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_sound_voice_creation_gateway import planned_source_task, SOURCE_CLASS, JAPANESE, SECOND
+    task = planned_source_task(tmp_path, '2025.1')
+    captured = json.loads((Path(__file__).resolve().parents[1] / 'fixtures/metadata/tone-source-2025.1-properties.json').read_text())
+    assert captured['type'] == {'classId': SOURCE_CLASS, 'name': 'Wwise Tone Generator', 'type': 'Source'}
+    task.metadata.pop('Frequency')
+    task.metadata.update(deepcopy(captured['metadata']))
+    if fault == 'missing-field':
+        task.metadata.pop('StartFreq')
+    task.languages = deepcopy(captured['project_languages'])
+    language_objects = deepcopy(captured['language_objects'])
+    if fault == 'language-membership':
+        language_objects = [row for row in language_objects if row['name'] != 'English(US)']
+    task.types.append({'name': 'Language', 'classId': 4915216, 'type': 'WObject'})
+    french = '{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}'
+    if fault == 'two-locales':
+        task.languages.append({'id': french, 'name': 'French', 'shortId': 4})
+        language_objects.append({'id': french, 'name': 'French', 'type': 'Language', 'path': 'French'})
+    task.objects[SECOND]['path'] = r'\Containers\Default Work Unit'
+    native = tmp_path / 'native'; native.mkdir()
+    task.env['WWISE_EVIDENCE_DIR'] = str(native)
+    task.env['WWISE_CATEGORY_EVIDENCE_PATH'] = str(tmp_path / 'category.jsonl')
+    created_sources, writes, commands = [], [], []
+    def create(node, parent, *, owned=False):
+        identity = '{' + str(uuid.uuid4()).upper() + '}'
+        if node['type'] == 'Source' and fault == 'reuse' and created_sources:
+            identity = created_sources[0]
+        row = {'id': identity, 'name': node['name'], 'type': 'SourcePlugin' if node['type'] == 'Source' else 'Sound',
+            'classId': SOURCE_CLASS if node['type'] == 'Source' else 65552,
+            'path': task.objects[parent]['path'] + '\\' + node['name'], 'parent': {'id': parent},
+            'notes': node.get('notes', ''), **{key: deepcopy(value) for key, value in node.items() if key.startswith('@')}}
+        if node['type'] == 'Source':
+            row.setdefault('@StartFreq', captured['metadata']['StartFreq']['default'])
+            row.setdefault('@WaveType', captured['metadata']['WaveType']['default'])
+            if fault == 'ignored-real-field': row['@StartFreq'] = 220
+            row['audioSource:language'] = {'name': node.get('language', 'SFX')}
+            if fault == 'ignored-language' and node.get('language'): row['audioSource:language']['name'] = 'SFX'
+            created_sources.append(identity)
+        else:
+            row.setdefault('@IsVoice', False)
+            row['activeSource'] = None
+        task.objects[identity] = row
+        children = [create(child, identity) for child in node.get('children', [])]
+        return {'id': identity, 'name': row['name'], **({'children': children} if children else {})}
+    task._create = create
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and (args or {}).get('waql', '').startswith('from type Language '):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': deepcopy(language_objects)}
+        expression = (args or {}).get('waql', '')
+        if uri.endswith('object.get') and expression.startswith('from object "'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            selected = expression.split('"')[1]
+            rows = [row for row in task.objects.values() if row['id'] == selected or row['path'] == selected]
+            if ' select children ' in expression:
+                assert len(rows) == 1, args
+                rows = [row for row in task.objects.values() if row.get('parent') == {'id': rows[0]['id']}]
+            return {'return': task.project_rows(rows, options or {})}
+        if uri.endswith('object.set'): writes.append(deepcopy(args))
+        result = original(uri, args, options)
+        if uri.endswith('object.set') and fault == 'extra-child' and len(writes) == 2:
+            original_owner = task.objects[created_sources[0]]['parent']['id']
+            extra = '{FAFAFAFA-FAFA-FAFA-FAFA-FAFAFAFAFAFA}'
+            task.objects[extra] = {'id': extra, 'name': 'Unexpected retained child', 'type': 'SourcePlugin',
+                'classId': SOURCE_CLASS, 'path': task.objects[original_owner]['path'] + r'\Unexpected retained child',
+                'parent': {'id': original_owner}, 'notes': 'Unexpected'}
+        if uri.endswith('getInfo'):
+            result['version'].update(minor=7, build=9143, displayName='v2025.1.7.9143')
+        return result
+    task.call = call
+    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+        state_dir=tmp_path / 'state', env=task.env, port=31337,
+        sandbox=SimpleNamespace(source_project=task.project_file),
+        lifecycle=SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi'))
+    def raw(argv):
+        commands.append(list(argv))
+        code, result = task.run(*argv)
+        if argv[0] == 'draft-discover-fields' and code == 0 and fault == 'ambiguous-field':
+            meaning, = result['meaning_results']
+            selected, = [row for row in meaning['candidates'] if row['metadata']['name'] == 'StartFreq']
+            meaning['candidates'].append(deepcopy(selected))
+            meaning['candidate_count'] += 1
+            result['candidate_count'] += 1
+        return code, result
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('locales', ['captured-single', 'two-locales'])
+def test_planned_source_collector_preserves_three_transactions_and_original_source_identity(tmp_path, workflow, locales):
+    import hashlib
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='two-locales' if locales == 'two-locales' else None)
+    category = workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt_path = Path(category['observation_path'])
+    receipt = json.loads(receipt_path.read_text())
+    assert category['status'] == 'PASS' and receipt['collection_complete'] is True
+    assert receipt['business_effect_verified'] is True
+    assert category['observation_sha256'] == hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    assert [p['case'] for p in receipt['phases']] == ['sfx', 'voice-explicit-source', 'voice-default-source']
+    assert len(writes) == 3 and len({p['transaction_id'] for p in receipt['phases']}) == 3
+    for args in writes:
+        source = args['objects'][0]['children'][0]['children'][0]
+        assert source['@StartFreq'] == 440 and '@Frequency' not in source
+    assert sum(argv[0] == 'execute' for argv in commands) == 3
+    assert len(commands) == receipt['limits']['calls'] == 74
+    ids = [p['independent_source']['id'] for p in receipt['phases']]
+    assert len(set(ids)) == 3
+    assert receipt['phases'][1]['retained_before'][0]['source'] == receipt['phases'][0]['independent_source']
+    assert receipt['phases'][2]['retained_after'] == receipt['phases'][2]['retained_before']
+    assert (receipt['phases'][1]['construction_language'] != receipt['phases'][1]['source_language']) is (locales == 'two-locales')
+    assert receipt['distinct_language_disambiguation'] is (locales == 'two-locales')
+    assert [row['name'] for row in receipt['language_choices']] == (['English(US)', 'French'] if locales == 'two-locales' else ['English(US)'])
+    for phase in receipt['phases']:
+        assert phase['frequency_field']['metadata']['name'] == 'StartFreq'
+        assert phase['frequency_field']['metadata']['dependencies'][0]['property'] == 'WaveType'
+        assert phase['independent_source']['properties']['StartFreq'] == 440
+    assert receipt['phases'][2]['source_language'] is None
+    assert receipt['phases'][2]['source_language_effect'] == 'observed_default_only_no_inheritance_claim'
+    assert receipt['get_info']['version']['build'] == 9143
+    assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+    assert receipt['lifecycle_final_reference']['transaction_ids'] == [p['transaction_id'] for p in receipt['phases']]
+    for evidence in receipt['native_evidence']:
+        raw = Path(evidence['archive_path']).read_bytes()
+        assert raw == Path(evidence['native_path']).read_bytes()
+        assert len(raw) == evidence['size'] and hashlib.sha256(raw).hexdigest() == evidence['sha256']
+
+
+@pytest.mark.parametrize('fault', ['reuse', 'ignored-language', 'extra-child'])
+def test_planned_source_collector_preserves_failed_native_effect_and_never_retries(tmp_path, workflow, fault):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['collection_complete'] is False and receipt['business_effect_verified'] is False
+    assert len(writes) == 2
+    ids = [argv[1] for argv in commands if argv[0] == 'execute']
+    assert len(ids) == len(set(ids)) == 2
+    expected_state = 'verified' if fault in {'reuse', 'extra-child'} else 'verification_failed'
+    assert receipt['phases'][-1]['verify']['payload']['state'] == expected_state
+    assert receipt['phases'][-1]['final_transaction']['state'] == expected_state
+    if fault == 'reuse':
+        # The local new-owner graph has no old children. Independent cross-phase
+        # GUID proof must still reject reparenting a Source from another owner.
+        assert 'retained GUID' in receipt['failure']['message']
+    if fault == 'extra-child':
+        assert 'changed the original owner/Source' in receipt['failure']['message']
+    assert receipt['native_evidence'] and receipt['failure']
+
+
+@pytest.mark.parametrize('fault', ['missing-field', 'ambiguous-field', 'language-membership'])
+def test_planned_source_collector_requires_exact_field_and_project_language_membership(tmp_path, workflow, fault):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert not writes and not any(argv[0] == 'execute' for argv in commands)
+    assert runtime.category_results[-1]['status'] == 'FAIL' and receipt['collection_complete'] is False
+    assert receipt['native_evidence'] and receipt['failure']
+
+
+def test_planned_source_collector_rejects_ignored_actual_start_frequency(tmp_path, workflow):
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow, fault='ignored-real-field')
+    with pytest.raises(AssertionError):
+        workflow._collect_planned_source_characterization(runtime, prefix='WAAPI_SOURCE_TEST')
+    receipt = json.loads((runtime.state_dir / 'planned-source-characterization.json').read_text())
+    assert len(writes) == 1 and sum(argv[0] == 'execute' for argv in commands) == 1
+    assert receipt['phases'][0]['verify']['payload']['state'] == 'verification_failed'
+    assert runtime.category_results[-1]['status'] == 'FAIL' and receipt['business_effect_verified'] is False
+    assert receipt['native_evidence'] and receipt['failure']
+
+
+def _source_plugin_selection_runtime(tmp_path, workflow, *, fault=None):
+    """Reuse the public workflow producer, with exact retained Tone metadata."""
+    from copy import deepcopy
+    runtime, commands, writes, task = _planned_source_characterization_runtime(tmp_path, workflow)
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/tone-source-2025-native-catalog.json').read_text())
+    task.types = deepcopy(fixture['catalog']['return'])
+    from tests.unit.test_sound_voice_creation_gateway import SECOND
+    task.objects[SECOND]['classId'] = 1638416
+    task.objects[SECOND]['parent'] = None
+    create = task._create
+    def create_source(node, parent, *, owned=False):
+        result = create(node, parent, owned=owned)
+        if node['type'] == 'Source':
+            row = task.objects[result['id']]
+            # Native default is modeled independently of the requested setter.
+            if task.objects[parent].get('activeSource') is None:
+                task.objects[parent]['activeSource'] = {'id': row['id'], 'name': row['name']}
+        return result
+    task._create = create_source
+    original = task.call
+    selections = []
+    def call(uri, args=None, options=None):
+        scope = (args or {}).get('object')
+        source_scope = scope == 6684674 or task.objects.get(scope, {}).get('type') in {'Source', 'SourcePlugin'}
+        if uri.endswith('getPropertyAndReferenceNames') and source_scope:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return deepcopy(fixture['property_names'])
+        if uri == 'ak.wwise.core.sound.setActiveSource':
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); selections.append(deepcopy(args))
+            owner, source = task.objects[args['sound']], task.objects[args['source']]
+            if fault != 'ignored': owner['activeSource'] = {'id': source['id'], 'name': source['name']}
+            if fault == 'source-field':
+                other = next(r for r in task.objects.values() if r['type'] == 'SourcePlugin' and r['id'] != source['id'])
+                other['@StartFreq'] = 999
+            if fault == 'extra-child':
+                identity = '{FEFEFEFE-FEFE-FEFE-FEFE-FEFEFEFEFEFE}'
+                task.objects[identity] = dict(source, id=identity, name='Unexpected', path=owner['path'] + r'\Unexpected')
+            return {}
+        previous = set(task.objects)
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            # Model the valid omitted shape after the producer's fake defaults.
+            for identity in set(task.objects) - previous:
+                if task.objects[identity]['type'] == 'Sound':
+                    task.objects[identity].pop('activeSource')
+        return result
+    task.call = call
+    return runtime, commands, writes, selections, task
+
+
+def test_source_plugin_selection_collector_requires_distinct_guid_change_and_preserves_original_bytes(tmp_path, workflow):
+    import hashlib
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow)
+    category = workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_TEST')
+    path = Path(category['observation_path']); receipt = json.loads(path.read_text())
+    assert category['status'] == 'PASS' and receipt['business_effect_verified'] is True
+    assert len(writes) == 3 and len(selections) == 1 and len(receipt['transaction_ids']) == 4
+    assert len(commands) == receipt['limits']['calls'] == 70
+    assert len({argv[1] for argv in commands if argv[0] == 'execute'}) == 4
+    assert receipt['selection']['before_active_id'] != receipt['selection']['requested_active_id']
+    assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id']
+    assert receipt['selection']['preserved_before'] == receipt['selection']['preserved_after']
+    assert category['observation_sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert receipt['native_evidence'] and receipt['lifecycle_final_reference']['cleanup_status'] == 'unresolved_until_final_row'
+    assert receipt['metadata_selection']['frequency']['metadata']['name'] == 'StartFreq'
+    assert receipt['metadata_selection']['waveform']['metadata']['name'] == 'WaveType'
+    for row in receipt['native_evidence']:
+        raw = Path(row['archive_path']).read_bytes()
+        assert raw == Path(row['native_path']).read_bytes() and hashlib.sha256(raw).hexdigest() == row['sha256']
+
+
+@pytest.mark.parametrize('fault', ['ignored', 'source-field', 'extra-child'])
+def test_source_plugin_selection_collector_cannot_accept_ignored_effect_or_lost_preservation(tmp_path, workflow, fault):
+    runtime, commands, writes, selections, task = _source_plugin_selection_runtime(tmp_path, workflow, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_source_plugin_selection_acceptance(runtime, prefix='WAAPI_SELECT_TEST')
+    receipt = json.loads((runtime.state_dir / 'source-plugin-selection.json').read_text())
+    assert runtime.category_results[-1]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['collection_complete'] is False
+    assert len(writes) == 3 and len(selections) == 1
+    executes = [argv[1] for argv in commands if argv[0] == 'execute']
+    assert len(executes) == len(set(executes)) == 4
+    assert receipt['selection']['before_active_id'] != receipt['selection']['requested_active_id']
+    phase = receipt['phases'][-1]
+    expected = 'verification_failed' if fault == 'ignored' else 'verified'
+    assert phase['verify']['payload']['state'] == phase['final_transaction']['state'] == expected
+    if fault != 'ignored':
+        assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id']
+        assert receipt['selection']['preserved_before'] != receipt['selection']['preserved_after']
+        assert 'preserved' in receipt['failure']['message']
+    assert receipt['native_evidence'] and receipt['failure']

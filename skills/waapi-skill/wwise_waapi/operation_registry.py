@@ -4521,6 +4521,44 @@ def _enforce_versioned_public_call_boundaries(
         )
 
 
+def _observe_active_source_plugin_binding(sound_id, source_id, *, read, rows=None, platform=None, include_active=False):
+    """Bind a Source plugin's actual class and direct parent, without caller tokens."""
+    if rows is None:
+        fields = ["id", "name", "type", "path", "classId", "parent", *(["activeSource"] if include_active else [])]
+        batch = _bounded_multi_identity_read([sound_id, source_id], fields=fields, read=read,
+            context="Active Source plugin identity binding", **({"platform": platform} if platform is not None else {}))
+        if not batch["exact"]:
+            raise OperationContractError("INVALID_READBACK", "Sound and source must resolve as one exact identity batch.")
+        rows = batch["result"]["return"]
+    by_id = {_identity_key(row["id"]): row for row in rows}
+    sound, source = by_id[_identity_key(sound_id)], by_id[_identity_key(source_id)]
+    if sound.get("type") != "Sound" or source.get("type") not in {"AudioFileSource", "Source", "SourcePlugin"}:
+        raise OperationContractError("INVALID_SOURCE_TARGET", "Active source selection requires a Sound and a file or Source-plugin child.")
+    if source["type"] == "AudioFileSource":
+        return None, rows  # Preserve the existing file-source contract and verifier.
+    from .business_declarations import normalize_live_object_identity
+    try:
+        normalize_live_object_identity(sound)
+        normalize_live_object_identity(source)
+    except ValueError as exc:
+        raise OperationContractError("INVALID_READBACK", "Sound and Source plugin require complete live identities.") from exc
+    if not _same_identity(_parent_value(source.get("parent")), sound_id):
+        raise OperationContractError("INVALID_SOURCE_TARGET", "The Source plugin must remain a direct child of the selected Sound.")
+    if source.get("path", "").rsplit("\\", 1)[0].casefold() != sound.get("path", "").casefold():
+        raise OperationContractError("INVALID_SOURCE_TARGET", "The Source plugin hierarchy must match its actual Sound parent.")
+    catalog = _read_object_type_catalog(read)
+    sound_type = _resolve_object_type("Sound", catalog=catalog)
+    if type(sound.get("classId")) is not int or sound["classId"] != sound_type.class_id:
+        raise OperationContractError("INVALID_OBJECT_TYPE", "The Sound class must match its exact live semantic type.")
+    source_class = source.get("classId")
+    matches = [row for row in catalog if row.class_id == source_class]
+    if type(source_class) is not int or not 0 < source_class <= 0xFFFFFFFF or len(matches) != 1 or matches[0].type.casefold() != "source":
+        raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The actual Source plugin class requires one live Source-category row.")
+    return {"sound": {key: sound[key] for key in ("id", "name", "type", "path", "classId")},
+        "source": {**{key: source[key] for key in ("id", "name", "type", "path", "classId")}, "parent": sound_id},
+        "source_type": matches[0].as_dict(), "sound_type": sound_type.as_dict()}, rows
+
+
 def _public_call_verification_plan(
     *,
     api: str,
@@ -6954,13 +6992,29 @@ def _prepare_object_set(
             if language_requires_live_project_validation(language):
                 requested_languages.add(str(language))
 
-    construction_specs = [spec for spec in node_specs if "construction_language" in spec]
+    specs_by_path = {spec["request_path"]: spec for spec in node_specs}
+    for spec in node_specs:
+        if "source_plugin" not in spec:
+            continue
+        parent_spec = specs_by_path[spec["parent_request_path"]]
+        if parent_spec.get("preexisting_id") is not None and "preexisting_children" not in parent_spec:
+            rows = _read_direct_children(parent_spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+            parent_spec["preexisting_children"] = rows
+            children_snapshots.append({"object_id": parent_spec["preexisting_id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": rows})
+        ids = [row.get("id") for row in parent_spec.get("preexisting_children", [])]
+        if any(not _valid_object_id(value) for value in ids) or len({_identity_key(value) for value in ids}) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "Source construction requires the complete unique pre-existing parent child GUID set.")
+        spec["source_plugin"]["preexisting_plugin_ids"] = ids
+    language_contexts = [spec[key] for spec in node_specs for key in ("construction_language", "source_language") if key in spec]
     construction_inventory = (_read_import_language_inventory(request.version, read=import_context_read)
-                              if construction_specs else None)
-    for spec in construction_specs:
-        context = spec["construction_language"]
+                              if language_contexts else None)
+    for context in language_contexts:
         context["selected"] = _select_construction_language(construction_inventory, context["requested"])
         context["project"] = construction_inventory["project"]
+    for spec in node_specs:
+        if "construction_language" in spec:
+            spec["construction_language"]["expected_sources"] = [child["request_path"] for child in node_specs
+                if "source_plugin" in child and child["parent_request_path"] == spec["request_path"]]
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
         language_inventory = (construction_inventory if construction_inventory is not None else
@@ -8034,9 +8088,9 @@ def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False)
 def _resolve_graph_node_type(node, *, catalog, version):
     if node.plugin is None:
         return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
-    matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == "Effect"]
+    matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == node.plugin.object_type]
     if len(matches) != 1:
-        raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph Effect requires one fresh exact plugin class")
+        raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph plugin requires one fresh exact selected class and category")
     _require_object_class_id(matches[0].class_id)
     return matches[0]
 
@@ -8127,6 +8181,8 @@ def _prepare_object_node_specs(
             "references": [],
             "collection": node.collection,
         }
+        if node.plugin is not None and node.plugin.kind == "source":
+            spec["structural_class_id"] = type_info.class_id
         if result_context and node.request_path in result_context["target_paths"]:
             spec["planned_reference_target_class"] = type_info.class_id
         if node.language is not None:
@@ -8160,6 +8216,10 @@ def _prepare_object_node_specs(
                 root_parent=root_parent, root_collection=root_collection, version=version, read=read,
                 allow_list_merge=allow_list_merge, guards=merge_guards)
         if merge_target is not None:
+            if node.plugin is not None and node.plugin.kind == "source":
+                raise OperationContractError("TARGET_EXISTS", "Source construction requires a new child; an existing Source needs an explicit existing-object field change.",
+                    details={"request_path": node.request_path, "preexisting_id": merge_target.object,
+                             "existing_path": merge_target.row.get("path")})
             roles[f"merge:{node.request_path}"] = merge_target
             spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
                     structural_class_id=type_info.class_id)
@@ -8369,7 +8429,15 @@ def _prepare_object_node_specs(
                 spec["properties"].append({"name": name, "value": value,
                     "metadata_type": evidence["metadata"][name]["type"], "derived": True})
         if node.plugin is not None:
-            if node.plugin.placement == "shareset":
+            if node.plugin.kind == "source":
+                parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
+                if node.collection != "children" or parent_spec is None or parent_spec["canonical_type"] != "Sound":
+                    raise OperationContractError("INVALID_SOURCE_TARGET", "Atomic Source construction requires a planned Sound/Voice parent; a live owner uses object.createPlugin.")
+                validate_plugin_target(node.plugin, target_type=parent_spec["canonical_type"])
+                if node.plugin.language is not None and not any(
+                        prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in parent_spec["properties"]):
+                    raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires a Boolean Voice owner intent.")
+            elif node.plugin.placement == "shareset":
                 if node.parent_request_path in node_paths or root_parent is None:
                     raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require an exact bound Effects Work Unit or Folder")
                 validate_plugin_target(node.plugin, target_type=root_parent.row["type"], target_path=root_parent.row["path"])
@@ -8388,6 +8456,12 @@ def _prepare_object_node_specs(
             validated = validate_plugin_property_metadata(node.plugin, metadata)
             spec["graph_plugin_native"] = _materialize_plugin_object(node.plugin, validated)
             spec["structural_class_id"] = type_info.class_id
+            if node.plugin.kind == "source":
+                spec["source_plugin"] = {"descriptor": node.plugin.as_dict(),
+                    "property_validation": [item.as_dict() for item in validated]}
+                if node.plugin.language is not None:
+                    spec["source_language"] = {"requested": node.plugin.language, "role": "source-language",
+                        "version": version}
         if node_derived_properties:
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
@@ -8903,18 +8977,18 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
-    language_nodes = [node for node in pre_state.get("object_set_nodes", []) if "construction_language" in node] if isinstance(pre_state, Mapping) else []
-    if language_nodes:
+    language_contexts = [node[key] for node in pre_state.get("object_set_nodes", [])
+        for key in ("construction_language", "source_language") if key in node] if isinstance(pre_state, Mapping) else []
+    if language_contexts:
         try:
-            inventory = _read_import_language_inventory(language_nodes[0]["construction_language"]["version"], read=read)
-            for node in language_nodes:
-                context = node["construction_language"]
+            inventory = _read_import_language_inventory(language_contexts[0]["version"], read=read)
+            for context in language_contexts:
                 selected = _select_construction_language(inventory, context["requested"])
-                assertions.append({"name": "Voice construction language binding remains valid", "passed":
+                assertions.append({"name": "selected Voice/Source language binding remains valid", "passed":
                     selected == context["selected"] and inventory["project"] == context["project"],
                     "evidence": {"expected": context, "selected": selected, "project": inventory["project"]}})
         except OperationContractError as exc:
-            assertions.append({"name": "Voice construction language binding remains valid", "passed": False, "evidence": exc.as_dict()})
+            assertions.append({"name": "selected Voice/Source language binding remains valid", "passed": False, "evidence": exc.as_dict()})
     result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
     if result_context:
         try:
@@ -10351,6 +10425,8 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
             *(row.get("name") for row in spec.get("references", []) if isinstance(row, Mapping)),
             *(requirement["name"] for evidence in spec.get("new_object_default_evidence", [])
               for requirement in evidence["requirements"]),
+            *(plugin_verification_fields(normalize_plugin_creation(spec["source_plugin"]["descriptor"]))
+              if "source_plugin" in spec else ()),
             *(
                 OBJECT_SET_IMPORT_READBACK_FIELDS
                 if isinstance(spec.get("import"), Mapping)
@@ -10697,15 +10773,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             request.version,
             arguments,
         )
+        call_metadata = {"execution_contract": execution_contract, "model_authored_code": False}
+        if api == "ak.wwise.core.sound.setActiveSource":
+            from .project_setting_business_contracts import active_source_linkage_disclosure
+            call_metadata["source_linkage"] = active_source_linkage_disclosure()
+            warnings.append("Active-source selection uses existing source linkage and may affect other linked platforms; this operation does not unlink or establish platform isolation.")
         preview = SemanticPreview(
             envelope=SemanticEnvelope(
                 uri=api,
                 args=call_args,
                 options=call_options,
-                metadata={
-                    "execution_contract": execution_contract,
-                    "model_authored_code": False,
-                },
+                metadata=call_metadata,
             ),
             source_note_family="public-execution-contract",
             version=request.version,
@@ -10723,6 +10801,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 else None
             ),
         )
+        if api == "ak.wwise.core.sound.setActiveSource":
+            source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
+            if source_guard is not None:
+                metadata["active_source_plugin_binding"] = source_guard
+                roles.update({role: ResolvedObject(identity=ObjectIdentity(id=source_guard[role]["id"]),
+                    object=source_guard[role]["id"], resolution="live-exact-id", row=source_guard[role]) for role in ("sound", "source")})
         if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
             from .remote_transition import remote_connection_snapshot
             try:
@@ -11627,6 +11711,17 @@ def prepare_object_set_batch_check(
                 "error_code": exc.error_code,
                 "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
             }
+            if exc.error_code == "UNKNOWN_PROJECT_LANGUAGE" and "available" in exc.details:
+                choices = _bounded_language_choice_details(exc.details, byte_budget=repair_bytes_remaining)
+                if choices is not None:
+                    issue["details"] = choices
+                    repair_bytes_remaining -= len(canonical_json_bytes(choices))
+                else:
+                    issue["details"] = {"field": "language", "available": [],
+                        "available_total": exc.details["available_total"], "available_returned": 0,
+                        "available_truncated": True,
+                        "language_discovery": {"available": True, "source": "metadata_types_exact_Language", "membership_bound": 1000, "follow": "query_command_then_result_detail_next_command"},
+                        "repair_details": "aggregate_repair_budget_exhausted", "mutation_dispatched": False}
             if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
                 # Preserve the exact owner and staged repair at this public
                 # batch-check boundary, under one aggregate output budget.
@@ -12279,12 +12374,31 @@ def _normalize_import_language_rows(value: Any, *, authority: str) -> list[dict[
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"].casefold()))
 
 
+def _bounded_language_choice_details(details, *, byte_budget):
+    bounded = {**details, "available": list(details["available"])}
+    while True:
+        bounded["available_returned"] = len(bounded["available"])
+        bounded["available_truncated"] = bounded["available_returned"] < bounded["available_total"]
+        if bounded["available_truncated"]:
+            # Exact live Language type selections disclose bounded query/result
+            # continuations; status deliberately omits this inventory.
+            bounded["language_discovery"] = {"available": True, "source": "metadata_types_exact_Language", "membership_bound": 1000, "follow": "query_command_then_result_detail_next_command"}
+        if len(canonical_json_bytes(bounded)) <= byte_budget:
+            return bounded
+        if not bounded["available"]:
+            return None
+        bounded["available"].pop()
+
+
 def _select_construction_language(inventory, requested):
     rows = [row for row in inventory["languages"]
             if row["name"] == requested or (_valid_object_id(requested) and _same_identity(row["id"], requested))]
     if len(rows) != 1 or not _valid_object_id(rows[0]["id"]):
-        raise OperationContractError("UNKNOWN_PROJECT_LANGUAGE", "Voice construction language must select one live Project Language by exact name or GUID.",
-            details={"requested": requested, "matches": rows})
+        details = _bounded_language_choice_details({"field": "language", "requested": requested, "matches": rows,
+            "available": inventory["languages"], "available_total": len(inventory["languages"])},
+            byte_budget=MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES)
+        raise OperationContractError("UNKNOWN_PROJECT_LANGUAGE", "Requested language must select one live Project Language by exact name or GUID.",
+            details=details)
     return dict(rows[0])
 
 
@@ -13107,6 +13221,36 @@ def _existing_sfx_source_snapshot(owner_id: str, *, version: str, read: ReadCall
     return {"owner_id": owner_id, "version": version, "rows": sorted(rows, key=lambda row: row["id"].casefold())}
 
 
+def _legacy_sfx_active_source(
+    sound: Mapping[str, Any], snapshot: Mapping[str, Any], *, source_class: Any,
+) -> str:
+    """Join the current SFX read view by complete native file paths, never filename."""
+    field = "sound:originalWavFilePath"
+    if field not in sound:
+        raise OperationContractError("INVALID_READBACK", "The SFX Sound omitted its current original-file path.")
+    if sound[field] is None:
+        raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "The SFX Sound has no observable active original-file path.")
+    try:
+        selected = parse_absolute_host_path(sound[field]).comparison_key()
+        matches = []
+        for source in snapshot["rows"]:
+            if _object_type_token(source.get("type")) != "audiofilesource":
+                continue
+            language = source.get("audioSource:language")
+            if (not _object_class_matches(source.get("classId"), source_class)
+                    or not isinstance(language, Mapping) or language.get("name") != "SFX"):
+                raise OperationContractError("INVALID_READBACK", "The SFX source collection has an invalid file-source class or language.")
+            key = parse_absolute_host_path(source.get("originalWavFilePath")).comparison_key()
+            if key == selected:
+                matches.append(source["id"])
+    except HostPathError as exc:
+        raise OperationContractError("INVALID_PROJECT_CONTEXT", "The current SFX file-path join requires complete canonical absolute paths.") from exc
+    if len(matches) != 1:
+        raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "The current SFX original-file path must identify exactly one direct AudioFileSource.",
+                                     details={"matching_source_count": len(matches)})
+    return matches[0]
+
+
 def _normalize_existing_sfx_imports(
     targets: list[dict[str, Any]], dispatch_args: Mapping[str, Any],
     originals_context: Mapping[str, Any], *, version: str, read: ReadCall,
@@ -13119,12 +13263,18 @@ def _normalize_existing_sfx_imports(
                 or len(before) != 1 or _object_type_token(before[0].get("type")) != "sound"):
             continue
         active = before[0].get("activeSource")
-        if active is None and not before[0].get("sound:originalWavFilePath"):
+        snapshot = None
+        if version == "2021.1":
+            snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
+        if active is None and not before[0].get("sound:originalWavFilePath") and not (snapshot and snapshot["rows"]):
+            if snapshot is not None:
+                target["empty_sfx_source_snapshot"] = snapshot
             continue  # An existing empty Sound has no source placement to preserve.
         source_id = _reference_identity(active)
         if version != "2021.1" and (not isinstance(source_id, str) or not _PLUGIN_GUID.fullmatch(source_id)):
             raise OperationContractError("INVALID_READBACK", "An existing SFX Sound has a malformed active Source identity.")
-        snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
+        if snapshot is None:
+            snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
         matching = [source for source in snapshot["rows"]
                     if source.get("path") == target.get("expected_audio_file_source_result_path")
                     and _object_type_token(source.get("type")) == "audiofilesource"]
@@ -13147,6 +13297,10 @@ def _normalize_existing_sfx_imports(
             raise OperationContractError("UNSAFE_ORIGINALS_PATH", "Existing SFX media must remain inside the live Originals/SFX root.") from exc
         if original.name != Path(target["source_file"].get("path", target["source_file"].get("relative_path", ""))).name:
             raise OperationContractError("SFX_SOURCE_FILENAME_MISMATCH", "Existing SFX replacement must retain its attested source filename.")
+        if version == "2021.1":
+            active_id = _legacy_sfx_active_source(before[0], snapshot, source_class=target.get("audio_source_class_id"))
+            if not _same_identity(source_id, active_id):
+                raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "Existing SFX media must resolve to its one exact active AudioFileSource.")
         subfolder = "\\".join(relative.parent.parts)
         if subfolder:
             subfolder = normalize_originals_subfolder(subfolder, field="existing SFX Originals subfolder")
@@ -13158,6 +13312,11 @@ def _normalize_existing_sfx_imports(
             target["requested_originals_subfolder"] = subfolder
         target["existing_sfx_source_id"] = source_id
         target["existing_sfx_source_snapshot"] = snapshot
+        if version == "2021.1":
+            try:
+                target["existing_sfx_source_file_proof"] = import_regular_file_proof(str(original), field="existing SFX active original")
+            except ImportContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
     return {**dict(dispatch_args), "imports": rows}
 
 
@@ -14367,6 +14526,9 @@ def _prepare_closed_import_plan(
                 if isinstance(proof, Mapping):
                     label = f"{proof_key}[{len(file_proofs)}]"
                     file_proofs.append({"field": label, "proof": dict(proof)})
+    for index, target in enumerate(targets):
+        if isinstance(target.get("existing_sfx_source_file_proof"), Mapping):
+            file_proofs.append({"field": f"existing_sfx_active_original[{index}]", "proof": dict(target["existing_sfx_source_file_proof"])})
     wire_path_input_audit: dict[str, Any] | None = None
     if source_operation == "audio.importTabDelimited":
         import_file_proof = plan.get("import_file_proof")
@@ -14408,6 +14570,8 @@ def _prepare_closed_import_plan(
         "path_snapshots": path_snapshots,
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
                                           if "existing_sfx_source_snapshot" in target],
+        "empty_sfx_source_snapshots": [target["empty_sfx_source_snapshot"] for target in targets
+                                       if "empty_sfx_source_snapshot" in target],
         "localized_source_snapshots": [target["localized_source_snapshot"] for target in targets
                                        if "localized_source_snapshot" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
@@ -16021,7 +16185,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
         if role_snapshots:
             role_batch = _bounded_multi_identity_read(
                 [object_id for _, object_id, _ in role_snapshots],
-                fields=IDENTITY_RETURN_FIELDS,
+                fields=(*IDENTITY_RETURN_FIELDS, "classId", "parent") if prepared.get("pre_state", {}).get("active_source_plugin_binding") is not None else IDENTITY_RETURN_FIELDS,
                 read=read_call,
                 context="Prepared waapi.call business role validation",
             )
@@ -16074,13 +16238,31 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                         },
                     }
                 )
+        source_guard = prepared.get("pre_state", {}).get("active_source_plugin_binding")
+        if source_guard is not None:
+            current, failure = None, None
+            def source_binding_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "source-plugin-binding", "uri": uri,
+                    "args": dict(args), "options": dict(options), "result": result})
+                return result
+            if role_batch["exact"]:
+                try:
+                    current, _ = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"],
+                        read=source_binding_read, rows=role_batch["result"]["return"])
+                except OperationContractError as exc:
+                    failure = exc.as_dict()
+            unchanged = current == source_guard
+            passed = passed and unchanged
+            assertions.append({"name": "Source plugin class and direct parent binding are unchanged", "passed": unchanged,
+                "evidence": {"expected": source_guard, "actual": current, "failure": failure}})
         return {
             "contract": ROLE_VALIDATION_CONTRACT,
             "operation": operation,
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None or arguments.get("history_binding") is not None else [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None or arguments.get("history_binding") is not None or source_guard is not None else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")
@@ -17197,7 +17379,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                     "evidence": evidence,
                 }
             )
-        for snapshot in import_guard.get("existing_sfx_source_snapshots", []):
+        for snapshot in [*import_guard.get("existing_sfx_source_snapshots", []),
+                         *import_guard.get("empty_sfx_source_snapshots", [])]:
             if (not isinstance(snapshot, Mapping) or not _valid_object_id(snapshot.get("owner_id"))
                     or snapshot.get("version") != prepared_version):
                 raise OperationContractError("INVALID_PREVIEW", "Existing SFX source guard is malformed.")
@@ -18783,11 +18966,27 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Active-source verification lacks its exact source or platform.",
                 )
-            rows = read_object(
-                object_id=object_id,
-                fields=("id", "name", "type", "path", "activeSource"),
-                platform=platform,
-            )
+            source_guard = prepared.get("pre_state", {}).get("active_source_plugin_binding")
+            if source_guard is not None:
+                def source_read(uri, args, options):
+                    result = read_call(uri, args, options)
+                    readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+                    return result
+                try:
+                    current, source_rows = _observe_active_source_plugin_binding(object_id, expected_source,
+                        read=source_read, platform=platform, include_active=True)
+                    rows = [row for row in source_rows if _same_identity(row.get("id"), object_id)]
+                except OperationContractError as exc:
+                    current, rows = None, []
+                    check("Source plugin binding remains valid", False, exc.as_dict())
+                check("Source plugin class and direct parent match the immutable Preview", current == source_guard,
+                    {"expected": source_guard, "actual": current})
+            else:
+                rows = read_object(
+                    object_id=object_id,
+                    fields=("id", "name", "type", "path", "activeSource"),
+                    platform=platform,
+                )
             check(
                 "active-source target resolves exactly once",
                 len(rows) == 1,
@@ -18798,7 +18997,7 @@ def verify_prepared_operation(
                     _field_value(rows[0], "activeSource")
                 )
                 check(
-                    "Sound active source matches the requested AudioFileSource",
+                    "Sound active source matches the requested source",
                     _same_identity(actual_source, expected_source),
                     {
                         "expected": expected_source,
@@ -19779,10 +19978,11 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Object graph verification language is malformed.",
                 )
+            source_read_language = (spec["source_language"]["selected"]["name"] if "source_language" in spec else None)
             rows = read_object(
                 object_id=object_id,
                 fields=fields,
-                language=None if "construction_language" in spec else _localized_import_read_language(requested_language),
+                language=source_read_language if "source_plugin" in spec else None if "construction_language" in spec else _localized_import_read_language(requested_language),
                 platform=platform,
             )
             check(f"{request_path} GUID resolves exactly once", len(rows) == 1, rows)
@@ -19995,8 +20195,29 @@ def verify_prepared_operation(
                     _reference_requirement_matches(row, str(field_name), field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
+            if "source_plugin" in spec:
+                source_plan = spec["source_plugin"]
+                descriptor_row = dict(source_plan["descriptor"])
+                if platform is not None:
+                    descriptor_row["platform"] = platform
+                if "source_language" in spec:
+                    descriptor_row["language"] = source_read_language
+                descriptor = normalize_plugin_creation(descriptor_row)
+                projection = plugin_verification_fields(descriptor)
+                try:
+                    evidence = verify_created_plugin_row(descriptor,
+                        {field: row[field] for field in projection if field in row}, version=version,
+                        expected_parent_id=expected_parent_id, expected_owner_id=expected_parent_id,
+                        validated_properties=tuple(ValidatedPluginProperty(**item) for item in source_plan["property_validation"]),
+                        preexisting_plugin_ids=source_plan["preexisting_plugin_ids"],
+                        readback_view={"fields": list(projection), "language": descriptor.language, "platform": descriptor.platform},
+                        placement_evidence={"kind": "source_child"})
+                except PluginOperationContractError as exc:
+                    check(f"{request_path} Source plugin state and parent match the immutable plan", False, exc.as_dict())
+                else:
+                    check(f"{request_path} Source plugin state and parent match the immutable plan", True, evidence.as_dict())
             import_spec = spec.get("import")
-            if "construction_language" in spec:
+            if "construction_language" in spec and not spec["construction_language"]["expected_sources"]:
                 children = read_direct_children(object_id=object_id, fields=IDENTITY_RETURN_FIELDS)
                 check(f"{request_path} empty Voice has no Source children", not children,
                       {"expected": [], "children": children, "construction_language": spec["construction_language"]})
@@ -22279,7 +22500,25 @@ def verify_prepared_operation(
                 active_source_id = _reference_identity(
                     _field_value(live_row, "activeSource")
                 )
-                if music_media or (version == "2021.1" and active_source_id is None):
+                legacy_bound_sfx = version == "2021.1" and isinstance(sfx_snapshot, Mapping)
+                if legacy_bound_sfx:
+                    def read_sfx_sources(uri, args, options):
+                        result = read_call(uri, args, options)
+                        readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
+                        return result
+
+                    try:
+                        after_sfx = _existing_sfx_source_snapshot(str(live_id), version=version, read=read_sfx_sources)
+                        active_source_id = _legacy_sfx_active_source(live_row, after_sfx, source_class=target.get("audio_source_class_id"))
+                    except OperationContractError as exc:
+                        active_source_id = None
+                        check(f"{label} active SFX source has an independent file-path proof", False, exc.as_dict())
+                    else:
+                        check(f"{label} existing SFX source identities and placement preserved",
+                              after_sfx == sfx_snapshot, {"expected": sfx_snapshot, "actual": after_sfx})
+                        check(f"{label} active SFX source remains the preview-bound GUID",
+                              _same_identity(active_source_id, sfx_source_id), {"expected": sfx_source_id, "actual": active_source_id})
+                elif music_media or (version == "2021.1" and active_source_id is None):
                     active_source_id = (returned_source_id or target.get("localized_audio_file_source_id")
                                         or (sfx_source_id if omitted_sound_source and bound_sfx_source else None))
                 if omitted_sound_source:
@@ -22313,7 +22552,7 @@ def verify_prepared_operation(
                         )
                 if active_source_id is not None:
                     source_fields = _dedupe_fields([*_import_audio_source_return_fields(version=version), "parent"])
-                    if music_media or omitted_sound_source:
+                    if music_media or omitted_sound_source or legacy_bound_sfx:
                         if version == "2021.1":
                             source_fields.append("originalWavFilePath")
                     source_rows = read_object(
@@ -22336,6 +22575,12 @@ def verify_prepared_operation(
                             check(f"{label} reimport preserves the bound SFX source GUID",
                                   _same_identity(audio_source_row.get("id"), target["existing_sfx_source_id"]),
                                   {"expected": target["existing_sfx_source_id"], "actual": audio_source_row.get("id")})
+                        if legacy_bound_sfx:
+                            expected_original = next((source.get("originalWavFilePath") for source in sfx_snapshot["rows"]
+                                                      if _same_identity(source.get("id"), sfx_source_id)), None)
+                            check(f"{label} active SFX original-file path remains bound",
+                                  expected_original is not None and audio_source_row.get("originalWavFilePath") == expected_original,
+                                  {"expected": expected_original, "actual": audio_source_row.get("originalWavFilePath")})
                         if target.get("localized_audio_file_source_id") is not None:
                             check(
                                 f"{label} reimport preserves the bound localized source GUID",
@@ -22385,7 +22630,7 @@ def verify_prepared_operation(
                     )
 
                 sfx_snapshot = target.get("existing_sfx_source_snapshot")
-                if isinstance(sfx_snapshot, Mapping):
+                if isinstance(sfx_snapshot, Mapping) and not legacy_bound_sfx:
                     def read_sfx_sources(uri, args, options):
                         result = read_call(uri, args, options)
                         readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
@@ -22519,7 +22764,7 @@ def verify_prepared_operation(
 
                 if media_expected:
                     copied_path = _field_value(source_state, "originalFilePath")
-                    if music_media and version == "2021.1":
+                    if (music_media or legacy_bound_sfx) and version == "2021.1":
                         copied_path = _field_value(source_state, "originalWavFilePath")
                     if music_media:
                         try:
@@ -22531,9 +22776,9 @@ def verify_prepared_operation(
                         else:
                             readbacks.extend(music_evidence.pop("readbacks"))
                             check(f"{label} Track Clip uses the imported media", music_evidence["ok"], music_evidence)
-                    if copied_path is None and source_state is not live_row:
+                    if copied_path is None and source_state is not live_row and not legacy_bound_sfx:
                         copied_path = _field_value(live_row, "originalFilePath")
-                    if copied_path is None:
+                    if copied_path is None and not legacy_bound_sfx:
                         copied_path = _field_value(
                             live_row,
                             "sound:originalWavFilePath",
@@ -25329,7 +25574,12 @@ def _require_specialized_object_tree_relationships(
     version: str,
 ) -> None:
     for node in nodes:
-        ordinary_children = [child for child in node.children if child.collection == "children"]
+        source_children = [child for child in node.children if child.collection == "children"
+            and child.plugin is not None and child.plugin.kind == "source"]
+        if source_children and node.type != "Sound":
+            raise OperationContractError("INVALID_SOURCE_TARGET", "Source plugin construction requires a Sound/Voice parent.",
+                details={"request_path": node.request_path})
+        ordinary_children = [child for child in node.children if child.collection == "children" and child not in source_children]
         if not ordinary_children:
             continue
         _require_specialized_object_child_types(

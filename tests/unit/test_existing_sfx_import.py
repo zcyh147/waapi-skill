@@ -264,3 +264,190 @@ def test_source_bound_reimport_still_rejects_changed_input_media_before_execute(
     prepared, reader = prepare_sfx(tmp_path, version)
     Path(prepared['dispatch']['args']['imports'][0]['audioFile']).write_bytes(b'changed after Preview')
     assert validate_prepared_roles(prepared, read_call=reader)['ok'] is False
+
+
+def _public_2021_sfx_reimport(tmp_path, filename='Beta.wav', *, outcome='normal'):
+    from tests.support.gateway_config import set_gateway_config
+    from tests.unit.test_waapi_gateway import gateway_env, waapi_gateway
+    reader = SfxReader(tmp_path, '2021.1')
+    owner, active = reader.owners[0], reader.sources[0]
+    active_file = Path(active['originalWavFilePath']).with_name('Alpha.wav')
+    active_file.write_bytes(b'active alpha media')
+    active.update(name='Alpha', path=owner['path'] + r'\Alpha',
+        originalFilePath=str(active_file), originalWavFilePath=str(active_file))
+    owner.update(activeSource={'id': active['id'], 'name': 'Alpha'},
+        originalFilePath=str(active_file), **{'sound:originalWavFilePath': str(active_file), '@IsVoice': False})
+    inactive_file = active_file.with_name('Beta.wav')
+    inactive_file.write_bytes(b'inactive beta media')
+    inactive = {**deepcopy(active), 'id': '{88888888-8888-8888-8888-888888888888}', 'name': 'Beta',
+        'path': owner['path'] + r'\Beta', 'originalFilePath': str(inactive_file), 'originalWavFilePath': str(inactive_file)}
+    reader.sources.append(inactive)
+    replacement = tmp_path / 'replacement'; replacement.mkdir()
+    (replacement / filename).write_bytes(b'new requested media')
+    calls = []
+    class Client:
+        imported = False
+
+        def call(self, uri, args=None, options=None):
+            args, options = args or {}, options or {}
+            calls.append((uri, deepcopy(args), deepcopy(options)))
+            if uri == 'ak.wwise.core.getInfo':
+                from tests.unit.test_audio_import_business_gateway import _info
+                info = _info(); info['version']['year'] = 2021; info['version']['displayName'] = 'v2021.1.0.1'
+                return info
+            if uri == 'ak.wwise.core.object.get' and args.get('waql') == 'from type Project take 1':
+                return reader(uri, {'waql': 'from type Project take 2'}, options)
+            if uri == 'ak.wwise.core.object.getPropertyAndReferenceNames':
+                return {'return': ['IsVoice']}
+            if uri == 'ak.wwise.core.object.getPropertyInfo':
+                assert args['property'] == 'IsVoice', args
+                return {'name': 'IsVoice', 'type': 'bool', 'default': False, 'dependencies': []}
+            if uri in {'ak.wwise.core.undo.beginGroup', 'ak.wwise.core.undo.endGroup', 'ak.wwise.core.undo.cancelGroup'}:
+                return {}
+            if uri == 'ak.wwise.core.audio.import':
+                self.imported = True
+                assert len(args['imports']) == 1
+                assert Path(args['imports'][0]['audioFile']).name == 'Alpha.wav'
+                incoming = Path(args['imports'][0]['audioFile']).read_bytes()
+                if not any(source['id'] == active['id'] for source in reader.sources):
+                    reader.sources.append(active)
+                    owner['sound:originalWavFilePath'] = str(active_file)
+                    owner['originalFilePath'] = str(active_file)
+                if outcome != 'stale-selected':
+                    active_file.write_bytes(incoming)
+                if outcome == 'changed-active':
+                    # Same complete Source collection and valid returned Alpha;
+                    # Beta also hashes correctly, but is now selected by the Sound.
+                    inactive_file.write_bytes(incoming)
+                    owner['sound:originalWavFilePath'] = str(inactive_file)
+                    owner['originalFilePath'] = str(inactive_file)
+                if outcome == 'contradictory-source-path':
+                    inactive_file.write_bytes(incoming)
+                returned = [owner] if outcome == 'omitted' else [owner, active]
+                return {'objects': deepcopy(returned)}
+            if (outcome == 'contradictory-source-path' and self.imported
+                    and uri == 'ak.wwise.core.object.get' and args.get('from', {}).get('id') == [active['id']]
+                    and 'originalWavFilePath' in options.get('return', [])):
+                result = reader(uri, args, options)
+                result['return'][0]['originalWavFilePath'] = str(inactive_file)
+                return result
+            return reader(uri, args, options)
+        def disconnect(self):
+            pass
+    client = Client()
+    env = set_gateway_config(gateway_env(tmp_path), wwise_version='2021.1')
+    state = ['--state-dir', str(tmp_path / 'state')]
+    def run(*argv):
+        return waapi_gateway.execute_gateway([*state, *argv], env=env, client_factory=lambda _: client)
+    code, started = run('draft-start', 'audio.import')
+    assert code == 0, started
+    draft, authority = started['draft']['draft_id'], started['task_authority']
+    code, bound = run('draft-bind-object', draft, '--task-authority', authority,
+        '--expected-revision', '1', '--object-id', owner['id'])
+    assert code == 0, bound
+    code, declared = run('draft-declare-import-batch', draft, '--task-authority', authority,
+        '--expected-revision', str(bound['draft']['revision']), '--row-order', 'hit',
+        '--existing-row', 'hit', bound['bound_object']['handle'], '--field', 'hit', 'language', 'SFX',
+        '--media-directory', str(replacement), '--media-file', 'hit', filename)
+    assert code == 0, declared
+    return run, reader, calls, draft, authority, declared
+
+
+def test_public_2021_sfx_reimport_cannot_bind_an_inactive_filename_as_active(tmp_path):
+    run, reader, calls, draft, authority, declared = _public_2021_sfx_reimport(tmp_path)
+    code, checked = run('draft-check', draft, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision']))
+    assert code == 2, checked
+    assert 'AMBIGUOUS_SFX_SOURCE' in str(checked)
+    assert not any(uri == 'ak.wwise.core.audio.import' for uri, _, _ in calls)
+
+
+@pytest.mark.parametrize('outcome', ['normal', 'omitted', 'reordered', 'prewrite-bytes', 'changed-active', 'stale-selected', 'contradictory-source-path'])
+def test_public_2021_sfx_reimport_binds_selection_and_own_media(tmp_path, outcome):
+    run, reader, calls, draft, authority, declared = _public_2021_sfx_reimport(tmp_path, 'Alpha.wav', outcome=outcome)
+    code, checked = run('draft-check', draft, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision']))
+    assert code == 0, checked
+    code, preview = run('preview-from-draft', draft, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision']))
+    assert code == 0, preview
+    transaction = preview['transaction_id']
+    code, shown = run('transaction-show', transaction, '--summary-only')
+    assert code == 0, shown
+    code, confirmed = run('confirm', transaction, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if outcome == 'prewrite-bytes':
+        Path(reader.sources[0]['originalWavFilePath']).write_bytes(b'concurrent change without metadata drift')
+    elif outcome == 'reordered':
+        reader.sources.reverse()
+    code, executed = run('execute', transaction)
+    writes = [call for call in calls if call[0] == 'ak.wwise.core.audio.import']
+    if outcome == 'prewrite-bytes':
+        assert code == 2, executed
+        assert not writes
+        assert 'existing_sfx_active_original' in str(executed)
+        return
+    assert code == 0, executed
+    assert len(writes) == 1
+    code, verified = run('verify', transaction)
+    if outcome in {'changed-active', 'stale-selected', 'contradictory-source-path'}:
+        assert code == 2, verified
+        assert verified['verified'] is False
+        expected = {'changed-active': 'preview-bound GUID', 'stale-selected': 'hash matches',
+                    'contradictory-source-path': 'original-file path remains bound'}[outcome]
+        assert expected in str(verified)
+    else:
+        assert code == 0, verified
+        assert verified['verified'] is True
+
+
+@pytest.mark.parametrize('fault', ['missing', 'null', 'ambiguous', 'empty'])
+def test_public_2021_sfx_reimport_requires_observable_unique_active_path(tmp_path, fault):
+    run, reader, calls, draft, authority, declared = _public_2021_sfx_reimport(tmp_path, 'Alpha.wav')
+    if fault == 'missing':
+        del reader.owners[0]['sound:originalWavFilePath']
+    elif fault == 'null':
+        reader.owners[0]['sound:originalWavFilePath'] = None
+    elif fault == 'empty':
+        reader.owners[0]['sound:originalWavFilePath'] = None
+        reader.sources = [source for source in reader.sources if source['parent']['id'] != reader.owners[0]['id']]
+    else:
+        reader.sources[-1]['originalWavFilePath'] = reader.sources[0]['originalWavFilePath']
+    code, checked = run('draft-check', draft, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision']))
+    assert code == (0 if fault == 'empty' else 2), checked
+    if fault != 'empty':
+        assert ('INVALID_READBACK' if fault == 'missing' else 'AMBIGUOUS_SFX_SOURCE') in str(checked)
+    assert not any(uri == 'ak.wwise.core.audio.import' for uri, _, _ in calls)
+
+
+@pytest.mark.parametrize('insert_no_file_source', [False, True])
+def test_public_2021_empty_sfx_preview_binds_no_source_precondition(tmp_path, insert_no_file_source):
+    run, reader, calls, draft, authority, declared = _public_2021_sfx_reimport(tmp_path, 'Alpha.wav')
+    owner = reader.owners[0]
+    owner['sound:originalWavFilePath'] = None
+    owner['activeSource'] = None
+    reader.sources = [source for source in reader.sources if source['parent']['id'] != owner['id']]
+    code, checked = run('draft-check', draft, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision']))
+    assert code == 0, checked
+    code, preview = run('preview-from-draft', draft, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision']))
+    assert code == 0, preview
+    transaction = preview['transaction_id']
+    code, shown = run('transaction-show', transaction, '--summary-only')
+    assert code == 0, shown
+    code, confirmed = run('confirm', transaction, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if insert_no_file_source:
+        reader.sources.append({'id': '{99999999-9999-9999-9999-999999999999}', 'name': 'Tone',
+            'type': 'Source', 'classId': 6684674, 'path': owner['path'] + r'\Tone', 'parent': {'id': owner['id']}})
+    code, executed = run('execute', transaction)
+    writes = [call for call in calls if call[0] == 'ak.wwise.core.audio.import']
+    if insert_no_file_source:
+        assert code == 2, executed
+        assert not writes
+    else:
+        assert code == 0 and len(writes) == 1, executed
+        code, verified = run('verify', transaction)
+        assert code == 0 and verified['verified'] is True, verified

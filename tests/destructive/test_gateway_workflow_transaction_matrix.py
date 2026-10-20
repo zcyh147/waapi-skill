@@ -6948,6 +6948,247 @@ def test_sound_voice_creation_acceptance(workflow_sandbox_runtime: _WorkflowSand
     assert category['status'] == 'PASS', category
 
 
+
+def _collect_planned_source_characterization(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    """Three bounded creation cases; omitted Source language is observation only."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    output = runtime.state_dir / 'planned-source-characterization.json'
+    assert not output.exists(), 'Never overwrite original Source evidence'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / 'planned-source-artifacts'; artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    previous_native = set(native_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    transactions: list[str] = []
+    category = {'category': 'planned-source-construction', 'status': 'FAIL', 'transaction_ids': transactions,
+        'observation_path': str(output), 'scope': 'three_exact_creation_cases_on_matching_Console_version',
+        'verifier_strength': 'Gateway_verification_plus_exact_GUID_class_parent_fields_language_childset_and_retained_state'}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.planned-source-characterization/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'phases': [], 'native_evidence': [],
+        'collection_complete': False, 'business_effect_verified': False, 'config_sha256': config_hash,
+        'native_catalog': {'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']},
+        'source_project': str(runtime.sandbox.source_project), 'endpoint': endpoint,
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
+            'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
+            'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
+            'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Requires exact final category row source hash/mtime/tree and owned-process/sandbox cleanup; body completion alone is not final acceptance.',
+        'scope_exclusions': ['other_versions', '2021_alternative', 'Source_language_inheritance', 'activeSource_switch', 'Tone_audio_effect'],
+        'limits': {'calls': 74, 'receipt_bytes': 8 * 1024 * 1024, 'reply_bytes': 1024 * 1024,
+            'native_files': 1024, 'native_bytes': 128 * 1024 * 1024}}
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Source receipt exceeds bound'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Source public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry a Source transaction'
+                attempted.add(argv[1])
+            row: dict[str, Any] = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                assert len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) <= receipt['limits']['reply_bytes']
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    def query(argv, *, source=False, voice=False, language=None, source_field=None):
+        projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+        if source:
+            assert source_field == 'StartFreq', 'Source observation must retain the selected real field'
+            projection += ['--include', 'owner', '--include', 'source-language', '--include-field', source_field]
+        if voice: projection += ['--include-field', 'IsVoice', '--include', 'active-source']
+        payload = gateway.gateway(['query-object', *argv, *projection,
+            *(['--language', language] if language is not None else []), '--max-results', '8'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        assert isinstance(payload.get('objects'), list) and payload.get('count') == len(payload['objects']), payload
+        return payload['objects']
+    def exact(identity, **view):
+        rows = query(['--exact-id', identity], **view)
+        assert len(rows) == 1 and uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        return rows[0]
+    retained: list[dict[str, Any]] = []
+    def retained_rows():
+        return [{'owner': exact(row['owner']['id'], voice=True),
+            'source': exact(row['source']['id'], source=True, language=row['language'], source_field=row['field']),
+            'children': query(['--exact-id', row['owner']['id'], '--relationship', 'children'], language=row['language'])} for row in retained]
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        receipt['get_info'] = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
+        assert receipt['get_info']['isCommandLine'] is True
+        version = receipt['get_info']['version']
+        assert tuple(version[key] for key in ('year', 'major', 'minor', 'build')) == tuple(
+            int(part) for part in catalog['provenance']['build'].split('.')), version
+        project_call, = [row for row in status['calls'] if row['api'] == 'ak.wwise.core.getProjectInfo']
+        project_observation = observe_console_file(Path(project_call['evidence_path']), io_root=native_root)
+        project_info = json.loads(base64.b64decode(project_observation['content_base64'], validate=True))['result']
+        project_languages = project_info['languages']
+        assert isinstance(project_languages, list) and 0 < len(project_languages) <= 64, project_languages
+        project_language_keys = {(uuid.UUID(row['id']), row['name']) for row in project_languages}
+        assert len(project_language_keys) == len(project_languages) and all(isinstance(name, str) and name for _, name in project_language_keys), project_languages
+        receipt['project_language_authority'] = {'project_id': project_info['id'], 'languages': project_languages,
+            'native_evidence_path': project_call['evidence_path'], 'file_proof': project_observation['file_proof']}
+        listed = gateway.gateway(['metadata', 'types', '--meaning', 'Language', '--page-size', '64'], live=True)['agent_result']
+        language_type, = [row for row in listed['types'] if row.get('name') == 'Language']
+        languages = gateway.gateway(language_type['query_command']['gateway_argv'], live=True)
+        assert languages.get('status') != 'partial' and languages.get('limit_reached') is not True, languages
+        choices = sorted((row for row in languages['objects'] if row.get('type') == 'Language'
+            and (uuid.UUID(row['id']), row.get('name')) in project_language_keys), key=lambda row: row['name'])
+        assert len(choices) == len(project_languages) and len({uuid.UUID(row['id']) for row in choices}) == len(choices), choices
+        receipt['language_choices'] = choices
+        construction_language = choices[0]['name']
+        source_language = choices[1 if len(choices) > 1 else 0]['name']
+        receipt['distinct_language_disambiguation'] = len(choices) > 1
+        receipt['distinct_language_prerequisite'] = 'established' if len(choices) > 1 else 'second_existing_language_absent_no_cross_language_credit'
+        root_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        parent_rows = query([value for segment in root_segments for value in ('--path-segment', segment)])
+        assert len(parent_rows) == 1, parent_rows
+        parent = parent_rows[0]
+        seen = {uuid.UUID(parent['id'])}
+        for case in ('sfx', 'voice-explicit-source', 'voice-default-source'):
+            phase: dict[str, Any] = {'case': case, 'construction_language': None if case == 'sfx' else construction_language,
+                'source_language': source_language if case == 'voice-explicit-source' else None,
+                'source_language_effect': 'explicit_exact_name' if case == 'voice-explicit-source' else 'observed_default_only_no_inheritance_claim',
+                'retained_before': retained_rows(), 'execution_attempted': False}
+            receipt['phases'].append(phase); persist()
+            assert phase['retained_before'] == [{'owner': row['owner'], 'source': row['source'], 'children': row['children']} for row in retained]
+            draft = _start_business_draft(gateway, 'object.set')
+            owner_parent = _bind_business_object(gateway, draft, object_id=parent['id'])
+            name = prefix + '_' + case
+            owner = _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'owner', '--parent-handle', owner_parent, '--name', name,
+                '--kind', 'sound-sfx' if case == 'sfx' else 'sound-voice', '--field', 'notes', 'Keep ' + case,
+                *(['--field', 'language', construction_language] if case != 'sfx' else [])], live=False)
+            owner_handle = declared_business_object_handle(owner, 'owner')
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--type-handle', kind, '--meaning', 'Frequency'], live=True)
+            meaning, = fields['meaning_results']
+            assert meaning['meaning'] == 'Frequency' and fields['candidate_count'] == len(meaning['candidates']), fields
+            selected = [row for row in meaning['candidates'] if row.get('label') == 'Start Frequency'
+                and row.get('field_kind') == 'property' and row.get('value_type') == 'number'
+                and row.get('metadata', {}).get('name') == 'StartFreq' and row['metadata'].get('type') == 'Real32'
+                and row['metadata'].get('display', {}).get('name') == 'Start Frequency']
+            assert len(selected) == 1, 'Start Frequency must have one exact disclosed metadata candidate'
+            field = phase['frequency_field'] = selected[0]
+            frequency = field['handle']
+            _update_business_draft(gateway, draft, 'draft-declare-new', [
+                '--declaration-id', 'source', '--parent-handle', owner_handle, '--name', 'Tone', '--kind', kind,
+                '--field', 'plugin_placement', 'owner', '--field', 'notes', 'Keep Source ' + case,
+                '--field-value', frequency, '440',
+                *(['--field', 'language', source_language] if case == 'voice-explicit-source' else [])], live=False)
+            _update_business_draft(gateway, draft, 'draft-check', live=True)
+            preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+            tx = phase['transaction_id'] = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
+            try:
+                shown = gateway.gateway(['transaction-show', tx], live=False)
+                phase['immutable_preview'] = shown['artifact']
+                prepared = shown['artifact']['prepared_operation']
+                specs = prepared['pre_state']['object_set_nodes']
+                owner_spec, = [row for row in specs if row['requested_name'] == name]
+                source_spec, = [row for row in specs if 'source_plugin' in row]
+                assert source_spec['structural_class_id'] == source_spec['source_plugin']['descriptor']['class_id'] == 6684674, 'Selected field must belong to the observed Wwise Tone Generator class'
+                assert any(prop['name'] == field['metadata']['name'] and prop['value'] == 440 for prop in source_spec['properties']), source_spec
+                phase['preexisting_source_ids'] = source_spec['source_plugin']['preexisting_plugin_ids']
+                assert phase['preexisting_source_ids'] == [], 'All three cases construct new owners, not merged owners'
+                gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+                phase['execution_attempted'] = True; persist()
+                code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+                assert code == 0 and executed.get('state') == 'executed_unverified', executed
+                code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+                assert code == 0 and verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
+                root_result, = executed['dispatch_result']['result']['objects']
+                owner_result, = root_result['children']; source_result, = owner_result['children']
+                owner_id, source_id = owner_result['id'], source_result['id']
+                assert uuid.UUID(owner_id) not in seen and uuid.UUID(source_id) not in seen and uuid.UUID(owner_id) != uuid.UUID(source_id), 'New constructor returned a retained GUID'
+                actual_owner = phase['independent_owner'] = exact(owner_id, voice=True)
+                actual_source = phase['independent_source'] = exact(source_id, source=True, language=phase['source_language'], source_field=field['metadata']['name'])
+                assert actual_owner['name'] == name and actual_owner['type'] == 'Sound' and actual_owner['class_id'] == owner_spec['class_id'], actual_owner
+                assert actual_owner['parent']['id'] == parent['id'] and actual_owner['notes'] == 'Keep ' + case, actual_owner
+                assert type(actual_owner['properties']['IsVoice']) is bool and actual_owner['properties']['IsVoice'] is (case != 'sfx'), actual_owner
+                assert actual_source['name'] == 'Tone' and actual_source['type'] in {'Source', 'SourcePlugin'} and actual_source['class_id'] == source_spec['structural_class_id'], actual_source
+                assert actual_source['parent']['id'] == owner_id and actual_source['path'] == actual_owner['path'] + '\\Tone', actual_source
+                assert actual_source.get('owner') is None or actual_source['owner'].get('id') == owner_id, actual_source
+                assert actual_source['notes'] == 'Keep Source ' + case and actual_source['properties'][field['metadata']['name']] == 440, actual_source
+                if phase['source_language'] is not None:
+                    assert actual_source['source_language']['name'] == phase['source_language'], actual_source
+                children = phase['independent_children'] = query(['--exact-id', owner_id, '--relationship', 'children'], language=phase['source_language'])
+                assert len(children) == 1 and all(children[0].get(key) == actual_source.get(key)
+                    for key in ('id', 'name', 'type', 'path', 'class_id', 'parent', 'notes')), children
+                phase['retained_after'] = retained_rows()
+                assert phase['retained_after'] == phase['retained_before'], 'A later construction changed the original owner/Source'
+                assert exact(parent['id']) == parent, 'Construction changed the bound parent'
+                seen.update((uuid.UUID(owner_id), uuid.UUID(source_id)))
+                retained.append({'owner': actual_owner, 'source': actual_source, 'children': children, 'language': phase['source_language'], 'field': field['metadata']['name']})
+                phase['effect_verified'] = True
+            finally:
+                phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False)
+                persist()
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Source configuration changed'
+        final = gateway.gateway(['status'], live=True)
+        assert final['wwise'] == status['wwise'], 'Source host context changed'
+        receipt.update(collection_complete=True, business_effect_verified=True)
+        category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - previous_native)
+            assert len(paths) <= receipt['limits']['native_files']
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root)
+                raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'] and len(raw) <= 4 * 1024 * 1024
+                target = artifacts / ('native-' + str(index) + '.json')
+                prove_artifact_path(target, io_root=artifacts, field='Source archive', expect_directory=False)
+                descriptor = os.open(target, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+                with os.fdopen(descriptor, 'wb') as stream:
+                    stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+                assert target.read_bytes() == raw
+                receipt['native_evidence'].append({'native_path': str(path), 'archive_path': str(target),
+                    'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw), 'native_file_proof': observed['file_proof']})
+        except Exception as exc:
+            receipt.update(collection_complete=False, business_effect_verified=False,
+                archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]})
+            category['status'] = 'FAIL'
+            raise
+        finally:
+            persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_planned_source_console_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Initial atomic Source characterization is Console2025-only; other lanes remain unproven')
+    category = _collect_planned_source_characterization(workflow_sandbox_runtime, prefix='WAAPI_SOURCE_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
 def _collect_created_leaf_fields_history_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str,
         null_source_only_diagnostic: bool = False) -> dict[str, Any]:
     """Ordinary created fields, then latest-project undo/redo with the owned receipt."""
@@ -7516,7 +7757,8 @@ def test_legacy_import_render_acceptance(workflow_sandbox_runtime: _WorkflowSand
     assert category['status'] == 'PASS', category
 
 
-def _multisource_saved_xml_oracle(raw: bytes, cases: Sequence[Mapping[str, Any]], *, work_unit_id: str) -> dict[str, Any]:
+def _multisource_saved_xml_oracle(raw: bytes, cases: Sequence[Mapping[str, Any]], *, work_unit_id: str,
+                                  platform_choices=None) -> dict[str, Any]:
     """Independent saved-model expectation, never a public/runtime active-source resolver."""
     assert len(raw) <= 8 * 1024 * 1024 and b'<!DOCTYPE' not in raw.upper(), 'Unsafe saved XML'
     root = ET.fromstring(raw)
@@ -7553,6 +7795,24 @@ def _multisource_saved_xml_oracle(raw: bytes, cases: Sequence[Mapping[str, Any]]
             assert actual['source_language']['name'] == language, 'Public source language differs'
             assert node.findtext('AudioFile') == Path(localize_waapi_host_path(actual['original_file_path'])).name, 'Saved/public original filename differs'
         active = sound.find('ActiveSourceList')
+        if platform_choices is not None:
+            assert active is not None and 1 <= len(active) <= 3, 'Saved platform choices missing or unbounded'
+            entries = [dict(node.attrib) for node in active]
+            assert all(node.tag == 'ActiveSource' and guid(node.get('ID')) in by_id and
+                node.get('Name') == by_id[guid(node.get('ID'))]['name'] for node in active), 'Saved platform choice identity differs'
+            assert len({entry.get('Platform') for entry in entries}) == len(entries), 'Duplicated saved platform choices'
+            known_keys = {'Linked', *(choice[key] for choice in platform_choices for key in ('name', 'id'))}
+            assert all(entry.get('Platform') in known_keys for entry in entries), 'Unreviewed saved platform key'
+            selected = {}
+            for choice in platform_choices:
+                specific = [entry for entry in entries if entry.get('Platform') in {choice['id'], choice['name']}]
+                candidates = specific or [entry for entry in entries if entry.get('Platform') == 'Linked']
+                assert len(candidates) == 1 and guid(candidates[0]['ID']) == guid(choice['source_id']), 'Saved platform active choice differs'
+                selected[choice['name']] = guid(candidates[0]['ID'])
+            assert len(set(selected.values())) == 2, 'Platform choices did not diverge'
+            result[case['label']] = {'active_ids': selected, 'active_source_entries': entries,
+                'document_attributes': dict(root.attrib), 'sound_attributes': dict(sound.attrib)}
+            continue
         assert active is not None and len(active) == 1, 'Saved active-source oracle is missing or ambiguous'
         selected = active[0]
         assert selected.tag == 'ActiveSource' and selected.get('Platform') == 'Linked', 'Unreviewed saved active platform representation'
@@ -7563,24 +7823,37 @@ def _multisource_saved_xml_oracle(raw: bytes, cases: Sequence[Mapping[str, Any]]
         result[case['label']] = {'active_id': active_id, 'public_order': public_order, 'xml_order': xml_order,
             'public_active_index': public_order.index(active_id), 'xml_active_index': xml_order.index(active_id),
             'platform': 'Linked', 'language': language, 'class_authority': 'live AudioSource class16 plus saved AudioFileSource tag'}
+    if platform_choices is not None:
+        return {'cases': result, 'platform_choices_diverge': True}
     sfx = [result[label] for label in ('sfx_reverse_1', 'sfx_reverse_2')]
     ordering = {kind: len({row[kind + '_active_index'] for row in sfx}) == 2 for kind in ('public', 'xml')}
     return {'cases': result, 'ordering_counterexample': ordering, 'ordering_discrimination': any(ordering.values())}
 
 
 def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    return _collect_multisource_active_selection_diagnostic(runtime, prefix=prefix)
+
+
+def _collect_multisource_active_selection_diagnostic(runtime: _WorkflowSandboxRuntime, *, prefix: str,
+                                                    platform_characterization: bool = False) -> dict[str, Any]:
     """Prepare only through public transactions; compare three two-source fixtures with saved XML."""
     from wwise_waapi.operation_soundbank import capture_file_proof
-    assert runtime.version == '2021.1', runtime.version
-    output = runtime.state_dir / 'multisource-active-selection-diagnostic.json'
+    assert runtime.version == ('2022.1' if platform_characterization else '2021.1'), runtime.version
+    output = runtime.state_dir / ('platform-active-source-characterization.json' if platform_characterization else 'multisource-active-selection-diagnostic.json')
     # Direct business helpers: Save9, import(1start+1bind+6rows+6completion),
     # copy(1start+2bind+1declare+6completion), delete(2queries+1start+1bind+1declare+6completion).
     budgets = {'readiness': 5, 'save_initial': 9, 'import_setup': 14, 'initial_sources': 24,
         'copy_setup': 3 * 10, 'cardinality': 3 * 4, 'save_final': 9, 'saved_oracle': 1,
         'observations': 3 * 6, 'cleanup': 6 * 11}
+    if platform_characterization:
+        budgets = {'readiness': 6, 'save_initial': 9, 'import_setup': 10, 'initial_sources': 8,
+            'copy_setup': 10, 'cardinality': 4, 'select_active': 20, 'save_final': 9, 'saved_oracle': 1,
+            'observations': 12, 'cleanup': 22}
     category = {'category': '2021-multisource-active-selection-diagnostic', 'status': 'FAIL',
         'coverage_credit': 'none', 'business_effect_verified': False, 'observation_path': str(output),
         'verifier_strength': 'public_setup_plus_saved_xml_active_guid_diagnostic_only'}
+    if platform_characterization:
+        category['category'] = '2022-platform-active-source-serialization-characterization'
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'transactions': [],
         'outcome': 'pending', 'stage': 'readiness', 'collection_complete': False,
@@ -7588,7 +7861,7 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
         'setup_coverage_credit': False, 'model_images': {}, 'call_counts': {key: 0 for key in budgets},
         'limits': {'public_calls': sum(budgets.values()), 'phase_calls': budgets, 'reply_bytes': 1024 * 1024,
             'total_reply_bytes': 8 * 1024 * 1024, 'receipt_bytes': 8 * 1024 * 1024,
-            'input_files': 6, 'input_bytes_each': 16 * 1024, 'xml_files': 1, 'xml_bytes': 8 * 1024 * 1024,
+            'input_files': 2 if platform_characterization else 6, 'input_bytes_each': 16 * 1024, 'xml_files': 1, 'xml_bytes': 8 * 1024 * 1024,
             'xml_nodes': 32768, 'xml_depth': 64},
         'lifecycle_acceptance': 'Requires existing host-category-evidence/v3 full source hash/mtime/tree and cleanup finalizer'}
     reply_bytes = 0
@@ -7646,7 +7919,7 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
                     else:
                         outcome = 'execution_indeterminate'
                 else:
-                    outcome = 'skill_preparation_rejected' if receipt['stage'] in {'import_setup', 'copy_setup'} and argv[0] != 'verify' else 'observation_or_verification_blocked'
+                    outcome = 'skill_preparation_rejected' if receipt['stage'] in {'import_setup', 'copy_setup', 'select_active'} and argv[0] != 'verify' else 'observation_or_verification_blocked'
                 stop(outcome, json.dumps(payload, ensure_ascii=False)[:2048])
             if live and (payload.get('detected_version') != runtime.version or payload.get('endpoint') != {
                     'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}):
@@ -7654,8 +7927,8 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
             return payload
     gateway = Gateway()
     projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
-    def rows(argv, *, language=None, source=False, sound=False, extra=()):
-        view = ['--platform', receipt['platform']['id']] if 'platform' in receipt else []
+    def rows(argv, *, language=None, source=False, sound=False, extra=(), platform=None):
+        view = ['--platform', platform or receipt['platform']['id']] if 'platform' in receipt else []
         if language is not None: view += ['--language', language]
         outputs = ['--include', 'original-file-path', '--include', 'source-language'] if source else []
         if sound: outputs += ['--include', 'original-file-path', '--include', 'work-unit', '--include-field', 'IsVoice']
@@ -7673,8 +7946,8 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
         found = one(['--exact-id', identity], **kwargs)
         assert guid(found['id']) == guid(identity), ('Exact identity changed', found)
         return found
-    def source_children(owner, language, expected):
-        found = rows(['--exact-id', owner['id'], '--relationship', 'children', '--max-results', '3'], language=language, source=True)
+    def source_children(owner, language, expected, *, platform=None):
+        found = rows(['--exact-id', owner['id'], '--relationship', 'children', '--max-results', '3'], language=language, source=True, platform=platform)
         if len(found) != expected:
             stop('setup_cardinality_blocked', 'Required exact direct-source cardinality not established')
         for row in found:
@@ -7711,18 +7984,23 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
         _update_business_draft(gateway, draft, 'draft-declare-object-change', ['--name-conflict', 'fail'] if parent is not None else [], live=False)
         return complete(draft, phase)
     try:
-        types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'AudioSource', '--meaning', 'WorkUnit', '--meaning', 'Platform', '--page-size', '64'], live=True)['agent_result']
+        source_kind = 'AudioFileSource' if platform_characterization else 'AudioSource'
+        types = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', source_kind, '--meaning', 'WorkUnit', '--meaning', 'Platform', '--page-size', '64'], live=True)['agent_result']
         assert types.get('complete') is True, 'Class discovery incomplete'
         classes = {}
-        for name in ('Sound', 'AudioSource', 'WorkUnit', 'Platform'):
+        for name in ('Sound', source_kind, 'WorkUnit', 'Platform'):
             candidates = [row for row in types['types'] if row['name'] == name and row['type'] == 'WObject']
             assert len(candidates) == 1 and type(candidates[0]['classId']) is int, name
             classes[name] = candidates[0]
-        assert classes['Sound']['classId'] == 65552 and classes['AudioSource']['classId'] == 16
+        assert classes['Sound']['classId'] == 65552 and classes[source_kind]['classId'] == 16
         platforms = rows(['--type-selection', classes['Platform']['selection'], '--max-results', '20'])
         platform_candidates = [row for row in platforms if row['name'] == 'Mac' and row['type'] == 'Platform']
         assert len(platform_candidates) == 1, 'Exact Mac platform unavailable'
         receipt['platform'] = exact(platform_candidates[0]['id'])
+        if platform_characterization:
+            windows = [row for row in platforms if row['name'] == 'Windows' and row['type'] == 'Platform']
+            assert len(windows) == 1, 'Exact Windows platform unavailable'
+            receipt['other_platform'] = exact(windows[0]['id'])
         parent = one([arg for segment in ACTOR_MIXER_PARENT_SEGMENTS for arg in ('--path-segment', segment)])
         parent = exact(parent['id'])
         assert parent['type'] == 'WorkUnit' and parent['class_id'] == classes['WorkUnit']['classId']
@@ -7732,8 +8010,10 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
         draft = _start_business_draft(gateway, 'audio.import')
         bound = _bind_business_object(gateway, draft, object_id=parent['id'])
         cases = []
-        for index, (label, language, stems) in enumerate((('sfx_reverse_1', 'SFX', ('Zeta_1', 'Alpha_1')),
-                ('sfx_reverse_2', 'SFX', ('Alpha_2', 'Zeta_2')), ('voice', 'English(US)', ('Voice_A', 'Voice_B')))):
+        fixtures = (('platform_pair', 'SFX', ('Original_A', 'Copied_B')),) if platform_characterization else (
+            ('sfx_reverse_1', 'SFX', ('Zeta_1', 'Alpha_1')), ('sfx_reverse_2', 'SFX', ('Alpha_2', 'Zeta_2')),
+            ('voice', 'English(US)', ('Voice_A', 'Voice_B')))
+        for index, (label, language, stems) in enumerate(fixtures):
             case = {'label': label, 'language': language, 'sounds': []}; cases.append(case)
             for offset, stem in enumerate(stems):
                 name = prefix + '_' + label + ('_Target' if offset == 0 else '_Donor')
@@ -7777,6 +8057,23 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
             assert len({proof['sha256'] for proof in proofs}) == 2, 'Two-source bytes are not distinct'
             assert {(p['size'], p['sha256']) for p in proofs} == {(s['original']['size'], s['original']['sha256']) for s in case['sounds']}
             case.update(owner=target['owner'], children=children, copied_media=proofs)
+        if platform_characterization:
+            target = cases[0]
+            original_id = guid(target['sounds'][0]['source']['id'])
+            copied = [row for row in target['children'] if guid(row['id']) != original_id]
+            assert len(copied) == 1, 'Copied source identity is not unique'
+            receipt['platform_choices'] = [
+                {'name': receipt['platform']['name'], 'id': receipt['platform']['id'], 'source_id': copied[0]['id']},
+                {'name': receipt['other_platform']['name'], 'id': receipt['other_platform']['id'], 'source_id': original_id}]
+            stage('select_active')
+            for choice in receipt['platform_choices']:
+                operation = 'ak.wwise.core.sound.setActiveSource'
+                draft = _start_business_draft(gateway, operation)
+                owner_handle = _bind_business_object(gateway, draft, object_id=target['owner']['id'], role='sound')
+                source_handle = _bind_business_object(gateway, draft, object_id=choice['source_id'], role='source')
+                _update_business_draft(gateway, draft, 'draft-declare-project-setting-plan',
+                    ['--sound-handle', owner_handle, '--source-handle', source_handle, '--platform-name', choice['name']], live=False)
+                complete(draft, {'operation': operation, 'platform': choice, 'native_outcome': 'not_executed'})
         stage('save_final'); receipt['final_save'] = _save_sandbox_project(gateway)
         stage('saved_oracle')
         unit = exact(parent['id'], extra=['--include', 'file-path'])
@@ -7786,30 +8083,41 @@ def _collect_2021_multisource_active_selection_diagnostic(runtime: _WorkflowSand
         image = ConsoleModelImageIndex(root=image_root, project=runtime.sandbox.sandbox_project, phase='after', link=receipt['model_images'].setdefault('after', {}))
         observed = observe_console_file(path, io_root=runtime.sandbox.sandbox_path)
         raw = image.save(path, observed); image.finish()
-        receipt['oracle'] = _multisource_saved_xml_oracle(raw, cases, work_unit_id=parent['id'])
+        receipt['oracle'] = _multisource_saved_xml_oracle(raw, cases, work_unit_id=parent['id'],
+            platform_choices=receipt.get('platform_choices'))
         stage('observations')
-        for case in cases:
-            owner = exact(case['owner']['id'], language=case['language'], sound=True)
+        observations = [(case, choice) for case in cases for choice in receipt['platform_choices']] if platform_characterization else [(case, None) for case in cases]
+        for case, choice in observations:
+            platform_id = choice['id'] if choice else None
+            owner = exact(case['owner']['id'], language=case['language'], sound=True, platform=platform_id,
+                extra=['--include', 'active-source'] if choice else ())
             assert guid(owner['work_unit']) == guid(parent['id']), 'Sound owning Work Unit differs'
             for key in ('id', 'name', 'type', 'path', 'class_id', 'notes', 'properties'):
                 assert owner.get(key) == case['owner'].get(key), ('Copy changed target Sound', key)
             assert guid(owner['parent']) == guid(case['owner']['parent']), 'Copy reparented the target Sound'
-            children = source_children(owner, case['language'], 2)
-            assert children == case['children'], 'Source collection changed after Save'
-            for child in children: assert exact(child['id'], language=case['language'], source=True) == child
+            children = source_children(owner, case['language'], 2, platform=platform_id)
+            assert {guid(row['id']): row for row in children} == {guid(row['id']): row for row in case['children']}, 'Source collection changed after Save'
+            for child in children: assert exact(child['id'], language=case['language'], source=True, platform=platform_id) == child
             matches = ['{' + str(uuid.UUID(row['id'])).upper() + '}' for row in children
                 if row['original_file_path'] == owner.get('original_file_path')]
-            expected = receipt['oracle']['cases'][case['label']]['active_id']
-            case['path_comparison'] = {'sound_file': owner.get('original_file_path'), 'field_present': 'original_file_path' in owner,
+            expected = receipt['oracle']['cases'][case['label']]['active_ids'][choice['name']] if choice else receipt['oracle']['cases'][case['label']]['active_id']
+            comparison = {'sound_file': owner.get('original_file_path'), 'field_present': 'original_file_path' in owner,
                 'matching_source_ids': matches, 'saved_active_guid': expected}
+            if choice:
+                comparison['platform'] = choice
+                assert guid(owner.get('active_source')) == expected, 'Native active edge differs from saved platform oracle'
+                case.setdefault('platform_path_comparisons', []).append(comparison)
+            else:
+                case['path_comparison'] = comparison
             assert matches == [expected], 'Sound WAV path does not uniquely match the saved active GUID'
-            assert exact(owner['id'], language=case['language'], sound=True) == owner, 'Sound observation drifted'
-            assert source_children(owner, case['language'], 2) == children, 'Source collection drifted'
+            assert exact(owner['id'], language=case['language'], sound=True, platform=platform_id,
+                extra=['--include', 'active-source'] if choice else ()) == owner, 'Sound observation drifted'
+            assert {guid(row['id']): row for row in source_children(owner, case['language'], 2, platform=platform_id)} == {guid(row['id']): row for row in children}, 'Source collection drifted'
         assert observe_console_file(path, io_root=runtime.sandbox.sandbox_path)['file_proof'] == observed['file_proof'], 'Saved XML changed during public observations'
         receipt['input_after'] = [media_proof(Path(proof['path'])) for proof in input_proofs]
         assert receipt['input_after'] == input_proofs, 'Diagnostic inputs changed'
         receipt['path_join_matches_saved_oracle'] = True
-        if not receipt['oracle']['ordering_discrimination']:
+        if not platform_characterization and not receipt['oracle']['ordering_discrimination']:
             stop('ordering_counterexample_unproven', 'No opposite actual active-source child positions observed; no order inference or replay')
         stage('cleanup')
         for identity in reversed(root_ids):
@@ -7838,6 +8146,16 @@ def test_2021_multisource_active_selection_diagnostic(workflow_sandbox_runtime: 
         pytest.skip('The source-bound active-selection diagnostic is2021-only')
     category = _collect_2021_multisource_active_selection_diagnostic(workflow_sandbox_runtime,
         prefix='WAAPI_MULTI_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_platform_active_source_serialization_characterization(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2022.1':
+        pytest.skip('The platform serialization characterization is2022-only')
+    category = _collect_multisource_active_selection_diagnostic(workflow_sandbox_runtime,
+        prefix='WAAPI_PLATFORM_' + uuid.uuid4().hex[:10], platform_characterization=True)
     assert category['status'] == 'PASS', category
 
 
@@ -8087,3 +8405,233 @@ def test_soundcaster_dump_metadata_observation(workflow_sandbox_runtime: _Workfl
     receipt = json.loads(Path(category['observation_path']).read_text())
     assert receipt['collection_complete'] and receipt['saved_model_preserved'], receipt
     assert receipt['session_values_observed'] is receipt['business_preservation_verified'] is False
+
+
+def _collect_source_plugin_selection_acceptance(runtime: _WorkflowSandboxRuntime, *, prefix: str) -> dict[str, Any]:
+    """Prove one observed A→B Source-plugin selection, never a sole-source no-op."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}
+    catalog = load_native_catalog(runtime.version, 'wwise-console')
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    output = runtime.state_dir / 'source-plugin-selection.json'
+    assert not output.exists(), 'Never overwrite original Source selection evidence'
+    output.parent.mkdir(parents=True, exist_ok=True)
+    artifacts = runtime.state_dir / 'source-plugin-selection-artifacts'; artifacts.mkdir(exist_ok=False)
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); previous_native = set(native_root.glob('*.json'))
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    transactions: list[str] = []
+    category = {'category': 'source-plugin-active-selection', 'status': 'FAIL', 'transaction_ids': transactions,
+        'observation_path': str(output), 'scope': 'one_actual_SourcePlugin_A_to_B_on_matching_Console_current_view',
+        'verifier_strength': 'Gateway_verification_plus_independent_GUID_change_class_parent_fields_complete_childset_and_preservation'}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {'contract': 'waapi-skill.source-plugin-selection/v1', 'candidate': runtime.candidate,
+        'version': runtime.version, 'endpoint': endpoint, 'transaction_ids': transactions, 'phases': [], 'calls': [],
+        'native_evidence': [], 'collection_complete': False, 'business_effect_verified': False,
+        'config_sha256': config_hash, 'source_project': str(runtime.sandbox.source_project),
+        'native_catalog': {'build': catalog['provenance']['build'], 'content_sha256': catalog['content_sha256']},
+        'scope_exclusions': ['other_versions_and_hosts', 'Voice_or_language_semantics', 'platform_isolation_or_unlink', 'Tone_audio_effect'],
+        'limits': {'calls': 70, 'receipt_bytes': 8 * 1024 * 1024, 'reply_bytes': 1024 * 1024,
+                   'native_files': 1024, 'native_bytes': 128 * 1024 * 1024},
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3', 'phase': 'final',
+            'candidate': runtime.candidate, 'category': category['category'], 'transaction_ids': transactions,
+            'path': runtime.env.get('WWISE_CATEGORY_EVIDENCE_PATH') or runtime.env.get('WWISE_MACOS_CATEGORY_EVIDENCE_PATH'),
+            'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Body completion requires matching final v3 category source/hash/mtime/tree and owned-process/sandbox cleanup.'}
+    attempted: set[str] = set()
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
+        assert len(raw) <= receipt['limits']['receipt_bytes'], 'Selection receipt exceeds bound'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+    class Gateway:
+        def raw_gateway(self, argv):
+            assert len(receipt['calls']) < receipt['limits']['calls'], 'Source selection public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry Source selection or setup'
+                attempted.add(argv[1])
+            row: dict[str, Any] = {'argv': list(argv)}; receipt['calls'].append(row)
+            try:
+                code, payload = runtime.raw_gateway(argv)
+                assert len(json.dumps(payload, ensure_ascii=False).encode('utf-8')) <= receipt['limits']['reply_bytes']
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+                raise
+            finally:
+                persist()
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+    gateway = Gateway()
+    def query(argv, *, source=False, sound=False):
+        projection = ['--include', 'class-id', '--include', 'parent', '--include', 'notes']
+        if source:
+            projection += [item for token in ('StartFreq', 'WaveType') for item in ('--include-field', token)]
+        if sound: projection += ['--include-field', 'IsVoice', '--include', 'active-source']
+        payload = gateway.gateway(['query-object', *argv, *projection, '--max-results', '8'], live=True)
+        assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', payload
+        rows = payload.get('objects'); assert isinstance(rows, list) and payload.get('count') == len(rows), payload
+        ids = [uuid.UUID(row['id']) for row in rows]; assert len(set(ids)) == len(ids), rows
+        return rows
+    def exact(identity, **view):
+        rows = query(['--exact-id', identity], **view); assert len(rows) == 1, rows
+        assert uuid.UUID(rows[0]['id']) == uuid.UUID(identity), rows
+        return rows[0]
+    def children(identity):
+        return sorted(query(['--exact-id', identity, '--relationship', 'children']), key=lambda row: uuid.UUID(row['id']))
+    def active(row):
+        value = row.get('active_source'); assert isinstance(value, Mapping) and isinstance(value.get('id'), str), row
+        return str(uuid.UUID(value['id']))
+    def preserved_sound(row):
+        result = {key: value for key, value in row.items() if key != 'active_source'}
+        if 'unavailable_fields' in result:
+            fields = [field for field in result['unavailable_fields'] if field != 'active_source']
+            if fields:
+                result['unavailable_fields'] = fields
+            else:
+                del result['unavailable_fields']
+        return result
+    def complete(draft, label):
+        phase: dict[str, Any] = {'phase': label, 'execution_attempted': False}; receipt['phases'].append(phase)
+        _update_business_draft(gateway, draft, 'draft-check', live=True)
+        preview = _update_business_draft(gateway, draft, 'preview-from-draft', live=True)
+        tx = phase['transaction_id'] = preview['transaction_id']; assert tx not in transactions; transactions.append(tx)
+        try:
+            shown = gateway.gateway(['transaction-show', tx], live=False); phase['immutable_preview'] = shown['artifact']
+            gateway.gateway(['confirm', tx, '--confirmation-token', shown['confirmation']['token']], live=False)
+            phase['execution_attempted'] = True; persist()
+            code, executed = gateway.raw_gateway(['execute', tx]); phase['execute'] = {'exit_code': code, 'payload': executed}
+            assert code == 0 and executed.get('state') == 'executed_unverified', executed
+            code, verified = gateway.raw_gateway(['verify', tx]); phase['verify'] = {'exit_code': code, 'payload': verified}
+            assert code == 0 and verified.get('state') == 'verified' and verified.get('verification', {}).get('business_state_verified') is True, verified
+            return phase
+        finally:
+            phase['final_transaction'] = gateway.gateway(['transaction-show', tx], live=False); persist()
+    def field(payload, label, token):
+        rows = payload.get('field_candidates')
+        if rows is None:
+            rows = [candidate for result in payload.get('meaning_results', []) for candidate in result.get('candidates', [])]
+        matches = {row['handle']: row for row in rows if row.get('label') == label and row.get('metadata', {}).get('name') == token}
+        assert len(matches) == 1, {'label': label, 'token': token, 'candidates': rows}
+        return next(iter(matches.values()))
+    persist()
+    try:
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        receipt['get_info'] = json.loads(base64.b64decode(observed['content_base64'], validate=True))['result']
+        assert receipt['get_info']['isCommandLine'] is True
+        version = receipt['get_info']['version']
+        assert tuple(version[key] for key in ('year', 'major', 'minor', 'build')) == tuple(int(p) for p in catalog['provenance']['build'].split('.')), version
+        segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
+        rows = query([item for segment in segments for item in ('--path-segment', segment)])
+        parent, = rows; receipt['parent_before'] = parent
+        draft = _start_business_draft(gateway, 'object.set')
+        parent_handle = _bind_business_object(gateway, draft, object_id=parent['id'])
+        for label in ('target', 'sentinel'):
+            _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', label,
+                '--parent-handle', parent_handle, '--name', prefix + '_' + label, '--kind', 'sound-sfx',
+                '--field', 'notes', 'Keep ' + label], live=False)
+        setup = complete(draft, 'empty_sounds')
+        root, = setup['execute']['payload']['dispatch_result']['result']['objects']
+        created = root['children']; assert len(created) == 2 and len({uuid.UUID(row['id']) for row in created}) == 2, created
+        target_id, = [row['id'] for row in created if row['name'] == prefix + '_target']
+        sentinel_id, = [row['id'] for row in created if row['name'] == prefix + '_sentinel']
+        target, sentinel = exact(target_id, sound=True), exact(sentinel_id, sound=True)
+        specs = setup['immutable_preview']['prepared_operation']['pre_state']['object_set_nodes']
+        for label, row in (('target', target), ('sentinel', sentinel)):
+            spec, = [s for s in specs if s['requested_name'] == prefix + '_' + label]
+            assert row['type'] == 'Sound' and row['class_id'] == spec['class_id'] and row['parent']['id'] == parent['id'], row
+            assert row['notes'] == 'Keep ' + label and row['properties']['IsVoice'] is False and row.get('active_source') is None, row
+            assert children(row['id']) == [], row
+        sources = []
+        for index, frequency in enumerate((440, 660), 1):
+            draft = _start_business_draft(gateway, 'object.createPlugin')
+            owner = _bind_business_object(gateway, draft, object_id=target_id)
+            kind = _discover_business_type(gateway, draft, meaning='Wwise Tone Generator', role='source', expected_label='Wwise Tone Generator')
+            fields = _update_business_draft(gateway, draft, 'draft-discover-fields',
+                ['--type-handle', kind, '--meaning', 'Start Frequency', '--meaning', 'Waveform'], live=True)
+            start, wave = field(fields, 'Start Frequency', 'StartFreq'), field(fields, 'Waveform', 'WaveType')
+            sine, = [row['value'] for row in wave['metadata']['restriction']['values'] if row['displayName'] == 'Sine']
+            assert type(sine) is int and 20 <= frequency <= 20000
+            receipt['metadata_selection'] = {'frequency': start, 'waveform': wave, 'sine_value': sine}
+            _update_business_draft(gateway, draft, 'draft-declare-existing', ['--declaration-id', 'source', '--object-handle', owner,
+                '--field', 'plugin_role', 'source', '--field', 'plugin_placement', 'owner', '--field', 'plugin_name', 'Tone' + str(index),
+                '--field', 'plugin_type_handle', kind, '--field', 'notes', 'Keep Source ' + str(index),
+                '--field-value', start['handle'], str(frequency), '--field-value', wave['handle'], str(sine)], live=False)
+            phase = complete(draft, 'source_' + str(index))
+            owner_result, = phase['execute']['payload']['dispatch_result']['result']['objects']
+            source_result, = owner_result['children']; assert uuid.UUID(owner_result['id']) == uuid.UUID(target_id)
+            source = exact(source_result['id'], source=True)
+            descriptor = phase['immutable_preview']['prepared_operation']['verification_plan']['descriptor']
+            assert source['type'] in {'Source', 'SourcePlugin'} and source['class_id'] == descriptor['class_id'], source
+            assert source['parent']['id'] == target_id and source['path'] == target['path'] + '\\Tone' + str(index), source
+            assert source['notes'] == 'Keep Source ' + str(index) and source['properties'] == {'StartFreq': frequency, 'WaveType': sine}, source
+            assert uuid.UUID(source['id']) not in {uuid.UUID(row['id']) for row in (parent, target, sentinel, *sources)}, 'Source returned a retained GUID'
+            for retained in sources: assert exact(retained['id'], source=True) == retained, 'Source setup changed a retained Source'
+            sources.append(source); phase['independent_source'] = source
+        def preservation():
+            current_target = exact(target_id, sound=True)
+            return {'sound': preserved_sound(current_target),
+                'sources': [exact(row['id'], source=True) for row in sources], 'children': children(target_id),
+                'sentinel': exact(sentinel_id, sound=True), 'sentinel_children': children(sentinel_id), 'parent': exact(parent['id'])}, current_target
+        before, owner = preservation()
+        assert before['sources'] == sources and before['sentinel'] == sentinel and before['parent'] == parent
+        assert before['sound'] == preserved_sound(target), 'Source setup changed the original Sound fields'
+        assert before['sentinel_children'] == [], 'Source setup changed the unrelated Sound child set'
+        assert len(before['children']) == 2 and {uuid.UUID(row['id']) for row in before['children']} == {uuid.UUID(row['id']) for row in sources}, before
+        initial = active(owner); assert initial in {str(uuid.UUID(row['id'])) for row in sources}, owner
+        selected, = [row for row in sources if str(uuid.UUID(row['id'])) != initial]
+        receipt['selection'] = {'before_active_id': initial, 'requested_active_id': str(uuid.UUID(selected['id'])),
+            'preserved_before': before, 'platform_scope': 'current_default_view_existing_linkage_no_isolation_claim'}
+        draft = _start_business_draft(gateway, 'ak.wwise.core.sound.setActiveSource')
+        sound_handle = _bind_business_object(gateway, draft, object_id=target_id, role='sound')
+        source_handle = _bind_business_object(gateway, draft, object_id=selected['id'], role='source')
+        _update_business_draft(gateway, draft, 'draft-declare-project-setting-plan',
+            ['--sound-handle', sound_handle, '--source-handle', source_handle], live=True)
+        selection = complete(draft, 'select_other_source')
+        args = selection['immutable_preview']['prepared_operation']['dispatch']['args']
+        assert args == {'sound': target_id, 'source': selected['id']}, args
+        after, owner = preservation(); receipt['selection'].update(preserved_after=after, after_active_id=active(owner))
+        assert receipt['selection']['after_active_id'] == receipt['selection']['requested_active_id'] != initial, receipt['selection']
+        assert after == before, 'Selection changed preserved Source/owner/sentinel fields or child membership'
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Source selection configuration changed'
+        final = gateway.gateway(['status'], live=True); assert final['wwise'] == status['wwise'], 'Source selection host context changed'
+        receipt.update(collection_complete=True, business_effect_verified=True); category['status'] = 'PASS'
+        return category
+    except Exception as exc:
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        raise
+    finally:
+        try:
+            paths = sorted(set(native_root.glob('*.json')) - previous_native); assert len(paths) <= receipt['limits']['native_files']
+            total = 0
+            for index, path in enumerate(paths):
+                observed = observe_console_file(path, io_root=native_root); raw = base64.b64decode(observed['content_base64'], validate=True)
+                total += len(raw); assert total <= receipt['limits']['native_bytes'] and len(raw) <= 4 * 1024 * 1024
+                target = artifacts / ('native-' + str(index) + '.json')
+                prove_artifact_path(target, io_root=artifacts, field='Source selection archive', expect_directory=False)
+                fd = os.open(target, binary_file_open_flags(os.O_WRONLY | os.O_CREAT | os.O_EXCL) | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+                with os.fdopen(fd, 'wb') as stream: stream.write(raw); stream.flush(); os.fsync(stream.fileno())
+                assert target.read_bytes() == raw
+                receipt['native_evidence'].append({'native_path': str(path), 'archive_path': str(target),
+                    'sha256': hashlib.sha256(raw).hexdigest(), 'size': len(raw), 'native_file_proof': observed['file_proof']})
+        except Exception as exc:
+            receipt.update(collection_complete=False, business_effect_verified=False,
+                archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]}); category['status'] = 'FAIL'
+            raise
+        finally:
+            persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_source_plugin_active_selection_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Initial SourcePlugin A-to-B acceptance is Console2025-only; other setter lanes remain unproven')
+    category = _collect_source_plugin_selection_acceptance(workflow_sandbox_runtime, prefix='WAAPI_SRC_SELECT_' + uuid.uuid4().hex[:10])
+    assert category['status'] == 'PASS', category

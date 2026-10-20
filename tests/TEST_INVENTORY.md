@@ -5,6 +5,63 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-20 R41 scoped Source, active-selection and reimport integration
+
+Runtime merge `edbc24cb` combines accepted `aaa91777`, `8ec0925d` and `01a65041`
+from `e80d9250`. Seventeen component files retain their exact blobs or clean
+shared-file composition. The following are separate original focused receipts;
+none is a combined final-candidate or full Program result.
+
+- Source construction: **29 passed in 10.06s**, then only collision/retained-GUID
+  controls **2 passed in 1.07s**. The real Voice→planned Bus unknown-language
+  continuation tracer went **1 failed in 0.68s → 1 passed in 0.64s**. Earlier
+  plain-Source attempts were test-design failures and remain recorded as such.
+  Collector prior-owner extra-child RED was **1 failed in 3.69s**; changed
+  happy/fault controls were **2 passed in 6.03s**, proving the 74-call collector,
+  three distinct executions, exact native-byte archive and retained child sets.
+- Query: the new predicate tracer went **1 failed in 0.39s → 1 passed in 0.40s**;
+  relationship/mixed producers **2 passed in 0.42s**, existing affected guards
+  **22 passed in 1.21s**. Only the full 1000-owner control went **1 failed in
+  0.51s → 1 passed in 0.64s**; structured config-drift/context controls went
+  **2 failed in 1.27s → 2 passed in 1.30s**; child/caller-bound guards were
+  **2 passed in 0.37s**. Setter linkage disclosure and public Preview summary
+  have separate passing receipts; neither promises unlinking or isolation.
+- Reimport: inactive-filename public RED was **1 failed in 0.62s**, then
+  **1 passed in 0.51s**. Distinct public effect/boundary controls were **9 passed
+  in 2.41s**, unchanged 2021 guards **29 passed in 1.54s**, and affected public/
+  later-version controls **12 passed in 1.43s**. Contradictory exact Source-path
+  RED/GREEN was **1 failed in 0.66s → 1 passed in 0.71s**. Empty-Sound Source
+  insertion exposed a further prewrite gap (**1 failed / 1 passed in 0.93s**);
+  the same two controls passed in **0.98s** after binding the empty precondition.
+
+Full chronology and original argv/outcomes remain in
+`/tmp/waapi-r41-planned-source/handoff.md`,
+`/tmp/waapi-r41-multi-sound-query-handoff.md`,
+`/tmp/waapi-r41-owner-bound-error-context-handoff.md` and
+`/tmp/waapi-r41-reimport-active-source-handoff.md`. Focused tests used pinned
+Poetry via `ci/test.sh --mode nonlive`; no counts are summed across stages.
+
+Four serial interface/branch generate/check commands passed once in
+**17.637s / 17.855s / 24.686s / 23.505s**. Restoring original policy formatting
+with the same two hash values invalidated its raw-byte branch source seal; only
+the branch generate/check pair repeated, passing in **24.666s / 23.455s**. The
+first receipts are retained and the interface pair was not repeated. All 153
+Registry machine seals and 272,313 compressed native obligations, ownership,
+statuses and evidence remain exact.
+Two reviewed aggregate disclosure seals, four Source business contracts, four
+setter linkage contract references and source/hash/line/candidate data refresh;
+there is no new branch credit. 2025 fixture LFS objects were materialized from
+local storage only (15 objects, zero remaining pointers; no fetch).
+
+Native originals are unchanged: the 2022 platform diagnostic r2 is **FAIL in
+11.84s** (only Linked final saved selection, no divergent-platform proof), and
+2024 owned OS observation is **BLOCKED / 1 skipped in 224.27s** (exact window
+observed, one click without image change, no saved-value proof). Both retained
+sandboxes/evidence and unchanged source/zero-owned-process results remain.
+Root's full Program on `e80d9250` is still pending at this stage; its eventual
+result must be recorded separately. No merger pytest/native/Fresh run occurred.
+The next reviewed 2025 Source construction run is Root-owned and not yet claimed.
+
 ## 2026-10-20 R40 scoped regression, Voice context and stationary Tone
 
 Runtime merge `495f8a7f` preserves accepted graph `026f9181`, Voice `89d0ef9f`
