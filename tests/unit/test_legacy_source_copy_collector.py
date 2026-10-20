@@ -58,6 +58,11 @@ def legacy_runtime(tmp_path, *, fault=None):
         if uri.endswith('getPropertyAndReferenceNames'):
             row = task.objects.get(args['object'], {})
             return {'return': [key[1:] for key in row if key.startswith('@')]}
+        if uri.endswith('object.get') and args.get('transform') == [{'select': ['children']}, {'range': [0, 130]}]:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            identity = args['from']['id'][0]
+            children = [row for row in task.objects.values() if row.get('parent') == {'id': identity}]
+            return {'return': task.project_rows(children[:130], options)}
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
             expression = args['waql']; identity = expression.split('"')[1]
             rows = [row for row in task.objects.values() if row['id'] == identity or row['path'] == identity]
@@ -407,6 +412,17 @@ def saved_copy_runtime(tmp_path, *, fault=None):
             'path': r'\Actor-Mixer Hierarchy\MIDI\Synth\Wwise Synth One' if role == 'source' else tag,
             **({'workunit': {'id': midi_id}} if role == 'source' else {})}
         task.objects[original].pop('class_id')
+    # Restore genuine field read frames lost when the saved-role identity rows
+    # replace legacy_runtime's Source row. Values are matching XML overrides or
+    # explicitly SDK-backed fake defaults, never production/native assumptions.
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/synth-one-2021-sdk-read-fields.json').read_text())
+    source_xml, = [node for node in midi.iter('SourcePlugin') if node.get('ID') == SOURCE]
+    overrides = {node.get('Name'): node.get('Value') for node in source_xml.findall('./PropertyList/Property') if node.get('Value') is not None}
+    for field in fixture['properties']:
+        name, kind = field['name'], field['type']
+        text = overrides.get(name, field['sdk_default_text'])
+        task.metadata[name] = {'name': name, 'type': kind, 'display': {'name': field['display_name']}}
+        task.objects[SOURCE]['@' + name] = bool(int(text)) if kind == 'bool' else int(text) if kind == 'int32' else float(text)
     from tests.unit.test_field_interface_closure_gateway import PROJECT
     task.objects[PROJECT] = {'id': PROJECT, 'name': 'Fixture', 'type': 'Project', 'path': '\\',
         'filePath': str(tmp_path / 'unowned/Other.wproj') if fault == 'wrong-project' else str(task.project_file)}
@@ -466,10 +482,18 @@ def test_legacy_saved_copy_collector_uses_four_public_transactions_and_bounded_f
     assert category['status'] == 'PASS' and category['business_effect_verified'] is False
     assert receipt['saved_copy_verified'] is True and receipt['collection_complete'] is True
     assert [row['name'] for row in receipt['phases']] == ['save_baseline', 'create_empty_destination', 'copy_source_only', 'save_final']
+    copy_phase, = [row for row in receipt['phases'] if row['name'] == 'copy_source_only']
+    assert copy_phase['gateway_verification_strength'] == 'source_default_view_fields_and_owner_frames_only'
+    assert copy_phase['gateway_verification_scope']['copied_scalar_field_count'] == 18
+    assert copy_phase['gateway_verification_scope']['complete_copy_preservation'] is False
     assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy', 'save']
     assert len([argv for argv in commands if argv[0] == 'execute']) == 4
     assert len(commands) <= receipt['limits']['calls'] == 128
     assert not any(argv[:2] in (['metadata', 'list'], ['metadata', 'detail']) for argv in commands)
+    proof_index = json.loads(Path(receipt['native_file_proofs']['path']).read_text())
+    assert proof_index['count'] == len(receipt['native_evidence'])
+    assert [row['archive'] for row in proof_index['files']] == receipt['native_evidence']
+    assert all(row['native_file_proof']['sha256'] == row['archive']['sha256'] for row in proof_index['files'])
     assert receipt['oracle']['ordered_point_count'] == 2 and receipt['oracle']['original_preserved']
     assert set(receipt['model_images']) == {'before', 'after'}
     assert all(value['complete'] for value in receipt['model_images'].values())
@@ -523,3 +547,18 @@ def test_legacy_saved_copy_refuses_save_outside_exact_owned_project(tmp_path, wo
     else:
         assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy']
         assert len([argv for argv in commands if argv[0] == 'typed-zero-call']) == 1
+
+
+def test_legacy_saved_copy_rejects_tampered_native_proof_index_without_replay(tmp_path, workflow, monkeypatch):
+    runtime, commands, writes, task = saved_copy_runtime(tmp_path)
+    observe = workflow.observe_console_file
+    def tamper(path, *, io_root):
+        if Path(path).name == 'native-proofs.json': Path(path).write_text('{}')
+        return observe(path, io_root=io_root)
+    monkeypatch.setattr(workflow, 'observe_console_file', tamper)
+    with pytest.raises(AssertionError, match='Native proof index hash/size changed'):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SAVED_COPY', saved_copy=True)
+    receipt = json.loads((runtime.state_dir / 'legacy-source-saved-copy.json').read_text())
+    assert receipt['collection_complete'] is False
+    assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['save', 'create', 'copy', 'save']
+    assert len([argv for argv in commands if argv[0] == 'execute']) == 4
