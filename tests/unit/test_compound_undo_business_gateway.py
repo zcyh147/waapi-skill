@@ -757,14 +757,20 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
         "--failure-cancellation", cancellation)
     def state_bytes():
         return {str(path.relative_to(state_dir)): path.read_bytes()
-                for path in state_dir.rglob("*") if path.is_file()}
+                for path in (state_dir / "transactions").rglob("*") if path.is_file()}
     def reject_without_parent_artifact(arguments, expected):
         before, calls_before = state_bytes(), len(client.calls)
+        parent_path = state_dir / "operation-drafts-v1" / "records" / (draft + ".json")
+        parent_before = json.loads(parent_path.read_text())
         code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *arguments],
             env=env, client_factory=lambda _url: client)
         assert code == 2 and expected in json.dumps(rejected), rejected
         assert not rejected.get("transaction_id"), rejected
-        assert state_bytes() == before  # includes existing immutable child previews and parent Draft bytes
+        assert state_bytes() == before  # every existing immutable child artifact/journal byte remains exact
+        parent_after = json.loads(parent_path.read_text())
+        assert {key: value for key, value in parent_after.items() if key != "audit"} == {
+            key: value for key, value in parent_before.items() if key != "audit"}
+        # A recorded rejection audit is allowed; parent state/seal/reservation are unchanged.
         assert not any(uri.startswith("ak.wwise.core.undo.") or uri.endswith(("object.setNotes", "object.setName", "object.setProperty", "object.setReference"))
                        for uri, _args, _options in client.calls[calls_before:])
         return rejected

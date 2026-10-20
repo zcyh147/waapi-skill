@@ -444,7 +444,7 @@ def object_row(*, volume: float | None = None) -> dict[str, Any]:
 def expected_preview_calls() -> list[
     tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
 ]:
-    identity_fields = ["id", "name", "type", "path", "parent", "notes", "classId"]
+    identity_fields = ["id", "name", "type", "path", "parent", "notes"]
     return [
         ("ak.wwise.core.getInfo", None, None),
         ("ak.wwise.core.getProjectInfo", None, None),
@@ -455,6 +455,11 @@ def expected_preview_calls() -> list[
             {"return": identity_fields},
         ),
         (
+            "ak.wwise.core.object.get",
+            {"from": {"id": [OBJECT_GUID]}},
+            {"return": [*identity_fields, "classId"]},
+        ),
+        (
             "ak.wwise.core.object.getPropertyInfo",
             {"property": "Volume", "object": OBJECT_GUID},
             {},
@@ -462,7 +467,7 @@ def expected_preview_calls() -> list[
         (
             "ak.wwise.core.object.get",
             {"from": {"id": [OBJECT_GUID]}},
-            {"return": [*identity_fields, "Volume"]},
+            {"return": [*identity_fields, "classId", "Volume"]},
         ),
         (
             "ak.wwise.core.object.get",
@@ -504,6 +509,7 @@ def preview_client(
                     if include_handle_revalidation
                     else []
                 ),
+                {"return": [object_row()]},
                 {"return": [object_row()]},
                 {"return": [object_row(volume=pre_state_volume)]},
                 {"return": []},
