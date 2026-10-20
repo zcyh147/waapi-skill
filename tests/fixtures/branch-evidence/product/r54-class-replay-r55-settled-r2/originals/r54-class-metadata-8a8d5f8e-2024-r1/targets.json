@@ -1,0 +1,47 @@
+[
+  {
+    "scope": "Sound",
+    "field": "AttenuationDistanceScaling",
+    "status": "captured",
+    "list_receipt": "005",
+    "detail_receipt": "006",
+    "whole_inventory_complete": false,
+    "detail_agent_result_sha256": "0506b66fdadaeedb41005c6ea32e071585130a6d909bf1ecc520307127c0fd61",
+    "native_receipt": "dispatcher-evidence/1792523882594386000-4b5baf457fc14764bcd4c3430381b592-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2024-r1/dispatcher-evidence/1792523882594386000-4b5baf457fc14764bcd4c3430381b592-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "e1a99a7d3f124d022224cf17eccaeb59aa78b10ad4f9cd4d84c45520b467340e",
+    "native_bytes": 2300,
+    "default_present": true,
+    "observed_default": 1.0
+  },
+  {
+    "scope": "EffectSlot",
+    "field": "Bypass",
+    "status": "captured",
+    "list_receipt": "008",
+    "detail_receipt": "009",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "f7b4693b4c6ce92cf5327b66f47fb97ba8961edba190cfbeec5ec93cb4a53ed6",
+    "native_receipt": "dispatcher-evidence/1792523883973107000-a7b6c1371b4f47478646faf14689588f-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2024-r1/dispatcher-evidence/1792523883973107000-a7b6c1371b4f47478646faf14689588f-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "698f14dc59bf55d00df8b7f38407facd0b8f32e3fff28d4304403bcff60a10c2",
+    "native_bytes": 1437,
+    "default_present": true,
+    "observed_default": false
+  },
+  {
+    "scope": "EffectSlot",
+    "field": "Effect",
+    "status": "captured",
+    "list_receipt": "008",
+    "detail_receipt": "010",
+    "whole_inventory_complete": true,
+    "detail_agent_result_sha256": "63b252297de2ac073a1ff73ce8600b0fbb71c8bd23f792d9cf3eb1f4d150b91a",
+    "native_receipt": "dispatcher-evidence/1792523884422303000-39dceeafbf524ef98418b733c1e2ad4a-ak_wwise_core_object_getPropertyInfo.json",
+    "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2024-r1/dispatcher-evidence/1792523884422303000-39dceeafbf524ef98418b733c1e2ad4a-ak_wwise_core_object_getPropertyInfo.json",
+    "native_sha256": "abbd46c778f46b254cffeb816c4a8f47376f6c90b16a10e91f3896bec7bbedeb",
+    "native_bytes": 1383,
+    "default_present": true,
+    "observed_default": null
+  }
+]
