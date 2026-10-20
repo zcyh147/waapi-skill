@@ -801,3 +801,115 @@ def test_normal_source_copy_diagnostic_retains_original_failure_when_index_fails
     assert receipt['collection_complete'] is False and receipt['native_admission_verified'] is False
     assert runtime.category_results[0]['status'] == 'FAIL'
     assert [uri.rsplit('.', 1)[-1] for uri, _ in writes] == ['create', 'copy']
+
+
+def selected_owned_probe_runtime(tmp_path, *, fault=None, version='2022.1'):
+    """Real public read commands; native fake models the predeclared modern graph."""
+    runtime, commands, writes, task = legacy_owned_read_runtime(tmp_path)
+    owner = '{63E5A1E6-4265-463E-A5C5-322F742423E1}'
+    rtpc, lfo, curve = ('{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
+        '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}')
+    task.objects[owner] = task.objects.pop(FIRST); task.objects[owner]['id'] = owner
+    task.objects[SOURCE]['parent'] = {'id': owner}
+    task.version = runtime.version = version
+    task.run('config-set', '--wwise-version', version)
+    task.objects[owner]['shortId'] = 69157655
+    task.objects[SOURCE]['shortId'] = 883831456
+    task.objects[rtpc]['shortId'] = 274268052
+    task.objects[lfo]['shortId'] = 641284001
+    # Boundary is deliberately real public discovery: RTPC is not a listed
+    # field, while the separately declared traversal is modeled as available.
+    task.metadata['PropertyName'] = {'name': 'PropertyName', 'type': 'string'}
+    task.objects[rtpc]['@PropertyName'] = 'OutputLevel'
+    task.objects[curve]['points'] = [{'x': 0, 'y': -5.67053, 'shape': 'Linear'},
+        {'x': 1, 'y': 0, 'shape': 'Linear'}]
+    root = Path(__file__).parents[2]
+    relative = Path('Containers' if version == '2025.1' else 'Actor-Mixer Hierarchy') / 'MIDI.wwu'
+    midi = task.project_file.parent / relative
+    midi.parent.mkdir(parents=True, exist_ok=True)
+    midi.write_bytes((root / 'tests/_org' / version / relative).read_bytes())
+    import xml.etree.ElementTree as ET
+    xml = ET.fromstring(midi.read_bytes())
+    for identity in (owner, SOURCE, rtpc, lfo, curve):
+        node, = [node for node in xml.iter() if node.get('ID') == identity and node.tag in {'Sound', 'SourcePlugin', 'RTPC', 'ModulatorLfo', 'Curve'}]
+        task.objects[identity].update(name=node.get('Name', ''), notes=node.findtext('Comment') or '')
+    runtime.sandbox.sandbox_project = task.project_file
+    runtime.sandbox.sandbox_path = task.project_file.parent
+    previous = task.call
+    task.probe_native_calls = []
+    def call(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        task.probe_native_calls.append((uri, deepcopy(args), deepcopy(options)))
+        expression = args.get('waql', '')
+        if uri.endswith('object.get') and ' select @' in expression:
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            identity = {f'from object "{SOURCE}" select @RTPC take 2': rtpc,
+                f'from object "{rtpc}" select @ControlInput take 2': lfo,
+                f'from object "{rtpc}" select @Curve take 2': curve}[expression]
+            rows = [task.objects[identity]]
+            if fault == 'saturated' and identity == rtpc: rows *= 2
+            return {'return': task.project_rows(rows, options)}
+        result = previous(uri, args, options)
+        if uri.endswith('getInfo'):
+            values = {'2022.1': (2022, 19, 8584), '2023.1': (2023, 19, 8928), '2024.1': (2024, 13, 9056), '2025.1': (2025, 7, 9143)}
+            year, minor, build = values[version]
+            result['version'].update(year=year, minor=minor, build=build, displayName=f'v{year}.1.{minor}.{build}')
+        return result
+    task.call = call
+    if fault == 'auth':
+        original_raw = runtime.raw_gateway
+        def raw(argv):
+            if '--include-field' in argv and argv[-1] == 'RTPC':
+                commands.append(list(argv))
+                return 1, {'ok': False, 'error_code': 'AUTHORIZATION_REQUIRED'}
+            return original_raw(argv)
+        runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+def test_selected_source_probe_retains_projection_boundary_and_independent_hops(tmp_path, workflow, request, version):
+    runtime, commands, writes, task = selected_owned_probe_runtime(tmp_path, version=version)
+    category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='', selected_owned_probe=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert receipt['collection_complete'] is True and category['status'] == 'blocked'
+    assert receipt['selected_owned_probe']['membership']['owner_array']['available'] is False
+    assert receipt['selected_owned_probe']['membership']['traversal']['complete'] is True
+    assert set(receipt['selected_owned_probe']['hops']) == {'ControlInput', 'Curve'}
+    assert set(receipt['selected_owned_probe']['fields']) == {'source', 'rtpc', 'lfo', 'curve'}
+    assert receipt['selected_owned_probe']['fields']['source']['names']
+    assert receipt['budget']['public_calls'] == len(commands) <= 128
+    assert receipt['budget']['native_files_including_index'] <= 512
+    assert receipt['budget']['receipt_bytes'] == Path(category['observation_path']).stat().st_size <= 256 * 1024
+    assert writes == [] and receipt['transaction_ids'] == []
+    assert all(uri in {'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.core.object.get',
+        'ak.wwise.core.object.getPropertyInfo', 'ak.wwise.core.object.getPropertyAndReferenceNames',
+        'ak.wwise.core.object.getTypes'} for uri, _, _ in task.probe_native_calls), {uri for uri, _, _ in task.probe_native_calls}
+    assert receipt['budget']['native_calls'] == len(task.probe_native_calls)
+    request.node.user_properties.append(('probe_budget', receipt['budget']))
+
+
+@pytest.mark.parametrize('fault', ['saturated', 'auth', 'call-budget'])
+def test_selected_source_probe_stops_on_incomplete_or_unexpected_read(tmp_path, workflow, fault):
+    runtime, commands, writes, task = selected_owned_probe_runtime(tmp_path, fault=fault)
+    if fault == 'call-budget':
+        # Large but valid live inventory: expose the real fixed public-call cap,
+        # rather than monkeypatching a limit or calling collector internals.
+        for index in range(90):
+            name = f'FixtureField{index:03d}'
+            task.objects[SOURCE]['@' + name] = index
+            task.metadata[name] = {'name': name, 'type': 'int32'}
+    with pytest.raises(AssertionError):
+        workflow._collect_legacy_source_copy_feasibility(runtime, prefix='', selected_owned_probe=True)
+    receipt = json.loads((runtime.state_dir / 'selected-source-owned-probe.json').read_text())
+    assert receipt['collection_complete'] is False and receipt['failure']
+    assert runtime.category_results[0]['status'] == 'FAIL' and writes == []
+    assert receipt['selected_owned_probe']['diagnostic_transport_complete'] is False
+    if fault == 'saturated':
+        assert 'below two-row cap' in receipt['failure']['message']
+        assert len([argv for argv in commands if '--advanced-waql' in argv]) == 1
+    elif fault == 'auth':
+        assert not any('--advanced-waql' in argv for argv in commands)
+        assert receipt['calls'][-1]['exit_code'] == 1
+    else:
+        assert 'public call bound' in receipt['failure']['message'] and len(commands) == 128

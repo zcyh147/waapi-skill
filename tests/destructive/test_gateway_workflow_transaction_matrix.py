@@ -9649,14 +9649,15 @@ def _legacy_saved_source_copy_oracle(before_images, after_images, *, source_id, 
 
 def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *, prefix: str,
         owned_read_only: bool = False, saved_copy: bool = False,
-        saved_copy_protocol: str | None = None) -> dict[str, Any]:
+        saved_copy_protocol: str | None = None, selected_owned_probe: bool = False) -> dict[str, Any]:
     """Historical diagnostic plus an explicit generated-Save-child successor."""
     from wwise_waapi.builders.query import MAX_STRUCTURED_RETURN_FIELDS
     from wwise_waapi.dispatcher import MAX_LIVE_RESULT_JSON_BYTES
     from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_QUERIES
     from wwise_waapi.native_catalog import load_native_catalog
 
-    assert runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
+    assert selected_owned_probe or runtime.version == '2021.1', 'This fixture and alternative are pinned to 2021.1'
+    assert not selected_owned_probe or (runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'} and not (owned_read_only or saved_copy or saved_copy_protocol)), 'Selected Source probe is read-only and pinned to modern versions'
     assert not (owned_read_only and saved_copy)
     assert saved_copy_protocol in {None, 'gateway-owned-save-children/v1'}, 'Unknown saved-copy protocol'
     successor = saved_copy_protocol is not None
@@ -9667,12 +9668,14 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     original_owned_ids = ['{CE99046D-D354-422D-A7BB-F1305FF00B2F}',
         '{E323F786-253F-48C6-86B9-AB0335804E9F}', '{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}']
     stem = 'legacy-source-owned-read' if owned_read_only else 'legacy-source-copy-feasibility'
+    if selected_owned_probe: stem = 'selected-source-owned-probe'
     if saved_copy: stem = 'source-copy-save-children' if successor else 'legacy-source-saved-copy'
     output = runtime.state_dir / (stem + '.json')
     assert not output.exists(), 'Never replace an earlier feasibility attempt'
     output.parent.mkdir(parents=True, exist_ok=True)
     artifacts = runtime.state_dir / (stem + '-artifacts' if saved_copy else
-        'legacy-source-owned-read-artifacts' if owned_read_only else 'legacy-source-copy-artifacts')
+        'legacy-source-owned-read-artifacts' if owned_read_only else
+        'selected-source-owned-probe-artifacts' if selected_owned_probe else 'legacy-source-copy-artifacts')
     artifacts.mkdir(exist_ok=False)
     native_root = Path(runtime.env['WWISE_EVIDENCE_DIR']); old_native = set(native_root.glob('*.json'))
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH']); config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
@@ -9730,11 +9733,19 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
                 'all_owner_properties', 'empty_project_constructor', 'other_versions', 'audio_effect'])
         receipt['limits'].update(receipt_bytes=1024 * 1024, native_files=1024)
         receipt['lifecycle_final_reference']['category'] = category['category']
+    if selected_owned_probe:
+        category.update(category='selected-source-owned-probe',
+            coverage_credit='none; read-only selected graph diagnostic',
+            verifier_strength='independent_pinned_XML_and_public_read_observations; no_copy_effect')
+        receipt.update(contract='waapi-skill.selected-source-owned-probe/v1', read_only=True,
+            scope_exclusions=['copy_admission', 'copy_effect', 'Save_effect', 'constructors', 'audio_effect',
+                '2021.1 retains its original diagnostic and native evidence'])
+        receipt['lifecycle_final_reference']['category'] = category['category']
     attempted: set[str] = set()
     active_save = None
     saved_model_indexes = []
     def persist():
-        if successor and 'budget' in receipt:
+        if (successor or selected_owned_probe) and 'budget' in receipt:
             # Include the final receipt itself, including this size field.
             while True:
                 raw = json.dumps(receipt, ensure_ascii=False, indent=2).encode('utf-8')
@@ -9757,6 +9768,10 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
     class Gateway:
         def raw_gateway(self, argv):
             assert len(receipt['calls']) < receipt['limits']['calls'], 'Diagnostic public call bound exceeded'
+            if selected_owned_probe:
+                assert argv[0] in {'status', 'config-show', 'query-object'} or argv[:2] in (
+                    ['metadata', 'list'], ['metadata', 'detail']) or argv[:3] == [
+                    '--version', runtime.version, 'query-schema'], 'Selected Source diagnostic permits only sealed reads'
             if owned_read_only:
                 assert argv[0] in {'status', 'query-object'} or argv[:2] in (
                     ['metadata', 'types'], ['metadata', 'list'], ['metadata', 'detail']), 'Owned diagnostic permits only reads'
@@ -10042,8 +10057,214 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             'save_verify_call_index': receipt['phases'][-1]['verify_call_index'],
             'save_receipt': receipt['phases'][-1]['authority_receipt']})
         return gateway.gateway(returned, live=True)
+    def selected_probe():
+        # Closed developer diagnostic over the original MIDI fixture. These
+        # candidates are scheduled independently, never a fallback after error.
+        pinned = {
+            '2022.1': ('2022.1.19.8584', '41784c1030c678d9a7f19a105dfb48e46fb8b76b044e9a3bdb8f2da885f61c3a'),
+            '2023.1': ('2023.1.19.8928', '09970d6126a6867f4535f9273b99873af4d044bccd591d7b1414029ffaf317d7'),
+            '2024.1': ('2024.1.13.9056', '9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3'),
+            '2025.1': ('2025.1.7.9143', 'b8fc20794cc3d6b7ac17f5bd67fd57d297098830c52e985d44318f459da9c0df')}
+        build, midi_sha = pinned[runtime.version]
+        relative = Path('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy') / 'MIDI.wwu'
+        original = REPO_ROOT / 'tests/_org' / runtime.version / relative
+        live_file = runtime.sandbox.sandbox_project.parent / relative
+        original_observed = observe_console_file(original, io_root=original.parents[1])
+        live_observed = observe_console_file(live_file, io_root=runtime.sandbox.sandbox_path)
+        assert original_observed['file_proof']['sha256'] == live_observed['file_proof']['sha256'] == midi_sha, 'Pinned MIDI fixture changed'
+        xml_raw = base64.b64decode(original_observed['content_base64'], validate=True)
+        assert b'<!DOCTYPE' not in xml_raw.upper()
+        xml = ET.fromstring(xml_raw)
+        ids = {'sound': '{63E5A1E6-4265-463E-A5C5-322F742423E1}', 'source': source_id,
+            'rtpc': original_owned_ids[0], 'lfo': original_owned_ids[1], 'curve': original_owned_ids[2]}
+        nodes = {}
+        for role, identity in ids.items():
+            matches = [node for node in xml.iter() if node.get('ID') == identity and
+                node.tag in {'Sound', 'SourcePlugin', 'RTPC', 'ModulatorLfo', 'Curve'}]
+            assert len(matches) == 1, (role, matches)
+            nodes[role] = matches[0]
+        source_xml = ET.tostring(nodes['source'], encoding='utf-8')
+        probe = receipt['selected_owned_probe'] = {'frames': {}, 'membership': {}, 'hops': {}, 'fields': {},
+            'native_build': build, 'fixture': {'relative_path': relative.as_posix(), 'sha256': midi_sha,
+                'original_file_proof': original_observed['file_proof'], 'sandbox_file_proof': live_observed['file_proof'],
+                'archive': archive('original-midi.wwu', xml_raw),
+                'source_subtree': archive('original-source.xml', source_xml),
+                'source_subtree_representation': 'ElementTree serialization of exact-hash original WWU subtree'},
+            'diagnostic_transport_complete': False, 'full_membership_verified': False, 'all_values_available': False}
+        receipt['fixture_topology'] = {'file': str(original.relative_to(REPO_ROOT)), 'source_id': source_id,
+            'owned_ids': original_owned_ids, 'sha256': midi_sha}
+        for extra in ([], ['--advanced'], *[['--output', name] for name in ('owner', 'class-id', 'short-id', 'curve-points')]):
+            schema = gateway.gateway(['--version', runtime.version, 'query-schema', *extra], live=False)
+            assert schema.get('contract') == ('waapi-skill.advanced-object-query-business-schema/v1' if extra == ['--advanced']
+                else 'waapi-skill.object-query-business-schema/v1'), schema
+        gateway.gateway(['config-show'], live=False)
+        status = gateway.gateway(['status'], live=True)
+        info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
+        info_observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
+        info = json.loads(base64.b64decode(info_observed['content_base64'], validate=True))['result']
+        assert info['isCommandLine'] is True and '.'.join(str(info['version'][key]) for key in ('year', 'major', 'minor', 'build')) == build, info
+        receipt['native_build'] = build
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), 'Probe requires the exact owned sandbox project'
+        classes = {'sound': 65552, 'source': 9699330, 'rtpc': 1441808, 'lfo': 4194320, 'curve': 917520}
+        def rows(payload):
+            assert payload.get('projection_complete') is not False and payload.get('limit_reached') is not True and payload.get('status') != 'partial', 'Probe query must be complete below two-row cap'
+            result = payload.get('objects', payload.get('agent_result'))
+            assert isinstance(result, list) and payload['count'] == len(result) and len(result) < 2, 'Probe query must be complete below two-row cap'
+            assert len({uuid.UUID(row['id']) for row in result}) == len(result), result
+            return result
+        def checked_frame(role, row):
+            assert uuid.UUID(row['id']) == uuid.UUID(ids[role]) and row['class_id'] == classes[role], row
+            assert row['type'] in ({'Source', 'SourcePlugin'} if role == 'source' else {nodes[role].tag}), row
+            if role == 'source': assert row.get('parent', {}).get('id') == ids['sound'], row
+            if role in {'rtpc', 'lfo', 'curve'}:
+                assert row.get('owner', {}).get('id') == ids['source' if role == 'rtpc' else 'rtpc'], row
+            if 'ShortID' in nodes[role].attrib:
+                assert row.get('short_id') == int(nodes[role].get('ShortID')), row
+            assert row['name'] == nodes[role].get('Name', ''), row
+            assert row.get('notes') == (nodes[role].findtext('Comment') or ''), row
+        for role, identity in ids.items():
+            row, = rows(gateway.gateway(['query-object', '--exact-id', identity, '--max-results', '2',
+                *[arg for name in ('class-id', 'parent', 'owner', 'notes', 'short-id') for arg in ('--include', name)]], live=True))
+            checked_frame(role, row); probe['frames'][role] = row
+        def issued(result, command):
+            envelope = result.get('next_command', {})
+            argv = envelope.get('gateway_argv')
+            assert envelope.get('command') == command and isinstance(argv, list) and argv and argv[0] == command, result
+            assert all(isinstance(value, str) and value for value in argv), result
+            return argv
+        def metadata(role):
+            identity = ids[role]; names, selections, calls = [], {}, []
+            command = ['metadata', 'list', '--exact-id', identity, '--page-size', '20']
+            seen = set()
+            for _ in range(8):
+                assert tuple(command) not in seen, 'Repeated metadata continuation'; seen.add(tuple(command))
+                calls.append(len(receipt['calls']))
+                result = gateway.gateway(command, live=True)['agent_result']
+                for field in result['fields']:
+                    name = field['name']; assert isinstance(name, str) and name and name not in selections, result
+                    names.append(name); selections[name] = field['selection']
+                assert len(names) <= 128, 'Selected role exceeds field cap'
+                if result['complete']:
+                    assert len(names) == result['total_count'], result
+                    break
+                command = issued(result, 'metadata')
+                assert command[:2] == ['metadata', 'list'] and identity in command, command
+            else: raise AssertionError('Selected role exceeds metadata page cap')
+            observation = {'names': names, 'list_call_indexes': calls, 'details': {}, 'values': [], 'unavailable': {}}
+            probe['fields'][role] = observation
+            readable = []
+            for name in names:
+                command = ['metadata', 'detail', '--exact-id', identity, '--selection', selections[name]]
+                entries, detail_calls, snapshot, total = [], [], None, None
+                for _ in range(8):
+                    detail_calls.append(len(receipt['calls']))
+                    detail = gateway.gateway(command, live=True)['agent_result']
+                    assert detail['selection'] == selections[name], detail
+                    if 'metadata' in detail:
+                        assert detail['complete'] is True and not entries, detail
+                        header = detail['metadata']; snapshot = hashlib.sha256(json.dumps(header, sort_keys=True).encode()).hexdigest()
+                        total = None
+                        break
+                    assert detail['detail_view'] == 'raw', detail
+                    assert detail['offset'] == len(entries), detail
+                    if snapshot is not None: assert detail['snapshot'] == snapshot and detail['total_entries'] == total, detail
+                    snapshot, total = detail['snapshot'], detail['total_entries']; entries.extend(detail['entries'])
+                    if detail['complete']:
+                        assert len(entries) == total, detail
+                        break
+                    command = issued(detail, 'metadata')
+                    assert command[:2] == ['metadata', 'detail'] and identity in command and selections[name] in command, command
+                else: raise AssertionError('Selected field exceeds detail page cap')
+                # Exact raw entries stay in archived replies; this header only
+                # classifies whether public scalar/reference discovery can read it.
+                header = detail.get('metadata', detail.get('field')); assert header['name'] == name, detail
+                observation['details'][name] = {'call_indexes': detail_calls, 'snapshot': snapshot, 'entries': total, 'header': header}
+                if header.get('type') or header.get('constraints', header.get('restriction', {})).get('type') == 'reference': readable.append(name)
+                else: observation['unavailable'][name] = 'live metadata leaves type/reference semantics unavailable'
+            for offset in range(0, len(readable), 8):
+                selected = readable[offset:offset + 8]
+                index = len(receipt['calls'])
+                payload = gateway.gateway(['query-object', '--exact-id', identity, '--max-results', '2',
+                    *[arg for field in selected for arg in ('--include-field', field)]], live=True)
+                row, = rows(payload)
+                assert all(row.get(key) == probe['frames'][role].get(key) for key in ('id', 'name', 'type', 'path')), row
+                actual = set(row.get('properties', {})) | set(row.get('references', {}))
+                missing = set(selected) - actual
+                assert actual <= set(selected), row
+                assert missing == {value.split('.', 1)[1] for value in row.get('unavailable_fields', []) if value.startswith(('properties.', 'references.'))}, row
+                observation['values'].append({'fields': selected, 'call_index': index, 'row': row})
+                observation['unavailable'].update({name: 'omitted by native observation' for name in missing})
+            return observation
+        metadata('source')
+        def candidate(argv, *, rtpc_boundary=False):
+            code, payload = gateway.raw_gateway(argv)
+            if code == 0 and payload.get('ok') is True and payload.get('status') != 'needs_clarification':
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+                return payload
+            # Only this predeclared applicability/type boundary may be retained
+            # without preventing the other predeclared selector observations.
+            error = payload.get('error_code')
+            expected = rtpc_boundary and (error in {'FIELD_TYPE_UNAVAILABLE', 'UNKNOWN_BUSINESS_FIELD'} or
+                (code == 0 and payload.get('status') == 'needs_clarification') or
+                payload.get('call', {}).get('message') == 'Unknown property RTPC (61)')
+            assert expected, payload
+            return None
+        index = len(receipt['calls'])
+        array = candidate(['query-object', '--exact-id', source_id, '--max-results', '2', '--include-field', 'RTPC'], rtpc_boundary=True)
+        array_observation = {'available': False, 'complete': False, 'call_index': index}
+        if array is not None:
+            row, = rows(array)
+            accessor = row.get('references', {}).get('RTPC', row.get('properties', {}).get('RTPC'))
+            array_observation['value'] = accessor
+            if isinstance(accessor, list):
+                assert [value['id'] for value in accessor] == [ids['rtpc']], accessor
+                array_observation.update(available=True, complete=True)
+        probe['membership']['owner_array'] = array_observation
+        for token, role, owner in (('RTPC', 'rtpc', 'source'), ('ControlInput', 'lfo', 'rtpc'), ('Curve', 'curve', 'rtpc')):
+            index = len(receipt['calls'])
+            payload = candidate(['query-object', '--advanced-waql', f'from object "{ids[owner]}" select @{token}',
+                '--max-results', '2', '--include', 'class-id', '--include', 'owner',
+                *(['--include', 'curve-points'] if token == 'Curve' else [])], rtpc_boundary=token == 'RTPC')
+            observation = {'available': payload is not None, 'complete': False, 'call_index': index}
+            if payload is not None:
+                row, = rows(payload)
+                assert row['id'] == ids[role] and row['class_id'] == classes[role] and row.get('owner', {}).get('id') == ids[owner], row
+                observation.update(complete=True, row=row)
+                if token == 'Curve':
+                    points = row.get('curve_points')
+                    saved_points = nodes['curve'].findall('.//Point')
+                    observation['saved_points'] = [{'x': node.findtext('XPos'), 'y': node.findtext('YPos'), 'flags': node.findtext('Flags')} for node in saved_points]
+                    observation['points_available'] = isinstance(points, list) and len(points) == len(saved_points)
+                    if observation['points_available']:
+                        assert all(isinstance(point, dict) and type(point.get('x')) in (int, float) and type(point.get('y')) in (int, float) and isinstance(point.get('shape'), str) and point['shape'] for point in points), points
+                        # Preserve native floating precision and XML text
+                        # independently. Exact numeric agreement is an observed
+                        # fact, not a guessed Flags-to-shape interpretation.
+                        observation['coordinates_exactly_equal_saved_text'] = [(point['x'], point['y']) for point in points] == [(float(node.findtext('XPos')), float(node.findtext('YPos'))) for node in saved_points]
+            if token == 'RTPC': probe['membership']['traversal'] = observation
+            else: probe['hops'][token] = observation
+        for role in ('rtpc', 'lfo', 'curve'): metadata(role)
+        probe['full_membership_verified'] = all(row['complete'] for row in probe['membership'].values())
+        probe['missing_semantic_fields'] = {role: sorted(set(required) - set(probe['fields'][role]['names'])) for role, required in {'rtpc': ['PropertyName', 'ControlInput', 'Curve'], 'curve': ['Flags']}.items()}
+        probe['all_values_available'] = not any(row['unavailable'] for row in probe['fields'].values()) and not any(probe['missing_semantic_fields'].values())
+        property_pages = probe['fields']['rtpc']['values']
+        property_values = {key: value for page in property_pages for key, value in page['row'].get('properties', {}).items()}
+        if 'PropertyName' in property_values:
+            assert property_values['PropertyName'] == 'OutputLevel' and type(property_values['PropertyName']) is str, 'RTPC PropertyName changed'
+        assert observe_console_file(original, io_root=original.parents[1])['file_proof'] == original_observed['file_proof'], 'Original MIDI changed'
+        assert observe_console_file(live_file, io_root=runtime.sandbox.sandbox_path)['file_proof'] == live_observed['file_proof'], 'Read-only sandbox MIDI changed'
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Diagnostic config changed'
+        probe['diagnostic_transport_complete'] = True
+        receipt['collection_complete'] = True
+        ready = probe['full_membership_verified'] and probe['all_values_available'] and all(row['complete'] for row in probe['hops'].values()) and probe['hops']['Curve'].get('points_available') is True and probe['hops']['Curve'].get('coordinates_exactly_equal_saved_text') is True
+        category['status'] = 'PASS' if ready else 'blocked'
+        category['reason'] = 'Read protocol complete; availability and completeness recorded separately; no copy-effect credit'
+        return category
+
     persist()
     try:
+        if selected_owned_probe:
+            return selected_probe()
         status = gateway.gateway(['status'], live=True)
         info_call = next(row for row in status['calls'] if row['api'] == 'ak.wwise.core.getInfo')
         observed = observe_console_file(Path(info_call['evidence_path']), io_root=native_root)
@@ -10172,7 +10393,12 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
         receipt.update(collection_complete=True, native_admission_verified=True); category['status'] = 'PASS'
         return category
     except Exception as exc:
-        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}; raise
+        receipt['failure'] = {'type': type(exc).__name__, 'message': str(exc)[:2048]}
+        if selected_owned_probe and 'selected_owned_probe' in receipt:
+            partial = receipt['selected_owned_probe']
+            link = archive('partial-probe.json', json.dumps(partial, ensure_ascii=False).encode('utf-8'))
+            receipt['selected_owned_probe'] = {'diagnostic_transport_complete': False, 'partial_observations': link}
+        raise
     finally:
         try:
             paths = sorted(set(native_root.glob('*.json')) - old_native)
@@ -10181,6 +10407,11 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             for index, path in enumerate(paths):
                 observed = observe_console_file(path, io_root=native_root)
                 raw = base64.b64decode(observed['content_base64'], validate=True)
+                if selected_owned_probe:
+                    packet = json.loads(raw)
+                    assert packet['api'] in {'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo',
+                        'ak.wwise.core.object.get', 'ak.wwise.core.object.getTypes',
+                        'ak.wwise.core.object.getPropertyInfo', 'ak.wwise.core.object.getPropertyAndReferenceNames'}, 'Probe dispatched a non-read URI'
                 link = archive('native-' + str(index) + '.json', raw)
                 if indexed_native:
                     receipt['native_evidence'].append(link)
@@ -10211,14 +10442,14 @@ def _collect_legacy_source_copy_feasibility(runtime: _WorkflowSandboxRuntime, *,
             receipt.update(collection_complete=False, native_admission_verified=False,
                 archive_failure={'type': type(exc).__name__, 'message': str(exc)[:2048]}); category['status'] = 'FAIL'; raise
         finally:
-            if successor:
+            if successor or selected_owned_probe:
                 receipt['budget'] = {'public_calls': len(receipt['calls']),
                     # Every admitted non-offline call performs exactly one
                     # version handshake; dispatcher packets are archived below.
                     # The positive fake independently counts all native calls.
-                    'native_calls': len(paths) + sum(row['argv'][0] not in waapi_gateway.OFFLINE_COMMANDS for row in receipt['calls']),
+                    'native_calls': len(paths) + sum(row['argv'][0] != '--version' and row['argv'][0] not in waapi_gateway.OFFLINE_COMMANDS for row in receipt['calls']),
                     'native_dispatcher_packets': len(paths),
-                    'native_version_handshakes': sum(row['argv'][0] not in waapi_gateway.OFFLINE_COMMANDS for row in receipt['calls']),
+                    'native_version_handshakes': sum(row['argv'][0] != '--version' and row['argv'][0] not in waapi_gateway.OFFLINE_COMMANDS for row in receipt['calls']),
                     'archive_files': sum(path.is_file() for path in artifacts.rglob('*')),
                     'native_files_including_index': len(receipt['native_evidence']) + int('native_file_proofs' in receipt),
                     'native_packet_bytes': sum(row['size'] for row in receipt['native_evidence']),
@@ -10265,3 +10496,12 @@ def test_source_copy_generated_save_children_console_oracle(workflow_sandbox_run
         prefix='WAAPI_SOURCE_SAVE_CHILDREN_' + uuid.uuid4().hex[:10], saved_copy=True,
         saved_copy_protocol='gateway-owned-save-children/v1')
     assert category['status'] == 'PASS', category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_selected_source_owned_graph_console_probe(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version == '2021.1':
+        pytest.skip('Modern selected Source probe covers2022–2025;2021 retains its original owned diagnostic')
+    category = _collect_legacy_source_copy_feasibility(workflow_sandbox_runtime, prefix='', selected_owned_probe=True)
+    assert category['status'] in {'PASS', 'blocked'}, category
