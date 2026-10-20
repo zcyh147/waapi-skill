@@ -13153,6 +13153,8 @@ def _normalize_existing_sfx_imports(
         if version == "2021.1":
             snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
         if active is None and not before[0].get("sound:originalWavFilePath") and not (snapshot and snapshot["rows"]):
+            if snapshot is not None:
+                target["empty_sfx_source_snapshot"] = snapshot
             continue  # An existing empty Sound has no source placement to preserve.
         source_id = _reference_identity(active)
         if version != "2021.1" and (not isinstance(source_id, str) or not _PLUGIN_GUID.fullmatch(source_id)):
@@ -14454,6 +14456,8 @@ def _prepare_closed_import_plan(
         "path_snapshots": path_snapshots,
         "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
                                           if "existing_sfx_source_snapshot" in target],
+        "empty_sfx_source_snapshots": [target["empty_sfx_source_snapshot"] for target in targets
+                                       if "empty_sfx_source_snapshot" in target],
         "localized_source_snapshots": [target["localized_source_snapshot"] for target in targets
                                        if "localized_source_snapshot" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
@@ -17243,7 +17247,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                     "evidence": evidence,
                 }
             )
-        for snapshot in import_guard.get("existing_sfx_source_snapshots", []):
+        for snapshot in [*import_guard.get("existing_sfx_source_snapshots", []),
+                         *import_guard.get("empty_sfx_source_snapshots", [])]:
             if (not isinstance(snapshot, Mapping) or not _valid_object_id(snapshot.get("owner_id"))
                     or snapshot.get("version") != prepared_version):
                 raise OperationContractError("INVALID_PREVIEW", "Existing SFX source guard is malformed.")

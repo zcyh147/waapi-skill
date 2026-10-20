@@ -309,6 +309,10 @@ def _public_2021_sfx_reimport(tmp_path, filename='Beta.wav', *, outcome='normal'
                 assert len(args['imports']) == 1
                 assert Path(args['imports'][0]['audioFile']).name == 'Alpha.wav'
                 incoming = Path(args['imports'][0]['audioFile']).read_bytes()
+                if not any(source['id'] == active['id'] for source in reader.sources):
+                    reader.sources.append(active)
+                    owner['sound:originalWavFilePath'] = str(active_file)
+                    owner['originalFilePath'] = str(active_file)
                 if outcome != 'stale-selected':
                     active_file.write_bytes(incoming)
                 if outcome == 'changed-active':
@@ -415,3 +419,35 @@ def test_public_2021_sfx_reimport_requires_observable_unique_active_path(tmp_pat
     if fault != 'empty':
         assert ('INVALID_READBACK' if fault == 'missing' else 'AMBIGUOUS_SFX_SOURCE') in str(checked)
     assert not any(uri == 'ak.wwise.core.audio.import' for uri, _, _ in calls)
+
+
+@pytest.mark.parametrize('insert_no_file_source', [False, True])
+def test_public_2021_empty_sfx_preview_binds_no_source_precondition(tmp_path, insert_no_file_source):
+    run, reader, calls, draft, authority, declared = _public_2021_sfx_reimport(tmp_path, 'Alpha.wav')
+    owner = reader.owners[0]
+    owner['sound:originalWavFilePath'] = None
+    owner['activeSource'] = None
+    reader.sources = [source for source in reader.sources if source['parent']['id'] != owner['id']]
+    code, checked = run('draft-check', draft, '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision']))
+    assert code == 0, checked
+    code, preview = run('preview-from-draft', draft, '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision']))
+    assert code == 0, preview
+    transaction = preview['transaction_id']
+    code, shown = run('transaction-show', transaction, '--summary-only')
+    assert code == 0, shown
+    code, confirmed = run('confirm', transaction, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if insert_no_file_source:
+        reader.sources.append({'id': '{99999999-9999-9999-9999-999999999999}', 'name': 'Tone',
+            'type': 'Source', 'classId': 6684674, 'path': owner['path'] + r'\Tone', 'parent': {'id': owner['id']}})
+    code, executed = run('execute', transaction)
+    writes = [call for call in calls if call[0] == 'ak.wwise.core.audio.import']
+    if insert_no_file_source:
+        assert code == 2, executed
+        assert not writes
+    else:
+        assert code == 0 and len(writes) == 1, executed
+        code, verified = run('verify', transaction)
+        assert code == 0 and verified['verified'] is True, verified
