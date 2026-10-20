@@ -387,10 +387,11 @@ def test_construction_language_selection_cannot_drift_between_preview_and_effect
     assert len([uri for uri, _, _ in task.calls if uri.endswith('object.set')]) == 1
 
 
-@pytest.mark.parametrize('fault', ['unknown', 'duplicate', 'malformed', 'sfx'])
+@pytest.mark.parametrize('fault', ['unknown', 'unknown-planned', 'duplicate', 'malformed', 'sfx'])
 def test_construction_language_admission_requires_valid_project_language_and_voice(tmp_path, fault, monkeypatch):
     task = language_voice_task(tmp_path)
-    if fault == 'unknown':
+    unknown = fault in {'unknown', 'unknown-planned'}
+    if unknown:
         task.languages.extend({'id': '{' + f'{index:08X}-1111-1111-1111-111111111111' + '}',
             'name': f'Project Language {index:02}', 'shortId': index + 10} for index in range(63))
         # Exercise the same bounded repair path without huge native fixture names.
@@ -399,20 +400,37 @@ def test_construction_language_admission_requires_valid_project_language_and_voi
         task.languages.append({'id': SECOND, 'name': 'Japanese', 'shortId': 3})
     elif fault == 'malformed':
         del task.languages[0]['id']
+    planned = ()
+    if fault == 'unknown-planned':
+        # Existing admitted cross-row reference forces one graph preparation
+        # scope rather than slicing the Voice into a batch issue wrapper.
+        bus_parent = '{DEDEDEDE-DEDE-DEDE-DEDE-DEDEDEDEDEDE}'
+        task.objects[bus_parent] = {'id': bus_parent, 'name': 'Default Work Unit', 'type': 'WorkUnit',
+            'classId': 3, 'path': r'\Master-Mixer Hierarchy\Default Work Unit', 'notes': ''}
+        task.types.append({'name': 'Bus', 'classId': 1376272, 'type': 'WObject'})
+        task.metadata['OutputBus'] = {'name': 'OutputBus', 'type': 'Reference', 'default': None,
+            'restriction': {'type': 'reference', 'restrictions': [{'type': ['Bus']}]}}
+        parent = task.bind(bus_parent)
+        code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Bus')
+        assert code == 0, found
+        code, bus = task.step('draft-declare-new', '--declaration-id', 'bus', '--parent-handle', parent,
+            '--name', 'Routing', '--kind', found['type_candidates'][0]['handle'])
+        assert code == 0, bus
+        planned = ('--field', 'output_bus', bus['draft']['declared_object']['result_handle'])
     code, declared = declare_voice(task, kind='sound-sfx' if fault == 'sfx' else 'sound-voice',
-        extra=('--field', 'language', 'Unknown' if fault == 'unknown' else 'Japanese'))
+        extra=('--field', 'language', 'Unknown' if unknown else 'Japanese', *planned))
     if fault == 'sfx':
         assert code == 2 and declared['error_code'] == 'OBJECT_SET_VOICE_LANGUAGE_INVALID', declared
         assert not any(uri.endswith('object.set') for uri, _, _ in task.calls)
         return
     assert code == 0, declared
     code, checked = task.step('draft-check')
-    assert code == 2 and checked['error_code'] == 'OPERATION_DRAFT_CHECK_FAILED', checked
-    assert checked['details']['issues'][0]['error_code'] == {
-        'unknown': 'UNKNOWN_PROJECT_LANGUAGE', 'duplicate': 'INVALID_PROJECT_CONTEXT',
-        'malformed': 'INVALID_PROJECT_CONTEXT', 'sfx': 'INVALID_LANGUAGE_TARGET'}[fault], checked
-    if fault == 'unknown':
-        details = checked['details']['issues'][0]['details']
+    assert code == 2 and checked['error_code'] == ('UNKNOWN_PROJECT_LANGUAGE' if fault == 'unknown-planned' else 'OPERATION_DRAFT_CHECK_FAILED'), checked
+    issue = checked if fault == 'unknown-planned' else checked['details']['issues'][0]
+    assert issue['error_code'] == ('UNKNOWN_PROJECT_LANGUAGE' if unknown else {
+        'duplicate': 'INVALID_PROJECT_CONTEXT', 'malformed': 'INVALID_PROJECT_CONTEXT', 'sfx': 'INVALID_LANGUAGE_TARGET'}[fault]), checked
+    if unknown:
+        details = issue['details']
         assert details['field'] == 'language' and details['requested'] == 'Unknown'
         assert details['available'][0] == {'id': JAPANESE, 'name': 'Japanese'}
         assert details['available_total'] == 64 and 0 < details['available_returned'] < 64

@@ -3862,9 +3862,11 @@ def _execute_gateway_unconstrained(
             "message": normalized["message"],
             "details": details,
         }
-        if isinstance(details, Mapping) and isinstance(details.get("issues"), list) and any(
-            isinstance(issue, Mapping) and issue.get("error_code") == "UNKNOWN_PROJECT_LANGUAGE"
-            for issue in details.get("issues", [])
+        if normalized["error_code"] == "UNKNOWN_PROJECT_LANGUAGE" or (
+            isinstance(details, Mapping) and isinstance(details.get("issues"), list) and any(
+                isinstance(issue, Mapping) and issue.get("error_code") == "UNKNOWN_PROJECT_LANGUAGE"
+                for issue in details["issues"]
+            )
         ):
             error_payload["next_command"] = transaction_next_command(
                 "metadata", ["metadata", "types", "--meaning", "Language", "--page-size", "64"],
