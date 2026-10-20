@@ -10436,14 +10436,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             payload["request_schema_route_defaults"] = route_defaults
             payload["request_schema_route_defaults_by_namespace"] = namespace_defaults
             payload["directory_reading"] = (
-                "Rows inherit request_schema_route_defaults, then the longest matching API prefix in "
-                "request_schema_route_defaults_by_namespace; explicit row fields override. "
-                "For schema discovery, use row next_command when present; "
-                "otherwise instantiate the static schema-command templates: "
-                "operation_schema_command_template replaces only <name> with the "
-                "selected name; request_schema_command_template replaces only <api> "
-                "with the selected api. These directory templates are not typed "
-                "continuations: copy typed continuations exactly as instructed."
+                "Rows inherit request_schema_route_defaults, then longest-prefix "
+                "request_schema_route_defaults_by_namespace; row fields override. "
+                "Use row next_command when present. Otherwise replace only <name> in "
+                "operation_schema_command_template or <api> in request_schema_command_template "
+                "with the selected name/api. Static schema templates are not typed continuations; "
+                "copy typed continuations exactly as instructed."
             )
         return payload
     if args.command == "operation-schema":
@@ -10554,7 +10552,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     state_dir=resolve_transaction_state_directory(args, env=env)))
                 # This fixed read-only view never falls through to confirm/execute.
                 if gateway_json_document_size(payload) > 32 * 1024:
-                    raise GatewayResultShapeError('The complete outcome page and continuation exceed their fixed output bound')
+                    raise GatewayResultShapeError('The complete outcome page and continuation exceed their fixed output bound',
+                        details={'transaction_id': args.transaction_id, 'view': args.none_state_outcome,
+                            'max_utf8_bytes': 32 * 1024, 'observed_utf8_bytes': gateway_json_document_size(payload)})
                 return payload
             if args.outcome_artifact_hash or args.outcome_event_hash or args.outcome_page:
                 raise GatewayInputError('Outcome hash/page options require --none-state-outcome or --history-view')
@@ -31059,14 +31059,20 @@ def none_state_outcome_continuation(transaction_id, artifact_hash, view, *, stat
 
 def none_state_actual_continuation(payload, verification, *, state_dir):
     if state_dir is None:
-        raise GatewayResultShapeError('Observed None-state additions lack their exact owned transaction store')
+        raise GatewayResultShapeError('Observed None-state additions lack their exact owned transaction store',
+            details={'transaction_id': payload.get('transaction_id'), 'artifact_hash': payload.get('artifact_hash'),
+                'view': 'actual-additions', 'reason': 'owning_store_missing'})
     snapshot = TransactionStore(state_dir).load_snapshot(payload['transaction_id'])
     if snapshot.preview.artifact_hash != payload['artifact_hash']:
-        raise GatewayResultShapeError('Observed None-state additions do not match their immutable artifact')
+        raise GatewayResultShapeError('Observed None-state additions do not match their immutable artifact',
+            details={'transaction_id': payload.get('transaction_id'), 'view': 'actual-additions',
+                'expected_artifact_hash': snapshot.preview.artifact_hash, 'observed_artifact_hash': payload.get('artifact_hash')})
     events = [event for event in snapshot.events if event.get('event_type') == 'verification_recorded'
         and canonical_sha256(event.get('details', {}).get('verification')) == canonical_sha256(verification)]
     if not events:
-        raise GatewayResultShapeError('Observed None-state additions lack their exact recorded verification event')
+        raise GatewayResultShapeError('Observed None-state additions lack their exact recorded verification event',
+            details={'transaction_id': payload.get('transaction_id'), 'view': 'actual-additions',
+                'verification_sha256': canonical_sha256(verification), 'matching_verification_events': len(events)})
     return none_state_outcome_continuation(payload['transaction_id'], payload['artifact_hash'],
         'actual-additions', state_dir=state_dir, event_hash=events[-1]['event_hash'])
 
@@ -31123,7 +31129,9 @@ def transaction_none_state_outcome_payload(snapshot, args, *, state_dir, envelop
                 view, state_dir=state_dir, event_hash=scope['verification_event_hash'], page=page['next_page'])
         if gateway_json_document_size({**envelope, **result}) <= 32 * 1024:
             return result
-    raise GatewayResultShapeError('The outcome continuation cannot fit its fixed public result bound')
+    raise GatewayResultShapeError('The outcome continuation cannot fit its fixed public result bound',
+        details={'transaction_id': args.transaction_id, 'view': view, 'total_entries': total,
+            'max_utf8_bytes': 32 * 1024, 'minimum_page_utf8_bytes': gateway_json_document_size({**envelope, **result})})
 
 
 def history_view_continuation(transaction_id, artifact_hash, view, *, state_dir, event_hash=None, page=None):
@@ -31210,20 +31218,28 @@ def transaction_history_view_payload(snapshot, args, *, state_dir, envelope):
                 args.history_view, state_dir=state_dir, event_hash=scope['verification_event_hash'], page=page['next_page'])
         if gateway_json_document_size({**envelope, **result}) <= 32 * 1024:
             return result
-    raise GatewayResultShapeError('The history detail page and continuation exceed their fixed output bound')
+    raise GatewayResultShapeError('The history detail page and continuation exceed their fixed output bound',
+        details={'transaction_id': args.transaction_id, 'view': args.history_view, 'total_entries': total,
+            'max_utf8_bytes': 32 * 1024, 'minimum_page_utf8_bytes': gateway_json_document_size({**envelope, **result})})
 
 
 def history_verification_continuation(payload, verification, *, state_dir):
     if state_dir is None:
-        raise GatewayResultShapeError('History verification detail requires its exact owning transaction store')
+        raise GatewayResultShapeError('History verification detail requires its exact owning transaction store',
+            details={'transaction_id': payload.get('transaction_id'), 'artifact_hash': payload.get('artifact_hash'),
+                'view': 'verification', 'reason': 'owning_store_missing'})
     snapshot = TransactionStore(state_dir).load_snapshot(payload['transaction_id'])
     stored_history_binding(snapshot.preview.artifact, state_dir=state_dir)
     if snapshot.preview.artifact_hash != payload['artifact_hash']:
-        raise GatewayResultShapeError('History verification differs from its immutable artifact')
+        raise GatewayResultShapeError('History verification differs from its immutable artifact',
+            details={'transaction_id': payload.get('transaction_id'), 'view': 'verification',
+                'expected_artifact_hash': snapshot.preview.artifact_hash, 'observed_artifact_hash': payload.get('artifact_hash')})
     events = [row for row in snapshot.events if row.get('event_type') == 'verification_recorded'
         and canonical_sha256(row.get('details', {}).get('verification')) == canonical_sha256(verification)]
     if len(events) != 1:
-        raise GatewayResultShapeError('History detail requires its exact recorded verification')
+        raise GatewayResultShapeError('History detail requires its exact recorded verification',
+            details={'transaction_id': payload.get('transaction_id'), 'view': 'verification',
+                'verification_sha256': canonical_sha256(verification), 'matching_verification_events': len(events)})
     return history_view_continuation(payload['transaction_id'], payload['artifact_hash'], 'verification',
         state_dir=state_dir, event_hash=events[0]['event_hash'])
 
@@ -31320,7 +31336,8 @@ def transaction_show_summary(
             if _page_history or len(canonical_json_bytes(notice)) > 2048:
                 transaction_id = next((event.get('transaction_id') for event in events if event.get('transaction_id')), None)
                 if transaction_id is None or state_dir is None:
-                    raise GatewayResultShapeError('History detail lacks its immutable transaction/store binding')
+                    raise GatewayResultShapeError('History detail lacks its immutable transaction/store binding',
+                        details={'transaction_id': transaction_id, 'view': 'expectation', 'store_bound': state_dir is not None})
                 notice.pop('expected_observations')
                 notice.update(observations_complete=False, observation_count=len(history_binding['observations']),
                     field_count=sum(row.get('kind') not in {'creation_presence', 'existing_render_chain'}
@@ -31342,7 +31359,9 @@ def transaction_show_summary(
             notice['relationships_complete'] = False
             transaction_id = next((event.get('transaction_id') for event in events if event.get('transaction_id')), None)
             if transaction_id is None:
-                raise GatewayResultShapeError('Optional saved-state materialization review lacks its transaction identity')
+                raise GatewayResultShapeError('Optional saved-state materialization review lacks its transaction identity',
+                    details={'view': 'eligible-bindings', 'reason': 'transaction_identity_missing',
+                        'artifact_hash': canonical_sha256(artifact)})
             notice['detail'] = none_state_outcome_continuation(transaction_id, canonical_sha256(artifact),
                 'eligible-bindings', state_dir=state_dir)
             notice['review_required'] = True

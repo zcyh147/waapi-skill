@@ -555,7 +555,13 @@ def test_diagnostic_view_and_separate_extra_field_query_keep_existing_input_boun
     env = _env(tmp_path, version)
     parser = gateway.build_parser()
     view = parser.parse_args(["query-object", *source, "--view", "sound-routing-diagnostics", "--detail"])
-    gateway.preflight_query_object_input(view, env=env)
+    if version == "2021.1":
+        # The generic active-source implementation gap remains #181 / #174;
+        # this diagnostic view cannot turn that missing mapping into support.
+        with pytest.raises(gateway.GatewayInputError, match="active-source.*2021.1"):
+            gateway.preflight_query_object_input(view, env=env)
+    else:
+        gateway.preflight_query_object_input(view, env=env)
     ordinary = parser.parse_args(["query-object", *source, "--include", "volume-db",
         "--include-field", "attenuation", "--max-results", "1"])
     gateway.preflight_query_object_input(ordinary, env=env)

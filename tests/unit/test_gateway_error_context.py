@@ -52,6 +52,22 @@ def test_packaged_gateway_shape_errors_supply_context_at_each_call_site():
     assert missing == []
 
 
+@pytest.mark.parametrize('builder,view', [
+    ('none_state_actual_continuation', 'actual-additions'),
+    ('history_verification_continuation', 'verification')])
+def test_missing_owned_store_preserves_structured_continuation_failure(builder, view):
+    gateway = core.gateway
+    payload = {'transaction_id': 'tx1-' + 'a' * 20, 'artifact_hash': 'b' * 64}
+    # Exercise the actual failure before any store read, rather than merely
+    # accepting an AST call that would mask the intended error with TypeError.
+    with pytest.raises(gateway.GatewayResultShapeError) as caught:
+        getattr(gateway, builder)(payload, {}, state_dir=None)
+    result = caught.value.as_dict()
+    assert result['error_code'] == 'INVALID_QUERY_RESULT'
+    assert result['details'] == {**payload, 'view': view, 'reason': 'owning_store_missing'}
+    assert len(json.dumps(result, ensure_ascii=False).encode('utf-8')) < 1024
+
+
 @pytest.mark.parametrize('roots,reason', [(None, 'directory_map_missing'), ({'root': '', 'originals': None}, 'directory_roots_invalid')])
 def test_source_control_missing_roots_keep_context_without_dispatching_mutation(tmp_path, roots, reason):
     from tests.unit import test_remaining_core_business_gateway as source

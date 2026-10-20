@@ -181,6 +181,8 @@ def test_platform_property_is_preflighted_dispatched_and_verified_with_same_plat
     )
     reader = ScriptedReader(
         {
+            # Platform history is explicitly unobserved without a complete inventory.
+            "ak.wwise.core.getProjectInfo": [{}],
             "ak.wwise.core.object.get": [
                 {"return": [_object_row()]},
                 {"return": [{"id": OBJECT_ID, "path": _object_row()["path"], "Volume": -3.0}]},
@@ -198,6 +200,7 @@ def test_platform_property_is_preflighted_dispatched_and_verified_with_same_plat
 
     prepared = prepare_operation(request, read_call=reader).as_dict()
 
+    assert prepared["pre_state"]["field_read_platform"]["status"] == "unobserved"
     assert prepared["dispatch"]["args"] == {
         "object": OBJECT_ID,
         "property": "Volume",

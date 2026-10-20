@@ -1215,9 +1215,16 @@ def test_sandbox_authoring_strategy_is_pinned_and_checks_readiness_before_return
             self.command = ['/fake/bin/wine', 'start.exe', '/wait',
                 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe',
                 'Z:\\owned\\SampleProject.wproj']
+            bottle_environment = {'HOME': str(home), 'WINEPREFIX': str(prefix),
+                'CX_BOTTLE': 'Wwise2019x64', 'CX_BOTTLE_PATH': str(prefix.parent),
+                'CX_MANAGED_BOTTLE_PATH': str(home / 'Library/Application Support/Wwise2019/BuiltinBottles')}
+            self.launch_env = {**kwargs['launch_env'], **bottle_environment}
             self.launch_project_attestation = {'method': 'owned_winepath_roundtrip',
                 'project': str(sandbox.sandbox_project), 'roundtrip_project': str(sandbox.sandbox_project),
-                'native_project': self.command[-1], 'build': '2025.1.7.9143'}
+                'native_project': self.command[-1], 'build': '2025.1.7.9143',
+                'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(prefix),
+                    'managed_reference': '/fake/support/Wwise2019x64',
+                    'configuration': str(prefix / 'cxbottle.conf'), 'environment': bottle_environment}}
             self.launch_preparation = [{'argv': ['/fake/bin/winepath', '-w', str(sandbox.sandbox_project)],
                                         'exit_code': 0, 'stdout': self.command[-1] + '\n', 'stderr': ''}]
         def run_until_ready(self):
