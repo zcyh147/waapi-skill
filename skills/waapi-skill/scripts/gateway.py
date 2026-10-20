@@ -15447,6 +15447,7 @@ def dispatch_command(
             try:
                 native_rows, preview, source_proof, project_observation = resolve_2021_active_source(read=read_active_source,
                     selector=selector, broad=broad,
+                    maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
                     platform=args.query_platform, language=args.query_language,
                     return_fields=tuple(return_fields), live_info=live_info,
                     project_before=getattr(args, "query_project_observation", None))

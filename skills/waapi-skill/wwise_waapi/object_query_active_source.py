@@ -91,7 +91,8 @@ def _selected_source(sound, candidates, language):
 
 def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], platform: str,
                                language: str, return_fields: tuple[str, ...], live_info: Mapping[str, Any],
-                               project_before: Mapping[str, Any] | None = None, broad: bool = False):
+                               project_before: Mapping[str, Any] | None = None, broad: bool = False,
+                               maximum_rows: int = MAX_QUERY_TAKE):
     """Return the unchanged requested Sound row plus an independently joined reference.
 
     No row order, import return value or serialized project file is an oracle.
@@ -146,7 +147,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
     before_project = ({**_identity(project_before), "filePath": project_before["filePath"]}
                       if project_before is not None else project())
     fields = tuple(dict.fromkeys((*return_fields, *SOURCE_FACTS)))
-    before, preview = rows(**selector, return_fields=fields, maximum=MAX_QUERY_TAKE if broad else 1, **view)
+    before, preview = rows(**selector, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
     if broad and len(before) == MAX_QUERY_TAKE:
         _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The Sound query reached its observation fence.")
     if not before and not broad:
@@ -203,7 +204,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
     if children() != before_children:
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "Source membership or selection facts changed during observation.")
     after_selector = selector if broad else {"object_id": owner_ids[0]}
-    after, _ = rows(**after_selector, return_fields=fields, maximum=MAX_QUERY_TAKE if broad else 1, **view)
+    after, _ = rows(**after_selector, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
     if broad and len(after) == MAX_QUERY_TAKE:
         _fail("ACTIVE_SOURCE_OBSERVATION_INCOMPLETE", "The repeated Sound query reached its observation fence.")
     def owner_facts(values):

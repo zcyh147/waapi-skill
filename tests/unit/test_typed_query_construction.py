@@ -1633,6 +1633,16 @@ def test_2021_active_source_query_fence_stops_before_scanning_child_batches(tmp_
     assert client.child_reads == 0
 
 
+def test_2021_active_source_rejects_native_rows_beyond_actual_requested_bound_before_child_reads(tmp_path):
+    client, _ = _legacy_multi_sound_client(tmp_path)
+    code, result = gateway.execute_gateway([
+        "query-object", "--kind", "all-sounds", "--max-results", "1",
+        "--platform", "Mac", "--language", "SFX", "--include", "active-source",
+    ], env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == "ACTIVE_SOURCE_INVALID_OBSERVATION", result
+    assert client.child_reads == 0
+
+
 def test_2021_multi_sound_result_continuation_rejects_changed_inactive_source_proof(tmp_path):
     client, _ = _legacy_multi_sound_client(tmp_path, notes="声" * 24000)
     env = _env(tmp_path, "2021.1")
