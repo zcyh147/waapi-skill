@@ -339,18 +339,27 @@ def test_anonymous_constructor_revalidates_source_and_target_before_one_write(tm
     assert not writes
 
 
-@pytest.mark.parametrize('value', ['retarget', 'null', 'zero', 'missing'])
-def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value):
+def _append_reference_edit_case(tmp_path, value, *, planned=False, fault=None):
     task = anonymous_task(tmp_path)
     # Retained f4 native receipt returns EffectSlot for this exact binding.
     # The independent class-verified construction controls also cover generic
     # PluginInnerObject projections without rewriting their returned type.
     task.objects[ROOT]['type'] = 'EffectSlot'
     task.objects[ROOT]['@Effect'] = {key: task.objects[EFFECT][key] for key in ['id', 'name', 'type', 'path']}
+    new_effect = '{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}'
+    planned_path = task.objects[EFFECT_PARENT]['path'] + r'\New ShareSet'
+    if planned:
+        parent = task.bind(EFFECT_PARENT)
+        code, found = task.step('draft-discover-types', '--role', 'effect', '--meaning', 'Wwise Meter')
+        assert code == 0, found
+        code, declared = task.step('draft-declare-new', '--declaration-id', 'new-effect', '--parent-handle', parent,
+            '--name', 'New ShareSet', '--kind', found['type_candidates'][0]['handle'], '--field', 'plugin_placement', 'shareset')
+        assert code == 0, declared
+        planned_handle = declared['draft']['declared_object']['result_handle']
     declare_slots(task)
     slot = task.bind(ROOT)
     field = select_field(task, owner=slot, token='Effect')
-    target = task.bind(EFFECT_B) if value == 'retarget' else 'null'
+    target = planned_handle if planned else task.bind(EFFECT_B) if value == 'retarget' else 'null'
     code, declared = task.step('draft-declare-existing', '--declaration-id', 'retarget', '--object-handle', slot,
         '--field-value', field, target)
     assert code == 0, declared
@@ -359,28 +368,63 @@ def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value)
         if uri.endswith('object.set'):
             writes.append(deepcopy(args))
             rows = {row['object']: row for row in args['objects']}
-            assert rows[ROOT] == {'object': ROOT, '@Effect': EFFECT_B if value == 'retarget' else None}
+            assert rows[ROOT] == {'object': ROOT, '@Effect': planned_path if planned else EFFECT_B if value == 'retarget' else None}
+            if planned:
+                task.objects[new_effect] = {'id': new_effect, 'name': 'New ShareSet', 'type': 'Effect', 'classId': 8454147,
+                    'parent': {'id': EFFECT_PARENT}, 'path': planned_path, 'notes': ''}
             if value == 'retarget':
-                task.objects[ROOT]['@Effect'] = {key: task.objects[EFFECT_B][key] for key in ['id', 'name', 'type', 'path']}
+                task.objects[ROOT]['@Effect'] = {key: task.objects[new_effect if planned else EFFECT_B][key] for key in ['id', 'name', 'type', 'path']}
             elif value == 'zero':
                 task.objects[ROOT]['@Effect'] = {'id': '{00000000-0000-0000-0000-000000000000}', 'name': ''}
             elif value == 'missing':
                 del task.objects[ROOT]['@Effect']
             else:
                 task.objects[ROOT]['@Effect'] = None
+            if fault == 'ignored': task.objects[ROOT]['@Effect'] = {'id': EFFECT}
+            if fault == 'wrong-target': task.objects[ROOT]['@Effect'] = {'id': EFFECT_B if planned else EFFECT}
             for identity, source in zip([SLOT_A, SLOT_B], rows[FIRST]['@Effects'], strict=True):
                 task.objects[identity] = {'id': identity, 'name': '', 'type': 'PluginInnerObject', 'classId': 5505040,
                     'owner': {'id': FIRST}, 'path': r'\Opaque new slot ' + identity, 'notes': '',
                     '@Effect': {'id': source['@Effect']}, '@Bypass': source['@Bypass'], '@Render': source['@Render']}
             task.objects[FIRST]['@Effects'] += [{'id': SLOT_A}, {'id': SLOT_B}]
-            return {'objects': [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]}]}
+            results = [{'id': FIRST, 'name': 'Sender', '@Effects': [{'id': SLOT_B, 'name': ''}, {'id': SLOT_A, 'name': ''}]}]
+            if planned and fault != 'missing-association':
+                result_id = SLOT_A if fault == 'duplicate-association' else 'not-a-guid' if fault == 'invalid-association' else new_effect
+                results.insert(0, {'id': EFFECT_PARENT, 'name': 'Default Work Unit',
+                    'children': [{'id': result_id, 'name': 'New ShareSet'}]})
+            return {'objects': results}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
-    code, verified = task.finish(tx, shown)
-    assert code == (2 if value == 'missing' else 0), json.dumps(verified)
-    assert (verified.get('verified') is True) == (value != 'missing'), verified
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    if code == 0:
+        code, verified = task.run('verify', tx)
+    else:
+        assert fault in {'missing-association', 'duplicate-association', 'invalid-association'}, executed
+        verified = executed
+    expected_failure = value == 'missing' or fault is not None
+    assert code == (2 if expected_failure else 0), json.dumps(verified)
+    assert (verified.get('verified') is True) == (not expected_failure), verified
     assert len(writes) == 1
+    if not expected_failure:
+        chains = [row for row in verified['verification']['assertions'] if row.get('kind') == 'effect_render_chain_observation']
+        assert len(chains) == 1 and chains[0]['passed'] is True
+    return verified
+
+
+
+@pytest.mark.parametrize('value', ['retarget', 'null', 'zero', 'missing'])
+def test_append_can_compose_an_explicit_old_slot_reference_edit(tmp_path, value):
+    _append_reference_edit_case(tmp_path, value)
+
+
+@pytest.mark.parametrize('planned,fault', [(False, 'ignored'), (False, 'wrong-target'),
+    (True, None), (True, 'ignored'), (True, 'wrong-target'), (True, 'missing-association'),
+    (True, 'duplicate-association'), (True, 'invalid-association')])
+def test_append_reference_intent_uses_actual_effect_and_owned_result_association(tmp_path, planned, fault):
+    _append_reference_edit_case(tmp_path, 'retarget', planned=planned, fault=fault)
 
 
 def test_existing_nested_shareset_reference_uses_actual_parent_chain_not_constructor_destination(tmp_path):
