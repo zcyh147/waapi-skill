@@ -1509,21 +1509,40 @@ def test_source_control_provider_read_only_policy_blocks_even_an_authorized_prev
 
 
 def test_source_control_provider_timeout_and_late_native_exception_remain_confidential(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
     import threading
-    import time
-    finished = threading.Event()
+    entered, release, finished, disconnected = (threading.Event() for _ in range(4))
     def delayed():
+        entered.set()
         try:
-            time.sleep(0.2)
+            assert release.wait(10), 'Provider release watchdog expired'
             raise RuntimeError('fake-password-雪-"\\-needle')
         finally:
             finished.set()
     client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path, native=delayed)
+    original_disconnect = client.disconnect
+    def disconnect():
+        try:
+            return original_disconnect()
+        finally:
+            disconnected.set()
+    client.disconnect = disconnect
     _authorize_provider_preview(run, preview)
-    code, result = run("--timeout", "0.1", "execute", preview["transaction_id"])
-    assert code != 0 and len(client.calls) == 1, result
-    assert "TIMEOUT" in json.dumps(result)
-    assert finished.wait(1)
+    # Entry and late failure are synchronized; elapsed preparation time is not
+    # used to guess when the provider has started or finished.
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(run, "--timeout", "5", "execute", preview["transaction_id"])
+        try:
+            assert entered.wait(10), 'Public execution never entered the provider'
+            assert not future.done() and not finished.is_set()
+            code, result = future.result(timeout=10)
+            assert code != 0 and len(client.calls) == 1, result
+            assert "TIMEOUT" in json.dumps(result)
+            assert not finished.is_set(), 'Provider must fail only after the public timeout'
+        finally:
+            release.set()
+            assert finished.wait(10), 'Late provider exception did not finish'
+            assert disconnected.wait(10), 'Timed-out transport owner did not disconnect'
     _assert_no_provider_secret_artifacts(state, evidence, secret, result)
 
 
@@ -2117,3 +2136,185 @@ def test_bound_move_rechecks_resolved_name_only_language_guid_proof(tmp_path, dr
                            "newFiles": [str(client.other_media.parent / "moved-雨.wav")]}]
         code, verified = run("verify", preview["transaction_id"])
         assert code == 0 and verified["agent_result"]["verified"] is False, verified
+
+
+class _PluginSourceSelectionClient(_SourceControlDraftClient):
+    sound_id = '{11111111-1111-1111-1111-111111111111}'
+    source_id = '{22222222-2222-2222-2222-222222222222}'
+    old_source_id = '{44444444-4444-4444-4444-444444444444}'
+
+    def __init__(self, path, version='2025.1'):
+        from copy import deepcopy
+        super().__init__(path)
+        self.version, self.calls, self.writes = version, [], []
+        root = r'\Containers' if version == '2025.1' else r'\Actor-Mixer Hierarchy'
+        sound_path = root + r'\Default Work Unit\Voice'
+        self.objects = {self.sound_id: {'id': self.sound_id, 'name': 'Voice', 'type': 'Sound',
+            'classId': 65552, 'path': sound_path, 'parent': None, 'activeSource': {'id': self.old_source_id, 'name': 'Original Tone'}}}
+        for identity, name in ((self.source_id, 'Alternate Tone'), (self.old_source_id, 'Original Tone')):
+            self.objects[identity] = {'id': identity, 'name': name, 'type': 'SourcePlugin', 'classId': 6684674,
+                'path': sound_path + '\\' + name, 'parent': {'id': self.sound_id}}
+        self.types = [{'name': 'Sound', 'type': 'WObject', 'classId': 65552},
+            {'name': 'Wwise Tone Generator', 'type': 'Source', 'classId': 6684674}]
+        self.ignore_selection = False
+        self.copy = deepcopy
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, self.copy(args), self.copy(options)))
+        if uri == 'ak.wwise.core.object.getTypes':
+            return {'return': self.copy(self.types)}
+        if uri == 'ak.wwise.core.object.get':
+            requested = (args or {}).get('from', {}).get('id', [])
+            return {'return': [{key: self.copy(row[key]) for key in options['return'] if key in row}
+                for identity in requested if (row := self.objects.get(identity)) is not None]}
+        if uri == SOUND_SET_ACTIVE_SOURCE_URI:
+            self.writes.append(self.copy(args))
+            if not self.ignore_selection:
+                row = self.objects[args['source']]
+                self.objects[args['sound']]['activeSource'] = {'id': row['id'], 'name': row['name']}
+            return {}
+        result = super().call(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo':
+            result['version']['year'] = int(self.version[:4])
+        return result
+
+
+class _PluginSourceSelectionTask:
+    def __init__(self, path, version='2025.1'):
+        self.client = _PluginSourceSelectionClient(path, version)
+        self.state = path / 'state'
+        self.env = _env(path, version=version)
+        code, started = self.run('draft-start', SOUND_SET_ACTIVE_SOURCE_URI)
+        assert code == 0, started
+        self.draft, self.authority, self.revision = started['draft']['draft_id'], started['task_authority'], started['draft']['revision']
+
+    def run(self, *argv):
+        return gateway.execute_gateway(['--state-dir', str(self.state), *argv], env=self.env,
+            client_factory=lambda _: self.client)
+
+    def step(self, command, *argv):
+        code, payload = self.run(command, self.draft, '--task-authority', self.authority,
+            '--expected-revision', str(self.revision), *argv)
+        if code == 0 and 'draft' in payload: self.revision = payload['draft']['revision']
+        return code, payload
+
+    def declare(self):
+        handles = {}
+        for role, identity in (('sound', self.client.sound_id), ('source', self.client.source_id)):
+            code, bound = self.step('draft-bind-object', '--role', role, '--object-id', identity)
+            assert code == 0, bound
+            handles[role] = bound['bound_object']['handle']
+        return self.step('draft-declare-project-setting-plan', '--sound-handle', handles['sound'],
+            '--source-handle', handles['source'], '--platform-name', 'Windows')
+
+    def preview(self):
+        code, declared = self.declare(); assert code == 0, declared
+        code, checked = self.step('draft-check'); assert code == 0, checked
+        code, preview = self.step('preview-from-draft'); assert code == 0, preview
+        tx = preview['transaction_id']
+        code, shown = self.run('transaction-show', tx); assert code == 0, shown
+        code, confirmed = self.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        return tx, shown
+
+
+def test_source_plugin_child_can_be_selected_through_public_project_setting_draft(tmp_path):
+    task = _PluginSourceSelectionTask(tmp_path)
+    tx, shown = task.preview()
+    assert shown['artifact']['request']['arguments']['args'] == {
+        'sound': task.client.sound_id, 'source': task.client.source_id, 'platform': 'Windows'}
+    code, executed = task.run('execute', tx)
+    assert code == 0 and executed['state'] == 'executed_unverified', executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.client.objects[task.client.sound_id]['activeSource']['id'] == task.client.source_id
+    assert len(task.client.writes) == 1
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1'])
+def test_source_plugin_selection_matches_other_admitted_version_schemas(tmp_path, version):
+    task = _PluginSourceSelectionTask(tmp_path, version)
+    # The constructor also accepts the native Source readback alias.
+    if version == '2023.1':
+        task.client.objects[task.client.source_id]['type'] = 'Source'
+    tx, shown = task.preview()
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    code, verified = task.run('verify', tx)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.client.writes == [{'sound': task.client.sound_id, 'source': task.client.source_id, 'platform': 'Windows'}]
+
+
+def _mutate_source_plugin_binding(task, fault):
+    source = task.client.objects[task.client.source_id]
+    if fault == 'parent':
+        source['parent'] = {'id': '{55555555-5555-5555-5555-555555555555}'}
+    elif fault == 'class':
+        source['classId'] = 1048592  # Generic SourcePlugin is not the actual selected Tone class.
+    elif fault == 'boolean-class':
+        source['classId'] = True
+    elif fault == 'category':
+        task.client.types[1]['type'] = 'Effect'
+    elif fault == 'catalog-duplicate':
+        task.client.types.append(dict(task.client.types[1], name='Ambiguous Tone'))
+    elif fault == 'catalog-name':
+        task.client.types[1]['name'] = 'Different Plugin'
+    elif fault == 'type':
+        source['type'] = 'Effect'
+    elif fault == 'identity':
+        del source['name']
+    elif fault == 'sound-class':
+        task.client.objects[task.client.sound_id]['classId'] = 1
+    elif fault == 'config':
+        path = Path(task.env['WAAPI_SKILL_CONFIG_PATH'])
+        config = json.loads(path.read_text())
+        config['waapi_port'] += 1
+        path.write_text(json.dumps(config))
+    else:
+        raise AssertionError(fault)
+
+
+@pytest.mark.parametrize('fault', ['parent', 'class', 'boolean-class', 'category', 'catalog-duplicate', 'type', 'sound-class'])
+def test_source_plugin_selection_rejects_invalid_actual_binding_before_preview(tmp_path, fault):
+    task = _PluginSourceSelectionTask(tmp_path)
+    _mutate_source_plugin_binding(task, fault)
+    code, declared = task.declare()
+    if code == 0:
+        code, rejected = task.step('draft-check')
+    else:
+        rejected = declared
+    assert code != 0, rejected
+    expected = {'parent': 'INVALID_SOURCE_TARGET', 'class': 'PLUGIN_TYPE_UNAVAILABLE',
+        'boolean-class': 'PLUGIN_TYPE_UNAVAILABLE', 'category': 'PLUGIN_TYPE_UNAVAILABLE',
+        'catalog-duplicate': 'PLUGIN_TYPE_UNAVAILABLE', 'type': 'BOUND_OBJECT_ROLE_MISMATCH',
+        'sound-class': 'INVALID_OBJECT_TYPE'}
+    assert rejected['error_code'] == expected[fault], rejected
+    assert task.client.writes == []
+    assert not list((task.state / 'transactions').glob('*'))
+
+
+@pytest.mark.parametrize('fault', ['parent', 'class', 'category', 'catalog-name', 'identity', 'config'])
+def test_source_plugin_selection_revalidates_parent_class_catalog_and_context_before_write(tmp_path, fault):
+    task = _PluginSourceSelectionTask(tmp_path)
+    tx, shown = task.preview()
+    _mutate_source_plugin_binding(task, fault)
+    code, rejected = task.run('execute', tx)
+    assert code != 0, rejected
+    assert task.client.writes == []
+    assert task.client.objects[task.client.sound_id]['activeSource']['id'] == task.client.old_source_id
+
+
+@pytest.mark.parametrize('fault', ['ignored', 'parent', 'class', 'catalog-name'])
+def test_source_plugin_selection_requires_actual_effect_and_binding_after_write(tmp_path, fault):
+    task = _PluginSourceSelectionTask(tmp_path)
+    tx, shown = task.preview()
+    task.client.ignore_selection = fault == 'ignored'
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    if fault != 'ignored':
+        _mutate_source_plugin_binding(task, fault)
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed' and verified['verified'] is False, verified
+    assert len(task.client.writes) == 1
+    code, replay = task.run('execute', tx)
+    assert code != 0 and len(task.client.writes) == 1, replay

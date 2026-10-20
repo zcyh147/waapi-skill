@@ -759,3 +759,29 @@ unlinked-view and active-choice-transition cases remain unresolved under #181.
 The implementation and its controls remain future work; the original blocked
 result and lack of generic credit are unchanged. Decision detail:
 `/tmp/waapi-181-multisource-next-decision.md`.
+
+## R42 scoped Source-plugin and staged Voice native observations
+
+Root's `r42-source-selection-d64e0db7-2025-r2` is **PASS, 8.58s** on
+2025.1.7.9143 macOS Console: 70 public calls, four separately previewed
+transactions and 170 archived native files. Two real Source plugins under the
+same Sound changed active GUID from A to requested B, with independent class,
+parent, fields, complete child-set and retained-state verification. This proves
+that current-view case only; Voice selection, platform isolation, other versions
+and whole-family coverage remain unproved. Its preceding r1 prerequisite failure
+before host launch is retained separately.
+
+Root's `r41-planned-source-staged-1a1b3b03-2025-r1` is **PASS, 6.10s**:
+33 calls, two previewed transactions and 86 native archives. It independently
+verifies an empty Voice, then creates a Source with explicit language beneath
+that existing bound GUID. This is a staged diagnostic, not atomic planned-parent
+Voice+Source acceptance. Atomic language remains required #179/#180/#181 work;
+original `r41-planned-source-b50f8007-2025-r1`,
+`r41-planned-source-8ed01e4f-2025-r2` and
+`r41-planned-source-d810c679-2025-r3` remain FAIL and quarantined. They are not
+native-absence evidence. Passing sandboxes were deleted only after PASS; all
+source full hashes, mtimes and tree metadata stayed unchanged and owned process
+sets were empty. Original receipts/observations remain under Root's
+`.waapi-skill-state/full-coverage/`; no native run occurred during R42 merging.
+Unlinked-view, ambiguous file-path, language/merge/preservation and remaining
+#181 obligations stay open; no broader or Windows/Fresh credit follows.
