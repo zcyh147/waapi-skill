@@ -10760,7 +10760,6 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                     metadata['cli_project_effect'] = effect
                     optional_none = effect.get('model_before', {}).get('optional_none_state_materialization')
                     if optional_none is not None:
-                        from dataclasses import replace
                         from .console_media_ids import none_state_notice
                         preview = replace(preview, envelope=replace(preview.envelope, metadata={
                             **dict(preview.envelope.metadata), 'optional_none_state_materialization': none_state_notice(optional_none)}))
