@@ -16,7 +16,12 @@ class ClassTask(ParameterTask):
     def __init__(self, path, version, class_name="ModulatorTime"):
         super().__init__(path, version)
         self.class_name = class_name
-        self.types[1].update(name=class_name, classId=5111824)
+        self.class_id = 5111824
+        if class_name == "GameParameter":
+            self.types[1]["classId"] = self.class_id
+            self.objects[EXISTING]["classId"] = self.class_id
+        else:
+            self.types.append({"name": class_name, "classId": self.class_id, "type": "WObject"})
         self.metadata = {
             "EnvelopeStopPlayback": {"name": "EnvelopeStopPlayback", "type": "bool", "default": True,
                 "dependencies": [{"type": "property", "action": "Enable", "context": "Self",
@@ -29,7 +34,7 @@ class ClassTask(ParameterTask):
         if uri.endswith("object.set"):
             self.calls.append((uri, args, options))
             child = args["objects"][0]["children"][0]
-            row = {"id": CREATED, "name": child["name"], "type": self.class_name,
+            row = {"id": CREATED, "name": child["name"], "type": self.class_name, "classId": self.class_id,
                 "path": self.objects[FIRST]["path"] + "\\" + child["name"], "parent": {"id": FIRST}}
             row.update({name: deepcopy(info["default"]) for name, info in self.metadata.items() if "default" in info})
             row.update({key[1:]: value for key, value in child.items() if key.startswith("@")})
@@ -41,7 +46,7 @@ class ClassTask(ParameterTask):
             return deepcopy(result)
         if uri.endswith("object.create"):
             row = self.objects[CREATED]
-            row["type"] = self.class_name
+            row.update(type=self.class_name, classId=self.class_id)
             for name, metadata in self.metadata.items():
                 if "default" in metadata:
                     row[name] = deepcopy(metadata["default"])
@@ -108,7 +113,7 @@ def test_new_reference_uses_class_default_instead_of_inventing_a_scalar_prerequi
     task = ClassTask(tmp_path, "2025.1", "Sound")
     task.metadata["OutputBus"] = {"name": "OutputBus", "type": "Reference",
         "dependencies": deepcopy(task.metadata["EnvelopeStopPlayback"]["dependencies"])}
-    task.objects[EXISTING]["type"] = "Bus"
+    task.set_object_type(EXISTING, "Bus", 30)
     parent = task.bind(FIRST)
     target = task.bind(EXISTING)
     kind = task.discover_kind("Sound")
@@ -477,7 +482,9 @@ def test_exact_recorded_time_modulator_class_shape_accepts_explicit_prerequisite
     from tests.unit.test_time_modulator_range_gateway import FACTS
     task = ClassTask(tmp_path, version)
     facts = FACTS["versions"][version]
-    task.types[1] = deepcopy(facts["metadata_scope"]["resolved"])
+    resolved = deepcopy(facts["metadata_scope"]["resolved"])
+    task.types = [resolved if row["name"] == task.class_name else row for row in task.types]
+    task.class_id = resolved["classId"]
     task.metadata = {"EnvelopeStopPlayback": deepcopy(facts["field_metadata"]),
                      "TimeModLoops": deepcopy(facts["controller_metadata_model"])}
     task.declare(EnvelopeStopPlayback=False, TimeModLoops=7)
@@ -550,10 +557,12 @@ class ProspectiveReferenceTask(ClassTask):
         super().__init__(path, version, "SwitchContainer")
         self.objects[FIRST]["path"] = r"\Actor-Mixer Hierarchy\Default Work Unit"
         group_type, target_type = ("StateGroup", "State") if state else ("SwitchGroup", "Switch")
+        self.types.extend([{"name": group_type, "classId": 40, "type": "WObject"},
+                           {"name": target_type, "classId": 41, "type": "WObject"}])
         for identity, name in ((HIERARCHY_GROUP, "Surface"), (HIERARCHY_OTHER, "Weather")):
-            self.objects[identity] = {"id": identity, "name": name, "type": group_type,
+            self.objects[identity] = {"id": identity, "name": name, "type": group_type, "classId": 40,
                 "path": "\\Switches\\Default Work Unit\\" + name, "parent": {"id": FIRST}}
-        self.objects[HIERARCHY_TARGET] = {"id": HIERARCHY_TARGET, "name": "Concrete", "type": target_type,
+        self.objects[HIERARCHY_TARGET] = {"id": HIERARCHY_TARGET, "name": "Concrete", "type": target_type, "classId": 41,
             "path": r"\Switches\Default Work Unit\Surface\Concrete", "parent": {"id": HIERARCHY_GROUP}}
         self.metadata = {
             "DefaultSwitchOrState": {"name": "DefaultSwitchOrState", "type": "", "default": None,
@@ -610,7 +619,7 @@ def test_new_reference_hierarchy_rejects_invalid_prospective_relationship_withou
     if fault == "wrong-parent":
         task.objects[HIERARCHY_TARGET]["parent"] = {"id": HIERARCHY_OTHER}
     if fault == "wrong-target-type":
-        task.objects[HIERARCHY_TARGET]["type"] = "Sound"
+        task.set_object_type(HIERARCHY_TARGET, "Sound", 42)
     if fault == "missing-group":
         task.declare(DefaultSwitchOrState=task.bind(HIERARCHY_TARGET))
     elif fault == "wrong-target-type":

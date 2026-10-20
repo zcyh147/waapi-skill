@@ -15,6 +15,7 @@ def test_dependent_class_field_explains_create_then_configure(tmp_path: Path, ve
     task = CreateTask(tmp_path, version)
     code, configured = task.run("config-set", "--project-modification-policy", policy)
     assert code == 0, configured
+    task.set_object_type(FIRST, "WorkUnit", 4)
     task.objects[FIRST].update({"type": "WorkUnit", "name": "Default Work Unit", "path": r"\Game Parameters\Default Work Unit"})
     task.types.append({"classId": 20, "name": "GameParameter", "type": "WObject"})
     # Synthetic dependency shape establishes the existing object-only boundary;
@@ -50,10 +51,10 @@ class ParameterTask(CreateTask):
     def __init__(self, path, version):
         super().__init__(path, version)
         self.objects = {
-            FIRST: {"id": FIRST, "name": "Default Work Unit", "type": "WorkUnit",
+            FIRST: {"id": FIRST, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1,
                     "path": r"\Game Parameters\Default Work Unit", "parent": {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"}},
         }
-        self.objects[EXISTING] = {"id": EXISTING, "name": "KeepExisting", "type": "GameParameter",
+        self.objects[EXISTING] = {"id": EXISTING, "name": "KeepExisting", "type": "GameParameter", "classId": 20,
                                   "path": self.objects[FIRST]["path"] + r"\KeepExisting", "parent": {"id": FIRST},
                                   "Min": 11.0, "Max": 23.0, "InitialValue": 17.0}
         self.types = [{"classId": 1, "name": "WorkUnit", "type": "WObject"},
@@ -70,7 +71,7 @@ class ParameterTask(CreateTask):
         if uri == "ak.wwise.core.object.create":
             self.calls.append((uri, args, options))
             assert CREATED not in self.objects, "duplicate creation"
-            self.objects[CREATED] = {"id": CREATED, "name": args["name"], "type": "GameParameter",
+            self.objects[CREATED] = {"id": CREATED, "name": args["name"], "type": "GameParameter", "classId": 20,
                                     "path": self.objects[FIRST]["path"] + "\\" + args["name"],
                                     "parent": {"id": FIRST}, "Min": 0.0, "Max": 100.0, "InitialValue": 0.0, "ControlMode": 0}
             return {key: self.objects[CREATED][key] for key in ("id", "name", "type", "path")}
