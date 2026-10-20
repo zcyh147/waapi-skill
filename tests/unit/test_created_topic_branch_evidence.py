@@ -137,3 +137,38 @@ def test_created_policy_selects_exact_559_console_leaves_and_retains_other_ids(i
     assert len(family) == 4902 and len(family) - len(selected) == 4343
     assert len(inventory['native_coverage']['obligations']) == 272313
     assert not any(row['id'] in selected_ids for row in family if '|wwise-authoring|' in row['route'])
+
+
+@pytest.mark.parametrize('number', (float('inf'), float('-inf'), float('nan'), 1.25),
+                         ids=('positive-inf', 'negative-inf', 'nan', 'finite'))
+def test_created_scalar_reader_requires_finite_numbers_from_valid_559_baseline(inventory, tmp_path, number):
+    """Nonfinite cases are corrupt reader controls, never public receipts."""
+    import math
+    # Prove the exact selected original branch passes first within the unchanged
+    # 559-row selection; corrupt only its matching callback, public leaf and checks.
+    assert len(producer.selected_branches(inventory)) == 559
+    edges = {row['id']: row for row in inventory['native_coverage']['obligations'] if row['kind'] == 'reference'}
+    capture, record, bindings = receipt(inventory, '2025.1', observed_stream(tmp_path, '2025.1'))
+    branch = next(row for row in capture['groups']['2025.1']['branches']
+                  if row['pointer'] == producer.DEFINITION + 'childrenCount')
+    binding = bindings[branch['id']]
+    assert read(tmp_path, record, binding, branch, edges) == ('passed', None)
+    original_checks = record['branch_assertions'][branch['id']]['checks']
+    assert completion.validate_created_topic_program(record, branch, binding, original_checks, audit.ROOT, edges) is None
+    index = int(binding['dispatch_pointer'].rsplit('/', 1)[1])
+    record['observations']['callbacks'][index]['event']['object']['childrenCount'] = number
+    record['stream_records'][index + 1]['event']['object']['childrenCount'] = number
+    for check in record['branch_assertions'][branch['id']]['checks']:
+        if 'equals' in check:
+            check['equals'] = deepcopy(completion.pointer_value(record, check['pointer']))
+    result = read(tmp_path, record, binding, branch, edges)
+    checks = record['branch_assertions'][branch['id']]['checks']
+    if math.isfinite(number):
+        assert result == ('passed', None)
+        assert completion.validate_created_topic_program(record, branch, binding, checks, audit.ROOT, edges) is None
+    else:
+        assert result[0] == 'missing', result
+        # NaN is already rejected by generic equality, but must also fail this
+        # adapter independently. Neither corrupted artifact is product evidence.
+        with pytest.raises(ValueError, match='nonfinite'):
+            completion.validate_created_topic_program(record, branch, binding, checks, audit.ROOT, edges)

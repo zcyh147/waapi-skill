@@ -72,7 +72,7 @@ def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03, ev
     code, payload = gateway.execute_gateway(
         client.argv,
         env={"WAAPI_SKILL_CONFIG_PATH": str(config)},
-        client_factory=lambda _url: client, stream_sink=records.append,
+        client_factory=lambda _url: client, stream_sink=lambda record: records.append(deepcopy(record)),
     )
     return code, payload, client, records
 
@@ -364,3 +364,41 @@ def test_created_fixed_scalar_packets_preserve_ordered_public_stream(tmp_path, r
     assert terminal["event_count"] == 4 and terminal["event_count_reached"] is True
     assert terminal["monitoring_outcome"]["target_completed"] is True
     assert terminal["cleanup"] == "unsubscribed" and client.unsubscribed == 1 and client.disconnected
+
+
+def test_created_stream_sink_freezes_received_records_before_later_mutation(tmp_path, monkeypatch):
+    """Run the public flow, then mutate the raw records retained by its consumer."""
+    from tests.support.created_topic_cases import URI, BUILDS, created_packets, created_fields
+    original_execute = gateway.execute_gateway
+    received, before_mutation = [], []
+
+    def execute_with_mutating_consumer(*args, **kwargs):
+        sink = kwargs['stream_sink']
+
+        def observe(record):
+            received.append(record)
+            before_mutation.append(deepcopy(record))
+            sink(record)
+
+        kwargs['stream_sink'] = observe
+        result = original_execute(*args, **kwargs)
+        # Gateway completed normally. A consumer retaining the original object
+        # must not be able to rewrite the independently recorded sink snapshot.
+        for record in received:
+            if record['record_type'] == 'event':
+                record['event']['object']['notes'] = 'changed after receipt'
+        return result
+
+    monkeypatch.setattr(gateway, 'execute_gateway', execute_with_mutating_consumer)
+    packets = created_packets('2025.1')
+    expected_packets = deepcopy(packets)
+    facts = [token for field in created_fields('2025.1') for token in ('--topic-option', 'include', field)]
+    code, terminal, client, records = run(tmp_path, '2025.1', 'stream-topic', URI, packets, *facts,
+        timeout_seconds=1.0, event_count=4, pinned_build=BUILDS['2025.1'])
+    assert code == 0 and terminal['cleanup'] == 'unsubscribed'
+    assert terminal['monitoring_outcome']['target_completed'] is True
+    assert client.unsubscribed == 1 and client.disconnected
+    assert len(received) == 5 and received != before_mutation
+    assert records == before_mutation
+    assert [record['event'] for record in records[1:]] == expected_packets
+    assert [callback['event'] for callback in client.callbacks] == expected_packets

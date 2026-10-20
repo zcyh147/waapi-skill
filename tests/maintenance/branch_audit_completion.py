@@ -630,6 +630,7 @@ def validate_created_topic_program(record, branch, binding, checks, root, refere
     """
     import hashlib
     import json
+    import math
     import re
     from wwise_waapi.native_catalog import canonical_digest
     from wwise_waapi.topic_business import topic_business_contract
@@ -738,6 +739,8 @@ def validate_created_topic_program(record, branch, binding, checks, root, refere
                 allowed = {'string': (str,), 'boolean': (bool,), 'number': (int, float), 'integer': (int,)}[field_schema['type']]
                 if type(value) not in allowed or ('enum' in field_schema and value not in field_schema['enum']):
                     raise ValueError('created stream scalar type/enum differs from pinned reflection')
+                if type(value) is float and not math.isfinite(value):
+                    raise ValueError('created stream nonfinite numeric value is not strict JSON')
     if (terminal.get('record_type') != 'terminal' or terminal.get('ok') is not True
             or terminal.get('status') != 'completed' or terminal.get('cleanup') != 'unsubscribed'
             or terminal.get('completion_reason') != 'event_count_reached'
