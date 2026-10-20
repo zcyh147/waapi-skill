@@ -315,6 +315,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "legacy-operation-schema",
         *DRAFT_GATEWAY_SUBCOMMANDS,
         "transaction-show",
+        "continue-source-copy-proof",
         "confirm",
         "reject",
         "preview",

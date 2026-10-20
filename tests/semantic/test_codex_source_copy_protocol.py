@@ -216,7 +216,7 @@ def test_later_turn_reuses_retained_accept_frame_and_same_unattempted_child(tmp_
 def test_source_generated_save_keeps_existing_project_policy_boundary(tmp_path, monkeypatch, policy):
     from tests.semantic.run_codex_skill_campaign import _validate_heavy_v3_broker_result
     protocol, evidence, commands, responses, writes, prompts = run_source_protocol(tmp_path, monkeypatch, policy=policy)
-    assert len(protocol.turn_prefix_counts) == 1
+    assert len(protocol.turn_prefix_counts) == (2 if policy == 'read_only' else 1)
     if policy == 'read_only':
         assert not writes and [step.subcommand for step in protocol.steps] == ['operation-schema']
     else:
@@ -459,3 +459,167 @@ def test_source_provenance_writer_and_strict_reader_reject_unowned_copy(tmp_path
     with pytest.raises(PromptProvenanceError):
         read_prompt_provenance(sealed.path, scenario=scenario, version=version, scenario_root=tmp_path,
             require_paths=True)
+
+
+def run_full_source_task(tmp_path, monkeypatch, *, policy):
+    """Real formal consumers; replace only external Codex and fake WAAPI I/O."""
+    import hashlib
+    from tests.semantic.support import codex_harness as harness
+    from tests.semantic.support import codex_task_runner_v3 as runner
+    from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol
+    from tests.semantic.support.codex_modification_policy_v3 import READ_ONLY_FOLLOW_UP_PROMPT
+    from tests.semantic.support.codex_business_oracle_plan_v3 import write_business_oracle_plan
+    from tests.semantic.run_codex_skill_campaign import _validate_heavy_v3_task_result
+    import tests.semantic.support.codex_expansion_reconciliation as reconciliation
+    from tests.semantic.support.codex_harness import _business_draft_continuation_candidates
+
+    protocol = build_source_copy_saved_proof_protocol(source_request(), dirty_baseline=policy != 'read_only', policy=policy)
+    prompts = ['Copy the pinned Source.'] + [
+        READ_ONLY_FOLLOW_UP_PROMPT if policy == 'read_only' else 'Confirm the current Preview.'
+    ] * (len(protocol.turn_prefix_counts) - 1)
+    scenario_root = tmp_path / 'scenario'
+    scenario, provenance = source_provenance(scenario_root, protocol, prompts)
+    count = 0 if policy == 'read_only' else 1
+    scenario.primary_dispatch = SimpleNamespace(count=count)
+    plan = write_business_oracle_plan(scenario_id=scenario.id, version='2021.1', api=scenario.api,
+        runner='project', family='object', scenario_root=scenario_root,
+        fixture_spec={'kind': 'scenario_fixture', 'sha256': hashlib.sha256(b'{}').hexdigest()},
+        protocol_sha256=provenance.payload['protocol']['sha256'], provenance_sha256=provenance.sha256,
+        primary_dispatch_count=count,
+        payload_bindings={'primary_steps': [] if not count else ['tx01.execute'],
+            'verification_steps': [] if not count else ['tx01.saved-verify']},
+        assertion_ids=('common.task-receipt',), static_expectation={}, live_binding={}, delta_rules=())
+    fixture = tmp_path / 'fake-native'
+    fixture.mkdir()
+    _, writes, native = saved_source_task(fixture)
+    if policy != 'read_only':
+        from tests.unit.test_field_interface_closure_gateway import PROJECT
+        native.objects[PROJECT]['workunitIsDirty'] = True
+    def provisioning(argv, *, environment, **kwargs):
+        code, payload = gateway.execute_gateway(argv[3:], env=environment)
+        return SimpleNamespace(returncode=code, stdout=json.dumps(payload), stderr='')
+    native_failures = []
+    def launch(self, argv, *, runner_env):
+        code, payload = gateway.execute_gateway(argv[3:], env=runner_env, client_factory=lambda _: native)
+        if code:
+            native_failures.append({key: payload.get(key) for key in ('error_code', 'error', 'message', 'details')})
+        return SimpleNamespace(returncode=code, stdout=json.dumps(payload), stderr='')
+    monkeypatch.setattr(reconciliation, 'run_owned_gateway', provisioning)
+    monkeypatch.setattr(CodexGatewayBroker, '_launch_runner', launch)
+    monkeypatch.setattr(CodexGatewayBroker, '_communicate_runner', lambda self, process: (process.stdout, process.stderr))
+    root = scenario_root / 'evidence/codex-task'
+    installed = root / 'agent-workspace/.agents/skills/waapi-skill'
+    responses, actual_outputs = {}, []
+    turn = 0
+    def external_codex(command, *, cwd, env, timeout):
+        nonlocal turn
+        if command[-3:-1] == ['debug', 'prompt-input']:
+            payload = [{'role': 'developer', 'content': f'- waapi-skill: target (file: {installed / "SKILL.md"})'}]
+            return harness.ProcessResult(0, json.dumps(payload), '', 0.001)
+        start = 0 if turn == 0 else protocol.turn_prefix_counts[turn - 1]
+        stop = protocol.turn_prefix_counts[turn]
+        events = [{'type': 'thread.started', 'thread_id': 'source-pure-code-thread'}, {'type': 'turn.started'}]
+        def completed_command(text, output):
+            item = {'id': f'command-{len(events)}', 'type': 'command_execution', 'command': text}
+            events.append({'type': 'item.started', 'item': {**item, 'status': 'in_progress'}})
+            events.append({'type': 'item.completed', 'item': {**item, 'status': 'completed',
+                'exit_code': 0, 'aggregated_output': output}})
+        if turn == 0:
+            for relative in ('SKILL.md', 'references/waapi-operate.md'):
+                path = installed / relative
+                completed_command(shlex.join(['cat', str(path)]), path.read_text())
+        for step in protocol.steps[start:stop]:
+            argv = ['python', str(installed / 'scripts/run.py'), 'gateway.py', step.subcommand,
+                *_render_step_arguments(step, responses)]
+            text = shlex.join(argv)
+            if responses:
+                previous = next(reversed(responses.values()))
+                emitted = previous.get('next_command')
+                if emitted is not None:
+                    text = emitted[emitted['copy_instruction']['source_field']]
+                    assert shlex.split(text)[3:] == argv[3:]
+                else:
+                    _, candidates = _business_draft_continuation_candidates(previous, platform_name='posix')
+                    matches = [(len(shlex.split(candidate)), candidate, mode) for mode, candidate in candidates
+                        if shlex.split(candidate)[3:] == argv[3:len(shlex.split(candidate))]]
+                    if matches:
+                        length, candidate, mode = max(matches)
+                        text = candidate + (' ' + shlex.join(argv[length:]) if mode == 'prefix' and argv[length:] else '')
+            result = run_model_argv(shlex.split(text), environment=env, cwd=cwd,
+                capture_output=True, text=True, timeout=30)
+            assert result.returncode == 0, (result.stderr, native_failures)
+            responses[step.name] = json.loads(result.stdout)
+            actual_outputs.append(result.stdout)
+            completed_command(text, result.stdout)
+        final = ('当前是 read_only 只读模式，因此不会复制 Source；项目保持原样，没有任何改动。'
+            if policy == 'read_only' and turn == 0 else '项目保持原样，没有任何改动。'
+            if policy == 'read_only' else 'The current Gateway phase completed; the recorded verification describes its exact scope.')
+        events.extend([{'type': 'item.completed', 'item': {'type': 'agent_message', 'text': final}},
+            {'type': 'turn.completed', 'usage': {'input_tokens': 0, 'output_tokens': 0}}])
+        turn += 1
+        return harness.ProcessResult(0, '\n'.join(json.dumps(event) for event in events) + '\n', '', 0.001)
+    monkeypatch.setattr(harness, 'run_process', external_codex)
+    binary, auth = tmp_path / 'external-codex', tmp_path / 'external-auth.json'
+    binary.write_text('external CLI substitute; never executed')
+    binary.chmod(0o755)
+    auth.write_text('{}')
+    options = SimpleNamespace(skill_source=SKILL, codex_binary=binary, auth_json=auth, model='pure-code-no-model',
+        reasoning_effort='medium', service_tier='default', timeout_seconds=60,
+        profile='source-owned-deterministic', protocol_manifest_revision=None, windows_powershell_core_host=None)
+    run = runner.run_v3_codex_task(scenario_id=scenario.id, version='2021.1', scenario=scenario,
+        prompts=prompts, protocol=protocol, task_root=root, skill_source=SKILL, codex_binary=binary, auth_json=auth,
+        model=options.model, reasoning_effort=options.reasoning_effort, service_tier=options.service_tier,
+        timeout_seconds=60, runner_environment={**native.env, 'WWISE_WAAPI_HOST': '127.0.0.1',
+            'WWISE_WAAPI_PORT': '31337'}, required_reference='references/waapi-operate.md',
+        business_oracle_plan=plan, project_modification_policy=policy, expected_primary_dispatch_count=count)
+    assert run.passed
+    unit = SimpleNamespace(unit_id=scenario.id, base_scenario_id=scenario.id, version='2021.1', scenario=scenario,
+        user_turn_count=len(prompts), project_modification_policy=policy, expected_primary_dispatch_count=count,
+        turns=tuple(SimpleNamespace(index=index, kind='request' if index == 1 else 'confirmation', prompt=prompt)
+            for index, prompt in enumerate(prompts, start=1)))
+    reread = _validate_heavy_v3_task_result(root, expected_unit=unit, expected_thread_id=run.thread_id,
+        scenario_root=scenario_root, options=options)
+    assert reread.provenance.protocol == protocol
+    return run, root, writes, responses, actual_outputs
+
+
+def test_source_read_only_schema_boundary_enters_real_task_and_full_archive(tmp_path, monkeypatch):
+    from tests.semantic.support.codex_heavy_project_runner_v3 import _require_policy_turn_response
+    run, root, writes, responses, outputs = run_full_source_task(tmp_path, monkeypatch, policy='read_only')
+    assert not writes and len(responses) == 1
+    assert next(iter(responses.values()))['command'] == 'operation-schema'
+    assert len(run.turns) == 2
+    for index, result in enumerate(run.turns, start=1):
+        _require_policy_turn_response(result, policy='read_only', turn_index=index, expected_change_terms=('Source',))
+    assert 'composer_evidence' not in json.loads((root / 'task-result.json').read_text())
+
+
+def test_full_dirty_source_task_through_real_broker_grader_archive_and_campaign_reader(tmp_path, monkeypatch):
+    run, root, writes, responses, outputs = run_full_source_task(tmp_path, monkeypatch, policy='ask_before_changes')
+    assert [uri.rsplit('.', 1)[-1] for uri, args in writes] == ['save', 'copy', 'save']
+    assert responses['tx01.saved-verify']['verification']['verification_scope']['complete_copy_preservation'] is True
+    assert json.loads((root / 'task-result.json').read_text())['composer_evidence']['flow_count'] == 3
+    assert all((root / f'turns/turn-{index:02d}/events.jsonl').is_file() for index in range(1, len(run.turns) + 1))
+
+
+
+def test_source_read_only_admission_requires_exact_existing_schema_topology():
+    from dataclasses import replace
+    from tests.semantic.support.codex_source_copy_protocol import build_source_copy_saved_proof_protocol, is_source_copy_proof_protocol
+    from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
+    protocol = build_source_copy_saved_proof_protocol(source_request(), policy='read_only')
+    assert is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', protocol)
+    wrong_schema = replace(protocol.steps[0], arguments=('object.delete',))
+    assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', replace(protocol, steps=(wrong_schema,)))
+    assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2022.1', protocol)
+    assert not is_source_copy_proof_protocol('ak.wwise.core.object.delete', '2021.1', protocol)
+    assert not is_source_copy_proof_protocol('ak.wwise.core.object.copy', '2021.1', V3GatewayProtocol(protocol.steps, (1,)))
+
+
+
+def test_source_continuation_classifier_accepts_exact_public_token_only():
+    from tests.semantic.support.codex_harness import gateway_subcommand
+    assert gateway_subcommand(('continue-source-copy-proof', 'issued-owner')) == 'continue-source-copy-proof'
+    for arguments in (('continue-source-copy-proofs', 'issued-owner'),
+            ('unknown-command', 'continue-source-copy-proof'), ('--unknown', 'continue-source-copy-proof')):
+        assert gateway_subcommand(arguments) is None

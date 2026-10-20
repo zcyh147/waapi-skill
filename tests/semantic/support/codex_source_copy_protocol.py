@@ -286,7 +286,8 @@ def build_source_copy_saved_proof_protocol(request: Mapping[str, Any], *, dirty_
         raise ValueError('unknown project modification policy')
     parent = list(build_object_lifecycle_business_transaction_steps(request, label='tx01'))
     if policy == 'read_only':
-        return V3GatewayProtocol((parent[0],), (1,))
+        from tests.semantic.support.codex_eval_protocol_v3 import build_modification_policy_protocol, build_transaction_protocol
+        return build_modification_policy_protocol(build_transaction_protocol([request]), policy='read_only')
     preview = parent.pop()
     check = parent[-1].name
     root = 'tx01.draft-start'
@@ -359,6 +360,11 @@ def is_source_copy_proof_protocol(api, version, protocol):
         return False
     try:
         steps = protocol.steps
+        if (len(steps) == 1 and steps[0].subcommand == 'operation-schema'
+                and steps[0].arguments == ('object.copy',) and steps[0].source_copy_proof_role is None):
+            from tests.semantic.support.codex_prompt_provenance_v3 import _modification_policy_for_protocol
+            return _modification_policy_for_protocol(protocol, version=version,
+                allow_cleaned_file_evidence=False) == 'read_only'
         validate_source_copy_steps(steps)
         root, = (step for step in steps if step.subcommand == 'draft-start')
         issuers = {step.name for step in steps if step.source_copy_proof_role is not None
