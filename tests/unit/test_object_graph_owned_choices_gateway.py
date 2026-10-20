@@ -44,9 +44,23 @@ def test_object_graph_next_action_discloses_documented_list_discovery(tmp_path):
         "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"}
     code, bound = task.step("draft-bind-object", "--object-id", FIRST)
     assert code == 0, bound
-    disclosure = bound["draft"]["next_action_binding"]["field_discovery"]["documented_lists"]
+    continuation = bound["draft"]["next_action_binding"]
+    disclosure = continuation["field_discovery"]["documented_lists"]
     assert disclosure["append"] == ["--field-source", "documented-lists", "--list"]
-    assert disclosure["scope"] == "copy_exact_bound_owner_handle_or_type_handle"
+    assert disclosure["details_via"] == "more_actions"
+    assert continuation["field_discovery"]["scope_decision"]["existing_object"] == [
+        "--object-handle", "<bound-existing-target-handle>"]
+    assert continuation["field_discovery"]["scope_decision"]["discovered_new_type"] == [
+        "--type-handle", "<selected-type-handle>"]
+    assert "draft-inspect" in continuation["more_actions"]["copy_command"]
+    code, inspected = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0, inspected
+    full_disclosure = inspected["draft"]["next_action_binding"]["field_discovery"]["documented_lists"]
+    assert full_disclosure["scope"] == "copy_exact_bound_owner_handle_or_type_handle"
+    code, listed = task.step("draft-discover-fields", "--object-handle", bound["bound_object"]["handle"],
+        *disclosure["append"])
+    assert code == 0, listed
+    assert any(row["name"] == "RTPC" for row in listed["agent_result"]["items"])
 
 
 @pytest.mark.parametrize("version,fault", (("2023.1", None), ("2024.1", None), ("2025.1", "wrong-target-class"), ("2023.1", "reversed-effect"), ("2024.1", "missing-effect-field"), ("2023.1", "changed-reference-notes")))
@@ -1099,6 +1113,7 @@ def test_set_replace_does_not_verify_surviving_old_descendant(tmp_path: Path, ve
 @pytest.mark.parametrize("version", VERSIONS[1:])
 def test_set_rejects_fictitious_custom_list_without_source_or_live_list_evidence(tmp_path, version):
     task = OwnedGraphTask(tmp_path, version, "object.set")
+    next(row for row in task.types if row["name"] == "Sound")["classId"] = 65552
     task.objects[FIRST].update({"type": "Sound", "classId": 65552})
     owner = task.bind(FIRST)
     code, configured = task.step("draft-business-configure", "--name-conflict", "replace")

@@ -228,6 +228,7 @@ def test_object_binding_returns_version_stable_business_kind(
         "field_discovery",
         "declare_existing",
         "declare_existing_batch",
+        "declare_rtpc",
         "existing_target_count_decision",
         "more_actions",
         "shell_tool_timeout_ms",
@@ -235,6 +236,7 @@ def test_object_binding_returns_version_stable_business_kind(
         "precompute_or_increment_revision",
     }
     assert "fixed_full_argv" not in continuation["more_actions"]
+    assert "draft-declare-rtpc" in continuation["declare_rtpc"]["fixed_argv_prefix_copy"]
     assert continuation["existing_target_count_decision"] == {
         "three_or_more_requested": (
             "bind_every_requested_existing_target_before_any_field_discovery_"
@@ -1419,6 +1421,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
         "field_discovery",
         "declare_existing",
         "declare_existing_batch",
+        "declare_rtpc",
         "more_actions",
         "shell_tool_timeout_ms",
         "then_read_next_response",
@@ -1427,6 +1430,7 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     assert continuation["declare_existing"]["cardinality"] == (
         "exactly_one_declaration_per_command"
     )
+    assert "draft-declare-rtpc" in continuation["declare_rtpc"]["fixed_argv_prefix_copy"]
     assert "fixed_full_argv" not in json.dumps(continuation)
     assert "draft-inspect" in continuation["more_actions"]["copy_command"]
     assert continuation["field_discovery"]["available_via"] == "more_actions"
