@@ -28657,6 +28657,7 @@ def _business_next_action_binding(
                 },
                 "declare_new": {
                     **operation_draft_prefix_copy_binding(declare_new_prefix),
+                    "source_plugin_details": "operation-schema object.set",
                     "anonymous_list_member": {
                         **operation_draft_prefix_copy_binding(declare_new_prefix),
                         "append": ["--declaration-id", "<task-local-id>", "--parent-handle", "<bound-or-planned-owner-handle>",

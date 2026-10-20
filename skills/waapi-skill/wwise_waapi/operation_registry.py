@@ -6954,13 +6954,29 @@ def _prepare_object_set(
             if language_requires_live_project_validation(language):
                 requested_languages.add(str(language))
 
-    construction_specs = [spec for spec in node_specs if "construction_language" in spec]
+    specs_by_path = {spec["request_path"]: spec for spec in node_specs}
+    for spec in node_specs:
+        if "source_plugin" not in spec:
+            continue
+        parent_spec = specs_by_path[spec["parent_request_path"]]
+        if parent_spec.get("preexisting_id") is not None and "preexisting_children" not in parent_spec:
+            rows = _read_direct_children(parent_spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+            parent_spec["preexisting_children"] = rows
+            children_snapshots.append({"object_id": parent_spec["preexisting_id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": rows})
+        ids = [row.get("id") for row in parent_spec.get("preexisting_children", [])]
+        if any(not _valid_object_id(value) for value in ids) or len({_identity_key(value) for value in ids}) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "Source construction requires the complete unique pre-existing parent child GUID set.")
+        spec["source_plugin"]["preexisting_plugin_ids"] = ids
+    language_contexts = [spec[key] for spec in node_specs for key in ("construction_language", "source_language") if key in spec]
     construction_inventory = (_read_import_language_inventory(request.version, read=import_context_read)
-                              if construction_specs else None)
-    for spec in construction_specs:
-        context = spec["construction_language"]
+                              if language_contexts else None)
+    for context in language_contexts:
         context["selected"] = _select_construction_language(construction_inventory, context["requested"])
         context["project"] = construction_inventory["project"]
+    for spec in node_specs:
+        if "construction_language" in spec:
+            spec["construction_language"]["expected_sources"] = [child["request_path"] for child in node_specs
+                if "source_plugin" in child and child["parent_request_path"] == spec["request_path"]]
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
         language_inventory = (construction_inventory if construction_inventory is not None else
@@ -8034,9 +8050,9 @@ def _effect_shareset_placement_assertions(pre_state, *, read, after_write=False)
 def _resolve_graph_node_type(node, *, catalog, version):
     if node.plugin is None:
         return _resolve_object_type("PropertyContainer" if version == "2025.1" and node.type == "ActorMixer" else node.type, catalog=catalog)
-    matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == "Effect"]
+    matches = [row for row in catalog if row.class_id == node.plugin.class_id and row.type == node.plugin.object_type]
     if len(matches) != 1:
-        raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph Effect requires one fresh exact plugin class")
+        raise OperationContractError("INVALID_OBJECT_TYPE", "A typed graph plugin requires one fresh exact selected class and category")
     _require_object_class_id(matches[0].class_id)
     return matches[0]
 
@@ -8127,6 +8143,8 @@ def _prepare_object_node_specs(
             "references": [],
             "collection": node.collection,
         }
+        if node.plugin is not None and node.plugin.kind == "source":
+            spec["structural_class_id"] = type_info.class_id
         if result_context and node.request_path in result_context["target_paths"]:
             spec["planned_reference_target_class"] = type_info.class_id
         if node.language is not None:
@@ -8160,6 +8178,10 @@ def _prepare_object_node_specs(
                 root_parent=root_parent, root_collection=root_collection, version=version, read=read,
                 allow_list_merge=allow_list_merge, guards=merge_guards)
         if merge_target is not None:
+            if node.plugin is not None and node.plugin.kind == "source":
+                raise OperationContractError("TARGET_EXISTS", "Source construction requires a new child; an existing Source needs an explicit existing-object field change.",
+                    details={"request_path": node.request_path, "preexisting_id": merge_target.object,
+                             "existing_path": merge_target.row.get("path")})
             roles[f"merge:{node.request_path}"] = merge_target
             spec.update(preexisting_id=merge_target.object, pre_state=merge_target.row,
                     structural_class_id=type_info.class_id)
@@ -8369,7 +8391,15 @@ def _prepare_object_node_specs(
                 spec["properties"].append({"name": name, "value": value,
                     "metadata_type": evidence["metadata"][name]["type"], "derived": True})
         if node.plugin is not None:
-            if node.plugin.placement == "shareset":
+            if node.plugin.kind == "source":
+                parent_spec = next((row for row in specs if row["request_path"] == node.parent_request_path), None)
+                if node.collection != "children" or parent_spec is None or parent_spec["canonical_type"] != "Sound":
+                    raise OperationContractError("INVALID_SOURCE_TARGET", "Atomic Source construction requires a planned Sound/Voice parent; a live owner uses object.createPlugin.")
+                validate_plugin_target(node.plugin, target_type=parent_spec["canonical_type"])
+                if node.plugin.language is not None and not any(
+                        prop["name"].casefold() == "isvoice" and prop["value"] is True for prop in parent_spec["properties"]):
+                    raise OperationContractError("PLUGIN_LANGUAGE_UNAVAILABLE", "A localized Source requires a Boolean Voice owner intent.")
+            elif node.plugin.placement == "shareset":
                 if node.parent_request_path in node_paths or root_parent is None:
                     raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Independent graph ShareSets require an exact bound Effects Work Unit or Folder")
                 validate_plugin_target(node.plugin, target_type=root_parent.row["type"], target_path=root_parent.row["path"])
@@ -8388,6 +8418,12 @@ def _prepare_object_node_specs(
             validated = validate_plugin_property_metadata(node.plugin, metadata)
             spec["graph_plugin_native"] = _materialize_plugin_object(node.plugin, validated)
             spec["structural_class_id"] = type_info.class_id
+            if node.plugin.kind == "source":
+                spec["source_plugin"] = {"descriptor": node.plugin.as_dict(),
+                    "property_validation": [item.as_dict() for item in validated]}
+                if node.plugin.language is not None:
+                    spec["source_language"] = {"requested": node.plugin.language, "role": "source-language",
+                        "version": version}
         if node_derived_properties:
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
@@ -8903,18 +8939,18 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=()):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
-    language_nodes = [node for node in pre_state.get("object_set_nodes", []) if "construction_language" in node] if isinstance(pre_state, Mapping) else []
-    if language_nodes:
+    language_contexts = [node[key] for node in pre_state.get("object_set_nodes", [])
+        for key in ("construction_language", "source_language") if key in node] if isinstance(pre_state, Mapping) else []
+    if language_contexts:
         try:
-            inventory = _read_import_language_inventory(language_nodes[0]["construction_language"]["version"], read=read)
-            for node in language_nodes:
-                context = node["construction_language"]
+            inventory = _read_import_language_inventory(language_contexts[0]["version"], read=read)
+            for context in language_contexts:
                 selected = _select_construction_language(inventory, context["requested"])
-                assertions.append({"name": "Voice construction language binding remains valid", "passed":
+                assertions.append({"name": "selected Voice/Source language binding remains valid", "passed":
                     selected == context["selected"] and inventory["project"] == context["project"],
                     "evidence": {"expected": context, "selected": selected, "project": inventory["project"]}})
         except OperationContractError as exc:
-            assertions.append({"name": "Voice construction language binding remains valid", "passed": False, "evidence": exc.as_dict()})
+            assertions.append({"name": "selected Voice/Source language binding remains valid", "passed": False, "evidence": exc.as_dict()})
     result_context = pre_state.get("planned_reference_context") if isinstance(pre_state, Mapping) else None
     if result_context:
         try:
@@ -10351,6 +10387,8 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
             *(row.get("name") for row in spec.get("references", []) if isinstance(row, Mapping)),
             *(requirement["name"] for evidence in spec.get("new_object_default_evidence", [])
               for requirement in evidence["requirements"]),
+            *(plugin_verification_fields(normalize_plugin_creation(spec["source_plugin"]["descriptor"]))
+              if "source_plugin" in spec else ()),
             *(
                 OBJECT_SET_IMPORT_READBACK_FIELDS
                 if isinstance(spec.get("import"), Mapping)
@@ -11627,6 +11665,17 @@ def prepare_object_set_batch_check(
                 "error_code": exc.error_code,
                 "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
             }
+            if exc.error_code == "UNKNOWN_PROJECT_LANGUAGE" and "available" in exc.details:
+                choices = _bounded_language_choice_details(exc.details, byte_budget=repair_bytes_remaining)
+                if choices is not None:
+                    issue["details"] = choices
+                    repair_bytes_remaining -= len(canonical_json_bytes(choices))
+                else:
+                    issue["details"] = {"field": "language", "available": [],
+                        "available_total": exc.details["available_total"], "available_returned": 0,
+                        "available_truncated": True,
+                        "language_discovery": {"available": False, "missing_seam": "paginated_project_language_choices"},
+                        "repair_details": "aggregate_repair_budget_exhausted", "mutation_dispatched": False}
             if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
                 # Preserve the exact owner and staged repair at this public
                 # batch-check boundary, under one aggregate output budget.
@@ -12279,12 +12328,31 @@ def _normalize_import_language_rows(value: Any, *, authority: str) -> list[dict[
     return sorted(rows, key=lambda row: (row["name"].casefold(), row["id"].casefold()))
 
 
+def _bounded_language_choice_details(details, *, byte_budget):
+    bounded = {**details, "available": list(details["available"])}
+    while True:
+        bounded["available_returned"] = len(bounded["available"])
+        bounded["available_truncated"] = bounded["available_returned"] < bounded["available_total"]
+        if bounded["available_truncated"]:
+            # There is no public project-language paging command yet. Never
+            # direct callers to status, which deliberately omits this inventory.
+            bounded["language_discovery"] = {"available": False, "missing_seam": "paginated_project_language_choices"}
+        if len(canonical_json_bytes(bounded)) <= byte_budget:
+            return bounded
+        if not bounded["available"]:
+            return None
+        bounded["available"].pop()
+
+
 def _select_construction_language(inventory, requested):
     rows = [row for row in inventory["languages"]
             if row["name"] == requested or (_valid_object_id(requested) and _same_identity(row["id"], requested))]
     if len(rows) != 1 or not _valid_object_id(rows[0]["id"]):
-        raise OperationContractError("UNKNOWN_PROJECT_LANGUAGE", "Voice construction language must select one live Project Language by exact name or GUID.",
-            details={"requested": requested, "matches": rows})
+        details = _bounded_language_choice_details({"field": "language", "requested": requested, "matches": rows,
+            "available": inventory["languages"], "available_total": len(inventory["languages"])},
+            byte_budget=MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES)
+        raise OperationContractError("UNKNOWN_PROJECT_LANGUAGE", "Requested language must select one live Project Language by exact name or GUID.",
+            details=details)
     return dict(rows[0])
 
 
@@ -19779,10 +19847,11 @@ def verify_prepared_operation(
                     "INVALID_PREVIEW",
                     "Object graph verification language is malformed.",
                 )
+            source_read_language = (spec["source_language"]["selected"]["name"] if "source_language" in spec else None)
             rows = read_object(
                 object_id=object_id,
                 fields=fields,
-                language=None if "construction_language" in spec else _localized_import_read_language(requested_language),
+                language=source_read_language if "source_plugin" in spec else None if "construction_language" in spec else _localized_import_read_language(requested_language),
                 platform=platform,
             )
             check(f"{request_path} GUID resolves exactly once", len(rows) == 1, rows)
@@ -19995,8 +20064,29 @@ def verify_prepared_operation(
                     _reference_requirement_matches(row, str(field_name), field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
+            if "source_plugin" in spec:
+                source_plan = spec["source_plugin"]
+                descriptor_row = dict(source_plan["descriptor"])
+                if platform is not None:
+                    descriptor_row["platform"] = platform
+                if "source_language" in spec:
+                    descriptor_row["language"] = source_read_language
+                descriptor = normalize_plugin_creation(descriptor_row)
+                projection = plugin_verification_fields(descriptor)
+                try:
+                    evidence = verify_created_plugin_row(descriptor,
+                        {field: row[field] for field in projection if field in row}, version=version,
+                        expected_parent_id=expected_parent_id, expected_owner_id=expected_parent_id,
+                        validated_properties=tuple(ValidatedPluginProperty(**item) for item in source_plan["property_validation"]),
+                        preexisting_plugin_ids=source_plan["preexisting_plugin_ids"],
+                        readback_view={"fields": list(projection), "language": descriptor.language, "platform": descriptor.platform},
+                        placement_evidence={"kind": "source_child"})
+                except PluginOperationContractError as exc:
+                    check(f"{request_path} Source plugin state and parent match the immutable plan", False, exc.as_dict())
+                else:
+                    check(f"{request_path} Source plugin state and parent match the immutable plan", True, evidence.as_dict())
             import_spec = spec.get("import")
-            if "construction_language" in spec:
+            if "construction_language" in spec and not spec["construction_language"]["expected_sources"]:
                 children = read_direct_children(object_id=object_id, fields=IDENTITY_RETURN_FIELDS)
                 check(f"{request_path} empty Voice has no Source children", not children,
                       {"expected": [], "children": children, "construction_language": spec["construction_language"]})
@@ -25329,7 +25419,12 @@ def _require_specialized_object_tree_relationships(
     version: str,
 ) -> None:
     for node in nodes:
-        ordinary_children = [child for child in node.children if child.collection == "children"]
+        source_children = [child for child in node.children if child.collection == "children"
+            and child.plugin is not None and child.plugin.kind == "source"]
+        if source_children and node.type != "Sound":
+            raise OperationContractError("INVALID_SOURCE_TARGET", "Source plugin construction requires a Sound/Voice parent.",
+                details={"request_path": node.request_path})
+        ordinary_children = [child for child in node.children if child.collection == "children" and child not in source_children]
         if not ordinary_children:
             continue
         _require_specialized_object_child_types(
