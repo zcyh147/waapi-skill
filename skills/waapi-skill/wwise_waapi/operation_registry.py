@@ -7395,8 +7395,10 @@ def _prepare_owned_control_input(descriptor, *, version, read, inherited_platfor
                 details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False}) from exc
         if not isinstance(curve_points, (list, tuple)) or not curve_points:
             raise OperationContractError("INVALID_READBACK", "Time-axis admission requires the exact declared or preserved Curve points.")
-        outside = [index for index, point in enumerate(curve_points) if type(point.get("x")) not in (int, float)
-            or not math.isfinite(point["x"]) or not 0 <= point["x"] <= duration]
+        if any(not isinstance(point, Mapping) or type(point.get("x")) not in (int, float)
+                or not math.isfinite(point["x"]) for point in curve_points):
+            raise OperationContractError("INVALID_READBACK", "Time-axis admission requires Curve point objects with finite numeric X coordinates.")
+        outside = [index for index, point in enumerate(curve_points) if not 0 <= point["x"] <= duration]
         if outside:
             if curve_context == "replacement_preservation":
                 repair["preservation"] = "This replacement changes only ControlInput and cannot rewrite its existing Curve. Choose an explicit Duration Field Handle value that contains every existing X within its live restriction, if one exists; otherwise retain this input. A separate object.setRTPC draft-declare-rtpc can add a new RTPC with explicitly chosen Time points while preserving the old RTPC."

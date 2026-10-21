@@ -460,6 +460,18 @@ def declare_replacement(task):
     return task
 
 
+@pytest.mark.parametrize('point', [None, {'x': '5', 'y': 0, 'shape': 'Linear'},
+    {'x': True, 'y': 0, 'shape': 'Linear'}], ids=['null-point', 'string-x', 'boolean-x'])
+def test_time_replacement_rejects_malformed_preserved_curve_readback_before_write(tmp_path, point):
+    task = ReplacementTask(tmp_path)
+    task.objects[RTPC]['@Curve']['points'] = [point]
+    before = deepcopy(task.objects)
+    declare_replacement(task)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'INVALID_READBACK', rejected
+    assert task.writes == [] and task.objects == before
+
+
 @pytest.mark.parametrize('duration', [5, 6])
 def test_time_replacement_preserves_curve_or_requires_supported_duration_choice(tmp_path, duration):
     task = ReplacementTask(tmp_path)
