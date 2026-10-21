@@ -1,0 +1,19 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_preserve0/native/1792556954974604000-5c15292be7e442e48f360c0957b824b1-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 0,
+    "name": "Flags",
+    "restriction": {},
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.998905334010487,
+  "version": "2022.1"
+}

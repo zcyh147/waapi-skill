@@ -1,0 +1,53 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792541051316280000-62890a232ee84ac797189a3302222830-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4,
+    "default": 1.0,
+    "dependencies": [],
+    "display": {
+      "group": "",
+      "index": 1839,
+      "name": "Frequency"
+    },
+    "name": "LfoFrequency",
+    "restriction": {
+      "max": 20000.0,
+      "min": 0.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": true,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "Real64",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "Frequency",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 3,
+        "fine": 0.001,
+        "infinity": 0,
+        "max": 20000.0,
+        "min": 0.0,
+        "step": 0.02
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.989066249981988,
+  "version": "2025.1"
+}

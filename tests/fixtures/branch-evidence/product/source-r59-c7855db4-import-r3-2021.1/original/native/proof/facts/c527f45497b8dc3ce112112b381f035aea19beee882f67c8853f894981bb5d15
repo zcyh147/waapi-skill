@@ -1,0 +1,72 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r57-source-graph/.waapi-skill-state/full-coverage/r57-repeated-source-6d4a3547-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792539391552627000-fff94d5f62b94fe4abbbade584f6fd8d-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 2,
+    "default": 1000.0,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "0",
+                  "value": 0
+                }
+              ]
+            }
+          }
+        ],
+        "context": "Self",
+        "property": "FrequencyMode",
+        "type": "property"
+      }
+    ],
+    "display": {
+      "group": "Input",
+      "index": 1251,
+      "name": "Base Frequency"
+    },
+    "name": "BaseFrequency",
+    "restriction": {
+      "max": 20000.0,
+      "min": 20.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "Real32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "Frequency",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 1,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 20000.0,
+        "min": 20.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.996037000004435,
+  "version": "2021.1"
+}
