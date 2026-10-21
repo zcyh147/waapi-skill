@@ -9,3 +9,7 @@ tests/_org/** -text
 # Sealed semantic witnesses and definitions are hashed as committed bytes.
 tests/fixtures/semantic/** -text
 tests/semantic/data/** -text
+
+# Portable branch evidence includes hash-named native payloads without extensions.
+# Preserve their sealed bytes on hosts with core.autocrlf enabled.
+tests/fixtures/branch-evidence/** -text
