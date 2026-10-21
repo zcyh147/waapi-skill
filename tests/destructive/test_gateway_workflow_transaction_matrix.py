@@ -6604,7 +6604,12 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             kind = _discover_business_type(gateway, draft, meaning='ModulatorTime', role='object', expected_label='ModulatorTime')
             duration = selected_field(draft, 'TimeModDuration', kind=kind)
             stop = selected_field(draft, 'EnvelopeStopPlayback', kind=kind)
-            wanted_points = [{'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 1000, 'y': 0, 'shape': 'Linear'}]
+            # A new explicit intent on the documented seconds axis, not a reinterpretation
+            # of the retained native attempt that changed its requested endpoint 1000 to 5.
+            wanted_points = [{'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 5, 'y': 0, 'shape': 'Linear'}]
+            receipt['time_axis_intent'] = {'unit': 'seconds', 'explicit_duration': 5, 'requested_x': [0, 5],
+                'policy': 'interim_intent_preservation', 'native_domain_complete': False,
+                'prior_1000_to_5_attempt': 'retained_failure_not_reinterpreted'}
             _update_business_draft(gateway, draft, 'draft-declare-rtpc', ['--object-handle', target,
                 '--field-handle', field, '--new-control-input-kind', kind, '--new-control-input-name', 'TimeMod',
                 '--new-control-input-notes', 'New time control', '--new-control-input-field-value', duration, '5',

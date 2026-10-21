@@ -54,6 +54,8 @@ class OwnedControlTask(OwnedGraphTask):
         self.writes = []
         self.fault = None
         self.input_platform = None
+        self.native_curve_points = [{'x': 0, 'y': -20, 'shape': 'Linear'},
+            {'x': 5 if input_type == 'ModulatorTime' else 1000, 'y': 0, 'shape': 'Linear'}]
 
     def call(self, uri, args=None, options=None):
         if uri.endswith('isPropertyEnabled'):
@@ -76,15 +78,14 @@ class OwnedControlTask(OwnedGraphTask):
                 **{'@' + name: value for name, value in self.input_properties.items()}}
             self.objects[CONTROL] = {'id': CONTROL, 'name': 'TimeMod', 'type': self.input_type,
                 'classId': self.input_classes[self.input_type], 'owner': {'id': RTPC}, 'path': r'\opaque-control',
-                'notes': 'New time control', **({'@TimeModLoops': 1} if self.input_type == 'ModulatorTime' else {}),
+                'notes': 'New time control', **({'@TimeModLoops': 1, '@TimeModDuration': 1} if self.input_type == 'ModulatorTime' else {}),
                 **{'@' + name: value for name, value in self.input_properties.items()}}
             self.objects[CURVE] = {'id': CURVE, 'name': '', 'type': 'Curve', 'classId': 917520,
                 'owner': {'id': RTPC}, 'path': r'\opaque-curve', 'notes': ''}
             self.objects[RTPC] = {'id': RTPC, 'name': '', 'type': 'RTPC', 'classId': 1441808,
                 'owner': {'id': owner_id}, 'path': r'\opaque-rtpc', 'notes': '',
                 '@PropertyName': 'Volume', '@ControlInput': {'id': CONTROL},
-                '@Curve': {'id': CURVE, 'points': [{'x': 0, 'y': -20, 'shape': 'Linear'},
-                    {'x': 1000, 'y': 0, 'shape': 'Linear'}]}}
+                '@Curve': {'id': CURVE, 'points': deepcopy(self.native_curve_points)}}
             self.objects[owner_id]['@RTPC'] = [*self.objects[owner_id]['@RTPC'], {'id': RTPC}]
             if self.fault == 'wrong-input-owner':
                 self.objects[CONTROL]['owner'] = {'id': FIRST}
@@ -121,7 +122,7 @@ class OwnedControlTask(OwnedGraphTask):
         return found['meaning_results'][0]['candidates'][0]['handle']
 
 
-def declare_time(task, owner=None, property_field=None, declaration_id='curve', expected_code=0, end_y=0):
+def declare_time(task, owner=None, property_field=None, declaration_id='curve', expected_code=0, end_y=0, end_x=None, start_x=0):
     owner = task.bind(FIRST) if owner is None else owner
     property_field = task.discover(owner, 'Volume') if property_field is None else property_field
     code, types = task.step('draft-discover-types', '--role', 'object', '--meaning', task.input_type)
@@ -134,7 +135,7 @@ def declare_time(task, owner=None, property_field=None, declaration_id='curve', 
         '--field-handle', property_field, '--new-control-input-kind', kind,
         '--new-control-input-name', 'TimeMod', '--new-control-input-notes', 'New time control',
         *values,
-        '--point', '0', '-20', 'Linear', '--point', '1000', str(end_y), 'Linear')
+        '--point', str(start_x), '-20', 'Linear', '--point', str(end_x if end_x is not None else 5 if task.input_type == 'ModulatorTime' else 1000), str(end_y), 'Linear')
     assert code == expected_code, declared
     task.declaration_reply = declared
     return task
@@ -164,6 +165,88 @@ def test_native_2022_reference_labels_allow_the_declared_custom_time_class(tmp_p
     assert len(task.writes) == 1
 
 
+def test_native_2022_time_curve_change_is_rejected_before_write(tmp_path):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/owned-control-input-2022-native-curve-change.json').read_text())
+    assert fixture['request']['@Curve']['points'][-1]['x'] == 1000
+    assert fixture['rtpc_readback']['Curve']['points'][-1]['x'] == 5
+    task = declare_time(OwnedControlTask(tmp_path), end_x=1000)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'CONTROL_INPUT_TIME_AXIS_OUT_OF_RANGE', rejected
+    assert rejected['details']['x_range_seconds'] == [0, 5] and task.writes == [], rejected
+
+
+def test_time_axis_default_is_sealed_without_assigning_unrequested_duration(tmp_path):
+    task = OwnedControlTask(tmp_path)
+    task.input_properties.pop('TimeModDuration')
+    task.native_curve_points[-1]['x'] = 1
+    declare_time(task, end_x=1)
+    tx, shown = task.preview()
+    proof, = [node['owned_control_input'] for node in shown['artifact']['prepared_operation']['pre_state']['object_set_nodes'] if node.get('owned_control_input')]
+    assert proof['time_axis']['x_range_seconds'] == [0, 1]
+    assert proof['time_axis']['effective_duration_source'] == 'class_default'
+    assert proof['time_axis']['native_domain_complete'] is False
+    assert proof['constructor_authority']['time_axis']['unit'] == 'seconds'
+    native = shown['artifact']['prepared_operation']['dispatch']['args']['objects'][0]['@RTPC'][0]['@ControlInput']
+    assert '@TimeModDuration' not in native
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+
+
+@pytest.mark.parametrize('default', ['absent', None])
+def test_time_axis_missing_default_gives_explicit_field_handle_repair(tmp_path, default):
+    task = OwnedControlTask(tmp_path)
+    task.input_properties.pop('TimeModDuration')
+    if default == 'absent': task.metadata['TimeModDuration'].pop('default')
+    else: task.metadata['TimeModDuration']['default'] = default
+    declare_time(task, end_x=1)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'CONTROL_INPUT_TIME_DURATION_REQUIRED', rejected
+    repair = rejected['details']['repair']
+    assert repair['discover_field']['subcommand'] == 'draft-discover-fields'
+    assert repair['discover_field']['meaning'] == 'Duration'
+    assert repair['declare']['option'] == '--new-control-input-field-value' and task.writes == []
+
+
+def test_time_axis_default_drift_blocks_before_source_write(tmp_path):
+    task = OwnedControlTask(tmp_path)
+    task.input_properties.pop('TimeModDuration')
+    declare_time(task, end_x=1)
+    tx, shown = task.preview()
+    task.metadata['TimeModDuration']['default'] = 2
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected
+    assert 'new object class metadata TimeModDuration unchanged' in json.dumps(rejected)
+
+
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
+@pytest.mark.parametrize('start_x,end_x', [(0, 1000), (-1, 5)])
+def test_time_axis_rejects_explicit_outside_points_through_named_and_graph_routes(tmp_path, operation, start_x, end_x):
+    task = declare_time(OwnedControlTask(tmp_path, operation=operation), start_x=start_x, end_x=end_x)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'CONTROL_INPUT_TIME_AXIS_OUT_OF_RANGE', rejected
+    assert rejected['details']['x_range_seconds'] == [0, 5] and task.writes == [], rejected
+
+
+def test_time_axis_explicit_field_value_repairs_an_unproved_default(tmp_path):
+    task = OwnedControlTask(tmp_path)
+    task.metadata['TimeModDuration'].pop('default')
+    declare_time(task)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+
+
+def test_time_axis_admission_does_not_relax_exact_curve_verification(tmp_path):
+    task = declare_time(OwnedControlTask(tmp_path))
+    task.native_curve_points[-1]['x'] = 4
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified.get('verified') is False, verified
+    assert 'UNEXPECTED_RESULT_NODE' in json.dumps(verified) and len(task.writes) == 1
+
+
 @pytest.mark.parametrize('restriction', ['excluded', 'shared-only'])
 def test_native_2022_reference_labels_preserve_owned_target_constraints(tmp_path, restriction):
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/owned-control-input-2022-native-reference.json').read_text())
@@ -177,6 +260,17 @@ def test_native_2022_reference_labels_preserve_owned_target_constraints(tmp_path
     assert code == 2 and rejected.get('error_code') == 'INVALID_CONTROL_INPUT_TYPE', rejected
     expected = 'does not permit' if restriction == 'excluded' else 'requires a shared reference'
     assert expected in rejected['message'] and task.writes == [], rejected
+
+
+@pytest.mark.parametrize('shared,allowed', [([''], 'unchanged'), (['Sound'], 'unchanged'), ([], None)])
+def test_owned_reference_rejects_malformed_shared_type_metadata_before_write(tmp_path, shared, allowed):
+    task = OwnedControlTask(tmp_path)
+    task.metadata['ControlInput']['restriction']['restrictions'][0]['sharedOnlyTypes'] = shared
+    if allowed is None: task.metadata['ControlInput']['restriction']['restrictions'][0]['type'] = None
+    declare_time(task)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'INVALID_METADATA', rejected
+    assert task.writes == []
 
 
 @pytest.mark.parametrize('fault', ['wrong-input-owner', 'wrong-input-class', 'wrong-rtpc-class', 'wrong-input-value'])
@@ -276,6 +370,24 @@ def test_owned_time_input_below_a_planned_owner_has_no_invented_rtpc_path(tmp_pa
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, json.dumps(verified)
 
+
+def test_time_axis_rejection_also_precedes_planned_owner_creation(tmp_path):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    task.types.append({'name': 'WorkUnit', 'classId': 1638416, 'type': 'WObject'})
+    task.objects[SECOND] = {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
+        'path': r'\Actor-Mixer Hierarchy\Default Work Unit', 'parent': None, 'notes': 'Keep work unit'}
+    parent = task.bind(SECOND)
+    code, types = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Sound')
+    assert code == 0, types
+    field = task.class_field(types['type_candidates'][0]['handle'], 'Volume')
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'sound', '--parent-handle', parent,
+        '--kind', 'sound-sfx', '--name', 'PlannedSound')
+    assert code == 0, declared
+    declare_time(task, declared['draft']['declared_object']['result_handle'], field, end_x=1000)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'CONTROL_INPUT_TIME_AXIS_OUT_OF_RANGE', rejected
+    assert task.writes == [] and CHILD not in task.objects
+
 OLD_CONTROL = '{99999999-9999-9999-9999-999999999999}'
 
 
@@ -290,7 +402,7 @@ class ReplacementTask(OwnedControlTask):
             'owner': {'id': FIRST}, 'path': r'\opaque-rtpc', 'notes': 'Keep RTPC',
             '@PropertyName': 'Volume', '@ControlInput': {'id': OLD_CONTROL},
             '@Curve': {'id': CURVE, 'points': [{'x': 0, 'y': -20, 'shape': 'Linear'},
-                {'x': 1000, 'y': 0, 'shape': 'Linear'}]}}
+                {'x': 5 if self.input_type == 'ModulatorTime' else 1000, 'y': 0, 'shape': 'Linear'}]}}
         self.objects[FIRST]['@RTPC'] = [{'id': RTPC}]
         self.objects[CHILD] = {**deepcopy(self.objects[RTPC]), 'id': CHILD, '@PropertyName': 'Pitch',
             'notes': 'Keep unrelated RTPC', '@Curve': {'id': '{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}',
@@ -348,6 +460,29 @@ def declare_replacement(task):
     return task
 
 
+@pytest.mark.parametrize('duration', [5, 6])
+def test_time_replacement_preserves_curve_or_requires_supported_duration_choice(tmp_path, duration):
+    task = ReplacementTask(tmp_path)
+    task.objects[RTPC]['@Curve']['points'][-1]['x'] = 6
+    task.input_properties['TimeModDuration'] = duration
+    before = deepcopy(task.objects)
+    declare_replacement(task)
+    if duration == 5:
+        code, rejected = task.step('draft-check')
+        assert code == 2 and rejected.get('error_code') == 'CONTROL_INPUT_TIME_AXIS_OUT_OF_RANGE', rejected
+        repair = rejected['details']['repair']
+        assert repair['declare']['subcommand'] == 'draft-declare-field-change'
+        assert repair['declare']['option'] == '--new-control-input-field-value'
+        assert 'cannot rewrite' in repair['preservation'] and 'draft-declare-rtpc' in repair['preservation']
+        assert task.writes == [] and task.objects == before
+    else:
+        tx, shown = task.preview()
+        code, verified = task.finish(tx, shown)
+        assert code == 0 and verified.get('verified') is True, verified
+        assert task.objects[RTPC]['@Curve'] == before[RTPC]['@Curve']
+        assert '@Curve' not in task.writes[0]['objects'][0]
+
+
 @pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
 @pytest.mark.parametrize('input_type', ['ModulatorLfo', 'ModulatorEnvelope', 'ModulatorTime'])
 def test_existing_rtpc_replacement_keeps_curve_identity_list_and_shared_input(tmp_path, version, input_type):
@@ -370,6 +505,11 @@ def test_public_schema_discloses_closed_existing_rtpc_owned_reference_route(tmp_
     assert code == 0, schema
     encoded = json.dumps(schema)
     assert 'replace_owned_control_input' in encoded and 'draft-declare-field-change' in encoded
+    assert '"unit": "seconds"' in encoded and '"native_domain_complete": false' in encoded
+    assert 'partial_duration_endpoints' in encoded and 'native_field_order' in encoded
+    code, named = task.run('operation-schema', 'object.setRTPC')
+    assert code == 0 and '"unit": "seconds"' in json.dumps(named), named
+    assert '"native_domain_complete": false' in json.dumps(named)
     code, schema = task.run('operation-schema', 'object.setReference')
     assert code == 0, schema
     assert 'new_owned_ControlInput_requires_object.set_Business_Draft' in json.dumps(schema)
@@ -654,6 +794,7 @@ def test_public_preview_seals_exact_versioned_constructor_source_without_sdk_run
     proof, = [node['owned_control_input']['constructor_authority'] for node in nodes if node.get('owned_control_input')]
     resource = Path(__file__).parents[2] / 'skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json'
     assert proof['version'] == '2025.1' and proof['resource_sha256'] == sha256(resource.read_bytes()).hexdigest()
+    assert proof['time_axis']['unit'] == 'seconds' and proof['time_axis']['complete_native_domain'] is False
 
 
 def test_invalid_constructor_source_is_a_structured_no_write_preview_boundary(tmp_path, monkeypatch):

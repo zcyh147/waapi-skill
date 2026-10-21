@@ -2707,6 +2707,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "live getPropertyInfo must report RTPC support for the requested property",
             "the ControlInput is exactly one existing GameParameter/MIDI/Modulator identity or a new owned Modulator through selected class Field Handles",
             "a new owned input always adds a fresh pair, preserves other RTPC rows and obeys exclusive property cardinality",
+            "new owned Time Curve X values are seconds within the explicit or fresh typed class-default Duration; this interim intent-preservation policy rejects outside points before writes without normalization and does not prove the complete native domain",
             "add appends one typed @RTPC row; add_or_replace updates one exact property/ControlInput match in place",
             "raw @RTPC rows and caller-authored listMode/replaceAll are never accepted",
             "the complete RTPC list is sealed before execution and read back after execution",
@@ -7335,14 +7336,18 @@ def _require_owned_control_input_reference(reference, input_type):
             continue
         if not isinstance(row, Mapping) or "type" not in row or set(row) - {"type", "sharedOnlyTypes"}:
             raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Owned ControlInput has an unproved live reference classifier.")
+        types = row["type"]
+        if not isinstance(types, list) or not all(isinstance(value, str) and value for value in types):
+            raise OperationContractError("INVALID_METADATA", "Reference type restriction must be a string array.")
         shared = row.get("sharedOnlyTypes", [])
-        if not isinstance(shared, list) or any(not isinstance(value, str) for value in shared):
-            raise OperationContractError("INVALID_METADATA", "sharedOnlyTypes must be a string array.")
+        if (not isinstance(shared, list) or any(not isinstance(value, str) or not value for value in shared)
+                or {reference_type_token(value) for value in shared} - {reference_type_token(value) for value in types}):
+            raise OperationContractError("INVALID_METADATA", "Shared-only reference types must be non-empty strings within the allowed type array.")
         if input_token in {reference_type_token(value) for value in shared}:
             raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "This live target type requires a shared reference.")
 
 
-def _prepare_owned_control_input(descriptor, *, version, read, inherited_platform=None):
+def _prepare_owned_control_input(descriptor, *, version, read, inherited_platform=None, curve_points=None, curve_context="new_rtpc"):
     """Seal the exact new class, reference allowance and prospective fields."""
     from .new_object_defaults import class_default_evidence, NewObjectDefaultError
     if version not in CONTROL_INPUT_VERSIONS or not isinstance(descriptor, OwnedControlInputDescriptor):
@@ -7366,6 +7371,43 @@ def _prepare_owned_control_input(descriptor, *, version, read, inherited_platfor
     fields = [_read_property_info(read, class_id=info.class_id, name=name) for name, _ in descriptor.properties]
     for field, (_, value) in zip(fields, descriptor.properties):
         _require_object_property_value(field, value)
+    time_axis = None
+    if descriptor.type == "ModulatorTime":
+        duration_field = next((field for field in fields if field.name == "TimeModDuration"), None)
+        if duration_field is None:
+            duration_field = _read_property_info(read, class_id=info.class_id, name="TimeModDuration")
+            fields.append(duration_field)
+        supplied = dict(descriptor.properties)
+        explicit = "TimeModDuration" in supplied
+        duration = supplied.get("TimeModDuration", duration_field.default)
+        repair = {"discover_field": {"subcommand": "draft-discover-fields", "type_handle": "<selected ModulatorTime Type Handle>", "meaning": "Duration"},
+            "declare": {"subcommand": "draft-declare-field-change" if curve_context == "replacement_preservation" else "draft-declare-rtpc",
+                "option": "--new-control-input-field-value", "arguments": ["<returned Duration Field Handle>", "<explicit duration in seconds within its live restriction>"]}}
+        if (duration_field.name != "TimeModDuration" or (duration_field.type or "").casefold() != "real64"
+                or not explicit and "default" not in duration_field.raw
+                or type(duration) not in (int, float) or not math.isfinite(duration) or duration <= 0):
+            raise OperationContractError("CONTROL_INPUT_TIME_DURATION_REQUIRED", "Discover the Duration class Field Handle and declare its explicit value in seconds; no usable typed class default is proved.",
+                details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False})
+        try:
+            _require_object_property_value(duration_field, duration)
+        except OperationContractError as exc:
+            raise OperationContractError("CONTROL_INPUT_TIME_DURATION_REQUIRED", "The effective Duration does not satisfy fresh class metadata; declare an explicit Duration Field Handle value.",
+                details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False}) from exc
+        if not isinstance(curve_points, (list, tuple)) or not curve_points:
+            raise OperationContractError("INVALID_READBACK", "Time-axis admission requires the exact declared or preserved Curve points.")
+        outside = [index for index, point in enumerate(curve_points) if type(point.get("x")) not in (int, float)
+            or not math.isfinite(point["x"]) or not 0 <= point["x"] <= duration]
+        if outside:
+            if curve_context == "replacement_preservation":
+                repair["preservation"] = "This replacement changes only ControlInput and cannot rewrite its existing Curve. Choose an explicit Duration Field Handle value that contains every existing X within its live restriction, if one exists; otherwise retain this input. A separate object.setRTPC draft-declare-rtpc can add a new RTPC with explicitly chosen Time points while preserving the old RTPC."
+            raise OperationContractError("CONTROL_INPUT_TIME_AXIS_OUT_OF_RANGE", "Interim Time intent-preservation policy requires explicit Curve X coordinates in seconds within effective Duration; points and Duration are never normalized.",
+                details={"x_range_seconds": [0, duration], "effective_duration_source": "explicit" if explicit else "class_default",
+                    "offending_point_indices": outside, "curve_context": curve_context, "repair": repair,
+                    "tracking_issue": 180, "native_domain_complete": False, "mutation_dispatched": False})
+        time_axis = {"unit": "seconds", "x_range_seconds": [0, duration], "effective_duration": duration,
+            "effective_duration_source": "explicit" if explicit else "class_default", "curve_context": curve_context,
+            "platform": descriptor.platform, "points": [dict(point) for point in curve_points],
+            "authority": source_authority["time_axis"], "native_domain_complete": False, "tracking_issue": 180}
     try:
         defaults = class_default_evidence(infos=fields, scope={"classId": info.class_id}, read_call=read,
             supplied_values=dict(descriptor.properties), validate_scalar=_require_object_property_value, version=version)
@@ -7373,10 +7415,13 @@ def _prepare_owned_control_input(descriptor, *, version, read, inherited_platfor
             supplied_references={"ControlInput": True}, validate_scalar=_require_object_property_value, version=version)
     except NewObjectDefaultError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    properties = {**dict(descriptor.properties), **defaults["derived_properties"]}
+    if time_axis is not None:
+        properties["TimeModDuration"] = time_axis["effective_duration"]
     return {"type": info.name, "class_id": info.class_id, "name": descriptor.name,
         "constructor_authority": source_authority,
         "platform": descriptor.platform,
-        "notes": descriptor.notes, "properties": {**dict(descriptor.properties), **defaults["derived_properties"]},
+        "notes": descriptor.notes, "properties": properties, **({"time_axis": time_axis} if time_axis is not None else {}),
         "native": descriptor.native(defaults["derived_properties"]),
         "metadata_guards": [{"class_metadata": info.as_dict(), "new_object_default_evidence": [defaults]},
             {"class_metadata": rtpc.as_dict(), "new_object_default_evidence": [reference_defaults]}]}
@@ -7415,7 +7460,9 @@ def _prepare_owned_control_replacement(target, descriptor, *, target_spec, versi
     baseline = _read_graph_rtpc_rows(owner_id, version=version, class_id=1441808, read=read)
     if sum(_same_identity(member["id"], target.object) for member in baseline) != 1:
         raise OperationContractError("INVALID_READBACK", "The selected RTPC must occur exactly once in its complete owning list.")
-    proof = _prepare_owned_control_input(descriptor.target, version=version, read=read, inherited_platform=target_spec.get("platform"))
+    curve = _field_value(row, "Curve")
+    proof = _prepare_owned_control_input(descriptor.target, version=version, read=read, inherited_platform=target_spec.get("platform"),
+        curve_points=curve.get("points") if isinstance(curve, Mapping) else None, curve_context="replacement_preservation")
     proof.update(baseline_rows=baseline, old_control_input=old_id, owner_id=owner_id)
     path = target_spec["request_path"] + ".owned_control_input"
     spec = {"request_path": path, "parent_request_path": target_spec["request_path"],
@@ -7784,7 +7831,8 @@ def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read,
     owned = isinstance(node.rtpc.control_input, OwnedControlInputDescriptor)
     if owned:
         inherited_platform = parent.get("platform", platform) if parent is not None else platform
-        spec["owned_control_input"] = _prepare_owned_control_input(node.rtpc.control_input, version=version, read=read, inherited_platform=inherited_platform)
+        spec["owned_control_input"] = _prepare_owned_control_input(node.rtpc.control_input, version=version, read=read,
+            inherited_platform=inherited_platform, curve_points=[point.as_dict() for point in node.rtpc.points])
     control = None if owned else _resolve_identity(node.rtpc.control_input.as_dict(), role=node.request_path + ".control_input", read=read, identity_cache=identity_cache)
     if control is not None and not _is_rtpc_control_input(control.row.get("type")):
         raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "RTPC ControlInput must have a supported actual type.")
@@ -9300,7 +9348,8 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     if not isinstance(pre_state, Mapping):
         return []
     nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
-    nodes.extend(guard for node in tuple(nodes) for guard in node.get("owned_control_input_replacement", {}).get("metadata_guards", []))
+    nodes.extend(guard for node in tuple(nodes) for key in ("owned_control_input", "owned_control_input_replacement")
+        for guard in node.get(key, {}).get("metadata_guards", []))
     from .owned_control_inputs import constructor_authority_current
     authority_proofs = {canonical_sha256(proof.get("constructor_authority")): proof.get("constructor_authority")
         for node in nodes for proof in (node.get("owned_control_input"), node.get("owned_control_input_replacement"))

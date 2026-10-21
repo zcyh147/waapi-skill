@@ -76,8 +76,19 @@
       "feature_member": "whatsnew_2022_1_new_features.html",
       "feature_sha256": "ef6a646ea1b813fa3c5a17231ab182671a0922d958a0da5b251c8d00d2f04201",
       "custom_modulator_statement": "Custom and ShareSets Modulators can now be created."
+    },
+    "time_axis": {
+      "guide_member": "ch18s06.html",
+      "guide_sha256": "cc52d69790d82c6ca4c4704a1cc5dcae154f3abd156617b28edc4a98f8d58e7d",
+      "duration_member": "Authoring/Data/WObjects/Html/en/TimeModDuration.html",
+      "duration_sha256": "6c21b4981f52b205195067ce36a764b68fc09e69ca57f917d15d2f45146e5d6e",
+      "x_quantity": "time",
+      "unit": "seconds",
+      "duration_quantity": "one_iteration_at_normal_playback_rate",
+      "policy": "interim_gateway_intent_preservation_within_effective_duration",
+      "complete_native_domain": false
     }
   },
   "scope": "new_property_bound_RTPC_ControlInput_only; native_acceptance_not_inferred_from_static_sources",
-  "authority_sha256": "5d4d0b0000294361b4615174b31e592e9123821a9a309bb360cc6fe6768e70a8"
+  "authority_sha256": "63b09bef2815e20e95f7b154c81e6ff678905cace37660d9140d3030f2596829"
 }
