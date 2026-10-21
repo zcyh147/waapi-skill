@@ -2752,6 +2752,7 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
     import uuid
     from tests.unit.test_unnamed_rtpc_graph_gateway import rtpc_task
     task, _ = rtpc_task(tmp_path, version)
+    task.types.append({'name': 'ModulatorTime', 'classId': 5111824, 'type': 'WObject'})
     actor, parameters = ('{' + str(uuid.UUID(int=n)).upper() + '}' for n in (101, 102))
     actor_path = ('\\Containers' if version == '2025.1' else '\\Actor-Mixer Hierarchy') + '\\Default Work Unit'
     task.objects = {identity: {'id': identity, 'name': 'Default Work Unit', 'type': 'WorkUnit',
@@ -2760,11 +2761,17 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
     task.metadata.update({
         'Min': {'name': 'Min', 'type': 'Real64', 'default': -10},
         'Max': {'name': 'Max', 'type': 'Real64', 'default': 90},
+        'TimeModDuration': {'name': 'TimeModDuration', 'type': 'Real64', 'default': 1,
+            'restriction': {'type': 'range', 'min': 0.1, 'max': 100}},
+        'EnvelopeStopPlayback': {'name': 'EnvelopeStopPlayback', 'type': 'bool', 'default': True},
         'CenterPercentage': {'name': 'CenterPercentage', 'type': 'int32', 'default': 0,
             'supports': {'rtpc': 'Exclusive' if exclusive else 'None'},
             'restriction': {'type': 'range', 'min': 0, 'max': 100}}})
+    task.metadata['ControlInput']['restriction']['restrictions'] = [
+        {'type': ['ModulatorTime', 'ModulatorLfo', 'ModulatorEnvelope', 'GameParameter', 'MidiParameter']}]
     fields = {'Sound': ['Volume', 'Pitch', 'CenterPercentage'], 'GameParameter': ['Min', 'Max'],
-        'RTPC': ['PropertyName', 'ControlInput', 'Curve'], 'Curve': [], 'WorkUnit': []}
+        'RTPC': ['PropertyName', 'ControlInput', 'Curve'], 'Curve': [], 'WorkUnit': [],
+        'ModulatorTime': ['TimeModDuration', 'EnvelopeStopPlayback']}
     if fault in {'names-overflow', 'paged-sound-fields'}:
         fields['Sound'] = ['Volume', 'Pitch', 'CenterPercentage'] + [f'Other{i:03}' for i in range(254 if fault == 'names-overflow' else 108)]
     original, writes, commands = task.call, [], []
@@ -2811,7 +2818,14 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
                 row['@RTPC'].append({'id': member['id']})
                 result['@RTPC'].append(member)
         if '@PropertyName' in node: row['@PropertyName'] = node['@PropertyName']
-        if '@ControlInput' in node: row['@ControlInput'] = {'id': node['@ControlInput']}
+        if '@ControlInput' in node:
+            if isinstance(node['@ControlInput'], dict):
+                result['@ControlInput'] = create(node['@ControlInput'], row['id'], owned=True)
+                row['@ControlInput'] = {'id': result['@ControlInput']['id']}
+            else:
+                row['@ControlInput'] = {'id': node['@ControlInput']}
+        for token in ('TimeModDuration', 'EnvelopeStopPlayback'):
+            if '@' + token in node: row['@' + token] = node['@' + token]
         if '@Curve' in node:
             curve = row.get('@Curve', {}).get('id') or allocate()
             points = deepcopy(node['@Curve']['points'])
@@ -2862,6 +2876,8 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
                     rows = [task.objects[item['id']] for item in rows[0]['@RTPC']]
                 elif 'select @Curve' in expression:
                     rows = [task.objects[rows[0]['@Curve']['id']]]
+                elif 'select children' in expression:
+                    rows = [row for row in task.objects.values() if row.get('parent') == {'id': rows[0]['id']}]
             elif 'id' in source: rows = [task.objects[key] for key in source['id'] if key in task.objects]
             else: rows = [row for row in task.objects.values() if row['path'] in source['path']]
             for transform in args.get('transform', []):
@@ -2882,6 +2898,11 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
         if fault == 'identity-drift' and command[0] == 'query-object' and '--path-segment' in command and 'WAAPI_RTPC_TEST' in command:
             created = next(row for row in task.objects.values() if row['name'] == 'WAAPI_RTPC_TEST')
             created.update(name='Changed between path and exact ID', path=created['path'] + '_Changed')
+        if command[0] == 'verify' and code == 0 and len(writes) == 2 and fault == 'wrong-input-owner':
+            # Deliberately after the real Gateway has verified its own readbacks:
+            # the collector must independently reject the altered native state.
+            control, = [row for row in task.objects.values() if row['type'] == 'ModulatorTime']
+            control['owner'] = {'id': parameters}
         if command[0] == 'verify' and code == 0 and len(writes) == 3 and fault:
             owner = next(row for row in task.objects.values() if row['name'] == 'WAAPI_RTPC_TEST')
             members = [task.objects[row['id']] for row in owner['@RTPC']]
@@ -2897,6 +2918,57 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
         return code, payload
     runtime.raw_gateway = raw
     return runtime, commands, writes, task
+
+
+def test_named_owned_time_first_collector_uses_one_public_source_transaction(tmp_path, workflow):
+    from copy import deepcopy
+    runtime, commands, writes, task = _rtpc_graph_runtime(tmp_path, workflow, '2022.1')
+    parent = next(row for row in task.objects.values() if row['path'].startswith(r'\Actor-Mixer Hierarchy'))
+    for suffix, name in [('050', 'Silence'), ('051', 'Existing fixture')]:
+        identity = '{00000000-0000-0000-0000-000000000' + suffix + '}'
+        task.objects[identity] = {'id': identity, 'name': name, 'type': 'Sound', 'classId': 65552,
+            'path': parent['path'] + '\\' + name, 'parent': {'id': parent['id']}, 'notes': 'Keep sibling'}
+    preserved = deepcopy(task.objects)
+    category = workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST', owned_time_first=True)
+    receipt = json.loads(Path(category['observation_path']).read_text())
+    assert category['category'] == 'named-owned-time-control-input-first' and category['status'] == 'PASS'
+    assert receipt['complete'] is True and receipt['business_effect_verified'] is True
+    assert receipt['setup_coverage_credit'] is False and len(receipt['effects']) == 1
+    assert len(writes) == 2 and [cmd[0] for cmd in commands].count('execute') == 2
+    assert [cmd[0] for cmd in commands].count('verify') == 2
+    assert not any(row['type'] == 'GameParameter' for row in task.objects.values())
+    source, = receipt['effects']
+    assert source['public_operation'] == 'object.setRTPC' and source['artifact_unchanged'] is True
+    assert source['constructor_authority']['authority_sha256']
+    observed = source['independent_effect']
+    member, = observed['members']
+    assert member['object']['properties']['PropertyName'] == 'Volume'
+    control = member['control_input']
+    assert control['type'] == 'ModulatorTime' and control['class_id'] == 5111824
+    assert control['name'] == 'TimeMod' and control['owner']['id'] == member['object']['id']
+    assert control['properties'] == {'TimeModDuration': 5, 'EnvelopeStopPlayback': False}
+    assert type(control['properties']['EnvelopeStopPlayback']) is bool
+    assert member['curve']['curve_points'] == [
+        {'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 1000, 'y': 0, 'shape': 'Linear'}]
+    assert source['parent_after'] == source['parent_before']
+    assert all(task.objects[key] == row for key, row in preserved.items())
+    assert len(receipt['calls']) <= 384 and Path(category['observation_path']).stat().st_size <= 16 * 1024 * 1024
+
+
+def test_named_owned_time_first_collector_rejects_wrong_owner_after_gateway_success(tmp_path, workflow):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, '2022.1', fault='wrong-input-owner')
+    with pytest.raises(AssertionError):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST', owned_time_first=True)
+    receipt = json.loads((runtime.state_dir / 'named-owned-time-control-input-first.json').read_text())
+    assert runtime.category_results[0]['status'] == 'FAIL'
+    assert receipt['business_effect_verified'] is False and receipt['complete'] is False
+    assert len(writes) == 2 and [cmd[0] for cmd in commands].count('execute') == 2
+    assert [cmd[0] for cmd in commands].count('verify') == 2
+    source, = receipt['effects']
+    assert source['verify']['exit_code'] == 0 and source['verify']['payload']['verified'] is True
+    assert source['verify']['payload']['verification']['business_state_verified'] is True
+    assert source['effect_verified'] is False and receipt['failure']
+    assert source['artifact_unchanged'] is True and len(receipt['calls']) <= 384
 
 
 @pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])

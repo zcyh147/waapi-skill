@@ -6289,12 +6289,14 @@ def test_existing_effect_slot_exact_member_acceptance(workflow_sandbox_runtime: 
     assert category['status'] == 'PASS', category
 
 
-def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str) -> dict[str, Any]:
-    """Five graph effects with independent complete pair/Curve observations."""
+def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: str,
+        owned_time_first: bool = False) -> dict[str, Any]:
+    """Five graph effects, or the separate first named owned-Time witness."""
     import math
     from copy import deepcopy
-    output = runtime.state_dir / 'rtpc-graph-acceptance.json'
-    category = {'category': 'rtpc-graph-acceptance', 'status': 'FAIL', 'observation_path': str(output),
+    category_name = 'named-owned-time-control-input-first' if owned_time_first else 'rtpc-graph-acceptance'
+    output = runtime.state_dir / (category_name + '.json')
+    category = {'category': category_name, 'status': 'FAIL', 'observation_path': str(output),
         'verifier_strength': 'gateway_verified_plus_independent_complete_ordered_pairs_and_exact_curve_points'}
     runtime.category_results.append(category)
     receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [], 'effects': [],
@@ -6389,8 +6391,16 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             assert row.get('owner', {}).get('id') == owner, row
             assert isinstance(row.get('properties', {}).get('PropertyName'), str), row
             control = ref(row, 'ControlInput')
-            assert control in controls_by_id, row
-            assert exact(control, ('Min', 'Max')) == controls_by_id[control]['object'], row
+            if owned_time_first:
+                input_row = exact(control, ('TimeModDuration', 'EnvelopeStopPlayback'))
+                assert input_row['type'] == 'ModulatorTime' and input_row['class_id'] == classes['ModulatorTime'], input_row
+                assert input_row['name'] == 'TimeMod' and input_row.get('owner', {}).get('id') == row['id'], input_row
+                assert input_row['notes'] == 'New time control', input_row
+                assert input_row['properties'] == {'TimeModDuration': 5, 'EnvelopeStopPlayback': False}, input_row
+                assert type(input_row['properties']['EnvelopeStopPlayback']) is bool, input_row
+            else:
+                assert control in controls_by_id, row
+                assert exact(control, ('Min', 'Max')) == controls_by_id[control]['object'], row
             curve_id = ref(row, 'Curve')
             hopped = query(['--advanced-waql', f'from object "{row["id"]}" select @Curve', '--max-results', '2',
                 *projection, '--include', 'curve-points'], count=1)[0]
@@ -6404,6 +6414,7 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             assert all(set(point) == {'x', 'y', 'shape'} and all(type(point[key]) in (int, float)
                 and math.isfinite(point[key]) for key in ('x', 'y')) for point in points), curve
             members.append({'object': row, 'curve': curve, 'pair': [row['properties']['PropertyName'], control]})
+            if owned_time_first: members[-1]['control_input'] = input_row
         assert len({tuple(row['pair']) for row in members}) == len(members), members
         return {'owner': sound, 'members': members}
     def selected_field(draft, token, *, owner=None, kind=None):
@@ -6441,6 +6452,14 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         assert shown['artifact']['prepared_operation']['dispatch']['uri'] == 'ak.wwise.core.object.set', shown
         phase.update(transaction_id=identity, artifact_hash=preview['artifact_hash'],
             compiled_native_request=shown['artifact']['prepared_operation']['dispatch'])
+        if owned_time_first:
+            phase['public_operation'] = shown['artifact']['request']['operation']
+            assert phase['public_operation'] == ('object.setRTPC' if effect else 'object.set'), shown
+            if effect:
+                proofs = [node['owned_control_input']['constructor_authority'] for node in
+                    shown['artifact']['prepared_operation']['pre_state']['object_set_nodes'] if node.get('owned_control_input')]
+                phase['constructor_authority'], = proofs
+                assert phase['constructor_authority']['version'] == runtime.version, proofs
         gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
         phase['native_outcome'] = 'indeterminate'
         code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
@@ -6448,6 +6467,11 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         phase['native_outcome'] = 'accepted'
         code, verified = gateway.raw_gateway(['verify', identity]); phase['verify'] = {'exit_code': code, 'payload': verified}
         assert code == 0 and verified.get('verified') is True and verified.get('verification', {}).get('business_state_verified') is True, verified
+        if owned_time_first:
+            final = gateway.gateway(['transaction-show', identity], live=False)
+            phase['final_transaction'] = final
+            assert final['artifact'] == shown['artifact'], 'Stored immutable Preview changed'
+            phase['artifact_unchanged'] = True
         return phase, phase_category
     def admit(phase, phase_category, observed):
         phase['independent_effect'] = observed
@@ -6460,38 +6484,51 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             assert actual['object']['notes'] == wanted['notes'], (wanted, actual)
     try:
         assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No fabricated 2021 RTPC graph construction'
+        if owned_time_first: assert runtime.version == '2022.1', 'First owned-Time witness is pinned to2022.1'
         schema = gateway.gateway(['query-schema', '--output', 'curve-points'], live=False)
         assert 'curve-points' in json.dumps(schema) and 'points' in json.dumps(schema), schema
         gateway.gateway(['query-schema', '--advanced'], live=False)
-        reflected = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', 'GameParameter',
+        input_type = 'ModulatorTime' if owned_time_first else 'GameParameter'
+        reflected = gateway.gateway(['metadata', 'types', '--meaning', 'Sound', '--meaning', input_type,
             '--meaning', 'RTPC', '--meaning', 'Curve', '--page-size', '64'], live=True)['agent_result']
         assert reflected.get('complete') is True, reflected
         classes = {}
-        for token in ('Sound', 'GameParameter', 'RTPC', 'Curve'):
+        for token in ('Sound', input_type, 'RTPC', 'Curve'):
             match, = [row for row in reflected['types'] if row.get('name') == token]
             assert type(match.get('classId')) is int, match
             classes[token] = match['classId']
         receipt['live_classes'] = classes
+        if owned_time_first:
+            assert classes == {'Sound': 65552, 'ModulatorTime': 5111824, 'RTPC': 1441808, 'Curve': 917520}, classes
         actor_segments = ('Containers' if runtime.version == '2025.1' else 'Actor-Mixer Hierarchy', 'Default Work Unit')
         input_segments = ('Game Parameters', 'Default Work Unit')
-        setup = _start_business_draft(gateway, 'object.set')
-        actor = _bind_business_object(gateway, setup, path_segments=actor_segments)
-        parameters = _bind_business_object(gateway, setup, path_segments=input_segments)
-        sound_kind = _discover_business_type(gateway, setup, meaning='Sound', role='object', expected_label='Sound')
-        input_kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
-        for declaration, parent, label, kind in [('owner', actor, name, sound_kind),
-                ('input-a', parameters, name + '_A', input_kind), ('input-b', parameters, name + '_B', input_kind)]:
-            _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', declaration,
-                '--parent-handle', parent, '--name', label, '--kind', kind, '--field', 'notes', 'Keep ' + declaration], live=False)
-        setup_phase, setup_category = complete(setup, 'setup_no_credit', effect=False)
         def by_path(segments):
             row, = query([*(arg for segment in segments for arg in ('--path-segment', segment)), *projection], count=1)
             certified = exact(row['id'])
             assert certified == row, (row, certified)
             return certified
+        def children(parent):
+            rows = query(['--advanced-waql', f'from object "{parent}" select children', '--max-results', '8', *projection])
+            return sorted(rows, key=lambda row: row['id'])
+        if owned_time_first:
+            parent_before = by_path(actor_segments)
+            children_before = children(parent_before['id'])
+            receipt['parent_before_setup'] = {'object': parent_before, 'children': children_before}
+        setup = _start_business_draft(gateway, 'object.set')
+        actor = _bind_business_object(gateway, setup, path_segments=actor_segments)
+        sound_kind = _discover_business_type(gateway, setup, meaning='Sound', role='object', expected_label='Sound')
+        declarations = [('owner', actor, name, sound_kind)]
+        if not owned_time_first:
+            parameters = _bind_business_object(gateway, setup, path_segments=input_segments)
+            input_kind = _discover_business_type(gateway, setup, meaning='GameParameter', role='object', expected_label='GameParameter')
+            declarations.extend([('input-a', parameters, name + '_A', input_kind), ('input-b', parameters, name + '_B', input_kind)])
+        for declaration, parent, label, kind in declarations:
+            _update_business_draft(gateway, setup, 'draft-declare-new', ['--declaration-id', declaration,
+                '--parent-handle', parent, '--name', label, '--kind', kind, '--field', 'notes', 'Keep ' + declaration], live=False)
+        setup_phase, setup_category = complete(setup, 'setup_no_credit', effect=False)
         owner = by_path((*actor_segments, name))['id']
         controls_by_id = {}
-        for suffix in ('_A', '_B'):
+        for suffix in (() if owned_time_first else ('_A', '_B')):
             identity = by_path((*input_segments, name + suffix))['id']
             details = inventory(identity, ('Min', 'Max'))
             assert set(details) == {'Min', 'Max'}, details
@@ -6501,9 +6538,9 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             assert row['type'] == 'GameParameter' and row['class_id'] == classes['GameParameter'], row
             controls_by_id[identity] = {'object': row, 'source_range': {'minimum': minimum, 'maximum': maximum}}
         receipt['controls'] = list(controls_by_id.values())
-        a, b = controls_by_id
-        field_details = inventory(owner, ('Volume', 'Pitch', 'CenterPercentage'))
-        assert {'Volume', 'Pitch'}.issubset(field_details), field_details
+        if not owned_time_first: a, b = controls_by_id
+        field_details = inventory(owner, ('Volume',) if owned_time_first else ('Volume', 'Pitch', 'CenterPercentage'))
+        assert ({'Volume'} if owned_time_first else {'Volume', 'Pitch'}).issubset(field_details), field_details
         assert field_details['Volume']['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative'}, field_details
         status = gateway.gateway(['status'], live=True)
         receipt['host_and_project'] = {'wwise': status.get('wwise'), 'project': status.get('project'), 'endpoint': status.get('endpoint')}
@@ -6518,6 +6555,63 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
                 assert code == 0 and type(observed) is bool, payload
             return code == 0 and observed is True
         assert enabled('Volume'), 'Selected Volume is not observed enabled on the actual current platform'
+        if owned_time_first:
+            draft = _start_business_draft(gateway, 'object.set')
+            target = _bind_business_object(gateway, draft, object_id=owner)
+            lists = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+                '--field-source', 'documented-lists', '--list'], live=True)['agent_result']
+            selected_list, = [row for row in lists['items'] if row.get('name') == 'RTPC']
+            assert selected_list.get('field_kind') == 'list' and selected_list.get('element_classes') == [
+                {'name': 'RTPC', 'class_id': classes['RTPC']}], selected_list
+            disclosed = _update_business_draft(gateway, draft, 'draft-discover-fields', ['--object-handle', target,
+                '--field-source', 'documented-lists', '--selection', selected_list['selection']], live=True)
+            receipt['documented_list'] = disclosed['meaning_results'][0]['candidates'][0]
+            assert receipt['documented_list']['evidence']['kind'] == 'documented-list', disclosed
+            initial = snapshot(owner)
+            assert initial['members'] == [], initial
+            parent_after_setup = {'object': exact(parent_before['id']), 'children': children(parent_before['id'])}
+            assert parent_after_setup['object'] == parent_before, parent_after_setup
+            assert {row['id']: row for row in parent_after_setup['children']} == {
+                **{row['id']: row for row in children_before}, owner: exact(owner)}, parent_after_setup
+            setup_phase['independent_effect'] = initial
+            setup_category['status'] = 'PASS'
+            restriction = field_details['Volume']['metadata']['restriction']
+            low, high = restriction.get('min'), restriction.get('max')
+            assert all(type(value) in (int, float) and math.isfinite(value) for value in (low, high)), restriction
+            assert low <= -20 < 0 <= high, restriction
+            draft = _start_business_draft(gateway, 'object.setRTPC')
+            target = _bind_business_object(gateway, draft, object_id=owner)
+            field = selected_field(draft, 'Volume', owner=target)
+            kind = _discover_business_type(gateway, draft, meaning='ModulatorTime', role='object', expected_label='ModulatorTime')
+            duration = selected_field(draft, 'TimeModDuration', kind=kind)
+            stop = selected_field(draft, 'EnvelopeStopPlayback', kind=kind)
+            wanted_points = [{'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 1000, 'y': 0, 'shape': 'Linear'}]
+            _update_business_draft(gateway, draft, 'draft-declare-rtpc', ['--object-handle', target,
+                '--field-handle', field, '--new-control-input-kind', kind, '--new-control-input-name', 'TimeMod',
+                '--new-control-input-notes', 'New time control', '--new-control-input-field-value', duration, '5',
+                '--new-control-input-field-value', stop, 'false',
+                *(arg for point in wanted_points for arg in ('--point', str(point['x']), str(point['y']), point['shape']))], live=False)
+            phase, phase_category = complete(draft, 'named_new_time')
+            observed = snapshot(owner)
+            member, = observed['members']
+            assert member['pair'] == ['Volume', member['control_input']['id']], member
+            assert member['curve']['curve_points'] == wanted_points and member['object']['notes'] == '', member
+            assert observed['owner'] == initial['owner'], (initial, observed)
+            identities = [member['object']['id'], member['control_input']['id'], member['curve']['id']]
+            assert len(set(identities)) == 3 and not set(identities).intersection({owner, parent_before['id'],
+                *[row['id'] for row in children_before]}), identities
+            verification, = [event['details']['verification'] for event in phase['final_transaction']['events']
+                if event['event_type'] == 'verification_recorded']
+            bound, = [check['evidence'] for check in verification['assertions']
+                if check.get('kind') == 'verified_owned_control_input_identity' and check.get('passed') is True]
+            assert bound['object']['id'] == member['control_input']['id'] and bound['owner_id'] == member['object']['id'], bound
+            phase['parent_before'] = parent_after_setup
+            phase['parent_after'] = {'object': exact(parent_before['id']), 'children': children(parent_before['id'])}
+            assert phase['parent_after'] == phase['parent_before'], phase
+            admit(phase, phase_category, observed)
+            receipt['business_effect_verified'] = receipt['complete'] = True
+            category['status'] = 'PASS'
+            return category
         active = {token: enabled(token) for token in ('Pitch', 'CenterPercentage') if token in field_details
             and field_details[token]['metadata'].get('supports', {}).get('rtpc') in {'Additive', 'Multiplicative', 'Exclusive'}}
         candidates = [token for token in ('Pitch', 'CenterPercentage') if active.get(token)]
@@ -6640,6 +6734,16 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
         category['status'] = 'FAIL'
         persist()
         category['status'] = completed_status
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2022.1', reason='First owned-Time witness is pinned to2022.1')
+def test_named_owned_time_control_input_first_2022_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    assert workflow_sandbox_runtime.version == '2022.1', 'This first native witness requires matching2022.1'
+    category = _collect_rtpc_graph_acceptance(workflow_sandbox_runtime,
+        name='WAAPI_OWNED_TIME_' + uuid.uuid4().hex[:12], owned_time_first=True)
+    assert category['status'] == 'PASS', category
 
 
 @pytest.mark.live
