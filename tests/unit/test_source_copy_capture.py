@@ -1,5 +1,6 @@
 """Frozen Source capture accepts only the reviewed complete dependencies."""
 import json
+from pathlib import Path
 
 import pytest
 
@@ -116,11 +117,12 @@ def test_native_source_requires_exact_original_finalized_node_and_receipt(tmp_pa
             {'artifact': 'absent-config', 'sha256': '0' * 64}, tmp_path)
 
 
-def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_bridge(tmp_path):
+def _assert_complete_source_review_bridge(tmp_path, version):
     from copy import deepcopy
     from tests.support.source_copy_branch_evidence import dependency_review, SYMBOLS, REVIEW_SHA256, write_json
     from tests.maintenance import branch_audit_completion as completion
-    from tests.support.source_copy_native_evidence import write_source_dependency_review
+    from tests.support.source_copy_native_evidence import write_source_dependency_review, native_source_maps
+    from tests.support.source_copy_branch_evidence import native_route, relevant_sources
     origin = tmp_path / 'original-evidence'
     (origin / 'native').mkdir(parents=True)
     review_descriptor = write_source_dependency_review(origin / 'native')
@@ -129,33 +131,59 @@ def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_br
     origin.rename(relocated)
     assert not origin.exists()
     review = dependency_review()
-    sources = {**review['original_sources'],
-        **review['launcher_and_dependency_config_source_maps'][review['original_native_candidate']],
-        **review['pinned_project_input_source_maps'][review['original_native_candidate']]}
-    branch = {'id': '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2',
-        'route': '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy',
-        'shape_sha256': 'a' * 64, 'pointer': '/argsSchema/properties/onNameConflict/enum/2'}
-    binding = {'relevant_sources': list(sources), 'source_copy_native_proof': {'artifact': 'native/proof.json', 'sha256': 'b' * 64},
+    original_candidate = (review['original_native_candidate'] if version == '2021.1'
+                          else review['modern_native_candidate'])
+    sources = native_source_maps(original_candidate)
+    route = native_route(version)
+    pointer = '/argsSchema/properties/onNameConflict/enum/2'
+    branch = {'id': route + '|' + pointer, 'route': route,
+        'shape_sha256': review['selected_native_shapes'][route + '|' + pointer], 'pointer': pointer}
+    binding = {'relevant_sources': list(relevant_sources()), 'source_copy_native_proof': {'artifact': 'native/proof.json', 'sha256': 'b' * 64},
         **{key: {'source': symbol} for key, symbol in SYMBOLS.items()}}
-    proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1', 'from_candidate': review['original_native_candidate'],
+    proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1', 'from_candidate': original_candidate,
         'to_candidate': 'c' * 64, 'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
         'native_route': branch['route'], 'evidence_sha256': 'd' * 64,
         'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)), 'sources': sources,
         'reviewed_reason': 'Exact Root-approved Source bridge; no history credit',
-        'source_native_candidate': review['original_native_candidate'],
+        'source_native_candidate': original_candidate,
         'source_copy_review': review_descriptor}
     descriptor = write_json(relocated / 'equivalence.json', proof)
     completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
-        {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': sources},
+        {'candidate_sha256': original_candidate, 'relevant_sources': sources},
+        branch, 'c' * 64, binding, relocated, audit.ROOT)
+    binding['native_equivalence'] = descriptor
+    completion.validate_native_source({'candidate': original_candidate}, {'sha256': 'd' * 64},
         branch, 'c' * 64, binding, relocated, audit.ROOT)
     for dependency in ('tests/conftest.py', 'skills/waapi-skill/wwise_waapi/source_copy_proof.py'):
         damaged = deepcopy(proof); damaged['sources'].pop(dependency)
         descriptor = write_json(relocated / 'equivalence.json', damaged)
-        with pytest.raises(ValueError, match='dependencies|complete|source'):
+        with pytest.raises(ValueError, match='dependencies|[Cc]omplete|[Ss]ource'):
             completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
-                {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': damaged['sources']},
+                {'candidate_sha256': original_candidate, 'relevant_sources': damaged['sources']},
                 branch, 'c' * 64, binding, relocated, audit.ROOT)
 
+    # Re-sign the public equivalence envelope so each rejection reaches the
+    # pinned Source boundary rather than merely a stale semantic digest.
+    for dependency in (review['current_added_dependencies'][0], 'unreviewed/current.py'):
+        damaged_binding = deepcopy(binding)
+        names = set(damaged_binding['relevant_sources'])
+        if dependency in names: names.remove(dependency)
+        else: names.add(dependency)
+        damaged_binding['relevant_sources'] = sorted(names)
+        damaged = deepcopy(proof)
+        damaged['binding_semantics_sha256'] = audit.digest(completion.binding_semantics(damaged_binding))
+        descriptor = write_json(relocated / 'equivalence.json', damaged)
+        with pytest.raises(ValueError, match='bridge differs'):
+            completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
+                {'candidate_sha256': original_candidate, 'relevant_sources': sources},
+                branch, 'c' * 64, damaged_binding, relocated, audit.ROOT)
+    damaged = deepcopy(proof)
+    damaged['sources']['unreviewed/historical.py'] = '0' * 64
+    descriptor = write_json(relocated / 'equivalence.json', damaged)
+    with pytest.raises(ValueError):
+        completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
+            {'candidate_sha256': original_candidate, 'relevant_sources': damaged['sources']},
+            branch, 'c' * 64, binding, relocated, audit.ROOT)
     # Portable descriptors cannot borrow the repository's matching bytes or
     # escape the relocated bundle, even with the approved content hash.
     for artifact in (str(audit.ROOT / 'tests/fixtures/source-copy/branch-dependency-review.json'),
@@ -164,12 +192,44 @@ def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_br
         descriptor = write_json(relocated / 'equivalence.json', damaged)
         with pytest.raises(ValueError):
             completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
-                {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': sources},
+                {'candidate_sha256': original_candidate, 'relevant_sources': sources},
                 branch, 'c' * 64, binding, relocated, audit.ROOT)
+    from tests.support.source_copy_branch_evidence import relevant_sources
+    current_sources = relevant_sources()
+    read_bytes = Path.read_bytes
+    for dependency in review['current_added_dependencies']:
+        assert dependency not in sources and dependency in current_sources
+    for dependency in review['current_added_dependencies']:
+        target = audit.ROOT / dependency
+        from unittest.mock import patch
+        with patch.object(Path, 'read_bytes', lambda path: read_bytes(path) + b' ' if path == target else read_bytes(path)):
+            descriptor = write_json(relocated / 'equivalence.json', proof)
+            with pytest.raises(ValueError, match='bridge differs'):
+                completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
+                    {'candidate_sha256': original_candidate, 'relevant_sources': sources},
+                    branch, 'c' * 64, binding, relocated, audit.ROOT)
+    for field, value in (('route', route.replace('wwise-console', 'wwise-authoring-ui')),
+                         ('pointer', '/argsSchema/properties/onNameConflict/enum/0'),
+                         ('shape_sha256', '0' * 64)):
+        damaged_branch = {**branch, field: value}
+        descriptor = write_json(relocated / 'equivalence.json', proof)
+        with pytest.raises(ValueError):
+            completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
+                {'candidate_sha256': original_candidate, 'relevant_sources': sources},
+                damaged_branch, 'c' * 64, binding, relocated, audit.ROOT)
     portable_review = relocated / review_descriptor['artifact']
     portable_review.write_bytes(portable_review.read_bytes() + b' ')
     descriptor = write_json(relocated / 'equivalence.json', proof)
     with pytest.raises(ValueError, match='artifact digest mismatch'):
         completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
-            {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': sources},
+            {'candidate_sha256': original_candidate, 'relevant_sources': sources},
             branch, 'c' * 64, binding, relocated, audit.ROOT)
+
+
+def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_bridge(tmp_path):
+    _assert_complete_source_review_bridge(tmp_path, '2021.1')
+
+
+@pytest.mark.parametrize('version', ('2022.1', '2023.1', '2024.1', '2025.1'))
+def test_modern_source_equivalence_accepts_only_reviewed_complete_bridge(tmp_path, version):
+    _assert_complete_source_review_bridge(tmp_path, version)

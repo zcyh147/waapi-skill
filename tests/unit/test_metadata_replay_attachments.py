@@ -175,7 +175,7 @@ def test_class_bridge_requires_exact_accepted_runtime_and_auxiliary_blobs(invent
     fixture='tests/destructive/support/source_copy_fixture.py'
     assert bridge['attribution']=='historical_native_current_program_not_current_native'
     assert len(bridge['historical_sources'])==(560 if cohort=='r54' else 561)
-    assert len(bridge['current_sources'])==563
+    assert len(bridge['current_sources'])==570
     assert helper not in bridge['historical_sources']
     assert bridge['changed_files'][helper]=={'before':None,
         'after':'b469b24ae64be096d314eb66da81b28833e0e45283d0cc66184199af2a089fdf'}
@@ -693,7 +693,7 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    source_pin = '411e8173949020bad26e4302f1e9428a21bcac7d'
+    source_pin = '796f16ca0794d45e4deed6f9ec92039f32f69b20'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
                  'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
@@ -756,3 +756,59 @@ def test_portable_attachment_rejects_closed_field_and_conflict_violations(origin
         desc = write(base/'attachment.changed.json',attachment);desc['artifact']='attachment.changed.json';index['metadata_attachments'][0]=desc
     path.write_text(json.dumps(index))
     with pytest.raises(ValueError):audit.portable_binding_inputs(path,policy)
+
+
+def test_r51_historical_source_map_does_not_grow_with_current_owned_dependencies():
+    # Retained-original discovery must work independently of stale current
+    # copied policy; strict whole-index import is deliberately a later phase.
+    originals = producer.portable_original_reads()
+    assert set(originals) == {'Color', 'ControlInput', 'OverrideColor'}
+    original = producer.historical_sources()
+    assert len(original) == 343
+    assert audit.digest(original) == '9f59dd64d2d7e856fae5f55cd71e5b1f471e1d32883d78a6ad53b860cde3ee9a'
+    current = producer.source_seals()
+    assert len(current) == 354
+    additions = {'skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
+        'skills/waapi-skill/resources/metadata/' + version + '/owned-control-input-construction.json'
+        for version in ('2022.1', '2023.1', '2024.1', '2025.1'))}
+    changes = producer.source_changes(original, current)
+    assert additions <= set(changes)
+    assert all(name not in original and changes[name]['before'] is None
+               and changes[name]['after'] == current[name] for name in additions)
+
+
+@pytest.mark.parametrize('cohort', ('r51', 'r54', 'r55'))
+def test_new_owned_dependencies_reject_unreviewed_drift(original_root, inventory, tmp_path, monkeypatch, cohort):
+    if cohort == 'r51':
+        capture, program, record, bindings, descriptor = controlled_attachment(tmp_path, original_root, inventory, 'ControlInput')
+        branch = next(row for row in capture['branches'] if row['id'] in bindings)
+        binding = {**bindings[branch['id']], 'category_inputs': {'live_metadata': record['category_inputs']}}
+        current_sources = producer.source_seals
+    else:
+        case = '2022.1|Wwise Delay|DelayTime' if cohort == 'r54' else '2021.1|MusicStinger|CustomCueMatchName'
+        capture, program, record, descriptor, branch, binding = r54_control(tmp_path, inventory, case, cohort=cohort)
+        current_sources = producer.r54_current_sources
+    def result():
+        return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata', 'controlled',
+            tmp_path, binding, source_root=audit.ROOT, reference_edges=capture['edges'])
+    assert result() == ('passed', None)
+    assert len(record['source_bridge']['current_sources']) == (354 if cohort == 'r51' else 570)
+    additions = ['skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
+        'skills/waapi-skill/resources/metadata/' + version + '/owned-control-input-construction.json'
+        for version in ('2022.1', '2023.1', '2024.1', '2025.1'))]
+    original_program, original_record = deepcopy(program), deepcopy(record)
+    read_bytes = Path.read_bytes
+    for relative in additions:
+        assert relative not in record['source_bridge']['historical_sources']
+        with monkeypatch.context() as scoped:
+            target = audit.ROOT / relative
+            scoped.setattr(Path, 'read_bytes', lambda path: read_bytes(path) + b'\n' if path == target else read_bytes(path))
+            program, record = deepcopy(original_program), deepcopy(original_record)
+            current = current_sources()
+            record['source_bridge']['current_sources'] = current
+            record['source_bridge']['changed_files'] = producer.source_changes(record['source_bridge']['historical_sources'], current)
+            program['relevant_sources'] = current
+            record['replay'] = write(tmp_path / 'changed-owned-program.json', program, nodeid=descriptor['nodeid'])
+            descriptor = write(tmp_path / 'changed-owned-attachment.json', record, nodeid=descriptor['nodeid'])
+            outcome, reason = result()
+            assert outcome == 'missing' and ('runtime drift' in reason or 'changed-file proof' in reason)

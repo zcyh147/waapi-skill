@@ -79,11 +79,10 @@ def test_default_product_inputs_select_portable_stale_receipt_without_business_c
     assert branch['evidence_results']['native']['outcome'] == 'missing'
     assert default['completion']['complete'] is False
     assert default['completion']['obligations'] == 272313
-    # Approved current selection: created-topic receipts are 559 additional
-    # bindings; the 60 metadata attachments strengthen existing metadata leaves.
-    # They do not add native obligations or silently become program receipts.
+    # Existing625 selected leaves plus exact26 Source leaves. Metadata65 and
+    # Source26 have their own complete categories; Topic559 still lacks native.
     assert default['completion']['states'] == {'approved_exclusion': 116,
-        'implemented_unverified': 625, 'unresolved': 271572}
+        'verified': 91, 'implemented_unverified': 560, 'unresolved': 271546}
     assert audit.main([*argv, '--check']) == 2
     capsys.readouterr()
     copied = tmp_path / 'relocated-product'
@@ -95,20 +94,22 @@ def test_default_product_inputs_select_portable_stale_receipt_without_business_c
     selected, _, _ = audit.portable_binding_inputs(index_path,
         audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json'))
     expected_families = {('media', '2025.1'): 1,
+        **{('source', version): count for version, count in
+            (('2021.1', 4), ('2022.1', 4), ('2023.1', 6), ('2024.1', 6), ('2025.1', 6))},
         **{('metadata', version): 13 for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')},
         **{('topic', version): count for version, count in
             (('2021.1', 79), ('2022.1', 112), ('2023.1', 116), ('2024.1', 116), ('2025.1', 136))}}
     def family(identity):
-        return ('topic' if '|topic|' in identity else 'metadata' if
+        return ('source' if '|function|ak.wwise.core.object.copy|' in identity else 'topic' if '|topic|' in identity else 'metadata' if
             '|function|ak.wwise.core.object.getPropertyInfo|' in identity else 'media', identity.split('|')[0])
     assert Counter(family(identity) for identity in selected['bindings']) == expected_families
-    assert not any('|function|ak.wwise.core.object.copy|' in identity for identity in selected['bindings'])
-    selected_rows = {row['id']: row for row in default['obligations'] if row['state'] == 'implemented_unverified'}
+    assert sum('|function|ak.wwise.core.object.copy|' in identity for identity in selected['bindings']) == 26
+    selected_rows = {row['id']: row for row in default['obligations'] if row['state'] in {'verified', 'implemented_unverified'}}
     assert set(selected_rows) == set(selected['bindings'])
     for identity, row in selected_rows.items():
         expected_categories = expected_cli_categories(identity)
         assert row['requirements'] == expected_categories
-        assert row['evidence_results']['program']['outcome'] == 'missing'
+        assert row['evidence_results']['program']['outcome'] == ('missing' if family(identity)[0] == 'media' else 'passed')
     program_index = deepcopy(index)
     program_index.pop('metadata_attachments')
     program_index_path = tmp_path / 'program-only-index.json'
@@ -123,7 +124,7 @@ def test_default_product_inputs_select_portable_stale_receipt_without_business_c
             strengthened[identity.split('|')[0]] += 1
             baseline['evidence'].pop('live_metadata')
             baseline.pop('category_inputs')
-        assert set(program_only['bindings'][identity]['evidence']) == {'program'}
+        assert set(program_only['bindings'][identity]['evidence']) == ({'program', 'native'} if family(identity)[0] == 'source' else {'program'})
         assert baseline == program_only['bindings'][identity]
     assert strengthened == {version: 12 for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')}
     explicit_bindings = copied / 'all.bindings.json'

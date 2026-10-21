@@ -13,6 +13,351 @@ from tests.support.metadata_read_branch_evidence import source_seals as metadata
 from tests.support.media_pool_branch_evidence import public_read_observation
 
 ORIGINAL = '90c1089b77e9a9d5695224d312bff9a3ab8b5c18'
+R51_ORIGINAL_SOURCE_NAMES = ('skills/waapi-skill/SKILL.md',
+ 'skills/waapi-skill/evals/adapter_registry.json',
+ 'skills/waapi-skill/evals/evals-v2.json',
+ 'skills/waapi-skill/evals/modification-policy-9.json',
+ 'skills/waapi-skill/evals/offline_tests.json',
+ 'skills/waapi-skill/evals/online/2022.1/core_object.json',
+ 'skills/waapi-skill/evals/online/2022.1/other.json',
+ 'skills/waapi-skill/evals/online/2022.1/runtime.json',
+ 'skills/waapi-skill/evals/online/debug_lua.json',
+ 'skills/waapi-skill/evals/online/version_specific/authoring.json',
+ 'skills/waapi-skill/evals/online/version_specific/other.json',
+ 'skills/waapi-skill/evals/online/version_specific/runtime.json',
+ 'skills/waapi-skill/evals/online_tests.json',
+ 'skills/waapi-skill/evals/request_mapping_registry.json',
+ 'skills/waapi-skill/evals/suite-v3.json',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-import.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-notebooklm-gate.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-object-mutation.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-property-reference.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-protocol.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-query.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-soundbank.md',
+ 'skills/waapi-skill/references/semantic/2021.1/semantic-builder-switchcontainer.md',
+ 'skills/waapi-skill/references/semantic/2021.1/short-id-query-sources.json',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-import.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-notebooklm-gate.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-object-mutation.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-property-reference.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-protocol.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-query.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-soundbank.md',
+ 'skills/waapi-skill/references/semantic/2022.1/semantic-builder-switchcontainer.md',
+ 'skills/waapi-skill/references/semantic/2022.1/short-id-query-sources.json',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-import.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-notebooklm-gate.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-object-mutation.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-property-reference.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-protocol.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-query.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-soundbank.md',
+ 'skills/waapi-skill/references/semantic/2023.1/semantic-builder-switchcontainer.md',
+ 'skills/waapi-skill/references/semantic/2023.1/short-id-query-sources.json',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-import.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-notebooklm-gate.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-object-mutation.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-property-reference.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-protocol.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-query.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-soundbank.md',
+ 'skills/waapi-skill/references/semantic/2024.1/semantic-builder-switchcontainer.md',
+ 'skills/waapi-skill/references/semantic/2024.1/short-id-query-sources.json',
+ 'skills/waapi-skill/references/semantic/2025.1/discrepancy-register.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-import.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-notebooklm-gate.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-object-mutation.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-property-reference.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-protocol.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-query.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-soundbank.md',
+ 'skills/waapi-skill/references/semantic/2025.1/semantic-builder-switchcontainer.md',
+ 'skills/waapi-skill/references/semantic/2025.1/short-id-query-sources.json',
+ 'skills/waapi-skill/references/waapi-coverage.md',
+ 'skills/waapi-skill/references/waapi-operate.md',
+ 'skills/waapi-skill/references/waapi-query.md',
+ 'skills/waapi-skill/references/waapi-setup.md',
+ 'skills/waapi-skill/resources/deferred/2021.1.json',
+ 'skills/waapi-skill/resources/deferred/2022.1.json',
+ 'skills/waapi-skill/resources/deferred/2023.1.json',
+ 'skills/waapi-skill/resources/deferred/2024.1.json',
+ 'skills/waapi-skill/resources/deferred/2025.1.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/authoring-ui-command-inventory.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/authoring-ui-commands-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/definitions.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/functions.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/manifest.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/schemas.json',
+ 'skills/waapi-skill/resources/manifest/2021.1/topics.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/authoring-ui-command-inventory.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/authoring-ui-commands-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/definitions.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/functions.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/manifest.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/schemas.json',
+ 'skills/waapi-skill/resources/manifest/2022.1/topics.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/authoring-ui-command-inventory.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/authoring-ui-commands-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/definitions.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/functions.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/manifest.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/schemas.json',
+ 'skills/waapi-skill/resources/manifest/2023.1/topics.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-core-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-layout-mutation-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-layout-read-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-model-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-ui-command-inventory.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-ui-commands-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/authoring-ui-topics-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/definitions.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/functions.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/manifest.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/schemas.json',
+ 'skills/waapi-skill/resources/manifest/2024.1/topics.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/added-since-2024.1.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-core-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-layout-mutation-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-layout-read-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-model-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-ui-command-inventory.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-ui-commands-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/authoring-ui-topics-supplement.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/definitions.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/functions.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/manifest.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/schemas.json',
+ 'skills/waapi-skill/resources/manifest/2025.1/topics.json',
+ 'skills/waapi-skill/resources/manifest/typed-request-surface.json',
+ 'skills/waapi-skill/resources/metadata/2021.1/documented-list-fields.json',
+ 'skills/waapi-skill/resources/metadata/2021.1/object-types.json',
+ 'skills/waapi-skill/resources/metadata/2021.1/override-applicability.json',
+ 'skills/waapi-skill/resources/metadata/2022.1/documented-list-fields.json',
+ 'skills/waapi-skill/resources/metadata/2022.1/object-types.json',
+ 'skills/waapi-skill/resources/metadata/2022.1/override-applicability.json',
+ 'skills/waapi-skill/resources/metadata/2023.1/documented-list-fields.json',
+ 'skills/waapi-skill/resources/metadata/2023.1/object-types.json',
+ 'skills/waapi-skill/resources/metadata/2023.1/override-applicability.json',
+ 'skills/waapi-skill/resources/metadata/2024.1/documented-list-fields.json',
+ 'skills/waapi-skill/resources/metadata/2024.1/object-types.json',
+ 'skills/waapi-skill/resources/metadata/2024.1/override-applicability.json',
+ 'skills/waapi-skill/resources/metadata/2025.1/documented-list-fields.json',
+ 'skills/waapi-skill/resources/metadata/2025.1/object-types.json',
+ 'skills/waapi-skill/resources/metadata/2025.1/override-applicability.json',
+ 'skills/waapi-skill/resources/native-catalog/2021.1/wwise-authoring.json',
+ 'skills/waapi-skill/resources/native-catalog/2021.1/wwise-console.json',
+ 'skills/waapi-skill/resources/native-catalog/2022.1/wwise-authoring.json',
+ 'skills/waapi-skill/resources/native-catalog/2022.1/wwise-console.json',
+ 'skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json',
+ 'skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json',
+ 'skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json',
+ 'skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json',
+ 'skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json',
+ 'skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json',
+ 'skills/waapi-skill/resources/native-catalog/capture-provenance.json',
+ 'skills/waapi-skill/resources/native-catalog/definition-provenance.json',
+ 'skills/waapi-skill/resources/native-catalog/host-schema-parity.json',
+ 'skills/waapi-skill/resources/native-catalog/index.json',
+ 'skills/waapi-skill/resources/native_surface_policy.json',
+ 'skills/waapi-skill/resources/semantic/2021.1/none_state_materialization.json',
+ 'skills/waapi-skill/resources/semantic/2021.1/source_notes.json',
+ 'skills/waapi-skill/resources/semantic/2022.1/none_state_materialization.json',
+ 'skills/waapi-skill/resources/semantic/2022.1/source_notes.json',
+ 'skills/waapi-skill/resources/semantic/2023.1/none_state_materialization.json',
+ 'skills/waapi-skill/resources/semantic/2023.1/source_notes.json',
+ 'skills/waapi-skill/resources/semantic/2024.1/none_state_materialization.json',
+ 'skills/waapi-skill/resources/semantic/2024.1/source_notes.json',
+ 'skills/waapi-skill/resources/semantic/2025.1/none_state_materialization.json',
+ 'skills/waapi-skill/resources/semantic/2025.1/source_notes.json',
+ 'skills/waapi-skill/resources/waql/2021.1/object-get-examples.json',
+ 'skills/waapi-skill/resources/waql/2022.1/object-get-examples.json',
+ 'skills/waapi-skill/resources/waql/2023.1/object-get-examples.json',
+ 'skills/waapi-skill/resources/waql/2024.1/object-get-examples.json',
+ 'skills/waapi-skill/resources/waql/2025.1/object-get-examples.json',
+ 'skills/waapi-skill/scripts/__init__.py',
+ 'skills/waapi-skill/scripts/config.py',
+ 'skills/waapi-skill/scripts/gateway.py',
+ 'skills/waapi-skill/scripts/run.py',
+ 'skills/waapi-skill/scripts/setup_environment.py',
+ 'skills/waapi-skill/wwise_waapi/__init__.py',
+ 'skills/waapi-skill/wwise_waapi/audio_import_business.py',
+ 'skills/waapi-skill/wwise_waapi/audio_import_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_core_manifest.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_launch.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_layout.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_layout_business.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_layout_handles.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_model_business.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_resources.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_ui_business.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_ui_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_ui_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_ui_commands_manifest.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_ui_topics_manifest.py',
+ 'skills/waapi-skill/wwise_waapi/authoring_wafm.py',
+ 'skills/waapi-skill/wwise_waapi/authorization.py',
+ 'skills/waapi-skill/wwise_waapi/builders/__init__.py',
+ 'skills/waapi-skill/wwise_waapi/builders/common.py',
+ 'skills/waapi-skill/wwise_waapi/builders/container_suitability.py',
+ 'skills/waapi-skill/wwise_waapi/builders/debug_lua.py',
+ 'skills/waapi-skill/wwise_waapi/builders/identity.py',
+ 'skills/waapi-skill/wwise_waapi/builders/metadata.py',
+ 'skills/waapi-skill/wwise_waapi/builders/object_mutation.py',
+ 'skills/waapi-skill/wwise_waapi/builders/properties.py',
+ 'skills/waapi-skill/wwise_waapi/builders/query.py',
+ 'skills/waapi-skill/wwise_waapi/builders/schema.py',
+ 'skills/waapi-skill/wwise_waapi/builders/soundbank.py',
+ 'skills/waapi-skill/wwise_waapi/builders/source_notes.py',
+ 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py',
+ 'skills/waapi-skill/wwise_waapi/builders/switchcontainer.py',
+ 'skills/waapi-skill/wwise_waapi/business_adapters.py',
+ 'skills/waapi-skill/wwise_waapi/business_declaration_state.py',
+ 'skills/waapi-skill/wwise_waapi/business_declarations.py',
+ 'skills/waapi-skill/wwise_waapi/business_fields.py',
+ 'skills/waapi-skill/wwise_waapi/business_planning.py',
+ 'skills/waapi-skill/wwise_waapi/canonical.py',
+ 'skills/waapi-skill/wwise_waapi/capabilities.py',
+ 'skills/waapi-skill/wwise_waapi/category_policy.py',
+ 'skills/waapi-skill/wwise_waapi/cli_console_business.py',
+ 'skills/waapi-skill/wwise_waapi/cli_console_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/cli_console_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/compound_undo_business.py',
+ 'skills/waapi-skill/wwise_waapi/compound_undo_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/compound_undo_observation.py',
+ 'skills/waapi-skill/wwise_waapi/condition_limits.py',
+ 'skills/waapi-skill/wwise_waapi/config.py',
+ 'skills/waapi-skill/wwise_waapi/console_media_ids.py',
+ 'skills/waapi-skill/wwise_waapi/console_project_operations.py',
+ 'skills/waapi-skill/wwise_waapi/core_business.py',
+ 'skills/waapi-skill/wwise_waapi/core_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/creation_observations.py',
+ 'skills/waapi-skill/wwise_waapi/debug_business.py',
+ 'skills/waapi-skill/wwise_waapi/debug_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/debug_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/deferred_registry.py',
+ 'skills/waapi-skill/wwise_waapi/dispatcher.py',
+ 'skills/waapi-skill/wwise_waapi/documented_list_fields.py',
+ 'skills/waapi-skill/wwise_waapi/edit_history_business.py',
+ 'skills/waapi-skill/wwise_waapi/edit_history_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/effect_render_conditions.py',
+ 'skills/waapi-skill/wwise_waapi/endpoint_scope.py',
+ 'skills/waapi-skill/wwise_waapi/exact_artifact_business.py',
+ 'skills/waapi-skill/wwise_waapi/exact_artifact_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/exact_artifact_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/execution_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/existing_field_observations.py',
+ 'skills/waapi-skill/wwise_waapi/filesystem_security.py',
+ 'skills/waapi-skill/wwise_waapi/headless.py',
+ 'skills/waapi-skill/wwise_waapi/host_paths.py',
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business.py',
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/identity_limits.py',
+ 'skills/waapi-skill/wwise_waapi/io_policy.py',
+ 'skills/waapi-skill/wwise_waapi/layout_blueprint.py',
+ 'skills/waapi-skill/wwise_waapi/manifest.py',
+ 'skills/waapi-skill/wwise_waapi/media_build_business.py',
+ 'skills/waapi-skill/wwise_waapi/media_build_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/media_build_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/media_pool_continuation.py',
+ 'skills/waapi-skill/wwise_waapi/media_pool_field_discovery.py',
+ 'skills/waapi-skill/wwise_waapi/metadata_cache.py',
+ 'skills/waapi-skill/wwise_waapi/metadata_catalog.py',
+ 'skills/waapi-skill/wwise_waapi/metadata_condition_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/metadata_detail.py',
+ 'skills/waapi-skill/wwise_waapi/metadata_discovery.py',
+ 'skills/waapi-skill/wwise_waapi/metadata_restrictions.py',
+ 'skills/waapi-skill/wwise_waapi/native_catalog.py',
+ 'skills/waapi-skill/wwise_waapi/native_surface_policy.py',
+ 'skills/waapi-skill/wwise_waapi/new_object_defaults.py',
+ 'skills/waapi-skill/wwise_waapi/object_capabilities.py',
+ 'skills/waapi-skill/wwise_waapi/object_graph_business.py',
+ 'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/object_graph_paths.py',
+ 'skills/waapi-skill/wwise_waapi/object_inline_curve.py',
+ 'skills/waapi-skill/wwise_waapi/object_lifecycle_business.py',
+ 'skills/waapi-skill/wwise_waapi/object_lifecycle_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/object_lifecycle_graph.py',
+ 'skills/waapi-skill/wwise_waapi/object_metadata_business.py',
+ 'skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/object_query_active_source.py',
+ 'skills/waapi-skill/wwise_waapi/object_query_outputs.py',
+ 'skills/waapi-skill/wwise_waapi/object_query_result_pages.py',
+ 'skills/waapi-skill/wwise_waapi/operation_composer.py',
+ 'skills/waapi-skill/wwise_waapi/operation_drafts.py',
+ 'skills/waapi-skill/wwise_waapi/operation_import.py',
+ 'skills/waapi-skill/wwise_waapi/operation_object.py',
+ 'skills/waapi-skill/wwise_waapi/operation_plugin.py',
+ 'skills/waapi-skill/wwise_waapi/operation_registry.py',
+ 'skills/waapi-skill/wwise_waapi/operation_soundbank.py',
+ 'skills/waapi-skill/wwise_waapi/operation_tone.py',
+ 'skills/waapi-skill/wwise_waapi/operation_ui_commands.py',
+ 'skills/waapi-skill/wwise_waapi/override_applicability.py',
+ 'skills/waapi-skill/wwise_waapi/peak_read_continuation.py',
+ 'skills/waapi-skill/wwise_waapi/planned_references.py',
+ 'skills/waapi-skill/wwise_waapi/platform_commands.py',
+ 'skills/waapi-skill/wwise_waapi/platform_paths.py',
+ 'skills/waapi-skill/wwise_waapi/project_setting_business.py',
+ 'skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/recovery.py',
+ 'skills/waapi-skill/wwise_waapi/remote_transition.py',
+ 'skills/waapi-skill/wwise_waapi/render_history_observations.py',
+ 'skills/waapi-skill/wwise_waapi/runtime_game_object_handles.py',
+ 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py',
+ 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py',
+ 'skills/waapi-skill/wwise_waapi/runtime_playing_handles.py',
+ 'skills/waapi-skill/wwise_waapi/runtime_transport_handles.py',
+ 'skills/waapi-skill/wwise_waapi/safety.py',
+ 'skills/waapi-skill/wwise_waapi/schema_inventory.py',
+ 'skills/waapi-skill/wwise_waapi/selection_guidance.py',
+ 'skills/waapi-skill/wwise_waapi/short_id_query_sources.py',
+ 'skills/waapi-skill/wwise_waapi/soundbank_business.py',
+ 'skills/waapi-skill/wwise_waapi/soundbank_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/soundbank_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/soundengine_business.py',
+ 'skills/waapi-skill/wwise_waapi/soundengine_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/soundengine_lifecycle.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_business.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_business_cli.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_object_files.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_object_moves.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_profiles.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_protected_dispatch.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_status_read.py',
+ 'skills/waapi-skill/wwise_waapi/source_control_windows_permissions.py',
+ 'skills/waapi-skill/wwise_waapi/subscriptions.py',
+ 'skills/waapi-skill/wwise_waapi/switch_assignment_business.py',
+ 'skills/waapi-skill/wwise_waapi/switch_assignment_business_contracts.py',
+ 'skills/waapi-skill/wwise_waapi/topic_business.py',
+ 'skills/waapi-skill/wwise_waapi/transaction_cleanup.py',
+ 'skills/waapi-skill/wwise_waapi/transaction_locality.py',
+ 'skills/waapi-skill/wwise_waapi/transaction_runtime.py',
+ 'skills/waapi-skill/wwise_waapi/transactions.py',
+ 'skills/waapi-skill/wwise_waapi/typed_operations.py',
+ 'skills/waapi-skill/wwise_waapi/typed_queries.py',
+ 'skills/waapi-skill/wwise_waapi/typed_requests.py',
+ 'skills/waapi-skill/wwise_waapi/typed_topics.py',
+ 'skills/waapi-skill/wwise_waapi/versions.py',
+ 'skills/waapi-skill/wwise_waapi/voice_source_staging.py',
+ 'skills/waapi-skill/wwise_waapi/wal_read_continuation.py',
+ 'skills/waapi-skill/wwise_waapi/waql.py',
+ 'tests/conftest.py',
+ 'tests/maintenance/branch_audit_completion.py',
+ 'tests/maintenance/branch_coverage_audit.py',
+ 'tests/support/exact_evidence_finalization.py',
+ 'tests/support/media_pool_branch_evidence.py',
+ 'tests/support/metadata_read_branch_evidence.py',
+ 'tests/support/metadata_result_case_bank.py',
+ 'tests/unit/test_branch_coverage_completion_cli.py',
+ 'tests/unit/test_branch_evidence_readers.py',
+ 'tests/unit/test_media_build_business_gateway.py',
+ 'tests/unit/test_metadata_default_branch_evidence.py',
+ 'tests/unit/test_metadata_discovery_gateway.py')
+R51_ORIGINAL_SOURCE_MAP_SHA256 = '9f59dd64d2d7e856fae5f55cd71e5b1f471e1d32883d78a6ad53b860cde3ee9a'
+
 OBJECT = '{CE99046D-D354-422D-A7BB-F1305FF00B2F}'
 URI = 'ak.wwise.core.object.getPropertyInfo'
 NODE = 'tests/unit/test_metadata_discovery_gateway.py::test_original_r51_metadata_default_replays_through_current_public_gateway'
@@ -38,7 +383,7 @@ R55_ORIGINAL_SEALS = {
 # blobs; both new helpers are explicitly absent in both originals. These auxiliary
 # pairs permit historical-native/current-program attribution only.
 CLASS_AUXILIARY_CHANGES = {'tests/destructive/support/source_copy_fixture.py': {'after': 'f9c8ba22f8b69e01bd9e5cf2424699efad4bafce71b1d10a712caf2b3d80177d',
-                                                                        'before': None},
+                                                      'before': None},
  'tests/semantic/support/codex_business_oracle_plan_v3.py': {'after': 'acdc65339374bf5109e7e4d8ba13ddab3a5367f10c87b95db64f251aaf97ce2c',
                                                              'before': '65f7943443a91520e535570345e6b43ac4d09e72b519f5ffd57c7c9be51b5eb9'},
  'tests/semantic/support/codex_eval_protocol_v3.py': {'after': '8350a1f08c70468d84c62b74711454354d78bd8c30d24fbe043110d9fee04ca1',
@@ -54,7 +399,11 @@ CLASS_AUXILIARY_CHANGES = {'tests/destructive/support/source_copy_fixture.py': {
  'tests/semantic/support/codex_task_runner_v3.py': {'after': '8250851354409dca2c6f789f776951f7174927279e5e495f0e7b01dc7e76bcef',
                                                     'before': 'b33e240e3c20ff5999e7ef773ade357a10222af9fb2b7f47ff3ff94015fc5e02'},
  'tests/semantic/support/codex_typed_draft_evidence_v3.py': {'after': '37841446878515c1484dfecf0cf35ac304c87b9f13ee39c6e0ec35c66d3d4189',
-                                                             'before': '05205d05f9c0bf56939297081e69f7db107f50f1808eb9a0274df3d11c06a588'}}
+                                                             'before': '05205d05f9c0bf56939297081e69f7db107f50f1808eb9a0274df3d11c06a588'},
+ 'tests/support/source_copy_branch_evidence.py': {'after': '732ab5d923638b91db1ae544eca69bbfd718449d30c955731e29ce1ef2d49d42',
+                                                  'before': None},
+ 'tests/support/source_copy_native_evidence.py': {'after': 'a7ac635f8b4964cab93d84479d64f6af1ca6dad2f1d2bfc2daffb5c3b6ec38d6',
+                                                  'before': None}}
 
 
 def class_original_profile(cohort):
@@ -289,17 +638,27 @@ def portable_original_reads(index_path=None):
     """
     from tests.maintenance import branch_audit_completion as completion
     index_path = Path(index_path) if index_path else audit.ROOT/'docs/branch-coverage-evidence-index.json'
-    requirements = audit.load(audit.ROOT/'docs/branch-coverage-requirements.json')
-    bindings,base,_ = audit.portable_binding_inputs(index_path,requirements)
+    # Resolve retained native anchors independently of current program policy.
+    # Full portable import still validates every copied requirement later.
+    index = audit.load(index_path)
+    base = (index_path.parent / index['base']).resolve()
     originals = {}
-    for identity,binding in bindings['bindings'].items():
-        evidence = binding.get('evidence',{}).get('live_metadata')
-        if identity not in selected_ids() or evidence is None:
+    for link in index.get('metadata_attachments', []):
+        attachment = completion.read_sealed_artifact(link, base)
+        if attachment['contract'] != 'waapi-skill.r51-metadata-attachment/v1':
             continue
+        if attachment['branch_id'] not in selected_ids():
+            continue
+        evidence = attachment['evidence']
         record = completion.read_sealed_artifact(evidence,base)
         descriptor = deepcopy(record['metadata_run'])
         context = completion.read_metadata_run(descriptor,base)
         field = context['native_result']['name']
+        if (context['candidate'] != ORIGINAL or context['version'] != '2021.1'
+                or context['host'] != 'wwise-console' or context['build'] != '2021.1.14.8108'
+                or field not in CASES or branch_case({'pointer': attachment['branch_id'].rsplit('|', 1)[1]}) != field
+                or attachment['branch_id'] not in record.get('branch_assertions', {})):
+            raise ValueError('Exact original R51 selected anchor differs')
         for role in ('category','observation','status','identity','reply','native'):
             descriptor[role]['artifact'] = str((base/descriptor[role]['artifact']).resolve())
         if field in originals and originals[field] != descriptor:
@@ -346,12 +705,13 @@ def git_source_seals(candidate, names):
 
 
 def historical_sources():
-    names = metadata_source_seals()
-    # These exact reviewed Source-copy modules did not exist in R51. Keep
-    # both explicit absences in source_changes; never invent historical hashes.
-    for name in ('source_copy_observations.py','source_copy_proof.py'):
-        names.pop('skills/waapi-skill/wwise_waapi/'+name,None)
-    return git_source_seals(ORIGINAL, names)
+    # The native R51 closure is independent of current imports. New current
+    # dependencies appear only as explicit before=None changes, never old names.
+    sources = git_source_seals(ORIGINAL, R51_ORIGINAL_SOURCE_NAMES)
+    if len(sources) != 343 or audit.digest(sources) != R51_ORIGINAL_SOURCE_MAP_SHA256:
+        raise ValueError('Exact immutable original R51 source map changed')
+    return sources
+
 
 def source_changes(before, after):
     return {name: {'before': before.get(name), 'after': after.get(name)} for name in sorted(set(before)|set(after))
@@ -424,7 +784,7 @@ def validate_default_replay_requirements(inventory, policy):
     return assigned
 
 
-def prepare_capture(root, original_root):
+def prepare_capture(root, original_root=None):
     """After source approval only: one fresh context, three selected public nodes."""
     import subprocess
     import shutil
@@ -445,9 +805,12 @@ def prepare_capture(root, original_root):
     for row in rows:
         if policy['branches'][row['id']]['native_shape_sha256'] != row['shape_sha256']:
             raise ValueError('Exact original default requirement shape changed')
+    retained = portable_original_reads() if original_root is None else None
+    if retained is not None and set(retained) != set(CASES):
+        raise ValueError('Exact three portable R51 original fields required')
     originals = {}
     for field in CASES:
-        original = original_read(original_root,field)
+        original = deepcopy(retained[field]) if retained is not None else original_read(original_root,field)
         completion.read_metadata_run(original,root.parent)
         for role in ('category','observation','status','identity','reply','native'):
             desc = original[role]

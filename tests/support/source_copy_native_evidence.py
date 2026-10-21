@@ -41,13 +41,17 @@ def read_source_native_run(category, receipt, config, base):
 
 
 def validate_source_equivalence(proof, branch, binding, root, *, evidence_base):
-    """Only the pinned 2021 six-delta bridge may cross changed runtime bytes."""
+    """Only the pinned five-version Source leaf bridge may cross changed bytes."""
     from tests.support.source_copy_branch_evidence import pointer_contract, native_route, REVIEW_SHA256
     import hashlib
     review = dependency_review()
-    sources = {**review['original_sources'],
-        **review['launcher_and_dependency_config_source_maps'][review['original_native_candidate']],
-        **review['pinned_project_input_source_maps'][review['original_native_candidate']]}
+    from tests.support.source_copy_branch_evidence import PUBLIC_NODES
+    versions = [version for version in PUBLIC_NODES if branch['route'] == native_route(version)]
+    if len(versions) != 1:
+        raise ValueError('Exact reviewed Source route required')
+    version = versions[0]
+    original = review['original_native_candidate'] if version == '2021.1' else review['modern_native_candidate']
+    sources = native_source_maps(original)
     current = {**review['current_sources'],
         **review['launcher_and_dependency_config_source_maps'][review['current_source_basis']],
         **review['pinned_project_input_source_maps'][review['current_source_basis']]}
@@ -60,14 +64,16 @@ def validate_source_equivalence(proof, branch, binding, root, *, evidence_base):
     review_path = evidence_root / relative
     if review_path.is_symlink() or not review_path.resolve().is_relative_to(evidence_root):
         raise ValueError('Source review descriptor escapes its evidence bundle')
-    if (branch['route'] != native_route('2021.1') or branch['pointer'] not in pointer_contract('2021.1')
-            or proof.get('source_native_candidate') != review['original_native_candidate']
+    if (branch['pointer'] not in pointer_contract(version)
+            or branch['id'] != native_route(version) + '|' + branch['pointer']
+            or review['selected_native_shapes'].get(branch['id']) != branch['shape_sha256']
+            or proof.get('source_native_candidate') != original
             or review_link.get('sha256') != REVIEW_SHA256
             or completion.read_sealed_artifact(review_link, evidence_root) != review
-            or proof['sources'] != sources or set(binding['relevant_sources']) != set(sources)
+            or proof['sources'] != sources or set(binding['relevant_sources']) != set(current)
             or not binding.get('source_copy_native_proof')
             or any(hashlib.sha256((root / name).read_bytes()).hexdigest() != seal for name, seal in current.items())):
-        raise ValueError('Complete reviewed 2021 Source dependency bridge differs')
+        raise ValueError('Complete reviewed Source dependency bridge differs')
 
 
 def native_source_maps(candidate):
@@ -247,8 +253,7 @@ def attach_original_source_native(program_index, *, category, receipt_path, conf
                 'native_route': branch['route'], 'evidence_sha256': digest,
                 'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)), 'sources': sources,
                 'reviewed_reason': 'Exact original Source/Synth selected leaves plus scoped #180 graph; raw diagnostic flags unchanged; no history credit.'}
-            if facts['version'] == '2021.1':
-                proof_record.update(source_native_candidate=context['candidate'], source_copy_review=review)
+            proof_record.update(source_native_candidate=context['candidate'], source_copy_review=review)
             name = kind + '-' + str(ordinal) + '.json'
             attachment[kind][identity] = {**write_json(output / name, proof_record), 'artifact': 'native/' + name}
     attachment_descriptor = {**write_json(output / 'attachment.json', attachment), 'artifact': 'native/attachment.json'}

@@ -42,7 +42,30 @@
     }
   },
   "contract": "waapi-skill.source-copy-dependency-accounting-proposal/v1",
-  "current_source_basis": "4e6cf4624fc2b559425417a90bad32d2c776230d",
+  "current_added_dependencies": [
+    "skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json",
+    "skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json",
+    "skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json",
+    "skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json",
+    "skills/waapi-skill/wwise_waapi/owned_control_inputs.py"
+  ],
+  "current_explicit_historical_absences": {
+    "411e8173949020bad26e4302f1e9428a21bcac7d": {
+      "skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/wwise_waapi/owned_control_inputs.py": null
+    },
+    "6d4a35471bda04f76a4501e3b29a3a19cf5b4132": {
+      "skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json": null,
+      "skills/waapi-skill/wwise_waapi/owned_control_inputs.py": null
+    }
+  },
+  "current_source_basis": "796f16ca0794d45e4deed6f9ec92039f32f69b20",
   "current_sources": {
     "skills/waapi-skill/SKILL.md": "fc7c4d88e42bb1663e407047fd29a0f3e7173c0bf4259da624ab36588757cc33",
     "skills/waapi-skill/evals/adapter_registry.json": "a8aacf7e6ff253dbf5045507c3b808164e86309a7aaa1952c6d8661869fa24d1",
@@ -167,15 +190,19 @@
     "skills/waapi-skill/resources/metadata/2022.1/documented-list-fields.json": "df0da459f2be952f87084ca55224357e40c43bd27932cd2db91a2d46f6ae5313",
     "skills/waapi-skill/resources/metadata/2022.1/object-types.json": "465787f842997f729944536fe7a346aa90e639a6c0a20f40d4f6539a2b0f2378",
     "skills/waapi-skill/resources/metadata/2022.1/override-applicability.json": "18c5049cd913e1eff16a3047e03755a1ff675ac01bfd41eedbd01497818c540a",
+    "skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json": "f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454",
     "skills/waapi-skill/resources/metadata/2023.1/documented-list-fields.json": "53270ad9feb3ab589a30b7b1f10279f3ad78bc37e1b69a2927ec438432e7765c",
     "skills/waapi-skill/resources/metadata/2023.1/object-types.json": "51d63c58394536b21b86811af9ea79d87bcadff061baea1a5e2a1eda58ea2609",
     "skills/waapi-skill/resources/metadata/2023.1/override-applicability.json": "1b63aee890efb48d82fdab46858a46d9bdd96037ac49cb8aa90013358243777a",
+    "skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json": "9d2fc5b8477b840edf4d2b9c8322514b45157761ac3fb898b90d2554fbd8f7c8",
     "skills/waapi-skill/resources/metadata/2024.1/documented-list-fields.json": "2d1ba1a5f72fcf6570a0452a549cc87c5d74319f53cbb5055f890b4106c8e75b",
     "skills/waapi-skill/resources/metadata/2024.1/object-types.json": "ce453380d932369e24ba7186f06f459f3785a19e824c123e15148689805109d8",
     "skills/waapi-skill/resources/metadata/2024.1/override-applicability.json": "290f89ac34996b99279c1694ba2b558aca60a2e3a09642cc31e5ac9b46f01b8d",
+    "skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json": "46a0180db2c083081c4ab3a410dffc8618603d83f7059dac2e748639ea1cdf21",
     "skills/waapi-skill/resources/metadata/2025.1/documented-list-fields.json": "f39a37438a382c4ece14aeb5760e6e7f5efe0b96b77b4757afad0dec325261a8",
     "skills/waapi-skill/resources/metadata/2025.1/object-types.json": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d",
     "skills/waapi-skill/resources/metadata/2025.1/override-applicability.json": "67ddd17cd63fd6d17c6b29ff32d3a68b272ff864201d3f210e463277a6f75b4d",
+    "skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json": "55a2005e667d122f46c5ecb75c57a666161f3f8c4c789b44f2515d992b609237",
     "skills/waapi-skill/resources/native-catalog/2021.1/wwise-authoring.json": "567433b3c72a379f89639ca952562ff3feb9de4666d75c7906c6d1f50d7ee705",
     "skills/waapi-skill/resources/native-catalog/2021.1/wwise-console.json": "0d9258e455d39e360267fd8f90e68622707fbdccecc384b7048f0c21519927f5",
     "skills/waapi-skill/resources/native-catalog/2022.1/wwise-authoring.json": "f3df757ea64f15de83466f56f68601bd0085ca216dfc7f4a575909a3cb7a37c9",
@@ -208,7 +235,7 @@
     "skills/waapi-skill/resources/waql/2025.1/object-get-examples.json": "6d3e7a06a1efb259fea2d16a8fdd6a79a84d52c53012fb6a5de57302b9e69d28",
     "skills/waapi-skill/scripts/__init__.py": "2caa9cc1a34eab6d11cc1c89c21fdd0f80a442909e72f64fb7964db38a0dc1de",
     "skills/waapi-skill/scripts/config.py": "d5384a25d6d7d8fe0886ce67d362b21cd331911b0c6441d7d224d538a4a78909",
-    "skills/waapi-skill/scripts/gateway.py": "fb73cecdc6e61ae9e702c7fe2450dc9b4abc38324f115261e1d772a3d5371d67",
+    "skills/waapi-skill/scripts/gateway.py": "837ee2edee8e40d5cc9cad87cba1ff1c536ccb61eb9a5c1119581f0f0de30ab4",
     "skills/waapi-skill/scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
     "skills/waapi-skill/scripts/setup_environment.py": "b42b182f55f0c199ceff3d695bfcba9644c750c1f1f10b858cd6d9819ba35f2e",
     "skills/waapi-skill/wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
@@ -242,7 +269,7 @@
     "skills/waapi-skill/wwise_waapi/builders/source_notes.py": "cbc92bf050e3d8d177e694b3f8f75c66fab7b34372370d042624c46ee135f81c",
     "skills/waapi-skill/wwise_waapi/builders/stable_reads.py": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
     "skills/waapi-skill/wwise_waapi/builders/switchcontainer.py": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da",
-    "skills/waapi-skill/wwise_waapi/business_adapters.py": "501f76379fbd13861091fb71748e7971287e677038205b022124b18dd9db98e2",
+    "skills/waapi-skill/wwise_waapi/business_adapters.py": "1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7",
     "skills/waapi-skill/wwise_waapi/business_declaration_state.py": "0c913fca1120d114c2268d052fce368d304c6588f1e1aff5872019dc8363f0a2",
     "skills/waapi-skill/wwise_waapi/business_declarations.py": "ea3d22b2c0c9eca269916b12a4dcaf25fde42cba6df77e7d5887b5eb0423d9f1",
     "skills/waapi-skill/wwise_waapi/business_fields.py": "0bc6664f53e4258b09e9a597eee54518a92128e9cb8856288f0f127ef79007b5",
@@ -303,30 +330,31 @@
     "skills/waapi-skill/wwise_waapi/native_surface_policy.py": "91a8dc71154b5938085cd0c59bc27603076fbd3e4aa728872c7eca84239a22c8",
     "skills/waapi-skill/wwise_waapi/new_object_defaults.py": "4647fdfcf212e503aa0a5f36e88a1b187b47f780c19fcc2f750c359c2f2b9a60",
     "skills/waapi-skill/wwise_waapi/object_capabilities.py": "75e8605fd1e435ea5df6b152a36d1d9adeaca197ab2dee2454bc8caf071374c1",
-    "skills/waapi-skill/wwise_waapi/object_graph_business.py": "e720da23c5157494caaa5cbee35da02ab9bfb4b08d0dd8db979532d636333f2e",
-    "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py": "a8477164bc13fe66ed6322eea4fbbe0902eba9f86373294f9aa774361a17e916",
+    "skills/waapi-skill/wwise_waapi/object_graph_business.py": "17d96c6f8a663cd4d8bdf3c34717b958ae16ebc36c88ceb59c3f18937389dcb7",
+    "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py": "487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f",
     "skills/waapi-skill/wwise_waapi/object_graph_paths.py": "82ffbdaa9da088b790d5fa255508b5f6058ec8a47d8b14afe077595d710b89b7",
     "skills/waapi-skill/wwise_waapi/object_inline_curve.py": "79cb2f48c1f85fc791b62ec03d79cdfbe393795cb2cf46f5cc75e0e13dc486f9",
     "skills/waapi-skill/wwise_waapi/object_lifecycle_business.py": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9",
     "skills/waapi-skill/wwise_waapi/object_lifecycle_business_contracts.py": "f6f8a4c343cb4b223566f89473be618ec3c2305849ce5023315563a05d9d32d9",
     "skills/waapi-skill/wwise_waapi/object_lifecycle_graph.py": "8f2df48a3089554996730ad1a074db35bea444316408d0c2f366686a646e226f",
     "skills/waapi-skill/wwise_waapi/object_metadata_business.py": "616d6e63fb35d9615cf8b6dab3311ada8caae8a64ca85c2d04044e54f35d9bdc",
-    "skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py": "c5585ae67ea0e8c9e5834f5416b03d152f5279059954d045fafb9f628aa5f2da",
+    "skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py": "8d6ad65d41bc98cb39f5f73e29d600f3d73be6fba0fa4ad631e1641764b3be18",
     "skills/waapi-skill/wwise_waapi/object_query_active_source.py": "d325020b2ac79c9fc32618b9b33a29bb52641f392244300b57f60192f6c66772",
     "skills/waapi-skill/wwise_waapi/object_query_outputs.py": "8211f64a3e5dce149f37de1b75f2c89bc63698a8b5daa4911f3c11d0e2eb11d2",
     "skills/waapi-skill/wwise_waapi/object_query_result_pages.py": "633ab098d8ba24038741a5fe9c45f4ea03d7f0482c098ae67f3f0f2e3b772b83",
     "skills/waapi-skill/wwise_waapi/operation_composer.py": "2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d",
     "skills/waapi-skill/wwise_waapi/operation_drafts.py": "ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45",
     "skills/waapi-skill/wwise_waapi/operation_import.py": "8c5e646a7cf0af22ef3e5835c5fc51b850d7f7a50d92c0e378c6c80119d02882",
-    "skills/waapi-skill/wwise_waapi/operation_object.py": "2dfa0ab081b65de6b724b7410a80328f8f7fb1252d60833d05351a1d6d5d9b6e",
+    "skills/waapi-skill/wwise_waapi/operation_object.py": "606efc27030d81559adba6f5bf0aa827aed4ff3c4ef6c5aa666f4529a15db29e",
     "skills/waapi-skill/wwise_waapi/operation_plugin.py": "15f1358c0eda3152116ecc4f7ea7519facb11386e43e8d7dbcd69437a6f15b7d",
-    "skills/waapi-skill/wwise_waapi/operation_registry.py": "5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045",
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": "3d619275df7106ac14bf75f6a6f221ff5ca01e2417850d4509fea13698a4718b",
     "skills/waapi-skill/wwise_waapi/operation_soundbank.py": "cbc517977a4d9a3b42cfb051631a62bc40977da2eb4a6c81d26c01bf57cea044",
     "skills/waapi-skill/wwise_waapi/operation_tone.py": "231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550",
     "skills/waapi-skill/wwise_waapi/operation_ui_commands.py": "78152a5e4ba9b002b2d740f43d7f6e94b88410b21391d101d93804611b9d0608",
     "skills/waapi-skill/wwise_waapi/override_applicability.py": "4513939505148b2966f21790cb33eadcde6c67ea56f3d86ea9388dab4a05b3a0",
+    "skills/waapi-skill/wwise_waapi/owned_control_inputs.py": "3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b",
     "skills/waapi-skill/wwise_waapi/peak_read_continuation.py": "883dcf973b52989cdc0b95f91a73fc2e2e3cd109b7af5e62ca0eca147db5ab3d",
-    "skills/waapi-skill/wwise_waapi/planned_references.py": "700eb1fc7b550e834e6762cbf386af1fb06db8af9733b6c4b30cc4f036ecf15b",
+    "skills/waapi-skill/wwise_waapi/planned_references.py": "6455105f7c25923c360b68f5883e64d5b8927dd904b621597e8d7150bf1c9401",
     "skills/waapi-skill/wwise_waapi/platform_commands.py": "85ee88c96c7d5246add85bab3ffd6d80fb631e832d885d9afbc24beb0f232d99",
     "skills/waapi-skill/wwise_waapi/platform_paths.py": "00149d5c4213da5d76d748ef21607051677f6364625853e7838c75701693a527",
     "skills/waapi-skill/wwise_waapi/project_setting_business.py": "87e116602cdc4c1b7ad58f6bf4405c4dd6d2cdea4c9e353e8276b7bd9cf84c70",
@@ -429,7 +457,7 @@
     "tests/destructive/test_expansion_gateway_goals.py": "7f89f7fa98153cbc131ef2e36dc6b2d15bafaf7c0def306ed44dec781b5b7773",
     "tests/destructive/test_gameparameter_creation_feasibility.py": "e991f64bce8300813a1e4ec9e2ef8faa31342ca1ed3b826d6d758b127ba710a5",
     "tests/destructive/test_gateway_transaction_matrix.py": "f694a0f545badec8f9fb1c0ddae933ee0e60437240071d96684805ad7188b318",
-    "tests/destructive/test_gateway_workflow_transaction_matrix.py": "435f942ea53a8a1f82fceb92e400ce76b6eb57252bbe2116f4f70903a4a1a1d4",
+    "tests/destructive/test_gateway_workflow_transaction_matrix.py": "d83d43d179020e7021df469074f01ba385283e25640ded6b58ee6af638833aeb",
     "tests/destructive/test_object_deferred_sandbox.py": "bc45b526fa7bdf8e9406192a2ecbc9ea835d043dba5199b5c722a7a989484d14",
     "tests/destructive/test_project_mutation_sandbox.py": "d87e11577aa8bc99b1d7dafd47496bf95d8328fc3ca65034f2ced377b6e88c95",
     "tests/destructive/test_repair_metadata_preflight.py": "355ea3916567b441029127447983c502bc16c51e3edc81d98478f981c22f97a1",
@@ -610,6 +638,12 @@
       "pyproject.toml": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6"
     },
     "6d4a35471bda04f76a4501e3b29a3a19cf5b4132": {
+      "ci/test.sh": "8e0be6da25d33455452590767e4b1b5c22bffa353d7ac6ff275f9580e981b534",
+      "ci/test_driver.py": "9d08ebedc4c57726d3127b7bdc6be2cbd311a7c7c508671dc0cb742b867f6b9a",
+      "poetry.lock": "62f5140fd58ea6626199fb6b1c710f9530ed773fa6535291346b023595a332b9",
+      "pyproject.toml": "c6b4c3708b11ad7d8215ca961df70531d21db960bd6434a77def49becff622b6"
+    },
+    "796f16ca0794d45e4deed6f9ec92039f32f69b20": {
       "ci/test.sh": "8e0be6da25d33455452590767e4b1b5c22bffa353d7ac6ff275f9580e981b534",
       "ci/test_driver.py": "9d08ebedc4c57726d3127b7bdc6be2cbd311a7c7c508671dc0cb742b867f6b9a",
       "poetry.lock": "62f5140fd58ea6626199fb6b1c710f9530ed773fa6535291346b023595a332b9",
@@ -1150,7 +1184,78 @@
     "tests/support/exact_evidence_finalization.py": "af3f33ddd0cecb386620164900ec39544d0c72aa12b34dea1e15e913b305badc",
     "tests/support/host_path_relatives.py": "8d5bcc6266540e702c70373b62128b142c8a1f7faddf8699cb299860b661480d"
   },
-  "modern_to_current_changes": [],
+  "modern_to_current_changes": [
+    {
+      "current_sha256": "f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "9d2fc5b8477b840edf4d2b9c8322514b45157761ac3fb898b90d2554fbd8f7c8",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "46a0180db2c083081c4ab3a410dffc8618603d83f7059dac2e748639ea1cdf21",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "55a2005e667d122f46c5ecb75c57a666161f3f8c4c789b44f2515d992b609237",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "837ee2edee8e40d5cc9cad87cba1ff1c536ccb61eb9a5c1119581f0f0de30ab4",
+      "original_sha256": "fb73cecdc6e61ae9e702c7fe2450dc9b4abc38324f115261e1d772a3d5371d67",
+      "path": "skills/waapi-skill/scripts/gateway.py"
+    },
+    {
+      "current_sha256": "1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7",
+      "original_sha256": "501f76379fbd13861091fb71748e7971287e677038205b022124b18dd9db98e2",
+      "path": "skills/waapi-skill/wwise_waapi/business_adapters.py"
+    },
+    {
+      "current_sha256": "17d96c6f8a663cd4d8bdf3c34717b958ae16ebc36c88ceb59c3f18937389dcb7",
+      "original_sha256": "e720da23c5157494caaa5cbee35da02ab9bfb4b08d0dd8db979532d636333f2e",
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_business.py"
+    },
+    {
+      "current_sha256": "487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f",
+      "original_sha256": "a8477164bc13fe66ed6322eea4fbbe0902eba9f86373294f9aa774361a17e916",
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py"
+    },
+    {
+      "current_sha256": "8d6ad65d41bc98cb39f5f73e29d600f3d73be6fba0fa4ad631e1641764b3be18",
+      "original_sha256": "c5585ae67ea0e8c9e5834f5416b03d152f5279059954d045fafb9f628aa5f2da",
+      "path": "skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py"
+    },
+    {
+      "current_sha256": "606efc27030d81559adba6f5bf0aa827aed4ff3c4ef6c5aa666f4529a15db29e",
+      "original_sha256": "2dfa0ab081b65de6b724b7410a80328f8f7fb1252d60833d05351a1d6d5d9b6e",
+      "path": "skills/waapi-skill/wwise_waapi/operation_object.py"
+    },
+    {
+      "current_sha256": "3d619275df7106ac14bf75f6a6f221ff5ca01e2417850d4509fea13698a4718b",
+      "original_sha256": "5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045",
+      "path": "skills/waapi-skill/wwise_waapi/operation_registry.py"
+    },
+    {
+      "current_sha256": "3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/wwise_waapi/owned_control_inputs.py"
+    },
+    {
+      "current_sha256": "6455105f7c25923c360b68f5883e64d5b8927dd904b621597e8d7150bf1c9401",
+      "original_sha256": "700eb1fc7b550e834e6762cbf386af1fb06db8af9733b6c4b30cc4f036ecf15b",
+      "path": "skills/waapi-skill/wwise_waapi/planned_references.py"
+    },
+    {
+      "current_sha256": "d83d43d179020e7021df469074f01ba385283e25640ded6b58ee6af638833aeb",
+      "original_sha256": "435f942ea53a8a1f82fceb92e400ce76b6eb57252bbe2116f4f70903a4a1a1d4",
+      "path": "tests/destructive/test_gateway_workflow_transaction_matrix.py"
+    }
+  ],
   "native_anchors": [
     {
       "category": {
@@ -1905,6 +2010,51 @@
   },
   "original_to_current_changes": [
     {
+      "current_sha256": "f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "9d2fc5b8477b840edf4d2b9c8322514b45157761ac3fb898b90d2554fbd8f7c8",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "46a0180db2c083081c4ab3a410dffc8618603d83f7059dac2e748639ea1cdf21",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "55a2005e667d122f46c5ecb75c57a666161f3f8c4c789b44f2515d992b609237",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json"
+    },
+    {
+      "current_sha256": "837ee2edee8e40d5cc9cad87cba1ff1c536ccb61eb9a5c1119581f0f0de30ab4",
+      "original_sha256": "fb73cecdc6e61ae9e702c7fe2450dc9b4abc38324f115261e1d772a3d5371d67",
+      "path": "skills/waapi-skill/scripts/gateway.py"
+    },
+    {
+      "current_sha256": "1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7",
+      "original_sha256": "501f76379fbd13861091fb71748e7971287e677038205b022124b18dd9db98e2",
+      "path": "skills/waapi-skill/wwise_waapi/business_adapters.py"
+    },
+    {
+      "current_sha256": "17d96c6f8a663cd4d8bdf3c34717b958ae16ebc36c88ceb59c3f18937389dcb7",
+      "original_sha256": "e720da23c5157494caaa5cbee35da02ab9bfb4b08d0dd8db979532d636333f2e",
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_business.py"
+    },
+    {
+      "current_sha256": "487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f",
+      "original_sha256": "a8477164bc13fe66ed6322eea4fbbe0902eba9f86373294f9aa774361a17e916",
+      "path": "skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py"
+    },
+    {
+      "current_sha256": "8d6ad65d41bc98cb39f5f73e29d600f3d73be6fba0fa4ad631e1641764b3be18",
+      "original_sha256": "c5585ae67ea0e8c9e5834f5416b03d152f5279059954d045fafb9f628aa5f2da",
+      "path": "skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py"
+    },
+    {
       "current_sha256": "2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d",
       "original_sha256": "456440f1b0502c3e1299943b07a21f88224f65ccbd0f475d6235e176ea52eb12",
       "path": "skills/waapi-skill/wwise_waapi/operation_composer.py"
@@ -1913,6 +2063,26 @@
       "current_sha256": "ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45",
       "original_sha256": "528e50ab6e1432415bfb4eedd34ce10eaa507a39e84a8590c9f5a048f70bfe01",
       "path": "skills/waapi-skill/wwise_waapi/operation_drafts.py"
+    },
+    {
+      "current_sha256": "606efc27030d81559adba6f5bf0aa827aed4ff3c4ef6c5aa666f4529a15db29e",
+      "original_sha256": "2dfa0ab081b65de6b724b7410a80328f8f7fb1252d60833d05351a1d6d5d9b6e",
+      "path": "skills/waapi-skill/wwise_waapi/operation_object.py"
+    },
+    {
+      "current_sha256": "3d619275df7106ac14bf75f6a6f221ff5ca01e2417850d4509fea13698a4718b",
+      "original_sha256": "5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045",
+      "path": "skills/waapi-skill/wwise_waapi/operation_registry.py"
+    },
+    {
+      "current_sha256": "3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b",
+      "original_sha256": null,
+      "path": "skills/waapi-skill/wwise_waapi/owned_control_inputs.py"
+    },
+    {
+      "current_sha256": "6455105f7c25923c360b68f5883e64d5b8927dd904b621597e8d7150bf1c9401",
+      "original_sha256": "700eb1fc7b550e834e6762cbf386af1fb06db8af9733b6c4b30cc4f036ecf15b",
+      "path": "skills/waapi-skill/wwise_waapi/planned_references.py"
     },
     {
       "current_sha256": "cc17c8e5562c350cb9b793a46fe0660ffc21c79a3cbb0f61c1f2b2fea4f5ec45",
@@ -1925,7 +2095,7 @@
       "path": "tests/destructive/support/source_copy_fixture.py"
     },
     {
-      "current_sha256": "435f942ea53a8a1f82fceb92e400ce76b6eb57252bbe2116f4f70903a4a1a1d4",
+      "current_sha256": "d83d43d179020e7021df469074f01ba385283e25640ded6b58ee6af638833aeb",
       "original_sha256": "c79068429dea4ed7b59b58d121df79ef579d7f42a898c5dbcfe180b09bd4cb99",
       "path": "tests/destructive/test_gateway_workflow_transaction_matrix.py"
     },
@@ -1956,12 +2126,81 @@
       "tests/_org/2023.1/Actor-Mixer Hierarchy/MIDI.wwu": "09970d6126a6867f4535f9273b99873af4d044bccd591d7b1414029ffaf317d7",
       "tests/_org/2024.1/Actor-Mixer Hierarchy/MIDI.wwu": "9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3",
       "tests/_org/2025.1/Containers/MIDI.wwu": "b8fc20794cc3d6b7ac17f5bd67fd57d297098830c52e985d44318f459da9c0df"
+    },
+    "796f16ca0794d45e4deed6f9ec92039f32f69b20": {
+      "tests/_org/2021.1/Actor-Mixer Hierarchy/MIDI.wwu": "4f4839e0457831e6d85c012847159b6f410c8716ec9a6c4ab6e9f888ff3c39e3",
+      "tests/_org/2022.1/Actor-Mixer Hierarchy/MIDI.wwu": "41784c1030c678d9a7f19a105dfb48e46fb8b76b044e9a3bdb8f2da885f61c3a",
+      "tests/_org/2023.1/Actor-Mixer Hierarchy/MIDI.wwu": "09970d6126a6867f4535f9273b99873af4d044bccd591d7b1414029ffaf317d7",
+      "tests/_org/2024.1/Actor-Mixer Hierarchy/MIDI.wwu": "9a00fda73b8d9a10e96968f8b10169c91b57051a24c43226e267444b2bd1b0a3",
+      "tests/_org/2025.1/Containers/MIDI.wwu": "b8fc20794cc3d6b7ac17f5bd67fd57d297098830c52e985d44318f459da9c0df"
     }
   },
   "prior_523_proposal": {
     "path": "/tmp/waapi-r59-source-2021-bridge-proposal.json",
     "sha256": "04fa543933482e4e7bf5149324f5a40ec9d6d362e00576448cb69d13bf6f1d20"
   },
+  "prior_review_modern_to_current_changes": [],
+  "prior_review_original_to_current_changes": [
+    {
+      "current_sha256": "2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d",
+      "original_sha256": "456440f1b0502c3e1299943b07a21f88224f65ccbd0f475d6235e176ea52eb12",
+      "path": "skills/waapi-skill/wwise_waapi/operation_composer.py"
+    },
+    {
+      "current_sha256": "ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45",
+      "original_sha256": "528e50ab6e1432415bfb4eedd34ce10eaa507a39e84a8590c9f5a048f70bfe01",
+      "path": "skills/waapi-skill/wwise_waapi/operation_drafts.py"
+    },
+    {
+      "current_sha256": "cc17c8e5562c350cb9b793a46fe0660ffc21c79a3cbb0f61c1f2b2fea4f5ec45",
+      "original_sha256": "34a48b9f5ea78b8e65320974b36ae31b6c21eb4e93ad617de78f0fc817d36b62",
+      "path": "skills/waapi-skill/wwise_waapi/source_copy_proof.py"
+    },
+    {
+      "current_sha256": "f9c8ba22f8b69e01bd9e5cf2424699efad4bafce71b1d10a712caf2b3d80177d",
+      "original_sha256": "804aa79503c6ec3b1afc1691adb55cbe307f40dfca17e11c2a92b2cb617716ea",
+      "path": "tests/destructive/support/source_copy_fixture.py"
+    },
+    {
+      "current_sha256": "435f942ea53a8a1f82fceb92e400ce76b6eb57252bbe2116f4f70903a4a1a1d4",
+      "original_sha256": "c79068429dea4ed7b59b58d121df79ef579d7f42a898c5dbcfe180b09bd4cb99",
+      "path": "tests/destructive/test_gateway_workflow_transaction_matrix.py"
+    },
+    {
+      "current_sha256": "b469b24ae64be096d314eb66da81b28833e0e45283d0cc66184199af2a089fdf",
+      "original_sha256": "f1aa72085e2985f8b93a1c399c17282743d716977529d9b7a00e4c5d860dffbe",
+      "path": "tests/semantic/support/codex_source_copy_protocol.py"
+    }
+  ],
+  "prior_review_raw_sha256": "fe2b853669060adf7fc0f1df8efc558dedb07c4e0d5fc3ad9b681ca880c5d9e4",
   "scope": "#180 exact Source graph; retain historical523 key set; finite selected extra code and donor dependencies",
+  "selected_native_shapes": {
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": "fc790d811274ce18aae552507c04ff50771fcdce130f254f8be9186d9ce5d4c0",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": "34e382cfb94027bb2ebfad2bcd3affd03b843b3d285b73bc2760d19b65abd85f",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "8ee6e9cb460049ac5dd31404779a82e2f66ac56651526f2dd6d467714aaa9c31",
+    "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": "fc790d811274ce18aae552507c04ff50771fcdce130f254f8be9186d9ce5d4c0",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": "34e382cfb94027bb2ebfad2bcd3affd03b843b3d285b73bc2760d19b65abd85f",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "8ee6e9cb460049ac5dd31404779a82e2f66ac56651526f2dd6d467714aaa9c31",
+    "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": "fc790d811274ce18aae552507c04ff50771fcdce130f254f8be9186d9ce5d4c0",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": "34e382cfb94027bb2ebfad2bcd3affd03b843b3d285b73bc2760d19b65abd85f",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "8ee6e9cb460049ac5dd31404779a82e2f66ac56651526f2dd6d467714aaa9c31",
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": "4fff39f986c29b080d0dca730d66b06199c24289a3491946c501724086007565",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": "34e382cfb94027bb2ebfad2bcd3affd03b843b3d285b73bc2760d19b65abd85f",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": "4fff39f986c29b080d0dca730d66b06199c24289a3491946c501724086007565",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": "34e382cfb94027bb2ebfad2bcd3affd03b843b3d285b73bc2760d19b65abd85f",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059"
+  },
   "status": "root_review_required_not_admitted"
 }

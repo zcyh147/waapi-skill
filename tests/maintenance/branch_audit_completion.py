@@ -541,12 +541,24 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
         'tests/support/metadata_replay_cases.json','tests/support/metadata_replay_branch_evidence.py',
         'docs/branch-coverage-requirements.json','tests/unit/test_metadata_default_branch_evidence.py',
         'tests/support/media_pool_branch_evidence.py'}
-    # Reviewed combined Source/Triangle runtime at411e8173949020bad26e4302f1e9428a21bcac7d.
-    # Full original/current maps remain mandatory. All thirteen exact runtime
-    # pairs occur together, including both explicit new-file before=None rows.
-    # Future hashes and partially combined runtimes are not this bridge.
-    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': 'fb73cecdc6e61ae9e702c7fe2450dc9b4abc38324f115261e1d772a3d5371d67',
+    # Root-reviewed R59 exact runtime/policy pairs. Full historical/current maps
+    # remain mandatory, including explicit absent-before dependencies. Changed
+    # producer hashes are separate from original native ownership; no future
+    # runtime, resource or partially combined source is admitted.
+    reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': 'b03d88cdca2184f690aa667177762e0a0cf5bc47e0d21eda98dcfe2baceb3141',
+                                            'before': None},
+ 'skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json': {'after': 'f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json': {'after': '9d2fc5b8477b840edf4d2b9c8322514b45157761ac3fb898b90d2554fbd8f7c8',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json': {'after': '46a0180db2c083081c4ab3a410dffc8618603d83f7059dac2e748639ea1cdf21',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json': {'after': '55a2005e667d122f46c5ecb75c57a666161f3f8c4c789b44f2515d992b609237',
+                                                                                        'before': None},
+ 'skills/waapi-skill/scripts/gateway.py': {'after': '837ee2edee8e40d5cc9cad87cba1ff1c536ccb61eb9a5c1119581f0f0de30ab4',
                                            'before': '1da3c6bcbc09c1a426defe958de142c549af6c27cbd5a1ff6ea70b2b182b49ca'},
+ 'skills/waapi-skill/wwise_waapi/business_adapters.py': {'after': '1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7',
+                                                         'before': '501f76379fbd13861091fb71748e7971287e677038205b022124b18dd9db98e2'},
  'skills/waapi-skill/wwise_waapi/core_business.py': {'after': '62e361dd638a53af8b62455ec5c414bff7e5e9a9fdf6a2a419edb44a6f970bb6',
                                                      'before': '2cbf4c4aa6aeca19af2bad665f36d1b0f3bbbcdc148e7da360973574ae0a2f46'},
  'skills/waapi-skill/wwise_waapi/core_business_contracts.py': {'after': 'f9fe51a42199b137420dc906e3ceea57a64e6f3d302940887747d7616f61d61a',
@@ -555,22 +567,38 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
                                                               'before': '55b42f82e7ac3574d815f8729fbd98821dea7d870e80a351a4c875fa025da177'},
  'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'after': 'ce27359dbfb4414bcc9b96e51c271036206f773e78ee22dc8b3b52fcec56da33',
                                                                         'before': '40f292ddb8b34c97a8596a0ae5476947cfbec0f9a675bd43307ac4ccafdadef6'},
+ 'skills/waapi-skill/wwise_waapi/object_graph_business.py': {'after': '17d96c6f8a663cd4d8bdf3c34717b958ae16ebc36c88ceb59c3f18937389dcb7',
+                                                             'before': 'e720da23c5157494caaa5cbee35da02ab9bfb4b08d0dd8db979532d636333f2e'},
+ 'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py': {'after': '487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f',
+                                                                       'before': 'a8477164bc13fe66ed6322eea4fbbe0902eba9f86373294f9aa774361a17e916'},
  'skills/waapi-skill/wwise_waapi/object_lifecycle_graph.py': {'after': '8f2df48a3089554996730ad1a074db35bea444316408d0c2f366686a646e226f',
                                                               'before': '97c3eef5097e66d34c5ecc87b56c787969c7bfe10c88d7a7f2ba3b2eef983c72'},
+ 'skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py': {'after': '8d6ad65d41bc98cb39f5f73e29d600f3d73be6fba0fa4ad631e1641764b3be18',
+                                                                          'before': 'c5585ae67ea0e8c9e5834f5416b03d152f5279059954d045fafb9f628aa5f2da'},
  'skills/waapi-skill/wwise_waapi/operation_composer.py': {'after': '2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d',
                                                           'before': 'f56b8fd67de519c2b391ce8399bee9c031e6f8b5d7804afa48ddf8b3326168f5'},
  'skills/waapi-skill/wwise_waapi/operation_drafts.py': {'after': 'ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45',
                                                         'before': 'dc6a828ae864c0d7ac1f4845c616bb1b1a49d2aad9ca5e503f754fd4a4922c98'},
- 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045',
+ 'skills/waapi-skill/wwise_waapi/operation_object.py': {'after': '606efc27030d81559adba6f5bf0aa827aed4ff3c4ef6c5aa666f4529a15db29e',
+                                                        'before': '2dfa0ab081b65de6b724b7410a80328f8f7fb1252d60833d05351a1d6d5d9b6e'},
+ 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '3d619275df7106ac14bf75f6a6f221ff5ca01e2417850d4509fea13698a4718b',
                                                           'before': '20be86428b6e1ae9fb6cab954ee7ada6b8092406bf33b8bc148b869853539b14'},
  'skills/waapi-skill/wwise_waapi/operation_tone.py': {'after': '231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550',
                                                       'before': '34572c49b6c3c9b3b71ad891fdfe8bd35ef22fd104ace8fb7d75a73362cd6912'},
+ 'skills/waapi-skill/wwise_waapi/owned_control_inputs.py': {'after': '3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b',
+                                                            'before': None},
+ 'skills/waapi-skill/wwise_waapi/planned_references.py': {'after': '6455105f7c25923c360b68f5883e64d5b8927dd904b621597e8d7150bf1c9401',
+                                                          'before': '700eb1fc7b550e834e6762cbf386af1fb06db8af9733b6c4b30cc4f036ecf15b'},
  'skills/waapi-skill/wwise_waapi/source_copy_observations.py': {'after': '78759d095e860f22b0c0ca85b98c3bb7913feb47b6cbc503940a9f62ea287b3e',
                                                                 'before': None},
  'skills/waapi-skill/wwise_waapi/source_copy_proof.py': {'after': 'cc17c8e5562c350cb9b793a46fe0660ffc21c79a3cbb0f61c1f2b2fea4f5ec45',
                                                          'before': None},
  'skills/waapi-skill/wwise_waapi/transaction_runtime.py': {'after': 'eca18101c572eb89c6af494235e7957602a4851073db4c99430f6086a7727baf',
-                                                           'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'}}
+                                                           'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'},
+ 'tests/support/metadata_read_branch_evidence.py': {'after': 'a69d316e6137bf0f1bb024816c111ea099180d1c435002fab8affea21ee73935',
+                                                    'before': '865806725017e2bd1d616faba010beaa775b7661ac3bd319fe31f42906034c99'},
+ 'tests/unit/test_branch_coverage_completion_cli.py': {'after': 'b6fcec39b5994eae73205ac9616b03a02e2c8475340e8036b1092485bd516ead',
+                                                       'before': 'f95abee0bba5b8e6184c57e806f8a16f112ba22b9cd63e49317b5338becddecb'}}
     if set(changes) & set(reviewed_runtime):
         if any(changes.get(name) != expected for name,expected in reviewed_runtime.items()):
             raise ValueError('Exact reviewed metadata changed-file proof missing; runtime drift is not equivalent')
@@ -664,46 +692,97 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
         'tests/unit/test_metadata_discovery_gateway.py','tests/unit/test_metadata_default_branch_evidence.py',
         'tests/support/media_pool_branch_evidence.py'}
     changes=producer.source_changes(before,after)
-    # Same exact reviewed411 Source/Triangle runtime as R51; original R54 is8a.
-    # These eight exact pairs do not grant native credit to the current source.
-    reviewed_runtime = {'skills/waapi-skill/scripts/gateway.py': {'after': 'fb73cecdc6e61ae9e702c7fe2450dc9b4abc38324f115261e1d772a3d5371d67',
+    # Root-reviewed R59 current runtime; independent original R54/R55 before
+    # values remain exact. These pairs do not grant current-native credit.
+    reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': 'b03d88cdca2184f690aa667177762e0a0cf5bc47e0d21eda98dcfe2baceb3141',
+                                            'before': '282bbc63583b56e7b13e65790b817795d9d8cfacaae54350dda549b8491b6c65'},
+ 'skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json': {'after': 'f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json': {'after': '9d2fc5b8477b840edf4d2b9c8322514b45157761ac3fb898b90d2554fbd8f7c8',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json': {'after': '46a0180db2c083081c4ab3a410dffc8618603d83f7059dac2e748639ea1cdf21',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json': {'after': '55a2005e667d122f46c5ecb75c57a666161f3f8c4c789b44f2515d992b609237',
+                                                                                        'before': None},
+ 'skills/waapi-skill/scripts/gateway.py': {'after': '837ee2edee8e40d5cc9cad87cba1ff1c536ccb61eb9a5c1119581f0f0de30ab4',
                                            'before': '9fead77024b8646db90fa6d80a16933c5bbe05c3f83f10c6d40ef8b8f7b86ebe'},
+ 'skills/waapi-skill/wwise_waapi/business_adapters.py': {'after': '1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7',
+                                                         'before': '501f76379fbd13861091fb71748e7971287e677038205b022124b18dd9db98e2'},
  'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'after': 'ce27359dbfb4414bcc9b96e51c271036206f773e78ee22dc8b3b52fcec56da33',
                                                                         'before': 'daab229af125377b55e75f3ec84d9f017fa1ed1c36b774851fad316e5e45b749'},
+ 'skills/waapi-skill/wwise_waapi/object_graph_business.py': {'after': '17d96c6f8a663cd4d8bdf3c34717b958ae16ebc36c88ceb59c3f18937389dcb7',
+                                                             'before': 'e720da23c5157494caaa5cbee35da02ab9bfb4b08d0dd8db979532d636333f2e'},
+ 'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py': {'after': '487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f',
+                                                                       'before': 'a8477164bc13fe66ed6322eea4fbbe0902eba9f86373294f9aa774361a17e916'},
+ 'skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py': {'after': '8d6ad65d41bc98cb39f5f73e29d600f3d73be6fba0fa4ad631e1641764b3be18',
+                                                                          'before': 'c5585ae67ea0e8c9e5834f5416b03d152f5279059954d045fafb9f628aa5f2da'},
  'skills/waapi-skill/wwise_waapi/operation_composer.py': {'after': '2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d',
                                                           'before': 'f56b8fd67de519c2b391ce8399bee9c031e6f8b5d7804afa48ddf8b3326168f5'},
  'skills/waapi-skill/wwise_waapi/operation_drafts.py': {'after': 'ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45',
                                                         'before': 'dc6a828ae864c0d7ac1f4845c616bb1b1a49d2aad9ca5e503f754fd4a4922c98'},
- 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045',
+ 'skills/waapi-skill/wwise_waapi/operation_object.py': {'after': '606efc27030d81559adba6f5bf0aa827aed4ff3c4ef6c5aa666f4529a15db29e',
+                                                        'before': '2dfa0ab081b65de6b724b7410a80328f8f7fb1252d60833d05351a1d6d5d9b6e'},
+ 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '3d619275df7106ac14bf75f6a6f221ff5ca01e2417850d4509fea13698a4718b',
                                                           'before': 'ae7d8430d03548ce8b42601d99dbc303ed2f99210a0d1d6e090b7fd7b1b3aade'},
  'skills/waapi-skill/wwise_waapi/operation_tone.py': {'after': '231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550',
                                                       'before': '73785ee94380e3c43b30f44754af299aefb68ffc654b3c86870d7b8c7a1f9c7f'},
+ 'skills/waapi-skill/wwise_waapi/owned_control_inputs.py': {'after': '3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b',
+                                                            'before': None},
+ 'skills/waapi-skill/wwise_waapi/planned_references.py': {'after': '6455105f7c25923c360b68f5883e64d5b8927dd904b621597e8d7150bf1c9401',
+                                                          'before': '700eb1fc7b550e834e6762cbf386af1fb06db8af9733b6c4b30cc4f036ecf15b'},
  'skills/waapi-skill/wwise_waapi/source_copy_proof.py': {'after': 'cc17c8e5562c350cb9b793a46fe0660ffc21c79a3cbb0f61c1f2b2fea4f5ec45',
                                                          'before': None},
  'skills/waapi-skill/wwise_waapi/transaction_runtime.py': {'after': 'eca18101c572eb89c6af494235e7957602a4851073db4c99430f6086a7727baf',
-                                                           'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'}}
+                                                           'before': '327ba44d7947e2beb7933d98b57b7bfdd9011926c1844487660230c6eb14f7e7'},
+ 'tests/support/metadata_read_branch_evidence.py': {'after': 'a69d316e6137bf0f1bb024816c111ea099180d1c435002fab8affea21ee73935',
+                                                    'before': '865806725017e2bd1d616faba010beaa775b7661ac3bd319fe31f42906034c99'},
+ 'tests/unit/test_branch_coverage_completion_cli.py': {'after': 'b6fcec39b5994eae73205ac9616b03a02e2c8475340e8036b1092485bd516ead',
+                                                       'before': 'f95abee0bba5b8e6184c57e806f8a16f112ba22b9cd63e49317b5338becddecb'}}
     if cohort=='r55':
         # Original860 owns the earlier runtime. Exact Source411 and Triangle
         # pairs advance it; native860 remains historical, never current-native.
-        reviewed_runtime = {
-            'skills/waapi-skill/scripts/gateway.py': {
-                'before':'f86e1102b99d7d552dd1fabebbda7ea4a3020f21b796233bdfc69186123c711c',
-                'after':'fb73cecdc6e61ae9e702c7fe2450dc9b4abc38324f115261e1d772a3d5371d67'},
-            'skills/waapi-skill/wwise_waapi/operation_composer.py': {
-                'before':'456440f1b0502c3e1299943b07a21f88224f65ccbd0f475d6235e176ea52eb12',
-                'after':'2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d'},
-            'skills/waapi-skill/wwise_waapi/operation_drafts.py': {
-                'before':'528e50ab6e1432415bfb4eedd34ce10eaa507a39e84a8590c9f5a048f70bfe01',
-                'after':'ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45'},
-            'skills/waapi-skill/wwise_waapi/source_copy_proof.py': {
-                'before':'71a1d2ae8c7d5e1b390733cd69cc20606465a475f10581eafaa77f55c757bb79',
-                'after':'cc17c8e5562c350cb9b793a46fe0660ffc21c79a3cbb0f61c1f2b2fea4f5ec45'},
-            'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {
-                'before':'4e231f2b1556d38b61534ab98889b309a136f7bdfd2631ceb5a20d80fefc979e',
-                'after':'ce27359dbfb4414bcc9b96e51c271036206f773e78ee22dc8b3b52fcec56da33'},
-            'skills/waapi-skill/wwise_waapi/operation_tone.py': {
-                'before':'db783ace35413ca1d126ea6a100bef0e2c813008502306dc6e4e3c4d03155fa8',
-                'after':'231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550'}}
+        reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': 'b03d88cdca2184f690aa667177762e0a0cf5bc47e0d21eda98dcfe2baceb3141',
+                                            'before': '282bbc63583b56e7b13e65790b817795d9d8cfacaae54350dda549b8491b6c65'},
+ 'skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json': {'after': 'f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2023.1/owned-control-input-construction.json': {'after': '9d2fc5b8477b840edf4d2b9c8322514b45157761ac3fb898b90d2554fbd8f7c8',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2024.1/owned-control-input-construction.json': {'after': '46a0180db2c083081c4ab3a410dffc8618603d83f7059dac2e748639ea1cdf21',
+                                                                                        'before': None},
+ 'skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json': {'after': '55a2005e667d122f46c5ecb75c57a666161f3f8c4c789b44f2515d992b609237',
+                                                                                        'before': None},
+ 'skills/waapi-skill/scripts/gateway.py': {'after': '837ee2edee8e40d5cc9cad87cba1ff1c536ccb61eb9a5c1119581f0f0de30ab4',
+                                           'before': 'f86e1102b99d7d552dd1fabebbda7ea4a3020f21b796233bdfc69186123c711c'},
+ 'skills/waapi-skill/wwise_waapi/business_adapters.py': {'after': '1e4d5ecf0a16de4459543bde1297b7a237f9b1e02363f4ed0ff9eb2489e6acf7',
+                                                         'before': '501f76379fbd13861091fb71748e7971287e677038205b022124b18dd9db98e2'},
+ 'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py': {'after': 'ce27359dbfb4414bcc9b96e51c271036206f773e78ee22dc8b3b52fcec56da33',
+                                                                        'before': '4e231f2b1556d38b61534ab98889b309a136f7bdfd2631ceb5a20d80fefc979e'},
+ 'skills/waapi-skill/wwise_waapi/object_graph_business.py': {'after': '17d96c6f8a663cd4d8bdf3c34717b958ae16ebc36c88ceb59c3f18937389dcb7',
+                                                             'before': 'e720da23c5157494caaa5cbee35da02ab9bfb4b08d0dd8db979532d636333f2e'},
+ 'skills/waapi-skill/wwise_waapi/object_graph_business_contracts.py': {'after': '487422db65a32cedb157a4e5d3cd5865688a4e5dff3b529a6e95d8250792882f',
+                                                                       'before': 'a8477164bc13fe66ed6322eea4fbbe0902eba9f86373294f9aa774361a17e916'},
+ 'skills/waapi-skill/wwise_waapi/object_metadata_business_contracts.py': {'after': '8d6ad65d41bc98cb39f5f73e29d600f3d73be6fba0fa4ad631e1641764b3be18',
+                                                                          'before': 'c5585ae67ea0e8c9e5834f5416b03d152f5279059954d045fafb9f628aa5f2da'},
+ 'skills/waapi-skill/wwise_waapi/operation_composer.py': {'after': '2423437b35cba5cd5ebb801c6ba4ccf23f642e33fa6e10a159fab337c8ca8b5d',
+                                                          'before': '456440f1b0502c3e1299943b07a21f88224f65ccbd0f475d6235e176ea52eb12'},
+ 'skills/waapi-skill/wwise_waapi/operation_drafts.py': {'after': 'ff2d8064ee56a2ed00cdb7565aff503b3d6604e0d677e5a85b0904f992e1ae45',
+                                                        'before': '528e50ab6e1432415bfb4eedd34ce10eaa507a39e84a8590c9f5a048f70bfe01'},
+ 'skills/waapi-skill/wwise_waapi/operation_object.py': {'after': '606efc27030d81559adba6f5bf0aa827aed4ff3c4ef6c5aa666f4529a15db29e',
+                                                        'before': '2dfa0ab081b65de6b724b7410a80328f8f7fb1252d60833d05351a1d6d5d9b6e'},
+ 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'after': '3d619275df7106ac14bf75f6a6f221ff5ca01e2417850d4509fea13698a4718b',
+                                                          'before': '5d351a80e7ceca94df76b9b97740a63b91f67b97d74038908e0242a669590045'},
+ 'skills/waapi-skill/wwise_waapi/operation_tone.py': {'after': '231521ce3931ed2f1cbde931ef21e8db4c582af2718f38f4765a239c5e908550',
+                                                      'before': 'db783ace35413ca1d126ea6a100bef0e2c813008502306dc6e4e3c4d03155fa8'},
+ 'skills/waapi-skill/wwise_waapi/owned_control_inputs.py': {'after': '3f0e642025564ccd501cc3e07909b80372eaa36ced2b1c3aab46a215282b162b',
+                                                            'before': None},
+ 'skills/waapi-skill/wwise_waapi/planned_references.py': {'after': '6455105f7c25923c360b68f5883e64d5b8927dd904b621597e8d7150bf1c9401',
+                                                          'before': '700eb1fc7b550e834e6762cbf386af1fb06db8af9733b6c4b30cc4f036ecf15b'},
+ 'skills/waapi-skill/wwise_waapi/source_copy_proof.py': {'after': 'cc17c8e5562c350cb9b793a46fe0660ffc21c79a3cbb0f61c1f2b2fea4f5ec45',
+                                                         'before': '71a1d2ae8c7d5e1b390733cd69cc20606465a475f10581eafaa77f55c757bb79'},
+ 'tests/support/metadata_read_branch_evidence.py': {'after': 'a69d316e6137bf0f1bb024816c111ea099180d1c435002fab8affea21ee73935',
+                                                    'before': '865806725017e2bd1d616faba010beaa775b7661ac3bd319fe31f42906034c99'},
+ 'tests/unit/test_branch_coverage_completion_cli.py': {'after': 'b6fcec39b5994eae73205ac9616b03a02e2c8475340e8036b1092485bd516ead',
+                                                       'before': 'f95abee0bba5b8e6184c57e806f8a16f112ba22b9cd63e49317b5338becddecb'}}
     if any(changes.get(name)!=expected for name,expected in reviewed_runtime.items()):
         raise ValueError('Exact R54 reviewed runtime blob proof missing; unreviewed runtime drift')
     allowed.update(reviewed_runtime)
@@ -782,8 +861,9 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
     sources = proof.get('sources', {})
     required = {binding[k]['source'].split('#')[0] for k in ('construction', 'validation', 'verifier')}
     required |= {'skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py'}
-    if (not sources or set(sources) != set(binding.get('relevant_sources', [])) or not required <= set(sources)
-            or sources != record.get('relevant_sources')):
+    if (not sources or (not proof.get('source_copy_review')
+                        and set(sources) != set(binding.get('relevant_sources', [])))
+            or not required <= set(sources) or sources != record.get('relevant_sources')):
         raise ValueError('equivalence omits original relevant source/behavior dependencies')
     if proof.get('source_copy_review'):
         from tests.support.source_copy_native_evidence import validate_source_equivalence
@@ -799,18 +879,25 @@ def validate_native_source(context, descriptor, branch, candidate, binding, base
     """Bridge an original producer's Git identity to the reviewed branch candidate."""
     import hashlib
     import subprocess
-    sources = context.get('relevant_sources')
-    selected = binding.get('relevant_sources', [])
-    if sources is None:
-        sources = {}
-        for name in selected:
-            completed = subprocess.run(['git', 'show', context['candidate'] + ':' + name], cwd=root,
-                                       check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if completed.returncode:
-                raise ValueError('original native source candidate unavailable')
-            sources[name] = hashlib.sha256(completed.stdout).hexdigest()
+    if binding.get('source_copy_native_proof'):
+        # Only the exact reviewed Source reader separates original540 from
+        # current545. validate_equivalence rechecks version/route/pointer,
+        # selected shape, original maps and the full pinned current closure.
+        from tests.support.source_copy_native_evidence import native_source_maps
+        sources = native_source_maps(context['candidate'])
     else:
-        sources = {name: sources[name] for name in selected}
+        sources = context.get('relevant_sources')
+        selected = binding.get('relevant_sources', [])
+        if sources is None:
+            sources = {}
+            for name in selected:
+                completed = subprocess.run(['git', 'show', context['candidate'] + ':' + name], cwd=root,
+                                           check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if completed.returncode:
+                    raise ValueError('original native source candidate unavailable')
+                sources[name] = hashlib.sha256(completed.stdout).hexdigest()
+        else:
+            sources = {name: sources[name] for name in selected}
     proof = binding.get('native_equivalence', {})
     if 'artifact' not in proof:
         proof = proof.get(descriptor['sha256'], {})
