@@ -118,8 +118,16 @@ def test_native_source_requires_exact_original_finalized_node_and_receipt(tmp_pa
 
 def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_bridge(tmp_path):
     from copy import deepcopy
-    from tests.support.source_copy_branch_evidence import dependency_review, relevant_sources, SYMBOLS, REVIEW_PATH, REVIEW_SHA256, write_json
+    from tests.support.source_copy_branch_evidence import dependency_review, SYMBOLS, REVIEW_SHA256, write_json
     from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_native_evidence import write_source_dependency_review
+    origin = tmp_path / 'original-evidence'
+    (origin / 'native').mkdir(parents=True)
+    review_descriptor = write_source_dependency_review(origin / 'native')
+    assert review_descriptor == {'artifact': 'native/dependency-review.json', 'sha256': REVIEW_SHA256}
+    relocated = tmp_path / 'relocated-evidence'
+    origin.rename(relocated)
+    assert not origin.exists()
     review = dependency_review()
     sources = {**review['original_sources'],
         **review['launcher_and_dependency_config_source_maps'][review['original_native_candidate']],
@@ -135,15 +143,33 @@ def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_br
         'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)), 'sources': sources,
         'reviewed_reason': 'Exact Root-approved Source bridge; no history credit',
         'source_native_candidate': review['original_native_candidate'],
-        'source_copy_review': {'artifact': str(audit.ROOT / REVIEW_PATH), 'sha256': REVIEW_SHA256}}
-    descriptor = write_json(tmp_path / 'equivalence.json', proof)
+        'source_copy_review': review_descriptor}
+    descriptor = write_json(relocated / 'equivalence.json', proof)
     completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
         {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': sources},
-        branch, 'c' * 64, binding, tmp_path, audit.ROOT)
+        branch, 'c' * 64, binding, relocated, audit.ROOT)
     for dependency in ('tests/conftest.py', 'skills/waapi-skill/wwise_waapi/source_copy_proof.py'):
         damaged = deepcopy(proof); damaged['sources'].pop(dependency)
-        descriptor = write_json(tmp_path / 'equivalence.json', damaged)
+        descriptor = write_json(relocated / 'equivalence.json', damaged)
         with pytest.raises(ValueError, match='dependencies|complete|source'):
             completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
                 {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': damaged['sources']},
-                branch, 'c' * 64, binding, tmp_path, audit.ROOT)
+                branch, 'c' * 64, binding, relocated, audit.ROOT)
+
+    # Portable descriptors cannot borrow the repository's matching bytes or
+    # escape the relocated bundle, even with the approved content hash.
+    for artifact in (str(audit.ROOT / 'tests/fixtures/source-copy/branch-dependency-review.json'),
+                     '../original-evidence/native/dependency-review.json'):
+        damaged = deepcopy(proof); damaged['source_copy_review']['artifact'] = artifact
+        descriptor = write_json(relocated / 'equivalence.json', damaged)
+        with pytest.raises(ValueError):
+            completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
+                {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': sources},
+                branch, 'c' * 64, binding, relocated, audit.ROOT)
+    portable_review = relocated / review_descriptor['artifact']
+    portable_review.write_bytes(portable_review.read_bytes() + b' ')
+    descriptor = write_json(relocated / 'equivalence.json', proof)
+    with pytest.raises(ValueError, match='artifact digest mismatch'):
+        completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
+            {'candidate_sha256': review['original_native_candidate'], 'relevant_sources': sources},
+            branch, 'c' * 64, binding, relocated, audit.ROOT)

@@ -40,7 +40,7 @@ def read_source_native_run(category, receipt, config, base):
     return {**context, 'anchor': anchor, 'category': categories[0], 'configuration': configured}
 
 
-def validate_source_equivalence(proof, branch, binding, root):
+def validate_source_equivalence(proof, branch, binding, root, *, evidence_base):
     """Only the pinned 2021 six-delta bridge may cross changed runtime bytes."""
     from tests.support.source_copy_branch_evidence import pointer_contract, native_route, REVIEW_SHA256
     import hashlib
@@ -52,10 +52,18 @@ def validate_source_equivalence(proof, branch, binding, root):
         **review['launcher_and_dependency_config_source_maps'][review['current_source_basis']],
         **review['pinned_project_input_source_maps'][review['current_source_basis']]}
     review_link = proof.get('source_copy_review', {})
+    from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+    if set(review_link) != {'artifact', 'sha256'}:
+        raise ValueError('Closed portable Source review descriptor required')
+    relative = parse_archive_relative_path(review_link['artifact']).canonical
+    evidence_root = Path(evidence_base).resolve(strict=True)
+    review_path = evidence_root / relative
+    if review_path.is_symlink() or not review_path.resolve().is_relative_to(evidence_root):
+        raise ValueError('Source review descriptor escapes its evidence bundle')
     if (branch['route'] != native_route('2021.1') or branch['pointer'] not in pointer_contract('2021.1')
             or proof.get('source_native_candidate') != review['original_native_candidate']
             or review_link.get('sha256') != REVIEW_SHA256
-            or completion.read_sealed_artifact(review_link, root) != review
+            or completion.read_sealed_artifact(review_link, evidence_root) != review
             or proof['sources'] != sources or set(binding['relevant_sources']) != set(sources)
             or not binding.get('source_copy_native_proof')
             or any(hashlib.sha256((root / name).read_bytes()).hexdigest() != seal for name, seal in current.items())):
@@ -151,6 +159,16 @@ def portable_source_native_attachments(descriptors, bindings, read, base):
             validate_source_native(loaded, binding, {'id': identity}, base)
 
 
+def write_source_dependency_review(output):
+    """Use the native producer's fixed portable descriptor and exact review bytes."""
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.source_copy_branch_evidence import fixture, REVIEW_PATH, REVIEW_SHA256
+    raw = fixture.read_file(audit.ROOT / REVIEW_PATH)
+    if fixture.sha(raw) != REVIEW_SHA256: raise ValueError('Reviewed Source bridge changed')
+    (Path(output) / 'dependency-review.json').write_bytes(raw)
+    return {'artifact': 'native/dependency-review.json', 'sha256': REVIEW_SHA256}
+
+
 def attach_original_source_native(program_index, *, category, receipt_path, config_path, inventory):
     """Produce one portable original wrapper; never launch or replay native work."""
     from copy import deepcopy
@@ -214,8 +232,7 @@ def attach_original_source_native(program_index, *, category, receipt_path, conf
             'native_route': branch['route'], 'checks': [{'pointer': pointer,
                 'equals': completion.pointer_value({'observations': {'source': facts}}, pointer)}]}
     evidence = {**write_json(output / 'native.json', record), 'artifact': 'native/native.json', 'nodeid': native_category['nodeid']}
-    review = copied('dependency-review.json', audit.ROOT / REVIEW_PATH)
-    if review['sha256'] != REVIEW_SHA256: raise ValueError('Reviewed Source bridge changed')
+    review = write_source_dependency_review(output)
     attachment = {'contract': 'waapi-skill.source-copy-native-attachment/v1', 'branch_ids': ids,
         'business_fact_id': facts['business_fact_id'], 'proof': proof_descriptor, 'evidence': evidence,
         'equivalence': {}, 'native_equivalence': {}}

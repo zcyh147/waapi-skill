@@ -787,7 +787,7 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
         raise ValueError('equivalence omits original relevant source/behavior dependencies')
     if proof.get('source_copy_review'):
         from tests.support.source_copy_native_evidence import validate_source_equivalence
-        validate_source_equivalence(proof, branch, binding, root)
+        validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
         return
     for name, seal in sources.items():
         path = (root / name).resolve()

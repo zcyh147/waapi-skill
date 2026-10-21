@@ -31,6 +31,33 @@ def write_json(path, data):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+# Reviewed expectation, independent of the capture validator and current policy.
+CLI_PROGRAM_ONLY_METADATA_IDS = {
+    version + '|wwise-console|' + build + '|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent'
+    for version, build in (
+        ('2021.1', '2021.1.14.8108'), ('2022.1', '2022.1.19.8584'),
+        ('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056'),
+        ('2025.1', '2025.1.7.9143'))
+}
+
+
+def expected_cli_categories(identity):
+    if identity in CLI_PROGRAM_ONLY_METADATA_IDS:
+        return ['program']
+    return ['live_metadata', 'program'] if '|function|ak.wwise.core.object.getPropertyInfo|' in identity else ['native', 'program']
+
+
+def test_cli_metadata_category_expectations_cover_exact_reviewed_five_and_other_sixty():
+    policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')['branches']
+    metadata = {identity: requirement for identity, requirement in policy.items()
+                if '|function|ak.wwise.core.object.getPropertyInfo|' in identity}
+    assert len(metadata) == 65
+    assert {identity for identity, requirement in metadata.items() if requirement['categories'] == ['program']} == CLI_PROGRAM_ONLY_METADATA_IDS
+    assert len(set(metadata) - CLI_PROGRAM_ONLY_METADATA_IDS) == 60
+    for identity, requirement in metadata.items():
+        assert expected_cli_categories(identity) == sorted(requirement['categories'])
+
+
 def test_default_product_inputs_select_portable_stale_receipt_without_business_credit(tmp_path, capsys, monkeypatch):
     import shutil
     original_open = Path.open
@@ -79,7 +106,7 @@ def test_default_product_inputs_select_portable_stale_receipt_without_business_c
     selected_rows = {row['id']: row for row in default['obligations'] if row['state'] == 'implemented_unverified'}
     assert set(selected_rows) == set(selected['bindings'])
     for identity, row in selected_rows.items():
-        expected_categories = ['live_metadata', 'program'] if family(identity)[0] == 'metadata' else ['native', 'program']
+        expected_categories = expected_cli_categories(identity)
         assert row['requirements'] == expected_categories
         assert row['evidence_results']['program']['outcome'] == 'missing'
     program_index = deepcopy(index)
