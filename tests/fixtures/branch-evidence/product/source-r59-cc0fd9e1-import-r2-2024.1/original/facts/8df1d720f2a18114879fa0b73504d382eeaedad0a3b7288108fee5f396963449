@@ -1,0 +1,21 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r2/run-cc0fd9e1-r1/pytest-capture/test_modern_collector_preserve2/native/1792554451789233000-db826f2fa56542488412be0125b5d12e-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": null,
+    "name": "Curve",
+    "restriction": {
+      "type": "reference"
+    },
+    "type": ""
+  },
+  "risk_level": "low",
+  "timeout": 9.99532266598544,
+  "version": "2024.1"
+}

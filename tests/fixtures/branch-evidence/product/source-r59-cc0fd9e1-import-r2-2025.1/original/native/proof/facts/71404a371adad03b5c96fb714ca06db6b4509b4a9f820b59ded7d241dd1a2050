@@ -1,0 +1,66 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2025-r1/pytest/gateway-workflows-2025-10/dispatcher-evidence/1792541051241516000-102a51d98c6749aa9a1e91cc6a71cc6d-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4294967295,
+    "default": null,
+    "dependencies": [],
+    "display": {
+      "group": "",
+      "index": 2048,
+      "name": "Control Input"
+    },
+    "name": "ControlInput",
+    "restriction": {
+      "restrictions": [
+        {
+          "sharedOnlyTypes": [
+            "Game Parameter",
+            "MIDI Parameter"
+          ],
+          "type": [
+            "Game Parameter",
+            "MIDI Parameter",
+            "Modulator LFO",
+            "Modulator Envelope",
+            "Modulator Time"
+          ]
+        }
+      ],
+      "type": "reference"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": false
+    },
+    "type": "",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.993706959008705,
+  "version": "2025.1"
+}

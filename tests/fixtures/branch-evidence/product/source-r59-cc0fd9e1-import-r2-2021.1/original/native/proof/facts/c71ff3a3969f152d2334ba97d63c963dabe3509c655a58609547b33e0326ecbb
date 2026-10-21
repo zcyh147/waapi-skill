@@ -1,0 +1,52 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r57-source-graph/.waapi-skill-state/full-coverage/r57-repeated-source-6d4a3547-2021-r1/pytest/gateway-workflows-2021-10/dispatcher-evidence/1792539393902820000-cd0f1a5293964186a22458754f1424f5-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 6,
+    "default": 0.0,
+    "dependencies": [],
+    "display": {
+      "group": "ShareSets/Modulators/LFO",
+      "index": 1666,
+      "name": "Initial Phase Offset"
+    },
+    "name": "LfoInitialPhase",
+    "restriction": {
+      "max": 180.0,
+      "min": -180.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": true,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "Real64",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 1,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 180.0,
+        "min": -180.0,
+        "step": 1.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.991198500007158,
+  "version": "2021.1"
+}

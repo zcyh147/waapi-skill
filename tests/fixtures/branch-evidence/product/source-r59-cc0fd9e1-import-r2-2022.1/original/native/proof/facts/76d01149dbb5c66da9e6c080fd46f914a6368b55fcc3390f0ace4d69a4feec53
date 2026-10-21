@@ -1,0 +1,52 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792540844792629000-ba8dd8a60f9c45878fbc7d22316330a1-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 1,
+    "default": 0.0,
+    "dependencies": [],
+    "display": {
+      "group": "ShareSets/Modulators/LFO",
+      "index": 1674,
+      "name": "Attack"
+    },
+    "name": "LfoAttack",
+    "restriction": {
+      "max": 100000.0,
+      "min": 0.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": true,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "Real64",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 2,
+        "fine": 0.001,
+        "infinity": 0.0,
+        "max": 10.0,
+        "min": 0.0,
+        "step": 0.01
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.99462283399771,
+  "version": "2022.1"
+}
