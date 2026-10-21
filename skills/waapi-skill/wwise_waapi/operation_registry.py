@@ -7385,7 +7385,7 @@ def _prepare_owned_control_input(descriptor, *, version, read, inherited_platfor
                 "option": "--new-control-input-field-value", "arguments": ["<returned Duration Field Handle>", "<explicit duration in seconds within its live restriction>"]}}
         if (duration_field.name != "TimeModDuration" or (duration_field.type or "").casefold() != "real64"
                 or not explicit and "default" not in duration_field.raw
-                or type(duration) not in (int, float) or not math.isfinite(duration) or duration <= 0):
+                or not _is_finite_waapi_number(duration) or duration <= 0):
             raise OperationContractError("CONTROL_INPUT_TIME_DURATION_REQUIRED", "Discover the Duration class Field Handle and declare its explicit value in seconds; no usable typed class default is proved.",
                 details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False})
         try:
@@ -7395,8 +7395,7 @@ def _prepare_owned_control_input(descriptor, *, version, read, inherited_platfor
                 details={"repair": repair, "tracking_issue": 180, "mutation_dispatched": False}) from exc
         if not isinstance(curve_points, (list, tuple)) or not curve_points:
             raise OperationContractError("INVALID_READBACK", "Time-axis admission requires the exact declared or preserved Curve points.")
-        if any(not isinstance(point, Mapping) or type(point.get("x")) not in (int, float)
-                or not math.isfinite(point["x"]) for point in curve_points):
+        if any(not isinstance(point, Mapping) or not _is_finite_waapi_number(point.get("x")) for point in curve_points):
             raise OperationContractError("INVALID_READBACK", "Time-axis admission requires Curve point objects with finite numeric X coordinates.")
         outside = [index for index, point in enumerate(curve_points) if not 0 <= point["x"] <= duration]
         if outside:

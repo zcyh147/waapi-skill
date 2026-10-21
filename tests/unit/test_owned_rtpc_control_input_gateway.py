@@ -192,7 +192,7 @@ def test_time_axis_default_is_sealed_without_assigning_unrequested_duration(tmp_
     assert code == 0 and verified.get('verified') is True, verified
 
 
-@pytest.mark.parametrize('default', ['absent', None])
+@pytest.mark.parametrize('default', ['absent', None, pytest.param(10**400, id='oversized-integer')])
 def test_time_axis_missing_default_gives_explicit_field_handle_repair(tmp_path, default):
     task = OwnedControlTask(tmp_path)
     task.input_properties.pop('TimeModDuration')
@@ -461,7 +461,8 @@ def declare_replacement(task):
 
 
 @pytest.mark.parametrize('point', [None, {'x': '5', 'y': 0, 'shape': 'Linear'},
-    {'x': True, 'y': 0, 'shape': 'Linear'}], ids=['null-point', 'string-x', 'boolean-x'])
+    {'x': True, 'y': 0, 'shape': 'Linear'}, {'x': 10**400, 'y': 0, 'shape': 'Linear'}],
+    ids=['null-point', 'string-x', 'boolean-x', 'oversized-integer'])
 def test_time_replacement_rejects_malformed_preserved_curve_readback_before_write(tmp_path, point):
     task = ReplacementTask(tmp_path)
     task.objects[RTPC]['@Curve']['points'] = [point]
