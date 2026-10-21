@@ -6,7 +6,10 @@ import pytest
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
     workflow_sandbox_runtime,
 )
-from tests.support.playlist_reference_observation import collect_playlist_slot_reference_metadata
+from tests.support.playlist_reference_observation import (
+    collect_playlist_instance_identities,
+    collect_playlist_slot_reference_metadata,
+)
 
 
 pytestmark = [
@@ -25,3 +28,11 @@ def test_playlist_slot_reference_native_metadata(workflow_sandbox_runtime):
         version.get(key) for key in ("year", "major", "minor", "build")
     ) == (2025, 1, 7, 9143), version
     collect_playlist_slot_reference_metadata(workflow_sandbox_runtime)
+
+
+def test_playlist_slot_native_identity(workflow_sandbox_runtime):
+    version = workflow_sandbox_runtime.sandbox.metadata.get_info_version
+    assert isinstance(version, dict) and tuple(
+        version.get(key) for key in ("year", "major", "minor", "build")
+    ) == (2025, 1, 7, 9143), version
+    collect_playlist_instance_identities(workflow_sandbox_runtime)

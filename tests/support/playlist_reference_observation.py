@@ -83,3 +83,50 @@ def collect_playlist_slot_reference_metadata(runtime) -> None:
         assert len(body) <= 8 * 1024 * 1024, "Playlist metadata observation exceeded byte bound"
         output.write_bytes(body)
         category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+
+def collect_playlist_instance_identities(runtime) -> None:
+    """Read source-selected instances, without treating XML tags as live types."""
+    assert runtime.version == "2025.1"
+    identities = {
+        "slot": "{7571D6B0-D614-40B5-B02D-0012FE3743A7}",
+        "peer": "{6298C41E-F7C6-40B6-BFFE-E0B02EE7DC72}",
+        "owner": "{8C0FD1AD-E45D-408D-9BF3-874970CCC123}",
+        "target": "{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}",
+    }
+    output = runtime.state_dir / "playlist-instance-identities.json"
+    observation = {"candidate": runtime.candidate, "version": runtime.version,
+        "project_mutation_count": 0, "business_effect_verified": False, "calls": [], "objects": {}}
+    category = {"category": "playlist-instance-native-identities", "status": "FAIL",
+        "verifier_strength": "read_only_identity_and_membership_observation",
+        "business_effect_verified": False, "observation_path": str(output)}
+    runtime.category_results.append(category)
+
+    def read(label, selector):
+        assert len(observation["calls"]) < 5
+        argv = ["query-object", *selector, "--max-results", "4", "--include", "class-id",
+                "--include", "owner", "--include", "parent"]
+        code, payload = runtime.raw_gateway(argv)
+        observation["calls"].append({"label": label, "argv": argv, "exit_code": code, "payload": payload})
+        assert code == 0 and payload.get("ok") is True, payload
+        rows = payload.get("objects", payload.get("agent_result"))
+        assert isinstance(rows, list), payload
+        observation["objects"][label] = rows
+        return rows
+
+    try:
+        for label, identity in identities.items():
+            rows = read(label, ["--exact-id", identity])
+            assert len(rows) == 1 and rows[0]["id"].casefold() == identity.casefold(), rows
+        members = read("playlist", ["--advanced-waql", f'from object "{identities["owner"]}" select @Playlist'])
+        assert [row["id"].casefold() for row in members] == [
+            identities["slot"].casefold(), identities["peer"].casefold()], members
+        category.update(status="PASS", reason="Existing identities and ordered Playlist members observed; no write acceptance")
+    except BaseException as exc:
+        observation["error"] = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
