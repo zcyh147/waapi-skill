@@ -1,0 +1,18 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r2/run-cc0fd9e1-r1/pytest-capture/test_modern_collector_preserve0/native/1792554434640615000-63384dbce3fe4f50bae7ac939a61bc52-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "default": 0,
+    "name": "Color",
+    "type": "int16"
+  },
+  "risk_level": "low",
+  "timeout": 9.998865833011223,
+  "version": "2022.1"
+}

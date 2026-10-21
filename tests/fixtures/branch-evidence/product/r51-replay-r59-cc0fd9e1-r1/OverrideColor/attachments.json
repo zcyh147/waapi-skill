@@ -1,0 +1,12 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r51-replay-r59-cc0fd9e1-r1/OverrideColor/attachment-0.json",
+      "sha256": "bd31e6633c3bc369c289584eb8bdbf597085d626a8561d4d7a67a48a70562595"
+    },
+    {
+      "artifact": "r51-replay-r59-cc0fd9e1-r1/OverrideColor/attachment-1.json",
+      "sha256": "9ba3fd3a6b794b5cc410e0a7d1cd88ef29ee2af69e02bcdd97f39f1823cbd143"
+    }
+  ]
+}

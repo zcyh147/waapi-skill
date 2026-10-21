@@ -1,0 +1,72 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792540976819224000-75e39c67b7b446e3946af7fcfa7bb46d-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 7,
+    "default": 50.0,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "2",
+                  "value": 2
+                }
+              ]
+            }
+          }
+        ],
+        "context": "Self",
+        "property": "LfoWaveform",
+        "type": "property"
+      }
+    ],
+    "display": {
+      "group": "",
+      "index": 1657,
+      "name": "PWM"
+    },
+    "name": "LfoPWM",
+    "restriction": {
+      "max": 100.0,
+      "min": 0.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": true,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "Real64",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 1,
+        "fine": 0.01,
+        "infinity": 0.0,
+        "max": 100.0,
+        "min": 0.0,
+        "step": 0.1
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.984713790996466,
+  "version": "2023.1"
+}

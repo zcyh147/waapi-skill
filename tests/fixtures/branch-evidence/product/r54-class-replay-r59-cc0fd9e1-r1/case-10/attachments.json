@@ -1,0 +1,24 @@
+{
+  "metadata_attachments": [
+    {
+      "artifact": "r54-class-replay-r59-cc0fd9e1-r1/case-10/attachment-0.json",
+      "sha256": "edbb55d10dae58449e79bcf706ed2d7242fa06f1006d65faa99046b7a9a3dbae"
+    },
+    {
+      "artifact": "r54-class-replay-r59-cc0fd9e1-r1/case-10/attachment-1.json",
+      "sha256": "2673d4597fa1b51f4906bd0ae6c886447b93be71433000930d8b5ae84f74a9e9"
+    },
+    {
+      "artifact": "r54-class-replay-r59-cc0fd9e1-r1/case-10/attachment-2.json",
+      "sha256": "498c25f3e5fa76675a63d25a6e6d81aae27e2d71315a00b1124452703a14c889"
+    },
+    {
+      "artifact": "r54-class-replay-r59-cc0fd9e1-r1/case-10/attachment-3.json",
+      "sha256": "04cffd5d5864783fc7984b958507d66fd783729ec4fef118760d2e23b6836b77"
+    },
+    {
+      "artifact": "r54-class-replay-r59-cc0fd9e1-r1/case-10/attachment-4.json",
+      "sha256": "ae16271122e6e75b343c9e8051d1a4eb37310d3aa95718b666529f7adb116aca"
+    }
+  ]
+}

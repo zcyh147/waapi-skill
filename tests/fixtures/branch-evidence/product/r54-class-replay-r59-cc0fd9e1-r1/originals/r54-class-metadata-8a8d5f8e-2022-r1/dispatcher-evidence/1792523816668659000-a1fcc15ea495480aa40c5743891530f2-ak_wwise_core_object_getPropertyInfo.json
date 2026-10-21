@@ -1,0 +1,66 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2022-r1/dispatcher-evidence/1792523816668659000-a1fcc15ea495480aa40c5743891530f2-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 29,
+    "default": false,
+    "dependencies": [
+      {
+        "action": "Enable",
+        "context": "Self",
+        "property": "OverrideEffect",
+        "type": "override"
+      },
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "referenceIsSet": true
+          }
+        ],
+        "context": "Self",
+        "property": "Effect0",
+        "type": "reference"
+      }
+    ],
+    "display": {
+      "group": "Audio/Effects/Effect 0",
+      "index": 1456,
+      "name": "Bypass Effect 0"
+    },
+    "name": "BypassEffect0",
+    "restriction": {},
+    "supports": {
+      "randomizer": false,
+      "rtpc": "None",
+      "unlink": true
+    },
+    "type": "bool",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.96536233398365,
+  "version": "2022.1"
+}

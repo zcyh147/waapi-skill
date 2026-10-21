@@ -1,0 +1,44 @@
+{
+  "get_info": {
+    "displayName": "Wwise",
+    "platform": "x64",
+    "version": {
+      "displayName": "v2021.1.14",
+      "year": 2021,
+      "major": 1,
+      "minor": 14,
+      "build": 8108,
+      "nickname": "",
+      "schema": 103
+    },
+    "sessionId": "{88C7888E-C750-4414-A0EF-421940791225}",
+    "apiVersion": 1,
+    "branch": "wwise_v2021.1",
+    "copyright": "(C) 2006-2023. Audiokinetic Inc. All rights reserved.",
+    "configuration": "release",
+    "isCommandLine": true,
+    "processId": 364,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2021.1.14.8108\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+    "directories": {
+      "log": "c:\\Program Files\\Audiokinetic\\Wwise 2021.1.14.8108\\Authoring\\x64\\Release\\bin\\Logs\\",
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\Wwise",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2021.1.14.8108\\",
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2021.1.14.8108\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2021.1.14.8108\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2021.1.14.8108\\Authoring\\Help\\"
+    }
+  },
+  "host": "127.0.0.1",
+  "port": 31619,
+  "home": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/scenario/owned/wwise-user-home",
+  "prefix": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/scenario/owned/wwise-user-home/Library/Application Support/Wwise2019/Bottles/Wwise2019x64",
+  "sandbox": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/scenario/owned/sandbox-root/sample-project-a118831446ab482f995ba5d8291a326f/SampleProject.wproj",
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "strategy": "full",
+    "digest": "18515349f431a86c1d9956461d5b00bb5a86b26a49db24a535d3d3714dba42f1",
+    "file_count": 68,
+    "bytes_hashed": 4511191
+  },
+  "source_mtime_before_ns": 1792521230143786485
+}
