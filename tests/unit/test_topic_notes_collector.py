@@ -1,6 +1,8 @@
 """Diagnostic collection through the public Gateway, with independent native packets."""
 from copy import deepcopy
 import json
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +12,7 @@ from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, S
 from tests.unit.test_object_graph_business_gateway import gateway
 
 
-def notes_runtime(tmp_path, *, fault=None):
+def notes_runtime(tmp_path, workflow, monkeypatch, *, fault=None):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.create')
     task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit',
         'classId': 3, 'path': r'\Containers\Default Work Unit', 'notes': ''}}
@@ -19,16 +21,18 @@ def notes_runtime(tmp_path, *, fault=None):
     original = task.call
     callbacks, writes, trace = [], [], []
     active = []
+    # Literal Notes fields/values observed at native 8f7d4432; the owned test
+    # identity is rebound here. This is not generated from the reflected schema.
     packet = {'summary': 'Set Notes', 'objects': [{'object': {
         'id': CHILD, 'name': 'WAAPI_NOTES_TEST', 'type': 'PropertyContainer',
         'path': r'\Containers\Default Work Unit\WAAPI_NOTES_TEST', 'notes': 'topic-notes-after'},
         'changes': [{'type': 'notesChange', 'notesChange': {
-            'oldName': 'topic-notes-before', 'newName': 'topic-notes-after'}}]}]}
+            'oldNotes': 'topic-notes-before', 'newNotes': 'topic-notes-after'}}]}]}
+    if fault == 'names-only':
+        packet['objects'][0]['changes'][0]['notesChange'] = {
+            'oldName': 'topic-notes-before', 'newName': 'topic-notes-after'}
     if fault == 'wrong-guid': packet['objects'][0]['object']['id'] = SECOND
     if fault == 'incomplete-diagnostic': packet['padding'] = 'x' * 2200
-    if fault == 'both':
-        packet['objects'][0]['changes'][0]['notesChange'].update(
-            oldNotes='topic-notes-before', newNotes='topic-notes-after')
 
     def call(uri, args=None, options=None):
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "'):
@@ -59,7 +63,10 @@ def notes_runtime(tmp_path, *, fault=None):
         return SimpleNamespace(unsubscribe=unsubscribe)
 
     task.call, task.subscribe = call, subscribe
-    runtime = SimpleNamespace(version='2025.1', candidate='a' * 40, category_results=[],
+    class Runtime(SimpleNamespace):
+        def packaged_topic_producer(self, argv):
+            return workflow._WorkflowSandboxRuntime.packaged_topic_producer(self, argv)
+    runtime = Runtime(version='2025.1', candidate='a' * 40, category_results=[],
         state_dir=tmp_path / 'state', env=task.env, port=31337,
         sandbox=SimpleNamespace(source_project=source, sandbox_project=task.project_file),
         lifecycle=SimpleNamespace(host='127.0.0.1', waapi_url='ws://127.0.0.1:31337/waapi'))
@@ -69,14 +76,31 @@ def notes_runtime(tmp_path, *, fault=None):
             stream_sink(record)
             if fault == 'duplicate-started' and record['record_type'] == 'started':
                 stream_sink(deepcopy(record))
+        def observer_client(_url):
+            assert not active, 'Observer process opened a peer client while subscribed'
+            return task
         return gateway.execute_gateway(['--state-dir', str(runtime.state_dir), *argv], env=task.env,
-            client_factory=lambda _url: task, stream_sink=sink if stream_sink else None)
+            client_factory=observer_client, stream_sink=sink if stream_sink else None)
     runtime.raw_gateway = raw
+    from tests.semantic.support import codex_expansion_reconciliation as processes
+    launches = []
+    def producer(command, *, environment, timeout_seconds, cwd=None, text=True):
+        assert active and command[:3] == [sys.executable, str(workflow.REPO_ROOT / 'skills/waapi-skill/scripts/run.py'), 'gateway.py']
+        assert command[3:7] == ['--timeout', '10', '--state-dir', str(runtime.state_dir)]
+        assert environment == runtime.env and cwd == workflow.REPO_ROOT / 'skills/waapi-skill'
+        assert 0 < timeout_seconds <= 30 and text is True
+        argv = command[7:]; launches.append(list(argv)); trace.append('producer:' + argv[0])
+        # Separate peer facade: the observer must not open/close a peer transport.
+        peer = SimpleNamespace(call=task.call, disconnect=lambda: None)
+        code, payload = gateway.execute_gateway(command[3:], env=environment, client_factory=lambda _url: peer)
+        return subprocess.CompletedProcess(command, code, json.dumps(payload), '')
+    monkeypatch.setattr(processes, 'run_owned_gateway', producer)
+    task.producer_launches = launches
     return runtime, task, packet, callbacks, writes, trace, active
 
 
-def test_notes_diagnostic_retains_actual_rejected_packet_and_independent_readback(tmp_path, workflow):
-    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path)
+def test_notes_diagnostic_retains_actual_rejected_packet_and_independent_readback(tmp_path, workflow, monkeypatch):
+    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path, workflow, monkeypatch, fault='names-only')
     with pytest.raises(AssertionError, match='Notes event schema rejected; exact diagnostic retained'):
         workflow._collect_structure_changed_notes_diagnostic(runtime, name='WAAPI_NOTES_TEST')
     receipt = json.loads((runtime.state_dir / 'structure-changed-notes-diagnostic.json').read_text())
@@ -102,8 +126,8 @@ def test_notes_diagnostic_retains_actual_rejected_packet_and_independent_readbac
     ('cleanup', 'Notes subscription cleanup not proven'),
     ('duplicate-started', 'Duplicate started record'),
 ])
-def test_notes_collector_rejects_unusable_evidence_without_replaying_trigger(tmp_path, workflow, fault, message):
-    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path, fault=fault)
+def test_notes_collector_rejects_unusable_evidence_without_replaying_trigger(tmp_path, workflow, monkeypatch, fault, message):
+    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path, workflow, monkeypatch, fault=fault)
     with pytest.raises(AssertionError, match=message):
         workflow._collect_structure_changed_notes_diagnostic(runtime, name='WAAPI_NOTES_TEST')
     receipt = json.loads((runtime.state_dir / 'structure-changed-notes-diagnostic.json').read_text())
@@ -113,13 +137,25 @@ def test_notes_collector_rejects_unusable_evidence_without_replaying_trigger(tmp
     assert not any(uri.endswith('object.delete') for uri, _ in writes)
     assert CHILD in task.objects  # Existing finalizer must quarantine this failed sandbox.
     assert bool(active) is (fault == 'cleanup')
+    if fault == 'cleanup':
+        assert receipt['records'][1]['event'] == packet == callbacks[0]
+        terminal = receipt['stream']['payload']
+        assert terminal['error_code'] == 'SUBSCRIPTION_CLEANUP_FAILED'
+        assert terminal['monitoring_outcome']['event_count'] == 1
+        assert terminal['monitoring_outcome']['target_completed'] is False
+        assert terminal['cleanup'] == 'unsubscribe_failed'
 
 
-def test_notes_collector_preserves_both_field_pairs_without_claiming_coverage(tmp_path, workflow):
-    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path, fault='both')
+def test_notes_collector_uses_isolated_producer_and_preserves_observed_old_notes_packet(tmp_path, workflow, monkeypatch):
+    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path, workflow, monkeypatch)
     category = workflow._collect_structure_changed_notes_diagnostic(runtime, name='WAAPI_NOTES_TEST')
     receipt = json.loads((runtime.state_dir / 'structure-changed-notes-diagnostic.json').read_text())
     assert receipt['collection_complete'] is True and receipt['schema_validation'] == 'accepted'
-    assert receipt['event'] == packet == callbacks[0] and receipt['notes_shape'] == 'both'
+    assert receipt['event'] == packet == callbacks[0] and receipt['notes_shape'] == 'oldNotes/newNotes'
+    transaction = receipt['notes_transaction_id']
+    assert task.producer_launches == [['execute', transaction], ['verify', transaction]]
+    assert [row['execution_context'] for row in receipt['calls']
+        if row['argv'] in task.producer_launches] == ['separate_packaged_gateway_process'] * 2
+    assert len([uri for uri, _ in writes if uri.endswith('object.setNotes')]) == 1
     assert category['diagnostic_only'] is True and category['coverage_credit'] == 'none'
     assert receipt['native_delivery_pass'] is False and not active

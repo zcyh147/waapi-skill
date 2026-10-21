@@ -185,6 +185,23 @@ class _WorkflowSandboxRuntime:
         assert payload["detected_version"] == self.version
         return payload
 
+    def packaged_topic_producer(self, command: Sequence[str]) -> tuple[int, dict[str, Any]]:
+        """Keep the observer's txaio loop isolated from the fixed producer peer."""
+        from tests.semantic.support.codex_expansion_reconciliation import run_owned_gateway
+
+        assert len(command) == 2 and command[0] in {'execute', 'verify'}, command
+        completed = run_owned_gateway(
+            [sys.executable, str(REPO_ROOT / 'skills/waapi-skill/scripts/run.py'), 'gateway.py',
+                '--timeout', '10', '--state-dir', str(self.state_dir), *command],
+            environment=self.env, timeout_seconds=30,
+            cwd=REPO_ROOT / 'skills/waapi-skill',
+        )
+        assert len(completed.stdout.encode('utf-8')) <= 256 * 1024, 'Notes producer stdout bound exceeded'
+        assert len(completed.stderr.encode('utf-8')) <= 16 * 1024, 'Notes producer stderr bound exceeded'
+        payload = json.loads(completed.stdout)
+        assert isinstance(payload, dict), payload
+        return completed.returncode, payload
+
 
 @dataclass(slots=True)
 class _BusinessDraft:
@@ -10967,22 +10984,24 @@ def _collect_structure_changed_notes_diagnostic(runtime, *, name: str) -> dict[s
         category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
 
     class Gateway:
-        def raw_gateway(self, argv, *, stream_sink=None):
+        def raw_gateway(self, argv, *, stream_sink=None, producer=False):
             assert len(receipt['calls']) < 64, 'Notes diagnostic public call bound exceeded'
             if argv[0] == 'execute':
                 assert argv[1] not in attempted, 'Never retry a Notes diagnostic transaction'
                 attempted.add(argv[1])
                 receipt['lifecycle_final_reference']['transaction_ids'].append(argv[1])
-            row = {'argv': list(argv), 'started_monotonic_ns': time.monotonic_ns()}
+            row = {'argv': list(argv), 'started_monotonic_ns': time.monotonic_ns(),
+                'execution_context': 'separate_packaged_gateway_process' if producer else 'observer_process'}
             receipt['calls'].append(row)
-            code, payload = runtime.raw_gateway(argv, stream_sink=stream_sink)
+            code, payload = (runtime.packaged_topic_producer(argv) if producer
+                else runtime.raw_gateway(argv, stream_sink=stream_sink))
             raw = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode('utf-8')
             assert len(raw) <= 256 * 1024, 'Notes diagnostic public reply bound exceeded'
             row.update(exit_code=code, payload=deepcopy(payload)); persist()
             return code, payload
 
-        def gateway(self, argv, *, live):
-            code, payload = self.raw_gateway(argv)
+        def gateway(self, argv, *, live, producer=False):
+            code, payload = self.raw_gateway(argv, producer=producer)
             assert code == 0 and payload.get('ok') is True, payload
             if live:
                 assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
@@ -11046,8 +11065,8 @@ def _collect_structure_changed_notes_diagnostic(runtime, *, name: str) -> dict[s
                     and record.get('is_command_line') is True and record.get('event_count_limit') == 1), record
                 receipt['started_monotonic_ns'] = time.monotonic_ns()
                 receipt['started_before_execute'] = True; persist()
-                gateway.gateway(['execute', transaction], live=True)
-                verified = gateway.gateway(['verify', transaction], live=True)
+                gateway.gateway(['execute', transaction], live=True, producer=True)
+                verified = gateway.gateway(['verify', transaction], live=True, producer=True)
                 assert verified['state'] == 'verified' and verified['verification']['business_state_verified'] is True, verified
 
         argv = ['--timeout', '10', 'stream-topic', topic, '--topic-contract-digest', digest, '--event-count', '1',

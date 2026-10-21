@@ -73,9 +73,25 @@ Boolean normalization or silently renaming fields. Determine the emitted field
 names, types and required presence on the matching native build before changing
 the closed contract or claiming native schema correctness.
 
-Run only in a future authorized native session, sequentially, through the
-existing isolated sandbox lifecycle and public Gateway path. No process or
-native test was launched for this checkpoint.
+One owned Console `2025.1.7.9143` diagnostic at frozen `8f7d4432` received a
+matching Notes event containing exactly `oldNotes/newNotes`, with the requested
+`topic-notes-before` and `topic-notes-after` strings. The unchanged validator
+accepted the event. This packet needs no field renaming or Boolean normalization
+to traverse the current contract; it does not establish every native shape or
+Authoring-host equivalence. The run failed final transport cleanup:
+`transport.close` timed out after 10.060 seconds, so no delivery PASS follows.
+Create and setNotes executed and verified; the collector's later independent
+Notes readback and object deletion were not reached. The final lifecycle row is
+FAIL, with unchanged source hash/mtime/tree, clean owned-process shutdown and a
+quarantined sandbox. The retained attempt is
+`.waapi-skill-state/full-coverage/r59-topic-notes-8f7d4432-2025-r1/` in the frozen
+diagnostic worktree; its `pytest/gateway-workflows-2025-10/state/structure-changed-notes-diagnostic.json`
+receipt SHA-256 is `afcad0344925f729dfcfb156f334c9b2fdfe00d9064c5393927ce93b87975747`.
+
+The procedure below remains the minimal shape probe. Any further native
+session requires separate authorization, sequential execution and the existing
+isolated sandbox lifecycle/public Gateway path. Preserve the failed attempt
+above without replay.
 
 1. Attest an owned disposable SampleProject copy, its source hash/mtime,
    configured connection, actual `getInfo` host/version/build/session and
@@ -122,13 +138,19 @@ The diagnostic producer is now implemented as the explicitly selected
 `tests/destructive/test_gateway_workflow_transaction_matrix.py`, limited to
 Console `2025.1.7.9143` in its existing private sandbox lifecycle. It confirms
 the immutable Notes Preview before observation, then executes it once from the
-public stream's post-subscription `started` sink. The receipt preserves exact
+public stream's post-subscription `started` sink through an independent packaged
+Gateway CLI producer process. Execute and verify reuse the same private
+configuration and sealed transaction state. This isolates the observer from
+waapi-client's process-global txaio loop, which nested same-process clients can
+replace and close. The existing bounded process-group helper owns producer
+termination/reap; no client/library patch is introduced. The receipt preserves exact
 public records or the complete bounded schema-mismatch diagnostic, independent
 Notes readback and verified object cleanup; final source/process/quarantine
 acceptance still belongs to the existing v3 finalizer. A schema mismatch stays
 a failed diagnostic attempt, even when its exact packet is collected. No
-native run or native branch acceptance follows from the injected controls, and
-no Authoring-host equivalence is claimed.
+additional native run or native branch acceptance follows from the injected
+controls, and no Authoring-host equivalence is claimed. The failed native packet
+above is a separate observation, not acceptance of this successor producer.
 
 ## Exact 2021 recursive SoundBank question
 
