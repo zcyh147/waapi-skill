@@ -6460,6 +6460,18 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
                     shown['artifact']['prepared_operation']['pre_state']['object_set_nodes'] if node.get('owned_control_input')]
                 phase['constructor_authority'], = proofs
                 assert phase['constructor_authority']['version'] == runtime.version, proofs
+                assert phase['constructor_authority']['build'] == receipt['witness_build'], proofs
+                state = shown['artifact']['prepared_operation']['pre_state']
+                spec, = [node for node in state['object_set_nodes'] if node.get('collection') == 'ControlInput']
+                fact = state['planned_reference_context']['facts'][spec['request_path']]
+                assert fact['request_path'] == spec['request_path'] and fact['type'] == 'ModulatorTime', fact
+                assert fact['class_id'] == 5111824 and fact['relation'] == 'owner' and fact['path'] is None, fact
+                _required_string(fact, 'result_handle')
+                rtpc_fact, = [item for item in state['planned_reference_context']['facts'].values()
+                    if item['result_handle'] == fact['parent_identity']]
+                assert rtpc_fact['type'] == 'RTPC' and rtpc_fact['rtpc_property'] == 'Volume', rtpc_fact
+                assert rtpc_fact['parent_identity'] == owner, rtpc_fact
+                phase['sealed_control_input_occurrence'] = deepcopy(fact)
         gateway.gateway(['confirm', identity, '--confirmation-token', shown['confirmation']['token']], live=False)
         phase['native_outcome'] = 'indeterminate'
         code, executed = gateway.raw_gateway(['execute', identity]); phase['execute'] = {'exit_code': code, 'payload': executed}
@@ -6484,7 +6496,14 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
             assert actual['object']['notes'] == wanted['notes'], (wanted, actual)
     try:
         assert runtime.version in {'2022.1', '2023.1', '2024.1', '2025.1'}, 'No fabricated 2021 RTPC graph construction'
-        if owned_time_first: assert runtime.version == '2022.1', 'First owned-Time witness is pinned to2022.1'
+        if owned_time_first:
+            assert runtime.version == '2022.1', 'First owned-Time witness is pinned to2022.1'
+            observed = runtime.sandbox.metadata.get_info_version
+            receipt['observed_lifecycle_version'] = deepcopy(observed)
+            expected = {'year': 2022, 'major': 1, 'minor': 19, 'build': 8584}
+            assert isinstance(observed, Mapping) and all(type(observed.get(key)) is int
+                and observed[key] == value for key, value in expected.items()), 'First owned-Time witness requires2022.1.19.8584'
+            receipt['witness_build'] = '.'.join(str(observed[key]) for key in expected)
         schema = gateway.gateway(['query-schema', '--output', 'curve-points'], live=False)
         assert 'curve-points' in json.dumps(schema) and 'points' in json.dumps(schema), schema
         gateway.gateway(['query-schema', '--advanced'], live=False)
@@ -6604,6 +6623,8 @@ def _collect_rtpc_graph_acceptance(runtime: _WorkflowSandboxRuntime, *, name: st
                 if event['event_type'] == 'verification_recorded']
             bound, = [check['evidence'] for check in verification['assertions']
                 if check.get('kind') == 'verified_owned_control_input_identity' and check.get('passed') is True]
+            sealed = phase['sealed_control_input_occurrence']
+            assert bound.get('result_handle') == sealed['result_handle'] and bound.get('request_path') == sealed['request_path'], 'Journal identity must match the sealed ControlInput occurrence'
             assert bound['object']['id'] == member['control_input']['id'] and bound['owner_id'] == member['object']['id'], bound
             phase['parent_before'] = parent_after_setup
             phase['parent_after'] = {'object': exact(parent_before['id']), 'children': children(parent_before['id'])}

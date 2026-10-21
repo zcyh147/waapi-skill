@@ -2903,6 +2903,16 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
             # the collector must independently reject the altered native state.
             control, = [row for row in task.objects.values() if row['type'] == 'ModulatorTime']
             control['owner'] = {'id': parameters}
+        if command[0] == 'transaction-show' and code == 0 and len(writes) == 2 and fault in {
+                'journal-foreign-result-handle', 'journal-missing-result-handle'}:
+            payload = deepcopy(payload)
+            verification, = [event['details']['verification'] for event in payload['events']
+                if event['event_type'] == 'verification_recorded']
+            check, = [check for check in verification['assertions']
+                if check.get('kind') == 'verified_owned_control_input_identity']
+            assert check['passed'] is True
+            if fault == 'journal-missing-result-handle': check['evidence'].pop('result_handle')
+            else: check['evidence']['result_handle'] = 'bnh1-' + 'f' * 32
         if command[0] == 'verify' and code == 0 and len(writes) == 3 and fault:
             owner = next(row for row in task.objects.values() if row['name'] == 'WAAPI_RTPC_TEST')
             members = [task.objects[row['id']] for row in owner['@RTPC']]
@@ -2917,6 +2927,9 @@ def _rtpc_graph_runtime(tmp_path, workflow, version='2025.1', *, fault=None, exc
             elif fault == 'wrong-owner': selected['owner'] = {'id': parameters}
         return code, payload
     runtime.raw_gateway = raw
+    if version == '2022.1':
+        runtime.sandbox = SimpleNamespace(metadata=SimpleNamespace(get_info_version={
+            'year': 2022, 'major': 1, 'minor': 19, 'build': 8584}))
     return runtime, commands, writes, task
 
 
@@ -2940,6 +2953,9 @@ def test_named_owned_time_first_collector_uses_one_public_source_transaction(tmp
     source, = receipt['effects']
     assert source['public_operation'] == 'object.setRTPC' and source['artifact_unchanged'] is True
     assert source['constructor_authority']['authority_sha256']
+    assert source['constructor_authority']['build'] == receipt['witness_build'] == '2022.1.19.8584'
+    assert receipt['observed_lifecycle_version'] == {'year': 2022, 'major': 1, 'minor': 19, 'build': 8584}
+    assert source['sealed_control_input_occurrence']['result_handle'].startswith('bnh1-')
     observed = source['independent_effect']
     member, = observed['members']
     assert member['object']['properties']['PropertyName'] == 'Volume'
@@ -2969,6 +2985,39 @@ def test_named_owned_time_first_collector_rejects_wrong_owner_after_gateway_succ
     assert source['verify']['payload']['verification']['business_state_verified'] is True
     assert source['effect_verified'] is False and receipt['failure']
     assert source['artifact_unchanged'] is True and len(receipt['calls']) <= 384
+
+
+@pytest.mark.parametrize('field,value', [('minor', 18), ('build', 8583)])
+def test_named_owned_time_first_collector_rejects_lifecycle_build_mismatch_before_write(tmp_path, workflow, field, value):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, '2022.1')
+    runtime.sandbox.metadata.get_info_version[field] = value
+    with pytest.raises(AssertionError, match='2022.1.19.8584'):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST', owned_time_first=True)
+    receipt = json.loads((runtime.state_dir / 'named-owned-time-control-input-first.json').read_text())
+    assert writes == [] and commands == []
+    assert receipt['business_effect_verified'] is False and receipt['complete'] is False
+    assert receipt['effects'] == [] and 'setup' not in receipt and receipt['failure']
+
+
+@pytest.mark.parametrize('fault', ['journal-foreign-result-handle', 'journal-missing-result-handle'])
+def test_named_owned_time_first_collector_rejects_journal_handle_after_gateway_success(tmp_path, workflow, fault):
+    runtime, commands, writes, _task = _rtpc_graph_runtime(tmp_path, workflow, '2022.1', fault=fault)
+    with pytest.raises(AssertionError, match='sealed ControlInput occurrence'):
+        workflow._collect_rtpc_graph_acceptance(runtime, name='WAAPI_RTPC_TEST', owned_time_first=True)
+    receipt = json.loads((runtime.state_dir / 'named-owned-time-control-input-first.json').read_text())
+    assert receipt['complete'] is False and receipt['business_effect_verified'] is False
+    source, = receipt['effects']
+    assert source['verify']['exit_code'] == 0 and source['verify']['payload']['verified'] is True
+    assert source['verify']['payload']['verification']['business_state_verified'] is True
+    assert source['artifact_unchanged'] is True and source['effect_verified'] is False
+    verification, = [event['details']['verification'] for event in source['final_transaction']['events']
+        if event['event_type'] == 'verification_recorded']
+    bound, = [check['evidence'] for check in verification['assertions']
+        if check.get('kind') == 'verified_owned_control_input_identity' and check.get('passed') is True]
+    assert bound.get('result_handle') != source['sealed_control_input_occurrence']['result_handle']
+    assert bound['object']['id'] and bound['owner_id']
+    assert len(writes) == 2 and [cmd[0] for cmd in commands].count('execute') == 2
+    assert [cmd[0] for cmd in commands].count('verify') == 2 and len(receipt['calls']) <= 384
 
 
 @pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
