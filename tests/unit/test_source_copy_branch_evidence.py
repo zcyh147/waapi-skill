@@ -238,3 +238,63 @@ def test_source_attachment_rejects_consistent_native_points_disagreeing_with_sav
     write_json(root / 'index.json', index)
     with pytest.raises(ValueError, match='native/saved Curve points differ'):
         audit.portable_binding_inputs(root / 'index.json', json.loads((root / 'requirements.json').read_bytes()))
+
+
+def test_default_source_product_requirements_reach_evidence_and_omission_stays_unresolved(source_case):
+    index, inventory = source_case
+    document, base, _ = audit.portable_binding_inputs(index,
+        json.loads((index.parent / 'requirements.json').read_bytes()))
+    selected = set(document['bindings'])
+    # No controlled scope or requirements override: use the default product file.
+    coverage = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base)
+    rows = {row['id']: row for row in coverage['obligations'] if row['id'] in selected}
+    assert len(rows) == 4
+    assert {row['state'] for row in rows.values()} == {'implemented_unverified'}
+    assert all(row['requirements'] == ['native', 'program']
+        and set(row['evidence_results']) == {'program', 'native'} for row in rows.values())
+    # Controlled fake-client evidence cannot become product/native credit.
+    assert all(row['evidence_results']['native']['outcome'] == 'missing' for row in rows.values())
+    policy = json.loads((audit.ROOT / 'docs/branch-coverage-requirements.json').read_bytes())
+    missing = next(iter(document['bindings']))
+    del policy['branches'][missing]
+    rejected = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    row = next(row for row in rejected['obligations'] if row['id'] == missing)
+    assert row['state'] == 'unresolved' and row['requirements'] == [] and row['evidence_results'] == {}
+    assert row['reasons'] == ['reviewed exact branch evidence requirements missing or stale']
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'))
+def test_default_source_product_policy_matches_generated_bundle_requirements(tmp_path, inventory, source_case, version):
+    from tests.support.source_copy_branch_evidence import write_source_program_bundle, dependency_review
+    if version == '2022.1':
+        index, _ = source_case
+    else:
+        with pytest.MonkeyPatch.context() as environment:
+            environment.setenv('WWISE_LIVE', '1'); environment.setenv('WWISE_DESTRUCTIVE', '1')
+            workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
+        public = tmp_path / 'public'; public.mkdir()
+        if version == '2021.1':
+            from tests.unit.test_source_copy_repeated_fixture import repeated_collector_runtime
+            runtime, _, _ = repeated_collector_runtime(public)
+            profile = '2021-native-donor-two-properties/v1'
+        else:
+            runtime, _, _ = modern_collector_runtime(public, version)
+            profile = PROFILE
+        category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SOURCE_POLICY', saved_copy=True,
+            saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=profile)
+        index = write_source_program_bundle(tmp_path / 'portable', Path(category['observation_path']),
+            inventory=inventory, nodeid='controlled-source-policy-' + version,
+            phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), scope_kind='controlled')
+    generated = json.loads((index.parent / 'requirements.json').read_bytes())['branches']
+    reviewed = {identity: shape for identity, shape in dependency_review()['selected_native_shapes'].items()
+                if identity.startswith(version + '|')}
+    assert set(generated) == set(reviewed)
+    assert len(generated) == (4 if version in ('2021.1', '2022.1') else 6)
+    default = json.loads((audit.ROOT / 'docs/branch-coverage-requirements.json').read_bytes())['branches']
+    assert {identity: default.get(identity) for identity in reviewed} == generated
+    assert all(row['native_shape_sha256'] == reviewed[identity]
+        and row['categories'] == ['program', 'native']
+        and row['reason'] == 'Exact Source copy leaf and scoped #180 graph fact; separate native evidence required.'
+        for identity, row in generated.items())
