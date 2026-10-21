@@ -547,7 +547,8 @@ def test_portable_metadata_attachment_is_additive_and_keeps_original_program(ori
 
 def test_portable_originals_resolve_without_environment_or_original_absolute_paths(original_root,inventory,tmp_path,monkeypatch):
     path,index,base,attachment,branch = portable_control(tmp_path,original_root,inventory)
-    assert producer.portable_original_reads(path)['ControlInput']
+    selected_path, _, _ = _complete_r51_anchor_index(tmp_path)
+    assert producer.portable_original_reads(selected_path)['ControlInput']
     archived = json.loads((base/'observation.original.json').read_bytes())
     forbidden = {Path(row['reply']['path']) for row in archived['calls']}
     forbidden.update(Path(row['path']) for row in archived['native_evidence'])
@@ -561,7 +562,7 @@ def test_portable_originals_resolve_without_environment_or_original_absolute_pat
         if target in forbidden:raise FileNotFoundError('Original host absolute paths unavailable')
         return read_bytes(target)
     monkeypatch.setattr(Path,'read_bytes',portable_only)
-    retained = producer.portable_original_reads(path)
+    retained = producer.portable_original_reads(selected_path)
     result = completion.read_metadata_run(retained['ControlInput'],tmp_path)
     assert result['native_result']['default'] is None
     assert result['business_category_status'] == 'blocked'
@@ -812,3 +813,52 @@ def test_new_owned_dependencies_reject_unreviewed_drift(original_root, inventory
             descriptor = write(tmp_path / 'changed-owned-attachment.json', record, nodeid=descriptor['nodeid'])
             outcome, reason = result()
             assert outcome == 'missing' and ('runtime drift' in reason or 'changed-file proof' in reason)
+
+
+def _complete_r51_anchor_index(tmp_path):
+    source = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
+    original = audit.load(source)
+    base = (source.parent / original['base']).resolve()
+    links = []
+    for link in original['metadata_attachments']:
+        item = completion.read_sealed_artifact(link, base)
+        if item['contract'] == 'waapi-skill.r51-metadata-attachment/v1':
+            links.append(deepcopy(link))
+    assert len(links) == 9
+    index = {'contract': original['contract'], 'base': str(base), 'entries': [], 'metadata_attachments': links}
+    path = tmp_path / 'selected-r51-index.json'
+    path.write_text(json.dumps(index))
+    return path, index, base
+
+
+@pytest.mark.parametrize('damage', ('missing', 'duplicate', 'reshaped', 'wrong-category', 'wrong-assertion'))
+def test_r51_original_reader_requires_complete_exact_selected_anchor_bindings(tmp_path, monkeypatch, damage):
+    path, index, base = _complete_r51_anchor_index(tmp_path)
+    assert set(producer.portable_original_reads(path)) == {'Color', 'ControlInput', 'OverrideColor'}
+    link = index['metadata_attachments'][0]
+    attachment = completion.read_sealed_artifact(link, base)
+    replacements = {}
+    if damage == 'missing': index['metadata_attachments'].pop()
+    elif damage == 'duplicate': index['metadata_attachments'].append(deepcopy(link))
+    else:
+        record = completion.read_sealed_artifact(attachment['evidence'], base)
+        if damage == 'reshaped':
+            attachment['native_shape_sha256'] = '0' * 64
+            record['branch_assertions'][attachment['branch_id']]['native_shape_sha256'] = '0' * 64
+        elif damage == 'wrong-category':
+            attachment['category_inputs']['historical'] = ['metadata', 'detail', '--forged']
+            record['category_inputs'] = deepcopy(attachment['category_inputs'])
+        else:
+            record['branch_assertions'][attachment['branch_id']]['checks'][0]['equals'] = 'forged'
+        # Re-seal both levels to reach the selected-policy/native-context guards.
+        raw = json.dumps(record, sort_keys=True).encode()
+        replacements[base / attachment['evidence']['artifact']] = raw
+        attachment['evidence']['sha256'] = hashlib.sha256(raw).hexdigest()
+        raw = json.dumps(attachment, sort_keys=True).encode()
+        replacements[base / link['artifact']] = raw
+        link['sha256'] = hashlib.sha256(raw).hexdigest()
+    path.write_text(json.dumps(index))
+    read_bytes = Path.read_bytes
+    monkeypatch.setattr(Path, 'read_bytes', lambda p: replacements[p] if p in replacements else read_bytes(p))
+    with pytest.raises(ValueError, match='R51.*(anchor|binding|nine|shape|category|assertion)'):
+        producer.portable_original_reads(path)

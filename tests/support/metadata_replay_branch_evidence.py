@@ -642,25 +642,60 @@ def portable_original_reads(index_path=None):
     # Full portable import still validates every copied requirement later.
     index = audit.load(index_path)
     base = (index_path.parent / index['base']).resolve()
-    originals = {}
+    selected = selected_ids()
+    policy = audit.load(audit.ROOT / 'docs/branch-coverage-requirements.json')['branches']
+    seen, validated = set(), []
     for link in index.get('metadata_attachments', []):
         attachment = completion.read_sealed_artifact(link, base)
         if attachment['contract'] != 'waapi-skill.r51-metadata-attachment/v1':
             continue
-        if attachment['branch_id'] not in selected_ids():
-            continue
+        identity = attachment['branch_id']
+        if (set(attachment) != {'contract', 'branch_id', 'native_shape_sha256', 'category_inputs', 'evidence'}
+                or identity not in selected or identity in seen):
+            raise ValueError('R51 selected anchor identities must be exact and unique')
+        seen.add(identity)
+        expected_policy = policy.get(identity, {})
+        shape = expected_policy.get('native_shape_sha256')
+        if (not shape or expected_policy.get('categories') != ['program', 'live_metadata']
+                or attachment['native_shape_sha256'] != shape):
+            raise ValueError('R51 selected anchor shape or category differs')
         evidence = attachment['evidence']
-        record = completion.read_sealed_artifact(evidence,base)
+        if set(evidence) != {'artifact', 'sha256', 'nodeid'}:
+            raise ValueError('R51 selected anchor evidence binding differs')
+        record = completion.read_sealed_artifact(evidence, base)
         descriptor = deepcopy(record['metadata_run'])
-        context = completion.read_metadata_run(descriptor,base)
+        context = completion.read_metadata_run(descriptor, base)
         field = context['native_result']['name']
         if (context['candidate'] != ORIGINAL or context['version'] != '2021.1'
                 or context['host'] != 'wwise-console' or context['build'] != '2021.1.14.8108'
-                or field not in CASES or branch_case({'pointer': attachment['branch_id'].rsplit('|', 1)[1]}) != field
-                or attachment['branch_id'] not in record.get('branch_assertions', {})):
-            raise ValueError('Exact original R51 selected anchor differs')
+                or field not in CASES or branch_case({'pointer': identity.rsplit('|', 1)[1]}) != field):
+            raise ValueError('R51 original selected anchor differs')
+        replay_link = record['replay']
+        if (set(replay_link) != {'artifact', 'sha256', 'nodeid'}
+                or replay_link['nodeid'] != evidence['nodeid']
+                or evidence['nodeid'] != NODE + '[' + CASES[field] + ']'):
+            raise ValueError('R51 selected anchor node binding differs')
+        replay = completion.read_sealed_artifact(replay_link, base)
+        categories = record.get('category_inputs', {})
+        if (attachment['category_inputs'] != categories or set(categories) != {'historical', 'replay'}
+                or categories['historical'] != context['gateway']['argv']
+                or categories['replay'] != replay['gateway']['argv']):
+            raise ValueError('R51 selected anchor category binding differs')
+        assertion = record.get('branch_assertions', {}).get(identity)
+        expected = {'native_shape_sha256': shape, 'native_route': identity.rsplit('|', 1)[0],
+            'checks': [{'pointer': '/gateway/payload/agent_result/metadata/default',
+                        'equals': context['native_result']['default']},
+                       {'pointer': '/gateway/payload/agent_result',
+                        'equals': context['gateway']['payload']['agent_result']}]}
+        if json.dumps(assertion, sort_keys=True, allow_nan=False) != json.dumps(expected, sort_keys=True, allow_nan=False):
+            raise ValueError('R51 selected anchor assertion binding differs')
         for role in ('category','observation','status','identity','reply','native'):
             descriptor[role]['artifact'] = str((base/descriptor[role]['artifact']).resolve())
+        validated.append((field, descriptor))
+    if seen != selected or len(seen) != 9:
+        raise ValueError('R51 original reader requires all nine selected anchors')
+    originals = {}
+    for field, descriptor in validated:
         if field in originals and originals[field] != descriptor:
             raise ValueError('Conflicting portable original metadata read')
         originals[field] = descriptor
