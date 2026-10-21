@@ -5,6 +5,30 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R58 settled Source and evidence integration
+
+Source/bridge candidate `35410b7e` passed **49 affected controls in 80.70s**
+and one **60-case capture in 19.14s**. All four interface semantic seals and
+existing generated interface artifacts matched; no interface refresh was needed.
+One additive import and branch generation/check passed. Artifact candidate
+`f5a6487e` then passed the two existing portable-product checks in **30.33s**,
+with source/HEAD unchanged and no remaining owned process groups.
+
+The import preserved all **2,683 earlier archive files** and added 1,096 files /
+128,655,875 bytes. All 625 selected bindings and 272,313 native obligation
+identities, shapes and owners remain intact. Only 624 Topic/metadata evidence
+rows changed. Metadata remains 65 program facts / 60 historical native facts /
+5 missing default-absence requirements; Topic remains 559 program facts with
+559 native requirements missing. Original native candidates and current program
+sources retain their separate attribution. Five scoped Source business rows do
+not yet grant generated native credit; the #180 attachment reader remains work.
+
+The native component results below belong to their frozen candidates. This
+integration ran no Wwise, Fresh Agent, Windows native or broad regression gate.
+The historical full Program failure is not superseded. Fixed preflight runs on
+GitHub only. Detailed terminal receipts are retained under
+`/tmp/waapi-r58-integration/run-settled-r1/`.
+
 ## 2026-10-21 R57/R58 scoped native Source copy and Save
 
 The [Source fact ledger](../docs/plans/full-waapi-coverage/SOURCE_COPY.md) pins

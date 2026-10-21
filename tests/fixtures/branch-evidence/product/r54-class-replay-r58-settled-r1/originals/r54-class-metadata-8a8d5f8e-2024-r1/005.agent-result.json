@@ -1,0 +1,322 @@
+{
+  "contract": "waapi-skill.metadata-page/v1",
+  "scope": {
+    "kind": "object_type",
+    "requested": "Sound",
+    "resolved": {
+      "classId": 65552,
+      "name": "Sound",
+      "type": "WObject"
+    }
+  },
+  "snapshot": "97bf430a1a940ad39dd705b1c4dfb38a5897fcaa94438fb46794ac7d9220c043",
+  "snapshot_kind": "live-property-reference-inventory",
+  "fields": [
+    {
+      "name": "3DPosition",
+      "selection": "mf1.1792523882.0.74b38f5396c3ee46588186b62869f6572e1178cef3dcdeba808e5cd7c61c9f00"
+    },
+    {
+      "name": "3DSpatialization",
+      "selection": "mf1.1792523882.1.f110d80b9f173aafe496cf7bb5be68238f9d377f27d7bb50f19f10721949d822"
+    },
+    {
+      "name": "Attenuation",
+      "selection": "mf1.1792523882.2.c3f22b6ea15432277f4ba7eafbafc816a2c12cb2657ce8730852a3d957ff6318"
+    },
+    {
+      "name": "AttenuationDistanceScaling",
+      "selection": "mf1.1792523882.3.7e7fdc669ced78f5dae1f56e35eb8560890601ba8e7b40d05a3988ae0d60e9c2"
+    },
+    {
+      "name": "BelowThresholdBehavior",
+      "selection": "mf1.1792523882.4.eca19952692197e4af1c9abcf99b5e236db8c195f16f62f891fa2a9920d04dcc"
+    },
+    {
+      "name": "BypassEffect",
+      "selection": "mf1.1792523882.5.9a882f34f34e0325b23261fedd031cee113ea0eb61b5359392af3e72ba5f53ea"
+    },
+    {
+      "name": "CenterPercentage",
+      "selection": "mf1.1792523882.6.c6f20cc3e781a350a8a6b2a57102811a760379ed21f0bc243eb7366ba1f175f1"
+    },
+    {
+      "name": "Color",
+      "selection": "mf1.1792523882.7.e1789df8547b4e943a211c25fff607a288b940e66262e4e8c884c1e5f0f8488f"
+    },
+    {
+      "name": "Conversion",
+      "selection": "mf1.1792523882.8.82117356b874c474fa41bee683e2f4f83e6e79545165bbf7dc9e5dc271741d81"
+    },
+    {
+      "name": "EnableAttenuation",
+      "selection": "mf1.1792523882.9.33e90611d52bdc8d6ff0feee00047a15c0b694fee257e200ade015510882c832"
+    },
+    {
+      "name": "EnableDiffraction",
+      "selection": "mf1.1792523882.10.38d9dfd02462672cbd50b6c0a8cdce82179aeb7f21dadb98a689f1baa565ae1e"
+    },
+    {
+      "name": "EnableLoudnessNormalization",
+      "selection": "mf1.1792523882.11.0ab5aea82d24c2e5790c318ef92de63fe8eb0629e4c2a35cbb859797ecd8719f"
+    },
+    {
+      "name": "EnableMidiNoteTracking",
+      "selection": "mf1.1792523882.12.78276b21ac13afd40b8a5bb21c6848a432c5b7b7c3b41507192c16985bd7652b"
+    },
+    {
+      "name": "GameAuxSendHPF",
+      "selection": "mf1.1792523882.13.93a5f69b2f051e9b5f44303d6f589f956a3fb14bc2b7339b5234209ca205572e"
+    },
+    {
+      "name": "GameAuxSendLPF",
+      "selection": "mf1.1792523882.14.9ff44516552268845c280915dfb03a9d95762680583f920f9853acf3a7c1b05d"
+    },
+    {
+      "name": "GameAuxSendVolume",
+      "selection": "mf1.1792523882.15.6a7cb9a0279508d95c8c7f60484885482ea952508de0df7e37559b231318a028"
+    },
+    {
+      "name": "HdrActiveRange",
+      "selection": "mf1.1792523882.16.86f212d66a8731b66dcf06b5730a5445f36e484be8963b68f2023ae0dd010bd5"
+    },
+    {
+      "name": "HdrEnableEnvelope",
+      "selection": "mf1.1792523882.17.cba8576f66ad725b4d90cde59b87072458af90b25c836fe173aa3263d07321b5"
+    },
+    {
+      "name": "HdrEnvelopeSensitivity",
+      "selection": "mf1.1792523882.18.17e580c1f8b744685deb065ad8d62c28d603cdf5d323ba9190648b390f453ed1"
+    },
+    {
+      "name": "Highpass",
+      "selection": "mf1.1792523882.19.bc11df98ae21dc9f366157e0cd99f97b27714c73400bfcbd2f3822089865a898"
+    },
+    {
+      "name": "HoldEmitterPositionOrientation",
+      "selection": "mf1.1792523882.20.6557289b5e78e0deb28463572c1f16b715e53aff6b82b7aab57061ef01c71030"
+    },
+    {
+      "name": "HoldListenerOrientation",
+      "selection": "mf1.1792523882.21.28c4a1d28044d1bd9d2da4c2b2dec41cf63d501e185324f625bfcd70b7dae2e0"
+    },
+    {
+      "name": "IgnoreParentMaxSoundInstance",
+      "selection": "mf1.1792523882.22.c2b542d3affa101c4f18531d442a9c05e773d78248a8a02380e219251c469335"
+    },
+    {
+      "name": "Inclusion",
+      "selection": "mf1.1792523882.23.e9901ba766665bb70058c677c7c0d7467d58d169775f8b12a244a1726ccf83c6"
+    },
+    {
+      "name": "InitialDelay",
+      "selection": "mf1.1792523882.24.65b4513e508fb8b51fadcef96599045fe10167260bd292768b63d9b1026fcc6e"
+    },
+    {
+      "name": "IsGlobalLimit",
+      "selection": "mf1.1792523882.25.79a52c8b881987c1c323afdb3b781271cd6b19d14c109fbe07c8e422bd679472"
+    },
+    {
+      "name": "IsLoopingEnabled",
+      "selection": "mf1.1792523882.26.e8b70dc0e47dc22054865484d63107c026ee54fdc91bae35147c225144688b40"
+    },
+    {
+      "name": "IsLoopingInfinite",
+      "selection": "mf1.1792523882.27.fb0f65e8ba0b46dcd88d4acd918160b31a3fb76010756373d6ca96266a3ea062"
+    },
+    {
+      "name": "IsNonCachable",
+      "selection": "mf1.1792523882.28.c4d0aca2f76b01ab9b3b50a72697bbe3f25029af88d16ff2ec51dc6519c787ec"
+    },
+    {
+      "name": "IsStreamingEnabled",
+      "selection": "mf1.1792523882.29.489c4599d50881c995dee3691738f965b14056c36159d7c06724fd49d2940420"
+    },
+    {
+      "name": "IsVoice",
+      "selection": "mf1.1792523882.30.354c265e4e6e2ae48188e176afb0b565dbaa71096b60f77ec5f5b7107be020b1"
+    },
+    {
+      "name": "IsZeroLatency",
+      "selection": "mf1.1792523882.31.77cfc7d3711c0f75a9b8e2e7aa428bde7c4e03f3ad4728443db51963a2a42db6"
+    },
+    {
+      "name": "ListenerRelativeRouting",
+      "selection": "mf1.1792523882.32.76e702e77f4c348d980455338c5ab5f7d1f85248591fbd5fbd33284d058e68ac"
+    },
+    {
+      "name": "LoopCount",
+      "selection": "mf1.1792523882.33.8482bd24ee4ebbded51730ef47952213b724e8b6991b88f28a5ef1b7cdef1fb9"
+    },
+    {
+      "name": "LoudnessNormalizationTarget",
+      "selection": "mf1.1792523882.34.ef4042c15c0d79a7bd98115e9ff356da74db12c903554999995014e3ca4c0e22"
+    },
+    {
+      "name": "LoudnessNormalizationType",
+      "selection": "mf1.1792523882.35.e3c451394f0999b81966ffc9321d7d8a254910cb81e5e0773144aff74bf8e2f8"
+    },
+    {
+      "name": "Lowpass",
+      "selection": "mf1.1792523882.36.b15fb4bb473f65b4718abe1308d15d5fc14efb0471e9398b18842f426751a43b"
+    },
+    {
+      "name": "MakeUpGain",
+      "selection": "mf1.1792523882.37.df367b391dc961e00c69c5afb239759f63faf7f61894b15437f9299c901756c2"
+    },
+    {
+      "name": "MaxReachedBehavior",
+      "selection": "mf1.1792523882.38.8e87480c91828b59e21beff224f238167f597ed711f1472d4b875361c60fd0ad"
+    },
+    {
+      "name": "MaxSoundPerInstance",
+      "selection": "mf1.1792523882.39.4214858e4ca6dd09945c1e288e2558221b4208f4fda4dda96b0d440d40c4d1ef"
+    },
+    {
+      "name": "MidiBreakOnNoteOff",
+      "selection": "mf1.1792523882.40.307bf8d2c067647fdd27c41ef8d07c1de20e5f98eca4b75aee81d9ed1cba6ec0"
+    },
+    {
+      "name": "MidiChannelFilter",
+      "selection": "mf1.1792523882.41.6d2f68230af7032a998bb09e4c12bc342b14ff9c57af952162b8c7597cdd3d94"
+    },
+    {
+      "name": "MidiKeyFilterMax",
+      "selection": "mf1.1792523882.42.9abfcad2137fd41ec436d2a4fc507de5b5fca82f518d5130df8510303ddeb45d"
+    },
+    {
+      "name": "MidiKeyFilterMin",
+      "selection": "mf1.1792523882.43.fe1cb03e854ec2d81b3ea544fbdbd52350583d1c87eba9fd30fe4bf2e8329a79"
+    },
+    {
+      "name": "MidiPlayOnNoteType",
+      "selection": "mf1.1792523882.44.038216fd47149b8e240341a2904ca0d5bc1461b7f0b98eadbbeeee622ee8e073"
+    },
+    {
+      "name": "MidiTrackingRootNote",
+      "selection": "mf1.1792523882.45.3d30b94bf99066fe040b9b3cd18224dbd37513ec9ffc0038d29d9ddcc4bd4819"
+    },
+    {
+      "name": "MidiTransposition",
+      "selection": "mf1.1792523882.46.b66699ed939ef3f9347df6066ad9fd1c50273ba81927ac9e5b9127a35f503d92"
+    },
+    {
+      "name": "MidiVelocityFilterMax",
+      "selection": "mf1.1792523882.47.b913cbcefe092e70dc6d9fd0a137076cec165fccf33a72871635a8b174fa8908"
+    },
+    {
+      "name": "MidiVelocityFilterMin",
+      "selection": "mf1.1792523882.48.c6212fb0fadb4861e7be51cd599b01bf8a5db31ea55ccdf6514126bd58bb49e9"
+    },
+    {
+      "name": "MidiVelocityOffset",
+      "selection": "mf1.1792523882.49.ad82f3d98d475d248dddb998e632610367c920b5788323c53ae74957e6494938"
+    },
+    {
+      "name": "OutputBus",
+      "selection": "mf1.1792523882.50.d0d87b2f329de1ec048962604ad98e6274a5a44fcf7bae256a9facac1a396fd2"
+    },
+    {
+      "name": "OutputBusHighpass",
+      "selection": "mf1.1792523882.51.7b84353837a608dfd20b4eb7163f6aec7ac723f16afc384ec28156ff07467d16"
+    },
+    {
+      "name": "OutputBusLowpass",
+      "selection": "mf1.1792523882.52.b3d7b189f4ef82129a35fd60df057d98472be36b00e9ca861ccceaf33982f951"
+    },
+    {
+      "name": "OutputBusVolume",
+      "selection": "mf1.1792523882.53.59ead4fab8ef740fe9167b4edc578db160ac1820a7c4b13544c8ba5ebe463b54"
+    },
+    {
+      "name": "OverLimitBehavior",
+      "selection": "mf1.1792523882.54.c7818adffb33acb8777b69a176b8cf81e3fa41ddcda0ae84c4b8db2530e61067"
+    },
+    {
+      "name": "OverrideAnalysis",
+      "selection": "mf1.1792523882.55.e186c9f17d72655cb2ad22258abd527332c7e1703eb3332c3afca729c02d36a8"
+    },
+    {
+      "name": "OverrideColor",
+      "selection": "mf1.1792523882.56.23d628b632b2dad13d14e9cc81c498d0b0868c1f5bc46f1b78456c6d25131e5f"
+    },
+    {
+      "name": "OverrideConversion",
+      "selection": "mf1.1792523882.57.3b68b43b3edd0a2cecb6c36b9259f25450b745eb766e22f778b000b7bf7cf37c"
+    },
+    {
+      "name": "OverrideEarlyReflections",
+      "selection": "mf1.1792523882.58.e1c533eb37cb327591575b1bbbb5f4f089987557f0fd25f124888d5fb0483eb1"
+    },
+    {
+      "name": "OverrideEffect",
+      "selection": "mf1.1792523882.59.9361764b5da60a13358814639701b5960ecf6e96f0dfc5ea4d7e924af54d6a15"
+    },
+    {
+      "name": "OverrideGameAuxSends",
+      "selection": "mf1.1792523882.60.b357c6b69d970b195f6f86e8ca40710c91819531e36e8b8824105b848eec5491"
+    },
+    {
+      "name": "OverrideHdrEnvelope",
+      "selection": "mf1.1792523882.61.0d78b80ecfe2587355ed0d24d15f5b23407141c3e2b4a726bf526c0ebc4a38d7"
+    },
+    {
+      "name": "OverrideMetadata",
+      "selection": "mf1.1792523882.62.d0041d7580620cca410d4ce0a63c416806beb22af4e37440ed4c855e68215aab"
+    },
+    {
+      "name": "OverrideMidiEventsBehavior",
+      "selection": "mf1.1792523882.63.6718b3bcf4965942935abf7204b87cb916983041883881cb05bb12050167e78d"
+    }
+  ],
+  "total_count": 100,
+  "offset": 0,
+  "remaining_count": 36,
+  "complete": false,
+  "next_page": "mp1.1792523882.64.1a8ca6be45a3b0bf013d223137880807db919b1e97f50162f1d9e99f5e7434d3",
+  "expires_at": 1792524782,
+  "mutation_authority": false,
+  "next_command": {
+    "contract": "waapi-skill.gateway-next-command/v2",
+    "command": "metadata",
+    "gateway_argv": [
+      "metadata",
+      "list",
+      "--custom-kind",
+      "Sound",
+      "--page-size",
+      "64",
+      "--page",
+      "mp1.1792523882.64.1a8ca6be45a3b0bf013d223137880807db919b1e97f50162f1d9e99f5e7434d3"
+    ],
+    "full_argv": [
+      "python",
+      "/Users/xiye/.codex/worktrees/waapi-class-metadata/waapi-skills/skills/waapi-skill/scripts/run.py",
+      "gateway.py",
+      "metadata",
+      "list",
+      "--custom-kind",
+      "Sound",
+      "--page-size",
+      "64",
+      "--page",
+      "mp1.1792523882.64.1a8ca6be45a3b0bf013d223137880807db919b1e97f50162f1d9e99f5e7434d3"
+    ],
+    "copy_exactly": true,
+    "shell_tool_timeout_ms": 30000,
+    "shell_family": "posix-sh",
+    "copy_instruction": {
+      "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+      "source_field": "shell_command",
+      "action": "execute_verbatim_as_one_shell_tool_call",
+      "forbidden_transformations": [
+        "reconstruct",
+        "shorten",
+        "normalize",
+        "substitute_path_segments",
+        "select_another_field"
+      ]
+    },
+    "shell_command": "python /Users/xiye/.codex/worktrees/waapi-class-metadata/waapi-skills/skills/waapi-skill/scripts/run.py gateway.py metadata list --custom-kind Sound --page-size 64 --page mp1.1792523882.64.1a8ca6be45a3b0bf013d223137880807db919b1e97f50162f1d9e99f5e7434d3"
+  }
+}

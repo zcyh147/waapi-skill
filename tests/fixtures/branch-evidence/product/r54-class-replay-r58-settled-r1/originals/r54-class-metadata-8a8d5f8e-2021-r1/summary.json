@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "host_failure": null,
+  "targets": [
+    {
+      "scope": "ModulatorTime",
+      "field": "EnvelopeStopPlayback",
+      "status": "captured",
+      "list_receipt": "005",
+      "detail_receipt": "006",
+      "whole_inventory_complete": true,
+      "detail_agent_result_sha256": "19e0d36d245cde9e9448b001af2c8793334b855e4ed8855cff1ff3b8e74bbbf7",
+      "native_receipt": "dispatcher-evidence/1792523736855286000-2ca0f0798e06410c8316a231a6b0f6be-ak_wwise_core_object_getPropertyInfo.json",
+      "native_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1/dispatcher-evidence/1792523736855286000-2ca0f0798e06410c8316a231a6b0f6be-ak_wwise_core_object_getPropertyInfo.json",
+      "native_sha256": "408ed03b6ce6b9eca69aa4cb139c829e97fcc7eb0926cfe3be4d9db4c73de354",
+      "native_bytes": 1560,
+      "default_present": true,
+      "observed_default": true
+    }
+  ],
+  "gateway_invocations": 7,
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "scenario_id": "CLASS-METADATA-2021.1",
+    "version": "2021.1",
+    "requested_status": "PASS",
+    "final_status": "PASS",
+    "sandbox_retained": false,
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "strategy": "full",
+      "digest": "18515349f431a86c1d9956461d5b00bb5a86b26a49db24a535d3d3714dba42f1",
+      "file_count": 68,
+      "bytes_hashed": 4511191
+    },
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "strategy": "full",
+      "digest": "18515349f431a86c1d9956461d5b00bb5a86b26a49db24a535d3d3714dba42f1",
+      "file_count": 68,
+      "bytes_hashed": 4511191
+    },
+    "source_mtime_before_ns": 1792521230143786485,
+    "source_mtime_after_ns": 1792521230143786485,
+    "errors": [],
+    "quarantine_path": null
+  },
+  "agent_started": false,
+  "project_mutation_commands": 0,
+  "scope": "Console class metadata reconciliation only; not implementation or business coverage",
+  "evidence_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2021-r1",
+  "invocation": {
+    "phase": "final",
+    "outcome": "PASS",
+    "node_outcomes": [
+      {
+        "nodeid": "tests/maintenance/collect_class_metadata.py::class_metadata[2021.1]",
+        "outcome": "PASS"
+      }
+    ]
+  }
+}
