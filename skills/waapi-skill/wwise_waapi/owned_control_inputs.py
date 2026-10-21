@@ -49,6 +49,16 @@ def _load_constructor_authority(version):
             or canonical_sha256({key: item for key, item in value.items() if key != "authority_sha256"}) != value["authority_sha256"]):
         raise ValueError("Constructor authority version/source seal is invalid")
     sources = value["sources"]
+    axis = sources["time_axis"]
+    if (set(axis) != {"guide_member", "guide_sha256", "duration_member", "duration_sha256", "x_quantity", "unit", "duration_quantity", "policy", "complete_native_domain"}
+            or axis["guide_member"] != {"2022.1": "ch22s06.html", "2023.1": "ch17s06.html", "2024.1": "ch18s06.html", "2025.1": "ch19s06.html"}[version]
+            or any(re.fullmatch(r"[0-9a-f]{64}", axis[key]) is None for key in ("guide_sha256", "duration_sha256"))
+            or axis["duration_member"] != "Authoring/Data/WObjects/Html/en/TimeModDuration.html"
+            or axis["x_quantity"] != "time" or axis["unit"] != "seconds"
+            or axis["duration_quantity"] != "one_iteration_at_normal_playback_rate"
+            or axis["policy"] != "interim_gateway_intent_preservation_within_effective_duration"
+            or axis["complete_native_domain"] is not False):
+        raise ValueError("Time-axis source authority is invalid")
     introduction = sources["constructor_introduction"]
     if (introduction["build"] != _BUILDS["2022.1"] or introduction["rtpc_work_item"] != "WG-38235"
             or introduction["release_member"] != "whatsnew_2022_1.html"
@@ -89,7 +99,7 @@ def _load_constructor_authority(version):
             or grammar["object_definition"] != ("localDefinitions" if "localDefinitions" in args else "definitions")):
         raise ValueError("Constructor authority differs from its reflected grammar")
     return {"contract": value["contract"], "version": version, "build": value["build"],
-        "resource_sha256": sha256(raw).hexdigest(), "authority_sha256": value["authority_sha256"]}
+        "resource_sha256": sha256(raw).hexdigest(), "authority_sha256": value["authority_sha256"], "time_axis": axis}
 
 
 def constructor_authority_current(proof):

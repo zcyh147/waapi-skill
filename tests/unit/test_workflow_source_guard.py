@@ -2947,6 +2947,10 @@ def test_named_owned_time_first_collector_uses_one_public_source_transaction(tmp
     assert category['category'] == 'named-owned-time-control-input-first' and category['status'] == 'PASS'
     assert receipt['complete'] is True and receipt['business_effect_verified'] is True
     assert receipt['setup_coverage_credit'] is False and len(receipt['effects']) == 1
+    assert receipt['time_axis_intent'] == {
+        'unit': 'seconds', 'explicit_duration': 5, 'requested_x': [0, 5],
+        'policy': 'interim_intent_preservation', 'native_domain_complete': False,
+        'prior_1000_to_5_attempt': 'retained_failure_not_reinterpreted'}
     assert len(writes) == 2 and [cmd[0] for cmd in commands].count('execute') == 2
     assert [cmd[0] for cmd in commands].count('verify') == 2
     assert not any(row['type'] == 'GameParameter' for row in task.objects.values())
@@ -2965,7 +2969,7 @@ def test_named_owned_time_first_collector_uses_one_public_source_transaction(tmp
     assert control['properties'] == {'TimeModDuration': 5, 'EnvelopeStopPlayback': False}
     assert type(control['properties']['EnvelopeStopPlayback']) is bool
     assert member['curve']['curve_points'] == [
-        {'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 1000, 'y': 0, 'shape': 'Linear'}]
+        {'x': 0, 'y': -20, 'shape': 'Linear'}, {'x': 5, 'y': 0, 'shape': 'Linear'}]
     assert source['parent_after'] == source['parent_before']
     assert all(task.objects[key] == row for key, row in preserved.items())
     assert len(receipt['calls']) <= 384 and Path(category['observation_path']).stat().st_size <= 16 * 1024 * 1024
