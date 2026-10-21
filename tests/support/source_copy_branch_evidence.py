@@ -40,7 +40,7 @@ SYMBOLS = {
 
 
 REVIEW_PATH = 'tests/fixtures/source-copy/branch-dependency-review.json'
-REVIEW_SHA256 = '8f867a11484e58d779f5680685ca87d690a8cfef9a9f5b9c9d88b2d0ca9078ac'
+REVIEW_SHA256 = 'aee3af054ccbb2ad109f9bb6a375c7ceab7d6e6468f3257ea3d14d581d79af5d'
 CAPTURE = 'waapi-skill.source-copy-program-capture-context/v1'
 PUBLIC_NODES = {
     '2021.1': 'tests/unit/test_source_copy_repeated_fixture.py::test_repeated_collector_gates_copy_on_actual_baseline_serialization',
@@ -52,7 +52,7 @@ PUBLIC_NODES = {
 
 
 def dependency_review():
-    # Root approval pins exact historical540/current545 maps for all26 selected leaves.
+    # Root approval pins exact historical540/current547 maps for all26 selected leaves.
     # An edited proposal cannot self-authorize new behavior or omit dependencies.
     raw = (audit.ROOT / REVIEW_PATH).read_bytes()
     if fixture.sha(raw) != REVIEW_SHA256:

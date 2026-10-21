@@ -17,7 +17,10 @@ def test_source_capture_rejects_omitted_runtime_or_current_producer_dependencies
     context = source_capture_plan(tmp_path / 'output', inventory=inventory)
     assert len(context['nodes']) == 5
     assert {'tests/conftest.py', 'tests/support/host_path_relatives.py',
-        'tests/support/exact_evidence_finalization.py', 'tests/fixtures/source-copy/2021-native-donor.json',
+        'tests/support/exact_evidence_finalization.py',
+        'skills/waapi-skill/wwise_waapi/topic_compatibility.py',
+        'skills/waapi-skill/resources/semantic/2025.1/structure-changed-notes-compatibility.json',
+        'tests/fixtures/source-copy/2021-native-donor.json',
         'tests/fixtures/source-copy/2021-native-donor.wwu'} <= set(context['relevant_sources'])
     assert {'tests/unit/test_source_copy_repeated_fixture.py', 'tests/unit/test_source_copy_modern_collector.py',
         'tests/unit/test_source_copy_saved_continuation_gateway.py', 'tests/support/gateway_config.py',
@@ -27,6 +30,8 @@ def test_source_capture_rejects_omitted_runtime_or_current_producer_dependencies
     node = next(iter(context['nodes']))
     assert load_source_capture(path, node)['nodeid'] == node
     for key, dependency in [('relevant_sources', 'tests/conftest.py'),
+                            ('relevant_sources', 'skills/waapi-skill/wwise_waapi/topic_compatibility.py'),
+                            ('relevant_sources', 'skills/waapi-skill/resources/semantic/2025.1/structure-changed-notes-compatibility.json'),
                             ('capture_sources', 'tests/unit/test_source_copy_saved_continuation_gateway.py')]:
         altered = json.loads(json.dumps(context))
         del altered[key][dependency]

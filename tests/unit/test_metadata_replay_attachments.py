@@ -175,7 +175,7 @@ def test_class_bridge_requires_exact_accepted_runtime_and_auxiliary_blobs(invent
     fixture='tests/destructive/support/source_copy_fixture.py'
     assert bridge['attribution']=='historical_native_current_program_not_current_native'
     assert len(bridge['historical_sources'])==(560 if cohort=='r54' else 561)
-    assert len(bridge['current_sources'])==570
+    assert len(bridge['current_sources'])==572
     assert helper not in bridge['historical_sources']
     assert bridge['changed_files'][helper]=={'before':None,
         'after':'b469b24ae64be096d314eb66da81b28833e0e45283d0cc66184199af2a089fdf'}
@@ -694,7 +694,7 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    source_pin = '796f16ca0794d45e4deed6f9ec92039f32f69b20'
+    source_pin = '7346d2f0f22e799e5324ebaa00e6e80e3eb03180'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
                  'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
@@ -768,8 +768,10 @@ def test_r51_historical_source_map_does_not_grow_with_current_owned_dependencies
     assert len(original) == 343
     assert audit.digest(original) == '9f59dd64d2d7e856fae5f55cd71e5b1f471e1d32883d78a6ad53b860cde3ee9a'
     current = producer.source_seals()
-    assert len(current) == 354
-    additions = {'skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
+    assert len(current) == 356
+    additions = {'skills/waapi-skill/wwise_waapi/topic_compatibility.py',
+        'skills/waapi-skill/resources/semantic/2025.1/structure-changed-notes-compatibility.json',
+        'skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
         'skills/waapi-skill/resources/metadata/' + version + '/owned-control-input-construction.json'
         for version in ('2022.1', '2023.1', '2024.1', '2025.1'))}
     changes = producer.source_changes(original, current)
@@ -793,8 +795,10 @@ def test_new_owned_dependencies_reject_unreviewed_drift(original_root, inventory
         return completion.evidence_result(descriptor, branch, 'c' * 64, 'live_metadata', 'controlled',
             tmp_path, binding, source_root=audit.ROOT, reference_edges=capture['edges'])
     assert result() == ('passed', None)
-    assert len(record['source_bridge']['current_sources']) == (354 if cohort == 'r51' else 570)
-    additions = ['skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
+    assert len(record['source_bridge']['current_sources']) == (356 if cohort == 'r51' else 572)
+    additions = ['skills/waapi-skill/wwise_waapi/topic_compatibility.py',
+        'skills/waapi-skill/resources/semantic/2025.1/structure-changed-notes-compatibility.json',
+        'skills/waapi-skill/wwise_waapi/owned_control_inputs.py', *(
         'skills/waapi-skill/resources/metadata/' + version + '/owned-control-input-construction.json'
         for version in ('2022.1', '2023.1', '2024.1', '2025.1'))]
     original_program, original_record = deepcopy(program), deepcopy(record)
