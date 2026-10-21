@@ -6,8 +6,8 @@ metadata, model images and four native writes) are transported; unrelated native
 reads remain in the original archive and grant no additional branch credit.
 """
 from copy import deepcopy
-import hashlib
 import json
+import math
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,17 +35,29 @@ SYMBOLS = {
 }
 
 
+
+def pointer_contract(version):
+    if version not in fixture.MODERN_ORIGINALS:
+        raise ValueError('Source branch attachment version is not yet admitted')
+    extra = {} if version == '2022.1' else {
+        '/argsSchema/properties/' + name + '/@boolean/false': ('/native_call/args/' + name, None)
+        for name in ('autoAddToSourceControl', 'autoCheckOutToSourceControl')}
+    return {**POINTERS, **extra}
+
+
+def native_route(version):
+    return f'{version}|wwise-console|{fixture.MODERN_ORIGINALS[version][0]}|function|{URI}'
+
+
 def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2), encoding='utf-8')
     return {'artifact': path.name, 'sha256': fixture.sha(path.read_bytes())}
 
 
 def selected_branches(inventory, version):
-    if version != '2022.1':
-        raise ValueError('Source branch attachment version is not yet admitted')
-    route = f'{version}|wwise-console|{fixture.MODERN_ORIGINALS[version][0]}|function|{URI}'
+    contract = pointer_contract(version)
     rows = {row['id']: row for row in inventory['native_coverage']['obligations']}
-    return [rows[route + '|' + pointer] for pointer in POINTERS]
+    return [rows[native_route(version) + '|' + pointer] for pointer in contract]
 
 
 class ProofFiles:
@@ -135,12 +147,12 @@ def export_source_proof(output, receipt_path):
     return write_json(output / 'proof.json', proof)
 
 
-def source_facts(proof, base):
+def _source_facts(proof, base):
     """Recheck shared scalar/root/graph guards against transported public facts."""
     files = ProofFiles(proof, base)
     receipt = files.read(proof['receipt'])
     version = receipt['version']
-    if (version != '2022.1' or receipt['contract'] != 'waapi-skill.modern-source-copy-save-children-collector/v1'
+    if (version not in fixture.MODERN_ORIGINALS or receipt['contract'] != 'waapi-skill.modern-source-copy-save-children-collector/v1'
             or receipt['fixture_profile'] != fixture.MODERN_PROFILE
             or receipt['native_build'] != fixture.MODERN_ORIGINALS[version][0]
             or receipt['diagnostic_only'] is not True or receipt['business_effect_verified'] is not False
@@ -181,7 +193,8 @@ def source_facts(proof, base):
               if call['argv'] == ['verify', copy_tx] and reply.get('verified') is True]
     (final_call, final), = finals
     if (dispatch['uri'] != URI or dispatch['args'] != {'object': fixture.SOURCE,
-            'parent': receipt['destination_id'], 'onNameConflict': 'fail'}
+            'parent': receipt['destination_id'], 'onNameConflict': 'fail',
+            **({} if version == '2022.1' else {'autoAddToSourceControl': False, 'autoCheckOutToSourceControl': False})}
             or final['verification']['verification_strength'] != 'saved_source_graph_and_live_roles'
             or final['verification']['verification_scope']['complete_copy_preservation'] is not True
             or final['verification']['verification_scope']['final_save_receipt'] != phases[3]['authority_receipt']
@@ -250,8 +263,15 @@ def source_facts(proof, base):
                 if role in live and live[role] != frame: raise ValueError('Source public field identity drift')
                 live[role] = frame
                 values.update(row.get('properties', {})); values.update(row.get('references', {}))
-            if values != snapshot['values'] or set(snapshot['names']) != set(values):
-                raise ValueError('Source typed fields lack exact public page authority')
+            inventories = [reply['agent_result'] for call, reply in zip(calls[start:stop], replies[start:stop])
+                           if call['argv'][:4] == ['metadata', 'list', '--exact-id', identity]]
+            if (len(inventories) != 1 or inventories[0].get('complete') is not True
+                    or inventories[0]['total_count'] != {'source': 18, 'rtpc': 5, 'control_input': 10, 'curve': 1}[role]
+                    or [field['name'] for field in inventories[0]['fields']] != snapshot['names']
+                    or len(snapshot['names']) != len(set(snapshot['names']))
+                    or values != snapshot['values'] or set(snapshot['names']) != set(values)
+                    or set(snapshot['native_metadata_authority']) != set(values)):
+                raise ValueError('Source typed fields lack complete exact public page authority')
             for name, authorities in snapshot['native_metadata_authority'].items():
                 if not authorities: raise ValueError('Source typed metadata authority missing')
                 for authority in authorities:
@@ -267,6 +287,19 @@ def source_facts(proof, base):
                       if call['argv'][:3] == ['query-object', '--advanced-waql', expression]
                       and call['argv'][3:5] == ['--max-results', '2']]
             if hopped != [[live[role]]]: raise ValueError('Source canonical bounded owned hop differs')
+        points = live['curve']['curve_points']
+        saved_points = nodes['curve'].findall('PointList/Point')
+        if (not isinstance(points, list) or len(points) != len(saved_points)
+                or any(not isinstance(point, dict) or set(point) != {'x', 'y', 'shape'}
+                       or point['shape'] != 'Linear' or any(type(point[axis]) not in (int, float)
+                       or not math.isfinite(point[axis]) for axis in ('x', 'y')) for point in points)
+                or [(point['x'], point['y']) for point in points] !=
+                    [(float(node.findtext('XPos')), float(node.findtext('YPos'))) for node in saved_points]):
+            raise ValueError('Source native/saved Curve points differ')
+        if (snapshots['rtpc']['values']['ControlInput'] != {'id': live['control_input']['id'], 'name': live['control_input']['name']}
+                or snapshots['rtpc']['values']['Curve'] != {'id': live['curve']['id'], 'points': points,
+                                                         '@Flags': snapshots['curve']['values']['Flags']}):
+            raise ValueError('Source typed canonical reference values differ')
         fixture.validate_frames(nodes, live, fixture.SOURCE_OWNER if nodes['source'].get('ID') == fixture.SOURCE else receipt['destination_id'], xml_notes_crlf=True)
         fixture.validate_scalars(nodes, snapshots, allow_references=True)
         lives.append(live)
@@ -286,13 +319,21 @@ def source_facts(proof, base):
         raise ValueError('Source saved graph oracle differs')
     if files.used != set(proof['files']): raise ValueError('Source portable proof has unused/unresolved dependency roots')
     return {'gateway': {'argv': final_call['argv'], 'exit_code': final_call['exit_code'], 'payload': final},
-            'native_call': dispatch, 'business_fact_id': version + '|source-copy-synth-owned-graph'}
+            'native_call': dispatch, 'version': version, 'business_fact_id': version + '|source-copy-synth-owned-graph'}
+
+
+
+def source_facts(proof, base):
+    try:
+        return _source_facts(proof, base)
+    except AssertionError as exc:
+        raise ValueError('Source independent fixture guard: ' + str(exc)) from exc
 
 
 def validate_source_program(record, binding, branch, base):
     proof = completion.read_sealed_artifact(binding['source_copy_proof'], base)
     facts = source_facts(proof, base)
-    if (branch['pointer'] not in POINTERS or branch['route'] != f'2022.1|wwise-console|{fixture.MODERN_ORIGINALS["2022.1"][0]}|function|{URI}'
+    if (branch['pointer'] not in pointer_contract(facts['version']) or branch['route'] != native_route(facts['version'])
             or record['gateway'] != facts['gateway'] or record['native_call'] != facts['native_call']
             or binding['source_business_fact'] != facts['business_fact_id']):
         raise ValueError('Source attachment does not prove this exact branch/public invocation')
@@ -305,15 +346,16 @@ def write_source_program_bundle(output, receipt_path, *, inventory, nodeid, phas
     output = Path(output)
     proof_desc = export_source_proof(output, receipt_path)
     facts = source_facts(completion.read_sealed_artifact(proof_desc, output), output)
-    branches = selected_branches(inventory, '2022.1')
-    public = next(row for row in inventory['routes'] if row['id'] == '2022.1|function|' + URI)
+    version = facts['version']
+    branches = selected_branches(inventory, version)
+    public = next(row for row in inventory['routes'] if row['id'] == version + '|function|' + URI)
     candidate = inventory['native_coverage']['candidate_sha256']
     record = {'candidate_sha256': candidate, 'scope_kind': scope_kind, 'evidence_kind': 'injected_client_program',
         'invocation': {'phase': 'final', 'outcome': 'PASS', 'node_outcomes': [{'nodeid': nodeid, 'outcome': 'PASS'}]},
         'gateway': facts['gateway'], 'native_call': facts['native_call'], 'branch_assertions': {}}
     bindings = {}
     for branch in branches:
-        pointer, edge = POINTERS[branch['pointer']]
+        pointer, edge = pointer_contract(version)[branch['pointer']]
         record['branch_assertions'][branch['id']] = {'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
             'checks': [{'pointer': pointer, 'equals': completion.pointer_value(facts, pointer)},
                        {'pointer': '/gateway/payload/agent_result', 'equals': facts['gateway']['payload']['agent_result']}]}
@@ -337,7 +379,7 @@ def write_source_program_bundle(output, receipt_path, *, inventory, nodeid, phas
     attachment = write_json(output / 'attachment.json', {'contract': ATTACHMENT,
         'branch_ids': list(bindings), 'business_fact_id': facts['business_fact_id'], 'proof': proof_desc})
     write_json(output / 'index.json', {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.',
-        'entries': [{'id': 'source-2022', 'bindings': bound, 'origin': {'bindings': bound, 'program': {k: program[k] for k in ('artifact', 'sha256')},
+        'entries': [{'id': 'source-' + version, 'bindings': bound, 'origin': {'bindings': bound, 'program': {k: program[k] for k in ('artifact', 'sha256')},
             'requirements': required, 'capture': capture}}], 'source_attachments': [attachment]})
     return output / 'index.json'
 
@@ -360,7 +402,7 @@ def portable_source_attachments(descriptors, bindings, read, base):
                 raise ValueError('Duplicate or unsupported exact Source branch')
             binding = bindings[identity]
             route, pointer = identity.rsplit('|', 1)
-            if identity in attached or pointer not in POINTERS or route != f'2022.1|wwise-console|{fixture.MODERN_ORIGINALS["2022.1"][0]}|function|{URI}':
+            if identity in attached or pointer not in pointer_contract(facts['version']) or route != native_route(facts['version']):
                 raise ValueError('Duplicate or unsupported exact Source branch')
             attached.add(identity)
             binding['source_copy_proof'] = deepcopy(attachment['proof'])
