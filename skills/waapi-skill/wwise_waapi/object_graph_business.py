@@ -1490,6 +1490,11 @@ def _materialize_set(
             "object": {"kind": "id", "value": source.object_id},
             **_compile_existing_set_fields(session, declaration),
         }
+        for reference in row.get("references", []):
+            owned_input = reference["target"].get("new_control_input") if isinstance(reference["target"], Mapping) else None
+            if owned_input is not None:
+                from .canonical import canonical_sha256
+                node_result_handles[id(owned_input)] = "bnh1-" + canonical_sha256({"owned_control_input_of": declaration.result_handle})[:32]
         rows_by_handle[handle] = row
         rows.append(row)
     for declaration in root_new:
@@ -1815,6 +1820,14 @@ def _materialize_set_rtpc(
         arguments["notes"] = notes
     if isinstance(declaration.target, OwnedRtpcTarget):
         return {"arguments": arguments}
+    if owned_input is not None:
+        from .canonical import canonical_sha256
+        path = "$.objects[0].lists[0].objects[0]"
+        rtpc_handle = "bnh1-" + canonical_sha256({"owned_rtpc_of": declaration.result_handle})[:32]
+        arguments["graph_result_bindings"] = [
+            {"result_handle": rtpc_handle, "request_path": path},
+            {"result_handle": "bnh1-" + canonical_sha256({"owned_control_input_of": rtpc_handle})[:32],
+             "request_path": path + ".control_input"}]
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",

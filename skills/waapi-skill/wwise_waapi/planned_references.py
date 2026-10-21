@@ -49,6 +49,9 @@ def graph_result_bindings(roots, result_handles):
             bindings.append({"result_handle": result_handles[id(owned)], "request_path": path + ".control_input"})
         for ref in node.get("references", []):
             target = ref["target"]
+            if isinstance(target, Mapping) and "new_control_input" in target:
+                bindings.append({"result_handle": result_handles[id(target["new_control_input"])],
+                    "request_path": path + ".owned_control_input"})
             if isinstance(target, Mapping) and target.get("kind") == "id" and str(target.get("value", "")).startswith("bnh1-"):
                 targets.add(target["value"])
         for index, child in enumerate(node.get("children", [])):
@@ -61,7 +64,7 @@ def graph_result_bindings(roots, result_handles):
     if not targets and not any("rtpc" in node for node, _ in roots):
         # Nested unnamed outcomes also require stable result bindings.
         def has_rtpc(node):
-            return "rtpc" in node or node.get("anonymous") is True or any(has_rtpc(child) for child in node.get("children", [])) or any(
+            return "rtpc" in node or node.get("anonymous") is True or any(isinstance(ref["target"], Mapping) and "new_control_input" in ref["target"] for ref in node.get("references", [])) or any(has_rtpc(child) for child in node.get("children", [])) or any(
                 has_rtpc(child) for descriptor in node.get("lists", []) for child in descriptor["objects"])
         if not any(has_rtpc(node) for node, _ in roots):
             return []

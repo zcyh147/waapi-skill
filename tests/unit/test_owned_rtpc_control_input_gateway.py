@@ -4,7 +4,9 @@ Fixtures model the matching SDK's custom ModulatorTime example; fake execution
 is program evidence only and never a native-Wwise receipt.
 """
 from copy import deepcopy
+from hashlib import sha256
 import json
+from pathlib import Path
 import pytest
 
 from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, FIRST, SECOND, CHILD
@@ -97,6 +99,8 @@ class OwnedControlTask(OwnedGraphTask):
                 result['@RTPC'].append(deepcopy(result['@RTPC'][0]))
             elif self.fault == 'missing-result':
                 result['@RTPC'] = []
+            elif self.fault == 'foreign-result':
+                result['id'] = SECOND
             return {'objects': [{'id': SECOND, 'name': 'Default Work Unit', 'children': [result]}] if planned else [result]}
         result = super().call(uri, args, options)
         if self.input_platform and uri.endswith('object.get') and CONTROL in args.get('from', {}).get('id', []) and options.get('platform') != self.input_platform:
@@ -152,7 +156,12 @@ def test_owned_time_input_rejects_independent_identity_or_ownership_mismatch(tmp
     task.fault = fault
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
-    assert code == 2 and verified.get('verified') is False, verified
+    if fault == 'wrong-rtpc-class':
+        # The shared graph verifier rejects the malformed complete-list
+        # readback, before it can certify a business-state verdict.
+        assert code == 2 and verified.get('error_code') == 'INVALID_READBACK', verified
+    else:
+        assert code == 2 and verified.get('verified') is False, verified
     assert len(task.writes) == 1
 
 
@@ -545,6 +554,90 @@ def test_graph_owned_input_rejects_incomplete_or_contrary_native_results(tmp_pat
     code, verified = task.finish(tx, shown)
     assert code == 2 and verified.get('verified') is False, verified
     assert len(task.writes) == 1
+
+
+@pytest.mark.parametrize('fault', ['duplicate-result', 'missing-result', 'foreign-result'])
+def test_named_new_input_rejects_malformed_or_foreign_result_associations(tmp_path, fault):
+    task = declare_time(OwnedControlTask(tmp_path))
+    task.fault = fault
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified.get('verified') is False, verified
+    assert len(task.writes) == 1
+
+
+def test_existing_rtpc_replacement_seals_and_verifies_its_nonshareable_occurrence(tmp_path):
+    task = declare_replacement(ReplacementTask(tmp_path))
+    tx, shown = task.preview()
+    state = shown['artifact']['prepared_operation']['pre_state']
+    facts = state['planned_reference_context']['facts']
+    assert len(facts) == 1, facts
+    fact, = facts.values()
+    assert fact['result_handle'].startswith('bnh1-') and fact['parent_identity'] == RTPC
+    assert fact['path'] is None and fact['relation'] == 'owner'
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    code, recorded = task.run('transaction-show', tx)
+    assert code == 0, recorded
+    verification, = [event['details']['verification'] for event in recorded['events']
+        if event['event_type'] == 'verification_recorded']
+    identities = [check for check in verification['assertions']
+        if check.get('kind') == 'verified_owned_control_input_identity']
+    assert len(identities) == 1 and identities[0]['passed'] is True, identities
+    assert identities[0]['evidence']['result_handle'] == fact['result_handle']
+    assert identities[0]['evidence']['object']['id'] == CONTROL
+
+
+def test_replacement_existing_reference_drift_cannot_rebind_the_sealed_outcome(tmp_path):
+    task = declare_replacement(ReplacementTask(tmp_path))
+    tx, shown = task.preview()
+    task.objects[RTPC]['@ControlInput'] = {'id': CONTROL}
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected
+
+
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set', 'replacement'])
+def test_constructor_authority_drift_blocks_before_single_write(tmp_path, monkeypatch, operation):
+    from wwise_waapi import owned_control_inputs
+    root = tmp_path / 'authority'
+    resource = root / '2022.1' / 'owned-control-input-construction.json'
+    resource.parent.mkdir(parents=True)
+    packaged = Path(owned_control_inputs.__file__).parents[1] / 'resources' / 'metadata' / '2022.1' / resource.name
+    resource.write_bytes(packaged.read_bytes())
+    monkeypatch.setattr(owned_control_inputs, 'CONSTRUCTION_AUTHORITY_ROOT', root, raising=False)
+    task = (declare_replacement(ReplacementTask(tmp_path)) if operation == 'replacement' else
+        declare_time(OwnedControlTask(tmp_path, operation=operation)))
+    tx, shown = task.preview()
+    resource.write_bytes(resource.read_bytes() + b'\n')
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected
+    assert 'constructor source authority unchanged' in json.dumps(rejected), rejected
+
+
+def test_public_preview_seals_exact_versioned_constructor_source_without_sdk_runtime(tmp_path):
+    task = declare_time(OwnedControlTask(tmp_path, version='2025.1'))
+    _, shown = task.preview()
+    nodes = shown['artifact']['prepared_operation']['pre_state']['object_set_nodes']
+    proof, = [node['owned_control_input']['constructor_authority'] for node in nodes if node.get('owned_control_input')]
+    resource = Path(__file__).parents[2] / 'skills/waapi-skill/resources/metadata/2025.1/owned-control-input-construction.json'
+    assert proof['version'] == '2025.1' and proof['resource_sha256'] == sha256(resource.read_bytes()).hexdigest()
+
+
+def test_invalid_constructor_source_is_a_structured_no_write_preview_boundary(tmp_path, monkeypatch):
+    from wwise_waapi import owned_control_inputs
+    root = tmp_path / 'authority'
+    resource = root / '2022.1' / 'owned-control-input-construction.json'
+    resource.parent.mkdir(parents=True)
+    resource.write_text('{"contract":"foreign"}')
+    monkeypatch.setattr(owned_control_inputs, 'CONSTRUCTION_AUTHORITY_ROOT', root)
+    task = declare_time(OwnedControlTask(tmp_path))
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'OWNED_CONTROL_INPUT_SOURCE_INVALID', rejected
+    assert task.writes == []
 
 
 def test_new_owned_input_rejects_a_scalar_handle_from_another_class(tmp_path):

@@ -17530,6 +17530,19 @@ def _parse_bound_field_business_value(
     return _parse_business_value(bound.value_type, raw, field=field)
 
 
+def _new_control_input_business_value(args, session):
+    """Parse the same closed class-field intent for both owned-input routes."""
+    values = {}
+    for handle, raw in args.new_control_input_field_value:
+        if handle in values:
+            raise GatewayInputError("Set each new Control Input property once")
+        field = session.handles.bound_field(handle)
+        values[handle] = _parse_bound_field_business_value(field, raw, field="new_control_input", session=session)
+    return {"kind_handle": args.new_control_input_kind, "name": args.new_control_input_name,
+        "field_values": values,
+        **({"notes": args.new_control_input_notes} if args.new_control_input_notes is not None else {})}
+
+
 def _parse_audio_import_business_fields(
     session: BusinessDeclarationSession,
     pairs: Sequence[Sequence[str]],
@@ -18047,15 +18060,8 @@ def dispatch_offline_business_draft_update(
         if args.new_control_input_kind is not None:
             if inspected.operation != "object.set":
                 raise GatewayInputError("New owned ControlInput replacement uses the disclosed object.set Business Draft")
-            values = {}
-            for handle, raw in args.new_control_input_field_value:
-                if handle in values:
-                    raise GatewayInputError("Set each new Control Input property once")
-                field = session.handles.bound_field(handle)
-                values[handle] = _parse_bound_field_business_value(field, raw, field="new_control_input", session=session)
-            fields = {"field_values": {args.field_handle: {"new_control_input_business": {
-                "kind_handle": args.new_control_input_kind, "name": args.new_control_input_name, "field_values": values,
-                **({"notes": args.new_control_input_notes} if args.new_control_input_notes is not None else {})}}}}
+            fields = {"field_values": {args.field_handle: {"new_control_input_business":
+                _new_control_input_business_value(args, session)}}}
         elif args.new_control_input_name is not None or args.new_control_input_notes is not None or args.new_control_input_field_value:
             raise GatewayInputError("New Control Input fields require --new-control-input-kind")
         elif inspected.operation == "object.set":
@@ -18111,15 +18117,7 @@ def dispatch_offline_business_draft_update(
             )
         input_fields = {"control_input_handle": args.control_input_handle}
         if args.new_control_input_kind is not None:
-            values = {}
-            for handle, raw in args.new_control_input_field_value:
-                if handle in values:
-                    raise GatewayInputError("Set each new Control Input property once")
-                field = session.handles.bound_field(handle)
-                values[handle] = _parse_bound_field_business_value(field, raw, field="new_control_input", session=session)
-            input_fields = {"new_control_input": {"kind_handle": args.new_control_input_kind,
-                "name": args.new_control_input_name, "field_values": values,
-                **({"notes": args.new_control_input_notes} if args.new_control_input_notes is not None else {})}}
+            input_fields = {"new_control_input": _new_control_input_business_value(args, session)}
         elif (args.new_control_input_name is not None or args.new_control_input_notes is not None
               or args.new_control_input_field_value):
             raise GatewayInputError("New Control Input fields require --new-control-input-kind")
