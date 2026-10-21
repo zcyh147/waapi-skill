@@ -76,6 +76,7 @@ _SET_NODE_EXTENSION_FIELDS = frozenset(
 _RTPC_FIELDS = frozenset(
     {
         "control_input_handle",
+        "new_control_input",
         "curve_points",
         "field_handle",
         "mode",
@@ -1664,8 +1665,10 @@ def _materialize_set_rtpc(
     if not isinstance(declaration.target, (ExistingObjectTarget, OwnedRtpcTarget)):
         raise _repair(session, "TARGET_FORM_INVALID", field="object_handle", action="bind the exact RTPC owner")
     fields = dict(declaration.fields)
-    required = {"control_input_handle", "curve_points", "field_handle"}
-    optional = {"mode", "notes"}
+    required = {"curve_points", "field_handle"}
+    optional = {"mode", "notes", "control_input_handle", "new_control_input"}
+    if ("control_input_handle" in fields) == ("new_control_input" in fields):
+        raise _repair(session, "CONTROL_INPUT_CHOICE_REQUIRED", field="control_input_handle", action="choose one existing or one new owned Control Input")
     missing = sorted(required - set(fields))
     unexpected = sorted(set(fields) - required - optional)
     if missing:
@@ -1687,13 +1690,18 @@ def _materialize_set_rtpc(
         else declaration.target.object_handle)
     planned = (planned_owners or {}).get(owner_handle)
     target = None if planned else session.handles.resolve_object(owner_handle)
-    control = session.handles.resolve_object(fields["control_input_handle"])
+    from .owned_control_inputs import compile_owned_control_input
+    owned_input = compile_owned_control_input(session, fields["new_control_input"]) if "new_control_input" in fields else None
+    if owned_input is not None and isinstance(declaration.target, OwnedRtpcTarget):
+        raise _repair(session, "OWNED_CONTROL_INPUT_GRAPH_PENDING", field="new_control_input",
+            tracking_issue=180, action="graph and planned-owner owned ControlInput construction remains unfinished under issue #180")
+    control = None if owned_input is not None else session.handles.resolve_object(fields["control_input_handle"])
     control_token = "".join(
         character
-        for character in control.object_type.casefold()
+        for character in (control.object_type.casefold() if control is not None else "")
         if character.isalnum()
     )
-    if control_token not in {
+    if control is not None and control_token not in {
         "gameparameter",
         "midiparameter",
         "modulatorlfo",
@@ -1780,7 +1788,7 @@ def _materialize_set_rtpc(
     arguments: dict[str, Any] = {
         "object": {"kind": "id", "value": owner_handle if planned else target.object_id},
         "property": field.token,
-        "control_input": {"kind": "id", "value": control.object_id},
+        "control_input": owned_input if owned_input is not None else {"kind": "id", "value": control.object_id},
         "points": points,
         "mode": "add" if mode == "add-only" else "add_or_replace",
     }

@@ -636,6 +636,7 @@ _OBJECT_RTPC_DEFINITION = {
         "cancel",
     ),
     "supports_field_discovery": True,
+    "supports_type_discovery": True,
     "auto_apply_preview": True,
 }
 

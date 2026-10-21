@@ -172,7 +172,7 @@ def object_graph_business_contract_data(
             },
             "binding": {
                 "object": "bound_object_handle",
-                "control_input": "bound_object_handle",
+                "control_input": "bound_object_handle_or_new_owned_Modulator",
                 "property": "live_discovered_field_handle",
             },
             "field_discovery": {
@@ -186,10 +186,19 @@ def object_graph_business_contract_data(
                 "required_fields": [
                     "object_handle",
                     "field_handle",
-                    "control_input_handle",
                     "curve_points",
                 ],
                 "optional_fields": ["mode", "notes"],
+                "control_input_choice": ["control_input_handle", "new_control_input"],
+                "new_control_input": {
+                    "kind": "selected_Modulator_Type_Handle",
+                    "required": ["kind_handle", "name"],
+                    "optional": ["notes", "class_Field_Handle_scalar_assignments"],
+                    "types": ["ModulatorLfo", "ModulatorEnvelope", "ModulatorTime"],
+                    "pair_semantics": "always_add_fresh_pair;_never_replace_an_unrequested_existing_input",
+                    "same_parent_issue": 180,
+                    "unfinished": ["2021.1_constructor", "graph_planned_owner", "old_custom_replacement_disposition", "non_fail_conflicts", "nested_RTPCs"],
+                },
                 "mode_values": ["add-only", "add-or-update"],
                 "point_fields": ["x", "y", "shape"],
                 "shape_semantics": "outgoing_segment",

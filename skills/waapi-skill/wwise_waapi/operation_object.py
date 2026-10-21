@@ -24,6 +24,7 @@ from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
 from .operation_plugin import PluginCreationDescriptor, normalize_plugin_creation
+from .owned_control_inputs import OwnedControlInputDescriptor, CONTROL_INPUT_CLASSES
 
 
 JsonScalar = str | int | float | bool
@@ -300,7 +301,7 @@ class RtpcDescriptor:
 
     request_path: str
     property: str
-    control_input: ObjectIdentityDescriptor
+    control_input: ObjectIdentityDescriptor | OwnedControlInputDescriptor
     points: tuple[RtpcCurvePoint, ...]
     notes: str | None
 
@@ -897,11 +898,7 @@ def normalize_rtpc_descriptors(
         path = f"{request_path}[{index}]"
         _exact_fields(item, required=RTPC_FIELDS, optional=RTPC_OPTIONAL_FIELDS, path=path)
         property_name = _field_name(item.get("property"), path=f"{path}.property", limits=limits)
-        control_input = _normalize_identity(
-            item.get("control_input"),
-            path=f"{path}.control_input",
-            limits=limits,
-        )
+        control_input = normalize_rtpc_control_input(item.get("control_input"), path=f"{path}.control_input", limits=limits)
         points = normalize_curve_points(item.get("points"), request_path=f"{path}.points",
             maximum_points=point_limit, minimum_points=1, require_increasing=True, label="RTPC")
 
@@ -941,17 +938,30 @@ def normalize_rtpc_descriptors(
     return tuple(normalized)
 
 
+def normalize_rtpc_control_input(payload, *, path, limits=ObjectTreeLimits()):
+    if not isinstance(payload, Mapping) or set(payload) != {"new_control_input"}:
+        return _normalize_identity(payload, path=path, limits=limits)
+    node = _mapping(payload["new_control_input"], path=path)
+    _exact_fields(node, required={"type", "name", "properties"}, optional={"notes"}, path=path)
+    if node["type"] not in CONTROL_INPUT_CLASSES:
+        raise ObjectOperationContractError("INVALID_CONTROL_INPUT_TYPE", "Custom ControlInput requires LFO, Envelope, or Time.")
+    name = _bounded_token(node["name"], path=path + ".name", max_length=limits.max_name_length, disallow_path_separator=True)
+    properties = _normalize_properties(node["properties"], request_path=path + ".properties", limits=limits)
+    notes = node.get("notes")
+    if notes is not None and (not isinstance(notes, str) or len(notes) > limits.max_notes_length):
+        raise ObjectOperationContractError("INVALID_NOTES", "New ControlInput notes exceed the string contract.")
+    return OwnedControlInputDescriptor(node["type"], name, tuple((row.name, row.value) for row in properties), notes)
+
+
 def materialize_waapi_rtpc(
     descriptor: RtpcDescriptor,
     *,
-    resolved_control_input: ObjectId,
+    resolved_control_input: ObjectId | Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build the native ``@RTPC`` row from reviewed data and one resolved identity."""
 
-    _require_object_id(
-        resolved_control_input,
-        path=f"{descriptor.request_path}.control_input",
-    )
+    if not isinstance(descriptor.control_input, OwnedControlInputDescriptor):
+        _require_object_id(resolved_control_input, path=f"{descriptor.request_path}.control_input")
     result: dict[str, Any] = {
         "type": "RTPC",
         "name": "",

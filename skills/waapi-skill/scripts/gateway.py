@@ -3035,7 +3035,12 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_rtpc.add_argument("--declaration-id")
     draft_declare_rtpc.add_argument("--object-handle", required=True)
     draft_declare_rtpc.add_argument("--field-handle", required=True)
-    draft_declare_rtpc.add_argument("--control-input-handle", required=True)
+    rtpc_input = draft_declare_rtpc.add_mutually_exclusive_group(required=True)
+    rtpc_input.add_argument("--control-input-handle")
+    rtpc_input.add_argument("--new-control-input-kind")
+    draft_declare_rtpc.add_argument("--new-control-input-name")
+    draft_declare_rtpc.add_argument("--new-control-input-notes")
+    draft_declare_rtpc.add_argument("--new-control-input-field-value", action="append", nargs=2, default=[])
     draft_declare_rtpc.add_argument(
         "--point",
         action="append",
@@ -18084,8 +18089,22 @@ def dispatch_offline_business_draft_update(
                     "shape": shape,
                 }
             )
+        input_fields = {"control_input_handle": args.control_input_handle}
+        if args.new_control_input_kind is not None:
+            values = {}
+            for handle, raw in args.new_control_input_field_value:
+                if handle in values:
+                    raise GatewayInputError("Set each new Control Input property once")
+                field = session.handles.bound_field(handle)
+                values[handle] = _parse_bound_field_business_value(field, raw, field="new_control_input", session=session)
+            input_fields = {"new_control_input": {"kind_handle": args.new_control_input_kind,
+                "name": args.new_control_input_name, "field_values": values,
+                **({"notes": args.new_control_input_notes} if args.new_control_input_notes is not None else {})}}
+        elif (args.new_control_input_name is not None or args.new_control_input_notes is not None
+              or args.new_control_input_field_value):
+            raise GatewayInputError("New Control Input fields require --new-control-input-kind")
         fields = {
-            "control_input_handle": args.control_input_handle,
+            **input_fields,
             "curve_points": points,
             "field_handle": args.field_handle,
             **({} if args.mode is None else {"mode": args.mode}),
@@ -19991,12 +20010,14 @@ def dispatch_business_field_discovery(
         discovery_scope = {"object_type": kind.metadata_object_type}
     if (
         binding.record.operation
-        in {"object.setLinked", "object.setProperty", "object.setReference", "object.setRTPC"}
+        in {"object.setLinked", "object.setProperty", "object.setReference"}
         or adapter.family == "core-project-object"
     ) and source is None:
         raise GatewayInputError(
             f"{binding.record.operation} field discovery requires its exact bound object"
         )
+    if binding.record.operation == "object.setRTPC" and source is None and args.type_handle is None:
+        raise GatewayInputError("New Control Input fields require one selected Modulator Type Handle")
     if binding.record.operation == "object.setLinked" and args.platform is None:
         raise GatewayInputError(
             "object.setLinked field discovery requires one explicit platform"
@@ -20124,6 +20145,11 @@ def dispatch_business_field_discovery(
             accepted = kind == "property" and value_type is not None
         elif binding.record.operation == "object.setReference":
             accepted = kind == "reference"
+        elif binding.record.operation == "object.setRTPC" and source is None:
+            from wwise_waapi.owned_control_inputs import CONTROL_INPUT_CLASSES
+            if bound_type.name not in CONTROL_INPUT_CLASSES or bound_type.class_id != CONTROL_INPUT_CLASSES[bound_type.name]:
+                raise GatewayInputError("New Control Input fields require a selected Modulator type")
+            accepted = kind == "property" and value_type is not None
         elif binding.record.operation == "object.setRTPC":
             supports = metadata.get("supports")
             rtpc = supports.get("rtpc") if isinstance(supports, Mapping) else None
@@ -28919,7 +28945,7 @@ def _business_next_action_binding(
                 "submit_once": True,
             },
         }
-    if adapter.supports_type_discovery:
+    if adapter.supports_type_discovery and record.operation != "object.setRTPC":
         type_discover_prefix = [*base, "draft-discover-types", *binding]
         declaration_prefix = [*base, "draft-declare-new", *binding]
         if record.operation == "object.createPlugin":
@@ -29468,6 +29494,17 @@ def _business_next_action_binding(
                 "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
                 "then_read_next_response": True,
                 "precompute_or_increment_revision": False,
+                "new_control_input": {
+                    "type_discovery": {**operation_draft_prefix_copy_binding([*base, "draft-discover-types", *binding]),
+                        "append": ["--role", "object", "--meaning", "<LFO, Envelope, or Time Modulator meaning>"]},
+                    "field_discovery": {**operation_draft_prefix_copy_binding(field_discover_prefix),
+                        "append": ["--type-handle", "<selected-Modulator-Type-Handle>", "--meaning", "<requested-property-meaning>"]},
+                    "declaration": {**operation_draft_prefix_copy_binding(declare_rtpc_prefix),
+                        "append": ["--object-handle", "<bound-owner>", "--field-handle", "<RTPC-property-Field-Handle>",
+                            "--new-control-input-kind", "<selected-Modulator-Type-Handle>", "--new-control-input-name", "<requested-name>",
+                            "[--new-control-input-notes <requested-input-notes>]", "[--new-control-input-field-value <class-Field-Handle> <typed-value>]...",
+                            "--point", "<x>", "<y>", "<shape>", "[--point <x> <y> <shape>]..."]},
+                },
             }
             if session.declarations:
                 return {

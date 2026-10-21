@@ -204,6 +204,7 @@ from .object_capabilities import (
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
 from .transaction_cleanup import build_transaction_cleanup_spec, persistent_project_cleanup
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
+from .owned_control_inputs import OwnedControlInputDescriptor, CONTROL_INPUT_CLASSES, CONTROL_INPUT_VERSIONS
 from .waql import quote_waql_literal
 
 
@@ -1011,6 +1012,15 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         },
     },
 }
+_RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA = {"oneOf": [IDENTITY_ARGUMENT_SCHEMA,
+    {"type": "object", "required": ["new_control_input"], "additionalProperties": False,
+     "properties": {"new_control_input": {"type": "object", "required": ["type", "name", "properties"],
+        "additionalProperties": False, "properties": {
+            "type": {"type": "string", "enum": sorted(CONTROL_INPUT_CLASSES)},
+            "name": {"type": "string", "minLength": 1, "maxLength": 255},
+            "notes": {"type": "string", "maxLength": 65536},
+            "properties": {"type": "array", "maxItems": 32, "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA}}}}}]}
+
 _OBJECT_SET_RTPC_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object", "required": ["rtpc"], "additionalProperties": False,
     "properties": {
@@ -2667,7 +2677,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "property": {"type": "string", "minLength": 1},
-                "control_input": IDENTITY_ARGUMENT_SCHEMA,
+                "control_input": _RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA,
                 "points": {
                     "type": "array",
                     "minItems": 1,
@@ -2693,7 +2703,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         identity_arguments=("object", "control_input"),
         constraints=(
             "live getPropertyInfo must report RTPC support for the requested property",
-            "the ControlInput resolves to exactly one existing GameParameter, MIDI, or Modulator object",
+            "the ControlInput is exactly one existing GameParameter/MIDI/Modulator identity or a new owned Modulator through selected class Field Handles",
+            "a new owned input always adds a fresh pair, preserves other RTPC rows and obeys exclusive property cardinality",
             "add appends one typed @RTPC row; add_or_replace updates one exact property/ControlInput match in place",
             "raw @RTPC rows and caller-authored listMode/replaceAll are never accepted",
             "the complete RTPC list is sealed before execution and read back after execution",
@@ -7280,6 +7291,78 @@ def _prepare_object_set_linked(
     return preview, {"object": target}, pre_state, verification, cleanup
 
 
+def _prepare_owned_control_input(descriptor, *, version, read):
+    """Seal the exact new class, reference allowance and prospective fields."""
+    from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+    if version not in CONTROL_INPUT_VERSIONS or not isinstance(descriptor, OwnedControlInputDescriptor):
+        raise OperationContractError("CONTROL_INPUT_CONSTRUCTION_UNRESOLVED", "Owned ControlInput construction remains unresolved in this version.", details={"tracking_issue": 180})
+    catalog = _read_object_type_catalog(read)
+    info = _resolve_object_type(descriptor.type, catalog=catalog)
+    rtpc = _resolve_object_type("RTPC", catalog=catalog)
+    if info.class_id != CONTROL_INPUT_CLASSES[descriptor.type] or rtpc.class_id != 1441808:
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live classes differ from the version-proven owned ControlInput classes.")
+    reference = _read_property_info(read, class_id=rtpc.class_id, name="ControlInput")
+    _require_object_reference_metadata(reference)
+    from .metadata_restrictions import reference_allowed_types
+    allowed = reference_allowed_types(reference.restriction)
+    if allowed and descriptor.type not in allowed:
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live ControlInput metadata does not permit the requested type.")
+    for row in reference.restriction.get("restrictions", []):
+        if row == "notNull":
+            continue
+        if not isinstance(row, Mapping) or "type" not in row or set(row) - {"type", "sharedOnlyTypes"}:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Owned ControlInput has an unproved live reference classifier.")
+        shared = row.get("sharedOnlyTypes", [])
+        if not isinstance(shared, list) or any(not isinstance(value, str) for value in shared):
+            raise OperationContractError("INVALID_METADATA", "sharedOnlyTypes must be a string array.")
+        if descriptor.type in shared:
+            raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "This live target type requires a shared reference.")
+    fields = [_read_property_info(read, class_id=info.class_id, name=name) for name, _ in descriptor.properties]
+    for field, (_, value) in zip(fields, descriptor.properties):
+        _require_object_property_value(field, value)
+    try:
+        defaults = class_default_evidence(infos=fields, scope={"classId": info.class_id}, read_call=read,
+            supplied_values=dict(descriptor.properties), validate_scalar=_require_object_property_value, version=version)
+        reference_defaults = class_default_evidence(infos=[reference], scope={"classId": rtpc.class_id}, read_call=read,
+            supplied_references={"ControlInput": True}, validate_scalar=_require_object_property_value, version=version)
+    except NewObjectDefaultError as exc:
+        raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    return {"type": info.name, "class_id": info.class_id, "name": descriptor.name,
+        "notes": descriptor.notes, "properties": {**dict(descriptor.properties), **defaults["derived_properties"]},
+        "native": descriptor.native(defaults["derived_properties"]),
+        "metadata_guards": [{"class_metadata": info.as_dict(), "new_object_default_evidence": [defaults]},
+            {"class_metadata": rtpc.as_dict(), "new_object_default_evidence": [reference_defaults]}]}
+
+
+def _owned_control_input_assertions(proof, *, rtpc_id, control_id, read, owner_id=None):
+    """Independently certify the exact new owned result; shared by callers."""
+    fields = ["id", "name", "type", "classId", "owner", "notes", *proof["properties"]]
+    args, options = {"from": {"id": [control_id]}}, {"return": fields}
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    exact = len(rows) == 1 and _same_identity(rows[0].get("id"), control_id)
+    row = rows[0] if exact else {}
+    assertions = [{"name": "new ControlInput has its exact requested class and RTPC owner", "passed": bool(exact
+        and row.get("type") == proof["type"] and row.get("classId") == proof["class_id"]
+        and row.get("name") == proof["name"] and _same_identity(_reference_identity(row.get("owner")), rtpc_id)), "evidence": rows}]
+    for name, value in proof["properties"].items():
+        assertions.append({"name": f"new ControlInput {name} matches", "passed": bool(exact and _has_field(row, name)
+            and condition_values_equal(_field_value(row, name), value)), "evidence": {"expected": value, "actual": _field_value(row, name)}})
+    if proof["notes"] is not None:
+        assertions.append({"name": "new ControlInput notes match", "passed": bool(exact and row.get("notes") == proof["notes"]), "evidence": rows})
+    readbacks = [{"role": "new-owned-control-input", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result}]
+    if owner_id is not None:
+        args, options = {"from": {"id": [rtpc_id]}}, {"return": ["id", "name", "type", "classId", "owner"]}
+        result = read(OBJECT_GET_URI, args, options)
+        rows = _rows(result)
+        assertions.append({"name": "new RTPC retains the exact native class and selected owner", "passed": bool(len(rows) == 1
+            and _same_identity(rows[0].get("id"), rtpc_id) and rows[0].get("name") == ""
+            and rows[0].get("type") == "RTPC" and rows[0].get("classId") == 1441808
+            and _same_identity(_reference_identity(rows[0].get("owner")), owner_id)), "evidence": rows})
+        readbacks.append({"role": "new-owned-control-rtpc", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+    return assertions, readbacks
+
+
 def _prepare_object_set_rtpc(
     request: OperationRequest,
     *,
@@ -7287,8 +7370,10 @@ def _prepare_object_set_rtpc(
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     target = _resolve_identity(arguments.get("object"), role="object", read=read)
-    control = _resolve_identity(arguments.get("control_input"), role="control_input", read=read)
-    if not _is_rtpc_control_input(control.row.get("type")):
+    raw_control = arguments.get("control_input")
+    owned = isinstance(raw_control, Mapping) and "new_control_input" in raw_control
+    control = None if owned else _resolve_identity(raw_control, role="control_input", read=read)
+    if control is not None and not _is_rtpc_control_input(control.row.get("type")):
         raise OperationContractError(
             "INVALID_CONTROL_INPUT_TYPE",
             "RTPC ControlInput must resolve to a GameParameter, MIDI parameter, or Modulator object.",
@@ -7309,6 +7394,8 @@ def _prepare_object_set_rtpc(
     except ObjectOperationContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
     descriptor = descriptors[0]
+    owned_proof = (_prepare_owned_control_input(descriptor.control_input, version=request.version, read=read)
+        if owned else None)
     info = _read_property_info(read, object_id=target.object, name=descriptor.property)
     rtpc_support = info.supports.get("rtpc")
     if not isinstance(rtpc_support, str) or rtpc_support.casefold() == "none":
@@ -7329,7 +7416,12 @@ def _prepare_object_set_rtpc(
         version=request.version,
         read=read,
     )
-    matches = _match_rtpc_pair(before_rows, descriptor.property, control.object, mode=mode, rtpc_support=rtpc_support)
+    if owned:
+        _require_rtpc_property_count(descriptor.property, rtpc_support,
+            sum(_field_value(row, "PropertyName") == descriptor.property for row in before_rows) + 1)
+        matches = []
+    else:
+        matches = _match_rtpc_pair(before_rows, descriptor.property, control.object, mode=mode, rtpc_support=rtpc_support)
 
     action = "update" if matches else "add"
     if action == "add":
@@ -7348,7 +7440,7 @@ def _prepare_object_set_rtpc(
             "@RTPC": [
                 materialize_waapi_rtpc(
                     descriptor,
-                    resolved_control_input=control.object,
+                    resolved_control_input=owned_proof["native"] if owned else control.object,
                 )
             ],
         }
@@ -7408,7 +7500,8 @@ def _prepare_object_set_rtpc(
         "action": action,
         "existing_rtpc_id": matches[0].get("id") if matches else None,
         "property": descriptor.property,
-        "control_input_id": control.object,
+        "control_input_id": None if owned else control.object,
+        **({"owned_control_input": owned_proof} if owned else {}),
         "points": [point.as_dict() for point in descriptor.points],
         "notes_supplied": descriptor.notes is not None,
         "expected_notes": descriptor.notes,
@@ -7423,9 +7516,9 @@ def _prepare_object_set_rtpc(
     }
     return (
         preview,
-        {"object": target, "control_input": control},
+        {"object": target, **({} if owned else {"control_input": control})},
         {"rtpc_snapshot": rtpc_snapshot, "condition_metadata": {"object_id": target.object,
-            "fields": [info.as_dict()]}},
+            "fields": [info.as_dict()]}, **({"object_set_nodes": owned_proof["metadata_guards"]} if owned else {})},
         verification,
         cleanup,
     )
@@ -21881,7 +21974,7 @@ def verify_prepared_operation(
             or not _valid_object_id(object_id)
             or action not in {"add", "update"}
             or not isinstance(property_name, str)
-            or not _valid_object_id(control_input_id)
+            or (not _valid_object_id(control_input_id) and not isinstance(plan.get("owned_control_input"), Mapping))
             or not isinstance(expected_points, list)
             or not isinstance(before_rows, list)
             or not all(isinstance(row, Mapping) for row in before_rows)
@@ -21912,6 +22005,19 @@ def verify_prepared_operation(
             len(actual_by_id) == len(actual_rows),
             actual_rows,
         )
+        if isinstance(plan.get("owned_control_input"), Mapping):
+            fresh = [row for row in actual_rows if _identity_key(row["id"]) not in before_by_id
+                and row.get("@PropertyName") == property_name]
+            check("one new RTPC supplies the owned ControlInput identity", len(fresh) == 1, fresh)
+            if len(fresh) == 1:
+                control_input_id = _reference_identity(fresh[0].get("@ControlInput"))
+                if _valid_object_id(control_input_id):
+                    owned_assertions, owned_reads = _owned_control_input_assertions(plan["owned_control_input"],
+                        rtpc_id=fresh[0]["id"], control_id=control_input_id, read=read_call, owner_id=object_id)
+                    assertions.extend(owned_assertions)
+                    readbacks.extend(owned_reads)
+                else:
+                    check("new ControlInput exposes a canonical GUID", False, fresh)
         matches = [
             row
             for row in actual_rows
@@ -24376,7 +24482,8 @@ def _validate_nested_request_shape(
         return
     if operation == "object.setRTPC":
         _validate_identity_payload_shape(arguments.get("object"), role="object")
-        _validate_identity_payload_shape(arguments.get("control_input"), role="control_input")
+        if not isinstance(arguments.get("control_input"), Mapping) or "new_control_input" not in arguments["control_input"]:
+            _validate_identity_payload_shape(arguments.get("control_input"), role="control_input")
         mode = arguments.get("mode", "add_or_replace")
         if mode not in {"add", "add_or_replace"}:
             raise OperationContractError(
