@@ -9,7 +9,18 @@ candidate/receipt hashes, raw diagnostic flags and Root's scoped effect assessme
 The Source collector-to-exact-branch adapter remains required #180 implementation;
 these observations add no generated native credit and close no functional ticket.
 
-## Latest integration: R55/R56
+## Latest integration: R58
+
+Reviewed source `35410b7e` passed 49 affected controls and one 60-case capture.
+Artifact candidate `f5a6487e` passed both portable-product checks after one
+additive import and branch generation/check. All 2,683 earlier archive files,
+625 selected bindings and native obligation identities/shapes/owners were
+preserved. The counts below remain unchanged; the five Source observations
+above remain scoped business facts until their required #180 reader is finished.
+This is focused integration evidence, not final full-gate or Fresh acceptance.
+Exact results are in [the test inventory](../../../tests/TEST_INVENTORY.md).
+
+## Historical integration: R55/R56
 
 Artifact candidate `3f8f3146` incorporates the accepted saved-copy continuation,
 formal task-consumer repairs, square/triangle verification and exact historical
