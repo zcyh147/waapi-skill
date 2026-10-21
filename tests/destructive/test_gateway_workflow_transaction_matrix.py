@@ -190,10 +190,11 @@ class _WorkflowSandboxRuntime:
         from tests.semantic.support.codex_expansion_reconciliation import run_owned_gateway
 
         assert len(command) == 2 and command[0] in {'execute', 'verify'}, command
+        producer_env = {**self.env, 'PYTHONIOENCODING': 'utf-8:strict', 'PYTHONUTF8': '1'}
         completed = run_owned_gateway(
             [sys.executable, str(REPO_ROOT / 'skills/waapi-skill/scripts/run.py'), 'gateway.py',
                 '--timeout', '10', '--state-dir', str(self.state_dir), *command],
-            environment=self.env, timeout_seconds=30,
+            environment=producer_env, timeout_seconds=30,
             cwd=REPO_ROOT / 'skills/waapi-skill',
         )
         assert len(completed.stdout.encode('utf-8')) <= 256 * 1024, 'Notes producer stdout bound exceeded'

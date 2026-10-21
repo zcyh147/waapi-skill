@@ -1,6 +1,7 @@
 """Diagnostic collection through the public Gateway, with independent native packets."""
 from copy import deepcopy
 import json
+import os
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -87,7 +88,8 @@ def notes_runtime(tmp_path, workflow, monkeypatch, *, fault=None):
     def producer(command, *, environment, timeout_seconds, cwd=None, text=True):
         assert active and command[:3] == [sys.executable, str(workflow.REPO_ROOT / 'skills/waapi-skill/scripts/run.py'), 'gateway.py']
         assert command[3:7] == ['--timeout', '10', '--state-dir', str(runtime.state_dir)]
-        assert environment == runtime.env and cwd == workflow.REPO_ROOT / 'skills/waapi-skill'
+        assert environment == {**runtime.env, 'PYTHONIOENCODING': 'utf-8:strict', 'PYTHONUTF8': '1'}
+        assert environment is not runtime.env and cwd == workflow.REPO_ROOT / 'skills/waapi-skill'
         assert 0 < timeout_seconds <= 30 and text is True
         argv = command[7:]; launches.append(list(argv)); trace.append('producer:' + argv[0])
         # Separate peer facade: the observer must not open/close a peer transport.
@@ -159,3 +161,28 @@ def test_notes_collector_uses_isolated_producer_and_preserves_observed_old_notes
     assert len([uri for uri, _ in writes if uri.endswith('object.setNotes')]) == 1
     assert category['diagnostic_only'] is True and category['coverage_credit'] == 'none'
     assert receipt['native_delivery_pass'] is False and not active
+
+
+def test_packaged_notes_producer_preserves_unicode_under_inherited_non_utf8_environment(tmp_path, workflow, monkeypatch):
+    skill = tmp_path / 'skills/waapi-skill'
+    scripts = skill / 'scripts'; scripts.mkdir(parents=True)
+    # Independent external CLI fixture: real stdout encoding/strict UTF-8
+    # decoding must preserve this literal JSON, without a Wwise connection.
+    (scripts / 'run.py').write_text(
+        "import os, sys\n"
+        "sys.stdout.write('{\"ok\":true,\"result\":{\"name\":\"Café\"}}\\n')\n"
+        "assert os.environ['PYTHONIOENCODING'] == 'utf-8:strict'\n"
+        "assert os.environ['PYTHONUTF8'] == '1'\n"
+        "assert sys.argv[1] == 'gateway.py'\n",
+        encoding='utf-8',
+    )
+    config = tmp_path / 'private-config.json'; config.write_bytes(b'{"private":true}')
+    environment = {**os.environ, 'PYTHONIOENCODING': 'latin-1:strict', 'PYTHONUTF8': '0',
+        'WAAPI_SKILL_CONFIG_PATH': str(config)}
+    before = dict(environment)
+    runtime = SimpleNamespace(env=environment, state_dir=tmp_path / 'private-state')
+    monkeypatch.setattr(workflow, 'REPO_ROOT', tmp_path)
+    code, result = workflow._WorkflowSandboxRuntime.packaged_topic_producer(
+        runtime, ['execute', 'tx1-aaaaaaaaaaaaaaaaaaaa'])
+    assert code == 0 and result == {'ok': True, 'result': {'name': 'Café'}}
+    assert runtime.env == before and config.read_bytes() == b'{"private":true}'
