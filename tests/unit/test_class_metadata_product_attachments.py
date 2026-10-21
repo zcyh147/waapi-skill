@@ -93,11 +93,13 @@ def test_actual_portable_class_attachments_bind_native_sources_and_independent_p
     assert original_class_sources["r54"] != original_class_sources["r55"]
     selected = {identity for identity, row in policy["branches"].items()
                 if "|wwise-console|" in identity
-                and "|function|ak.wwise.core.object.getPropertyInfo|" in identity
-                and row["categories"] == ["program", "live_metadata"]}
+                and "|function|ak.wwise.core.object.getPropertyInfo|" in identity}
     assert len(selected) == 65
+    assert {identity for identity in selected
+            if policy["branches"][identity]["categories"] == ["program", "live_metadata"]} == expected_ids
     missing_ids = selected - expected_ids
     assert expected_ids <= selected and len(missing_ids) == 5
+    assert all(policy["branches"][identity]["categories"] == ["program"] for identity in missing_ids)
     assert {branches[identity]["pointer"] for identity in missing_ids} == {
         "/resultSchema/properties/default/@presence/absent"
     }

@@ -1,0 +1,52 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792540840293254000-50f713041bbc45b0b14f5b454e979f4c-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 4,
+    "default": 0.0,
+    "dependencies": [],
+    "display": {
+      "group": "Output",
+      "index": 1268,
+      "name": "Output Level"
+    },
+    "name": "OutputLevel",
+    "restriction": {
+      "max": 24.0,
+      "min": -96.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Additive",
+      "unlink": false
+    },
+    "type": "Real32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "Decibels",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 1,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 24.0,
+        "min": -96.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.995510540989926,
+  "version": "2022.1"
+}

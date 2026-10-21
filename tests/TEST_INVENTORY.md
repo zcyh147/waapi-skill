@@ -5,6 +5,39 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R59 Source completion and portable evidence integration
+
+Candidate `4e3c2800` passed the **65-case program capture in 62.09s** after
+repairing the Source selector binding and admitting the exact 26 Source branches
+to the default product evidence policy. Five original version-specific Source
+native attachments were reused without rerunning Wwise. The actual default
+completion evaluator now verifies **91 branches: 65 metadata and 26 Source**.
+The metadata policy requires native evidence for 60 branches and program evidence
+for the five version-specific default-absence branches. Topic's 559 branches
+still lack required native evidence; overall completion remains false.
+
+The original import attempt exited unsuccessfully because its final assertion
+read the inventory scaffold before applying evidence bindings. Its result is
+preserved as failed. A separate read-only evaluation verified the completed
+artifact effects, all **11,241 previous archive files** unchanged, and the same
+651 binding identities. Official inventory generation/check and semantic
+preservation review passed: 650 selected evidence rows changed, with obligation
+identities, shapes, owners and unrelated rows preserved. The successor local
+coordinator uses the actual completion evaluator; no import was replayed.
+
+Post-import checks reported **4 passed / 1 failed in 318.35s**. The failure was
+an obsolete test expectation that all 65 metadata branches required native
+evidence. After aligning that oracle with the approved 60/5 policy, only the
+failed node was rerun: **1 passed in 35.84s**. This test-only change leaves the
+captured candidate identity unchanged. These are separate runs, not a single
+five-test passing run.
+
+No new native, Fresh Agent, Windows-host or full Program/Non-live gate ran in this
+integration. The historical full Program failure is not superseded. Detailed
+terminal receipts and the separate read-only verification are retained under
+`/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-diagnosed-r5/`; original failed
+attempts remain intact.
+
 ## 2026-10-21 R58 settled Source and evidence integration
 
 Source/bridge candidate `35410b7e` passed **49 affected controls in 80.70s**

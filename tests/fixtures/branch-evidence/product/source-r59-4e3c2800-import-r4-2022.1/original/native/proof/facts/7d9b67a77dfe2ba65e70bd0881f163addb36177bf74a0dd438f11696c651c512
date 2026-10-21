@@ -1,0 +1,52 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792540840254886000-5b0827c3d7554f77abed441bfbe4c954-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 8,
+    "default": 0,
+    "dependencies": [],
+    "display": {
+      "group": "Oscillator 1",
+      "index": 1254,
+      "name": "Osc1 Transpose"
+    },
+    "name": "Osc1Transpose",
+    "restriction": {
+      "max": 3600,
+      "min": -3600,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Additive",
+      "unlink": false
+    },
+    "type": "int32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "PitchCents",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 3600.0,
+        "min": -3600.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.993990333983675,
+  "version": "2022.1"
+}

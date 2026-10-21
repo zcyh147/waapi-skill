@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r5/run-4e3c2800-r3/pytest-capture/test_modern_collector_preserve0/native/1792558284169018000-8b5d916c89b54edd88aab43aa303ff5b-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc2 Waveform"
+    },
+    "name": "Osc2Waveform",
+    "type": "int32"
+  },
+  "risk_level": "low",
+  "timeout": 9.975047834013822,
+  "version": "2022.1"
+}
