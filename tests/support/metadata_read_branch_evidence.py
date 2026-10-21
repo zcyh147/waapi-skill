@@ -22,6 +22,28 @@ URI = "ak.wwise.core.object.getPropertyInfo"
 NODE = "tests/unit/test_metadata_discovery_gateway.py::test_public_metadata_result_bank_preserves_each_selected_native_fact"
 
 
+# Root-reviewed R59 decoder scope. Exact host/build/shape identity is intentional:
+# this is no exemption for metadata meanings, applicability or native effects.
+ABSENT_DEFAULT_PROGRAM_BRANCHES = frozenset(
+    version + "|wwise-console|" + build + "|function|" + URI
+    + "|/resultSchema/properties/default/@presence/absent"
+    for version, build in (
+        ("2021.1", "2021.1.14.8108"), ("2022.1", "2022.1.19.8584"),
+        ("2023.1", "2023.1.19.8928"), ("2024.1", "2024.1.13.9056"),
+        ("2025.1", "2025.1.7.9143")))
+ABSENT_DEFAULT_SHAPE = "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd"
+
+
+def validate_selected_metadata_requirement(branch, policy):
+    """Admit the exact reviewed decoder split; all other native reads stay required."""
+    decoder = branch["id"] in ABSENT_DEFAULT_PROGRAM_BRANCHES
+    categories = ["program"] if decoder else ["program", "live_metadata"]
+    if (policy.get("native_shape_sha256") != branch["shape_sha256"]
+            or (decoder and branch["shape_sha256"] != ABSENT_DEFAULT_SHAPE)
+            or policy.get("categories") != categories or not policy.get("reason")):
+        raise ValueError("Reviewed selected metadata shape or evidence policy changed")
+
+
 def source_seals():
     seals = _source_seals()
     for name in ("tests/support/metadata_result_case_bank.py", "tests/support/metadata_read_branch_evidence.py",
@@ -121,10 +143,9 @@ def prepare_metadata_capture(root: Path, *, selected_branch_ids=None, reviewed_r
         available = {row["id"]: row for row in owned if "|wwise-console|" in row["route"]
                      and row["route"].endswith("|" + URI) and row["pointer"].startswith("/resultSchema")}
         for identity in selected:
-            policy = reviewed_requirements["branches"][identity]
-            if (identity not in available or policy.get("native_shape_sha256") != available[identity]["shape_sha256"]
-                    or policy.get("categories") != ["program", "live_metadata"] or not policy.get("reason")):
+            if identity not in available:
                 raise ValueError("Reviewed selected metadata shape or evidence policy changed")
+            validate_selected_metadata_requirement(available[identity], reviewed_requirements["branches"][identity])
     elif reviewed_requirements is not None:
         raise ValueError("Reviewed metadata requirements need an exact branch selection")
     edges = {row["id"]: row for row in owned if row["kind"] == "reference"}

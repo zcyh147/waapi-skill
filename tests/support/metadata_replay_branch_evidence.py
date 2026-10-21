@@ -406,6 +406,24 @@ def make_attachment_record(capture, field, replay_descriptor, replay_record, rep
     return record
 
 
+def validate_default_replay_requirements(inventory, policy):
+    """Retain the complete exact default slice with only the reviewed decoder split."""
+    from tests.support.metadata_read_branch_evidence import validate_selected_metadata_requirement
+    defaults = {row['id']: row for row in inventory['native_coverage']['obligations']
+        if row['route'] and '|wwise-console|' in row['route']
+        and row['route'].endswith('|' + URI)
+        and (row['pointer'].startswith('/resultSchema/properties/default')
+             or any(row['pointer'].startswith('/resultSchema/@definition/' + document + '/definitions/propertyValue')
+                    for document in ('waapi_definitions.json', 'common_definitions.json')))}
+    assigned = {identity for identity in policy['branches']
+        if '|wwise-console|' in identity and '|function|' + URI + '|' in identity}
+    if len(defaults) != 65 or assigned != set(defaults):
+        raise ValueError('Original65 default requirements changed')
+    for identity, branch in defaults.items():
+        validate_selected_metadata_requirement(branch, policy['branches'][identity])
+    return assigned
+
+
 def prepare_capture(root, original_root):
     """After source approval only: one fresh context, three selected public nodes."""
     import subprocess
@@ -421,9 +439,8 @@ def prepare_capture(root, original_root):
     inventory = audit.build_inventory()
     rows = selected_branches(inventory)
     policy = audit.load(audit.ROOT/'docs/branch-coverage-requirements.json')
-    assigned = {identity for identity,p in policy['branches'].items() if '|wwise-console|' in identity
-        and '|function|'+URI+'|' in identity and p['categories'] == ['program','live_metadata']}
-    if len(assigned) != 65 or not {row['id'] for row in rows} <= assigned:
+    assigned = validate_default_replay_requirements(inventory, policy)
+    if not {row['id'] for row in rows} <= assigned:
         raise ValueError('Original65 default requirements changed')
     for row in rows:
         if policy['branches'][row['id']]['native_shape_sha256'] != row['shape_sha256']:

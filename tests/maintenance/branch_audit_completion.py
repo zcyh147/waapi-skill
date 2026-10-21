@@ -163,6 +163,15 @@ def candidate_identity(root, inventory, catalogs, *, digest):
         sources[path] = digest((root / path).read_text(encoding='utf-8'))
     for path in sorted((root / 'skills/waapi-skill/resources/metadata').glob('*/object-types.json')):
         sources[str(path.relative_to(root))] = digest(path.read_text(encoding='utf-8'))
+    # Source attachment producer/finalizer bytes are part of the current
+    # program candidate. Historical trees without this adapter retain their
+    # original source context; missing/changed current files change identity.
+    for name in ('tests/support/source_copy_branch_evidence.py', 'tests/support/exact_evidence_finalization.py',
+                 'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
+                 'tests/unit/test_source_copy_capture.py'):
+        path = root / name
+        if path.is_file():
+            sources[name] = hashlib.sha256(path.read_bytes()).hexdigest()
     return digest({'sources': sources, 'native_catalogs': catalogs})
 
 
@@ -776,6 +785,10 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
     if (not sources or set(sources) != set(binding.get('relevant_sources', [])) or not required <= set(sources)
             or sources != record.get('relevant_sources')):
         raise ValueError('equivalence omits original relevant source/behavior dependencies')
+    if proof.get('source_copy_review'):
+        from tests.support.source_copy_native_evidence import validate_source_equivalence
+        validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
+        return
     for name, seal in sources.items():
         path = (root / name).resolve()
         if not path.is_relative_to(root.resolve()) or hashlib.sha256(path.read_bytes()).hexdigest() != seal:
@@ -1272,6 +1285,12 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             read_sealed_artifact(artifact, base)
         if boundary is not None:
             validate_boundary_receipt(record, branch, binding, checks)
+        if category == 'native' and binding.get('source_copy_native_proof'):
+            from tests.support.source_copy_native_evidence import validate_source_native
+            validate_source_native(record, binding, branch, base)
+        if category == 'program' and binding.get('source_copy_proof'):
+            from tests.support.source_copy_branch_evidence import validate_source_program
+            validate_source_program(record, binding, branch, base)
         if category == 'program' and boundary is None:
             gateway = record['gateway']
             if binding is None or gateway['argv'] != binding.get('input', {}).get('gateway_argv'):

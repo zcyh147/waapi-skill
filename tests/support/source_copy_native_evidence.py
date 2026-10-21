@@ -1,0 +1,267 @@
+"""Narrow original Source category ownership; diagnostic verdicts stay immutable."""
+from pathlib import Path
+
+from tests.maintenance import branch_audit_completion as completion
+from tests.support.source_copy_branch_evidence import dependency_review
+
+
+def read_source_native_run(category, receipt, config, base):
+    """Require the five reviewed native nodes, not a family or read-probe PASS."""
+    context = completion.read_category_run(category, base)
+    review = dependency_review()
+    anchors = {row['version']: row for row in review['native_anchors']}
+    anchor = anchors.get(context['version'])
+    record = context['record']
+    if (anchor is None or set(category) != {'artifact', 'sha256', 'record_index', 'nodeid'}
+            or category['nodeid'] != anchor['selected_nodes'][0]
+            or record['invocation']['selected_test_nodeids'] != anchor['selected_nodes']
+            or record['invocation']['node_outcomes'] != [{'nodeid': category['nodeid'], 'outcome': 'PASS'}]
+            or category['record_index'] != anchor['category']['record_index']
+            or category['sha256'] != anchor['category']['sha256']
+            or context['candidate'] != anchor['native_candidate']
+            or receipt['sha256'] != anchor['receipt']['sha256']):
+        raise ValueError('An exact original Source finalized node and receipt are required')
+    categories = [row for row in record['categories']
+                  if row.get('category') == ('repeated' if context['version'] == '2021.1' else 'modern') + '-source-copy-save-children-oracle']
+    if (len(categories) != 1 or categories[0].get('status') != 'PASS'
+            or categories[0].get('diagnostic_only') is not True
+            or categories[0].get('business_effect_verified') is not False
+            or categories[0].get('observation_sha256') != receipt['sha256']
+            or categories[0].get('observation_path') != receipt['path']
+            or record['source'] != anchor['preserved_source_tree']
+            or config['sha256'] != anchor['public_config']['sha256']):
+        raise ValueError('Exact original Source category ownership or preservation differs')
+    configured = completion.read_sealed_artifact(config, base)
+    if (set(configured) != {'wwise_version', 'waapi_host', 'waapi_port', 'project_modification_policy'}
+            or configured['wwise_version'] != context['version']
+            or configured['waapi_host'] != '127.0.0.1'
+            or configured['project_modification_policy'] != 'ask_before_changes'):
+        raise ValueError('Exact original Source isolated configuration differs')
+    return {**context, 'anchor': anchor, 'category': categories[0], 'configuration': configured}
+
+
+def validate_source_equivalence(proof, branch, binding, root, *, evidence_base):
+    """Only the pinned 2021 six-delta bridge may cross changed runtime bytes."""
+    from tests.support.source_copy_branch_evidence import pointer_contract, native_route, REVIEW_SHA256
+    import hashlib
+    review = dependency_review()
+    sources = {**review['original_sources'],
+        **review['launcher_and_dependency_config_source_maps'][review['original_native_candidate']],
+        **review['pinned_project_input_source_maps'][review['original_native_candidate']]}
+    current = {**review['current_sources'],
+        **review['launcher_and_dependency_config_source_maps'][review['current_source_basis']],
+        **review['pinned_project_input_source_maps'][review['current_source_basis']]}
+    review_link = proof.get('source_copy_review', {})
+    from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+    if set(review_link) != {'artifact', 'sha256'}:
+        raise ValueError('Closed portable Source review descriptor required')
+    relative = parse_archive_relative_path(review_link['artifact']).canonical
+    evidence_root = Path(evidence_base).resolve(strict=True)
+    review_path = evidence_root / relative
+    if review_path.is_symlink() or not review_path.resolve().is_relative_to(evidence_root):
+        raise ValueError('Source review descriptor escapes its evidence bundle')
+    if (branch['route'] != native_route('2021.1') or branch['pointer'] not in pointer_contract('2021.1')
+            or proof.get('source_native_candidate') != review['original_native_candidate']
+            or review_link.get('sha256') != REVIEW_SHA256
+            or completion.read_sealed_artifact(review_link, evidence_root) != review
+            or proof['sources'] != sources or set(binding['relevant_sources']) != set(sources)
+            or not binding.get('source_copy_native_proof')
+            or any(hashlib.sha256((root / name).read_bytes()).hexdigest() != seal for name, seal in current.items())):
+        raise ValueError('Complete reviewed 2021 Source dependency bridge differs')
+
+
+def native_source_maps(candidate):
+    review = dependency_review()
+    if candidate == review['original_native_candidate']:
+        sources = review['original_sources']
+    elif candidate == review['modern_native_candidate']:
+        sources = review['modern_sources']
+    else:
+        raise ValueError('Unreviewed original Source candidate')
+    return {**sources, **review['launcher_and_dependency_config_source_maps'][candidate],
+            **review['pinned_project_input_source_maps'][candidate]}
+
+
+def validate_source_native(record, binding, branch, base):
+    """Recheck original category→receipt→selected files, not declared SHA lists."""
+    from tests.support.source_copy_branch_evidence import source_facts, ProofFiles, native_route, pointer_contract, relevant_sources
+    proof = completion.read_sealed_artifact(binding['source_copy_native_proof'], base)
+    files = ProofFiles(proof, base)
+    receipt = files.read(proof['receipt'])
+    observations = record['observation_artifacts']
+    if set(observations) != {'source', 'category', 'config'}:
+        raise ValueError('Closed original Source observations required')
+    context = read_source_native_run(observations['category'], proof['receipt'], observations['config'], base)
+    facts = source_facts(proof, base)
+    source_context = completion.read_sealed_artifact(record['source_context'], base)
+    expected_ids = {native_route(facts['version']) + '|' + pointer for pointer in pointer_contract(facts['version'])}
+    transactions = {row['transaction_id']: row for row in context['record']['transactions']}
+    if (record.get('source_copy_proof') != binding['source_copy_native_proof']
+            or branch['id'] not in expected_ids or record['observations']['source'] != facts
+            or record.get('git_candidate') != context['candidate']
+            or source_context['original_git_candidate'] != context['candidate']
+            or source_context['original_candidate_sha256'] != record['candidate_sha256']
+            or source_context['original_sources'] != native_source_maps(context['candidate'])
+            or source_context['current_sources'] != relevant_sources()
+            or record.get('relevant_sources') != native_source_maps(context['candidate'])
+            or context['category']['transaction_ids'] != receipt['transaction_ids']
+            or set(transactions) != set(receipt['transaction_ids'])
+            or receipt['endpoint']['host'] != context['configuration']['waapi_host']
+            or receipt['endpoint']['port'] != context['configuration']['waapi_port']
+            or receipt['config_sha256'] != observations['config']['sha256']):
+        raise ValueError('Original Source proof/context/public configuration differs')
+    for phase in receipt['phases']:
+        row = transactions[phase['transaction_id']]
+        if (row['artifact_hash'] != phase['authority_receipt']['artifact_hash']
+                or row['state'] != ('verified' if phase['name'] in {'create_empty_destination', 'copy_source_only'} else 'result_schema_checked')):
+            raise ValueError('Original Source four-transaction category binding differs')
+
+
+def portable_source_native_attachments(descriptors, bindings, read, base):
+    """Attach only reviewed Source native records to existing program bindings."""
+    from copy import deepcopy
+    from tests.support.source_copy_branch_evidence import source_facts, native_route, pointer_contract
+    if not isinstance(descriptors, list): raise ValueError('Closed Source native attachment list required')
+    attached = set()
+    for descriptor in descriptors:
+        attachment = read(descriptor)
+        fields = {'contract', 'branch_ids', 'business_fact_id', 'proof', 'evidence', 'equivalence', 'native_equivalence'}
+        if set(attachment) != fields or attachment['contract'] != 'waapi-skill.source-copy-native-attachment/v1':
+            raise ValueError('Closed Source native attachment required')
+        facts = source_facts(read(attachment['proof']), base)
+        ids = attachment['branch_ids']
+        expected = {native_route(facts['version']) + '|' + pointer for pointer in pointer_contract(facts['version'])}
+        if (not isinstance(ids, list) or len(ids) != len(set(ids)) or set(ids) != expected
+                or attachment['business_fact_id'] != facts['business_fact_id']
+                or set(attachment['equivalence']) != expected or set(attachment['native_equivalence']) != expected):
+            raise ValueError('Source native exact leaf or scoped business set differs')
+        for identity in ids:
+            if identity in attached or identity not in bindings: raise ValueError('Conflicting Source native attachment')
+            attached.add(identity)
+            binding = bindings[identity]
+            program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+            if (set(binding['evidence']) != {'program'} or program.get('scope_kind') != 'product'
+                    or binding.get('source_business_fact') != facts['business_fact_id']
+                    or binding.get('dispatch_pointer') != '/observations/source/native_call'
+                    or binding.get('observation_pointer') != '/observations/source' + pointer_contract(facts['version'])[identity.rsplit('|', 1)[1]][0]):
+                raise ValueError('Source native attachment needs its current exact product program binding')
+            binding.update(source_copy_native_proof=deepcopy(attachment['proof']),
+                equivalence=deepcopy(attachment['equivalence'][identity]),
+                native_equivalence=deepcopy(attachment['native_equivalence'][identity]))
+            native = read({key: attachment['evidence'][key] for key in ('artifact', 'sha256')})
+            binding['native_observations_sha256'] = {key: value['sha256'] for key, value in native['observation_artifacts'].items()}
+            binding['evidence']['native'] = deepcopy(attachment['evidence'])
+            # Early ownership check also prevents locator-only projections from
+            # admitting a caller-created wrapper before evidence_result runs.
+            loaded = deepcopy(native)
+            loaded['observations'] = {key: completion.read_sealed_artifact(value, base)
+                                      for key, value in native['observation_artifacts'].items()}
+            validate_source_native(loaded, binding, {'id': identity}, base)
+
+
+def write_source_dependency_review(output):
+    """Use the native producer's fixed portable descriptor and exact review bytes."""
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.source_copy_branch_evidence import fixture, REVIEW_PATH, REVIEW_SHA256
+    raw = fixture.read_file(audit.ROOT / REVIEW_PATH)
+    if fixture.sha(raw) != REVIEW_SHA256: raise ValueError('Reviewed Source bridge changed')
+    (Path(output) / 'dependency-review.json').write_bytes(raw)
+    return {'artifact': 'native/dependency-review.json', 'sha256': REVIEW_SHA256}
+
+
+def attach_original_source_native(program_index, *, category, receipt_path, config_path, inventory):
+    """Produce one portable original wrapper; never launch or replay native work."""
+    from copy import deepcopy
+    import json
+    import tempfile
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.media_id_branch_evidence import _original_source_context
+    from tests.support.source_copy_branch_evidence import (
+        export_source_proof, source_facts, write_json, fixture, REVIEW_PATH, REVIEW_SHA256, relevant_sources)
+    receipt_raw = fixture.read_file(Path(receipt_path))
+    receipt_link = {'path': str(Path(receipt_path).resolve()), 'sha256': fixture.sha(receipt_raw)}
+    config_link = {'artifact': str(Path(config_path).resolve()), 'sha256': fixture.sha(fixture.read_file(Path(config_path)))}
+    # Fail before publishing any wrapper for an unowned or substituted run.
+    read_source_native_run(category, receipt_link, config_link, Path(program_index).parent)
+    program_index = Path(program_index); base = program_index.parent
+    requirements = json.loads((base / 'requirements.json').read_bytes())
+    document, _, _ = audit.portable_binding_inputs(program_index, requirements)
+    if len(document['bindings']) not in {4, 6}: raise ValueError('Select one exact Source version program')
+    output = base / 'native'
+    output.mkdir(exist_ok=False)
+    def copied(name, path):
+        raw = fixture.read_file(Path(path), maximum=16 * 1024 * 1024)
+        (output / name).write_bytes(raw)
+        return {'artifact': 'native/' + name, 'sha256': fixture.sha(raw)}
+    raw_category = copied('category.jsonl', category['artifact'])
+    native_category = {**raw_category, 'record_index': category['record_index'], 'nodeid': category['nodeid']}
+    config = copied('config.json', config_path)
+    export_source_proof(output / 'proof', Path(receipt_path).resolve())
+    proof_path = output / 'proof/proof.json'
+    proof = json.loads(proof_path.read_bytes())
+    for item in proof['files'].values(): item['artifact'] = 'native/proof/' + item['artifact']
+    proof_descriptor = write_json(proof_path, proof); proof_descriptor['artifact'] = 'native/proof/proof.json'
+    context = read_source_native_run(native_category, proof['receipt'], config, base)
+    facts = source_facts(proof, base)
+    ids = list(document['bindings'])
+    if {identity.split('|', 1)[0] for identity in ids} != {facts['version']}:
+        raise ValueError('Source program/native version differs')
+    observed = {'source': {**write_json(output / 'facts.json', facts), 'artifact': 'native/facts.json'},
+                'category': native_category, 'config': config}
+    sources = native_source_maps(context['candidate'])
+    # Only immutable Git source bytes are used to compute historical audit
+    # identity. This temporary source view grants no execution or native credit.
+    with tempfile.TemporaryDirectory(prefix='source-audit-identity-') as temporary:
+        original_candidate, _ = _original_source_context(Path(temporary) / 'source',
+            context['candidate'], inventory, list(sources))
+    current_candidate = inventory['native_coverage']['candidate_sha256']
+    original_context = {'original_git_candidate': context['candidate'], 'original_candidate_sha256': original_candidate,
+        'current_candidate_sha256': current_candidate, 'original_sources': sources,
+        'current_sources': relevant_sources(),
+        'native_catalogs': inventory['native_coverage']['catalogs']}
+    source_context = {**write_json(output / 'source-context.json', original_context), 'artifact': 'native/source-context.json'}
+    record = {'candidate_sha256': original_candidate, 'git_candidate': context['candidate'],
+        'scope_kind': 'product', 'evidence_kind': 'native_execution', 'relevant_sources': sources,
+        'source_copy_proof': proof_descriptor, 'source_context': source_context, 'invocation': context['record']['invocation'],
+        'native_runs': [{**native_category, 'observation_sha256': sorted({item['sha256'] for item in observed.values()})}],
+        'observation_artifacts': observed, 'branch_assertions': {}}
+    for identity, binding in document['bindings'].items():
+        pointer = binding['observation_pointer']
+        branch = next(row for row in inventory['native_coverage']['obligations'] if row['id'] == identity)
+        record['branch_assertions'][identity] = {'native_shape_sha256': branch['shape_sha256'],
+            'native_route': branch['route'], 'checks': [{'pointer': pointer,
+                'equals': completion.pointer_value({'observations': {'source': facts}}, pointer)}]}
+    evidence = {**write_json(output / 'native.json', record), 'artifact': 'native/native.json', 'nodeid': native_category['nodeid']}
+    review = write_source_dependency_review(output)
+    attachment = {'contract': 'waapi-skill.source-copy-native-attachment/v1', 'branch_ids': ids,
+        'business_fact_id': facts['business_fact_id'], 'proof': proof_descriptor, 'evidence': evidence,
+        'equivalence': {}, 'native_equivalence': {}}
+    for ordinal, (identity, binding) in enumerate(document['bindings'].items()):
+        binding.update(source_copy_native_proof=proof_descriptor,
+            native_observations_sha256={key: item['sha256'] for key, item in observed.items()})
+        branch = next(row for row in inventory['native_coverage']['obligations'] if row['id'] == identity)
+        for kind, origin, digest in [('equivalence', original_candidate, evidence['sha256']),
+                                     ('native_equivalence', context['candidate'], native_category['sha256'])]:
+            proof_record = {'contract': 'waapi-skill.branch-evidence-equivalence/v1', 'from_candidate': origin,
+                'to_candidate': current_candidate, 'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'],
+                'native_route': branch['route'], 'evidence_sha256': digest,
+                'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)), 'sources': sources,
+                'reviewed_reason': 'Exact original Source/Synth selected leaves plus scoped #180 graph; raw diagnostic flags unchanged; no history credit.'}
+            if facts['version'] == '2021.1':
+                proof_record.update(source_native_candidate=context['candidate'], source_copy_review=review)
+            name = kind + '-' + str(ordinal) + '.json'
+            attachment[kind][identity] = {**write_json(output / name, proof_record), 'artifact': 'native/' + name}
+    attachment_descriptor = {**write_json(output / 'attachment.json', attachment), 'artifact': 'native/attachment.json'}
+    index = json.loads(program_index.read_bytes())
+    if index.get('source_native_attachments'): raise ValueError('Never replace an earlier Source native attachment')
+    index['source_native_attachments'] = [attachment_descriptor]
+    temporary_index = base / '.source-native-index.json'
+    write_json(temporary_index, index)
+    merged, _, _ = audit.portable_binding_inputs(temporary_index, requirements)
+    for identity, binding in merged['bindings'].items():
+        branch = next(row for row in inventory['native_coverage']['obligations'] if row['id'] == identity)
+        result = completion.evidence_result(binding['evidence']['native'], branch, current_candidate, 'native',
+            'product', base, binding, source_root=audit.ROOT)
+        if result != ('passed', None): raise ValueError('Source original native reader rejected attachment: ' + str(result))
+    temporary_index.replace(program_index)
+    return attachment_descriptor

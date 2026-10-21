@@ -151,7 +151,7 @@ def repeated_collector_runtime(tmp_path, *, fault=None):
     return runtime, writes, task
 
 
-def test_repeated_collector_gates_copy_on_actual_baseline_serialization(tmp_path, workflow):
+def test_repeated_collector_gates_copy_on_actual_baseline_serialization(tmp_path, workflow, request):
     from tests.destructive.support.source_copy_fixture import PROFILE
     runtime, writes, task = repeated_collector_runtime(tmp_path)
     category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='REPEATED_SOURCE', saved_copy=True,
@@ -189,6 +189,8 @@ def test_repeated_collector_gates_copy_on_actual_baseline_serialization(tmp_path
     assert receipt['budget']['archive_bytes'] == sum(path.stat().st_size for path in artifact_files)
     print('R57 actual repeated collector budget:', json.dumps(receipt['budget']))
     (tmp_path / 'repeated-budget.json').write_text(json.dumps(receipt['budget'], indent=2))
+    from tests.support.source_copy_branch_evidence import register_source_capture
+    register_source_capture(request.node, Path(category['observation_path']))
 
 
 @pytest.mark.parametrize('fault', ['missing-serialization', 'lost-graph'])
