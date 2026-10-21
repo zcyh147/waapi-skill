@@ -5,6 +5,31 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R62 targeted PlaylistSlot metadata observation
+
+Candidate `7572b2d7` ran one read-only observation on macOS Console
+**2025.1.7.9143: 1 passed in 4.73s**. Two public Gateway calls listed the
+`PlaylistSlot` class fields and read the selected `PlaylistObject` detail.
+Native metadata confirms class 5636096, `mustChildOf`, `notNull`, and reference
+type labels `Container`, `Switch Container`, `Blend Container`, and `Sound`.
+This establishes the exact metadata shape, not hierarchy semantics, mutation
+effects or complete playlist support.
+
+The existing sandbox lifecycle recorded no transactions, unchanged source file
+hashes/mtime/tree metadata, clean process shutdown and sandbox deletion. The
+final category record is line 289 of the local
+`.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl`.
+The observation and original pytest log are under
+`.waapi-skill-state/full-coverage/r62-playlist-metadata-7572b2d7-2025-r1/`.
+
+Two focused public-Gateway fake-client controls passed in **0.38s**, including
+rejection of a missing native flag. An earlier test collection skipped because
+it imported the live-only module; the observer was separated from that fixture
+before the passing run. No full Program/Non-live or Fresh gate ran. The 2023/2024
+list-level variant and 2025 existing/new-slot implementation remain work under
+#177/#178/#180. Historical branch inventories are not refreshed by this scoped
+collection.
+
 ## 2026-10-21 R60 focused schema-seal follow-up
 
 GitHub pure-code preflight on `99d8f115` reported **825 passed / 1 failed in
