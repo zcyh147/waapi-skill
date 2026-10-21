@@ -625,7 +625,8 @@ def write_source_program_bundle(output, receipt_path, *, inventory, nodeid, phas
                        {'pointer': '/gateway/payload/agent_result', 'equals': facts['gateway']['payload']['agent_result']}]}
         binding = {'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
             'public_route': public['id'], 'public_route_sha256': audit.digest(public),
-            'input': {'gateway_argv': facts['gateway']['argv']},
+            'input': {'gateway_argv': facts['gateway']['argv'],
+                      'selector': 'exact_owned_source_to_empty_destination_saved_children_copy'},
             **{key: {'source': source, 'selector': branch['pointer']} for key, source in SYMBOLS.items()},
             'observation_pointer': pointer, 'native_hosts': ['wwise-console'], 'evidence': {}}
         if capture_context is not None:

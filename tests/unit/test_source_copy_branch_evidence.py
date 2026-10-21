@@ -60,6 +60,37 @@ def test_2022_public_source_chain_is_portable_exact_branch_evidence(source_case)
     assert raw_receipt['diagnostic_only'] is True and raw_receipt['business_effect_verified'] is False
 
 
+
+def test_source_program_binding_completes_exact_leaves_and_missing_selector_loses_implementation(source_case):
+    index, inventory = source_case
+    document, base, _ = audit.portable_binding_inputs(index,
+        json.loads((index.parent / 'requirements.json').read_bytes()))
+    selected = set(document['bindings'])
+    route = next(row['route'] for row in inventory['native_coverage']['obligations'] if row['id'] in selected)
+    scope = {'contract': 'waapi-skill.controlled-branch-scope/v1',
+        'id': 'source-copy-public-binding-program-only', 'credit': 'controlled_program_only',
+        'requirements': ['program'], 'native_catalogs': inventory['native_coverage']['catalogs'],
+        'route_ids': [route], 'obligation_ids': [row['id'] for row in inventory['native_coverage']['obligations']
+                                               if row['route'] == route]}
+    def evaluate(bindings):
+        result = completion.evaluate_coverage(audit.ROOT, inventory, bindings,
+            digest=audit.digest, scope=scope, evidence_base=base)
+        return {row['id']: row for row in result['obligations'] if row['id'] in selected}
+    completed = evaluate(document)
+    assert len(completed) == 4
+    assert {row['state'] for row in completed.values()} == {'verified'}
+    assert all(row['requirements'] == ['program']
+        and row['evidence_results'] == {'program': {'outcome': 'passed', 'reason': None}}
+        for row in completed.values())
+    damaged = deepcopy(document)
+    missing = next(iter(damaged['bindings']))
+    del damaged['bindings'][missing]['input']['selector']
+    rejected = evaluate(damaged)
+    assert rejected[missing]['state'] == 'missing_implementation'
+    assert rejected[missing]['evidence_results'] == {}
+    assert rejected[missing]['reasons'] == ['exact public input/construction/validation/verifier binding missing or stale']
+    assert all(row['state'] == 'verified' for identity, row in rejected.items() if identity != missing)
+
 def test_source_attachment_rejects_wrong_branch_before_import(source_case, tmp_path):
     from tests.support.source_copy_branch_evidence import write_json
     original, _ = source_case
