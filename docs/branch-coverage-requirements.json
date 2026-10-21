@@ -44,10 +44,9 @@
     "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
       "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
       "categories": [
-        "program",
-        "live_metadata"
+        "program"
       ],
-      "reason": "Exact 2021.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+      "reason": "Exact 2021.1 Console schema-permitted absent-default decoder branch. Under SPEC section 5's conditional native-evidence rule, independent pinned reflection and exact public program proof establish omission preservation, availability.default unknown and distinction from null. Actual native occurrence remains unobserved; no default-value semantics, applicability, prerequisite or effect is claimed. All other metadata semantic requirements retain live_metadata; no separate Fresh interaction is required."
     },
     "2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
       "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
@@ -148,10 +147,9 @@
     "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
       "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
       "categories": [
-        "program",
-        "live_metadata"
+        "program"
       ],
-      "reason": "Exact 2022.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+      "reason": "Exact 2022.1 Console schema-permitted absent-default decoder branch. Under SPEC section 5's conditional native-evidence rule, independent pinned reflection and exact public program proof establish omission preservation, availability.default unknown and distinction from null. Actual native occurrence remains unobserved; no default-value semantics, applicability, prerequisite or effect is claimed. All other metadata semantic requirements retain live_metadata; no separate Fresh interaction is required."
     },
     "2022.1|wwise-console|2022.1.19.8584|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
       "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
@@ -252,10 +250,9 @@
     "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
       "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
       "categories": [
-        "program",
-        "live_metadata"
+        "program"
       ],
-      "reason": "Exact 2023.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+      "reason": "Exact 2023.1 Console schema-permitted absent-default decoder branch. Under SPEC section 5's conditional native-evidence rule, independent pinned reflection and exact public program proof establish omission preservation, availability.default unknown and distinction from null. Actual native occurrence remains unobserved; no default-value semantics, applicability, prerequisite or effect is claimed. All other metadata semantic requirements retain live_metadata; no separate Fresh interaction is required."
     },
     "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
       "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
@@ -356,10 +353,9 @@
     "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
       "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
       "categories": [
-        "program",
-        "live_metadata"
+        "program"
       ],
-      "reason": "Exact 2024.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+      "reason": "Exact 2024.1 Console schema-permitted absent-default decoder branch. Under SPEC section 5's conditional native-evidence rule, independent pinned reflection and exact public program proof establish omission preservation, availability.default unknown and distinction from null. Actual native occurrence remains unobserved; no default-value semantics, applicability, prerequisite or effect is claimed. All other metadata semantic requirements retain live_metadata; no separate Fresh interaction is required."
     },
     "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
       "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
@@ -460,10 +456,9 @@
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/absent": {
       "native_shape_sha256": "15dbb2c4361b809a46b847b3b6c071f3c27c096057d31c45351902b79fe39efd",
       "categories": [
-        "program",
-        "live_metadata"
+        "program"
       ],
-      "reason": "Exact 2025.1 Console getPropertyInfo absence of a default in an actual selected metadata object; omission is distinct from null. Program proves closed metadata list/detail routing and lossless projection; a scoped live object/class/plugin metadata receipt must prove the real native fact on the pinned host/build. No mutation effect or separate Fresh interaction is required."
+      "reason": "Exact 2025.1 Console schema-permitted absent-default decoder branch. Under SPEC section 5's conditional native-evidence rule, independent pinned reflection and exact public program proof establish omission preservation, availability.default unknown and distinction from null. Actual native occurrence remains unobserved; no default-value semantics, applicability, prerequisite or effect is claimed. All other metadata semantic requirements retain live_metadata; no separate Fresh interaction is required."
     },
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.getPropertyInfo|/resultSchema/properties/default/@presence/present": {
       "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
