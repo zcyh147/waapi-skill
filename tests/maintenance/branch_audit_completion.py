@@ -545,7 +545,7 @@ def validate_r51_metadata_replay(record, branch, candidate, binding, context, ba
     # remain mandatory, including explicit absent-before dependencies. Changed
     # producer hashes are separate from original native ownership; no future
     # runtime, resource or partially combined source is admitted.
-    reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': 'b03d88cdca2184f690aa667177762e0a0cf5bc47e0d21eda98dcfe2baceb3141',
+    reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': '99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a',
                                             'before': None},
  'skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json': {'after': 'f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454',
                                                                                         'before': None},
@@ -702,7 +702,7 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
     changes=producer.source_changes(before,after)
     # Root-reviewed R59 current runtime; independent original R54/R55 before
     # values remain exact. These pairs do not grant current-native credit.
-    reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': 'b03d88cdca2184f690aa667177762e0a0cf5bc47e0d21eda98dcfe2baceb3141',
+    reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': '99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a',
                                             'before': '282bbc63583b56e7b13e65790b817795d9d8cfacaae54350dda549b8491b6c65'},
  'skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json': {'after': 'f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454',
                                                                                         'before': None},
@@ -757,7 +757,7 @@ def validate_r54_metadata_replay(record,branch,candidate,binding,context,base,ro
     if cohort=='r55':
         # Original860 owns the earlier runtime. Exact Source411 and Triangle
         # pairs advance it; native860 remains historical, never current-native.
-        reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': 'b03d88cdca2184f690aa667177762e0a0cf5bc47e0d21eda98dcfe2baceb3141',
+        reviewed_runtime = {'docs/branch-coverage-requirements.json': {'after': '99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a',
                                             'before': '282bbc63583b56e7b13e65790b817795d9d8cfacaae54350dda549b8491b6c65'},
  'skills/waapi-skill/resources/metadata/2022.1/owned-control-input-construction.json': {'after': 'f6ef893344a4b11099962f57178d3484d61df8d01d0b6a07b898d890c8c76454',
                                                                                         'before': None},
