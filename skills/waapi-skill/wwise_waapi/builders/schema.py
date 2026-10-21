@@ -342,14 +342,16 @@ def validate_resolved_semantic_event(
     do not prove event delivery conforms to the native publish contract.
     """
     from wwise_waapi.schema_inventory import (
-        SchemaInventoryError, load_definition_graph, resolve_schema_reference, topic_publish_schema,
+        SchemaInventoryError, load_definition_graph, resolve_schema_reference,
     )
+    from wwise_waapi.topic_compatibility import public_topic_publish_schema
 
     graph = load_definition_graph(version)
     schema = SemanticSchemaValidator(
         version=version, authoring_ui_profile=authoring_ui_profile,
     ).schema_for(uri)
-    publish = topic_publish_schema(version, uri, schema)
+    publish, compatibility = public_topic_publish_schema(version, uri, schema,
+        host='wwise-authoring' if authoring_ui_profile else 'wwise-console')
 
     class EventWalker(_SchemaWalker):
         context: Mapping[str, Any] = publish
@@ -378,6 +380,7 @@ def validate_resolved_semantic_event(
     return SchemaValidationResult(
         uri=uri, version=version, section="event", validated_nodes=walker.nodes,
         required_fields=_required_fields(publish), required_families=_required_families(publish),
+        compatibility_rules=(compatibility,) if compatibility is not None else (),
     )
 
 

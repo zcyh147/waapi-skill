@@ -24,9 +24,10 @@ VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 
 
 class Client:
-    def __init__(self, version, events, *, pinned_build=None):
+    def __init__(self, version, events, *, pinned_build=None, is_command_line=True):
         self.version = version
         self.pinned_build = pinned_build
+        self.is_command_line = is_command_line
         self.calls = []
         self.subscriptions = []
         self.callbacks = []
@@ -39,7 +40,7 @@ class Client:
     def call(self, uri, args=None, options=None):
         assert uri == "ak.wwise.core.getInfo"
         parts = [int(part) for part in self.pinned_build.split(".")] if self.pinned_build else [int(self.version[:4]), 1, 0, 1]
-        result = {"displayName": "Wwise", "isCommandLine": True,
+        result = {"displayName": "Wwise", "isCommandLine": self.is_command_line,
                   "version": dict(zip(("year", "major", "minor", "build"), parts))}
         self.calls.append({"uri": uri, "args": deepcopy(args), "options": deepcopy(options), "result": deepcopy(result)})
         return result
@@ -60,11 +61,11 @@ class Client:
         self.disconnected = True
 
 
-def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03, event_count=1, pinned_build=None):
+def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03, event_count=1, pinned_build=None, is_command_line=True):
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1",
                                  "waapi_port": 31337, "project_modification_policy": "read_only"}))
-    client = Client(version, events, pinned_build=pinned_build)
+    client = Client(version, events, pinned_build=pinned_build, is_command_line=is_command_line)
     records = []
     client.argv = ["--timeout", str(timeout_seconds), mode, topic,
                    "--topic-contract-digest", topic_business_contract(version, topic).contract_digest,
@@ -402,3 +403,59 @@ def test_created_stream_sink_freezes_received_records_before_later_mutation(tmp_
     assert records == before_mutation
     assert [record['event'] for record in records[1:]] == expected_packets
     assert [callback['event'] for callback in client.callbacks] == expected_packets
+
+
+@pytest.mark.parametrize('mode', ('wait-topic', 'stream-topic'))
+@pytest.mark.parametrize('is_command_line', (True, False), ids=('console', 'authoring-structural'))
+def test_structure_notes_rows_match_the_observed_old_notes_fields(tmp_path, mode, is_command_line):
+    topic = 'ak.wwise.core.object.structureChanged'
+    # Literal shape observed by the clean 796f16ca Console diagnostic.
+    event = {'summary': 'Edit Notes', 'objects': [{'object': {'id': GUID},
+        'changes': [{'type': 'notesChange', 'notesChange': {
+            'oldNotes': 'topic-notes-before', 'newNotes': 'topic-notes-after'}}]}]}
+    other = deepcopy(event)
+    other['objects'][0]['changes'][0]['notesChange']['oldNotes'] = 'unrelated'
+    code, terminal, client, records = run(tmp_path, '2025.1', mode, topic, [other, event],
+        '--event-row', 'objects-changes', '0,0', 'notes-change-old-notes', 'topic-notes-before',
+        '--event-row', 'objects-changes', '0,0', 'notes-change-new-notes', 'topic-notes-after',
+        timeout_seconds=1.0, pinned_build='2025.1.7.9143', is_command_line=is_command_line)
+    assert code == 0, terminal
+    assert terminal['match'] == {'objects': [{'changes': [{'notesChange': {
+        'oldNotes': 'topic-notes-before', 'newNotes': 'topic-notes-after'}}]}]}
+    if mode == 'stream-topic':
+        assert [row['event'] for row in records if row['record_type'] == 'event'] == [event]
+        validation = records[1]['event_validation']
+    else:
+        assert terminal['event'] == event
+        validation = terminal['event_validation']
+    rule, = validation['compatibility_rules']
+    assert rule['fields'] == ['oldNotes', 'newNotes']
+    assert rule['host'] == ('wwise-console' if is_command_line else 'wwise-authoring')
+    assert rule['native_delivery_credit'] is False
+    assert terminal['monitoring_outcome']['target_completed'] is True
+    assert client.unsubscribed == 1 and client.disconnected
+
+
+@pytest.mark.parametrize('field,value', [('oldNotes', 1), ('newNotes', False)])
+@pytest.mark.parametrize('is_command_line', (True, False), ids=('console', 'authoring-structural'))
+def test_structure_notes_string_validation_precedes_filtering(tmp_path, field, value, is_command_line):
+    event = {'summary': 'Edit Notes', 'objects': [{'object': {'id': GUID},
+        'changes': [{'type': 'notesChange', 'notesChange': {'oldNotes': 'unrelated', 'newNotes': 'after', field: value}}]}]}
+    code, result, client, records = run(tmp_path, '2025.1', 'stream-topic',
+        'ak.wwise.core.object.structureChanged', [event],
+        '--event-row', 'objects-changes', '0,0', 'notes-change-old-notes', 'before',
+        timeout_seconds=1.0, is_command_line=is_command_line)
+    assert code != 0 and result['error_code'] == 'TOPIC_EVENT_SCHEMA_MISMATCH', result
+    assert not any(row.get('record_type') == 'event' for row in records)
+    assert result['cleanup'] == 'unsubscribed' and client.unsubscribed == 1 and client.disconnected
+
+
+@pytest.mark.parametrize('version', VERSIONS[:-1])
+def test_classic_notes_changed_predicates_remain_unchanged(tmp_path, version):
+    event = {'object': {'id': GUID}, 'oldNotes': 'before', 'newNotes': 'after'}
+    code, result, client, _ = run(tmp_path, version, 'wait-topic', 'ak.wwise.core.object.notesChanged', [event],
+        '--event-match', 'old-notes', 'before', '--event-match', 'new-notes', 'after', timeout_seconds=1.0)
+    assert code == 0 and result['event'] == event, result
+    assert result['match'] == {'oldNotes': 'before', 'newNotes': 'after'}
+    assert 'compatibility_rules' not in result['event_validation']
+    assert client.unsubscribed == 1 and client.disconnected

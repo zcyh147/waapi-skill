@@ -152,6 +152,45 @@ additional native run or native branch acceptance follows from the injected
 controls, and no Authoring-host equivalence is claimed. The failed native packet
 above is a separate observation, not acceptance of this successor producer.
 
+The later clean Console diagnostic at `796f16ca` received the same fixed
+`oldNotes/newNotes` string shape, completed unsubscribe and independent Notes
+readback, verified owned-object absence, and finalized with unchanged source
+hash/mtime/tree, clean process shutdown and sandbox deletion. Its receipt
+SHA-256 is `1fcf0cda348987c74bc2faf76c775f89c41c28256cf013caf4ee6ee3980f4b5e`;
+the final category stream SHA-256 is
+`cb2c35a8a88157a6a313e7704a378a7ef6dc3dd68210547f635e3ddc93b82be4`.
+That observation was unfiltered and grants no filtered-predicate or Authoring
+acceptance.
+
+### Closed Notes predicate compatibility (#187, parent #174)
+
+`topic_compatibility.py` provides an explicit public-only view consumed by Topic
+match construction and resolved delivered-event validation. Canonical native
+inventory walkers and shared definition resolution keep their existing view.
+For the exact 2025.1 `structureChanged` schema, both independently sealed host
+catalogs and the original schema digest are checked before adding only the fixed
+string members `oldNotes/newNotes`. The existing `oldName/newName` members and
+literal string-false annotations remain intact. Raw catalogs, native digests and
+original native branch IDs are not changed. A changed source requires review.
+
+The public `objects-changes` row now discloses
+`notes-change-old-notes` and `notes-change-new-notes`; the changed contract digest
+rejects old continuations. The two separate semantic mappings and their exact
+source/observation provenance are retained in
+`resources/semantic/2025.1/structure-changed-notes-compatibility.json`, with
+program/native requirements still explicit. The mapping grants no generated
+branch acceptance. Authoring construction uses its own matching reflection;
+Authoring publication, filtering and cleanup still require separate native proof.
+
+The distinct opt-in node `test_structure_changed_notes_filtered_diagnostic`
+uses both disclosed fields and their current digest through the existing
+closed row interface and producer/sandbox lifecycle. It retains a separate
+`structure-changed-notes-filtered-diagnostic.json` receipt. The default
+unfiltered diagnostic remains unchanged. Neither filtered native delivery nor
+Fresh execution was run for this implementation. Classic `object.notesChanged`
+remains a five-version monitoring alternative; it does not replace the 2025
+undo-batched `structureChanged` semantics.
+
 ## Exact 2021 recursive SoundBank question
 
 Both captured `2021.1.14.8108` host routes for

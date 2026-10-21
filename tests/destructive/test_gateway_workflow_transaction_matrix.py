@@ -10949,19 +10949,20 @@ def test_modern_source_copy_generated_save_children_console_oracle(workflow_sand
     assert category['status'] == 'PASS', category
 
 
-def _collect_structure_changed_notes_diagnostic(runtime, *, name: str) -> dict[str, Any]:
+def _collect_structure_changed_notes_diagnostic(runtime, *, name: str, filtered: bool = False) -> dict[str, Any]:
     """One owned Notes trigger; a schema rejection stays failed diagnostic evidence."""
     from wwise_waapi.native_catalog import load_native_catalog
     from wwise_waapi.canonical import canonical_sha256
 
     assert runtime.version == '2025.1', 'Notes diagnostic is pinned to 2025.1.7.9143'
     topic = 'ak.wwise.core.object.structureChanged'
-    output = runtime.state_dir / 'structure-changed-notes-diagnostic.json'
+    label = 'structure-changed-notes-filtered-diagnostic' if filtered else 'structure-changed-notes-diagnostic'
+    output = runtime.state_dir / (label + '.json')
     assert not output.exists(), 'Never overwrite a Notes diagnostic attempt'
     runtime.state_dir.mkdir(parents=True, exist_ok=True)
     config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
     endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
-    category = {'category': 'structure-changed-notes-diagnostic', 'status': 'FAIL',
+    category = {'category': label, 'status': 'FAIL',
         'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none',
         'verifier_strength': 'exact_packet_or_complete_bounded_diagnostic_only',
         'observation_path': str(output), 'reason': 'collection incomplete'}
@@ -11040,6 +11041,19 @@ def _collect_structure_changed_notes_diagnostic(runtime, *, name: str) -> dict[s
         gateway.gateway(['operation-schema', 'object.setNotes'], live=False)
         schema = gateway.gateway(['topic-schema', topic], live=False)
         digest = schema['continuation']['contract_binding']['value']
+        match_facts = []
+        if filtered:
+            for field, value in (('notes-change-old-notes', 'topic-notes-before'),
+                    ('notes-change-new-notes', 'topic-notes-after')):
+                disclosure = gateway.gateway(['topic-schema', topic, '--row', 'objects-changes',
+                    '--row-field-group', field], live=False)
+                assert disclosure['continuation']['contract_binding']['value'] == digest, 'Notes contract drift'
+                row = disclosure['business_input']['event_rows']['selected']
+                assert row['collection'] == 'objects-changes' and row['index_depth'] == 2, row
+                fields = row['fields']
+                assert fields['columns'] == ['field', 'value_mode', 'value_choice_handles'], fields
+                assert fields['rows'] == [[field, 'gateway_derived', []]], fields
+                match_facts += ['--event-row', row['collection'], '0,0', fields['rows'][0][0], value]
         draft = _start_business_draft(gateway, 'object.create')
         parent = _bind_business_object(gateway, draft, path_segments=CONTAINERS_PARENT_SEGMENTS)
         _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'notes-target',
@@ -11076,7 +11090,8 @@ def _collect_structure_changed_notes_diagnostic(runtime, *, name: str) -> dict[s
                 assert verified['state'] == 'verified' and verified['verification']['business_state_verified'] is True, verified
 
         argv = ['--timeout', '10', 'stream-topic', topic, '--topic-contract-digest', digest, '--event-count', '1',
-            *[arg for field in ('id', 'name', 'type', 'path', 'notes') for arg in ('--topic-option', 'include', field)]]
+            *[arg for field in ('id', 'name', 'type', 'path', 'notes') for arg in ('--topic-option', 'include', field)],
+            *match_facts]
         # The existing public stream emits started only after open_stream has subscribed.
         code, terminal = gateway.raw_gateway(argv, stream_sink=observe)
         receipt['stream'] = {'exit_code': code, 'payload': terminal}
@@ -11140,3 +11155,12 @@ def test_structure_changed_notes_shape_diagnostic(workflow_sandbox_runtime: _Wor
     if workflow_sandbox_runtime.version != '2025.1':
         pytest.skip('Notes shape diagnostic is pinned to Console 2025.1.7.9143')
     _collect_structure_changed_notes_diagnostic(workflow_sandbox_runtime, name='WAAPI_NOTES_' + uuid.uuid4().hex[:12])
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_structure_changed_notes_filtered_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Filtered Notes diagnostic is pinned to Console 2025.1.7.9143')
+    _collect_structure_changed_notes_diagnostic(workflow_sandbox_runtime,
+        name='WAAPI_NOTES_FILTERED_' + uuid.uuid4().hex[:12], filtered=True)
