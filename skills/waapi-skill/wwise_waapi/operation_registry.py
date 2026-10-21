@@ -7327,7 +7327,8 @@ def _require_owned_control_input_reference(reference, input_type):
     _require_object_reference_metadata(reference)
     from .metadata_restrictions import reference_allowed_types
     allowed = reference_allowed_types(reference.restriction)
-    if allowed and input_type not in allowed:
+    input_token = reference_type_token(input_type)
+    if allowed and input_token not in {reference_type_token(value) for value in allowed}:
         raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live ControlInput metadata does not permit the requested type.")
     for row in reference.restriction.get("restrictions", []):
         if row == "notNull":
@@ -7337,7 +7338,7 @@ def _require_owned_control_input_reference(reference, input_type):
         shared = row.get("sharedOnlyTypes", [])
         if not isinstance(shared, list) or any(not isinstance(value, str) for value in shared):
             raise OperationContractError("INVALID_METADATA", "sharedOnlyTypes must be a string array.")
-        if input_type in shared:
+        if input_token in {reference_type_token(value) for value in shared}:
             raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "This live target type requires a shared reference.")
 
 

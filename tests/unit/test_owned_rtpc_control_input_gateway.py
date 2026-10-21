@@ -76,7 +76,8 @@ class OwnedControlTask(OwnedGraphTask):
                 **{'@' + name: value for name, value in self.input_properties.items()}}
             self.objects[CONTROL] = {'id': CONTROL, 'name': 'TimeMod', 'type': self.input_type,
                 'classId': self.input_classes[self.input_type], 'owner': {'id': RTPC}, 'path': r'\opaque-control',
-                'notes': 'New time control', **{'@' + name: value for name, value in self.input_properties.items()}}
+                'notes': 'New time control', **({'@TimeModLoops': 1} if self.input_type == 'ModulatorTime' else {}),
+                **{'@' + name: value for name, value in self.input_properties.items()}}
             self.objects[CURVE] = {'id': CURVE, 'name': '', 'type': 'Curve', 'classId': 917520,
                 'owner': {'id': RTPC}, 'path': r'\opaque-curve', 'notes': ''}
             self.objects[RTPC] = {'id': RTPC, 'name': '', 'type': 'RTPC', 'classId': 1441808,
@@ -148,6 +149,34 @@ def test_public_time_input_creates_owned_reference_and_verifies_once(tmp_path):
     assert len(task.writes) == 1
     code, repeated = task.run('execute', tx)
     assert code == 2 and len(task.writes) == 1, repeated
+
+
+def test_native_2022_reference_labels_allow_the_declared_custom_time_class(tmp_path):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/owned-control-input-2022-native-reference.json').read_text())
+    task = OwnedControlTask(tmp_path)
+    task.metadata['ControlInput'] = deepcopy(fixture['result'])
+    task.metadata.update({name: deepcopy(capture['result']) for name, capture in fixture['selected_input_fields'].items()})
+    declare_time(task)
+    tx, shown = task.preview()
+    assert task.writes == []
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(task.writes) == 1
+
+
+@pytest.mark.parametrize('restriction', ['excluded', 'shared-only'])
+def test_native_2022_reference_labels_preserve_owned_target_constraints(tmp_path, restriction):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/metadata/owned-control-input-2022-native-reference.json').read_text())
+    task = OwnedControlTask(tmp_path)
+    task.metadata['ControlInput'] = deepcopy(fixture['result'])
+    row, = task.metadata['ControlInput']['restriction']['restrictions']
+    if restriction == 'excluded': row['type'].remove('Modulator Time')
+    else: row['sharedOnlyTypes'].append('Modulator Time')
+    declare_time(task)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected.get('error_code') == 'INVALID_CONTROL_INPUT_TYPE', rejected
+    expected = 'does not permit' if restriction == 'excluded' else 'requires a shared reference'
+    assert expected in rejected['message'] and task.writes == [], rejected
 
 
 @pytest.mark.parametrize('fault', ['wrong-input-owner', 'wrong-input-class', 'wrong-rtpc-class', 'wrong-input-value'])
