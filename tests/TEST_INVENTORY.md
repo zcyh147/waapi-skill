@@ -5,6 +5,20 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R57/R58 scoped native Source copy and Save
+
+The [Source fact ledger](../docs/plans/full-waapi-coverage/SOURCE_COPY.md) pins
+original receipt hashes and separates raw diagnostic flags from Root's exact
+effect assessment. The 2021.1 repeated two-property Synth graph on `6d4a3547`
+passed one native node in 16.06s. Frozen `411e8173` then passed the modern existing
+Synth/RTPC/ModulatorLfo/Curve node sequentially on Console 2022.1.19.8584,
+2023.1.19.8928, 2024.1.13.9056 and 2025.1.7.9143 in 15.91/17.50/16.00/16.32s.
+Each run had four separately authorized transactions, independent saved-file
+and live-state oracles, unchanged sources and terminal cleanup. These are
+component native results, not current-integration test runs. The Source fact
+adapter remains required #180 implementation; no generated branch count,
+constructor, other-class, Windows or Fresh acceptance is inferred.
+
 ## 2026-10-21 R55/R56 saved-copy, Tone and portable metadata integration
 
 Accepted runtime/harness sources are Source saved-copy `ee78f00b` with explicit

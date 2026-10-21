@@ -162,7 +162,8 @@ def test_r55_original_and_current_replay_keep_distinct_sources_inputs_and_ten_le
 
 @pytest.mark.parametrize('cohort',('r54','r55'))
 @pytest.mark.parametrize('damage',('future-tone','future-contract','future-aux','future-helper',
-    'unknown-aux','omitted-aux','false-helper-before'))
+    'unknown-aux','omitted-aux','false-helper-before','future-gateway','future-composer',
+    'future-drafts','future-proof','future-fixture','omitted-fixture','false-fixture-before','partial-source-runtime'))
 def test_class_bridge_requires_exact_accepted_runtime_and_auxiliary_blobs(inventory,tmp_path,monkeypatch,cohort,damage):
     case='2022.1|Wwise Delay|DelayTime' if cohort=='r54' else '2021.1|MusicStinger|CustomCueMatchName'
     capture,program,record,descriptor,branch,binding=r54_control(tmp_path,inventory,case,cohort=cohort)
@@ -171,23 +172,38 @@ def test_class_bridge_requires_exact_accepted_runtime_and_auxiliary_blobs(invent
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result()==('passed',None)
     bridge=record['source_bridge'];helper='tests/semantic/support/codex_source_copy_protocol.py'
+    fixture='tests/destructive/support/source_copy_fixture.py'
     assert bridge['attribution']=='historical_native_current_program_not_current_native'
     assert len(bridge['historical_sources'])==(560 if cohort=='r54' else 561)
-    assert len(bridge['current_sources'])==562
+    assert len(bridge['current_sources'])==563
     assert helper not in bridge['historical_sources']
     assert bridge['changed_files'][helper]=={'before':None,
-        'after':'f1aa72085e2985f8b93a1c399c17282743d716977529d9b7a00e4c5d860dffbe'}
+        'after':'b469b24ae64be096d314eb66da81b28833e0e45283d0cc66184199af2a089fdf'}
+    assert fixture not in bridge['historical_sources']
+    assert bridge['changed_files'][fixture]=={'before':None,
+        'after':'f9c8ba22f8b69e01bd9e5cf2424699efad4bafce71b1d10a712caf2b3d80177d'}
     assert all(name not in bridge['current_sources'] for name in ('ci/program-test-nodes.txt',
         'tests/unit/test_ci_test_bat.py','tests/unit/test_class_metadata_product_attachments.py'))
     if damage=='omitted-aux':bridge['changed_files'].pop(helper)
     elif damage=='false-helper-before':bridge['changed_files'][helper]['before']='0'*64
+    elif damage=='omitted-fixture':bridge['changed_files'].pop(fixture)
+    elif damage=='false-fixture-before':bridge['changed_files'][fixture]['before']='0'*64
     else:
         relative={'future-tone':'skills/waapi-skill/wwise_waapi/operation_tone.py',
             'future-contract':'skills/waapi-skill/wwise_waapi/host_ui_debug_business_contracts.py',
             'future-aux':'tests/semantic/support/codex_gateway_broker.py',
-            'future-helper':helper,'unknown-aux':'tests/semantic/support/codex_archive_paths.py'}[damage]
+            'future-helper':helper,'unknown-aux':'tests/semantic/support/codex_archive_paths.py',
+            'future-gateway':'skills/waapi-skill/scripts/gateway.py',
+            'future-composer':'skills/waapi-skill/wwise_waapi/operation_composer.py',
+            'future-drafts':'skills/waapi-skill/wwise_waapi/operation_drafts.py',
+            'future-proof':'skills/waapi-skill/wwise_waapi/source_copy_proof.py',
+            'future-fixture':fixture,'partial-source-runtime':'skills/waapi-skill/scripts/gateway.py'}[damage]
         path=audit.ROOT/relative;read_bytes=Path.read_bytes
-        monkeypatch.setattr(Path,'read_bytes',lambda p:read_bytes(p)+b'\n# unreviewed future source\n' if p==path else read_bytes(p))
+        if damage=='partial-source-runtime':
+            import subprocess
+            changed=subprocess.check_output(['git','show',producer.class_original_profile(cohort)['candidate']+':'+relative],cwd=audit.ROOT)
+        else:changed=read_bytes(path)+b'\n# unreviewed future source\n'
+        monkeypatch.setattr(Path,'read_bytes',lambda p:changed if p==path else read_bytes(p))
         current=producer.r54_current_sources();bridge['current_sources']=current
         bridge['changed_files']=producer.source_changes(bridge['historical_sources'],current)
         program['relevant_sources']=current
@@ -268,7 +284,7 @@ def test_r54_historical_replay_controls_start_from_valid_original_and_current_fl
     elif damage=='product-git':
         # This committed source contains the newly added module too: rejection
         # must prove different source bytes, not merely a missing historical file.
-        wrong='ee78f00baf06f1840228313ae1bb6b263fd95301'
+        wrong='411e8173949020bad26e4302f1e9428a21bcac7d'
         assert producer.git_source_seals(wrong,program['relevant_sources'])!=program['relevant_sources']
         record['scope_kind']=program['scope_kind']='product';program['git_candidate']=wrong
     elif damage=='teardown':
@@ -677,17 +693,13 @@ def test_metadata_bridge_accepts_only_exact_reviewed_tone_blobs(original_root,in
         return completion.evidence_result(descriptor,branch,'c'*64,'live_metadata','controlled',tmp_path,binding,
             source_root=audit.ROOT,reference_edges=capture['edges'])
     assert result() == ('passed',None)
-    source_pin = 'ee78f00baf06f1840228313ae1bb6b263fd95301'
-    tone_pin = '4521245a87c754baed9595db71df9e5510548c0f'
-    gateway_pin = '4a6208a15d19f847b3bac848a075229eb3547585'
+    source_pin = '411e8173949020bad26e4302f1e9428a21bcac7d'
     packets = {}
     for name in ('operation_tone.py','host_ui_debug_business_contracts.py','host_ui_debug_business.py','gateway.py',
                  'object_lifecycle_graph.py','operation_registry.py','source_copy_observations.py','core_business.py','core_business_contracts.py',
                  'operation_composer.py','operation_drafts.py','transaction_runtime.py','source_copy_proof.py'):
         relative = ('skills/waapi-skill/scripts/' if name == 'gateway.py' else 'skills/waapi-skill/wwise_waapi/')+name
-        accepted = (gateway_pin if name=='gateway.py' else
-            tone_pin if name in ('operation_tone.py','host_ui_debug_business_contracts.py') else source_pin)
-        raw = subprocess.check_output(['git','show',accepted+':'+relative],cwd=audit.ROOT)
+        raw = subprocess.check_output(['git','show',source_pin+':'+relative],cwd=audit.ROOT)
         packets[audit.ROOT/relative] = raw
     read_bytes = Path.read_bytes
     monkeypatch.setattr(Path,'read_bytes',lambda path:packets[path] if path in packets else read_bytes(path))

@@ -1,5 +1,14 @@
 # Branch completion ledger
 
+## R57/R58 exact Source copy observations
+
+Accepted `411e8173` adds version-matched saved-copy continuation support and the
+modern collector. [The Source fact ledger](SOURCE_COPY.md) records separate
+2021 repeated-fixture and 2022–2025 existing-Synth copy/Save observations, original
+candidate/receipt hashes, raw diagnostic flags and Root's scoped effect assessment.
+The Source collector-to-exact-branch adapter remains required #180 implementation;
+these observations add no generated native credit and close no functional ticket.
+
 ## Latest integration: R55/R56
 
 Artifact candidate `3f8f3146` incorporates the accepted saved-copy continuation,
