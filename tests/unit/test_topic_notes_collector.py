@@ -186,3 +186,17 @@ def test_packaged_notes_producer_preserves_unicode_under_inherited_non_utf8_envi
         runtime, ['execute', 'tx1-aaaaaaaaaaaaaaaaaaaa'])
     assert code == 0 and result == {'ok': True, 'result': {'name': 'Café'}}
     assert runtime.env == before and config.read_bytes() == b'{"private":true}'
+
+
+def test_filtered_notes_collector_uses_both_disclosed_fixed_fields(tmp_path, workflow, monkeypatch):
+    runtime, task, packet, callbacks, writes, trace, active = notes_runtime(tmp_path, workflow, monkeypatch)
+    category = workflow._collect_structure_changed_notes_diagnostic(runtime, name='WAAPI_NOTES_TEST', filtered=True)
+    receipt = json.loads((runtime.state_dir / 'structure-changed-notes-filtered-diagnostic.json').read_text())
+    assert category['category'] == 'structure-changed-notes-filtered-diagnostic'
+    assert receipt['event'] == packet == callbacks[0] and receipt['collection_complete'] is True
+    assert receipt['stream']['payload']['match'] == {'objects': [{'changes': [{'notesChange': {
+        'oldNotes': 'topic-notes-before', 'newNotes': 'topic-notes-after'}}]}]}
+    disclosures = [row['argv'] for row in receipt['calls'] if '--row-field-group' in row['argv']]
+    assert [argv[-1] for argv in disclosures] == ['notes-change-old-notes', 'notes-change-new-notes']
+    assert not (runtime.state_dir / 'structure-changed-notes-diagnostic.json').exists()
+    assert receipt['native_delivery_pass'] is False and not active

@@ -9,7 +9,8 @@ from typing import Any, Mapping, Sequence
 
 from .capabilities import CapabilityCatalog, CapabilityNotFoundError
 from .canonical import canonical_sha256
-from .schema_inventory import DefinitionGraph, load_definition_graph, topic_publish_schema
+from .schema_inventory import DefinitionGraph, load_definition_graph
+from .topic_compatibility import public_topic_publish_schema
 from .typed_requests import (
     MaterializedTypedRequest,
     TypedRequestContract,
@@ -86,11 +87,12 @@ def topic_match_contract(version: str, topic: str) -> TypedRequestContract:
     publish = schema.get("publishSchema")
     if not isinstance(publish, Mapping):
         raise TypedTopicError(f"Topic {topic!r} has no reflected publish schema")
+    public_publish, _compatibility = public_topic_publish_schema(version, topic, schema)
     return compile_typed_request_contract(
         version=version,
         uri=f"{TOPIC_MATCH_OPERATION_PREFIX}{topic}",
         schema={
-            "argsSchema": _optional_match_schema(topic_publish_schema(version, topic, schema)),
+            "argsSchema": _optional_match_schema(public_publish),
             "optionsSchema": _empty_object_schema(),
         },
         graph=_optional_match_definition_graph(version),

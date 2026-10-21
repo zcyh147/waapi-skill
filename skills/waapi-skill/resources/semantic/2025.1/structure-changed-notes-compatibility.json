@@ -1,0 +1,71 @@
+{
+  "contract": "waapi-skill.topic-semantic-mapping/v1",
+  "rule_id": "structure-changed-notes-strings/v1",
+  "parent_issue": 174,
+  "owner_issue": 187,
+  "version": "2025.1",
+  "uri": "ak.wwise.core.object.structureChanged",
+  "build": "2025.1.7.9143",
+  "scope": "Public Topic matching and resolved delivered-event validation only; native catalogs, original branch IDs and canonical inventory remain unchanged.",
+  "schema_sha256": "cc6b46578244813850fb27e64d658756676f8cd5e4340ab501052e20cf08c5d4",
+  "host_sources": {
+    "wwise-console": {
+      "path": "resources/native-catalog/2025.1/wwise-console.json",
+      "sha256": "d0135cdd7e53ead98c50b6dc7f6be161d212a7d1feb9b2e52daf38e63acb6e1d",
+      "evidence_kind": "independently_sealed_reflection"
+    },
+    "wwise-authoring": {
+      "path": "resources/native-catalog/2025.1/wwise-authoring.json",
+      "sha256": "b7602cd4e66c008fb80b321ef1841a0d61386f1d31fe9710ff268198b94fe906",
+      "evidence_kind": "independently_sealed_reflection"
+    }
+  },
+  "semantic_fields": [
+    {
+      "id": "2025.1|structureChanged|notes-change-old-notes",
+      "public_collection": "objects-changes",
+      "index_depth": 2,
+      "public_field": "notes-change-old-notes",
+      "event_pointer": "/objects/0/changes/0/notesChange/oldNotes",
+      "type": "string",
+      "native_required_pointer": "/publishSchema/properties/objects/items/properties/changes/items/properties/notesChange/required/0",
+      "described_semantics_pointer": "/publishSchema/properties/objects/items/properties/changes/items/properties/notesChange/properties/oldName",
+      "requirements": ["program", "native"],
+      "native_obligations": ["wwise-console filtered delivery/count/cleanup", "wwise-authoring delivery/filter/count/cleanup"],
+      "completion": "required_evidence_pending"
+    },
+    {
+      "id": "2025.1|structureChanged|notes-change-new-notes",
+      "public_collection": "objects-changes",
+      "index_depth": 2,
+      "public_field": "notes-change-new-notes",
+      "event_pointer": "/objects/0/changes/0/notesChange/newNotes",
+      "type": "string",
+      "native_required_pointer": "/publishSchema/properties/objects/items/properties/changes/items/properties/notesChange/required/1",
+      "described_semantics_pointer": "/publishSchema/properties/objects/items/properties/changes/items/properties/notesChange/properties/newName",
+      "requirements": ["program", "native"],
+      "native_obligations": ["wwise-console filtered delivery/count/cleanup", "wwise-authoring delivery/filter/count/cleanup"],
+      "completion": "required_evidence_pending"
+    }
+  ],
+  "console_observation": {
+    "candidate": "796f16ca0794d45e4deed6f9ec92039f32f69b20",
+    "attempt": "r59-topic-notes-796f16ca-2025-r1",
+    "receipt": "pytest/gateway-workflows-2025-10/state/structure-changed-notes-diagnostic.json",
+    "receipt_sha256": "1fcf0cda348987c74bc2faf76c775f89c41c28256cf013caf4ee6ee3980f4b5e",
+    "category_sha256": "cb2c35a8a88157a6a313e7704a378a7ef6dc3dd68210547f635e3ddc93b82be4",
+    "scope": "One unfiltered owned Console Notes event used oldNotes/newNotes string values and completed cleanup; this grants no new filtered-predicate, Authoring or native branch acceptance."
+  },
+  "public_contract": "topic-schema / wait-topic / stream-topic closed objects-changes row",
+  "construction": "wwise_waapi/typed_topics.py#topic_match_contract",
+  "compatibility_view": "wwise_waapi/topic_compatibility.py#public_topic_publish_schema",
+  "validation": "wwise_waapi/builders/schema.py#validate_resolved_semantic_event",
+  "program_definitions": [
+    "tests/unit/test_typed_topic_construction.py",
+    "tests/unit/test_topic_monitoring_contracts.py",
+    "tests/unit/test_topic_notes_collector.py"
+  ],
+  "native_filtered_console_node": "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_structure_changed_notes_filtered_diagnostic",
+  "authoring_boundary": "Own matching reflection supports structural construction; native Authoring publication, filtering and resource cleanup remain required and unverified.",
+  "evidence_is_not_generated_coverage_credit": true
+}
