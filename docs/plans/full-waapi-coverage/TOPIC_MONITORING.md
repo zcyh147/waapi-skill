@@ -117,6 +117,19 @@ original received packet or bounded diagnostic and compare its exact source
 seal. #195 owns scheduling and native acceptance; #187 owns the Topic shape fix
 after that observation.
 
+The diagnostic producer is now implemented as the explicitly selected
+`test_structure_changed_notes_shape_diagnostic` node in
+`tests/destructive/test_gateway_workflow_transaction_matrix.py`, limited to
+Console `2025.1.7.9143` in its existing private sandbox lifecycle. It confirms
+the immutable Notes Preview before observation, then executes it once from the
+public stream's post-subscription `started` sink. The receipt preserves exact
+public records or the complete bounded schema-mismatch diagnostic, independent
+Notes readback and verified object cleanup; final source/process/quarantine
+acceptance still belongs to the existing v3 finalizer. A schema mismatch stays
+a failed diagnostic attempt, even when its exact packet is collected. No
+native run or native branch acceptance follows from the injected controls, and
+no Authoring-host equivalence is claimed.
+
 ## Exact 2021 recursive SoundBank question
 
 Both captured `2021.1.14.8108` host routes for

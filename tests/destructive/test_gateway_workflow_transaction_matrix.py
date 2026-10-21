@@ -19,7 +19,7 @@ import xml.etree.ElementTree as ET
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
 
@@ -142,6 +142,8 @@ class _WorkflowSandboxRuntime:
     def raw_gateway(
         self,
         command: Sequence[str],
+        *,
+        stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> tuple[int, dict[str, Any]]:
         argv = [
             "--timeout",
@@ -150,7 +152,7 @@ class _WorkflowSandboxRuntime:
             str(self.state_dir),
             *command,
         ]
-        exit_code, payload = waapi_gateway.execute_gateway(argv, env=self.env)
+        exit_code, payload = waapi_gateway.execute_gateway(argv, env=self.env, stream_sink=stream_sink)
         assert isinstance(payload, dict), payload
         return exit_code, payload
 
@@ -10922,3 +10924,194 @@ def test_modern_source_copy_generated_save_children_console_oracle(workflow_sand
         prefix='WAAPI_MODERN_SOURCE_' + uuid.uuid4().hex[:10], saved_copy=True,
         saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=MODERN_PROFILE)
     assert category['status'] == 'PASS', category
+
+
+def _collect_structure_changed_notes_diagnostic(runtime, *, name: str) -> dict[str, Any]:
+    """One owned Notes trigger; a schema rejection stays failed diagnostic evidence."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    from wwise_waapi.canonical import canonical_sha256
+
+    assert runtime.version == '2025.1', 'Notes diagnostic is pinned to 2025.1.7.9143'
+    topic = 'ak.wwise.core.object.structureChanged'
+    output = runtime.state_dir / 'structure-changed-notes-diagnostic.json'
+    assert not output.exists(), 'Never overwrite a Notes diagnostic attempt'
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    config = Path(runtime.env['WAAPI_SKILL_CONFIG_PATH'])
+    endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
+    category = {'category': 'structure-changed-notes-diagnostic', 'status': 'FAIL',
+        'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none',
+        'verifier_strength': 'exact_packet_or_complete_bounded_diagnostic_only',
+        'observation_path': str(output), 'reason': 'collection incomplete'}
+    runtime.category_results.append(category)
+    catalog = load_native_catalog('2025.1', 'wwise-console')
+    receipt = {'contract': 'waapi-skill.structure-changed-notes-diagnostic/v1',
+        'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint,
+        'native_catalog_build': catalog['provenance']['build'],
+        'native_schema_sha256': canonical_sha256(catalog['schemas'][topic]),
+        'diagnostic_only': True, 'business_effect_verified': False, 'coverage_credit': 'none',
+        'native_delivery_pass': False, 'collection_complete': False, 'calls': [], 'records': [],
+        'stage': 'setup', 'object_cleanup': 'not_attempted',
+        'lifecycle_final_reference': {'contract': 'waapi-skill.host-category-evidence/v3',
+            'phase': 'final', 'candidate': runtime.candidate, 'category': category['category'],
+            'transaction_ids': [], 'cleanup_status': 'unresolved_until_final_row'},
+        'lifecycle_acceptance': 'Requires matching final v3 source hash/mtime/tree and owned-process cleanup; collector body is not final acceptance.'}
+    attempted = set()
+    native_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
+    prior_native = set(native_root.glob('*.json'))
+    config_hash = None
+
+    def persist():
+        raw = json.dumps(receipt, ensure_ascii=False, indent=2, allow_nan=False).encode('utf-8')
+        assert len(raw) <= 2 * 1024 * 1024, 'Notes diagnostic receipt bound exceeded'
+        temporary = output.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(output)
+        category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
+
+    class Gateway:
+        def raw_gateway(self, argv, *, stream_sink=None):
+            assert len(receipt['calls']) < 64, 'Notes diagnostic public call bound exceeded'
+            if argv[0] == 'execute':
+                assert argv[1] not in attempted, 'Never retry a Notes diagnostic transaction'
+                attempted.add(argv[1])
+                receipt['lifecycle_final_reference']['transaction_ids'].append(argv[1])
+            row = {'argv': list(argv), 'started_monotonic_ns': time.monotonic_ns()}
+            receipt['calls'].append(row)
+            code, payload = runtime.raw_gateway(argv, stream_sink=stream_sink)
+            raw = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode('utf-8')
+            assert len(raw) <= 256 * 1024, 'Notes diagnostic public reply bound exceeded'
+            row.update(exit_code=code, payload=deepcopy(payload)); persist()
+            return code, payload
+
+        def gateway(self, argv, *, live):
+            code, payload = self.raw_gateway(argv)
+            assert code == 0 and payload.get('ok') is True, payload
+            if live:
+                assert payload.get('endpoint') == endpoint and payload.get('detected_version') == runtime.version, payload
+            return payload
+
+    gateway = Gateway()
+
+    def read(identity):
+        payload = gateway.gateway(['query-object', '--exact-id', identity, '--include', 'notes'], live=True)
+        assert payload['count'] == 1 and len(payload['objects']) == 1, payload
+        row = payload['objects'][0]
+        assert row['id'] == identity, row
+        return row
+
+    try:
+        gateway.version = runtime.version
+        assert runtime.sandbox.source_project.resolve() != runtime.sandbox.sandbox_project.resolve(), 'Private sandbox required'
+        gateway.gateway(['config-set', '--wwise-version', '2025.1', '--waapi-host', runtime.lifecycle.host,
+            '--waapi-port', str(runtime.port)], live=False)
+        settings = json.loads(config.read_text(encoding='utf-8'))
+        assert settings['project_modification_policy'] == 'ask_before_changes', 'Notes probe requires explicit confirmation'
+        config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+        receipt.update(config_path=str(config), config_sha256=config_hash,
+            source_project=str(runtime.sandbox.source_project), sandbox_project=str(runtime.sandbox.sandbox_project))
+        status = gateway.gateway(['status'], live=True); receipt['host'] = status
+        info = status['wwise']; version = info['version']
+        assert '.'.join(str(version[k]) for k in ('year', 'major', 'minor', 'build')) == '2025.1.7.9143', info
+        assert info['isCommandLine'] is True and info.get('sessionId') and info.get('processId'), info
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), 'Wrong sandbox project'
+        gateway.gateway(['operation-schema', 'object.setNotes'], live=False)
+        schema = gateway.gateway(['topic-schema', topic], live=False)
+        digest = schema['continuation']['contract_binding']['value']
+        draft = _start_business_draft(gateway, 'object.create')
+        parent = _bind_business_object(gateway, draft, path_segments=CONTAINERS_PARENT_SEGMENTS)
+        _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', 'notes-target',
+            '--parent-handle', parent, '--name', name, '--kind', 'actor-mixer',
+            '--field', 'notes', 'topic-notes-before'], live=False)
+        created = _complete_business_draft(gateway, draft)
+        identity = _created_object_id(created['execute']); receipt['object_id'] = identity
+        before = read(identity); receipt['before'] = before
+        assert before['name'] == name and before['type'] == 'PropertyContainer' and before['notes'] == 'topic-notes-before', before
+        preview = create_object_lifecycle_business_preview(lambda argv: gateway.gateway(argv,
+            live=argv[0] in {'draft-bind-object', 'draft-check', 'preview-from-draft'}),
+            version='2025.1', operation='object.setNotes', object_id=identity, notes='topic-notes-after')
+        transaction = preview['transaction_id']; receipt['notes_transaction_id'] = transaction
+        shown = gateway.gateway(['transaction-show', transaction, '--summary-only'], live=False)
+        gateway.gateway(['confirm', transaction, '--confirmation-token', shown['confirmation']['token']], live=False)
+        receipt['stage'] = 'observation'; started = False
+
+        def observe(record):
+            nonlocal started
+            assert len(receipt['records']) < 3, 'Notes diagnostic stream record bound exceeded'
+            receipt['records'].append(deepcopy(record)); persist()
+            if record.get('record_type') == 'started':
+                assert not started, 'Duplicate started record; Notes trigger will not repeat'
+                started = True
+                assert (record.get('contract') == 'waapi-skill.topic-stream/v1'
+                    and record.get('status') == 'streaming' and record.get('ok') is True
+                    and record.get('topic') == topic and record.get('topic_contract_digest') == digest
+                    and record.get('endpoint') == endpoint and record.get('detected_version') == '2025.1'
+                    and record.get('is_command_line') is True and record.get('event_count_limit') == 1), record
+                receipt['started_monotonic_ns'] = time.monotonic_ns()
+                receipt['started_before_execute'] = True; persist()
+                gateway.gateway(['execute', transaction], live=True)
+                verified = gateway.gateway(['verify', transaction], live=True)
+                assert verified['state'] == 'verified' and verified['verification']['business_state_verified'] is True, verified
+
+        argv = ['--timeout', '10', 'stream-topic', topic, '--topic-contract-digest', digest, '--event-count', '1',
+            *[arg for field in ('id', 'name', 'type', 'path', 'notes') for arg in ('--topic-option', 'include', field)]]
+        # The existing public stream emits started only after open_stream has subscribed.
+        code, terminal = gateway.raw_gateway(argv, stream_sink=observe)
+        receipt['stream'] = {'exit_code': code, 'payload': terminal}
+        assert started and terminal.get('cleanup') == 'unsubscribed', 'Notes subscription cleanup not proven'
+        after = read(identity); receipt['after'] = after
+        assert all(after[k] == before[k] for k in ('id', 'name', 'type', 'path')) and after['notes'] == 'topic-notes-after', after
+        events = [r['event'] for r in receipt['records'] if r.get('record_type') == 'event']
+        mismatch = terminal.get('error_code') == 'TOPIC_EVENT_SCHEMA_MISMATCH'
+        if mismatch:
+            assert not events, 'Rejected event must not appear as accepted delivery'
+            diagnostic = terminal['details']['event_diagnostic']
+            assert diagnostic.get('complete') is True and isinstance(diagnostic.get('json'), str), 'Incomplete Notes event diagnostic'
+            assert len(diagnostic['json'].encode('utf-8')) <= 2048, 'Notes diagnostic exceeded public boundary'
+            event = json.loads(diagnostic['json'])
+        else:
+            assert code == 0 and terminal.get('ok') is True and len(events) == 1, terminal.get('message') or terminal
+            assert terminal.get('monitoring_outcome', {}).get('target_completed') is True, terminal
+            event = events[0]
+        receipt['event'] = event
+        assert len(event.get('objects', [])) == 1, 'Notes observation must contain one tracked object'
+        changed = event['objects'][0]
+        assert changed.get('object', {}).get('id') == identity, 'Wrong GUID in Notes event'
+        assert len(changed.get('changes', [])) == 1 and changed['changes'][0].get('type') == 'notesChange', changed
+        details = changed['changes'][0].get('notesChange'); assert isinstance(details, dict), changed
+        pairs = [(a, b) for a, b in (('oldNotes', 'newNotes'), ('oldName', 'newName')) if a in details and b in details]
+        for old, new in pairs:
+            assert details[old] == 'topic-notes-before' and details[new] == 'topic-notes-after', details
+        receipt['notes_shape'] = 'both' if len(pairs) == 2 else '/'.join(pairs[0]) if pairs else 'another_shape'
+        final_status = gateway.gateway(['status'], live=True)
+        assert final_status['wwise'] == status['wwise'] and final_status['project']['id'] == status['project']['id'], 'Host/session/project drift'
+        receipt['stage'] = 'cleanup'
+        _delete_if_present_via_transaction(gateway, identity)
+        receipt.update(object_cleanup='verified_absent', collection_complete=True,
+            schema_validation='rejected' if mismatch else 'accepted')
+        if mismatch:
+            category['reason'] = 'Notes event schema rejected; exact diagnostic retained'
+            raise AssertionError(category['reason'])
+        category.update(status='PASS', reason='Diagnostic collection complete; no native branch acceptance credit')
+        return category
+    except BaseException as exc:
+        receipt['error'] = f'{type(exc).__name__}: {str(exc)[:1024]}'
+        category.update(status='FAIL', reason=receipt['error'])
+        raise
+    finally:
+        receipt['native_evidence'] = []
+        paths = sorted(set(native_root.glob('*.json')) - prior_native)
+        assert len(paths) <= 256, 'Notes native evidence file bound exceeded'
+        total = 0
+        for path in paths:
+            raw = path.read_bytes(); total += len(raw)
+            assert total <= 16 * 1024 * 1024, 'Notes native evidence byte bound exceeded'
+            receipt['native_evidence'].append({'path': str(path), 'bytes': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()})
+        if config_hash is not None:
+            assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, 'Notes diagnostic config drift'
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_structure_changed_notes_shape_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Notes shape diagnostic is pinned to Console 2025.1.7.9143')
+    _collect_structure_changed_notes_diagnostic(workflow_sandbox_runtime, name='WAAPI_NOTES_' + uuid.uuid4().hex[:12])
