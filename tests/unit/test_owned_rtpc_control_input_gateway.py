@@ -51,6 +51,7 @@ class OwnedControlTask(OwnedGraphTask):
         }
         self.writes = []
         self.fault = None
+        self.input_platform = None
 
     def call(self, uri, args=None, options=None):
         if uri.endswith('isPropertyEnabled'):
@@ -69,7 +70,8 @@ class OwnedControlTask(OwnedGraphTask):
                     'path': self.objects[SECOND]['path'] + r'\PlannedSound', 'parent': {'id': SECOND}, 'notes': '', '@RTPC': []}
             node = (item['children'][0] if planned else item)['@RTPC'][0]
             assert node['@ControlInput'] == {'type': self.input_type, 'name': 'TimeMod',
-                'notes': 'New time control', **{'@' + name: value for name, value in self.input_properties.items()}}
+                'notes': 'New time control', **({'platform': self.input_platform} if self.input_platform else {}),
+                **{'@' + name: value for name, value in self.input_properties.items()}}
             self.objects[CONTROL] = {'id': CONTROL, 'name': 'TimeMod', 'type': self.input_type,
                 'classId': self.input_classes[self.input_type], 'owner': {'id': RTPC}, 'path': r'\opaque-control',
                 'notes': 'New time control', **{'@' + name: value for name, value in self.input_properties.items()}}
@@ -87,18 +89,34 @@ class OwnedControlTask(OwnedGraphTask):
                 self.objects[CONTROL]['classId'] = 4194320
             elif self.fault == 'wrong-rtpc-class':
                 self.objects[RTPC]['classId'] = 917520
+            elif self.fault == 'wrong-input-value':
+                self.objects[CONTROL]['@TimeModDuration'] = 6
             result = {'id': owner_id, 'name': 'PlannedSound' if planned else 'Sound', '@RTPC': [
                 {'id': RTPC, 'name': '', '@ControlInput': {'id': CONTROL, 'name': 'TimeMod'}}]}
+            if self.fault == 'duplicate-result':
+                result['@RTPC'].append(deepcopy(result['@RTPC'][0]))
+            elif self.fault == 'missing-result':
+                result['@RTPC'] = []
             return {'objects': [{'id': SECOND, 'name': 'Default Work Unit', 'children': [result]}] if planned else [result]}
-        return super().call(uri, args, options)
+        result = super().call(uri, args, options)
+        if self.input_platform and uri.endswith('object.get') and CONTROL in args.get('from', {}).get('id', []) and options.get('platform') != self.input_platform:
+            for row in result.get('return', []):
+                for name in self.input_properties:
+                    if name in row:
+                        row[name] = None
+                    if '@' + name in row:
+                        row['@' + name] = None
+        return result
 
     def class_field(self, kind, meaning):
-        code, found = self.step('draft-discover-fields', '--type-handle', kind, '--meaning', meaning)
+        platform = getattr(self, 'field_platforms', {}).get(meaning, self.input_platform)
+        code, found = self.step('draft-discover-fields', '--type-handle', kind, '--meaning', meaning,
+            *(['--platform', platform] if platform else []))
         assert code == 0, found
         return found['meaning_results'][0]['candidates'][0]['handle']
 
 
-def declare_time(task, owner=None, property_field=None):
+def declare_time(task, owner=None, property_field=None, declaration_id='curve', expected_code=0, end_y=0):
     owner = task.bind(FIRST) if owner is None else owner
     property_field = task.discover(owner, 'Volume') if property_field is None else property_field
     code, types = task.step('draft-discover-types', '--role', 'object', '--meaning', task.input_type)
@@ -107,12 +125,13 @@ def declare_time(task, owner=None, property_field=None):
     values = []
     for name, value in task.input_properties.items():
         values.extend(('--new-control-input-field-value', task.class_field(kind, name), json.dumps(value)))
-    code, declared = task.step('draft-declare-rtpc', *(['--declaration-id', 'curve'] if task.operation == 'object.set' else []), '--object-handle', owner,
+    code, declared = task.step('draft-declare-rtpc', *(['--declaration-id', declaration_id] if task.operation == 'object.set' else []), '--object-handle', owner,
         '--field-handle', property_field, '--new-control-input-kind', kind,
         '--new-control-input-name', 'TimeMod', '--new-control-input-notes', 'New time control',
         *values,
-        '--point', '0', '-20', 'Linear', '--point', '1000', '0', 'Linear')
-    assert code == 0, declared
+        '--point', '0', '-20', 'Linear', '--point', '1000', str(end_y), 'Linear')
+    assert code == expected_code, declared
+    task.declaration_reply = declared
     return task
 
 
@@ -127,7 +146,7 @@ def test_public_time_input_creates_owned_reference_and_verifies_once(tmp_path):
     assert code == 2 and len(task.writes) == 1, repeated
 
 
-@pytest.mark.parametrize('fault', ['wrong-input-owner', 'wrong-input-class', 'wrong-rtpc-class'])
+@pytest.mark.parametrize('fault', ['wrong-input-owner', 'wrong-input-class', 'wrong-rtpc-class', 'wrong-input-value'])
 def test_owned_time_input_rejects_independent_identity_or_ownership_mismatch(tmp_path, fault):
     task = declare_time(OwnedControlTask(tmp_path))
     task.fault = fault
@@ -137,8 +156,9 @@ def test_owned_time_input_rejects_independent_identity_or_ownership_mismatch(tmp
     assert len(task.writes) == 1
 
 
-def test_new_owned_input_cannot_reuse_and_reparent_a_prior_rtpc_control(tmp_path):
-    task = OwnedControlTask(tmp_path)
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
+def test_new_owned_input_cannot_reuse_and_reparent_a_prior_rtpc_control(tmp_path, operation):
+    task = OwnedControlTask(tmp_path, operation=operation)
     old_curve = '{88888888-8888-8888-8888-888888888888}'
     task.objects[CONTROL] = {'id': CONTROL, 'name': 'TimeMod', 'type': 'ModulatorTime', 'classId': 5111824,
         'path': r'\old-control', 'owner': {'id': CHILD}, 'notes': 'Old input'}
@@ -190,7 +210,8 @@ def test_graph_time_control_input_binds_both_owned_occurrences(tmp_path):
     assert len(task.writes) == 1
 
 
-def test_owned_time_input_below_a_planned_owner_has_no_invented_rtpc_path(tmp_path):
+@pytest.mark.parametrize('conflict', ['fail', 'merge'])
+def test_owned_time_input_below_a_planned_owner_has_no_invented_rtpc_path(tmp_path, conflict):
     task = OwnedControlTask(tmp_path, operation='object.set')
     task.types.append({'name': 'WorkUnit', 'classId': 1638416, 'type': 'WObject'})
     task.objects[SECOND] = {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
@@ -204,6 +225,13 @@ def test_owned_time_input_below_a_planned_owner_has_no_invented_rtpc_path(tmp_pa
     assert code == 0, declared
     planned = declared['draft']['declared_object']['result_handle']
     declare_time(task, planned, property_field)
+    if conflict != 'fail':
+        code, configured = task.step('draft-business-configure', '--name-conflict', conflict)
+        assert code == 0, configured
+        code, rejected = task.step('draft-check')
+        assert code == 2 and 'OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN' in json.dumps(rejected), rejected
+        assert task.writes == []
+        return
     tx, shown = task.preview()
     facts = shown['artifact']['prepared_operation']['pre_state']['planned_reference_context']['facts']
     assert len([fact for fact in facts.values() if fact['path'] is None]) == 2
@@ -226,6 +254,10 @@ class ReplacementTask(OwnedControlTask):
             '@Curve': {'id': CURVE, 'points': [{'x': 0, 'y': -20, 'shape': 'Linear'},
                 {'x': 1000, 'y': 0, 'shape': 'Linear'}]}}
         self.objects[FIRST]['@RTPC'] = [{'id': RTPC}]
+        self.objects[CHILD] = {**deepcopy(self.objects[RTPC]), 'id': CHILD, '@PropertyName': 'Pitch',
+            'notes': 'Keep unrelated RTPC', '@Curve': {'id': '{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}',
+                'points': [{'x': 0, 'y': 2, 'shape': 'Linear'}]}}
+        self.objects[FIRST]['@RTPC'].append({'id': CHILD})
 
     def call(self, uri, args=None, options=None):
         if uri.endswith('object.get') and args.get('waql', '').startswith('from object "' + OLD_CONTROL):
@@ -250,6 +282,8 @@ class ReplacementTask(OwnedControlTask):
                 self.objects[RTPC]['@Curve']['points'][0]['y'] = -19
             elif self.fault == 'rtpc-notes-changed':
                 self.objects[RTPC]['notes'] = 'Unexpected change'
+            elif self.fault == 'unrelated-rtpc-changed':
+                self.objects[CHILD]['notes'] = 'Unexpected unrelated change'
             elif self.fault == 'owner-membership-changed':
                 self.objects[FIRST]['@RTPC'] = []
             elif self.fault == 'wrong-input-owner':
@@ -276,8 +310,10 @@ def declare_replacement(task):
     return task
 
 
-def test_existing_rtpc_replacement_keeps_curve_identity_list_and_shared_input(tmp_path):
-    task = ReplacementTask(tmp_path)
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('input_type', ['ModulatorLfo', 'ModulatorEnvelope', 'ModulatorTime'])
+def test_existing_rtpc_replacement_keeps_curve_identity_list_and_shared_input(tmp_path, version, input_type):
+    task = ReplacementTask(tmp_path, version, input_type)
     before = deepcopy(task.objects)
     declare_replacement(task)
     tx, shown = task.preview()
@@ -302,7 +338,7 @@ def test_public_schema_discloses_closed_existing_rtpc_owned_reference_route(tmp_
 
 
 @pytest.mark.parametrize('fault', ['shared-input-changed', 'curve-changed', 'rtpc-notes-changed',
-    'owner-membership-changed', 'wrong-input-owner', 'wrong-input-class'])
+    'unrelated-rtpc-changed', 'owner-membership-changed', 'wrong-input-owner', 'wrong-input-class'])
 def test_replacement_rejects_changed_preserved_state_or_wrong_owned_identity(tmp_path, fault):
     task = declare_replacement(ReplacementTask(tmp_path))
     task.fault = fault
@@ -329,3 +365,215 @@ def test_graph_replacement_has_copy_ready_business_declaration(tmp_path):
     action = inspected['draft']['next_action_binding']['replace_owned_control_input']
     assert 'draft-declare-field-change' in json.dumps(action)
     assert '--new-control-input-kind' in action['append']
+
+
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
+def test_new_input_keeps_class_field_platform_through_native_and_readback(tmp_path, operation):
+    task = OwnedControlTask(tmp_path, operation=operation)
+    task.input_platform = 'Windows'
+    declare_time(task)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert len(task.writes) == 1
+    assert any(uri.endswith('object.get') and CONTROL in args.get('from', {}).get('id', [])
+        and options.get('platform') == 'Windows' for uri, args, options in task.calls)
+
+
+@pytest.mark.parametrize('different_curve', [False, True])
+def test_owned_outcomes_bind_without_native_order_or_confusing_distinct_curves(tmp_path, different_curve):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    owner = task.bind(FIRST)
+    field = task.discover(owner, 'Volume')
+    for declaration in ['a', 'b']:
+        declare_time(task, owner, field, declaration_id=declaration,
+            end_y=2 if different_curve and declaration == 'b' else 0)
+    original = task.call
+    second_rtpc = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+    second_input = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
+    second_curve = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    def call(uri, args=None, options=None):
+        if not uri.endswith('object.set'):
+            return original(uri, args, options)
+        nodes = args['objects'][0]['@RTPC']
+        assert len(nodes) == 2 and (nodes[0] != nodes[1]) == different_curve
+        single = deepcopy(args)
+        single['objects'][0]['@RTPC'] = [nodes[0]]
+        original(uri, single, options)
+        task.objects[second_rtpc] = {**deepcopy(task.objects[RTPC]), 'id': second_rtpc,
+            '@ControlInput': {'id': second_input}, '@Curve': {'id': second_curve, 'points': deepcopy(nodes[1]['@Curve']['points'])}}
+        task.objects[second_input] = {**deepcopy(task.objects[CONTROL]), 'id': second_input, 'owner': {'id': second_rtpc}}
+        task.objects[second_curve] = {**deepcopy(task.objects[CURVE]), 'id': second_curve, 'owner': {'id': second_rtpc}}
+        task.objects[FIRST]['@RTPC'].append({'id': second_rtpc})
+        return {'objects': [{'id': FIRST, 'name': 'Sound', '@RTPC': [
+            {'id': second_rtpc, 'name': ''}, {'id': RTPC, 'name': ''}]}]}
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, json.dumps(verified)
+    assert len(task.writes) == 1
+
+
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
+def test_new_input_combines_class_field_dependency_requirements_before_write(tmp_path, operation):
+    task = OwnedControlTask(tmp_path, operation=operation)
+    task.metadata['EnvelopeStopPlayback']['dependencies'] = [{'type': 'property', 'action': 'Enable',
+        'context': 'Self', 'property': 'TimeModLoops',
+        'conditions': [{'restriction': {'type': 'range', 'min': 1, 'max': 100}}]}]
+    task.metadata['TimeModLoops'] = {'name': 'TimeModLoops', 'type': 'int32', 'default': 1,
+        'restriction': {'type': 'range', 'min': 0, 'max': 100}}
+    task.input_properties['TimeModLoops'] = 0
+    declare_time(task)
+    code, checked = task.step('draft-check')
+    assert code == 2 and 'NEW_OBJECT_DEPENDENCY_CONFLICT' in json.dumps(checked), checked
+    assert task.writes == []
+
+
+def test_public_2021_boundary_is_limited_to_the_constructor_introduced_in_2022(tmp_path):
+    task = OwnedControlTask(tmp_path)
+    code, unavailable = task.run('--version', '2021.1', 'operation-schema', 'object.setRTPC')
+    assert code == 0 and '2021.1' not in unavailable['operation']['supported_versions'], unavailable
+    code, modern = task.run('operation-schema', 'object.setRTPC')
+    assert code == 0, modern
+    assert 'constructor_introduced_2022.1' in json.dumps(modern) and 'this_property_bound_RTPC_owned_ControlInput_constructor_only' in json.dumps(modern)
+    assert task.writes == []
+
+
+def test_owned_input_graph_counts_rtpc_curve_and_input_against_existing_node_cap(tmp_path):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    task.objects[SECOND] = {**deepcopy(task.objects[FIRST]), 'id': SECOND, 'name': 'Other',
+        'path': r'\Actor-Mixer Hierarchy\Default Work Unit\Other', 'parent': None}
+    owner = task.bind(FIRST)
+    field = task.discover(owner, 'Volume')
+    for index in range(32):
+        declare_time(task, owner, field, declaration_id=str(index))
+    owner = task.bind(SECOND)
+    field = task.discover(owner, 'Volume')
+    for index in range(32, 42):
+        declare_time(task, owner, field, declaration_id=str(index))
+    declare_time(task, owner, field, declaration_id='over-limit', expected_code=2)
+    assert task.declaration_reply['error_code'] == 'NODE_LIMIT_EXCEEDED', task.declaration_reply
+    assert task.writes == []
+
+
+def test_mixed_generic_and_explicit_new_input_field_platforms_do_not_lose_intent(tmp_path):
+    task = OwnedControlTask(tmp_path)
+    task.input_platform = 'Windows'
+    task.field_platforms = {'EnvelopeStopPlayback': None}
+    declare_time(task, expected_code=2)
+    assert task.declaration_reply['error_code'] == 'OWNED_CONTROL_INPUT_PLATFORM_ASSIGNMENTS_UNRESOLVED'
+    assert '180' in json.dumps(task.declaration_reply) and task.writes == []
+
+
+def test_generic_new_input_fields_do_not_inherit_a_different_graph_platform(tmp_path):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    declare_time(task)
+    code, configured = task.step('draft-business-configure', '--platform', 'Windows')
+    assert code == 0, configured
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'OWNED_CONTROL_INPUT_PLATFORM_ASSIGNMENTS_UNRESOLVED' in json.dumps(rejected), rejected
+    assert task.writes == []
+
+
+def seed_old_pair(task):
+    old_curve = '{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}'
+    task.objects[OLD_CONTROL] = {'id': OLD_CONTROL, 'name': 'Intensity', 'type': 'GameParameter',
+        'classId': 1507344, 'path': r'\Game Parameters\Default Work Unit\Intensity',
+        'parent': {'id': SECOND}, 'owner': None, 'notes': 'Keep shared'}
+    task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'RTPC', 'classId': 1441808,
+        'path': r'\old-rtpc', 'owner': {'id': FIRST}, 'notes': 'Keep old',
+        '@PropertyName': 'Volume', '@ControlInput': {'id': OLD_CONTROL},
+        '@Curve': {'id': old_curve, 'points': [{'x': 0, 'y': 0, 'shape': 'Linear'}]}}
+    task.objects[old_curve] = {'id': old_curve, 'name': '', 'type': 'Curve', 'classId': 917520,
+        'path': r'\old-curve', 'owner': {'id': CHILD}, 'notes': ''}
+    task.objects[FIRST]['@RTPC'] = [{'id': CHILD}]
+    return old_curve
+
+
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
+def test_new_owned_input_preserves_additive_existing_pair_and_curve(tmp_path, operation):
+    task = OwnedControlTask(tmp_path, operation=operation)
+    seed_old_pair(task)
+    before = deepcopy(task.objects[CHILD])
+    declare_time(task)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert task.objects[CHILD] == before and task.objects[FIRST]['@RTPC'] == [{'id': CHILD}, {'id': RTPC}]
+
+
+@pytest.mark.parametrize('operation', ['object.setRTPC', 'object.set'])
+def test_fresh_owned_input_does_not_bypass_exclusive_existing_property_limit(tmp_path, operation):
+    task = OwnedControlTask(tmp_path, operation=operation)
+    seed_old_pair(task)
+    task.metadata['Volume']['supports']['rtpc'] = 'Exclusive'
+    declare_time(task)
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'RTPC_EXCLUSIVE_CONFLICT' in json.dumps(rejected), rejected
+    assert task.writes == []
+
+
+def test_owned_replace_all_uses_final_exclusive_count_and_keeps_shared_input(tmp_path):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    old_curve = seed_old_pair(task)
+    shared = deepcopy(task.objects[OLD_CONTROL])
+    task.metadata['Volume']['supports']['rtpc'] = 'Exclusive'
+    declare_time(task)
+    code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            assert args['listMode'] == 'replaceAll'
+            del task.objects[CHILD]
+            del task.objects[old_curve]
+            task.objects[FIRST]['@RTPC'] = [{'id': RTPC}]
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified.get('verified') is True, verified
+    assert task.objects[OLD_CONTROL] == shared and len(task.writes) == 1
+
+
+@pytest.mark.parametrize('fault', ['duplicate-result', 'missing-result', 'wrong-input-value'])
+def test_graph_owned_input_rejects_incomplete_or_contrary_native_results(tmp_path, fault):
+    task = declare_time(OwnedControlTask(tmp_path, operation='object.set'))
+    task.fault = fault
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified.get('verified') is False, verified
+    assert len(task.writes) == 1
+
+
+def test_new_owned_input_rejects_a_scalar_handle_from_another_class(tmp_path):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    owner = task.bind(FIRST)
+    owner_field = task.discover(owner, 'Volume')
+    code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', 'ModulatorTime')
+    assert code == 0, found
+    code, wrong = task.step('draft-discover-types', '--role', 'object', '--meaning', 'Sound')
+    assert code == 0, wrong
+    wrong_field = task.class_field(wrong['type_candidates'][0]['handle'], 'Volume')
+    code, rejected = task.step('draft-declare-rtpc', '--declaration-id', 'curve', '--object-handle', owner, '--field-handle', owner_field,
+        '--new-control-input-kind', found['type_candidates'][0]['handle'], '--new-control-input-name', 'TimeMod',
+        '--new-control-input-field-value', wrong_field, '5', '--point', '0', '-20', 'Linear', '--point', '1000', '0', 'Linear')
+    assert code == 2 and rejected['error_code'] == 'FIELD_HANDLE_SCOPE_MISMATCH', rejected
+    assert task.writes == []
+
+
+@pytest.mark.parametrize('replacement', [False, True])
+def test_two_new_owned_inputs_obey_combined_exclusive_final_count(tmp_path, replacement):
+    task = OwnedControlTask(tmp_path, operation='object.set')
+    task.metadata['Volume']['supports']['rtpc'] = 'Exclusive'
+    owner = task.bind(FIRST)
+    field = task.discover(owner, 'Volume')
+    for declaration in ['a', 'b']:
+        declare_time(task, owner, field, declaration_id=declaration)
+    if replacement:
+        code, configured = task.step('draft-business-configure', '--list-behavior', 'replace-all')
+        assert code == 0, configured
+    code, rejected = task.step('draft-check')
+    assert code == 2 and 'RTPC_EXCLUSIVE_CONFLICT' in json.dumps(rejected), rejected
+    assert task.writes == []

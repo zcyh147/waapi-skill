@@ -942,7 +942,7 @@ def normalize_rtpc_control_input(payload, *, path, limits=ObjectTreeLimits()):
     if not isinstance(payload, Mapping) or set(payload) != {"new_control_input"}:
         return _normalize_identity(payload, path=path, limits=limits)
     node = _mapping(payload["new_control_input"], path=path)
-    _exact_fields(node, required={"type", "name", "properties"}, optional={"notes"}, path=path)
+    _exact_fields(node, required={"type", "name", "properties"}, optional={"notes", "platform"}, path=path)
     if node["type"] not in CONTROL_INPUT_CLASSES:
         raise ObjectOperationContractError("INVALID_CONTROL_INPUT_TYPE", "Custom ControlInput requires LFO, Envelope, or Time.")
     name = _bounded_token(node["name"], path=path + ".name", max_length=limits.max_name_length, disallow_path_separator=True)
@@ -950,7 +950,9 @@ def normalize_rtpc_control_input(payload, *, path, limits=ObjectTreeLimits()):
     notes = node.get("notes")
     if notes is not None and (not isinstance(notes, str) or len(notes) > limits.max_notes_length):
         raise ObjectOperationContractError("INVALID_NOTES", "New ControlInput notes exceed the string contract.")
-    return OwnedControlInputDescriptor(node["type"], name, tuple((row.name, row.value) for row in properties), notes)
+    platform = (_bounded_import_text(node["platform"], path=path + ".platform", max_length=128)
+        if "platform" in node else None)
+    return OwnedControlInputDescriptor(node["type"], name, tuple((row.name, row.value) for row in properties), notes, platform)
 
 
 def materialize_waapi_rtpc(
@@ -1327,6 +1329,7 @@ class _NormalizationState:
             if isinstance(descriptor.control_input, OwnedControlInputDescriptor):
                 new_input = descriptor.control_input
                 children = (self.node({"type": new_input.type, "name": new_input.name,
+                    **({"platform": new_input.platform} if new_input.platform is not None else {}),
                     "properties": [{"name": name, "value": value} for name, value in new_input.properties],
                     **({"notes": new_input.notes} if new_input.notes is not None else {})},
                     request_path=request_path + ".control_input", parent_path=request_path, depth=depth + 1, collection="ControlInput"),)
@@ -2071,7 +2074,7 @@ def _reject_duplicate_sibling_names(nodes: Sequence[ObjectNodeDescriptor], *, pa
     seen: dict[str, str] = {}
     duplicates: list[str] = []
     for node in nodes:
-        if node.anonymous:
+        if node.anonymous or node.rtpc is not None and isinstance(node.rtpc.control_input, OwnedControlInputDescriptor):
             continue
         key = ("rtpc:" + json.dumps([node.rtpc.property, node.rtpc.control_input.as_dict()], sort_keys=True)
                if node.rtpc is not None else node.name.casefold())
