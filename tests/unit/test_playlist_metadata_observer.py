@@ -28,7 +28,7 @@ def test_playlist_observer_preserves_disclosed_restrictions(tmp_path, has_flag):
     )
     assert code == 0, payload
     runtime = SimpleNamespace(candidate="controlled-program-only", version="2025.1",
-        state_dir=tmp_path, category_results=[], raw_gateway=lambda argv:
+        state_dir=tmp_path / "observations", category_results=[], raw_gateway=lambda argv:
         public.waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client))
     if has_flag:
         collect_playlist_slot_reference_metadata(runtime)
@@ -38,4 +38,4 @@ def test_playlist_observer_preserves_disclosed_restrictions(tmp_path, has_flag):
             collect_playlist_slot_reference_metadata(runtime)
         assert runtime.category_results[0]["status"] == "FAIL"
     assert runtime.category_results[0]["business_effect_verified"] is False
-    assert (tmp_path / "playlist-reference-metadata.json").is_file()
+    assert (tmp_path / "observations" / "playlist-reference-metadata.json").is_file()

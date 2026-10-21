@@ -81,6 +81,7 @@ def collect_playlist_slot_reference_metadata(runtime) -> None:
     finally:
         body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
         assert len(body) <= 8 * 1024 * 1024, "Playlist metadata observation exceeded byte bound"
+        output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(body)
         category["observation_sha256"] = hashlib.sha256(body).hexdigest()
 
@@ -128,5 +129,6 @@ def collect_playlist_instance_identities(runtime) -> None:
     finally:
         body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
         assert len(body) <= 8 * 1024 * 1024
+        output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(body)
         category["observation_sha256"] = hashlib.sha256(body).hexdigest()
