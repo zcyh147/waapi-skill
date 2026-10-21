@@ -5,6 +5,23 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-21 R60 focused schema-seal follow-up
+
+GitHub pure-code preflight on `99d8f115` reported **825 passed / 1 failed in
+64.42s** (run `39549064298`). The sole failure was the non-object-set operation
+schema aggregate. An isolated comparison with `7f457d01` established that only
+the four 2022.1–2025.1 `object.setRTPC` contracts changed: owned ControlInput
+construction, result bindings and their constraints. The other 145 contracts,
+existing identity alternatives and required arguments remain unchanged.
+
+The test now protects the new aggregate and retains all historical aggregates
+using the four exact previous RTPC seals. An initial focused attempt exposed
+the still-stale historical aggregate (1 failed in 0.42s); after preserving that
+history explicitly, the same node passed in **0.40s**. No other local tests were
+rerun. This test-only edit is absent from all R59 capture source maps; it grants
+no new native, Fresh or broad-gate acceptance. The original CI failure remains
+historical evidence.
+
 ## 2026-10-21 R59 Source completion and portable evidence integration
 
 Candidate `4e3c2800` passed the **65-case program capture in 62.09s** after

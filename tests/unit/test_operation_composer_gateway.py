@@ -332,6 +332,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # Reviewed owned ControlInput construction and result bindings change only
+    # object.setRTPC in 2022.1–2025.1; the other 145 contracts are unchanged.
+    assert canonical_sha256(non_object_set_digests) == (
+        "7625144ba94c098847024fea8a5c50d7dbbe1eada00dfa54d6446368ff80851a"
+    )
+    # Exact pre-extension RTPC seals from 7f457d01. The current aggregate above
+    # protects all new fields; substituting only these four prior seals proves
+    # that every other contract and the historical aggregates stay unchanged.
+    non_object_set_digests.update({
+        "object.setRTPC@2022.1": "2f725349ef5e26108544a5e157222657e97317df1a4fe815c08afb40f7b4aa20",
+        "object.setRTPC@2023.1": "e4cf246a63cdc3103dabe67a1f48aee6edfe4741c74d24fb3c55954ecac4889d",
+        "object.setRTPC@2024.1": "f1be65816443c189c12838b817ad83a590e9addc7fa837d1af217c4a415f4ee8",
+        "object.setRTPC@2025.1": "90b6e9e5dd45924b20ad1a73b8432d47011fe5b35eac61b48208a335cb6ca793",
+    })
     assert canonical_sha256(non_object_set_digests) == (
         "a3d8593d2d4b0ad167c77264182de22abe49475781c031c0cd96429af874f4f9"
     )
