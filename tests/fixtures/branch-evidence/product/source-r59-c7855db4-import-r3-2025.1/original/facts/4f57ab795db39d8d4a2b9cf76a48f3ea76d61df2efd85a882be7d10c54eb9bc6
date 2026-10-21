@@ -1,0 +1,17 @@
+{
+  "api": "ak.wwise.core.object.create",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_2025_pre0/native/1792556976880167000-20e393ca04f84286a3aea1b2ff6c7c14-ak_wwise_core_object_create.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "id": "{44444444-4444-4444-4444-444444444444}",
+    "name": "MODERN_SOURCE"
+  },
+  "risk_level": "medium",
+  "timeout": 30.0,
+  "version": "2025.1"
+}

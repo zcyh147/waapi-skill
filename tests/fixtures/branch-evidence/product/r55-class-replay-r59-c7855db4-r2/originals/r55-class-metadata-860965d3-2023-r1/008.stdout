@@ -1,0 +1,127 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30068,
+    "url": "ws://127.0.0.1:30068/waapi"
+  },
+  "detected_version": "2023.1",
+  "is_command_line": true,
+  "operation": "list",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 2,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyAndReferenceNames",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2023.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r55-class-metadata-860965d3-2023-r1/dispatcher-evidence/1792528826076614000-831212e90fb14ba5959574ac2a4d2e36-ak_wwise_core_object_getPropertyAndReferenceNames.json",
+      "timeout": 29.968048667011317
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30068,
+      "url": "ws://127.0.0.1:30068/waapi"
+    },
+    "adapter_version": "2023.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30068/waapi",
+        "adapter_version": "2023.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "contract": "waapi-skill.metadata-page/v1",
+    "scope": {
+      "kind": "object_type",
+      "requested": "ModulatorTime",
+      "resolved": {
+        "classId": 5111824,
+        "name": "ModulatorTime",
+        "type": "WObject"
+      }
+    },
+    "snapshot": "90b2658ddc3a8bc5226d50af1a225b8a0eb50d0f659932d85a1950d363a2d077",
+    "snapshot_kind": "live-property-reference-inventory",
+    "fields": [
+      {
+        "name": "Color",
+        "selection": "mf1.1792528826.0.cac285bd26b1ae735a2a9e4224da3df219b6b17f501fbcc4ee7efa9d597c9c7b"
+      },
+      {
+        "name": "EnvelopeStopPlayback",
+        "selection": "mf1.1792528826.1.e6bf3fb91b501bcf61fada6e0ffd4f44ac62b0e02785d54acfc48c13280a9a04"
+      },
+      {
+        "name": "EnvelopeTriggerOn",
+        "selection": "mf1.1792528826.2.792984e1cd0a9f97816f18c9c53cd8142d93437607a8f760e05ae1360b6b56e8"
+      },
+      {
+        "name": "ModulatorScope",
+        "selection": "mf1.1792528826.3.9f2c304587764e08f7136533b99b99c675a9d5c0f6de3cc117442420cbaa9c13"
+      },
+      {
+        "name": "OverrideColor",
+        "selection": "mf1.1792528826.4.feb3398f6e0bac4e04cfbedfaa33ef865938dedf1c6993153ea5a0c2bf45c32e"
+      },
+      {
+        "name": "TimeModDuration",
+        "selection": "mf1.1792528826.5.831e86fdc71738c0cdf0b3a90246e4398b2ad5e23ef271b980f46ae81faa19d1"
+      },
+      {
+        "name": "TimeModInitialDelay",
+        "selection": "mf1.1792528826.6.98acb1d0bd621b5daee9b9d2ba0848d761ae62eacb26415e68892d8c5f4f16ef"
+      },
+      {
+        "name": "TimeModLoops",
+        "selection": "mf1.1792528826.7.ec07c2768111c75fa3277073f5cbba9589769c78a8776ce6ea5132fa6cb36ded"
+      },
+      {
+        "name": "TimeModPlaybackRate",
+        "selection": "mf1.1792528826.8.e96d1c69416d05992c39918dc1b99bb761ebb2b00a5a2b20b97bef482c84c2ab"
+      }
+    ],
+    "total_count": 9,
+    "offset": 0,
+    "remaining_count": 0,
+    "complete": true,
+    "next_page": null,
+    "expires_at": 1792529726,
+    "mutation_authority": false
+  }
+}

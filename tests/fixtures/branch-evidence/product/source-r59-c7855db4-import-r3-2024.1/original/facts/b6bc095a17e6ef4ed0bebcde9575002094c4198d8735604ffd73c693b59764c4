@@ -1,0 +1,20 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r59-integration/runtime-r4/run-c7855db4-r2/pytest-capture/test_modern_collector_preserve2/native/1792556972053233000-0be3b7269625404184c5f8b617c1b666-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "display": {
+      "name": "Osc1 Level"
+    },
+    "name": "Osc1Level",
+    "type": "Real32"
+  },
+  "risk_level": "low",
+  "timeout": 9.987883124995278,
+  "version": "2024.1"
+}

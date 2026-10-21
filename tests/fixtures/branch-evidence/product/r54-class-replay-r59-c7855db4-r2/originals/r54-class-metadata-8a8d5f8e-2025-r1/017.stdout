@@ -1,0 +1,150 @@
+{
+  "ok": true,
+  "status": "ok",
+  "contract": "waapi-skill.gateway-result/v1",
+  "command": "metadata",
+  "endpoint": {
+    "host": "127.0.0.1",
+    "port": 30607,
+    "url": "ws://127.0.0.1:30607/waapi"
+  },
+  "detected_version": "2025.1",
+  "is_command_line": true,
+  "operation": "detail",
+  "metadata_authority": "live-waapi",
+  "metadata_call_count": 3,
+  "calls": [
+    {
+      "api": "ak.wwise.core.object.getPropertyInfo",
+      "item_type": "function",
+      "category": "core.object",
+      "version": "2025.1",
+      "ok": true,
+      "dry_run": false,
+      "risk_level": "low",
+      "error_code": null,
+      "message": "ok",
+      "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2025-r1/dispatcher-evidence/1792523920508423000-44e3d94a29734cd49f519fc53ff62c1c-ak_wwise_core_object_getPropertyInfo.json",
+      "timeout": 29.96243075001985
+    }
+  ],
+  "metadata_evidence_scope": "all calls retained in dispatcher evidence directory",
+  "session_context": {
+    "contract": "waapi-skill.session-context/v2",
+    "available": true,
+    "endpoint": {
+      "host": "127.0.0.1",
+      "port": 30607,
+      "url": "ws://127.0.0.1:30607/waapi"
+    },
+    "adapter_version": "2025.1",
+    "adapter_version_source": "live_detection",
+    "project_modification_policy": "read_only",
+    "available_project_modification_policies": [
+      "read_only",
+      "ask_before_changes",
+      "allow_changes"
+    ],
+    "one_time_introduction": {
+      "contract": "waapi-skill.session-introduction/v2",
+      "emit_condition": "visible_conversation_intro_absent",
+      "emit_timing": "first_agent_message_after_gateway_result",
+      "atomic": true,
+      "style": "natural_prose_in_user_language",
+      "facts": {
+        "skill_name": "waapi-skill",
+        "endpoint_url": "ws://127.0.0.1:30607/waapi",
+        "adapter_version": "2025.1",
+        "project_modification_policy": "read_only",
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ]
+      },
+      "machine_readable_result_policy": "separate_progress_message"
+    }
+  },
+  "agent_result": {
+    "selection": "mf1.1792523920.5.b0b8ba06d0ab1f1cd69dd5db5db03c2f42aa5f1a11716e7b140ee3ade4390bbf",
+    "scope": {
+      "kind": "object_type",
+      "requested": "MediaPoolFilter",
+      "resolved": {
+        "classId": 5767184,
+        "name": "MediaPoolFilter",
+        "type": "WObject"
+      }
+    },
+    "metadata": {
+      "name": "FieldName",
+      "type": "string",
+      "default": "",
+      "audioEngineId": 4294967295,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Field",
+        "index": 1868,
+        "group": ""
+      },
+      "dependencies": [
+        {
+          "type": "property",
+          "action": "Show",
+          "property": "CriteriaType",
+          "context": "Self",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "value": 0,
+                    "displayName": "0"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "restriction": {},
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false,
+          "percentage": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      },
+      "unit": {
+        "status": "unknown",
+        "value": null
+      },
+      "availability": {
+        "type": "known",
+        "default": "known",
+        "restriction": "known",
+        "dependencies": "known",
+        "supports": "known",
+        "ui": "known"
+      }
+    },
+    "complete": true,
+    "mutation_authority": false
+  }
+}

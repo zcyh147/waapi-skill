@@ -1,0 +1,260 @@
+{
+  "business_fact_id": "2024.1|source-copy-synth-owned-graph",
+  "gateway": {
+    "argv": [
+      "verify",
+      "tx1-kan2tgtbg0553dh8cx62"
+    ],
+    "exit_code": 0,
+    "payload": {
+      "agent_result": {
+        "artifact_hash": "187f5f715c1dcc7a21055eee64bfdc36fe302bc84d30015392d28fd86baa7783",
+        "cleanup": {
+          "projection": {
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "kind": "retain-project-and-outputs",
+            "phase": "verified",
+            "status": "not_required"
+          },
+          "spec": {
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "automatic_rollback": false,
+            "kind": "retain-project-and-outputs",
+            "output_policy": "retain",
+            "project_policy": "retain"
+          },
+          "status": "not_required"
+        },
+        "executed": true,
+        "operation": "object.copy",
+        "request": {
+          "arguments": {
+            "object": {
+              "kind": "id",
+              "value": "{95DDA32B-B666-4269-A54C-5ABF4E201C99}"
+            },
+            "on_name_conflict": "fail",
+            "parent": {
+              "kind": "id",
+              "value": "{90214EE9-07AD-4B82-A6BE-03EED47A2D8E}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.copy",
+          "version": "2024.1"
+        },
+        "state": "verified",
+        "transaction_id": "tx1-kan2tgtbg0553dh8cx62",
+        "verified": true
+      },
+      "artifact_hash": "187f5f715c1dcc7a21055eee64bfdc36fe302bc84d30015392d28fd86baa7783",
+      "automatic_retry": false,
+      "cleanup": {
+        "projection": {
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "contract": "waapi-skill.transaction-cleanup-projection/v1",
+          "kind": "retain-project-and-outputs",
+          "phase": "verified",
+          "status": "not_required"
+        },
+        "spec": {
+          "automatic_cleanup": false,
+          "automatic_retry": false,
+          "automatic_rollback": false,
+          "kind": "retain-project-and-outputs",
+          "output_policy": "retain",
+          "project_policy": "retain"
+        },
+        "status": "not_required"
+      },
+      "command": "verify",
+      "contract": "waapi-skill.gateway-result/v1",
+      "detected_version": "2024.1",
+      "endpoint": {
+        "host": "127.0.0.1",
+        "port": 31788,
+        "url": "ws://127.0.0.1:31788/waapi"
+      },
+      "executed": true,
+      "guard_validation": {
+        "expires_at": "2026-10-21T00:33:36.327165Z",
+        "ok": true,
+        "project_guard_fingerprint": "12a6fcb05841b48e4a0849f05d8d5e1b2b8efc34dc4acb76f48cf48c78c5bcf2",
+        "project_guard_mode": "invariant",
+        "project_guard_phase": "post_verification",
+        "project_transition": null,
+        "runtime_guard_fingerprint": "ffb82d2db6d28764c8c641ff9db088fc417cede6b3f65089f5eed642924d54c9",
+        "status": "valid"
+      },
+      "is_command_line": true,
+      "ok": true,
+      "project_call": {
+        "api": "ak.wwise.core.getProjectInfo",
+        "category": "core",
+        "dry_run": false,
+        "error_code": null,
+        "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792541017993428000-e02c2927b7b94993b167d25332c6afd9-ak_wwise_core_getProjectInfo.json",
+        "item_type": "function",
+        "message": "ok",
+        "ok": true,
+        "risk_level": "low",
+        "timeout": 29.987083500018343,
+        "version": "2024.1"
+      },
+      "recovery": {
+        "actions": [
+          "inspect_transaction",
+          "independent_read_only_diagnosis"
+        ],
+        "additional_read_permission_required": false,
+        "cleanup_complete": true,
+        "contract": "waapi-skill.recovery/v1",
+        "max_reconnect_attempts": 1,
+        "modification_policy": "ask_before_changes",
+        "next_change": "preview_then_explicit_confirmation",
+        "original_write_replay_allowed": false,
+        "project_write_outcome": "verified",
+        "read_only_continuation_allowed": true,
+        "scope": "existing_authorized_task_only",
+        "service_start_requires_existing_task_authorization": true,
+        "stage": "known_write_outcome"
+      },
+      "result_schema_checked": false,
+      "session_context": {
+        "adapter_version": "2024.1",
+        "adapter_version_source": "live_detection",
+        "available": true,
+        "available_project_modification_policies": [
+          "read_only",
+          "ask_before_changes",
+          "allow_changes"
+        ],
+        "contract": "waapi-skill.session-context/v2",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 31788,
+          "url": "ws://127.0.0.1:31788/waapi"
+        },
+        "one_time_introduction": {
+          "atomic": true,
+          "contract": "waapi-skill.session-introduction/v2",
+          "emit_condition": "visible_conversation_intro_absent",
+          "emit_timing": "first_agent_message_after_gateway_result",
+          "facts": {
+            "adapter_version": "2024.1",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ],
+            "endpoint_url": "ws://127.0.0.1:31788/waapi",
+            "project_modification_policy": "ask_before_changes",
+            "skill_name": "waapi-skill"
+          },
+          "machine_readable_result_policy": "separate_progress_message",
+          "style": "natural_prose_in_user_language"
+        },
+        "project_modification_policy": "ask_before_changes"
+      },
+      "state": "verified",
+      "status": "verified",
+      "stdout_projection": {
+        "agent_result_exact": true,
+        "assertion_count": 19,
+        "cleanup_exact": true,
+        "contract": "waapi-skill.transaction-verify-success-summary/v1",
+        "detail_level": "digest-verification-evidence",
+        "fixed_projection_limit_bytes": 22528,
+        "full_verification_evidence_in_stdout": false,
+        "full_verification_evidence_persisted": true,
+        "journal_event": "verification_recorded",
+        "passed_assertion_count": 19,
+        "projected_payload_bytes": 6819,
+        "readback_count": 47,
+        "session_context_reserve_bytes": 2048,
+        "stdout_budget_bytes": 24576,
+        "truncated": false,
+        "verification_canonical_sha256": "cfd1d390913da828a4dd714426689e328cf9e5aa199cde40817718d7682d4eb1"
+      },
+      "transaction_id": "tx1-kan2tgtbg0553dh8cx62",
+      "verification": {
+        "assertion_count": 19,
+        "assertions_canonical_sha256": "6815774981a368ebc7daa10184558a087659a3e0de5ad15ec800b86da6972e2a",
+        "business_state_verified": true,
+        "canonical_sha256": "cfd1d390913da828a4dd714426689e328cf9e5aa199cde40817718d7682d4eb1",
+        "contract": "waapi-skill.operation-verification/v1",
+        "failed_assertion_count": 0,
+        "full_evidence_in_stdout": false,
+        "ok": true,
+        "operation": "object.copy",
+        "passed_assertion_count": 19,
+        "readback_count": 47,
+        "readbacks_canonical_sha256": "f4615da47c2ee952db330a0a3c7c7b42a2e515250d8c71c7484cce485c411dc9",
+        "status": "verified",
+        "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+        "verification_scope": {
+          "baseline_digest": "9bb9cbb0c89c77ac19bf25792f7d2337dcd785a45617fddee345dcfa127228b0",
+          "complete_copy_preservation": true,
+          "complete_owner_childset_count": 2,
+          "copied_scalar_field_count": 18,
+          "discovered_field_count": 18,
+          "field_count": 18,
+          "file_reference_observed": false,
+          "final_save_receipt": {
+            "artifact_hash": "cdee2910cb7e570f65ba8884db951641a97de1143267578930f22e8ce92ed901",
+            "execution_event_hash": "d65c881d7edae59178aaacf96d45f7b4a81c439b7f07deda65a41cd5d7e7f956",
+            "transaction_id": "tx1-zjm5g126pwtp4g40qhk7",
+            "verification_event_hash": "4b57b294b218d30641ab2c6163a2d68d0854f2a29bbc2bdfd34dad7ada24dc05"
+          },
+          "language_observed": true,
+          "live_role_digest": "4e41f2213da78baddf96e13d5ae58beae0ed67b22c1f95d4a8d147b099ce7b91",
+          "model_proofs_digest": "b77c73834a5a4d624976a96a923e09e7f1360ba2eae785950f61fcb1aebbf23e",
+          "observed": [
+            "source_identity_class_notes",
+            "certified_default_view_scalars",
+            "original_source_fields",
+            "owner_frames_and_bounded_childsets"
+          ],
+          "ordered_point_count": 2,
+          "owned_guid_mapping": {
+            "{0B357DC6-5FE7-4E50-9C31-23CDE7F34307}": "{3634A6C6-82D6-4515-BF9A-D42EF2339717}",
+            "{95DDA32B-B666-4269-A54C-5ABF4E201C99}": "{4BE76677-3060-4D01-B2E7-2FACA24BA8B2}",
+            "{CE99046D-D354-422D-A7BB-F1305FF00B2F}": "{DCBD085D-7678-4054-B505-F6FEA6A9B5E6}",
+            "{E323F786-253F-48C6-86B9-AB0335804E9F}": "{77A5C8A2-9BAA-451B-8E36-69C83A9C5DF4}"
+          },
+          "owned_role_count": 3,
+          "owner_count": 2,
+          "owner_is_voice_count": 2,
+          "supported_shape": "2024.1.13.9056_Synth_owned_declaration_graph_zero_ObjectRefs",
+          "uncertified_field_count": 0,
+          "unobserved": [
+            "media_bytes_and_audio_effect"
+          ]
+        },
+        "verification_strength": "saved_source_graph_and_live_roles"
+      },
+      "verification_strength": "saved_source_graph_and_live_roles",
+      "verified": true
+    }
+  },
+  "native_call": {
+    "args": {
+      "autoAddToSourceControl": false,
+      "autoCheckOutToSourceControl": false,
+      "object": "{95DDA32B-B666-4269-A54C-5ABF4E201C99}",
+      "onNameConflict": "fail",
+      "parent": "{90214EE9-07AD-4B82-A6BE-03EED47A2D8E}"
+    },
+    "options": {},
+    "result": {
+      "id": "{4BE76677-3060-4D01-B2E7-2FACA24BA8B2}",
+      "name": "Wwise Synth One"
+    },
+    "uri": "ak.wwise.core.object.copy"
+  },
+  "version": "2024.1"
+}

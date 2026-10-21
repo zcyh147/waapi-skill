@@ -1,0 +1,60 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792540979380154000-e089e8359e6747919f85971896ec78d6-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 3,
+    "default": 0,
+    "dependencies": [],
+    "display": {
+      "group": "Output",
+      "index": 1266,
+      "name": "Operation Mode"
+    },
+    "name": "OperationMode",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "displayName": "Mix",
+          "value": 0
+        },
+        {
+          "displayName": "Ring",
+          "value": 1
+        }
+      ]
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Exclusive",
+      "unlink": false
+    },
+    "type": "int32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 0,
+        "fine": 0.0,
+        "infinity": 0.0,
+        "max": 0.0,
+        "min": 0.0,
+        "step": 0.0
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.98480020900024,
+  "version": "2023.1"
+}

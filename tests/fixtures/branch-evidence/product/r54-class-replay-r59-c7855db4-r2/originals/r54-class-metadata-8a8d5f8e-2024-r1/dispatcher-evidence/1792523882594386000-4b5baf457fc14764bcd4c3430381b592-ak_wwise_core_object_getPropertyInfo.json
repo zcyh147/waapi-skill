@@ -1,0 +1,96 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r54-class-metadata-8a8d5f8e-2024-r1/dispatcher-evidence/1792523882594386000-4b5baf457fc14764bcd4c3430381b592-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 56,
+    "default": 1.0,
+    "dependencies": [
+      {
+        "action": "Show",
+        "context": "Self",
+        "type": "isMasterBus",
+        "value": false
+      },
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "referenceIsSet": true
+          }
+        ],
+        "context": "Self",
+        "property": "Attenuation",
+        "type": "reference"
+      },
+      {
+        "action": "Enable",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "displayName": "True",
+                  "value": true
+                }
+              ]
+            }
+          }
+        ],
+        "context": "Self",
+        "property": "ListenerRelativeRouting",
+        "type": "property"
+      },
+      {
+        "action": "Enable",
+        "context": "Self",
+        "property": "OverridePositioning",
+        "type": "override"
+      }
+    ],
+    "display": {
+      "group": "Listener Relative Routing/Attenuation",
+      "index": 1461,
+      "name": "Distance Scaling %"
+    },
+    "name": "AttenuationDistanceScaling",
+    "restriction": {
+      "max": 100.0,
+      "min": 0.009999999776482582,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Multiplicative",
+      "unlink": false
+    },
+    "type": "Real32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false,
+        "percentage": true
+      },
+      "value": {
+        "decimals": 2,
+        "fine": 0.01,
+        "infinity": 0.0,
+        "max": 4.0,
+        "min": 0.25,
+        "step": 0.05
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.96355741599109,
+  "version": "2024.1"
+}

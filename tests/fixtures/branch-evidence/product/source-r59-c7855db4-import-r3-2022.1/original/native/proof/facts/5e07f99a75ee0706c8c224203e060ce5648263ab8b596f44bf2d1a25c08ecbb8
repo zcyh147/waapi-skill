@@ -1,0 +1,52 @@
+{
+  "api": "ak.wwise.core.object.getPropertyInfo",
+  "category": "core.object",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/private/tmp/waapi-r58-modern-source-collector/.waapi-skill-state/full-coverage/r58-modern-source-411e8173-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792540844602131000-197899c021a24d8a89d07ea6aeca21a2-ak_wwise_core_object_getPropertyInfo.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "audioEngineId": 17,
+    "default": 0.0,
+    "dependencies": [],
+    "display": {
+      "group": "Output",
+      "index": 1267,
+      "name": "FM Amount"
+    },
+    "name": "FmAmount",
+    "restriction": {
+      "max": 100.0,
+      "min": 0.0,
+      "type": "range"
+    },
+    "supports": {
+      "randomizer": false,
+      "rtpc": "Additive",
+      "unlink": false
+    },
+    "type": "Real32",
+    "ui": {
+      "autoUpdate": false,
+      "dataMeaning": "None",
+      "displayAs": {
+        "bitfield": false,
+        "lrMix": false,
+        "musicNote": false
+      },
+      "value": {
+        "decimals": 2,
+        "fine": 0.01,
+        "infinity": 0.0,
+        "max": 100.0,
+        "min": 0.0,
+        "step": 0.1
+      }
+    }
+  },
+  "risk_level": "low",
+  "timeout": 29.99468537501525,
+  "version": "2022.1"
+}
