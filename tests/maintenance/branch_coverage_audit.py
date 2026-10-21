@@ -350,7 +350,7 @@ def portable_binding_inputs(index_path, requirements):
     from tests.maintenance.branch_audit_completion import read_sealed_artifact
     raw = index_path.read_bytes()
     index = json.loads(raw)
-    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments'}
+    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments'}
             or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
             or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
             or not isinstance(index['entries'], list) or not index['entries']):
@@ -532,11 +532,15 @@ def portable_binding_inputs(index_path, requirements):
     if 'source_attachments' in index:
         from tests.support.source_copy_branch_evidence import portable_source_attachments
         source_business_facts = portable_source_attachments(index['source_attachments'], bindings, read, base)
+    if 'source_native_attachments' in index:
+        from tests.support.source_copy_native_evidence import portable_source_native_attachments
+        portable_source_native_attachments(index['source_native_attachments'], bindings, read, base)
     return {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': bindings}, base, {
         **({'source_business_facts': source_business_facts} if source_business_facts else {}),
         'mode': 'portable-index', 'index_sha256': hashlib.sha256(raw).hexdigest(),
         'selected_documents_sha256': digest({'entries':index['entries'],'metadata_attachments':attachments,
-            'source_attachments':index.get('source_attachments', [])}) if index.get('source_attachments') else
+            'source_attachments':index.get('source_attachments', []),
+            'source_native_attachments':index.get('source_native_attachments', [])}) if index.get('source_attachments') or index.get('source_native_attachments') else
             digest({'entries':index['entries'],'metadata_attachments':attachments}) if attachments else digest(index['entries'])}
 
 

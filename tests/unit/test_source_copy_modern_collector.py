@@ -85,8 +85,9 @@ def modern_collector_runtime(tmp_path, version='2022.1', *, fault=None):
     return runtime, writes, task
 
 
-def test_modern_collector_2022_preserves_original_graph_through_four_transactions(tmp_path, workflow):
-    runtime, writes, task = modern_collector_runtime(tmp_path)
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1'])
+def test_modern_collector_preserves_original_graph_through_four_transactions(tmp_path, workflow, request, version):
+    runtime, writes, task = modern_collector_runtime(tmp_path, version)
     category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='MODERN_SOURCE', saved_copy=True,
         saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile=PROFILE)
     receipt = json.loads(Path(category['observation_path']).read_text())
@@ -108,7 +109,9 @@ def test_modern_collector_2022_preserves_original_graph_through_four_transaction
     assert not any(row['argv'][:2] == ['metadata', 'detail'] for row in receipt['calls'])
     copy_preview, = [i for i, row in enumerate(receipt['calls']) if row['argv'][:2] == ['preview-from-draft', receipt['copy_draft_id']]]
     assert acceptance['accepted_at_call_index'] < copy_preview
-    print('R58 modern2022 collector budget:', json.dumps(receipt['budget']))
+    from tests.support.source_copy_branch_evidence import register_source_capture
+    register_source_capture(request.node, Path(category['observation_path']))
+    print('R58 modern collector budget:', json.dumps(receipt['budget']))
 
 
 def test_modern_collector_rejects_stable_scalar_disagreement_before_copy_preview(tmp_path, workflow):
@@ -123,7 +126,7 @@ def test_modern_collector_rejects_stable_scalar_disagreement_before_copy_preview
     assert not any(row['argv'][:2] == ['metadata', 'detail'] for row in receipt['calls'])
 
 
-def test_modern_collector_2025_preserves_native_crlf_and_direct_rtpc_through_four_transactions(tmp_path, workflow):
+def test_modern_collector_2025_preserves_native_crlf_and_direct_rtpc_through_four_transactions(tmp_path, workflow, request):
     runtime, writes, task = modern_collector_runtime(tmp_path, '2025.1')
     notes_before = task.objects[SOURCE]['notes']
     assert notes_before.count('\r\n') == 8
@@ -138,6 +141,8 @@ def test_modern_collector_2025_preserves_native_crlf_and_direct_rtpc_through_fou
     assert receipt['native_build'] == '2025.1.7.9143'
     assert receipt['budget']['unique_transactions'] == 4
     assert receipt['budget']['native_calls'] == len(runtime.fixture_native_calls)
+    from tests.support.source_copy_branch_evidence import register_source_capture
+    register_source_capture(request.node, Path(category['observation_path']))
     assert receipt['budget']['public_calls'] <= receipt['limits']['calls'] == 160
     assert receipt['budget']['native_files_including_index'] <= receipt['limits']['native_files'] == 1280
     assert not any(row['argv'][:2] == ['metadata', 'detail'] for row in receipt['calls'])
