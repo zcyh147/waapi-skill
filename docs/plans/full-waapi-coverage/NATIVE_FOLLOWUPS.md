@@ -1,6 +1,18 @@
 # Native observations needed by current implementation
 
-## Latest R55/R56 evidence and remaining work
+## Latest R57/R58 Source evidence
+
+[SOURCE_COPY.md](SOURCE_COPY.md) records the exact 2021 repeated owned graph and
+2022–2025 existing Synth Source copy/Save results. Their original candidates,
+receipt hashes, diagnostic flags and separate Root effect assessments remain
+distinct. This supersedes older Source limits only for those exercised graphs;
+other classes, shared references, constructors and history remain required.
+The settled `f5a6487e` integration adds current program evidence without a new
+native run. Its required #180 Source attachment reader is being implemented;
+these records do not yet change generated native counts. Metadata default
+absence, Topic publication and the Tone gaps below remain open.
+
+## Historical R55/R56 evidence and remaining work
 
 The production saved-copy continuation now proves the exercised 2021.1 Synth /
 RTPC / LFO / Curve graph through separate baseline/final Save authorization and

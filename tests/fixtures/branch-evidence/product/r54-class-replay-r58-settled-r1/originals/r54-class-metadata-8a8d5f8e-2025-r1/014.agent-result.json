@@ -1,0 +1,78 @@
+{
+  "selection": "mf1.1792523918.1.1950a3b80b0a5328cb8434a356bcbf180395ddba90f2729a9f1f0a31166c6dde",
+  "scope": {
+    "kind": "object_type",
+    "requested": "ModulatorTime",
+    "resolved": {
+      "classId": 5111824,
+      "name": "ModulatorTime",
+      "type": "WObject"
+    }
+  },
+  "metadata": {
+    "name": "EnvelopeStopPlayback",
+    "type": "bool",
+    "default": true,
+    "audioEngineId": 4294967295,
+    "supports": {
+      "rtpc": "None",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Stop Playback At End",
+      "index": 1850,
+      "group": ""
+    },
+    "dependencies": [
+      {
+        "type": "property",
+        "action": "Enable",
+        "property": "TimeModLoops",
+        "context": "Self",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "range",
+              "min": 1,
+              "max": 100
+            }
+          }
+        ]
+      }
+    ],
+    "restriction": {},
+    "ui": {
+      "value": {
+        "min": 0.0,
+        "max": 0.0,
+        "decimals": 0,
+        "step": 0.0,
+        "fine": 0.0,
+        "infinity": 0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false,
+        "percentage": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "complete": true,
+  "mutation_authority": false
+}

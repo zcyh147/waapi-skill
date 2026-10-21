@@ -33,12 +33,13 @@ R55_ORIGINAL_SEALS = {
 
 
 
-# Accepted20c8dcc8b37a951b76584a560a4529d69b9ceea9 Source consumers,
-# present in integrationa106ad52d2924c1cbaecb7d297c55b85bdade3fd.
+# Accepted411e8173949020bad26e4302f1e9428a21bcac7d Source consumers/fixture.
 # R54 and R55 independently checked original Git maps have these same before
-# blobs; the new helper is explicitly absent in both originals. These auxiliary
+# blobs; both new helpers are explicitly absent in both originals. These auxiliary
 # pairs permit historical-native/current-program attribution only.
-CLASS_AUXILIARY_CHANGES = {'tests/semantic/support/codex_business_oracle_plan_v3.py': {'after': 'acdc65339374bf5109e7e4d8ba13ddab3a5367f10c87b95db64f251aaf97ce2c',
+CLASS_AUXILIARY_CHANGES = {'tests/destructive/support/source_copy_fixture.py': {'after': 'f9c8ba22f8b69e01bd9e5cf2424699efad4bafce71b1d10a712caf2b3d80177d',
+                                                                        'before': None},
+ 'tests/semantic/support/codex_business_oracle_plan_v3.py': {'after': 'acdc65339374bf5109e7e4d8ba13ddab3a5367f10c87b95db64f251aaf97ce2c',
                                                              'before': '65f7943443a91520e535570345e6b43ac4d09e72b519f5ffd57c7c9be51b5eb9'},
  'tests/semantic/support/codex_eval_protocol_v3.py': {'after': '8350a1f08c70468d84c62b74711454354d78bd8c30d24fbe043110d9fee04ca1',
                                                       'before': 'aa0593dee563fa000c026460825cbaa4ae250f7ae567117906fe68a098ee3b4d'},
@@ -48,7 +49,7 @@ CLASS_AUXILIARY_CHANGES = {'tests/semantic/support/codex_business_oracle_plan_v3
                                              'before': '44b8888ee682a37d46882bdfbbf5c701a7b2108f310cc40cdd4f14e1658934b2'},
  'tests/semantic/support/codex_prompt_provenance_v3.py': {'after': 'e1a85408dd2f0ed25e75bda00c82d0c3180172ff885ab23d602404da6c478bb1',
                                                           'before': '38a6082b6a95e485dc62f5a52d74e50592a5424d7aa1b1b86500b5a07161e669'},
- 'tests/semantic/support/codex_source_copy_protocol.py': {'after': 'f1aa72085e2985f8b93a1c399c17282743d716977529d9b7a00e4c5d860dffbe',
+ 'tests/semantic/support/codex_source_copy_protocol.py': {'after': 'b469b24ae64be096d314eb66da81b28833e0e45283d0cc66184199af2a089fdf',
                                                           'before': None},
  'tests/semantic/support/codex_task_runner_v3.py': {'after': '8250851354409dca2c6f789f776951f7174927279e5e495f0e7b01dc7e76bcef',
                                                     'before': 'b33e240e3c20ff5999e7ef773ade357a10222af9fb2b7f47ff3ff94015fc5e02'},
