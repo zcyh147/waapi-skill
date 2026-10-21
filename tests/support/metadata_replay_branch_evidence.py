@@ -400,7 +400,7 @@ CLASS_AUXILIARY_CHANGES = {'tests/destructive/support/source_copy_fixture.py': {
                                                     'before': 'b33e240e3c20ff5999e7ef773ade357a10222af9fb2b7f47ff3ff94015fc5e02'},
  'tests/semantic/support/codex_typed_draft_evidence_v3.py': {'after': '37841446878515c1484dfecf0cf35ac304c87b9f13ee39c6e0ec35c66d3d4189',
                                                              'before': '05205d05f9c0bf56939297081e69f7db107f50f1808eb9a0274df3d11c06a588'},
- 'tests/support/source_copy_branch_evidence.py': {'after': 'c2d14f93c183ded28d7a50739dabad82e3049d8bbc7b8edd26c44ae0483d8f85',
+ 'tests/support/source_copy_branch_evidence.py': {'after': 'd4d1e5ae5e5736c01362ed25f7ec0745c4a324bddca5a88695811e852cc88e06',
                                                   'before': None},
  'tests/support/source_copy_native_evidence.py': {'after': 'a7ac635f8b4964cab93d84479d64f6af1ca6dad2f1d2bfc2daffb5c3b6ec38d6',
                                                   'before': None}}
