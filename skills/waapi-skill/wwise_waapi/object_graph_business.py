@@ -520,6 +520,12 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
         raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
                       action="object.create accepts one bound reference or null; complex reference values belong to available object.set lanes")
     if isinstance(value, Mapping):
+        if set(value) == {"new_control_input_business"}:
+            if field.scope_kind != "object" or field.field_kind != "reference" or field.token != "ControlInput":
+                raise _repair(session, "INVALID_CONTROL_INPUT_PLACEMENT", field="field_values",
+                    action="select the exact existing RTPC Control Input Reference Field Handle")
+            from .owned_control_inputs import compile_owned_control_input
+            return {"name": field.token, "target": compile_owned_control_input(session, value["new_control_input_business"])}
         if set(value) != {"curve_points"}:
             raise _repair(session, "INLINE_CURVE_INPUT_INVALID", field="field_values",
                           action="provide only curve_points; native type, IDs and field tokens remain Gateway-owned")
@@ -730,6 +736,8 @@ def _compile_create_fields(
                 rejected_handle=field.handle,
                 action="discover the field for this exact declared object kind",
             )
+        if isinstance(business_value, Mapping) and "new_control_input_business" in business_value:
+            raise _repair(session, "INVALID_CONTROL_INPUT_PLACEMENT", field="field_values", action="bind the exact existing RTPC for an owned Control Input replacement")
         if field.token in used_tokens:
             raise _repair(
                 session,
@@ -1336,6 +1344,8 @@ def _compile_existing_set_fields(
                 rejected_handle=field.handle,
                 action="discover each field for its exact bulk-set target",
             )
+        if isinstance(business_value, Mapping) and "new_control_input_business" in business_value and source.object_type != "RTPC":
+            raise _repair(session, "INVALID_CONTROL_INPUT_PLACEMENT", field="field_values", action="bind the exact existing RTPC for an owned Control Input replacement")
         if field.token in used_tokens:
             raise _repair(
                 session,
@@ -1419,6 +1429,10 @@ def _materialize_set(
         node = {"rtpc": {key: rtpc_args[key] for key in ("property", "control_input", "points", "notes") if key in rtpc_args},
             "rtpc_mode": rtpc_args["mode"]}
         node_result_handles[id(node)] = row.result_handle
+        new_input = node["rtpc"]["control_input"].get("new_control_input")
+        if new_input is not None:
+            from .canonical import canonical_sha256
+            node_result_handles[id(new_input)] = "bnh1-" + canonical_sha256({"owned_control_input_of": row.result_handle})[:32]
         return node
 
     def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
@@ -1692,9 +1706,6 @@ def _materialize_set_rtpc(
     target = None if planned else session.handles.resolve_object(owner_handle)
     from .owned_control_inputs import compile_owned_control_input
     owned_input = compile_owned_control_input(session, fields["new_control_input"]) if "new_control_input" in fields else None
-    if owned_input is not None and isinstance(declaration.target, OwnedRtpcTarget):
-        raise _repair(session, "OWNED_CONTROL_INPUT_GRAPH_PENDING", field="new_control_input",
-            tracking_issue=180, action="graph and planned-owner owned ControlInput construction remains unfinished under issue #180")
     control = None if owned_input is not None else session.handles.resolve_object(fields["control_input_handle"])
     control_token = "".join(
         character

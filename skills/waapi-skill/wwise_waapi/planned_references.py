@@ -44,6 +44,9 @@ def graph_result_bindings(roots, result_handles):
         handle = result_handles.get(id(node))
         if handle is not None:
             bindings.append({"result_handle": handle, "request_path": path})
+        owned = node.get("rtpc", {}).get("control_input", {}).get("new_control_input")
+        if owned is not None:
+            bindings.append({"result_handle": result_handles[id(owned)], "request_path": path + ".control_input"})
         for ref in node.get("references", []):
             target = ref["target"]
             if isinstance(target, Mapping) and target.get("kind") == "id" and str(target.get("value", "")).startswith("bnh1-"):
@@ -161,11 +164,11 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             parent_native_path, parent_identity = parent["path"], parent["result_handle"]
         else:
             parent_native_path, parent_identity = root_path(prefix, root), root[0].object
-        if node.rtpc is not None or node.anonymous or (node.plugin is not None and node.plugin.kind == "effect" and node.plugin.placement == "owner"):
+        if node.rtpc is not None or node.anonymous or node.collection == "ControlInput" or (node.plugin is not None and node.plugin.kind == "effect" and node.plugin.placement == "owner"):
             if path in selected:
                 raise ObjectOperationContractError("PLANNED_REFERENCE_TARGET_UNAVAILABLE", "Unnamed RTPC result has no source-proven native reference expression")
             info = resolve_type(node)
-            fact = {"result_handle": paths[path], "request_path": path, "path": None, "name": "",
+            fact = {"result_handle": paths[path], "request_path": path, "path": None, "name": node.name,
                 "type": node.plugin.object_type if node.plugin is not None else info.name, "class_name": info.name,
                 "class_id": info.class_id, "parent_identity": parent_identity,
                 "relation": "owner", **({"rtpc_property": node.rtpc.property} if node.rtpc is not None else {})}

@@ -827,10 +827,19 @@ _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
                    "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"}]}},
 }
 
+_RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA = {"oneOf": [IDENTITY_ARGUMENT_SCHEMA,
+    {"type": "object", "required": ["new_control_input"], "additionalProperties": False,
+     "properties": {"new_control_input": {"type": "object", "required": ["type", "name", "properties"],
+        "additionalProperties": False, "properties": {
+            "type": {"type": "string", "enum": sorted(CONTROL_INPUT_CLASSES)},
+            "name": {"type": "string", "minLength": 1, "maxLength": 255},
+            "notes": {"type": "string", "maxLength": 65536},
+            "properties": {"type": "array", "maxItems": 32, "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA}}}}}]}
+
 _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
     "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
-                   "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"},
+                   "target": {"oneOf": [*_RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA["oneOf"], {"type": "null"},
                        {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA,
                         "supported_versions": sorted(OBJECT_SET_REFERENCE_ARRAY_VERSIONS)},
                        {"type": "object", "required": ["curve_points"], "additionalProperties": False,
@@ -1012,20 +1021,11 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         },
     },
 }
-_RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA = {"oneOf": [IDENTITY_ARGUMENT_SCHEMA,
-    {"type": "object", "required": ["new_control_input"], "additionalProperties": False,
-     "properties": {"new_control_input": {"type": "object", "required": ["type", "name", "properties"],
-        "additionalProperties": False, "properties": {
-            "type": {"type": "string", "enum": sorted(CONTROL_INPUT_CLASSES)},
-            "name": {"type": "string", "minLength": 1, "maxLength": 255},
-            "notes": {"type": "string", "maxLength": 65536},
-            "properties": {"type": "array", "maxItems": 32, "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA}}}}}]}
-
 _OBJECT_SET_RTPC_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object", "required": ["rtpc"], "additionalProperties": False,
     "properties": {
         "rtpc": {"type": "object", "required": ["property", "control_input", "points"], "additionalProperties": False, "properties": {
-            "property": {"type": "string", "minLength": 1}, "control_input": IDENTITY_ARGUMENT_SCHEMA,
+            "property": {"type": "string", "minLength": 1}, "control_input": _RTPC_CONTROL_INPUT_ARGUMENT_SCHEMA,
             "points": {"type": "array", "minItems": 1, "maxItems": 256, "items": _RTPC_POINT_ARGUMENT_SCHEMA},
             "notes": {"type": "string"}}},
         "rtpc_mode": {"type": "string", "enum": ["add", "add_or_replace"], "default": "add_or_replace"},
@@ -6230,6 +6230,20 @@ def _prepare_object_set(
             )
             _require_object_reference_metadata(info, allow_hierarchy=True)
             property_info_by_name[descriptor.name.casefold()] = info
+            if isinstance(descriptor.target, OwnedControlInputDescriptor):
+                if (target_class != 1441808 or target.row.get("type") != "RTPC" or descriptor.name != "ControlInput"
+                        or row_conflict != "fail" or row_list_mode != "append"):
+                    raise OperationContractError("OWNED_CONTROL_INPUT_REPLACEMENT_UNPROVEN", "Only an exact existing RTPC ControlInput replacement with fail/append is admitted; other variants remain under issue #180.", details={"tracking_issue": 180})
+                _require_owned_control_input_reference(info, descriptor.target.type)
+                proof, owned_spec, snapshots = _prepare_owned_control_replacement(target, descriptor,
+                    target_spec=target_spec, version=request.version, read=read)
+                trusted["@ControlInput"] = proof["native"]
+                target_spec["owned_control_input_replacement"] = proof
+                target_spec["references"].append({"name": "ControlInput", "target_request_path": owned_spec["request_path"]})
+                node_specs.append(owned_spec)
+                field_snapshots.extend(snapshots)
+                condition_metadata_guards.append({"object_id": target.object, "platform": platform, "fields": [info.as_dict()]})
+                continue
             if platform is not None:
                 _require_platform_field_enabled(
                     read,
@@ -6660,9 +6674,9 @@ def _prepare_object_set(
                 list_spec["on_name_conflict"] = row_conflict
                 if is_root:
                     list_spec["parent_request_path"] = target_spec["request_path"]
-            rtpc_pairs = [(spec["rtpc_binding"]["property"].casefold(),
-                _identity_key(next(ref["target_id"] for ref in spec["references"] if ref["name"] == "ControlInput")))
-                for spec in root_specs if spec.get("rtpc_binding")]
+            if row_conflict != "fail" and any(spec.get("owned_control_input") for spec in prepared_specs):
+                raise OperationContractError("OWNED_CONTROL_INPUT_CONFLICT_UNPROVEN", "Non-fail owned ControlInput conflicts remain unfinished under issue #180.", details={"tracking_issue": 180})
+            rtpc_pairs = [_rtpc_pair_key(spec) for spec in root_specs if spec.get("rtpc_binding")]
             if len(rtpc_pairs) != len(set(rtpc_pairs)):
                 raise OperationContractError("DUPLICATE_RTPC_PAIR", "An owner may request each exact RTPC pair once.")
             collisions_by_name: dict[str, list[dict[str, Any]]] = {}
@@ -7291,6 +7305,24 @@ def _prepare_object_set_linked(
     return preview, {"object": target}, pre_state, verification, cleanup
 
 
+def _require_owned_control_input_reference(reference, input_type):
+    _require_object_reference_metadata(reference)
+    from .metadata_restrictions import reference_allowed_types
+    allowed = reference_allowed_types(reference.restriction)
+    if allowed and input_type not in allowed:
+        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live ControlInput metadata does not permit the requested type.")
+    for row in reference.restriction.get("restrictions", []):
+        if row == "notNull":
+            continue
+        if not isinstance(row, Mapping) or "type" not in row or set(row) - {"type", "sharedOnlyTypes"}:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Owned ControlInput has an unproved live reference classifier.")
+        shared = row.get("sharedOnlyTypes", [])
+        if not isinstance(shared, list) or any(not isinstance(value, str) for value in shared):
+            raise OperationContractError("INVALID_METADATA", "sharedOnlyTypes must be a string array.")
+        if input_type in shared:
+            raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "This live target type requires a shared reference.")
+
+
 def _prepare_owned_control_input(descriptor, *, version, read):
     """Seal the exact new class, reference allowance and prospective fields."""
     from .new_object_defaults import class_default_evidence, NewObjectDefaultError
@@ -7302,21 +7334,7 @@ def _prepare_owned_control_input(descriptor, *, version, read):
     if info.class_id != CONTROL_INPUT_CLASSES[descriptor.type] or rtpc.class_id != 1441808:
         raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live classes differ from the version-proven owned ControlInput classes.")
     reference = _read_property_info(read, class_id=rtpc.class_id, name="ControlInput")
-    _require_object_reference_metadata(reference)
-    from .metadata_restrictions import reference_allowed_types
-    allowed = reference_allowed_types(reference.restriction)
-    if allowed and descriptor.type not in allowed:
-        raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "Live ControlInput metadata does not permit the requested type.")
-    for row in reference.restriction.get("restrictions", []):
-        if row == "notNull":
-            continue
-        if not isinstance(row, Mapping) or "type" not in row or set(row) - {"type", "sharedOnlyTypes"}:
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Owned ControlInput has an unproved live reference classifier.")
-        shared = row.get("sharedOnlyTypes", [])
-        if not isinstance(shared, list) or any(not isinstance(value, str) for value in shared):
-            raise OperationContractError("INVALID_METADATA", "sharedOnlyTypes must be a string array.")
-        if descriptor.type in shared:
-            raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "This live target type requires a shared reference.")
+    _require_owned_control_input_reference(reference, descriptor.type)
     fields = [_read_property_info(read, class_id=info.class_id, name=name) for name, _ in descriptor.properties]
     for field, (_, value) in zip(fields, descriptor.properties):
         _require_object_property_value(field, value)
@@ -7334,7 +7352,85 @@ def _prepare_owned_control_input(descriptor, *, version, read):
             {"class_metadata": rtpc.as_dict(), "new_object_default_evidence": [reference_defaults]}]}
 
 
-def _owned_control_input_assertions(proof, *, rtpc_id, control_id, read, owner_id=None):
+def _observe_owned_reference_result(owner_id, field, *, read, readbacks):
+    args, options = {"from": {"id": [owner_id]}}, {"return": ["id", field]}
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    readbacks.append({"role": "owned-reference-association", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+    identity = _reference_identity(_field_value(rows[0], field)) if len(rows) == 1 and _same_identity(rows[0].get("id"), owner_id) else None
+    if not _valid_object_id(identity):
+        raise ObjectOperationContractError("INVALID_READBACK", "The owned reference must expose one canonical target GUID")
+    args, options = {"from": {"id": [identity]}}, {"return": ["id", "name"]}
+    result = read(OBJECT_GET_URI, args, options)
+    rows = _rows(result)
+    readbacks.append({"role": "owned-reference-result", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), identity) or not isinstance(rows[0].get("name"), str):
+        raise ObjectOperationContractError("INVALID_READBACK", "The owned target must independently resolve once")
+    return identity, rows[0]["name"]
+
+
+def _prepare_owned_control_replacement(target, descriptor, *, target_spec, version, read):
+    """An existing RTPC changes one owned reference; its list/Curve stay fixed."""
+    before = _read_object_id_rows(target.object, fields=(*RTPC_SNAPSHOT_FIELDS, "classId", "owner"), read=read)
+    if len(before) != 1 or not _same_identity(before[0].get("id"), target.object):
+        raise OperationContractError("INVALID_READBACK", "Existing RTPC replacement needs one exact complete RTPC row.")
+    row = before[0]
+    owner_id = _reference_identity(row.get("owner"))
+    old_id = _reference_identity(_field_value(row, "ControlInput"))
+    if not _valid_object_id(owner_id) or not _valid_object_id(old_id):
+        raise OperationContractError("OWNED_CONTROL_INPUT_REPLACEMENT_UNPROVEN", "The existing RTPC must have observed canonical owner/input identities.", details={"tracking_issue": 180})
+    shared = _read_shared_reference_target(old_id, read=read, platform=None, version=version, require_match=False)
+    if shared["owner_absent"] is not True or not _valid_object_id(shared["parent_id"]):
+        raise OperationContractError("OWNED_INPUT_REPLACEMENT_DISPOSITION_UNPROVEN", "Replacing an old owned custom input remains unfinished under issue #180.", details={"tracking_issue": 180})
+    baseline = _read_graph_rtpc_rows(owner_id, version=version, class_id=1441808, read=read)
+    if sum(_same_identity(member["id"], target.object) for member in baseline) != 1:
+        raise OperationContractError("INVALID_READBACK", "The selected RTPC must occur exactly once in its complete owning list.")
+    proof = _prepare_owned_control_input(descriptor.target, version=version, read=read)
+    proof.update(baseline_rows=baseline, old_control_input=old_id, owner_id=owner_id)
+    path = target_spec["request_path"] + ".owned_control_input"
+    spec = {"request_path": path, "parent_request_path": target_spec["request_path"],
+        "existing_target": False, "requested_name": proof["name"], "requested_type": proof["type"],
+        "canonical_type": proof["type"], "class_id": proof["class_id"],
+        **proof["metadata_guards"][0], "notes_supplied": proof["notes"] is not None,
+        "requested_notes": proof["notes"], "properties": [{"name": name, "value": value} for name, value in proof["properties"].items()],
+        "references": [], "collection": "ControlInput", "owned_reference": True}
+    snapshots = []
+    for member in baseline:
+        fields = list(RTPC_SNAPSHOT_FIELDS) + ["classId", "owner"]
+        if _same_identity(member["id"], target.object):
+            fields = [field for field in fields if field.lstrip("@") != "ControlInput"]
+        expected = {field: member[field] for field in fields if field in member}
+        snapshots.append({"object_id": member["id"], "fields": fields, "rows": [expected], "preserve_after_write": True})
+    membership_fields = [*IDENTITY_RETURN_FIELDS, "classId", "@RTPC"]
+    membership = _read_object_id_rows(owner_id, fields=membership_fields, read=read)
+    if len(membership) != 1 or not _same_identity(membership[0].get("id"), owner_id):
+        raise OperationContractError("INVALID_READBACK", "RTPC owner membership must independently resolve once.")
+    snapshots.append({"object_id": owner_id, "fields": membership_fields, "rows": membership, "preserve_after_write": True})
+    # Discovery owns the projection tokens; bounded pages preserve every
+    # discovered old shared-input field without assuming a fixed Modulator set.
+    from .builders.query import MAX_STRUCTURED_RETURN_FIELDS
+    names = parse_property_and_reference_names_result(read(GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": old_id}, {}))
+    base = _dedupe_fields([*IDENTITY_RETURN_FIELDS, "classId", "owner"])
+    tokens = _dedupe_fields(["@" + field.name for field in names])
+    page_size = MAX_STRUCTURED_RETURN_FIELDS - len(base)
+    for offset in range(0, max(1, len(tokens)), page_size):
+        fields = [*base, *tokens[offset:offset + page_size]]
+        rows = _read_object_id_rows(old_id, fields=fields, read=read)
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), old_id):
+            raise OperationContractError("INVALID_READBACK", "The old shared ControlInput must independently resolve once.")
+        snapshots.append({"object_id": old_id, "fields": fields, "rows": rows, "preserve_after_write": True})
+    return proof, spec, snapshots
+
+
+def _rtpc_baseline_identities(rows):
+    values = []
+    for row in rows:
+        values.extend((row.get("id"), _reference_identity(_field_value(row, "ControlInput")),
+            _reference_identity(_field_value(row, "Curve"))))
+    return {_identity_key(value) for value in values if _valid_object_id(value)}
+
+
+def _owned_control_input_assertions(proof, *, rtpc_id, control_id, read, owner_id=None, baseline_ids=()):
     """Independently certify the exact new owned result; shared by callers."""
     fields = ["id", "name", "type", "classId", "owner", "notes", *proof["properties"]]
     args, options = {"from": {"id": [control_id]}}, {"return": fields}
@@ -7342,8 +7438,10 @@ def _owned_control_input_assertions(proof, *, rtpc_id, control_id, read, owner_i
     rows = _rows(result)
     exact = len(rows) == 1 and _same_identity(rows[0].get("id"), control_id)
     row = rows[0] if exact else {}
-    assertions = [{"name": "new ControlInput has its exact requested class and RTPC owner", "passed": bool(exact
-        and row.get("type") == proof["type"] and row.get("classId") == proof["class_id"]
+    assertions = [{"name": "new ControlInput identity is absent from the complete owning baseline",
+        "passed": _identity_key(control_id) not in baseline_ids, "evidence": {"id": control_id, "baseline_ids": sorted(baseline_ids)}},
+        {"name": "new ControlInput has its exact requested class and RTPC owner", "passed": bool(exact
+        and row.get("type") == proof["type"] and _object_class_matches(row.get("classId"), proof["class_id"])
         and row.get("name") == proof["name"] and _same_identity(_reference_identity(row.get("owner")), rtpc_id)), "evidence": rows}]
     for name, value in proof["properties"].items():
         assertions.append({"name": f"new ControlInput {name} matches", "passed": bool(exact and _has_field(row, name)
@@ -7357,7 +7455,7 @@ def _owned_control_input_assertions(proof, *, rtpc_id, control_id, read, owner_i
         rows = _rows(result)
         assertions.append({"name": "new RTPC retains the exact native class and selected owner", "passed": bool(len(rows) == 1
             and _same_identity(rows[0].get("id"), rtpc_id) and rows[0].get("name") == ""
-            and rows[0].get("type") == "RTPC" and rows[0].get("classId") == 1441808
+            and rows[0].get("type") == "RTPC" and _object_class_matches(rows[0].get("classId"), 1441808)
             and _same_identity(_reference_identity(rows[0].get("owner")), owner_id)), "evidence": rows})
         readbacks.append({"role": "new-owned-control-rtpc", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
     return assertions, readbacks
@@ -7566,6 +7664,12 @@ def _read_graph_rtpc_rows(owner_id, *, version, class_id, read, snapshot_cache=N
     return complete
 
 
+def _rtpc_pair_key(spec):
+    control_ref = next(ref for ref in spec["references"] if ref["name"] == "ControlInput")
+    input_key = ("new", control_ref["target_request_path"]) if spec.get("owned_control_input") else _identity_key(control_ref["target_id"])
+    return (spec["rtpc_binding"]["property"].casefold(), input_key)
+
+
 def _validate_graph_rtpc_capacity(specs, *, version):
     """Admit the combined owner outcome, including aliases of an existing owner."""
     by_path = {spec["request_path"]: spec for spec in specs}
@@ -7584,8 +7688,7 @@ def _validate_graph_rtpc_capacity(specs, *, version):
             raise OperationContractError("INVALID_READBACK", "One RTPC owner needs one exact class and complete pre-state.")
         mode = spec.get("list_mode", parent.get("list_mode", "append"))
         group["modes"].add(mode)
-        pair = (spec["rtpc_binding"]["property"].casefold(), _identity_key(next(
-            ref["target_id"] for ref in spec["references"] if ref["name"] == "ControlInput")))
+        pair = _rtpc_pair_key(spec)
         if pair in group["pairs"]:
             raise OperationContractError("DUPLICATE_RTPC_PAIR", "One owner may request each exact RTPC pair once across the graph.")
         group["pairs"].add(pair)
@@ -7629,14 +7732,22 @@ def _resolve_graph_rtpc_target(node, spec, specs, *, root_parent, version, read,
     if not isinstance(support, str) or support.casefold() == "none":
         raise OperationContractError("RTPC_UNSUPPORTED", "Live property metadata does not support an RTPC for this field.")
     spec["rtpc_property_guard"] = {**scope, "property": node.rtpc.property, "metadata": info.as_dict()}
-    control = _resolve_identity(node.rtpc.control_input.as_dict(), role=node.request_path + ".control_input", read=read, identity_cache=identity_cache)
-    if not _is_rtpc_control_input(control.row.get("type")):
+    owned = isinstance(node.rtpc.control_input, OwnedControlInputDescriptor)
+    if owned:
+        spec["owned_control_input"] = _prepare_owned_control_input(node.rtpc.control_input, version=version, read=read)
+    control = None if owned else _resolve_identity(node.rtpc.control_input.as_dict(), role=node.request_path + ".control_input", read=read, identity_cache=identity_cache)
+    if control is not None and not _is_rtpc_control_input(control.row.get("type")):
         raise OperationContractError("INVALID_CONTROL_INPUT_TYPE", "RTPC ControlInput must have a supported actual type.")
     if owner_id is None:
         return None
     before = _read_graph_rtpc_rows(owner_id, version=version, class_id=spec["class_id"], read=read, snapshot_cache=snapshot_cache)
     spec["rtpc_list_guard"] = {"owner_id": owner_id, "version": version, "class_id": spec["class_id"], "before": before}
-    matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode, rtpc_support=support)
+    if owned:
+        _require_rtpc_property_count(node.rtpc.property, support, 1 + (0 if replace_all else sum(
+            _field_value(row, "PropertyName").casefold() == node.rtpc.property.casefold() for row in before)))
+        matches = []
+    else:
+        matches = _match_rtpc_pair([] if replace_all else before, node.rtpc.property, control.object, mode=node.rtpc_mode, rtpc_support=support)
     if not matches:
         if not replace_all and len(before) >= RTPC_MAX_LIST_ROWS:
             raise OperationContractError("RTPC_LIST_LIMIT_EXCEEDED", "Adding an RTPC exceeds the complete-list limit.")
@@ -8356,6 +8467,11 @@ def _prepare_object_node_specs(
             spec["import_requested"] = True
         if node.rtpc is not None:
             spec["rtpc_binding"] = {"property": node.rtpc.property, "mode": node.rtpc_mode}
+        if node.collection == "ControlInput":
+            parent = next((item for item in specs if item["request_path"] == node.parent_request_path), None)
+            if parent is None or not parent.get("owned_control_input"):
+                raise OperationContractError("INVALID_CONTROL_INPUT_PLACEMENT", "Owned ControlInput requires its exact RTPC occurrence.")
+            spec["owned_reference"] = True
         merge_target = None
         if node.rtpc is not None:
             merge_target = _resolve_graph_rtpc_target(node, spec, specs, root_parent=root_parent,
@@ -8404,20 +8520,21 @@ def _prepare_object_node_specs(
             )
         reference_targets = []
         for child in node.children:
-            if child.collection != "Effect":
+            if child.collection not in {"Effect", "ControlInput"}:
                 continue
-            if result_context is None or not node.anonymous:
+            if result_context is None or (child.collection == "Effect" and not node.anonymous) or (child.collection == "ControlInput" and node.rtpc is None):
                 raise OperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "Local graph Effect requires its exact planned anonymous owner")
-            info = _read_property_info_cached(read, cache=property_info_cache, class_id=type_info.class_id, name="Effect")
+            field_name = child.collection
+            info = _read_property_info_cached(read, cache=property_info_cache, class_id=type_info.class_id, name=field_name)
             _require_object_reference_metadata(info, allow_hierarchy=True)
-            property_info_by_name["effect"] = info
+            property_info_by_name[field_name.casefold()] = info
             fact = result_context["facts"][child.request_path]
             from .planned_references import PlannedReferenceTarget
             target = PlannedReferenceTarget(fact)
             reference_targets.append((info, [target]))
-            spec["references"].append({"name": "Effect", "target_request_path": child.request_path,
+            spec["references"].append({"name": field_name, "target_request_path": child.request_path,
                 "target_result_handle": fact["result_handle"]})
-            result_context["metadata"].append({"class_id": type_info.class_id, "name": "Effect", "metadata": info.as_dict()})
+            result_context["metadata"].append({"class_id": type_info.class_id, "name": field_name, "metadata": info.as_dict()})
         for descriptor in node.references:
             documented = [binding for binding in list_bindings
                 if binding.get("planned_owner", {}).get("request_path") == node.request_path
@@ -9133,6 +9250,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
     if not isinstance(pre_state, Mapping):
         return []
     nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
+    nodes.extend(guard for node in tuple(nodes) for guard in node.get("owned_control_input_replacement", {}).get("metadata_guards", []))
     if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
         nodes.append(pre_state["plugin_creation_guard"])
     assertions, seen = [], set()
@@ -9881,8 +9999,8 @@ def _materialize_canonical_object_node(
         for child, child_row in zip(ordinary, row.get("children", []), strict=True):
             apply(child, child_row)
         for child in current.children:
-            if child.collection == "Effect":
-                apply(child, row["@Effect"])
+            if child.collection in {"Effect", "ControlInput"}:
+                apply(child, row["@" + child.collection])
         for descriptor in current.lists:
             for child, child_row in zip(descriptor.objects, row.get("@" + descriptor.name, []), strict=True):
                 apply(child, child_row)
@@ -18083,7 +18201,9 @@ def _bind_object_set_result_nodes(
     *,
     on_name_conflict: str,
     observed_rtpcs: Mapping[str, Mapping[str, Any]] | None = None,
+    observed_owned_controls: Mapping[str, Mapping[str, Any]] | None = None,
     observe_anonymous: Callable | None = None,
+    observe_owned_reference: Callable | None = None,
 ) -> dict[str, ObjectResultNode]:
     """Bind sparse ``object.set`` associations to the sealed request graph.
 
@@ -18148,6 +18268,17 @@ def _bind_object_set_result_nodes(
         if spec.get("rtpc_binding"):
             actual = (observed_rtpcs or {}).get(node.object, {})
             control = next((ref.get("target_id") for ref in spec.get("references", []) if ref["name"] == "ControlInput"), None)
+            if spec.get("owned_control_input"):
+                control = _reference_identity(_field_value(actual, "ControlInput"))
+                input_row = (observed_owned_controls or {}).get(control, {})
+                proof = spec["owned_control_input"]
+                if (input_row.get("name") != proof["name"] or input_row.get("type") != proof["type"]
+                        or input_row.get("classId") != proof["class_id"]
+                        or not _same_identity(_reference_identity(input_row.get("owner")), node.object)
+                        or any(not _has_field(input_row, name) or not condition_values_equal(_field_value(input_row, name), value)
+                            for name, value in proof["properties"].items())
+                        or proof["notes"] is not None and input_row.get("notes") != proof["notes"]):
+                    return False
             return (node.name == "" and actual.get("name") == ""
                 and actual.get("classId") == spec["class_id"]
                 and _same_identity(_reference_identity(actual.get("owner")), owner_id)
@@ -18230,7 +18361,16 @@ def _bind_object_set_result_nodes(
             if observe_anonymous is None:
                 raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require independent ordered membership")
             anonymous_ids.update(observe_anonymous(node.object, spec, available))
-        for child in returned_children.get(node.request_path, ()):  # result-relative parent path
+        returned = list(returned_children.get(node.request_path, ()))
+        for owned in available:
+            if owned.get("owned_reference") and owned.get("collection") == "ControlInput" and not any(
+                    child.collection == "ControlInput" for child in returned):
+                if observe_owned_reference is None:
+                    raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Sparse owned reference outcomes require exact-ID reference readback")
+                identity, name = observe_owned_reference(node.object, "ControlInput")
+                returned.append(ObjectResultNode(node.request_path + ".@ControlInput[0]", node.request_path,
+                    identity, name, 0, "ControlInput"))
+        for child in returned:  # result-relative parent path
             collection_matches = [
                 candidate
                 for candidate in available
@@ -18282,6 +18422,13 @@ def _bind_object_set_result_nodes(
                 details={"object_id": root.object, "name": root.name},
             )
         bind_node(root, target)
+
+    for target in target_by_id.values():
+        if target.get("owned_control_input_replacement") and target["request_path"] not in bound:
+            # Existing GUID is already sealed. Sparse field-only results gain
+            # no identity authority: the owned edge is read independently.
+            bind_node(ObjectResultNode("$sparse." + target["request_path"], None,
+                target["target_id"], target["requested_name"], 0, None), target)
 
     required_new_paths = {
         str(spec.get("request_path"))
@@ -20170,7 +20317,7 @@ def verify_prepared_operation(
                     payload,
                     allowed_lists=raw_list_names,
                 )
-                observed_rtpcs = {}
+                observed_rtpcs, observed_owned_controls = {}, {}
                 if any(spec.get("rtpc_binding") for spec in specs):
                     for result_node in result_nodes:
                         if result_node.collection == "RTPC":
@@ -20179,6 +20326,15 @@ def verify_prepared_operation(
                             if len(observations) != 1 or not _same_identity(observations[0].get("id"), result_node.object):
                                 raise ObjectOperationContractError("INVALID_READBACK", "Returned RTPC must resolve by its exact GUID once")
                             observed_rtpcs[result_node.object] = observations[0]
+                            if any(spec.get("owned_control_input") for spec in specs):
+                                control_id = _reference_identity(_field_value(observations[0], "ControlInput"))
+                                if _valid_object_id(control_id) and control_id not in observed_owned_controls:
+                                    fields = ["id", "name", "type", "classId", "owner", "notes", *sorted({
+                                        name for spec in specs for name in spec.get("owned_control_input", {}).get("properties", {})})]
+                                    control_rows = read_object(object_id=control_id, fields=fields)
+                                    if len(control_rows) != 1 or not _same_identity(control_rows[0].get("id"), control_id):
+                                        raise ObjectOperationContractError("INVALID_READBACK", "Owned ControlInput must resolve by its exact GUID once")
+                                    observed_owned_controls[control_id] = control_rows[0]
                 def observe_anonymous(owner_id, owner_spec, children):
                     # Native List order, not returned association order or post
                     # values, assigns stable declaration identities.
@@ -20211,7 +20367,8 @@ def verify_prepared_operation(
 
                 result_by_path = _bind_object_set_result_nodes(
                     result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),
-                    observed_rtpcs=observed_rtpcs, observe_anonymous=observe_anonymous,
+                    observed_rtpcs=observed_rtpcs, observed_owned_controls=observed_owned_controls, observe_anonymous=observe_anonymous,
+                    observe_owned_reference=lambda owner, field: _observe_owned_reference_result(owner, field, read=read_call, readbacks=readbacks),
                 )
         except ObjectOperationContractError as exc:
             assertion_name = (
@@ -20383,6 +20540,16 @@ def verify_prepared_operation(
             else:
                 expected_parent_id = spec.get("expected_parent_id")
             if expected_parent_id is not None:
+                if spec.get("owned_control_input"):
+                    control_id = _reference_identity(_field_value(row, "ControlInput"))
+                    if _valid_object_id(control_id):
+                        owned_assertions, owned_reads = _owned_control_input_assertions(spec["owned_control_input"],
+                            rtpc_id=object_id, control_id=control_id, read=read_call, owner_id=expected_parent_id,
+                            baseline_ids=_rtpc_baseline_identities(spec.get("rtpc_list_guard", {}).get("before", [])))
+                        assertions.extend(owned_assertions)
+                        readbacks.extend(owned_reads)
+                    else:
+                        check("new ControlInput exposes a canonical GUID", False, row)
                 collection = spec.get("collection")
                 if collection not in {None, "children"}:
                     actual_owner = _reference_identity(row.get("owner"))
@@ -20397,6 +20564,17 @@ def verify_prepared_operation(
                         _same_identity(_parent_value(row.get("parent")), expected_parent_id),
                         {"expected": expected_parent_id, "actual": _parent_value(row.get("parent"))},
                     )
+            if spec.get("owned_control_input_replacement"):
+                proof = spec["owned_control_input_replacement"]
+                control_id = _reference_identity(_field_value(row, "ControlInput"))
+                if _valid_object_id(control_id):
+                    owned_assertions, owned_reads = _owned_control_input_assertions(proof, rtpc_id=object_id,
+                        control_id=control_id, read=read_call, owner_id=proof["owner_id"],
+                        baseline_ids=_rtpc_baseline_identities(proof["baseline_rows"]))
+                    assertions.extend(owned_assertions)
+                    readbacks.extend(owned_reads)
+                else:
+                    check("replacement ControlInput exposes a canonical GUID", False, row)
             expected_path = spec.get("expected_path")
             if kind == 'object-create-graph' and compound_path_context:
                 from .creation_observations import ordinary_creation_graph
@@ -22013,7 +22191,8 @@ def verify_prepared_operation(
                 control_input_id = _reference_identity(fresh[0].get("@ControlInput"))
                 if _valid_object_id(control_input_id):
                     owned_assertions, owned_reads = _owned_control_input_assertions(plan["owned_control_input"],
-                        rtpc_id=fresh[0]["id"], control_id=control_input_id, read=read_call, owner_id=object_id)
+                        rtpc_id=fresh[0]["id"], control_id=control_input_id, read=read_call, owner_id=object_id,
+                        baseline_ids=_rtpc_baseline_identities(before_rows))
                     assertions.extend(owned_assertions)
                     readbacks.extend(owned_reads)
                 else:
@@ -24583,7 +24762,7 @@ def _validate_nested_request_shape(
                     request_path=f"$.objects[{index}].references",
                     allow_unions=True,
                 )
-                total_nodes += sum(isinstance(reference.target, ObjectCurveDescriptor) for reference in normalized_references)
+                total_nodes += sum(isinstance(reference.target, (ObjectCurveDescriptor, OwnedControlInputDescriptor)) for reference in normalized_references)
                 if "import" in item:
                     if version not in OBJECT_SET_IMPORT_VERSIONS:
                         raise OperationContractError(

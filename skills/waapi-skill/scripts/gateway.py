@@ -3023,6 +3023,10 @@ def build_parser() -> argparse.ArgumentParser:
     outcome.add_argument("--target-handle")
     outcome.add_argument("--clear-reference", action="store_true")
     outcome.add_argument("--link-state", choices=("linked", "unlinked"))
+    outcome.add_argument("--new-control-input-kind")
+    draft_declare_field_change.add_argument("--new-control-input-name")
+    draft_declare_field_change.add_argument("--new-control-input-notes")
+    draft_declare_field_change.add_argument("--new-control-input-field-value", action="append", nargs=2, default=[])
 
     draft_declare_rtpc = subparsers.add_parser(
         "draft-declare-rtpc",
@@ -18040,7 +18044,23 @@ def dispatch_offline_business_draft_update(
     elif args.command == "draft-declare-field-change":
         bound_field = session.handles.bound_field(args.field_handle)
         fields: dict[str, Any] = {"field_handle": args.field_handle}
-        if args.business_value is not None:
+        if args.new_control_input_kind is not None:
+            if inspected.operation != "object.set":
+                raise GatewayInputError("New owned ControlInput replacement uses the disclosed object.set Business Draft")
+            values = {}
+            for handle, raw in args.new_control_input_field_value:
+                if handle in values:
+                    raise GatewayInputError("Set each new Control Input property once")
+                field = session.handles.bound_field(handle)
+                values[handle] = _parse_bound_field_business_value(field, raw, field="new_control_input", session=session)
+            fields = {"field_values": {args.field_handle: {"new_control_input_business": {
+                "kind_handle": args.new_control_input_kind, "name": args.new_control_input_name, "field_values": values,
+                **({"notes": args.new_control_input_notes} if args.new_control_input_notes is not None else {})}}}}
+        elif args.new_control_input_name is not None or args.new_control_input_notes is not None or args.new_control_input_field_value:
+            raise GatewayInputError("New Control Input fields require --new-control-input-kind")
+        elif inspected.operation == "object.set":
+            raise GatewayInputError("The graph field-change outcome requires one new owned ControlInput")
+        elif args.business_value is not None:
             fields["business_value"] = _parse_bound_field_business_value(
                 bound_field,
                 args.business_value,
@@ -29170,13 +29190,31 @@ def _business_next_action_binding(
                         "more_outcomes_remain"
                     ),
                 },
+                "replace_owned_control_input": {
+                    **operation_draft_prefix_copy_binding(declare_field_change_prefix),
+                    "append": ["--object-handle", "<bound-existing-RTPC-handle>",
+                        "--field-handle", "<selected-object-ControlInput-Field-Handle>",
+                        "--new-control-input-kind", "<selected-Modulator-Type-Handle>",
+                        "--new-control-input-name", "<requested-name>",
+                        "[--new-control-input-notes <input-notes>]",
+                        "[--new-control-input-field-value <class-Field-Handle> <typed-value>]..."],
+                    "semantics": business_contract["reference_values"]["replace_owned_control_input"],
+                },
                 "declare_rtpc": {
                     **operation_draft_prefix_copy_binding(declare_rtpc_prefix),
                     "append": ["--declaration-id", "<task-local-id>", "--object-handle", "<bound-or-planned-owner-handle>",
-                        "--field-handle", "<selected-owner-property-handle>", "--control-input-handle", "<bound-control-input-handle>",
+                        "--field-handle", "<selected-owner-property-handle>",
+                        "--control-input-handle", "<bound-control-input-handle>",
                         "--point", "<x>", "<y>", "<Wwise-shape>", "[--point <x> <y> <Wwise-shape>]...",
                         "[--mode add-only|add-or-update]", "[--notes <exact-user-notes>]"],
                     "semantics": business_contract["rtpc_declaration"],
+                    "new_owned_input_alternative": {
+                        "replace_arguments": ["--control-input-handle", "<bound-control-input-handle>"],
+                        "with_arguments": ["--new-control-input-kind", "<selected-Modulator-Type-Handle>",
+                            "--new-control-input-name", "<requested-name>", "[--new-control-input-notes <input-notes>]",
+                            "[--new-control-input-field-value <class-Field-Handle> <typed-value>]..."],
+                        "mutually_exclusive": True,
+                    },
                 },
                 "declare_new": {
                     **operation_draft_prefix_copy_binding(declare_new_prefix),

@@ -63,6 +63,11 @@ def object_metadata_business_contract_data(
     return {
         "contract": OBJECT_METADATA_BUSINESS_CONTRACT,
         "operation": operation,
+        **({"new_owned_ControlInput_requires_object.set_Business_Draft": {
+            "start": ["draft-start", "object.set"], "declaration": "draft-declare-field-change",
+            "scope": "new_custom_LFO_Envelope_Time_owned_by_existing_RTPC; scalar_native_setReference_contract_unchanged",
+            "versions": ["2022.1", "2023.1", "2024.1", "2025.1"], "tracking_issue": 180}}
+           if operation == "object.setReference" else {}),
         "version": version,
         "input_mode": "business_declaration",
         "start": {

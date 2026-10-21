@@ -226,11 +226,11 @@ class ObjectCurveDescriptor:
 class ObjectReferenceDescriptor:
     request_path: str
     name: str
-    target: ObjectIdentityDescriptor | tuple[ObjectIdentityDescriptor, ...] | ObjectCurveDescriptor | None
+    target: ObjectIdentityDescriptor | tuple[ObjectIdentityDescriptor, ...] | ObjectCurveDescriptor | OwnedControlInputDescriptor | None
 
     @property
     def targets(self) -> tuple[ObjectIdentityDescriptor, ...]:
-        if self.target is None or isinstance(self.target, ObjectCurveDescriptor):
+        if self.target is None or isinstance(self.target, (ObjectCurveDescriptor, OwnedControlInputDescriptor)):
             return ()
         return self.target if isinstance(self.target, tuple) else (self.target,)
 
@@ -1055,8 +1055,9 @@ def materialize_waapi_node(
 
     def build(current: ObjectNodeDescriptor) -> dict[str, Any]:
         if current.rtpc is not None:
+            owned = isinstance(current.rtpc.control_input, OwnedControlInputDescriptor)
             return materialize_waapi_rtpc(current.rtpc,
-                resolved_control_input=resolved[current.references[0].request_path])
+                resolved_control_input=build(current.children[0]) if owned else resolved[current.references[0].request_path])
         result: dict[str, Any] = {"type": current.type, "name": current.name}
         if current.notes is not None:
             result["notes"] = current.notes
@@ -1321,10 +1322,23 @@ class _NormalizationState:
                 raise ObjectOperationContractError("INVALID_ARGUMENT", "RTPC mode must be add or add_or_replace")
             descriptor = normalize_rtpc_descriptors([mapping["rtpc"]], request_path=request_path + ".rtpc", max_rtpcs=1)[0]
             properties = (ObjectPropertyDescriptor(request_path + ".properties[0]", "PropertyName", descriptor.property),)
-            references = (ObjectReferenceDescriptor(request_path + ".references[0]", "ControlInput", descriptor.control_input),
-                ObjectReferenceDescriptor(request_path + ".references[1]", "Curve", ObjectCurveDescriptor(descriptor.points)))
+            children = ()
+            references = (ObjectReferenceDescriptor(request_path + ".references[0]", "ControlInput", descriptor.control_input),)
+            if isinstance(descriptor.control_input, OwnedControlInputDescriptor):
+                new_input = descriptor.control_input
+                children = (self.node({"type": new_input.type, "name": new_input.name,
+                    "properties": [{"name": name, "value": value} for name, value in new_input.properties],
+                    **({"notes": new_input.notes} if new_input.notes is not None else {})},
+                    request_path=request_path + ".control_input", parent_path=request_path, depth=depth + 1, collection="ControlInput"),)
+                references = ()
+            references += (ObjectReferenceDescriptor(request_path + ".references[1]", "Curve", ObjectCurveDescriptor(descriptor.points)),)
+            # Curve is an owned object even though its closed points descriptor
+            # does not need an ordinary graph occurrence/result handle.
+            self.node_count += 1
+            if self.node_count > self.limits.max_nodes or depth + 1 > self.limits.max_depth:
+                raise ObjectOperationContractError("NODE_LIMIT_EXCEEDED", "The RTPC/Curve/ControlInput graph exceeds its existing node/depth bound.")
             return ObjectNodeDescriptor(request_path, parent_path, "RTPC", "", descriptor.notes,
-                None, None, None, properties, references, (), collection="RTPC", rtpc=descriptor, rtpc_mode=mode)
+                None, None, None, properties, references, children, collection="RTPC", rtpc=descriptor, rtpc_mode=mode)
         allowed_fields = (
             OBJECT_SET_NODE_FIELDS
             if self.allow_platform or self.allow_language or self.allow_import
@@ -1533,7 +1547,9 @@ def _normalize_references(
         _exact_fields(item, required=REFERENCE_FIELDS, optional=frozenset(), path=path)
         name = _field_name(item.get("name"), path=f"{path}.name", limits=limits)
         raw_target = item.get("target")
-        if isinstance(raw_target, Mapping) and set(raw_target) == {"curve_points"} and allow_unions:
+        if isinstance(raw_target, Mapping) and set(raw_target) == {"new_control_input"} and allow_unions:
+            target = normalize_rtpc_control_input(raw_target, path=f"{path}.target", limits=limits)
+        elif isinstance(raw_target, Mapping) and set(raw_target) == {"curve_points"} and allow_unions:
             target = ObjectCurveDescriptor(normalize_curve_points(raw_target["curve_points"], request_path=f"{path}.target.curve_points"))
         elif raw_target is None and allow_unions:
             target = None
