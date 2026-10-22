@@ -45,7 +45,7 @@ stack ownership, preservation of unobserved project state, or a new automatic
 rollback mechanism. Five-version R69 read evidence is reused for the stored vs
 inherited distinction; it is not five-version clear/undo execution evidence.
 No Fresh, broad gate, Windows or Authoring run is claimed. Remaining #177,
-#181 and #190 obligations stay open.
+#181 and #192 obligations stay open.
 
 ## 2026-10-23 R69 directly stored reference values
 
