@@ -5,6 +5,49 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R66 existing-field metadata and staged PlaylistSlot edits
+
+Public fake-client tests reproduced a shared `object.set` omission: metadata
+without activation dependencies was not retained for execution/verification
+drift checks. The ordinary reference controls produced **8 failures / 4 passes**
+across 2022.1–2025.1, then **12 passes** after using the existing guard for every
+consumed field. At `99d31eca`, the selected final run passed **41 in 13.20s**,
+including ordinary scalar/reference drift, notes-only changes without metadata
+queries, conditional callers and the native 2021.1 operation boundary.
+Original focused logs are retained in
+`.waapi-skill-state/full-coverage/r66-compound-program-logs/`.
+
+The simulated direct PlaylistSlot `object.set` success did **not** establish
+native support. The first native attempt at `99d31eca` failed in the test helper
+before a transaction: it assumed the wrong field-discovery projection
+(1 failed in 5.63s). Reusing the existing projection helper passed its two
+controls in 0.51s. The second native attempt at `c770e807` reached `object.set`
+and was rejected by Console 2025.1.7.9143 with `ak.wwise.unexpected_error`,
+`objectType: 50`, and `Can't process object type` (1 failed in 5.57s).
+Transaction `tx1-dbdr5e98xjqb8szgr6ye` remains indeterminate; it was not verified
+or replayed, and no unchanged sandbox write outcome is inferred. Both original
+FAILs and quarantined sandboxes remain preserved. These observations do not
+establish absence of every possible owner-list or other-host update form.
+
+Candidate `eba0e2bb` then completed the business outcome through existing
+`object.setNotes` and `object.setReference` routes: **1 passed in 7.69s** on
+Console 2025.1.7.9143. Each stage had a separate immutable Preview, authorization,
+execution and verification; the second Draft rebound the independently observed
+post-notes object. Sixteen bounded query observations proved exact final notes
+and reference, unchanged peer, ordered list membership, owner and target.
+Both transactions reached `verified`; source hashes/mtime/tree metadata were
+unchanged, processes exited cleanly and the passing sandbox was deleted.
+This is a two-step workflow, not an atomic `object.set` success.
+
+Original native roots are under `.waapi-skill-state/full-coverage/`:
+`r66-playlist-compound-99d31eca-2025-r1`,
+`r66-playlist-compound-projection-2025-r2`, and
+`r66-playlist-staged-eba0e2bb-2025-r3`. The final observation SHA-256 is
+`ca7568395c684d551dd2d55cf4916ea1cc5c03c1a5533a63b50806c9180f71be`.
+No Fresh, broad gate, inventory regeneration or historical evidence rebinding
+was performed for this runtime slice. #177/#178/#180 and consolidated #195
+acceptance remain open; no whole-ticket or whole-goal completion is claimed.
+
 ## 2026-10-23 R64 existing PlaylistSlot reference change
 
 Candidate `ee55f8e5` passed one public-Gateway mutation on macOS Console
