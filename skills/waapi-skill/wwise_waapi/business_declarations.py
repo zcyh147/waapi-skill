@@ -572,6 +572,7 @@ class BusinessHandleRegistry:
         self._objects: dict[str, BoundObjectHandle] = {}
         self._fields: dict[str, BoundFieldHandle] = {}
         self._types: dict[str, BoundTypeHandle] = {}
+        self._property_targets = {}
 
     def bind_object(
         self,
@@ -683,6 +684,7 @@ class BusinessHandleRegistry:
                 }
                 for row in sorted(self._fields.values(), key=lambda item: item.handle)
             ],
+            **({"property_targets": [row.as_dict() for row in self._property_targets.values()]} if self._property_targets else {}),
             "types": [
                 {
                     "contract": BOUND_TYPE_HANDLE_CONTRACT,
@@ -712,6 +714,8 @@ class BusinessHandleRegistry:
             expected.add("types")
         elif contract != _LEGACY_BUSINESS_HANDLE_REGISTRY_CONTRACT:
             raise ValueError("business handle registry contract is invalid")
+        if "property_targets" in payload:
+            expected.add("property_targets")
         if set(payload) != expected:
             raise ValueError("business handle registry fields are invalid")
         context = BusinessContext.from_binding_dict(payload.get("context"))
@@ -740,7 +744,37 @@ class BusinessHandleRegistry:
             if bound.handle in registry._types:
                 raise ValueError("business type handles must be unique")
             registry._types[bound.handle] = bound
+        from .switch_child_context import restore
+        targets = payload.get("property_targets", [])
+        if not isinstance(targets, list) or len(targets) > 16:
+            raise ValueError("Tagged property targets exceed their bound")
+        for raw in targets:
+            target = restore(raw, context)
+            if target.handle in registry._property_targets:
+                raise ValueError("Duplicate tagged property target")
+            registry._property_targets[target.handle] = target
         return registry
+
+    def bind_property_target(self, proof):
+        from .switch_child_context import BoundContext
+        if len(self._property_targets) >= 16:
+            raise ValueError("Tagged property targets exceed their bound")
+        digest = canonical_sha256({"context": self.context.as_binding_dict(), "proof": proof})
+        target = BoundContext(self._new_handle("bsc1", digest), self.context, proof, digest)
+        self._property_targets[target.handle] = target
+        return target
+
+    def resolve_property_target(self, handle):
+        if handle in self._property_targets:
+            target = self._property_targets[handle]
+            self._require_context(target.context, self.context, handle=handle)
+            return target
+        return self.resolve_object(handle)
+
+    def revalidate_property_targets(self, read):
+        from .switch_child_context import validate
+        for target in self._property_targets.values():
+            validate(target.proof, read=read)
 
     def bind_type(
         self,
@@ -989,7 +1023,7 @@ class BusinessHandleRegistry:
         )
 
     def existing_target(self, object_handle: str) -> ExistingObjectTarget:
-        self.resolve_object(object_handle)
+        self.resolve_property_target(object_handle)
         return ExistingObjectTarget(object_handle=object_handle)
 
     def validate_field_value(self, field: BoundFieldHandle, value: Any) -> Any:

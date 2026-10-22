@@ -332,6 +332,18 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # R74 adds only the generated structural Switch-child property target proof
+    # to the five setProperty machine contracts. Invert exactly that addition
+    # before retaining every reviewed prior aggregate below.
+    assert canonical_sha256(non_object_set_digests) == "b4b9f6bcc8653b91d0ae37b34a24b80cdd3d5a4bcf476688ff6dd635e20f4fd5"
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.setProperty", version)
+        contract["optional_arguments"].remove("switch_child_context")
+        contract["argument_contract"]["optional"].remove("switch_child_context")
+        assert contract["argument_contract"]["properties"].pop("switch_child_context") == {
+            "type": "object", "description": "Gateway-generated owner/child context binding; callers use the disclosed binding handles.",
+        }
+        non_object_set_digests[f"object.setProperty@{version}"] = canonical_sha256(contract)
     # R70 clarifies only the five setReference null-target descriptions: a
     # directly stored clear may retain an inherited effective reference. The
     # other 144 machine contracts are unchanged from cb8f4391.

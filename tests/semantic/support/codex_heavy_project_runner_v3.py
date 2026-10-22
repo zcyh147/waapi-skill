@@ -4265,6 +4265,7 @@ def _compile_integration_workflow_plan(
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
         "draft-bind-object": "operation_compose",
+        "draft-bind-switch-child-context": "operation_compose",
         "draft-bind-field": "operation_compose",
         "draft-discover-fields": "operation_compose",
         "query-object": "operation_compose",

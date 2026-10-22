@@ -25,7 +25,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
     "object.setProperty": {
         "required_fields": ["object_handle", "field_handle", "business_value"],
         "field_types": {
-            "object_handle": "bound_object_handle",
+            "object_handle": "bound_object_handle_or_switch_child_context_handle",
             "field_handle": "bound_property_handle",
             "business_value": "live_metadata_typed_scalar",
         },
@@ -85,6 +85,14 @@ def object_metadata_business_contract_data(
             ),
             "result": "copy_the_returned_bound_object_handle",
         },
+        **({"structural_property_target": {
+            "subcommand": "draft-bind-switch-child-context",
+            "required_fields": ["owner_handle", "child_handle"],
+            "scope": "exact SwitchContainer owner and its directly bound child; Gateway derives the child context GUID",
+            "result": "copy bound_context.handle as object_handle for metadata-authorized scalar property discovery",
+            "native_identity": "preserved without inventing an absent native type",
+            "history_recovery": {"status": "unavailable", "tracking_issue": 192},
+        }} if operation == "object.setProperty" else {}),
         "field_discovery": {
             "subcommand": "draft-discover-fields",
             "input": "user_facing_meaning",
@@ -117,7 +125,8 @@ def object_metadata_business_contract_data(
         "safety": {
             "immutable_preview": True,
             "single_execute": True,
-            "object_revalidation": "exact_guid_name_type_path",
+            "object_revalidation": ("ordinary_exact_guid_name_type_path_or_structural_owner_child_context_proof"
+                if operation == "object.setProperty" else "exact_guid_name_type_path"),
             "field_revalidation": "exact_scope_token_metadata_platform",
         },
     }

@@ -169,6 +169,8 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
     plan, state = prepared.get("verification_plan"), prepared.get("pre_state")
     if not isinstance(plan, Mapping) or not isinstance(state, Mapping):
         raise ValueError("History expectation receipt lacks a prepared business observation")
+    if state.get("switch_child_context") is not None:
+        raise ValueError("Switch-child context history recovery is not yet implemented (#192); this receipt does not authorize recovery")
     if plan.get("kind") == "undo-group-result-schemas":
         raise ValueError("Compound history needs actual parent-owned child execution and verification associations")
     if plan.get("kind") == "same-guid-reference":

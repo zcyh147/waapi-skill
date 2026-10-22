@@ -2514,7 +2514,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "property-reference",
         "Set one property for the current or an explicit platform using live property metadata and typed readback; Effect Render also previews and verifies its source-proved owner-chain prefix and version-observed clearing suffix.",
         ("object", "property", "value"),
-        ("platform",),
+        ("platform", "switch_child_context"),
         argument_contract=_object_contract(
             ("object", "property", "value"),
             {
@@ -2522,8 +2522,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "property": {"type": "string", "minLength": 1},
                 "value": {"description": "JSON scalar accepted only after live property metadata validation."},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
+                "switch_child_context": {"type": "object", "description": "Gateway-generated owner/child context binding; callers use the disclosed binding handles."},
             },
-            optional=("platform",),
+            optional=("platform", "switch_child_context"),
         ),
         identity_arguments=("object",),
         selection_guidance=_selection_guidance(
@@ -9262,7 +9263,7 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord, *, 
         )
 
 
-def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, activation_path, platform=None):
+def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, activation_path, platform=None, context_binding=None):
     """Bind the observed Switch association context to its exact native owner."""
     from .metadata_restrictions import condition_matches
     if object_id is None:
@@ -9270,7 +9271,8 @@ def _prepare_association_parent_condition(*, object_id, property_name, restricti
     rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
                       {"return": ["id", "name", "type", "path", "owner"]}))
     if (len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id)
-            or rows[0].get("type") != "ObjectSettingAssociation"):
+            or (rows[0].get("type") != "ObjectSettingAssociation" and not (context_binding
+                and _same_identity(context_binding["context_id"], object_id)))):
         raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "AssocParent needs the observed native association context identity.")
     source = rows[0]
     owner_id = _reference_identity(source.get("owner"))
@@ -9413,6 +9415,8 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    from .switch_child_context import assertions as context_assertions
+    assertions.extend(context_assertions(pre_state, read=read))
     transfer = pre_state.get("source_transfer_parent_guard") if isinstance(pre_state, Mapping) else None
     if after_write and isinstance(transfer, Mapping):
         expected = transfer["objects"]
@@ -9661,6 +9665,7 @@ def _apply_reference_activation_dependencies(
     reference_requirements: dict[str, Any] | None = None,
     desired_references: Mapping[str, Any] | None = None,
     related_conditions: list[dict[str, Any]] | None = None,
+    context_binding=None,
     platform: str | None = None,
     _closure_collected: bool = False,
     wwise_version: str | None = None,
@@ -9775,7 +9780,7 @@ def _apply_reference_activation_dependencies(
                 _activation_fields=all_fields, _condition_sources=_condition_sources,
                 reference_requirements=reference_requirements,
                 desired_references=desired_references,
-                related_conditions=related_conditions,
+                related_conditions=related_conditions, context_binding=context_binding,
                 platform=platform,
                 _closure_collected=_closure_collected,
                 wwise_version=wwise_version, override_applicability=override_applicability,
@@ -9855,7 +9860,7 @@ def _apply_reference_activation_dependencies(
                 _prepare_association_parent_condition(
                     object_id=object_id, property_name=property_name, restriction=restriction,
                     read=read, requirements=related_conditions, activation_path=path,
-                    platform=platform,
+                    platform=platform, context_binding=context_binding,
                 )
                 continue
             supplied = next((spec for spec in property_specs
@@ -9975,7 +9980,7 @@ def _apply_reference_activation_dependencies(
             _condition_sources=_condition_sources,
             reference_requirements=reference_requirements,
             desired_references=desired_references,
-            related_conditions=related_conditions,
+            related_conditions=related_conditions, context_binding=context_binding,
             platform=platform,
             _closure_collected=_closure_collected,
             wwise_version=wwise_version, override_applicability=override_applicability,
@@ -11921,6 +11926,19 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         cleanup = {"kind": "restore-pre-state", "snapshot": dict(target.row)}
     elif request.operation in {"object.setProperty", "object.setReference"}:
         source = _resolve_identity(arguments["object"], role="object", read=read)
+        context_binding = arguments.get("switch_child_context")
+        if context_binding is not None:
+            from .switch_child_context import validate as validate_context
+            try:
+                if request.operation != "object.setProperty" or context_binding.get("version") != request.version:
+                    raise ValueError("Context binding operation/version differs")
+                context_binding = validate_context(context_binding, read=read)
+                if not _same_identity(context_binding["context_id"], source.object):
+                    raise ValueError("Context binding names another target")
+            except (ValueError, TypeError, KeyError, StopIteration) as exc:
+                raise OperationContractError("SWITCH_CHILD_CONTEXT_INVALID", str(exc)) from exc
+            source = ResolvedObject(identity=source.identity, object=source.object, resolution="switch-child-context", row=context_binding["rows"]["context"])
+            metadata["switch_child_context"] = context_binding
         roles["object"] = source
         field_name = "property" if request.operation == "object.setProperty" else "reference"
         field_value = _non_empty_string(arguments[field_name], field=field_name)
@@ -11965,7 +11983,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 derived_properties={}, request_path="$.reference",
                 wwise_version=request.version, override_applicability=override_applicability,
                 reference_requirements=activation_reference_requirements,
-                related_conditions=related_conditions,
+                related_conditions=related_conditions, context_binding=context_binding,
                 platform=platform,
             )
             activation_requirements = {spec["name"]: spec["value"] for spec in activation_specs}

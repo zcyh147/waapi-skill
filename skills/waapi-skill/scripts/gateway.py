@@ -3181,6 +3181,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_business_draft_binding_arguments(draft_remove_declaration)
     draft_remove_declaration.add_argument("--declaration-id", required=True)
 
+    context_binding = subparsers.add_parser("draft-bind-switch-child-context", help="Bind a Switch child property target from exact owner and child handles")
+    _add_business_draft_binding_arguments(context_binding)
+    context_binding.add_argument("--owner-handle", required=True)
+    context_binding.add_argument("--child-handle", required=True)
+
     draft_bind_object = subparsers.add_parser(
         "draft-bind-object",
         help="Resolve one exact live Wwise object into a task-local opaque handle",
@@ -14436,6 +14441,9 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-bind-switch-child-context":
+        return dispatch_switch_child_context_binding(args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher, common=common)
     if args.command == "draft-bind-object":
         return dispatch_business_object_binding(
             args,
@@ -17371,6 +17379,7 @@ def dispatch_operation_draft_check(
             bound_objects,
             read_call=read_call,
         )
+        business_session.handles.revalidate_property_targets(read_call)
         if adapter.supports_field_discovery:
             for row in business_session.handles.as_dict()["fields"]:
                 bound_field = business_session.handles.bound_field(row["handle"])
@@ -19617,6 +19626,35 @@ def _created_root_business_result(verification: Mapping[str, Any], transaction_i
     }
 
 
+def dispatch_switch_child_context_binding(args, *, env, connection, detected_version, live_info, dispatcher, common):
+    from wwise_waapi.switch_child_context import capture
+    binding = _open_business_binding(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    if binding.record.operation != "object.setProperty":
+        raise GatewayInputError("Switch child context targets are reviewed for object.setProperty only")
+    session = BusinessDeclarationSession.from_dict(binding.record.composition["business_session"])
+    owner = session.handles.resolve_object(args.owner_handle)
+    child = session.handles.resolve_object(args.child_handle)
+    revalidate_live_objects(session.handles, (owner, child), read_call=binding.read_call)
+    proof = capture(detected_version, owner.object_id, child.object_id, read=binding.read_call)
+    captured = []
+    def bind(current):
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        captured.append(handles.bind_property_target(proof))
+        return current.with_handle_registry(handles)
+    record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
+        expected_revision=args.expected_revision, schema_digest=operation_draft_schema_digest(binding.record.operation, detected_version),
+        composer_digest=operation_composer_digest(binding.record.operation, detected_version), context=binding.context,
+        update=bind, event_type="handles.bound")
+    payload = operation_draft_payload(args.command, record, offline=False, state_dir=args.state_dir, task_authority=args.task_authority)
+    payload["bound_context"] = {"handle": captured[0].handle, "context_id": proof["context_id"],
+        "business_role": "switch_child_context", "native_identity": proof["rows"]["context"]}
+    payload["next_actions"] = {"discover_fields": transaction_next_command("draft-discover-fields", ["draft-discover-fields", record.draft_id,
+        "--task-authority", args.task_authority, "--expected-revision", str(record.revision), "--object-handle", captured[0].handle,
+        "--meaning", "<requested-property-meaning>"], state_dir=args.state_dir)}
+    return payload
+
+
 def dispatch_business_object_binding(
     args: argparse.Namespace,
     *,
@@ -20107,7 +20145,11 @@ def dispatch_business_field_discovery(
         )
     source = None
     if args.object_handle is not None:
-        source = session.handles.resolve_object(args.object_handle)
+        source = (session.handles.resolve_property_target(args.object_handle) if binding.record.operation == "object.setProperty"
+            else session.handles.resolve_object(args.object_handle))
+        from wwise_waapi.switch_child_context import BoundContext, validate as validate_context
+        if isinstance(source, BoundContext):
+            validate_context(source.proof, read=binding.read_call)
         scope_kind = "object"
         scope_value: str | int = source.object_id
         discovery_scope = {"object": source.object_id}
@@ -27613,6 +27655,14 @@ def _business_next_action_binding(
             "custom_reference_value",
         ],
     }
+    if record.operation == "object.setProperty":
+        context_binding = operation_draft_prefix_copy_binding(
+            [*base, "draft-bind-switch-child-context", *binding]
+        )
+        context_binding["append"] = ["--owner-handle", "<bound-switch-owner-handle>",
+                                     "--child-handle", "<bound-direct-child-handle>"]
+        context_binding["result"] = "copy_the_returned_bound_context.handle_as_object_handle"
+        object_binding["switch_child_context"] = context_binding
     if record.operation == "object.set":
         event_action_by_event_path_segments = (
             operation_draft_prefix_copy_binding(object_bind_prefix)

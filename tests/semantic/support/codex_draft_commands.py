@@ -15,6 +15,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-add-media",
         "draft-bind-field",
         "draft-bind-object",
+        "draft-bind-switch-child-context",
         "draft-business-configure",
         "draft-declare-import-batch",
         "draft-clear-object-list",
