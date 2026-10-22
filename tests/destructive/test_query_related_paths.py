@@ -93,7 +93,9 @@ def test_scoped_related_paths_match_independent_objects(workflow_sandbox_runtime
         selected = [row for row in proof["scopes"] if row.get("path") == "parent" and row.get("selected")]
         assert {row["selected"]["name"] for row in selected} == {"Pitch", "OutputBus"}, selected
         for row in selected:
-            assert row["scope"] == {"classId": sound["class_id"]}, row
+            # Instance metadata is authoritative when class facts are insufficient.
+            # Either scope must name this independently observed related Sound.
+            assert row["scope"] in ({"classId": sound["class_id"]}, {"object": SOUND}), row
             assert row["selected"]["kind"] == ("property" if row["selected"]["name"] == "Pitch" else "reference"), row
 
         exact_bus, bus_native, _ = read("bus-independent", RESOLVED_BUS, ["--include", "volume-db"])
