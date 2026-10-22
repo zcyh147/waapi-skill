@@ -712,7 +712,7 @@ def _validate_target(
         return target
     if isinstance(target, ExistingObjectTarget):
         try:
-            handles.resolve_object(target.object_handle)
+            handles.resolve_property_target(target.object_handle)
         except BusinessDeclarationError as exc:
             raise repair_at_draft_revision(
                 exc,
