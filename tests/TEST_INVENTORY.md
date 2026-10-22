@@ -5,6 +5,44 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R72 Parent/Show Weight evidence reuse
+
+Read-only review of the five original Parent/Show roots at
+`5d899f1e30d42422fbd04c07ebb3490252a7477f` found sufficient native business
+evidence for the exact existing Sound.Weight condition. Ten original Weight
+transactions (two modes per version) retain matching immutable artifact hashes,
+confirmation tokens, one execution each, successful guards and independent
+readback. Sequence mode 0 changes Weight 50 to 37; Random mode 1 changes 37 to
+38. Each Weight edit preserves the parent mode and the other observed source
+fields. Metadata remains equal before/after, and isPropertyEnabled is true in
+both modes. All five original lifecycles are PASS with unchanged source hashes
+and mtimes, no recorded errors and completed cleanup.
+
+The original `agent_semantic_pass=false` values remain unchanged: these runs
+never claimed Fresh Agent acceptance. Exploratory provenance and the absence
+of newer category wrappers do not erase their actual authorization, effect and
+cleanup evidence. This assessment grants no new run or modern producer receipt.
+It withdraws the proposed five replacement native tests.
+
+The property builder/value validation and Real64 comparison retain their
+relevant ASTs. Current Show validation and metadata/identity/platform guards
+strengthen preparation without changing this native property effect. On current
+candidate `d1c4866d`, the directly affected public Parent/Show function passed
+**18 tests in 5.02s**, covering both modes for setProperty on all five versions
+and object.set on 2022.1–2025.1. This is focused program evidence, not another
+native batch or full gate.
+
+Exact five product IDs, ten transaction/artifact hashes, observation/lifecycle
+hashes and source review are retained under
+`.waapi-skill-state/full-coverage/research/` in
+`waapi-r72-parent-weight-native-reuse.md` and
+`waapi-r72-parent-weight-reuse-audit.json` (SHA-256
+`214be9d4bd7ef38ca0988960f4bcce72f6fc95134b3f404d73ba19710b852db2`).
+The current program log is `r72-parent-current-program.log` in the parent state
+directory. Exact source/evidence linkage remains #195 work; missing linkage
+must not be relabeled as missing native effect. Other condition mechanisms,
+unobserved sibling/global state and whole #177 completion are not claimed.
+
 ## 2026-10-23 R71 related fixed outputs
 
 Candidate `fd1c139e44e3fd39870d5fb3c6456a281a6be86a` adds
