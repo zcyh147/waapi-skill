@@ -38,20 +38,25 @@ UNLINKED_PLATFORM = "{00000000-0000-0000-0000-000000000000}"
 
 
 def test_existing_association_continue_play_preserves_owner_and_child(workflow_sandbox_runtime):
-    runtime = workflow_sandbox_runtime
+    _exercise_existing_association_continue_play(workflow_sandbox_runtime)
+
+
+def _exercise_existing_association_continue_play(runtime, *, history_actions=()):
     version = runtime.sandbox.metadata.get_info_version
     assert tuple(version.get(key) for key in ("year", "major", "minor", "build")) == BUILDS[runtime.version]
     hierarchy = "Containers" if runtime.version == "2025.1" else "Actor-Mixer Hierarchy"
     owner_path = "\\" + hierarchy + r"\Minigun\Minigun\Shells"
-    output = runtime.state_dir / "association-continue-play.json"
+    history = bool(history_actions)
+    output = runtime.state_dir / ("association-continue-play-history.json" if history else "association-continue-play.json")
     assert not output.exists(), "An earlier observation must not be overwritten"
     evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
     prior_packets = set(evidence_root.glob("*.json"))
     observation = {"candidate": runtime.candidate, "version": runtime.version,
         "operation": "object.setProperty", "reads": [], "transactions": [],
         "native_evidence": [], "business_effect_verified": False}
-    category = {"category": "existing-association-continue-play", "status": "FAIL",
-        "verifier_strength": "independent_exact_association_owner_child_and_membership_readback",
+    category = {"category": "structural-association-continue-play-owned-history" if history else "existing-association-continue-play", "status": "FAIL",
+        "verifier_strength": ("receipt_bound_structural_history_and_independent_association_owner_child_membership_readback"
+            if history else "independent_exact_association_owner_child_and_membership_readback"),
         "observation_path": str(output)}
     runtime.category_results.append(category)
     status = "FAIL"
@@ -140,6 +145,9 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         assert all(isinstance(source.get(key), str) for key in ("id", "name", "path")), source
         assert source["path"] and source["name"] == "" and source["class_id"] == 1572880, source
         needs_context_binding = "type" not in source
+        if history:
+            assert runtime.version in {"2022.1", "2023.1"}
+            assert needs_context_binding is (runtime.version == "2022.1"), source
         if needs_context_binding:
             # The ordinary query remains an incomplete identity. Only the
             # separate owner/child binding below can authorize a field target.
@@ -186,7 +194,7 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         enabled("association-enabled-before", association, selection, enabled_platform)
 
         draft = _start_business_draft(runtime, "object.setProperty")
-        if needs_context_binding:
+        if needs_context_binding or history:
             owner_handle = _bind_business_object(runtime, draft, object_id=OWNER)
             child_handle = _bind_business_object(runtime, draft, object_id=CHILD)
             binding = _update_business_draft(runtime, draft, "draft-bind-switch-child-context",
@@ -194,7 +202,10 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
             observation["context_binding"] = binding
             context = binding["bound_context"]
             assert context["context_id"] == association and context["business_role"] == "switch_child_context", context
-            assert context["native_identity"]["id"] == association and "type" not in context["native_identity"], context
+            assert context["native_identity"]["id"] == association, context
+            assert ("type" not in context["native_identity"]) is needs_context_binding, context
+            if not needs_context_binding:
+                assert context["native_identity"]["type"] == source["type"], context
             bound = context["handle"]
             assert isinstance(bound, str) and bound, context
         else:
@@ -213,6 +224,12 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
             assert dispatch["uri"] == "ak.wwise.core.object.setProperty", dispatch
             assert dispatch["args"] == {"object": association, "property": "ContinuePlay", "value": True,
                 **({"platform": platform} if platform is not None else {})}, dispatch
+            if history:
+                proof = prepared["pre_state"]["switch_child_context"]
+                assert proof["context_id"] == association and proof["owner_id"] == OWNER and proof["child_id"] == CHILD, proof
+                assert ("type" not in proof["rows"]["context"]) is needs_context_binding, proof
+                assert prepared["request"]["arguments"]["switch_child_context"] == proof, prepared
+                observation["structural_history_source_proof"] = proof
             related, = prepared["pre_state"]["related_conditions"]
             assert related["source_id"] == association and related["owner_id"] == OWNER, related
             assert related["property"] == "SwitchBehavior" and type(related["value"]) is int and related["value"] == 1, related
@@ -226,6 +243,53 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         same(objects("owner-children-after", OWNER, children=True, context=True), members)
         enabled("association-enabled-after", association, selection, enabled_platform)
         assert len(observation["transactions"]) == 1
+        if history:
+            source_read_count = len(observation["reads"])
+            observation["source_observation_read_count"] = source_read_count
+            source_receipt = receipt["preview"]["transaction_id"]
+            for direction in history_actions:
+                history_draft = _start_business_draft(runtime, "ak.wwise.core.undo." + direction)
+                _update_business_draft(runtime, history_draft, "draft-declare-core-plan",
+                    ["--value", "history_scope", "latest_project_history",
+                     "--value", "expectation_receipt", source_receipt], live=True)
+
+                def inspect_history_preview(preview):
+                    observation.setdefault("history_previews", {})[direction] = preview
+                    action = preview["preview_summary"]["history_action"]
+                    assert action["scope"] == "latest_project_history" and action["action"] == direction, action
+                    assert action["expectation_receipt"] == source_receipt, action
+                    assert action["verification_boundary"] == "owned_receipt_scoped_state_only", action
+                    assert action["stack_head_observed"] is False and action["outside_scope_preservation_observed"] is False, action
+                    assert action["automatic_retry"] is False and action["automatic_compensation"] is False, action
+                    # History detail may be paged out of the compact notice.
+                    # Inspect the immutable preparation through the same full
+                    # transaction-show read already used for the source Preview.
+                    shown = runtime.gateway(["transaction-show", preview["transaction_id"]], live=False)
+                    observation.setdefault("immutable_history_previews", {})[direction] = shown
+                    prepared = shown["artifact"]["prepared_operation"]
+                    binding = prepared["pre_state"]["history_binding"]
+                    assert binding["source_receipt"]["transaction_id"] == source_receipt, binding
+                    assert prepared["verification_plan"]["history_binding"] == binding, prepared
+                    expected, = binding["observations"]
+                    assert expected["kind"] == "switch_child_property" and expected["field"] == "ContinuePlay", expected
+                    assert expected["before"] is False and expected["after"] is True, expected
+                    same(expected["guards"]["switch_child_context"], observation["structural_history_source_proof"])
+                    assert ("type" not in expected["object_before"]) is needs_context_binding, expected
+                    assert ("type" not in expected["object_after"]) is needs_context_binding, expected
+
+                phase = _complete_business_draft(runtime, history_draft, inspect_preview=inspect_history_preview)
+                observation["transactions"].append(phase)
+                assert phase["verify"]["verification_strength"] == "scoped_history_effect_readback", phase
+                expected_source = source if direction == "undo" else after
+                same(objects("association-after-" + direction, association, ("ContinuePlay", "FadeInTime")), expected_source)
+                same(objects("owner-after-" + direction, OWNER, ("SwitchBehavior",)), owner)
+                same(objects("child-after-" + direction, CHILD, context=True), child)
+                same(objects("owner-children-after-" + direction, OWNER, children=True, context=True), members)
+                enabled("association-enabled-after-" + direction, association, selection, enabled_platform)
+            assert len(observation["transactions"]) == 1 + len(history_actions)
+            assert len(observation["reads"]) == source_read_count + 5 * len(history_actions)
+            observation["history_observation_read_count"] = 5 * len(history_actions)
+            observation["history_scope"] = "owned receipt and observed objects only; global stack head and other state are not proven"
         observation["business_effect_verified"] = True
         status = "PASS"
     except BaseException as exc:
