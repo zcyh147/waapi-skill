@@ -5,6 +5,46 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R68 Blend Track output and field-refinement guidance
+
+Candidate `f437f57cfa22cf03d0983be66dfc3864940a00c0` exposes the fixed
+`query-object --include blend-tracks` output on the source-proven 2024.1/2025.1
+lanes. Its schema cites the matching return-expression enum, native addTrack
+read guidance and object-return pattern union. It does not invent a narrower
+accessor-specific schema. Earlier versions retain an explicit unavailable
+packaged route, not a claim of native absence.
+
+The selected fake-client run passed **169 tests in 8.25s**: versioned discovery
+and dispatch, unchanged native order/extensions, false/zero/empty/null/absence,
+advanced-query composition, duplicates, bounded result paging and result drift.
+The same batch repairs custom-field refinement guidance to retain the originally
+requested ordinary/override-source mode. No-match followed by refinement proves
+the intended native accessor remains selected. The output audit now accounts
+for return-expression enum entries as well as named result properties; new
+unclassified enum entries fail the check. Legacy spelling reconciliation,
+2025 `states` semantics and the native spelling conflict remain explicit #181
+questions rather than assumed equivalences or automatic public inputs.
+
+Sequential native macOS Console runs on that same candidate each passed once:
+**2024.1.13.9056: 1 passed in 7.40s**;
+**2025.1.7.9143: 1 passed in 8.74s**. Each reads an existing Blend Container's
+track list, independently resolves both exact track GUIDs, then reads the owner
+again. Original native packets and public output agree on the On-Load/Off-Load
+track identities, names and order. All four reads per version completed; there
+were no transactions. Source hashes/mtime/tree metadata were unchanged, process
+shutdown was clean and the passing sandbox was deleted.
+
+Evidence roots: `.waapi-skill-state/full-coverage/r68-blend-tracks-f437f57c-<year>-r1/`,
+with per-root `root-review.json` and aggregate `r68-two-version-native-review.json`.
+Observation SHA-256 values are
+`1ded5b8c706ac15f4b492d1357575a77de4cefdcf4e5af60808fd94c6194fc9a`
+and `475a47855caba9c8837b612baf649d82ff356660631227f4ec840b9e9c11388c`
+for 2024 and 2025 respectively. Original RED/intermediate audit failures and
+final code-test stdout remain in `r68-program-logs/`; they were not regraded.
+No new Fresh, broad gate, Windows/Authoring, inventory regeneration or historical
+source-evidence rebinding was performed. R67's native property results remain
+valid without rerunning them for the refinement guidance change. #181 stays open.
+
 ## 2026-10-23 R67 property values at the source of override
 
 Candidate `29cb2291ba87d67c1058dae6f5e77c106c25c302` adds the closed
