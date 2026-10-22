@@ -146,6 +146,25 @@ def available_query_outputs(version: str) -> dict[str, tuple[str | None, str]]:
     return outputs
 
 
+def override_source_value_contract(version: str) -> dict[str, Any]:
+    """Disclose the documented property-value alternative, not ancestor identity."""
+    graph = _definition_graph(version)
+    return {
+        "option": "--include-override-source-value <user-facing property meaning>",
+        "output_group": "override_source_values",
+        "meaning": "value of the property for the source of override",
+        "not_observed": ["ancestor identity", "runtime RTPC or mixed audio result"],
+        "same_property_with_ordinary_value": True,
+        "ordinary_value_output_group": "properties",
+        "units": "unchanged selected property units; unknown units remain unknown",
+        "scope": "same exact live metadata scope as --include-field; advanced expressions and post-relationship fields remain unavailable",
+        "reference_alternative": {"status": "unproven", "tracking_issue": 181},
+        "native_definition": {"version": version, "wwise_build": graph.wwise_build,
+            "document": "waapi_definitions.json",
+            "pointer": "/definitions/returnExpression/items/anyOf/1"},
+    }
+
+
 def query_output_detail(version: str, name: str) -> dict[str, Any]:
     if version == "2021.1" and name == "active-source":
         return {

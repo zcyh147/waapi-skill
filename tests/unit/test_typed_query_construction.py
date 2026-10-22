@@ -526,11 +526,12 @@ def test_query_schema_discloses_diagnostic_view_exclusions_before_transport(tmp_
     assert "literal" in view["source"] and "one exact" in view["source"]
     forbidden = {
         "--include": ["volume-db"], "--include-field": ["attenuation"],
+        "--include-override-source-value": ["Volume"],
         "--relationship": ["children"], "--predicate": ["name-is", "Sound"], "--max-results": ["1"],
     }
     assert set(view["cannot_combine_with"]) == set(forbidden)
     assert view["additional_fields"]["omit_options"] == ["--view"]
-    assert view["additional_fields"]["field_options"] == ["--include", "--include-field"]
+    assert view["additional_fields"]["field_options"] == ["--include", "--include-field", "--include-override-source-value"]
     identity = ["--exact-id", "{33333333-3333-3333-3333-333333333333}"]
     for option in view["cannot_combine_with"]:
         code, payload = gateway.execute_gateway(["query-object", *identity,
@@ -556,9 +557,9 @@ def test_diagnostic_view_and_separate_extra_field_query_keep_existing_input_boun
     parser = gateway.build_parser()
     view = parser.parse_args(["query-object", *source, "--view", "sound-routing-diagnostics", "--detail"])
     if version == "2021.1":
-        # The generic active-source implementation gap remains #181 / #174;
-        # this diagnostic view cannot turn that missing mapping into support.
-        with pytest.raises(gateway.GatewayInputError, match="active-source.*2021.1"):
+        # The narrow file-backed derivation needs an explicit platform/language
+        # view; this invocation does not provide one.
+        with pytest.raises(gateway.GatewayInputError, match="2021.1 active-source.*explicit platform and language"):
             gateway.preflight_query_object_input(view, env=env)
     else:
         gateway.preflight_query_object_input(view, env=env)

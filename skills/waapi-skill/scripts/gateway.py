@@ -130,6 +130,7 @@ from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[report
 from wwise_waapi.object_query_outputs import (  # noqa: E402
     QUERY_BUSINESS_OUTPUTS,
     available_query_outputs,
+    override_source_value_contract,
     query_output_detail,
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -2000,6 +2001,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument(
+        "--include-override-source-value",
+        action="append",
+        default=[],
+        dest="override_source_value_meanings",
+        metavar="MEANING",
+        help=(
+            "Read one live-discovered property's value on its source of override; "
+            "not an ancestor identity or a runtime RTPC/audio result"
+        ),
+    )
+    query_object.add_argument(
         "--predicate",
         nargs=2,
         action="append",
@@ -2038,7 +2050,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Select one Gateway-owned diagnostic view; the Gateway owns its "
             "complete projection and one exact-object bound. Do not combine "
-            "--include, --include-field, --relationship, --predicate, or "
+            "--include, --include-field, --include-override-source-value, --relationship, --predicate, or "
             "--max-results; use a separate exact-object query for extra fields"
         ),
     )
@@ -5619,6 +5631,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 relationships,
                 getattr(args, "business_outputs", None),
                 getattr(args, "custom_field_meanings", None),
+                getattr(args, "override_source_value_meanings", None),
                 getattr(args, "business_predicates", None),
                 args.max_results is not None,
             )
@@ -5710,9 +5723,9 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         field, operator, value_type = native
         args.where.append((field, operator, value_type, value))
     if getattr(args, "advanced_waql", None) is not None:
-        if args.custom_field_meanings:
+        if args.query_custom_field_meanings:
             raise GatewayInputError(
-                "--advanced-waql does not accept --include-field because an exact "
+                "--advanced-waql does not accept --include-field or --include-override-source-value because an exact "
                 "live metadata scope cannot be derived; use a scoped business query"
             )
         if args.business_predicates or args.relationships:
@@ -5745,13 +5758,13 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         )
         if args.select:
             raise GatewayInputError(
-                "--include-field cannot be combined with --relationship because "
+                "--include-field and --include-override-source-value cannot be combined with --relationship because "
                 "the post-traversal result type is not one exact metadata scope; "
                 "use a closed --include business field"
             )
         if not (type_scope or exact_object_scope):
             raise GatewayInputError(
-                "--include-field requires a --kind/--custom-kind source or one exact "
+                "--include-field and --include-override-source-value require a --kind/--custom-kind source or one exact "
                 "path/GUID source so the Gateway can "
                 "bind one live metadata scope"
             )
@@ -5826,11 +5839,12 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             if output not in requested
         )
     custom_meanings = list(getattr(args, "custom_field_meanings", ()) or ())
+    override_meanings = list(getattr(args, "override_source_value_meanings", ()) or ())
     if len(requested) > MAX_QUERY_BUSINESS_OUTPUTS:
         raise GatewayInputError(
             f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} --include values"
         )
-    if len(custom_meanings) > MAX_QUERY_CUSTOM_OUTPUTS:
+    if len(custom_meanings) + len(override_meanings) > MAX_QUERY_CUSTOM_OUTPUTS:
         raise GatewayInputError(
             "query-object accepts at most "
             f"{MAX_QUERY_CUSTOM_OUTPUTS} custom field meanings"
@@ -5849,7 +5863,7 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         native, output = available_query_outputs(version)[name]
         bindings.append(("derived" if native is None else "business", native or output, output))
 
-    def bounded_custom_meaning(value: Any) -> str:
+    def bounded_custom_meaning(value: Any, option: str) -> str:
         if (
             not isinstance(value, str)
             or not value
@@ -5859,16 +5873,29 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             or any(character in value for character in ('"', "'", "\\", ";"))
         ):
             raise GatewayInputError(
-                "--include-field must be one bounded user-facing field meaning"
+                f"{option} must be one bounded user-facing field meaning"
             )
         return value
 
-    normalized_meanings = [bounded_custom_meaning(value) for value in custom_meanings]
-    if len({" ".join(value.split()).casefold() for value in normalized_meanings}) != len(
-        normalized_meanings
-    ):
-        raise GatewayInputError("query-object --include-field meanings must be unique")
-    args.query_custom_field_meanings = tuple(normalized_meanings)
+    def unique_meanings(values: Sequence[str], option: str) -> list[str]:
+        normalized = [bounded_custom_meaning(value, option) for value in values]
+        if len({" ".join(value.split()).casefold() for value in normalized}) != len(normalized):
+            raise GatewayInputError(f"query-object {option} meanings must be unique")
+        return normalized
+
+    ordinary = unique_meanings(custom_meanings, "--include-field")
+    override = unique_meanings(override_meanings, "--include-override-source-value")
+    if any("@" in meaning for meaning in override):
+        raise GatewayInputError(
+            "--include-override-source-value requires a user-facing property meaning, not accessor text"
+        )
+    # Discover one exact live field for a meaning used in both value modes.
+    meanings_by_key = {}
+    for value in (*ordinary, *override):
+        meanings_by_key.setdefault(" ".join(value.split()).casefold(), value)
+    args.query_custom_field_meanings = tuple(meanings_by_key.values())
+    args.query_ordinary_field_meanings = tuple(meanings_by_key[" ".join(value.split()).casefold()] for value in ordinary)
+    args.query_override_source_value_meanings = tuple(meanings_by_key[" ".join(value.split()).casefold()] for value in override)
 
     native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
     if len(set(native_fields)) != len(native_fields):
@@ -8772,6 +8799,7 @@ def query_business_schema_payload(
         "output_detail": "query-schema --output <business-output>",
         "custom_outputs": {
             "field_meaning": "--include-field <user-facing property/reference meaning>",
+            "override_source_values": override_source_value_contract(version),
             "authority": "live WAAPI metadata bound by the Gateway before object.get",
             "repair": "refine the meaning when live discovery is not unique",
         },
@@ -8835,12 +8863,12 @@ def query_business_schema_payload(
                 ),
                 "exact_object_bound": 1,
                 "cannot_combine_with": [
-                    "--include", "--include-field", "--relationship", "--predicate", "--max-results",
+                    "--include", "--include-field", "--include-override-source-value", "--relationship", "--predicate", "--max-results",
                 ],
                 "additional_fields": {
                     "route": "a separate query-object for the same exact GUID or object path",
                     "omit_options": ["--view"],
-                    "field_options": ["--include", "--include-field"],
+                    "field_options": ["--include", "--include-field", "--include-override-source-value"],
                 },
                 "automatic_outputs": [
                     "override-output",
@@ -24917,9 +24945,11 @@ def _project_query_business_rows(
         unavailable = list(missing_identity)
         properties: dict[str, Any] = {}
         references: dict[str, Any] = {}
+        override_source_values: dict[str, Any] = {}
         for kind, native, output in bindings:
             if native not in row:
-                group = {"property": "properties", "reference": "references"}.get(kind)
+                group = {"property": "properties", "reference": "references",
+                         "override_source_value": "override_source_values"}.get(kind)
                 unavailable.append(f"{group}.{output}" if group else output)
                 continue
             value = row[native]
@@ -24927,12 +24957,16 @@ def _project_query_business_rows(
                 properties[output] = value
             elif kind == "reference":
                 references[output] = value
+            elif kind == "override_source_value":
+                override_source_values[output] = value
             else:
                 item[output] = value
         if properties:
             item["properties"] = properties
         if references:
             item["references"] = references
+        if override_source_values:
+            item["override_source_values"] = override_source_values
         if unavailable:
             item["unavailable_fields"] = unavailable
         if missing_identity:
@@ -25267,8 +25301,16 @@ def _bind_query_custom_fields_from_live_metadata(
         if kind not in {"property", "reference"} or not isinstance(token, str):
             unresolved.append({"meaning": meaning, "candidate_names": names})
             continue
-        native = f"@{token}" if kind == "property" else token
-        bindings.append((kind, native, token))
+        if meaning in args.query_ordinary_field_meanings:
+            native = f"@{token}" if kind == "property" else token
+            bindings.append((kind, native, token))
+        if meaning in args.query_override_source_value_meanings:
+            if kind != "property":
+                raise GatewayInputError(
+                    "--include-override-source-value requires a live property; "
+                    "the reference alternative remains unproven under #181; no data query was dispatched"
+                )
+            bindings.append(("override_source_value", f"@@{token}", token))
     if unresolved:
         return {
             "metadata_authority": "live-waapi",
