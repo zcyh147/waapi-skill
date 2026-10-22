@@ -40,23 +40,36 @@ class PlaylistTask(AttenuationTask):
 
     def call(self, uri, args=None, options=None):
         result = super().call(uri, args, options)
-        if uri.endswith('setReference') and getattr(self, 'display_path_changes', False):
+        if uri.endswith('object.set'):
+            for row in args['objects']:
+                if 'notes' in row:
+                    self.objects[row['object']]['notes'] = row['notes']
+        changed_target = (args['value'] if uri.endswith('setReference') else
+            next((row['@PlaylistObject'] for row in args['objects'] if row['object'] == FIRST
+                  and '@PlaylistObject' in row), None) if uri.endswith('object.set') else None)
+        if changed_target and getattr(self, 'display_path_changes', False):
             owner_path = self.objects[OWNER]['path']
-            self.objects[FIRST]['path'] = owner_path + '\\[PlaylistSlot: (' + self.objects[args['value']]['name'] + ')]'
+            self.objects[FIRST]['path'] = owner_path + '\\[PlaylistSlot: (' + self.objects[changed_target]['name'] + ')]'
         return result
 
-    def declare_playlist(self):
+    def declare_playlist(self, notes=None):
         source, target = self.bind(FIRST), self.bind(SECOND)
         field = self.discover(source, 'Playlist Object')
-        code, payload = self.step('draft-declare-field-change', '--object-handle', source,
-                                  '--field-handle', field, '--target-handle', target)
+        if self.operation == 'object.set':
+            code, payload = self.step('draft-declare-existing', '--declaration-id', 'slot',
+                '--object-handle', source, '--field-value', field, target,
+                *([] if notes is None else ['--field', 'notes', notes]))
+        else:
+            code, payload = self.step('draft-declare-field-change', '--object-handle', source,
+                                      '--field-handle', field, '--target-handle', target)
         assert code == 0, payload
 
 
 @pytest.mark.parametrize('target_type', ['Sound', 'RandomSequenceContainer', 'SwitchContainer', 'BlendContainer'])
 @pytest.mark.parametrize('display_path_changes', [False, True])
-def test_existing_playlist_slot_changes_to_a_direct_child_without_changing_its_list(tmp_path, target_type, display_path_changes):
-    task = PlaylistTask(tmp_path, target_type=target_type)
+@pytest.mark.parametrize('operation', ['object.setReference', 'object.set'])
+def test_existing_playlist_slot_changes_to_a_direct_child_without_changing_its_list(tmp_path, target_type, display_path_changes, operation):
+    task = PlaylistTask(tmp_path, target_type=target_type, operation=operation)
     task.display_path_changes = display_path_changes
     before = deepcopy(task.objects)
     task.declare_playlist()
@@ -65,8 +78,11 @@ def test_existing_playlist_slot_changes_to_a_direct_child_without_changing_its_l
     assert not preview['preview_summary'].get('derived_changes')
     expected_path = before[OWNER]['path'] + r'\[PlaylistSlot: (Second)]' if display_path_changes else before[FIRST]['path']
     assert task.objects == {**before, FIRST: {**before[FIRST], 'path': expected_path, 'PlaylistObject': {'id': SECOND}}}
-    assert [args for uri, args, _ in task.calls if uri.endswith('setReference')] == [
-        {'object': FIRST, 'reference': 'PlaylistObject', 'value': SECOND}]
+    assert len(writes(task)) == 1
+    if operation == 'object.setReference':
+        assert writes(task)[0][1] == {'object': FIRST, 'reference': 'PlaylistObject', 'value': SECOND}
+    else:
+        assert writes(task)[0][1]['objects'] == [{'object': FIRST, '@PlaylistObject': SECOND}]
 
 
 def preview_and_confirm(task):
@@ -98,14 +114,20 @@ def damage(task, change):
         task.objects[FIRST]['parent'] = {'id': OWNER}
     elif change == 'source-path':
         task.objects[FIRST]['path'] += 'unexpected'
+    elif change == 'source-notes':
+        task.objects[FIRST]['notes'] = 'unexpected'
     elif change == 'target-class':
         task.objects[SECOND]['classId'] = 589840
     elif change == 'target-parent':
         task.objects[SECOND]['parent'] = {'id': PEER}
+    elif change == 'target-notes':
+        task.objects[SECOND]['notes'] = 'unexpected'
     elif change == 'owner-class':
         task.objects[OWNER]['classId'] = 65552
     elif change == 'owner-parent':
         task.objects[OWNER]['parent'] = {'id': SECOND}
+    elif change == 'owner-notes':
+        task.objects[OWNER]['notes'] = 'unexpected'
     elif change == 'list-order':
         task.objects[OWNER]['@Playlist'].reverse()
     elif change == 'list-membership':
@@ -121,11 +143,13 @@ def damage(task, change):
 
 
 @pytest.mark.parametrize('change', ['source-class', 'source-name', 'source-owner', 'source-parent', 'source-path',
-    'target-class', 'target-parent', 'owner-class', 'owner-parent', 'list-order', 'list-membership', 'peer-reference', 'peer-notes', 'metadata'])
+    'source-notes', 'target-class', 'target-parent', 'target-notes', 'owner-class', 'owner-parent', 'owner-notes',
+    'list-order', 'list-membership', 'peer-reference', 'peer-notes', 'metadata'])
 @pytest.mark.parametrize('stage', ['before-execute', 'after-execute'])
-def test_playlist_preview_rejects_material_drift_and_never_retries(tmp_path, change, stage):
-    task = PlaylistTask(tmp_path)
-    task.declare_playlist()
+@pytest.mark.parametrize('operation', ['object.setReference', 'object.set'])
+def test_playlist_preview_rejects_material_drift_and_never_retries(tmp_path, change, stage, operation):
+    task = PlaylistTask(tmp_path, operation=operation)
+    task.declare_playlist(notes='Reviewed playlist choice' if operation == 'object.set' else None)
     tx = preview_and_confirm(task)
     if stage == 'after-execute':
         code, executed = task.run('execute', tx)
@@ -173,21 +197,43 @@ def test_playlist_reference_cannot_be_cleared_when_native_metadata_requires_a_ta
     assert writes(task) == []
 
 
-def test_playlist_reference_proof_does_not_admit_a_different_operation_mode(tmp_path):
+def test_existing_playlist_reference_can_use_the_public_object_set_declaration(tmp_path):
     task = PlaylistTask(tmp_path, operation='object.set')
-    source, target = task.bind(FIRST), task.bind(SECOND)
-    field = task.discover(source, 'Playlist Object')
-    code, declared = task.step('draft-declare-existing', '--declaration-id', 'slot',
-        '--object-handle', source, '--field-value', field, target)
-    assert code == 0, declared
-    code, result = task.step('draft-check')
-    assert code == 2 and 'CONSTRAINED_REFERENCE_BOUNDARY' in json.dumps(result), result
-    assert writes(task) == []
+    before = deepcopy(task.objects)
+    task.declare_playlist()
+    preview, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert not preview['preview_summary'].get('derived_changes')
+    assert task.objects == {**before, FIRST: {**before[FIRST], 'PlaylistObject': {'id': SECOND}}}
+    assert writes(task) == [('ak.wwise.core.object.set', {'objects': [
+        {'object': FIRST, '@PlaylistObject': SECOND}], 'onNameConflict': 'fail', 'listMode': 'append',
+        'autoAddToSourceControl': False})]
+
+
+@pytest.mark.parametrize('notes', ['Reviewed playlist choice', ''])
+@pytest.mark.parametrize('display_path_changes', [False, True])
+def test_playlist_reference_and_exact_notes_share_one_preview_and_write(tmp_path, notes, display_path_changes):
+    task = PlaylistTask(tmp_path, operation='object.set')
+    task.display_path_changes = display_path_changes
+    before = deepcopy(task.objects)
+    task.declare_playlist(notes=notes)
+    preview, _, verified, tx = finish(task)
+    assert verified['verified'] is True and list(verified)[-1] == 'agent_result'
+    assert not preview['preview_summary'].get('derived_changes')
+    expected_path = before[OWNER]['path'] + r'\[PlaylistSlot: (Second)]' if display_path_changes else before[FIRST]['path']
+    assert task.objects == {**before, FIRST: {**before[FIRST], 'path': expected_path,
+        'PlaylistObject': {'id': SECOND}, 'notes': notes}}
+    assert len(writes(task)) == 1
+    assert writes(task)[0][1]['objects'] == [{'object': FIRST, '@PlaylistObject': SECOND, 'notes': notes}]
+    code, replay = task.run('execute', tx)
+    assert code == 2, replay
+    assert len(writes(task)) == 1
 
 
 @pytest.mark.parametrize('case', ['wrong-class', 'wrong-parent', 'missing-owner', 'absent-member', 'overflow', 'unknown-flag'])
-def test_invalid_playlist_reference_is_rejected_before_preview(tmp_path, case):
-    task = PlaylistTask(tmp_path)
+@pytest.mark.parametrize('operation', ['object.setReference', 'object.set'])
+def test_invalid_playlist_reference_is_rejected_before_preview(tmp_path, case, operation):
+    task = PlaylistTask(tmp_path, operation=operation)
     task.declare_playlist()
     if case == 'wrong-class':
         task.objects[SECOND]['classId'] = 589840
@@ -208,11 +254,12 @@ def test_invalid_playlist_reference_is_rejected_before_preview(tmp_path, case):
 
 
 @pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
-def test_playlist_reference_retains_each_modification_policy(tmp_path, policy):
-    task = PlaylistTask(tmp_path)
+@pytest.mark.parametrize('operation', ['object.setReference', 'object.set'])
+def test_playlist_reference_retains_each_modification_policy(tmp_path, policy, operation):
+    task = PlaylistTask(tmp_path, operation=operation)
     code, configured = task.run('config-set', '--project-modification-policy', policy)
     assert code == 0, configured
-    task.declare_playlist()
+    task.declare_playlist(notes='Reviewed playlist choice' if operation == 'object.set' else None)
     code, checked = task.step('draft-check')
     assert code == 0, checked
     code, preview = task.step('preview-from-draft', *(['--apply'] if policy == 'allow_changes' else []))

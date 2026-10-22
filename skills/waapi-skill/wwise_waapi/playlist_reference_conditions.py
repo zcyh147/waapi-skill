@@ -93,13 +93,21 @@ def observe(*, version, source_id, target_id, name, restriction, read):
         'source': source, 'owner': owner, 'target': target, 'list_guard': guard, 'references': refs}
 
 
-def assertion(expected, *, read, after_write):
+def assertion(expected, *, read, after_write, source_changes=None):
+    intended = deepcopy(expected)
     try:
         actual = observe(version=expected['version'], source_id=expected['source_id'], target_id=expected['target_id'],
             name=expected['reference'], restriction=expected['restriction'], read=read)
         compared = deepcopy(actual)
         if after_write:
             source_id = expected['source_id']
+            changes = source_changes or {}
+            if set(changes) - {'notes'} or any(not isinstance(value, str) for value in changes.values()):
+                raise ValueError('PlaylistSlot companion intent permits only exact declared notes')
+            intended['source'].update(changes)
+            for row in intended['list_guard']['members']:
+                if row['id'].upper() == source_id:
+                    row.update(changes)
             old_path = expected['source']['path']
             owner_path = expected['list_guard']['evidence']['scope']['owner']['path']
             new_path = owner_path + '\\[PlaylistSlot: (' + expected['target']['name'] + ')]'
@@ -115,8 +123,8 @@ def assertion(expected, *, read, after_write):
                         raise ValueError('PlaylistSlot did not retain the requested reference')
                     old = next(item for item in expected['references'] if item['id'].upper() == source_id)
                     row['PlaylistObject'] = deepcopy(old['PlaylistObject'])
-        passed = compared == expected
+        passed = compared == intended
     except (ValueError, KeyError, TypeError) as exc:
         actual, passed = {'error': str(exc)}, False
     return {'name': 'PlaylistSlot exact class, owner, direct-child target and ordered Playlist remain bound',
-        'passed': passed, 'evidence': {'expected': expected, 'actual': actual}}
+        'passed': passed, 'evidence': {'expected': intended, 'actual': actual}}

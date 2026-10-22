@@ -6305,7 +6305,7 @@ def _prepare_object_set(
             _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
                 platform=platform, desired_references=desired_references,
                 conditions=reference_target_conditions, property_info_cache=property_info_cache,
-                wwise_version=request.version)
+                wwise_version=request.version, allow_playlist_slot=True)
         reference_requirements: dict[str, Any] = {}
         override_applicability = {}
         for descriptor in (*properties, *references):
@@ -6333,7 +6333,8 @@ def _prepare_object_set(
         for name, identity in reference_requirements.items():
             if name.casefold() not in desired_references:
                 target_spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
-        if any(info.dependencies for info in property_info_by_name.values()):
+        if any(info.dependencies or "mustChildOf" in (info.restriction.get("restrictions") or [])
+                for info in property_info_by_name.values()):
             condition_metadata_guards.append({
                 "object_id": target.object,
                 "platform": platform,
@@ -25785,7 +25786,7 @@ def _require_reference_target_allowed(
 ) -> None:
     if "mustChildOf" in (metadata.restriction.get("restrictions") or []):
         if not allow_playlist_slot or source_id is None or read is None or conditions is None:
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires the existing object.setReference business path.")
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires a proven existing-object reference business path.")
         from .playlist_reference_conditions import observe
         try:
             condition = observe(version=wwise_version, source_id=source_id, target_id=target.object,
@@ -26048,7 +26049,12 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     for condition in conditions:
         if condition.get("kind") == "playlist_slot_direct_child":
             from .playlist_reference_conditions import assertion
-            assertions.append(assertion(condition, read=read, after_write=after_write))
+            source_changes = {}
+            for spec in pre_state.get("object_set_nodes", []):
+                if spec.get("target_id") == condition["source_id"] and spec.get("notes_supplied"):
+                    source_changes["notes"] = spec["requested_notes"]
+            assertions.append(assertion(condition, read=read, after_write=after_write,
+                source_changes=source_changes))
             continue
         source_metadata = condition.get("source_class_metadata")
         if source_metadata is not None:
