@@ -28,6 +28,9 @@ SYSTEM = "{ADC920EF-0BEE-483D-B40B-0C2CDF19E1F4}"
 NO_OUTPUT = "{5C2A5343-5AB9-44EB-9054-348F70EA38BE}"
 BUS_PARENT = "{A74EEB4A-0805-4AFA-969C-53DCB862B550}"
 DEVICE_PARENT = "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}"
+# Matching 2024/25 packaged getTypes rows classify these concrete plugins as
+# AudioDevice. The base WObject AudioDevice class is not an instance class.
+DEVICE_PLUGIN_CLASSES = {"System": 11403271, "No Output": 11862023}
 
 
 def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_runtime):
@@ -130,9 +133,9 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         assert bus["name"] == bus_name and bus["path"] == "\\" + bus_hierarchy + "\\Default Work Unit\\" + bus_name, bus
         assert bus["parent"]["id"] == BUS_PARENT and peer["parent"]["id"] == BUS_PARENT, before
         assert bus["references"]["AudioDevice"]["id"] == SYSTEM and peer["references"]["AudioDevice"]["id"] == SYSTEM, before
-        for key, name in (("system", "System"), ("target", "No_Output")):
+        for key, name, plugin in (("system", "System", "System"), ("target", "No_Output", "No Output")):
             row = before[key]
-            assert row["type"] == "AudioDevice" and row["class_id"] == 4653072 and row["name"] == name, row
+            assert row["type"] == "AudioDevice" and row["class_id"] == DEVICE_PLUGIN_CLASSES[plugin] and row["name"] == name, row
             assert row["parent"]["id"] == DEVICE_PARENT, row
             assert row["path"] == "\\" + device_hierarchy + "\\Default Work Unit\\" + name, row
         member, = [row for row in before["siblings"] if row["id"] == BUS]
@@ -147,7 +150,11 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         restriction = metadata["restriction"]
         assert restriction["type"] == "reference", metadata
         restrictions = restriction["restrictions"]
-        assert any(isinstance(row, dict) and "AudioDevice" in row.get("type", []) for row in restrictions), metadata
+        # Source WObjects names AudioDevice; the matching 2024 native packet
+        # uses the display label Audio Device. The existing reference matcher
+        # accepts these spellings for the same exact native target type.
+        assert any(isinstance(row, dict) and isinstance(row.get("type"), list) and row["type"]
+            and set(row["type"]) <= {"Audio Device", "AudioDevice"} for row in restrictions), metadata
         master_dependency, = [row for row in metadata.get("dependencies", []) if row.get("type") == "isMasterBus"]
         assert master_dependency == {"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}, metadata
         enabled("bus-enabled-before", selection, platform)
