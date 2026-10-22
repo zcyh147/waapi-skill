@@ -34,6 +34,7 @@ pytestmark = [
 ]
 CHILD = "{0CB83139-F17F-40DB-8221-48AA8A20B807}"
 OWNER = "{8A261B8F-89AA-490E-A62A-2551D87F3E56}"
+UNLINKED_PLATFORM = "{00000000-0000-0000-0000-000000000000}"
 
 
 def test_existing_association_continue_play_preserves_owner_and_child(workflow_sandbox_runtime):
@@ -116,9 +117,18 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
 
     try:
         host = read("host-and-current-platform", ["status"])
-        platform = host.get("project", {}).get("currentPlatformId")
-        assert isinstance(platform, str) and uuid.UUID(platform).int != 0, host
-        observation["platform"] = platform
+        project = host.get("project")
+        assert isinstance(project, dict), host
+        if "currentPlatformId" in project:
+            platform = project["currentPlatformId"]
+            assert isinstance(platform, str) and uuid.UUID(platform).int != 0, host
+            enabled_platform = platform
+            platform_mode = "observed_current_platform"
+        else:
+            platform = None
+            enabled_platform = UNLINKED_PLATFORM
+            platform_mode = "unlinked_enabled_observation_and_default_property_write"
+        observation.update(platform=platform, enabled_observation_platform=enabled_platform, platform_mode=platform_mode)
         child = objects("child-before", CHILD, context=True)
         assert child["type"] == "RandomSequenceContainer" and child["name"] == "Shells_Concrete", child
         assert child["path"] == owner_path + r"\Shells_Concrete" and child["parent"]["id"] == OWNER, child
@@ -164,7 +174,12 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         assert owner_metadata["restriction"]["type"] == "enum", owner_metadata
         choices = owner_metadata["restriction"]["values"]
         assert all(type(row["value"]) is int for row in choices) and {row["value"] for row in choices} == {0, 1}, choices
-        enabled("association-enabled-before", association, selection, platform)
+        if platform is None:
+            # The default write is admitted only for these observed fields
+            # without per-platform unlink support; no current platform is guessed.
+            assert source_metadata.get("supports", {}).get("unlink") is False, source_metadata
+            assert owner_metadata.get("supports", {}).get("unlink") is False, owner_metadata
+        enabled("association-enabled-before", association, selection, enabled_platform)
 
         draft = _start_business_draft(runtime, "object.setProperty")
         bound = _bind_business_object(runtime, draft, object_id=association)
@@ -181,7 +196,7 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
             dispatch = prepared["dispatch"]
             assert dispatch["uri"] == "ak.wwise.core.object.setProperty", dispatch
             assert dispatch["args"] == {"object": association, "property": "ContinuePlay", "value": True,
-                "platform": platform}, dispatch
+                **({"platform": platform} if platform is not None else {})}, dispatch
             related, = prepared["pre_state"]["related_conditions"]
             assert related["source_id"] == association and related["owner_id"] == OWNER, related
             assert related["property"] == "SwitchBehavior" and type(related["value"]) is int and related["value"] == 1, related
@@ -193,7 +208,7 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         same(objects("owner-after", OWNER, ("SwitchBehavior",)), owner)
         same(objects("child-after", CHILD, context=True), child)
         same(objects("owner-children-after", OWNER, children=True, context=True), members)
-        enabled("association-enabled-after", association, selection, platform)
+        enabled("association-enabled-after", association, selection, enabled_platform)
         assert len(observation["transactions"]) == 1
         observation["business_effect_verified"] = True
         status = "PASS"
