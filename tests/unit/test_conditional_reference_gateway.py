@@ -1476,17 +1476,25 @@ class MasterBusDeviceTask(AttenuationTask):
         super().__init__(path, version, operation=operation)
         self.enabled = enabled
         self.enabled_reads = []
-        self.objects[FIRST].update(classId=1, name="Main Mix", type="Bus", path=r"\Master-Mixer Hierarchy\Default Work Unit\Main Mix", AudioDevice=None)
-        self.objects[SECOND].update(classId=2, name="System", type="AudioDevice", path=r"\Audio Devices\Default Work Unit\System")
+        root = "Busses" if version == "2025.1" else "Master-Mixer Hierarchy"
+        workunit, boundary = "{33333333-3333-3333-3333-333333333333}", "{44444444-4444-4444-4444-444444444444}"
+        self.objects[FIRST].update(classId=1376272, name="Main Mix", type="Bus", path="\\" + root + "\\Default Work Unit\\Main Mix",
+            parent={"id": workunit}, AudioDevice=None)
+        self.objects[workunit] = {"id": workunit, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+            "path": "\\" + root + "\\Default Work Unit", "parent": {"id": boundary}}
+        self.objects[boundary] = {"id": boundary, "name": root, "path": "\\" + root}
+        self.objects[SECOND].update(classId=11403271, name="System", type="AudioDevice", path=r"\Audio Devices\Default Work Unit\System")
         self.metadata = {"AudioDevice": {"name": "AudioDevice", "type": "",
             "restriction": {"type": "reference", "restrictions": [{"type": ["AudioDevice"]}, "notNull"]},
             "dependencies": [{"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}]}}
-        self.types = [{"classId": index + 1, "name": name, "type": "WObject"}
-                      for index, name in enumerate(("Bus", "AudioDevice"))]
+        self.types = [{"classId": class_id, "name": name, "type": "WObject"}
+                      for class_id, name in ((1376272, "Bus"), (11403271, "AudioDevice"), (1638416, "WorkUnit"), (131088, "Folder"))]
 
     def call(self, uri, args=None, options=None):
         if uri.endswith("isPropertyEnabled"):
             self.calls.append((uri, deepcopy(args), options))
+            if args["property"] == "AudioDevice":
+                raise RuntimeError("ak.wwise.invalid_arguments: Property doesn't exist on the object.")
             result = {"return": self.enabled.get(args["platform"], False) if isinstance(self.enabled, dict) else self.enabled}
             self.enabled_reads.append({"uri": uri, "args": deepcopy(args), "options": options, "result": deepcopy(result)})
             return result
@@ -1495,15 +1503,17 @@ class MasterBusDeviceTask(AttenuationTask):
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
 @pytest.mark.parametrize("operation", ["object.setReference", "object.set"])
-@pytest.mark.parametrize("enabled", [True, False])
+@pytest.mark.parametrize("topmost", [True, False])
 @pytest.mark.parametrize("platform", [None, PlatformConditionTask.platform])
-def test_master_bus_device_visibility_uses_live_enabled_proof_without_topology_change(tmp_path, version, operation, enabled, platform):
-    task = MasterBusDeviceTask(tmp_path, version, operation, {platform: enabled} if platform else enabled)
+def test_master_bus_device_visibility_uses_structural_proof_without_topology_change(tmp_path, version, operation, topmost, platform):
+    task = MasterBusDeviceTask(tmp_path, version, operation)
+    if not topmost:
+        task.objects["{33333333-3333-3333-3333-333333333333}"].update(type="Bus", classId=1376272)
     before = deepcopy(task.objects)
     source, target = task.bind(FIRST), task.bind(SECOND)
     code, discovered = task.step("draft-discover-fields", "--object-handle", source, "--meaning", "AudioDevice",
                                 *(["--platform", platform] if platform else []))
-    if not enabled:
+    if not topmost:
         assert code == 2 or not discovered.get("meaning_results", [{}])[0].get("candidates"), discovered
         assert task.objects == before
         assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
@@ -1533,8 +1543,8 @@ def test_master_bus_device_visibility_uses_live_enabled_proof_without_topology_c
     writes = [(uri, args) for uri, args, _ in task.calls if uri.endswith(("setProperty", "setReference", "object.set"))]
     assert len(writes) == 1
     assert writes[0][0].endswith("setReference" if operation == "object.setReference" else "object.set")
-    assert task.enabled_reads
-    assert all(row["args"]["platform"] == (platform or "{00000000-0000-0000-0000-000000000000}") for row in task.enabled_reads)
+    assert not task.enabled_reads
+    assert not any(uri.endswith("isPropertyEnabled") for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize("version,condition_product_capture", [
@@ -1563,23 +1573,24 @@ def test_product_master_bus_audio_device_show_condition_changes_only_the_selecte
     writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls
               if uri.endswith(("setProperty", "setReference", "object.set"))]
     assert len(writes) == 1 and writes[0]["uri"].endswith("setReference")
-    enabled_reads = deepcopy(task.enabled_reads)
-    assert len(enabled_reads) >= 3
-    assert all(row["args"]["object"] == FIRST and row["args"]["property"] == "AudioDevice" for row in enabled_reads)
+    assert not task.enabled_reads
+    structural = shown["artifact"]["prepared_operation"]["pre_state"]["condition_metadata"]["structural_applicability"][0]
+    ancestry_before = structural["rows"][1:]
+    ancestry_after = [{key: task.objects[row["id"]][key] for key in row} for row in ancestry_before]
     condition_product_capture.update(
         gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
         native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["AudioDevice"]),
             "observations": [{"before": before[FIRST], "after": deepcopy(task.objects[FIRST]),
                 "target_before": before[SECOND], "target_after": deepcopy(task.objects[SECOND]),
-                "enabled_before": enabled_reads[0]["result"]["return"],
-                "enabled_after": enabled_reads[-1]["result"]["return"], "enabled_reads": enabled_reads}]}},
+                "applicability": structural, "native_enabled_state": "not_queried",
+                "ancestry_before": ancestry_before, "ancestry_after": ancestry_after}]}},
     )
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
 @pytest.mark.parametrize("operation", ["object.setReference", "object.set"])
-@pytest.mark.parametrize("failure", ["wrong-target-class", "disabled-before", "disabled-after"])
-def test_master_bus_device_reference_retains_target_restrictions_and_enabled_proof(tmp_path, version, operation, failure):
+@pytest.mark.parametrize("failure", ["wrong-target-class", "ancestry-before", "ancestry-after"])
+def test_master_bus_device_reference_retains_target_restrictions_and_structural_proof(tmp_path, version, operation, failure):
     task = MasterBusDeviceTask(tmp_path, version, operation)
     if failure == "wrong-target-class":
         task.set_object_type(SECOND, "Sound", 3)
@@ -1606,15 +1617,15 @@ def test_master_bus_device_reference_retains_target_restrictions_and_enabled_pro
     assert code == 0, shown
     code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
     assert code == 0, confirmed
-    if failure == "disabled-before":
-        task.enabled = False
+    if failure == "ancestry-before":
+        task.objects[FIRST]["parent"]["id"] = SECOND
     code, executed = task.run("execute", tx)
-    if failure == "disabled-before":
+    if failure == "ancestry-before":
         assert code == 2, executed
         assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
         return
     assert code == 0, executed
-    task.enabled = False
+    task.objects[FIRST]["parent"]["id"] = SECOND
     code, verified = task.run("verify", tx)
     assert code == 2 and verified["verified"] is False, verified
     assert task.objects[FIRST]["AudioDevice"] == {"id": SECOND}

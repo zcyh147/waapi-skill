@@ -140,24 +140,17 @@ def test_ordinary_exact_id_binding_still_rejects_missing_native_type(tmp_path):
     assert not any(uri.endswith("setProperty") for uri, _, _ in task.calls)
 
 
-def test_schema_discloses_binding_and_history_recovery_boundary(tmp_path):
+def test_schema_discloses_binding_and_owned_history_version_scope(tmp_path):
     task = ContextTask(tmp_path, "2025.1")
     code, result = task.run("--version", "2025.1", "operation-schema", "object.setProperty")
     assert code == 0, result
     binding = result["business_adapter"]["structural_property_target"]
     assert binding["subcommand"] == "draft-bind-switch-child-context"
-    assert binding["history_recovery"] == {"status": "unavailable", "tracking_issue": 192}
-    tx, shown = prepare(task)
-    for command in ("execute", "verify"):
-        code, result = task.run(command, tx)
-        assert code == 0, result
-    code, started = task.run("draft-start", "ak.wwise.core.undo.undo")
-    assert code == 0, started
-    code, result = task.run("draft-declare-core-plan", started["draft"]["draft_id"],
-        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
-        "--value", "history_scope", "latest_project_history", "--value", "expectation_receipt", tx)
-    assert code == 2 and "#192" in result["message"], result
-    assert not any(uri == "ak.wwise.core.undo.undo" for uri, _, _ in task.calls)
+    history = binding["history_recovery"]
+    assert history["status"] == "owned_receipt_observation_only"
+    assert history["undo_versions"] == list(VERSIONS[1:])
+    assert history["redo_versions"] == list(VERSIONS[2:])
+    assert history["stack_head_observed"] is history["automatic_retry"] is False
 
 
 def test_dropped_write_fails_verification_and_execution_is_once_only(tmp_path):

@@ -273,6 +273,7 @@ class BoundFieldHandle:
     restrictions: Mapping[str, Any]
     metadata_digest: str
     binding_digest: str
+    applicability: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -681,6 +682,7 @@ class BusinessHandleRegistry:
                     "restrictions": dict(row.restrictions),
                     "metadata_digest": row.metadata_digest,
                     "binding_digest": row.binding_digest,
+                    **({"applicability": dict(row.applicability)} if row.applicability is not None else {}),
                 }
                 for row in sorted(self._fields.values(), key=lambda item: item.handle)
             ],
@@ -884,6 +886,7 @@ class BusinessHandleRegistry:
         restrictions: Mapping[str, Any],
         metadata_digest: str,
         trusted_native_token: bool = False,
+        applicability: Mapping[str, Any] | None = None,
     ) -> BoundFieldHandle:
         normalized_scope = _normalize_scope(scope_kind, scope_value)
         if (not isinstance(token, str) or not token.strip()
@@ -918,6 +921,7 @@ class BusinessHandleRegistry:
             "platform": normalized_platform,
             "restrictions": normalized_restrictions,
             "metadata_digest": metadata_digest,
+            **({"applicability": dict(applicability)} if applicability is not None else {}),
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("bfh1", digest)
@@ -933,6 +937,7 @@ class BusinessHandleRegistry:
             restrictions=normalized_restrictions,
             metadata_digest=metadata_digest,
             binding_digest=digest,
+            applicability=applicability,
         )
         self._fields[handle] = bound
         return bound
@@ -1255,7 +1260,8 @@ def bind_live_field(
             new_object_workflow=_dependent_new_object_workflow(token),
             action="For a new object, complete and verify creation without this field, then configure the verified GUID through a separate property Preview; creation alone does not complete configuration",
         )
-    structural_enabled_proof = scope_kind == "object" and any(
+    applicability = _reference_applicability(registry, info, scope_kind, normalized_scope, platform, read_call)
+    structural_enabled_proof = field_kind == "property" and scope_kind == "object" and any(
         is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
     if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
@@ -1292,6 +1298,7 @@ def bind_live_field(
             "scope_value": normalized_scope,
             "metadata": info.as_dict(),
             **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
+            **({"structural_applicability": applicability} if applicability is not None else {}),
         }
     )
     try:
@@ -1305,6 +1312,7 @@ def bind_live_field(
             restrictions=restrictions,
             metadata_digest=metadata_digest,
             trusted_native_token=True,
+            applicability=applicability,
         )
     except ValueError as exc:
         raise _error(
@@ -1312,6 +1320,21 @@ def bind_live_field(
             field=token,
             action="refresh or repair the live Wwise metadata contract",
         ) from exc
+
+
+def _reference_applicability(registry, info, scope_kind, scope_value, platform, read_call):
+    from .reference_applicability import needs_structural_proof, prove
+    if not needs_structural_proof(info):
+        return None
+    if scope_kind != "object":
+        raise _error("FIELD_OBJECT_SCOPE_REQUIRED", field=info.name,
+            action="Rediscover this reference on the selected existing object to prove its structural visibility")
+    try:
+        return prove(version=registry.context.wwise_version, object_id=scope_value, info=info,
+            platform=platform, read=read_call)
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        raise _error("REFERENCE_APPLICABILITY_UNPROVEN", field=info.name,
+            action="The selected reference requires source-proven topmost Bus ancestry", reason=str(exc)) from exc
 
 
 def revalidate_live_field(
@@ -1398,7 +1421,8 @@ def revalidate_live_field(
             new_object_workflow=_dependent_new_object_workflow(field.token),
             action="Use the verified created GUID to rediscover this field in object scope and configure it through a separate property Preview; never repeat completed creation",
         )
-    structural_enabled_proof = field.scope_kind == "object" and any(
+    applicability = _reference_applicability(registry, info, field.scope_kind, field.scope_value, effective_platform, read_call)
+    structural_enabled_proof = field.field_kind == "property" and field.scope_kind == "object" and any(
         is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
     if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
@@ -1437,6 +1461,7 @@ def revalidate_live_field(
             "scope_value": field.scope_value,
             "metadata": info.as_dict(),
             **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
+            **({"structural_applicability": applicability} if applicability is not None else {}),
         }
     )
     return registry.resolve_field(
@@ -2054,7 +2079,7 @@ def _bound_field_from_dict(
         "metadata_digest",
         "binding_digest",
     }
-    if not isinstance(payload, Mapping) or set(payload) != expected:
+    if not isinstance(payload, Mapping) or set(payload) not in (expected, expected | {"applicability"}):
         raise ValueError("bound field handle fields are invalid")
     if payload.get("contract") != BOUND_FIELD_HANDLE_CONTRACT:
         raise ValueError("bound field handle contract is invalid")
@@ -2105,6 +2130,10 @@ def _bound_field_from_dict(
         "restrictions": restrictions,
         "metadata_digest": metadata_digest,
     }
+    if "applicability" in payload:
+        if not isinstance(payload["applicability"], Mapping) or payload["applicability"].get("kind") != "structural-reference-visibility":
+            raise ValueError("bound field applicability is invalid")
+        material["applicability"] = dict(payload["applicability"])
     expected_digest = canonical_sha256(material)
     digest = payload.get("binding_digest")
     if (
@@ -2125,6 +2154,7 @@ def _bound_field_from_dict(
         restrictions=restrictions,
         metadata_digest=metadata_digest,
         binding_digest=digest,
+        applicability=payload.get("applicability"),
     )
 
 

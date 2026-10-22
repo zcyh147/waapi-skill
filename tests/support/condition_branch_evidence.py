@@ -27,8 +27,8 @@ for _version, _build, _index in (("2024.1", "2024.1.13.9056", 152), ("2025.1", "
         "branch_id": f"{_version}|installed|{_build}|condition|existing-object|WObjects/WObjects.xml|"
                      f"PluginModule/WwiseObject[Bus]/Properties/Reference[AudioDevice]/Dependencies/{_index}/condition",
         "public_uri": "ak.wwise.core.object.setReference",
-        "selector": "exact_bound_Bus_live_enabled_AudioDevice_Field_Handle_and_exact_chosen_AudioDevice_target",
-        "reason": "Exact installed Bus.AudioDevice IsMasterBus=True occurrence: injected native-shaped Show metadata requires live enabled proof and a restricted exact AudioDevice target, without topology mutation. Native true-predicate metadata applicability remains unobserved.",
+        "selector": "exact_bound_topmost_Bus_structurally_applicable_AudioDevice_Field_Handle_and_exact_chosen_AudioDevice_target",
+        "reason": "Exact installed Bus.AudioDevice IsMasterBus=True occurrence: injected Show metadata requires source-bound actual topmost Bus ancestry and a restricted exact AudioDevice target, without topology mutation or a reference property-enabled call. This receipt is program evidence, not a native effect verdict.",
     }
 for _version, _build in (("2022.1", "2022.1.19.8584"), ("2025.1", "2025.1.7.9143")):
     _PROGRAM_CASES[f"existing-bed-mixer-{_version}"] = {
@@ -162,8 +162,9 @@ def finish_condition_capture(capture: dict, phase_reports: dict, observed: dict)
             {"pointer": "/observations/wwise-console/observations/0/before/AudioDevice", "equals": None},
             {"pointer": "/observations/wwise-console/observations/0/after/AudioDevice/id", "equals": "{22222222-2222-2222-2222-222222222222}"},
             {"pointer": "/observations/wwise-console/observations/0/target_after", "equals": snapshot.get("target_before")},
-            {"pointer": "/observations/wwise-console/observations/0/enabled_before", "equals": True},
-            {"pointer": "/observations/wwise-console/observations/0/enabled_after", "equals": True},
+            {"pointer": "/observations/wwise-console/observations/0/native_enabled_state", "equals": "not_queried"},
+            {"pointer": "/observations/wwise-console/observations/0/applicability/kind", "equals": "structural-reference-visibility"},
+            {"pointer": "/observations/wwise-console/observations/0/ancestry_after", "equals": snapshot.get("ancestry_before")},
         ])
     else:
         scalar = case["scalar"]
