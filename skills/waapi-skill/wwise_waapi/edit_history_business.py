@@ -61,12 +61,11 @@ def _read_error(exc: Exception) -> dict[str, Any]:
 def _reference_value(value: Any) -> str | None:
     # Reuse the owning reference primitive's null/identity representations,
     # then require the canonical GUID observation this history proof promises.
-    from .operation_registry import _reference_identity, _reference_value_is_null
+    from .operation_registry import _reference_identity, _reference_value_is_null, _reference_value_is_observed
+    if not _reference_value_is_observed(value):
+        raise ValueError("History reference readback lacks a canonical object-reference shape")
     if _reference_value_is_null(value):
         return None
-    if isinstance(value, Mapping) and ("id" not in value or set(value) - {"id", "name", "type", "path"}
-            or any(not isinstance(item, str) for item in value.values())):
-        raise ValueError("History reference readback lacks a canonical object-reference shape")
     identity = _reference_identity(value)
     if not isinstance(identity, str) or not _GUID.fullmatch(identity):
         raise ValueError("History reference readback lacks a canonical target GUID or explicit null")

@@ -1250,7 +1250,7 @@ def test_compound_current_platform_membership_drift_blocks_before_begin_group(tm
     assert not any(row[0].endswith("setProperty") for row in client.calls)
 
 
-def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}", source_platform_observer_error=False, inherited_reference=False):
+def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}", source_platform_observer_error=False, inherited_reference=False, reference_extensions=False):
     from tests.unit.test_remaining_core_business_gateway import _env
     from tests.unit.test_object_graph_business_gateway import _info
     reference_case = source_operation == "object.setReference" or compound_reference
@@ -1303,7 +1303,9 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                     {"name": "Attenuation", "classId": 2686992, "type": "WObject"}]}
             if uri == "ak.wwise.core.object.setReference":
                 self.calls.append((uri, args, options))
-                self.source["@Attenuation"] = None if args["value"] == "{00000000-0000-0000-0000-000000000000}" else {"id": args["value"]}
+                self.source["@Attenuation"] = (None if not reference_extensions else {
+                    "id": args["value"], "name": "", "future": {"enabled": False, "count": 0}}
+                    ) if args["value"] == "{00000000-0000-0000-0000-000000000000}" else {"id": args["value"]}
                 self.history_after = dict(self.source)
                 return {}
             if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
@@ -1343,6 +1345,8 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
         client.source["classId"] = 65552
         client.parent.update(type="Attenuation", classId=2686992, path=r"\Attenuations\Default Work Unit\Destination")
         client.source["@Attenuation"] = {"id": client.parent["id"]} if reference_clear else None
+        if reference_extensions and reference_clear:
+            client.source["@Attenuation"].update(name="Stored target", future={"enabled": False, "count": 0})
     client.platform_rows = [{"id": "{55555555-5555-5555-5555-555555555555}", "name": "Windows"},
         {"id": "{66666666-6666-6666-6666-666666666666}", "name": "Mac"}]
     client.current_platform = client.platform_rows[0]["id"]
@@ -1933,10 +1937,11 @@ def test_standalone_history_observes_verified_reference_receipt_in_exact_platfor
 
 @pytest.mark.parametrize("direction", ["undo", "redo"])
 @pytest.mark.parametrize("effect", [True, False])
-def test_standalone_history_clear_receipt_observes_stored_state_despite_inheritance(tmp_path, direction, effect):
+@pytest.mark.parametrize("extensions", [False, True])
+def test_standalone_history_clear_receipt_observes_stored_state_despite_inheritance(tmp_path, direction, effect, extensions):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
         source_operation="object.setReference", reference_clear=True, inherited_reference=True,
-        direction=direction, effect=effect)
+        direction=direction, effect=effect, reference_extensions=extensions)
     binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
     observation = binding["observations"][0]
     assert observation["reference_observation"]["value_source"] == "local_stored"
@@ -1973,15 +1978,15 @@ def test_standalone_history_reference_receipt_certifies_original_current_or_name
 
 
 @pytest.mark.parametrize("stage", ["prewrite", "readback"])
-@pytest.mark.parametrize("damage", ["wrong-guid", "missing", "path", "extra-member", "boolean", "read-error", "identity", "metadata"])
+@pytest.mark.parametrize("damage", ["wrong-guid", "missing", "path", "malformed-name", "boolean", "read-error", "identity", "metadata"])
 def test_standalone_history_reference_wrong_or_missing_observation_never_proves_effect(tmp_path, stage, damage):
     client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, source_operation="object.setReference")
     if stage == "readback":
         code, executed = run("execute", preview["transaction_id"])
         assert code == 0, executed
     value = {"wrong-guid": {"id": "{77777777-7777-7777-7777-777777777777}"}, "path": r"\Attenuations\Destination",
-        "extra-member": {"id": client.parent["id"], "hidden": True}, "boolean": True}.get(damage)
-    if damage in {"wrong-guid", "path", "extra-member", "boolean"}:
+        "malformed-name": {"id": client.parent["id"], "name": False}, "boolean": True}.get(damage)
+    if damage in {"wrong-guid", "path", "malformed-name", "boolean"}:
         client.source["@Attenuation"] = value
     elif damage == "missing":
         client.source.pop("@Attenuation")

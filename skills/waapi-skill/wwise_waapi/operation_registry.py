@@ -17148,14 +17148,15 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                     "name": f"object.{field_name} pre-state unchanged",
                     "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
                         and (observed_field in rows[0] if clear_field is not None else _has_field(rows[0], field_name))
-                        and actual == field_before.get("value"),
+                        and (_native_snapshot_equal(actual, field_before.get("value"))
+                            if clear_field is not None else actual == field_before.get("value")),
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
             if clear_field is not None:
                 assertions.append({"name": "reference clear inherited context unchanged",
                     "passed": len(rows) == 1 and field_name in rows[0]
-                        and rows[0][field_name] == field_before["resolved_value"],
+                        and _native_snapshot_equal(rows[0][field_name], field_before["resolved_value"]),
                     "evidence": {"expected": field_before["resolved_value"], "rows": rows}})
 
             for name, expected in activation_requirements.items():
@@ -26566,8 +26567,8 @@ def _require_stored_reference_clear_observation(prepared: Mapping[str, Any]) -> 
             or f"@{field_name}" not in row or field_name not in row
             or not _reference_value_is_observed(before.get("value"))
             or not _reference_value_is_observed(before["resolved_value"])
-            or before.get("value") != row[f"@{field_name}"]
-            or before["resolved_value"] != row[field_name]):
+            or not _native_snapshot_equal(before.get("value"), row[f"@{field_name}"])
+            or not _native_snapshot_equal(before["resolved_value"], row[field_name])):
         raise OperationContractError("REFERENCE_CLEAR_REPREVIEW_REQUIRED",
             "A clear requires a fresh Preview with its directly stored reference bound; legacy resolved values cannot be reinterpreted as stored values.",
             details={"automatic_retry": False, "stored_reference_observation_required": True})
@@ -26597,9 +26598,15 @@ def _reference_value_is_observed(value: Any) -> bool:
     if value is None:
         return True
     if isinstance(value, Mapping):
-        if "id" not in value or set(value) - {"id", "name", "type", "path"}:
+        if "id" not in value:
             return False
-        if any(not isinstance(member, str) for member in value.values()):
+        if any(key in value and not isinstance(value[key], str) for key in ("id", "name", "type", "path")):
+            return False
+        # Pinned objectReturn reference objects permit additional properties.
+        # Keep their JSON values intact inside the already bounded native read.
+        try:
+            canonical_json_bytes(dict(value))
+        except (TypeError, ValueError, OverflowError, RecursionError):
             return False
         value = value["id"]
     return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
@@ -26608,14 +26615,9 @@ def _reference_value_is_observed(value: Any) -> bool:
 def _reference_value_is_null(value: Any) -> bool:
     if value is None:
         return True
-    if isinstance(value, Mapping):
-        if "id" not in value or set(value) - {"id", "name", "type", "path"}:
-            return False
-        if any(key in value and not isinstance(value[key], str) for key in value):
-            return False
-        identity = value["id"]
-    else:
-        identity = value
+    if not _reference_value_is_observed(value):
+        return False
+    identity = value["id"] if isinstance(value, Mapping) else value
     return (
         isinstance(identity, str)
         and identity.casefold()

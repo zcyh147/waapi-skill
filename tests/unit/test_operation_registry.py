@@ -3010,7 +3010,7 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
     elif case == "malformed":
         result_row["OutputBus"] = {}
     elif case == "malformed-zero":
-        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "unexpected": True}
+        result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "name": False}
     if "OutputBus" in result_row:
         result_row["@OutputBus"] = copy.deepcopy(result_row["OutputBus"])
     verified = verify_prepared_operation(

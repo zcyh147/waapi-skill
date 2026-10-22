@@ -27,7 +27,7 @@ class StoredReferenceTask(AttenuationTask):
         if uri.endswith('setReference') and args['value'] == NULL:
             self.calls.append((uri, deepcopy(args), options))
             if not getattr(self, 'drop_clear', False):
-                self.objects[args['object']][args['reference']] = None
+                self.objects[args['object']][args['reference']] = deepcopy(getattr(self, 'clear_result', None))
             return {}
         result = super().call(uri, args, options)
         if uri.endswith('object.get') and args.get('from', {}).get('id'):
@@ -42,6 +42,10 @@ class StoredReferenceTask(AttenuationTask):
                             del row[field]
                         elif fault == 'malformed':
                             row[field] = {'id': 'not-a-guid'}
+                        elif fault == 'malformed-name':
+                            row[field] = {'id': SECOND, 'name': False}
+                        elif fault == 'missing-id':
+                            row[field] = {'future': {'id': SECOND}}
                     elif field == 'Attenuation':
                         source = FIRST if self.objects[FIRST]['OverridePositioning'] else PARENT
                         row[field] = deepcopy(self.objects[source]['Attenuation'])
@@ -78,6 +82,25 @@ def test_clear_stored_reference_verifies_while_the_inherited_reference_still_app
 
 
 @pytest.mark.parametrize('version', VERSIONS)
+def test_clear_preserves_native_reference_extensions_and_accepts_an_extended_null_guid(tmp_path, version):
+    task = StoredReferenceTask(tmp_path, version)
+    for identity in (FIRST, PARENT):
+        task.objects[identity]['Attenuation'].update(name='Reference target', future={'enabled': False, 'count': 0})
+    task.clear_result = {'id': NULL, 'name': '', 'future': {'enabled': False, 'count': 0}}
+    before = deepcopy(task.objects)
+    task.declare_clear()
+    _, _, verified, tx = finish(task)
+    assert verified['verified'] is True
+    assert task.objects == {**before, FIRST: {**before[FIRST], 'Attenuation': task.clear_result}}
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    field_before = shown['artifact']['prepared_operation']['pre_state']['field_before']
+    assert field_before['value'] == before[FIRST]['Attenuation']
+    assert field_before['resolved_value'] == before[PARENT]['Attenuation']
+    assert len(writes(task)) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('drift', ['stored', 'resolved'])
 def test_clear_revalidates_stored_reference_and_the_original_resolved_context(tmp_path, version, drift):
     task = StoredReferenceTask(tmp_path, version)
@@ -91,6 +114,21 @@ def test_clear_revalidates_stored_reference_and_the_original_resolved_context(tm
     code, rejected = task.run('execute', tx)
     assert code == 2, rejected
     assert task.objects == before and writes(task) == []
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('view', ['stored', 'resolved'])
+@pytest.mark.parametrize('member', ['enabled', 'count'])
+def test_clear_guards_native_reference_extension_boolean_number_drift(tmp_path, version, view, member):
+    task = StoredReferenceTask(tmp_path, version)
+    identity = FIRST if view == 'stored' else PARENT
+    task.objects[identity]['Attenuation']['future'] = {'enabled': False, 'count': 0}
+    task.declare_clear()
+    tx = preview_and_confirm(task)
+    task.objects[identity]['Attenuation']['future'][member] = 0 if member == 'enabled' else False
+    before = deepcopy(task.objects)
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and writes(task) == [] and task.objects == before, rejected
 
 
 @pytest.mark.parametrize('version', VERSIONS)
@@ -132,7 +170,7 @@ def test_inactive_clear_does_not_admit_an_ordinary_non_null_restoration(tmp_path
     assert task.objects[PARENT]['Attenuation'] == {'id': INHERITED}
 
 
-@pytest.mark.parametrize('fault', ['missing', 'malformed'])
+@pytest.mark.parametrize('fault', ['missing', 'malformed', 'malformed-name', 'missing-id'])
 @pytest.mark.parametrize('stage', ['preview', 'before-execute', 'after-execute'])
 def test_local_reference_projection_is_required_at_each_clear_phase(tmp_path, fault, stage):
     task = StoredReferenceTask(tmp_path)
