@@ -63,6 +63,8 @@ class ListTask(PathTask):
             self.calls.append((uri, args, options))
             waql = args.get('waql','')
             if self.native_version in {'2021.1','2022.1'}:
+                if re.search(r'\bskip 0\b', waql):
+                    raise RuntimeError('ak.wwise.query.invalid_query: Invalid count specified in skip (70)')
                 if any(any(part in {'children','descendants','ancestors','referencesTo'} for part in field.split('.')) for field in options['return']):
                     raise RuntimeError('ak.wwise.query.invalid_query: Unknown accessor children')
                 if ' select ' in waql:
@@ -564,6 +566,7 @@ def test_older_native_surface_requires_relationship_selection_instead_of_return_
     selections = [read for read in result['related_read_evidence'] if ' select children' in read['args'].get('waql','')]
     assert {re.search(r'\{[0-9A-Fa-f-]{36}\}',read['args']['waql']).group(0) for read in selections} == {PARENT['id'],OTHER_PARENT['id']}
     assert all(read['options']['return'] == ['id','name','type','path'] for read in selections)
+    assert all(' skip ' not in read['args']['waql'] for read in selections)
 
 
 @pytest.mark.parametrize('version',['2021.1','2022.1'])
@@ -581,6 +584,8 @@ def test_older_relationship_windows_preserve_complete_order_or_reject_overflow(t
     selects = [args['waql'] for uri,args,_ in task.calls if uri.endswith('object.get') and ' select children ' in args.get('waql','')]
     owner = [waql for waql in selects if PARENT['id'] in waql]
     assert owner
+    assert all(' skip 0 ' not in waql for waql in owner)
+    assert any(' skip ' not in waql for waql in owner)
     assert all(int(re.search(r' take (\d+)$',waql).group(1)) <= MAX_QUERY_TAKE for waql in owner)
     if count > 4096:
         assert code == 2 and result['error_code'] == 'RELATED_QUERY_MEMBER_LIMIT', result

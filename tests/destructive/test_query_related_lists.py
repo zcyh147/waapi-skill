@@ -101,7 +101,7 @@ def test_related_child_records_match_independent_children(workflow_sandbox_runti
             captured_paths = {packet["path"] for packet in observation["reads"][0]["native_packets"]}
             for association in payload["related_read_evidence"]:
                 waql = association["args"].get("waql", "")
-                if not re.fullmatch(r'from object "' + re.escape(CONTAINER) + r'" select children skip 0 take [1-9][0-9]*', waql):
+                if not re.fullmatch(r'from object "' + re.escape(CONTAINER) + r'" select children take [1-9][0-9]*', waql):
                     continue
                 path = association["call"]["evidence_path"]
                 assert path in captured_paths, association

@@ -176,7 +176,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
     return {"option": "--include-related <closed-hop>... <business-output> (repeat)",
             "relations": dict(RELATED_QUERY_RELATIONS),
             "list_members": {"relations": dict(RELATED_QUERY_LIST_RELATIONS), "strategy": list_source["strategy"],
-                "membership": "2021/2022: each actual canonical owner/relation is read with documented query SELECT, repeated bounded skip/final-take windows and overflow detection; no bare list return accessor is assumed",
+                "membership": "2021/2022: each actual canonical owner/relation is read with documented query SELECT, an initial window without skip, positive-offset bounded skip/final-take windows and overflow detection; no bare list return accessor is assumed",
                 "result": "related.<list>.items contains ordered independent member records with object identities and the same fixed/custom terminal modes; nested paths retain their grouping",
                 "source": {**{key: list_source[key] for key in ("version", "wwise_build", "page", "page_sha256")}, "sections_sha256": canonical_sha256(list_source["sections"])},
                 "limits": {"closed_path_hops": MAX_ADVANCED_RETURN_EXPRESSIONS, "unique_member_ids": MULTI_IDENTITY_READ_MAX_IDS, "member_occurrences": MULTI_IDENTITY_READ_MAX_IDS,

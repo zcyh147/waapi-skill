@@ -136,8 +136,13 @@ class RelatedListPlan:
         rows = []
         while True:
             count = min(MAX_QUERY_TAKE, MAX_RELATED_MEMBER_OCCURRENCES - len(rows) + 1)
+            # COUNT is not documented to accept zero, and pinned2021 native
+            # rejects skip 0. The initial sequence needs no skip transform.
+            waql = source.envelope.args["waql"]
+            if rows:
+                waql += f" skip {len(rows)}"
             preview = build_advanced_object_get_query({"contract": ADVANCED_QUERY_CONTRACT,
-                "waql": f'{source.envelope.args["waql"]} skip {len(rows)}',
+                "waql": waql,
                 "return": list(IDENTITY), "max_results": count}, version=self.version,
                 platform=self.return_scope.get('platform'), language=self.return_scope.get('language'))
             result = self.measured_read(OBJECT_GET, preview.envelope.args, preview.envelope.options)

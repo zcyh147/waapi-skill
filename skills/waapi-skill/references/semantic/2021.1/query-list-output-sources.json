@@ -34,5 +34,15 @@
     "evidence_status": "sealed failed read; no changes",
     "source": "r74-lists-f5ecfd82-2021-r1, dispatcher 1792710006063480000-c27075aad6634df39d75f08171df6d0a",
     "packet_sha256": "5408975779eeb20a258d3bbf73db22b670c9b21acfe9fac52bad31b3950b4f06"
+  },
+  "native_skip_observation": {
+    "wwise_build": "2021.1.14.8108",
+    "host": "WwiseConsole",
+    "query_transform": "skip 0",
+    "error_uri": "ak.wwise.query.invalid_query",
+    "message": "Invalid count specified in skip (70)",
+    "packet_sha256": "fdb6ef7eb5244a397f6aeb28475843d38ed2dbc6b37f0d00d865e165316005dd",
+    "source": "r74-lists-6af29be7-2021-r2, dispatcher 1792711038419169000-e870ad9e86e24d958f228820b4cda29d",
+    "source_boundary": "Matched query-transform docs describe COUNT but do not promise zero is accepted. The initial window omits skip; later windows use positive counts."
   }
 }
