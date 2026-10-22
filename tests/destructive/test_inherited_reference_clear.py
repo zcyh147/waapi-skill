@@ -1,4 +1,4 @@
-"""Clear one dormant stored reference while retaining its inherited value."""
+"""Clear and undo/redo one dormant reference while retaining inherited state."""
 import hashlib
 import json
 import os
@@ -36,14 +36,14 @@ def test_clear_dormant_attenuation_preserves_inheritance_and_peer(workflow_sandb
     observation = {"candidate": runtime.candidate, "version": runtime.version,
         "operation": "object.setReference", "reads": [], "transactions": [],
         "business_effect_verified": False}
-    category = {"category": "clear-dormant-reference", "status": "FAIL",
-        "verifier_strength": "stored_clear_with_inherited_reference_and_peer_preservation",
+    category = {"category": "clear-dormant-reference-with-history", "status": "FAIL",
+        "verifier_strength": "stored_clear_and_receipt_bound_history_with_inheritance_and_peer_readback",
         "observation_path": str(output)}
     runtime.category_results.append(category)
     status = "FAIL"
 
     def read(label, identity):
-        assert len(observation["reads"]) < 6
+        assert len(observation["reads"]) < 12
         argv = ["query-object", "--exact-id", identity, "--max-results", "2", "--detail",
             "--include", "notes", "--include", "parent"]
         for meaning in ("Attenuation", "OutputBus"):
@@ -86,6 +86,26 @@ def test_clear_dormant_attenuation_preserves_inheritance_and_peer(workflow_sandb
         assert read("ancestor-after", ANCESTOR) == ancestor
         assert read("peer-after", PEER) == peer
         assert len(observation["transactions"]) == 1
+        observation["clear_effect_verified"] = True
+
+        # Each native latest-history action receives its own immutable Preview
+        # and authorization. This isolated sequence does not certify a general
+        # stack-head identity or preservation outside the observed objects.
+        source_receipt = receipt["preview"]["transaction_id"]
+        for direction, expected in (("undo", before), ("redo", after)):
+            history = _start_business_draft(runtime, "ak.wwise.core.undo." + direction)
+            _update_business_draft(runtime, history, "draft-declare-core-plan",
+                ["--value", "history_scope", "latest_project_history",
+                 "--value", "expectation_receipt", source_receipt], live=True)
+            phase = _complete_business_draft(runtime, history,
+                inspect_preview=lambda preview, direction=direction:
+                    observation.setdefault("history_previews", {}).update({direction: preview}))
+            observation["transactions"].append(phase)
+            assert read("source-after-" + direction, SOUND) == expected
+            assert read("ancestor-after-" + direction, ANCESTOR) == ancestor
+            assert read("peer-after-" + direction, PEER) == peer
+        assert len(observation["transactions"]) == 3
+        observation["history_scope"] = "owned receipt and observed objects only; global stack head and other state are not proven"
         observation["business_effect_verified"] = True
         status = "PASS"
     except BaseException as exc:
