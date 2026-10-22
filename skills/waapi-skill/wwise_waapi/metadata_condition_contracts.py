@@ -60,7 +60,10 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                 "conditions": "validated_property_or_reference_presence_condition",
                 "prerequisite_write": False,
                 "master_bus": {"action": "Show", "context": "Self", "value": "native_boolean",
-                    "true_predicate": "require_fresh_exact_object_field_enabled_proof_before_and_after_execution",
+                    "true_predicate": "require_fresh_exact_object_field_applicability_before_and_after_execution",
+                    "property": "native_isPropertyEnabled_state",
+                    "reference": ("source_bound_topmost_Bus_actual_ancestry; native_enabled_state_not_queried"
+                        if version in {"2024.1", "2025.1"} else "no_matching_isMasterBus_descriptor_in_pinned_schema"),
                     "topology_changes": False},
             },
             "association_owner": {

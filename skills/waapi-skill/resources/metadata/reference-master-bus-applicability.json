@@ -1,0 +1,69 @@
+{
+  "contract": "waapi-skill.reference-master-bus-source/v1",
+  "meaning": "A master/main Bus is topmost in its Bus hierarchy; WorkUnits and Virtual Folders may intervene, with no Bus ancestor. This proves structural reference Show applicability, not native property enabled state or hardware availability.",
+  "classes": {
+    "Bus": 1376272,
+    "WorkUnit": 1638416,
+    "Folder": 131088
+  },
+  "class_source": "matching packaged object-types.json; native Folder is the versioned Virtual Folder object class, not an invented type alias",
+  "versions": {
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "hierarchy_path": "\\Master-Mixer Hierarchy",
+      "wobjects": {
+        "member": "Authoring/Data/WObjects/WObjects.xml",
+        "sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+        "condition": "Bus/Properties/Reference[AudioDevice]/Dependencies/IsMasterBusDependency[@Value=True]"
+      },
+      "help": {
+        "member": "Authoring/Help/WwiseHelp_en.chm",
+        "sha256": "5ad4a161b174dc5f573c04a8d62612078c1011db7f0c7fe8b78681e8f9468ff1",
+        "sources": [
+          {
+            "member": "ch12s01.html",
+            "line": 13,
+            "sha256": "b937fddf662450dd8d82f414679041e35e74c907f91a4f8633bb1cb8a9c05402",
+            "claim": "WorkUnit/VirtualFolder placement is allowed only without a Bus above"
+          },
+          {
+            "member": "ch59s01s02s01.html",
+            "line": 7,
+            "sha256": "f2d784ca0c5289a998b8db077082ccd6c79c6750abe1d8f54557182618969e9f",
+            "claim": "AudioDevice available only at topmost level of each Bus hierarchy"
+          }
+        ]
+      },
+      "types_sha256": "ce453380d932369e24ba7186f06f459f3785a19e824c123e15148689805109d8"
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "hierarchy_path": "\\Busses",
+      "wobjects": {
+        "member": "Authoring/Data/WObjects/WObjects.xml",
+        "sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+        "condition": "Bus/Properties/Reference[AudioDevice]/Dependencies/IsMasterBusDependency[@Value=True]"
+      },
+      "help": {
+        "member": "Authoring/Help/WwiseHelp_en.chm",
+        "sha256": "2c17662af99cdc7476b2dee1c3e1274a9df8b9e98550197d68e8d25a543491db",
+        "sources": [
+          {
+            "member": "ch13s01.html",
+            "line": 13,
+            "sha256": "cf3db1002bd9208e187a37726af0313afe20d5366b5e6e4a81d67cef478e937f",
+            "claim": "WorkUnit/VirtualFolder placement is allowed only without a Bus above"
+          },
+          {
+            "member": "ch61s01s02s01.html",
+            "line": 7,
+            "sha256": "5d770f8c76879d1658e47bdd99557544da8cfdee223667a4b375de9ddf31a020",
+            "claim": "AudioDevice available only at topmost level of each Bus hierarchy"
+          }
+        ]
+      },
+      "types_sha256": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d"
+    }
+  },
+  "sha256": "fc4a8fc6d9a96da7403ea73001c35f199069662c96f9dffdb2facb73f1e1a7e3"
+}
