@@ -58,7 +58,7 @@ def related_output_detail(version: str, name: str) -> dict[str, Any]:
     elif name not in outputs:
         reason = "the existing business output is unavailable in the selected version"
     elif name not in allowed:
-        reason = "related composition is not established by the reviewed matching SDK descriptor; remains #181 work, not native absence"
+        reason = "related composition is not yet supported by the related-output contract; this does not establish native absence"
     else:
         reason = "matching SDK object/value descriptor and dot-chain rule"
     return {"available": available, "reason": reason, "output_field": outputs.get(name, (None, None))[1]}
@@ -109,4 +109,4 @@ def related_query_contract(version: str, *, maximum_outputs: int) -> dict[str, A
             "identity": "root id/name/type/path unchanged; related.<relation>.object is the native singleton reference; canonical GUID supports read-only hops, not mutation authority",
             "presence": "native absence uses group-local unavailable_fields; null/extensions/order preserved; no inferred join",
             "metadata_reads": False,
-            "followup": "custom related fields, multiple declared hops, list compositions, unresolved legacy spellings and the native states accessor remain #181 work"}
+            "followup": "custom related fields, multiple declared hops, list compositions and additional fixed-output combinations are not yet supported"}
