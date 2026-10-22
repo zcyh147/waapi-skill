@@ -18,6 +18,8 @@ SOUND = "{0030BF58-90C3-428B-B940-44CC1C5A51B5}"
 ANCESTOR = "{B5DB3AFA-044F-441E-BC4A-1397D20E2692}"
 LOCAL_BUS = "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}"
 RESOLVED_BUS = "{ED2BCAC8-D7B6-4448-8900-439B557894F4}"
+LOCAL_ATTENUATION = "{C8288DEA-9716-4647-A5DE-6FFB5FD78D75}"
+RESOLVED_ATTENUATION = "{DD088B98-4DAD-4C54-B1EE-CA3427643E93}"
 
 
 def test_local_and_resolved_output_bus_references_remain_distinct(workflow_sandbox_runtime):
@@ -37,7 +39,9 @@ def test_local_and_resolved_output_bus_references_remain_distinct(workflow_sandb
         assert len(observation["reads"]) < 5
         argv = ["query-object", "--exact-id", identity, "--max-results", "2", "--detail"]
         if references:
-            argv.extend(["--include-field", "OutputBus", "--include-local-reference", "OutputBus"])
+            for meaning in ("OutputBus", "Attenuation"):
+                argv.extend(["--include-field", meaning, "--include-local-reference", meaning])
+            argv.extend(["--include-field", "OverridePositioning"])
         code, payload = runtime.raw_gateway(argv)
         record = {"label": label, "argv": argv, "exit_code": code, "payload": payload}
         observation["reads"].append(record)
@@ -56,8 +60,11 @@ def test_local_and_resolved_output_bus_references_remain_distinct(workflow_sandb
         assert len(native) == 1 and native[0]["id"] == identity, native
         record["native"] = {"path": str(evidence), "sha256": hashlib.sha256(raw).hexdigest(), "row": native[0]}
         if references:
-            assert rows[0]["local_references"] == {"OutputBus": native[0]["@OutputBus"]}
-            assert rows[0]["references"] == {"OutputBus": native[0]["OutputBus"]}
+            assert rows[0]["local_references"] == {
+                field: native[0]["@" + field] for field in ("OutputBus", "Attenuation")}
+            assert rows[0]["references"] == {
+                field: native[0][field] for field in ("OutputBus", "Attenuation")}
+            assert rows[0]["properties"]["OverridePositioning"] is native[0]["@OverridePositioning"]
         return rows[0]
 
     try:
@@ -65,10 +72,15 @@ def test_local_and_resolved_output_bus_references_remain_distinct(workflow_sandb
         assert sound["type"] == "Sound" and sound["name"] == "Footstep_Crouching_Concrete_01"
         assert sound["local_references"]["OutputBus"]["id"] == LOCAL_BUS
         assert sound["references"]["OutputBus"]["id"] == RESOLVED_BUS
+        assert sound["local_references"]["Attenuation"]["id"] == LOCAL_ATTENUATION
+        assert sound["references"]["Attenuation"]["id"] == RESOLVED_ATTENUATION
+        assert sound["properties"]["OverridePositioning"] is False
         ancestor = read("override-source", ANCESTOR, references=True)
         assert ancestor["type"] == "SwitchContainer" and ancestor["name"] == "Footstep_Types"
         assert ancestor["local_references"]["OutputBus"]["id"] == RESOLVED_BUS
         assert ancestor["references"]["OutputBus"]["id"] == RESOLVED_BUS
+        assert ancestor["local_references"]["Attenuation"]["id"] == RESOLVED_ATTENUATION
+        assert ancestor["references"]["Attenuation"]["id"] == RESOLVED_ATTENUATION
         local_bus = read("local-bus-identity", LOCAL_BUS)
         assert local_bus["type"] == "Bus"
         assert local_bus["name"] == ("Main Audio Bus" if runtime.version == "2025.1" else "Master Audio Bus")
