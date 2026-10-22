@@ -10,6 +10,7 @@ from tests.unit.test_query_related_paths import PathTask, SOUND_CLASS, SOUND, OT
 class ListTask(PathTask):
     def __init__(self, tmp_path, version='2025.1'):
         super().__init__(tmp_path, version)
+        self.native_version = version
         self.members = {
             SOUND: {'id': SOUND, 'name': 'First', 'type': 'Sound', 'path': r'\Sounds\First',
                     'classId': SOUND_CLASS, '@Volume': -12, '@Pitch': -560},
@@ -60,6 +61,25 @@ class ListTask(PathTask):
     def call(self, uri, args=None, options=None):
         if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}:
             self.calls.append((uri, args, options))
+            waql = args.get('waql','')
+            if self.native_version in {'2021.1','2022.1'}:
+                if any(any(part in {'children','descendants','ancestors','referencesTo'} for part in field.split('.')) for field in options['return']):
+                    raise RuntimeError('ak.wwise.query.invalid_query: Unknown accessor children')
+                if ' select ' in waql:
+                    owner, = re.findall(r'\{[0-9A-Fa-f-]{36}\}',waql)
+                    relation = re.search(r' select (\w+)',waql).group(1)
+                    refs = self.objects[owner].get(relation) or []
+                    skip = re.search(r' skip (\d+)',waql)
+                    take = re.search(r' take (\d+)$',waql)
+                    start = int(skip.group(1)) if skip else 0
+                    selected = refs[start:start+int(take.group(1))] if take else refs[start:]
+                    values = []
+                    for reference in selected:
+                        row = {**self.objects.get(reference['id'],{}), **reference}
+                        value = self.projection(row,options['return'])
+                        value.update({key:copy.deepcopy(item) for key,item in reference.items() if key not in ('id','name','type','path')})
+                        values.append(value)
+                    return {'return':values}
             ids = args.get('from', {}).get('id')
             if ids is None:
                 ids = re.findall(r'\{[0-9A-Fa-f-]{36}\}', args.get('waql', ''))
@@ -133,7 +153,8 @@ def test_list_and_member_presence_extensions_and_duplicate_occurrences_are_lossl
     code, result = task.run('query-object', *options())
     assert code == 0, result
     context = result['agent_result'][0]['related']['children']
-    if presence == 'absent': assert context == {'unavailable_fields':['items']}
+    if presence in {'absent','null'} and version in {'2021.1','2022.1'}: assert context == {'items':[]}
+    elif presence == 'absent': assert context == {'unavailable_fields':['items']}
     elif presence == 'null': assert context == {'items':None}
     elif presence == 'empty': assert context == {'items':[]}
     elif presence == 'duplicate': assert [item['object']['id'] for item in context['items']] == [SOUND,SOUND]
@@ -203,9 +224,9 @@ def test_preparation_rejects_type_exact_scope_or_membership_drift(tmp_path, vers
     class Changing(ListTask):
         count = 0
         def call(self, uri,args=None,options=None):
-            if uri.endswith('object.get') and args != {'waql':'from type Project take 1'}:
+            if uri.endswith('object.get') and args != {'waql':'from type Project take 1'} and ' select ' not in args.get('waql','') and 'from object ' not in args.get('waql',''):
                 self.count += 1
-                if self.count == (4 if version in {'2021.1','2022.1'} else 3):
+                if self.count == 3:
                     if change == 'typed-class': self.members[SOUND]['classId'] = True
                     elif change == 'membership': self.rows[0]['children'].reverse()
                     else: self.rows.reverse()
@@ -225,7 +246,7 @@ def test_grouped_member_batch_requires_exact_canonical_identity_set(tmp_path,ver
     class Invalid(ListTask):
         def call(self,uri,args=None,options=None):
             result = super().call(uri,args,options)
-            if uri.endswith('object.get') and 'from object ' in args.get('waql',''):
+            if uri.endswith('object.get') and 'from object ' in args.get('waql','') and ' select ' not in args.get('waql',''):
                 if invalid == 'missing': result['return'].pop()
                 elif invalid == 'duplicate': result['return'][1] = copy.deepcopy(result['return'][0])
                 elif invalid == 'extra': result['return'][1]['id'] = TARGET['id']
@@ -287,16 +308,26 @@ def test_list_pages_reconstruct_member_values_and_seal_all_owned_reads(tmp_path,
         code,rejected = task.run(*next_argv)
         assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
         return
-    entries = []
+    entries, position = [], 0
     while True:
         page = result['agent_result']
+        assert page['page']['offset'] == position
+        position += len(page['entries'])
+        assert page['page']['next_offset'] == position
         entries.extend(page['entries'])
         assert len(json.dumps(result,ensure_ascii=False,indent=2).encode()) <= 32768
         assert list(result)[-1] == 'agent_result'
         if page['projection_complete']: break
-        code,result = task.run(*page['next_command']['gateway_argv'])
-        assert code == 0, result
-    assert ''.join(entry['value'] for entry in entries if entry['pointer'] == '/objects/0/related/children/items/0/notes') == text
+        argv = page['next_command']['gateway_argv']
+        assert int(argv[-1].split('.')[1]) == position
+        code,result = task.run(*argv)
+        assert code == 0, json.dumps(result,ensure_ascii=False)
+    fragments = [entry for entry in entries if entry['pointer'] == '/objects/0/related/children/items/0/notes']
+    character_offset = 0
+    for fragment in fragments:
+        assert fragment['offset'] == character_offset
+        character_offset += len(fragment['value'])
+    assert ''.join(entry['value'] for entry in fragments).encode() == text.encode()
     assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/related/children/items/0/properties/Pitch'] == [-560]
 
 
@@ -345,10 +376,10 @@ def test_raw_member_identity_extensions_are_type_exact_scope_facts_and_never_pru
         def projection(self,row,expressions):
             projected = super().projection(row,expressions)
             if row['id'] == SOUND:
-                projected['future'] = {'related':{},'value': True if self.count >= 4 else 1}
+                projected['future'] = {'related':{},'value': True if self.count >= 3 else 1}
             return projected
         def call(self,uri,args=None,options=None):
-            if uri.endswith('object.get') and args != {'waql':'from type Project take 1'}: self.count += 1
+            if uri.endswith('object.get') and args != {'waql':'from type Project take 1'} and ' select ' not in args.get('waql','') and 'from object ' not in args.get('waql',''): self.count += 1
             return super().call(uri,args,options)
     task = Extension(tmp_path,version)
     code,result = task.run('query-object',*options())
@@ -519,3 +550,64 @@ def test_query_page_rejects_changed_or_malformed_pinned_origin_before_delivering
     code,rejected = task.run(*argv)
     assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
     assert rejected.get('agent_result') is None
+
+
+@pytest.mark.parametrize('version',['2021.1','2022.1'])
+def test_older_native_surface_requires_relationship_selection_instead_of_return_accessor(tmp_path,version):
+    task = ListTask(tmp_path,version)
+    code,result = task.run('query-object',*options(),'--detail')
+    assert code == 0, result
+    rows = result['agent_result']
+    assert [row['id'] for row in rows] == [PARENT['id'],OTHER_PARENT['id']]
+    assert [[item['object']['id'] for item in row['related']['children']['items']] for row in rows] == [[SOUND,OTHER],[OTHER,SOUND]]
+    assert rows[0]['related']['children']['items'][0]['properties']['Pitch'] == -560
+    selections = [read for read in result['related_read_evidence'] if ' select children' in read['args'].get('waql','')]
+    assert {re.search(r'\{[0-9A-Fa-f-]{36}\}',read['args']['waql']).group(0) for read in selections} == {PARENT['id'],OTHER_PARENT['id']}
+    assert all(read['options']['return'] == ['id','name','type','path'] for read in selections)
+
+
+@pytest.mark.parametrize('version',['2021.1','2022.1'])
+@pytest.mark.parametrize('count',[1001,4096,4097])
+def test_older_relationship_windows_preserve_complete_order_or_reject_overflow(tmp_path,version,count):
+    from wwise_waapi.builders.query import MAX_QUERY_TAKE
+    task = ListTask(tmp_path,version)
+    # Compact real object identity shapes let the4096 occurrence boundary be
+    # exercised independently of the separate reconstruction-byte boundary.
+    task.members[SOUND].update(name='s',path=r'\s')
+    task.rows[0]['children'] = [task.reference(SOUND)] * count
+    task.rows[1]['children'] = []
+    code,result = task.run('query-object','--kind','all-sounds','--max-results','2',
+        '--include-related','children','volume-db')
+    selects = [args['waql'] for uri,args,_ in task.calls if uri.endswith('object.get') and ' select children ' in args.get('waql','')]
+    owner = [waql for waql in selects if PARENT['id'] in waql]
+    assert owner
+    assert all(int(re.search(r' take (\d+)$',waql).group(1)) <= MAX_QUERY_TAKE for waql in owner)
+    if count > 4096:
+        assert code == 2 and result['error_code'] == 'RELATED_QUERY_MEMBER_LIMIT', result
+        assert owner[-1].endswith('skip 4000 take 97')
+        assert result.get('agent_result') is None
+    else:
+        assert code == 0 and result['status'] == 'partial', result
+        expected = 'skip 1000 take 1000' if count == 1001 else 'skip 4000 take 97'
+        assert any(waql.endswith(expected) for waql in owner)
+        header = result['agent_result']['objects'][0]
+        assert header['id'] == PARENT['id']
+
+
+@pytest.mark.parametrize('version',['2021.1','2022.1'])
+def test_older_relationship_reads_deduplicate_actual_owner_and_keep_distinct_occurrences(tmp_path,version):
+    task = ListTask(tmp_path,version)
+    task.rows[1]['children'] = task.rows[0]['children']
+    # Both root occurrences retain the same observed owner without forcing
+    # separate membership reads or deduplicating the public roots.
+    for field in ('id','name','type','path'):
+        task.rows[1][field] = task.rows[0][field]
+    code,result = task.run('query-object',*options(),'--detail')
+    assert code == 0, result
+    assert [row['id'] for row in result['agent_result']] == [PARENT['id'],PARENT['id']]
+    assert result['agent_result'][0]['related']['children'] == result['agent_result'][1]['related']['children']
+    reads = [read for read in result['related_read_evidence'] if ' select children ' in read['args'].get('waql','')]
+    root_observations = [read for read in result['related_read_evidence'] if read['args'].get('waql') == 'from type Sound take 2']
+    # Initial identity observation has no relationship edge. Every later
+    # observed graph reads this single distinct owner exactly once.
+    assert len(reads) == len(root_observations)

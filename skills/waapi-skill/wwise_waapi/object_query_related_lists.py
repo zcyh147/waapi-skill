@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from .canonical import canonical_json_bytes, canonical_sha256
-from .builders.query import (build_object_get_query, MAX_STRUCTURED_SOURCE_ITEMS,
+from .builders.query import (build_object_get_query, build_advanced_object_get_query, ADVANCED_QUERY_CONTRACT, MAX_QUERY_TAKE, MAX_STRUCTURED_SOURCE_ITEMS,
     MAX_ADVANCED_RETURN_EXPRESSIONS)
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .object_query_outputs import QUERY_FIELD_OUTPUT_GROUPS, available_query_outputs
@@ -84,7 +84,10 @@ class RelatedListPlan:
                 if root:
                     expression += f' as related{edge.child.number - 1}'
             else:
-                expression = edge.native
+                # Older lanes establish membership with query SELECT, not an
+                # unsupported return accessor. Prefix owner references already
+                # belong to frame.fields when the path requires them.
+                continue
             result.append(expression)
         return related_native_fields([('related_scope', value, {}) for value in result], ())
 
@@ -122,23 +125,62 @@ class RelatedListPlan:
             found.update(batch)
         return found
 
+    def relationship_rows(self, owner, relation):
+        """Return a complete bounded sequence for one actual owner/relation.
+
+        The compiler owns SELECT, skip and final take. A final overflow sentinel
+        distinguishes exactly4096 members from a silently truncated prefix.
+        """
+        source = build_object_get_query(object_id=owner, select=relation,
+            return_fields=IDENTITY, version=self.version)
+        rows = []
+        while True:
+            count = min(MAX_QUERY_TAKE, MAX_RELATED_MEMBER_OCCURRENCES - len(rows) + 1)
+            preview = build_advanced_object_get_query({"contract": ADVANCED_QUERY_CONTRACT,
+                "waql": f'{source.envelope.args["waql"]} skip {len(rows)}',
+                "return": list(IDENTITY), "max_results": count}, version=self.version,
+                platform=self.return_scope.get('platform'), language=self.return_scope.get('language'))
+            result = self.measured_read(OBJECT_GET, preview.envelope.args, preview.envelope.options)
+            chunk = self.validate_rows(result, count)
+            rows.extend(chunk)
+            if len(rows) > MAX_RELATED_MEMBER_OCCURRENCES:
+                raise RelatedQueryError('Relationship membership exceeded its owned occurrence budget; refine the query', code='RELATED_QUERY_MEMBER_LIMIT')
+            if len(chunk) < count:
+                return rows
+
     def decode(self, root_rows):
         self.root.rows = {(index,): row for index, row in enumerate(root_rows)}
         occurrences = 0
         record_bytes = 0
+        memberships = {}
+        membership_facts = {}
         for frame in self.frames:
             for edge in frame.lists.values():
                 edge.states, edge.child.rows = {}, {}
                 members = []
                 key = self.edge_key(frame, edge)
                 for loc, row in frame.rows.items():
-                    if key not in row:
-                        edge.states[loc] = ('absent', None)
-                        continue
-                    values = row[key]
-                    if values is None:
-                        edge.states[loc] = ('null', None)
-                        continue
+                    if not self.composed:
+                        prefix, _, relation = edge.native.rpartition('.')
+                        owner = row.get(prefix) if prefix else row
+                        if owner is None:
+                            edge.states[loc] = ('absent', None)
+                            continue
+                        if not isinstance(owner, Mapping) or not canonical_guid(owner.get('id')):
+                            raise RelatedQueryError('Relationship membership requires an actual canonical owner', code='RELATED_QUERY_RESULT_SHAPE')
+                        association = (owner['id'].upper(), relation)
+                        if association not in memberships:
+                            memberships[association] = self.relationship_rows(*association)
+                        values = memberships[association]
+                        membership_facts[(frame.number,loc,edge.native)] = {'owner':association[0], 'relation':relation, 'members':values}
+                    else:
+                        if key not in row:
+                            edge.states[loc] = ('absent', None)
+                            continue
+                        values = row[key]
+                        if values is None:
+                            edge.states[loc] = ('null', None)
+                            continue
                     if not isinstance(values, list) or any(not isinstance(value, Mapping) or not canonical_guid(value.get('id')) for value in values):
                         raise RelatedQueryError('A related list must contain canonical object records, null or absence', code='RELATED_QUERY_RESULT_SHAPE')
                     occurrences += len(values)
@@ -180,8 +222,7 @@ class RelatedListPlan:
                 for loc, state in edge.states.items():
                     snapshot[f'{frame.number}:{loc}:list:{edge.native}'] = state
                     if not self.composed:
-                        owner = frame.rows[loc]
-                        snapshot[f'{frame.number}:{loc}:membership:{edge.native}'] = {'present':edge.native in owner,'value':owner.get(edge.native)}
+                        snapshot[f'{frame.number}:{loc}:membership:{edge.native}'] = membership_facts.get((frame.number,loc,edge.native))
         return snapshot
 
     def accept(self, root_rows):
@@ -316,6 +357,7 @@ class RelatedListPlan:
             'scopes':self.binder.selections,'read_associations':self.descriptors,
             'limits':{'unique_member_ids':MULTI_IDENTITY_READ_MAX_IDS,'member_occurrences':MAX_RELATED_MEMBER_OCCURRENCES,
                 'cumulative_member_observations':MAX_RELATED_MEMBER_OBSERVATIONS,'source_ids_per_read':MAX_STRUCTURED_SOURCE_ITEMS,
+                **({'relationship_rows_per_read':MAX_QUERY_TAKE} if not self.composed else {}),
                 'cumulative_read_bytes':MAX_ADVANCED_RETURN_EXPRESSIONS*self.maximum_read_bytes,'grouped_member_reconstruction_bytes':self.maximum_read_bytes},
             'metadata_authority':'live-waapi','mutation_authority':False}
 

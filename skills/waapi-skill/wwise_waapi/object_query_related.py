@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .object_query_outputs import QUERY_BUSINESS_OUTPUTS, QUERY_FIELD_MODES, reference_value_source_contract, available_query_outputs
-from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS, MAX_ADVANCED_RETURN_EXPRESSION_BYTES
+from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS, MAX_ADVANCED_RETURN_EXPRESSION_BYTES, MAX_QUERY_TAKE
 from .schema_inventory import load_definition_graph
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
@@ -176,13 +176,14 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
     return {"option": "--include-related <closed-hop>... <business-output> (repeat)",
             "relations": dict(RELATED_QUERY_RELATIONS),
             "list_members": {"relations": dict(RELATED_QUERY_LIST_RELATIONS), "strategy": list_source["strategy"],
+                "membership": "2021/2022: each actual canonical owner/relation is read with documented query SELECT, repeated bounded skip/final-take windows and overflow detection; no bare list return accessor is assumed",
                 "result": "related.<list>.items contains ordered independent member records with object identities and the same fixed/custom terminal modes; nested paths retain their grouping",
                 "source": {**{key: list_source[key] for key in ("version", "wwise_build", "page", "page_sha256")}, "sections_sha256": canonical_sha256(list_source["sections"])},
                 "limits": {"closed_path_hops": MAX_ADVANCED_RETURN_EXPRESSIONS, "unique_member_ids": MULTI_IDENTITY_READ_MAX_IDS, "member_occurrences": MULTI_IDENTITY_READ_MAX_IDS,
                     "cumulative_member_observations": MAX_ADVANCED_RETURN_EXPRESSIONS * MULTI_IDENTITY_READ_MAX_IDS,
-                    "source_ids_per_read": MAX_STRUCTURED_SOURCE_ITEMS, "grouped_member_reconstruction_bytes": "existing per-read result byte limit", "cumulative_read_result_bytes": "64 times the existing per-read result byte limit", "deadline": "existing shared query deadline"},
-                "presence": "missing list reports unavailable_fields items; null differs from empty; member absence never removes that member; native extensions and duplicate occurrences are retained",
-                "provenance": "unpaged detail related_read_evidence is current invocation; paged evidence is pinned origin-invocation data in the existing query plan and bound by digest; current final call remains separate. API/args/projection associations are explicit. Original request limit256 KiB and request/context record limit512 KiB are independent of origin evidence allowance15.5 MiB; each record and total store16 MiB,128 records,900 seconds. Capacity failures never truncate. Grouped reads are Gateway-composed, not native composition or an atomic snapshot",
+                    "source_ids_per_read": MAX_STRUCTURED_SOURCE_ITEMS, "relationship_rows_per_read": MAX_QUERY_TAKE, "grouped_member_reconstruction_bytes": "existing per-read result byte limit", "cumulative_read_result_bytes": "64 times the existing per-read result byte limit", "deadline": "existing shared query deadline"},
+                "presence": "native composition preserves omitted/null/empty list distinctions. Older owner relationship queries return a sequence: zero selected rows means items []; no unsupported bare-return null/absence fact is inferred. Missing owners remain unavailable. Member absence never removes that member; native extensions and duplicate occurrences are retained",
+                "provenance": "unpaged detail related_read_evidence is current invocation; paged evidence is pinned origin-invocation data in the existing query plan and bound by digest; current final call remains separate. API/args/projection associations are explicit. Original request limit: 256 KiB and request/context record limit: 512 KiB are independent of origin evidence allowance: 15.5 MiB; each record and total store: 16 MiB, 128 records, 900 seconds. Capacity failures never truncate. Grouped reads are Gateway-composed, not native composition or an atomic snapshot",
                 "authority": "canonical GUID membership associates read-only member values only; root and member references never certify mutation selection"},
             "outputs": {name: related_output_detail(version, name) for name in QUERY_BUSINESS_OUTPUTS},
             "result_schema": patterns,

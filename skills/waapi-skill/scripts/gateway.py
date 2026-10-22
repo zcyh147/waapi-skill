@@ -25628,33 +25628,40 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         evidence_fragment_required = args.detail and len(canonical_json_bytes(payload.get("related_read_evidence"))) > 4096
         page_payload = {**payload, "detail_fragment_required": detail_fragment_required,
             "scope_fragment_required": scope_fragment_required, "evidence_fragment_required": evidence_fragment_required}
-        page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
-            next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
-                "--result-query", handle, "--result-page", token]))
-        if not (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int and live_info["processId"] > 0):
-            page.pop("next_command", None)
-            if not page["projection_complete"]:
-                page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
-        result = {key: value for key, value in payload.items() if key not in
-            {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
-        if detail_fragment_required:
-            result.pop("semantic_preview", None)
-        if scope_fragment_required:
-            result.pop("related_scope_binding", None)
-        if evidence_fragment_required:
-            result.pop("related_read_evidence", None)
-        result.update(status="ok" if page["projection_complete"] else "partial",
-            projection_complete=page["projection_complete"],
-            projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
-                "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
-                "related_read_evidence_source": "agent_result.entries/related_read_evidence" if evidence_fragment_required else "inline_when_detail_requested",
-                **({"related_read_evidence_provenance": "origin invocation pinned in existing query plan; live revalidation and final call are current invocation"} if origin_evidence is not None else {}),
-                "related_scope_binding_source": "agent_result.entries/related_scope_binding" if scope_fragment_required else "inline_when_detail_requested",
-                "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
-            objects_source="agent_result.objects", agent_result=page)
-        if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) != "ok":
-            raise QueryResultProjectionLimitError("The query page with diagnostics exceeds its bounded output; refine the original read")
-        return result
+        page_positions = 32
+        while True:
+            page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
+                next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
+                    "--result-query", handle, "--result-page", token]), maximum_entries=page_positions)
+            if not (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int and live_info["processId"] > 0):
+                page.pop("next_command", None)
+                if not page["projection_complete"]:
+                    page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
+            result = {key: value for key, value in payload.items() if key not in
+                {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
+            if detail_fragment_required:
+                result.pop("semantic_preview", None)
+            if scope_fragment_required:
+                result.pop("related_scope_binding", None)
+            if evidence_fragment_required:
+                result.pop("related_read_evidence", None)
+            result.update(status="ok" if page["projection_complete"] else "partial",
+                projection_complete=page["projection_complete"],
+                projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
+                    "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
+                    "related_read_evidence_source": "agent_result.entries/related_read_evidence" if evidence_fragment_required else "inline_when_detail_requested",
+                    **({"related_read_evidence_provenance": "origin invocation pinned in existing query plan; live revalidation and final call are current invocation"} if origin_evidence is not None else {}),
+                    "related_scope_binding_source": "agent_result.entries/related_scope_binding" if scope_fragment_required else "inline_when_detail_requested",
+                    "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
+                objects_source="agent_result.objects", agent_result=page)
+            if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) == "ok":
+                return result
+            positions = page["page"]["next_offset"] - offset
+            if positions <= 1:
+                raise QueryResultProjectionLimitError("One query entry with diagnostics exceeds its bounded output; refine the original read")
+            # Only reduce the number of unchanged entries. Their splitting and
+            # absolute positions never depend on this envelope-fitting ceiling.
+            page_positions = max(1, positions // 2)
     except QueryResultPageError as exc:
         raise GatewayResultShapeError(str(exc),
             details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},

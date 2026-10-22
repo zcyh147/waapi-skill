@@ -122,7 +122,7 @@ def parse_offset(token: str | None, binding: Mapping[str, Any]) -> int:
 
 def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str, Any],
                expires_at: int | float,
-               next_command: Callable[[str], Mapping[str, Any]]) -> dict[str, Any]:
+               next_command: Callable[[str], Mapping[str, Any]], maximum_entries: int = 32) -> dict[str, Any]:
     observation = {"objects": payload["objects"]}
     if "native_observation" in payload:
         observation["native_observation"] = payload["native_observation"]
@@ -150,7 +150,7 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
         if omitted:
             header["projection_omitted_fields"] = omitted
         headers.append(header)
-    end = min(len(entries), offset + 32)
+    end = min(len(entries), offset + maximum_entries)
     while True:
         complete = end == len(entries)
         result = {"objects": headers, "entries": entries[offset:end],
