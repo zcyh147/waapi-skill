@@ -117,7 +117,12 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         source = objects("association-before", association, ("ContinuePlay", "FadeInTime"))
         owner = objects("owner-before", OWNER, ("SwitchBehavior",))
         members = objects("owner-children-before", OWNER, children=True, context=True)
-        assert source["type"] == "ObjectSettingAssociation" and source["name"] == "" and source["parent"] is None, source
+        assert source["type"] == "ObjectSettingAssociation" and source["name"] == "", source
+        # Keep native omission distinct from explicit null in the saved snapshot.
+        if "parent" in source:
+            assert source["parent"] is None, source
+        else:
+            assert "parent" in source["unavailable_fields"], source
         assert source["owner"]["id"] == OWNER and source["path"] == OWNER_PATH + r"\<Unnamed Object Setting Association>", source
         assert source["properties"]["ContinuePlay"] is False and source["properties"]["FadeInTime"] == 0.0, source
         assert owner["type"] == "SwitchContainer" and owner["name"] == "Shells" and owner["path"] == OWNER_PATH, owner
