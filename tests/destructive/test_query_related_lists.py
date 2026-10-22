@@ -124,13 +124,13 @@ def test_related_child_records_match_independent_children(workflow_sandbox_runti
                 assert [member["id"] for member in members] == [item["object"]["id"] for item in items]
 
         children, _, _ = read("children-independent", ["--relationship", "children",
-            "--include", "volume-db", "--include-field", "Pitch"])
+            "--include", "volume-db", "--include", "pitch-cents"])
         assert len(children) == 5 and {child["id"] for child in children} == CHILDREN, children
         for child in children:
             item = by_id[child["id"]]
             assert all(item["object"][field] == child[field] for field in ("id", "name", "type", "path")), item
             assert item["volume_db"] == child["volume_db"]
-            assert item["properties"]["Pitch"] == child["properties"]["Pitch"]
+            assert item["properties"]["Pitch"] == child["pitch_cents"]
         repeated, _, _ = read("container-after", projection)
         assert json.dumps(repeated, sort_keys=True) == json.dumps(roots, sort_keys=True)
         observation["business_effect_verified"] = True
