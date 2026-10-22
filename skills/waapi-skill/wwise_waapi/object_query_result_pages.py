@@ -1,6 +1,6 @@
 """Lossless bounded delivery of one exact bounded object-query observation.
 
-Plans contain only original public argv, revalidated by the Gateway. Pages
+Plans retain original public argv and optional origin packet diagnostics. Pages
 repeat that read and verify the entire result and resolved projection; they
 provide no offset in Wwise and no mutation authority.
 """
@@ -41,14 +41,29 @@ def _has_oversized_pointer(value: Any) -> bool:
     return False
 
 
+MAX_QUERY_REQUEST_BYTES = 256 * 1024
+MAX_QUERY_BASE_RECORD_BYTES = MediaPoolQueryStore.MAX_RECORD_BYTES
+MAX_QUERY_ORIGIN_EVIDENCE_BYTES = MediaPoolQueryStore.MAX_TOTAL_BYTES - MAX_QUERY_BASE_RECORD_BYTES
+
+
 def validate_plan(plan: Mapping[str, Any]) -> None:
     argv = plan.get("argv") if isinstance(plan, dict) else None
-    if (not isinstance(plan, dict) or set(plan) != {"argv"} or not isinstance(argv, list) or not argv
+    if (not isinstance(plan, dict) or not {"argv"} <= set(plan) <= {"argv", "origin_related_read_evidence"} or not isinstance(argv, list) or not argv
             or "query-object" not in argv or len(argv) > 2048
             or not all(isinstance(item, str) for item in argv)
             or any(item in {"--result-query", "--result-page"} for item in argv)
-            or len(canonical_json_bytes(plan)) > 256 * 1024):
+            or len(canonical_json_bytes({"argv": argv})) > MAX_QUERY_REQUEST_BYTES):
         raise MediaPoolContinuationError("Stored query is not a bounded original public business request")
+    if "origin_related_read_evidence" in plan:
+        evidence = plan["origin_related_read_evidence"]
+        if (not isinstance(evidence, list) or any(not isinstance(read, dict)
+                or set(read) != {"api", "args", "options", "result_sha256", "call"}
+                or not isinstance(read["api"], str) or not isinstance(read["args"], dict)
+                or not isinstance(read["options"], dict) or not isinstance(read["call"], dict)
+                or not isinstance(read["result_sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", read["result_sha256"])
+                for read in evidence)
+                or len(canonical_json_bytes(evidence)) > MAX_QUERY_ORIGIN_EVIDENCE_BYTES):
+            raise MediaPoolContinuationError("Origin query evidence is malformed or exceeds its separate bounded storage allowance")
 
 
 class ObjectQueryPlanStore(MediaPoolQueryStore):
@@ -57,6 +72,33 @@ class ObjectQueryPlanStore(MediaPoolQueryStore):
     PREFIX = "oq1-"
     _HANDLE = re.compile(r"^oq1-[0-9a-f]{32}$")
     validate_plan = staticmethod(validate_plan)
+    # Keep the original request/context allowance independent of diagnostic data.
+    # Origin data shares the existing total store quota, not the argv ceiling.
+    MAX_RECORD_BYTES = MediaPoolQueryStore.MAX_TOTAL_BYTES
+
+    def _validate_base_record(self, *, plan, context, expires_at):
+        if not isinstance(plan, dict) or "argv" not in plan:
+            raise MediaPoolContinuationError("Query plan no longer contains its original request")
+        base = {"contract": self.CONTRACT, "handle": self.PREFIX + "0" * 32,
+            "plan": {"argv": plan["argv"]}, "context": context, "expires_at": expires_at, "sha256": "0" * 64}
+        if len(canonical_json_bytes(base)) > MAX_QUERY_BASE_RECORD_BYTES:
+            raise MediaPoolContinuationError("Query request/context exceeds its original bounded record allowance")
+
+    def _load(self, handle, *, allow_expired=False):
+        try:
+            record = super()._load(handle, allow_expired=allow_expired)
+            self._validate_base_record(plan=record["plan"], context=record["context"], expires_at=record["expires_at"])
+            return record
+        except MediaPoolContinuationError as exc:
+            raise QueryResultPageError(str(exc)) from exc
+
+    def issue(self, *, plan, context, issued):
+        try:
+            self.validate_plan(plan)
+            self._validate_base_record(plan=plan, context=context, expires_at=issued + 900)
+            return super().issue(plan=plan, context=context, issued=issued)
+        except (MediaPoolContinuationError, QueryResultPageError) as exc:
+            raise QueryResultProjectionLimitError(f"Query plan/evidence storage is unavailable or exceeds its bounded capacity: {exc}") from exc
 
 
 def page_token(offset: int, binding: Mapping[str, Any]) -> str:
@@ -88,6 +130,8 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
         observation["semantic_preview"] = payload["semantic_preview"]
     if payload.get("scope_fragment_required"):
         observation["related_scope_binding"] = payload["related_scope_binding"]
+    if payload.get("evidence_fragment_required"):
+        observation["related_read_evidence"] = payload["related_read_evidence"]
     encoded_observation = canonical_json_bytes(observation)
     document_fragments = _has_oversized_pointer(observation)
     # Canonical traversal makes entry positions stable when only native object

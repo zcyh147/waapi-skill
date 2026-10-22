@@ -2000,12 +2000,12 @@ def build_parser() -> argparse.ArgumentParser:
     query_object.add_argument(
         "--include-related", nargs="+", action="append", default=[],
         dest="related_outputs", metavar="PATH_OR_OUTPUT",
-        help="Return one closed output from a singleton related object, retaining the queried object's identity",
+        help="Return a closed output along singleton or list relations, retaining each queried object's identity",
     )
     for related_option in RELATED_FIELD_MODES:
         query_object.add_argument(related_option, nargs="+", action="append", default=[],
             dest=related_option[2:].replace("-", "_"), metavar="PATH_OR_MEANING",
-            help="Read a live-discovered field on an actual singleton-related object; final argument is its user-facing meaning")
+            help="Read a live-discovered field on actual related object/member scopes; final argument is its user-facing meaning")
     query_object.add_argument(
         "--include-field",
         action="append",
@@ -3643,7 +3643,7 @@ def _execute_gateway_unconstrained(
                 "entry point so every streamed record remains observable."
             )
         if args.command == "query-object":
-            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore
+            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError
             if args.result_query is not None or args.result_page is not None:
                 if args.result_query is None or args.result_page is None:
                     raise GatewayInputError("Query projection requires both returned --result-query and --result-page")
@@ -3651,7 +3651,10 @@ def _execute_gateway_unconstrained(
                 expected.state_dir = args.state_dir
                 if vars(expected) != vars(args):
                     raise GatewayInputError("A query result continuation accepts only its returned handle/page and existing state directory")
-                record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                try:
+                    record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                except QueryResultPageError as exc:
+                    raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
                 handle, page = args.result_query, args.result_page
                 original_argv = record["plan"]["argv"]
                 args = build_parser().parse_args(original_argv)
@@ -5902,9 +5905,11 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         if len(set(signatures)) != len(signatures):
             raise ValueError("query-object related declarations must be unique")
         args.query_related_requests = tuple(requests)
+        args.query_related_has_lists = any(kind == "list" for request in requests for kind, _ in request["hops"])
         args.query_related_preparation_required = any(request["option"] != "--include-related" or
             any(kind != "relation" for kind, _ in request["hops"]) for request in requests)
-        bindings.extend(fixed_related_bindings(version, requests))
+        if not args.query_related_has_lists:
+            bindings.extend(fixed_related_bindings(version, requests))
     except ValueError as exc:
         raise GatewayInputError(str(exc)) from exc
 
@@ -25045,6 +25050,34 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
         return None
     from wwise_waapi.object_query_related_runtime import RelatedQueryError, prepare_related_outputs
     try:
+        if getattr(args, "query_related_has_lists", False):
+            from wwise_waapi.object_query_related_lists import RelatedListPlan
+            from wwise_waapi.canonical import canonical_sha256
+            calls, evidence = [], []
+            raw_read = transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=calls)
+            def read(uri, native_args, options):
+                try:
+                    result = raw_read(uri, native_args, options)
+                except OperationContractError as exc:
+                    raise RelatedQueryError(str(exc), code="RELATED_QUERY_READ_FAILED", details=exc.details) from exc
+                evidence.append({"api": uri, "args": native_args, "options": options,
+                    "result_sha256": canonical_sha256(result), "call": calls[-1]})
+                return result
+            plan = RelatedListPlan(version=detected_version, requests=args.query_related_requests,
+                bindings=args.query_output_bindings, build_preview=build_preview, read=read,
+                maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
+                maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES)
+            clarification = plan.prepare()
+            if clarification is not None:
+                if args.result_page is not None:
+                    raise RelatedQueryError("Related field selection changed; restart the original read", code="QUERY_RESULT_CONTINUATION_CHANGED")
+                return clarification
+            args.query_related_list_plan = plan
+            args.query_output_bindings = plan.bindings
+            args.query_return_fields = plan.render(plan.root, root=True)
+            args.query_related_scope_binding = plan.proof()
+            args.query_related_read_evidence = evidence
+            return None
         bindings, proof, clarification = prepare_related_outputs(version=detected_version,
             requests=args.query_related_requests, bindings=args.query_output_bindings,
             build_preview=build_preview, read=transaction_read_call(dispatcher, connection=connection, version=detected_version),
@@ -25073,7 +25106,17 @@ def _project_query_business_rows(
 
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     proof = getattr(args, "query_related_scope_binding", None)
-    if proof is not None:
+    list_plan = getattr(args, "query_related_list_plan", None)
+    related_rows = None
+    if list_plan is not None:
+        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+        try:
+            related_rows = list_plan.project(rows)
+            args.query_related_scope_binding = list_plan.proof()
+        except RelatedQueryError as exc:
+            code = "QUERY_RESULT_CONTINUATION_CHANGED" if args.result_page is not None else exc.code
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+    elif proof is not None:
         from wwise_waapi.object_query_related_runtime import RelatedQueryError, validate_related_observation
         try:
             validate_related_observation(rows, proof)
@@ -25135,6 +25178,8 @@ def _project_query_business_rows(
         for group in QUERY_FIELD_OUTPUT_GROUPS.values():
             if group in grouped:
                 item[group] = grouped[group]
+        if related_rows is not None:
+            item.update(related_rows[row_index])
         if related_groups:
             item["related"] = related_groups
         if unavailable:
@@ -25541,6 +25586,9 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
     if args.detail and getattr(args, "query_related_scope_binding", None) is not None:
         terminal = payload.pop("agent_result")
         payload["related_scope_binding"] = args.query_related_scope_binding
+        if getattr(args, "query_related_read_evidence", None) is not None:
+            payload["related_read_evidence"] = args.query_related_read_evidence
+            payload["related_read_evidence_provenance"] = "current_query_invocation"
         payload["agent_result"] = terminal
     if args.result_page is None and len(canonical_json_bytes(
             project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
@@ -25549,7 +25597,14 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         context = (args.result_record["context"] if getattr(args, "result_record", None) is not None else
             _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
                 dispatcher=dispatcher, common=common, live_info=live_info))
+        record = getattr(args, "result_record", None)
+        origin_evidence = (record["plan"].get("origin_related_read_evidence") if record is not None
+            else payload.get("related_read_evidence"))
+        if origin_evidence is not None:
+            payload["related_read_evidence"] = origin_evidence
+            payload["related_read_evidence_provenance"] = "origin_query_invocation_pinned_in_query_plan; current final native call is separate"
         binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
+            **({"origin_related_read_evidence_sha256": canonical_sha256(origin_evidence)} if origin_evidence is not None else {}),
             "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
             "output_bindings": getattr(args, "query_output_bindings", ()),
             "field_selection": getattr(args, "query_field_selection", None),
@@ -25562,15 +25617,17 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         if record is None:
             import time
             issued = int(time.time())
-            handle = store.issue(plan={"argv": args.original_query_argv}, context=context, issued=issued)
+            handle = store.issue(plan={"argv": args.original_query_argv,
+                **({"origin_related_read_evidence": origin_evidence} if origin_evidence is not None else {})}, context=context, issued=issued)
             expires = issued + 900
         else:
             handle, expires = args.result_query, record["expires_at"]
         prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
         detail_fragment_required = args.detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
         scope_fragment_required = args.detail and len(canonical_json_bytes(payload.get("related_scope_binding"))) > 4096
+        evidence_fragment_required = args.detail and len(canonical_json_bytes(payload.get("related_read_evidence"))) > 4096
         page_payload = {**payload, "detail_fragment_required": detail_fragment_required,
-            "scope_fragment_required": scope_fragment_required}
+            "scope_fragment_required": scope_fragment_required, "evidence_fragment_required": evidence_fragment_required}
         page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
             next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
                 "--result-query", handle, "--result-page", token]))
@@ -25584,10 +25641,14 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             result.pop("semantic_preview", None)
         if scope_fragment_required:
             result.pop("related_scope_binding", None)
+        if evidence_fragment_required:
+            result.pop("related_read_evidence", None)
         result.update(status="ok" if page["projection_complete"] else "partial",
             projection_complete=page["projection_complete"],
             projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
                 "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
+                "related_read_evidence_source": "agent_result.entries/related_read_evidence" if evidence_fragment_required else "inline_when_detail_requested",
+                **({"related_read_evidence_provenance": "origin invocation pinned in existing query plan; live revalidation and final call are current invocation"} if origin_evidence is not None else {}),
                 "related_scope_binding_source": "agent_result.entries/related_scope_binding" if scope_fragment_required else "inline_when_detail_requested",
                 "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
             objects_source="agent_result.objects", agent_result=page)

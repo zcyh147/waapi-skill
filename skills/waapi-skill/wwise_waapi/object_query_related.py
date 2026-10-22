@@ -12,6 +12,8 @@ from .schema_inventory import load_definition_graph
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
 
+RELATED_QUERY_LIST_RELATIONS = {"children": "children", "descendants": "descendants", "ancestors": "ancestors", "references-to": "referencesTo"}
+
 RELATED_QUERY_RELATIONS = {"parent": "parent", "owner": "owner", "work-unit": "workunit"}
 
 # Reviewed SDK OBJECT/VALUE descriptors, never inferred from a live enum or input.
@@ -82,7 +84,7 @@ class RelatedQueryOutput:
                     "group": self.output_group, "field": self.output_name}
         if self.row_indices is not None:
             location["row_indices"] = self.row_indices
-        return ("related", f"{self.relation_native}.{self.terminal_native}", location)
+        return ("related", ".".join(value for value in (self.relation_native, self.terminal_native) if value), location)
 
 
 RELATED_FIELD_MODES = {mode.option.replace("--include-", "--include-related-"): mode for mode in QUERY_FIELD_MODES}
@@ -97,19 +99,21 @@ def _meaning(value: str) -> str:
 
 def parse_related_request(version: str, values: list[str], option: str) -> dict[str, Any]:
     if len(values) < 2:
-        raise ValueError(f"{option} requires a singleton path and one terminal")
+        raise ValueError(f"{option} requires a related path and one terminal")
     tokens, terminal = values[:-1], values[-1]
     hops, index = [], 0
     while index < len(tokens):
         name = tokens[index]
-        if name in RELATED_QUERY_RELATIONS:
-            hops.append(("relation", name))
+        if name in RELATED_QUERY_RELATIONS or name in RELATED_QUERY_LIST_RELATIONS:
+            hops.append(("list" if name in RELATED_QUERY_LIST_RELATIONS else "relation", name))
             index += 1
         elif name in {"reference", "local-reference"} and index + 1 < len(tokens):
             hops.append((name, _meaning(tokens[index + 1])))
             index += 2
         else:
-            raise ValueError(f"{option} requires disclosed singleton relation or reference/local-reference MEANING hops")
+            raise ValueError(f"{option} requires disclosed relation or reference/local-reference MEANING hops")
+    if len(hops) > MAX_ADVANCED_RETURN_EXPRESSIONS:
+        raise ValueError(f"closed related paths accept at most {MAX_ADVANCED_RETURN_EXPRESSIONS} hops")
     if option == "--include-related":
         detail = related_output_detail(version, terminal)
         if not detail["available"]:
@@ -163,8 +167,23 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
     if source["version"] != version or source["wwise_build"] != graph.wwise_build:
         raise ValueError("Related-query source evidence does not match the selected definitions")
     patterns = graph.documents["waapi_definitions.json"]["definitions"]["objectReturn"]["patternProperties"]
-    return {"option": "--include-related <singleton-hop>... <business-output> (repeat)",
+    list_source = json.loads((source_file.parent / "query-list-output-sources.json").read_text(encoding="utf-8"))
+    if (list_source["version"], list_source["wwise_build"], list_source["page_sha256"]) != (version, graph.wwise_build, source["page_sha256"]):
+        raise ValueError("Related-list evidence does not match the selected definitions")
+    from .canonical import canonical_sha256
+    from .builders.query import MAX_STRUCTURED_SOURCE_ITEMS
+    from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+    return {"option": "--include-related <closed-hop>... <business-output> (repeat)",
             "relations": dict(RELATED_QUERY_RELATIONS),
+            "list_members": {"relations": dict(RELATED_QUERY_LIST_RELATIONS), "strategy": list_source["strategy"],
+                "result": "related.<list>.items contains ordered independent member records with object identities and the same fixed/custom terminal modes; nested paths retain their grouping",
+                "source": {**{key: list_source[key] for key in ("version", "wwise_build", "page", "page_sha256")}, "sections_sha256": canonical_sha256(list_source["sections"])},
+                "limits": {"closed_path_hops": MAX_ADVANCED_RETURN_EXPRESSIONS, "unique_member_ids": MULTI_IDENTITY_READ_MAX_IDS, "member_occurrences": MULTI_IDENTITY_READ_MAX_IDS,
+                    "cumulative_member_observations": MAX_ADVANCED_RETURN_EXPRESSIONS * MULTI_IDENTITY_READ_MAX_IDS,
+                    "source_ids_per_read": MAX_STRUCTURED_SOURCE_ITEMS, "grouped_member_reconstruction_bytes": "existing per-read result byte limit", "cumulative_read_result_bytes": "64 times the existing per-read result byte limit", "deadline": "existing shared query deadline"},
+                "presence": "missing list reports unavailable_fields items; null differs from empty; member absence never removes that member; native extensions and duplicate occurrences are retained",
+                "provenance": "unpaged detail related_read_evidence is current invocation; paged evidence is pinned origin-invocation data in the existing query plan and bound by digest; current final call remains separate. API/args/projection associations are explicit. Original request limit256 KiB and request/context record limit512 KiB are independent of origin evidence allowance15.5 MiB; each record and total store16 MiB,128 records,900 seconds. Capacity failures never truncate. Grouped reads are Gateway-composed, not native composition or an atomic snapshot",
+                "authority": "canonical GUID membership associates read-only member values only; root and member references never certify mutation selection"},
             "outputs": {name: related_output_detail(version, name) for name in QUERY_BUSINESS_OUTPUTS},
             "result_schema": patterns,
             "result_schema_source": {"version": version, "wwise_build": graph.wwise_build, "document": "waapi_definitions.json", "pointer": "/definitions/objectReturn/patternProperties"},
@@ -173,8 +192,8 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "return_options_source": source["return_options_source"],
             "budget": {"shared_fixed_outputs": maximum_outputs, "shared_custom_terminals_with_root": maximum_custom_outputs, "automatic_identity_fields_per_relation": 1, "identity_and_class_helpers": "each distinct path prefix counts against the native return-expression limit", "singleton_relations": len(RELATED_QUERY_RELATIONS)},
             "terminal_semantics": "same existing output contract; volume-db/pitch-cents read local values on the related object, not cumulative levels or runtime audio",
-            "identity": "root id/name/type/path unchanged; related.<relation>.object is the native singleton reference; canonical GUID supports read-only hops, not mutation authority",
-            "presence": "native absence uses group-local unavailable_fields; null/extensions/order preserved; no inferred join",
+            "identity": "root id/name/type/path unchanged; related.<singleton>.object is the native reference and related.<list>.items preserves each member identity; canonical GUID supports read-only hops, not mutation authority",
+            "presence": "native absence uses group-local unavailable_fields; null/extensions/order preserved; grouped member association uses checked canonical GUIDs",
             "metadata_reads": False,
             "custom_metadata_reads": "actual related class/object discovery for custom terminals and reference hops; fixed paths and fixed outputs require none",
             "custom_terminal_options": list(RELATED_FIELD_MODES),
@@ -187,4 +206,4 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "metadata_scope": "actual endpoint classId or canonical GUID only; complete no-match scopes can report unavailable_field_requests when another actual scope binds; empty roots or absent contexts establish no metadata authority",
             "applicability": "ordinary, broad and bounded advanced reads retain root membership, ordered identities and prefix scope facts through preparation/final read/paging; no mutation authority",
             "native_limits": {"return_expressions_including_helpers": MAX_ADVANCED_RETURN_EXPRESSIONS, "each_expression_utf8_bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES},
-            "followup": "list compositions, functions, additional legacy spellings, states and other unproved fixed-output combinations remain unavailable through this related-output interface; this does not establish native absence"}
+            "followup": "list compositions with selectors/reducers, other functions, additional legacy spellings, states and other unproved fixed-output combinations remain unavailable through this related-output interface; this does not establish native absence"}
