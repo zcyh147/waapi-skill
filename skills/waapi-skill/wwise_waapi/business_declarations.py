@@ -232,6 +232,7 @@ class BoundObjectHandle:
     semantic_kind: str | None
     role: str | None
     binding_digest: str
+    class_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -566,6 +567,7 @@ class BusinessHandleRegistry:
         path: str,
         semantic_kind: str | None = None,
         role: str | None = None,
+        class_id: int | None = None,
     ) -> BoundObjectHandle:
         identity = normalize_live_object_identity(
             {
@@ -573,8 +575,12 @@ class BusinessHandleRegistry:
                 "name": name,
                 "type": object_type,
                 "path": path,
+                "classId": class_id,
             }
         )
+        if class_id is not None and (self.context.wwise_version != "2025.1" or object_type != "PluginInnerObject"
+                or type(class_id) is not int or class_id != 5636096):
+            raise ValueError("Only the pinned 2025 PlaylistSlot identity carries a class binding")
         normalized_type = identity.object_type
         normalized_name = identity.name
         normalized_path = identity.path
@@ -608,6 +614,7 @@ class BusinessHandleRegistry:
             "path": normalized_path,
             "semantic_kind": semantic_kind,
             **({} if normalized_role is None else {"role": normalized_role}),
+            **({} if class_id is None else {"class_id": class_id}),
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("boh1", digest)
@@ -621,6 +628,7 @@ class BusinessHandleRegistry:
             semantic_kind=semantic_kind,
             role=normalized_role,
             binding_digest=digest,
+            class_id=class_id,
         )
         self._objects[handle] = bound
         return bound
@@ -639,6 +647,7 @@ class BusinessHandleRegistry:
                     "path": row.path,
                     "semantic_kind": row.semantic_kind,
                     **({} if row.role is None else {"role": row.role}),
+                    **({} if row.class_id is None else {"class_id": row.class_id}),
                     "binding_digest": row.binding_digest,
                 }
                 for row in sorted(self._objects.values(), key=lambda item: item.handle)
@@ -1153,12 +1162,25 @@ def bind_live_field(
             action="use a separately reviewed Adapter for this metadata type",
         )
     try:
+        playlist_types = None
+        if field_kind == "reference" and "mustChildOf" in (info.restriction.get("restrictions") or []):
+            from .playlist_reference_conditions import discovery_target_types
+            try:
+                if scope_kind != "object":
+                    raise ValueError("Playlist hierarchy requires an existing exact object")
+                playlist_types = discovery_target_types(version=registry.context.wwise_version,
+                    source_id=live_scope["object"], name=info.name, restriction=info.restriction, read=read_call)
+            except ValueError as exc:
+                raise MetadataRestrictionError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
         restrictions = _restrictions_from_live_metadata(
-            info.restriction,
+            ({**info.restriction, "restrictions": [row for row in info.restriction["restrictions"] if row != "mustChildOf"]}
+             if playlist_types else info.restriction),
             field_kind=field_kind,
             value_type=value_type,
             allow_target_classifiers=scope_kind == "object",
         )
+        if playlist_types:
+            restrictions["allowed_target_types"] = list(playlist_types)
     except MetadataRestrictionError as exc:
         raise _error(
             exc.error_code,
@@ -1495,6 +1517,8 @@ def revalidate_live_objects(
         )
     try:
         return_fields = ["id", "name", "type", "path"]
+        if any(bound.class_id is not None for bound in bounds):
+            return_fields.append("classId")
         if any(
             bound.semantic_kind in {"sound-sfx", "sound-voice"}
             for bound in bounds
@@ -1597,6 +1621,9 @@ def revalidate_live_objects(
             "type": bound.object_type,
             "path": bound.path,
         }
+        if bound.class_id is not None:
+            live["classId"] = row.get("classId")
+            expected["classId"] = bound.class_id
         if bound.semantic_kind is not None:
             expected["semantic_kind"] = bound.semantic_kind
         if live != expected:
@@ -1879,7 +1906,7 @@ def _bound_object_from_dict(
     }
     if (
         not isinstance(payload, Mapping)
-        or set(payload) not in (expected, {*expected, "role"})
+        or set(payload) - {"role", "class_id"} != expected
     ):
         raise ValueError("bound object handle fields are invalid")
     handle = payload.get("handle")
@@ -1896,6 +1923,7 @@ def _bound_object_from_dict(
                 "name": payload.get("name"),
                 "type": payload.get("object_type"),
                 "path": payload.get("path"),
+                "classId": payload.get("class_id"),
             }
         )
     except ValueError as exc:
@@ -1923,6 +1951,10 @@ def _bound_object_from_dict(
             maximum_bytes=MAX_FIELD_TOKEN_BYTES,
         )
     path = identity.path
+    class_id = payload.get("class_id")
+    if "class_id" in payload and (context.wwise_version != "2025.1" or object_type != "PluginInnerObject"
+            or type(class_id) is not int or class_id != 5636096):
+        raise ValueError("Invalid pinned PlaylistSlot class binding")
     material = {
         "contract": BOUND_OBJECT_HANDLE_CONTRACT,
         "context": context.as_binding_dict(),
@@ -1932,6 +1964,7 @@ def _bound_object_from_dict(
         "path": path,
         "semantic_kind": semantic_kind,
         **({} if role is None else {"role": role}),
+        **({} if class_id is None else {"class_id": class_id}),
     }
     expected_digest = canonical_sha256(material)
     if (
@@ -1950,6 +1983,7 @@ def _bound_object_from_dict(
         semantic_kind=semantic_kind,
         role=role,
         binding_digest=digest,
+        class_id=class_id,
     )
 
 
@@ -2393,7 +2427,9 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
         field="object_type",
         maximum_bytes=MAX_FIELD_TOKEN_BYTES,
     )
-    name = _bounded_object_name(row.get("name"), object_type=object_type)
+    playlist_slot = (object_type == "PluginInnerObject" and type(row.get("classId")) is int
+                     and row["classId"] == 5636096)
+    name = "" if playlist_slot and row.get("name") == "" else _bounded_object_name(row.get("name"), object_type=object_type)
     path = _bounded_required_text(
         row.get("path"),
         field="path",

@@ -12052,7 +12052,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 roles["target"] = target
                 reference_conditions = []
                 _require_reference_target_allowed(info, target, source_id=source.object, read=read,
-                    platform=platform, conditions=reference_conditions, wwise_version=request.version)
+                    platform=platform, conditions=reference_conditions, wwise_version=request.version, allow_playlist_slot=True)
                 if reference_conditions:
                     metadata["reference_target_conditions"] = reference_conditions
             preview = PropertyReferenceBuilder(version=request.version).set_reference(
@@ -25781,7 +25781,19 @@ def _require_reference_target_allowed(
     desired_references=None, property_info_cache=None, _restriction_path=(),
     _restriction_context=None,
     wwise_version=None,
+    allow_playlist_slot=False,
 ) -> None:
+    if "mustChildOf" in (metadata.restriction.get("restrictions") or []):
+        if not allow_playlist_slot or source_id is None or read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires the existing object.setReference business path.")
+        from .playlist_reference_conditions import observe
+        try:
+            condition = observe(version=wwise_version, source_id=source_id, target_id=target.object,
+                name=metadata.name, restriction=metadata.restriction, read=read)
+        except ValueError as exc:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc)) from exc
+        conditions.append(condition)
+        return
     try:
         allowed_types = set(reference_allowed_types(metadata.restriction,
             allow_target_classifiers=read is not None and conditions is not None))
@@ -26034,6 +26046,10 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        if condition.get("kind") == "playlist_slot_direct_child":
+            from .playlist_reference_conditions import assertion
+            assertions.append(assertion(condition, read=read, after_write=after_write))
+            continue
         source_metadata = condition.get("source_class_metadata")
         if source_metadata is not None:
             expected_class = source_metadata["class"]
@@ -26125,6 +26141,10 @@ def _require_reference_clear_allowed(
                 "restriction": dict(metadata.restriction),
             },
         )
+    if "notNull" in restrictions:
+        raise OperationContractError("REFERENCE_NOT_CLEARABLE",
+            "Live getPropertyInfo metadata marks this reference as non-null.",
+            details={"reference": metadata.name, "restriction": dict(metadata.restriction)})
     for item in restrictions:
         if isinstance(item, str):
             if item == "notNull":

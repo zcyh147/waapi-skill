@@ -19629,7 +19629,7 @@ def dispatch_business_object_binding(
     raw = binding.read_call(
         OBJECT_GET_URI,
         closed_selector.request,
-        {"return": ["id", "name", "type", "path"]},
+        {"return": ["id", "name", "type", "path", "classId"]},
     )
     rows = raw.get("return")
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping):
@@ -19814,6 +19814,7 @@ def dispatch_business_object_binding(
             path=str(row["path"]),
             semantic_kind=semantic_kind,
             role=args.role,
+            class_id=row.get("classId") if row["type"] == "PluginInnerObject" and row["name"] == "" else None,
         )
         captured.append(bound)
         return current.with_handle_registry(handles)
