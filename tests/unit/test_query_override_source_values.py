@@ -42,7 +42,9 @@ def test_query_schema_discloses_exact_override_source_value_branch(tmp_path, ver
     assert value_source['same_property_with_ordinary_value'] is True
     assert value_source['meaning'] == 'value of the property for the source of override'
     assert value_source['not_observed'] == ['ancestor identity', 'runtime RTPC or mixed audio result']
-    assert value_source['reference_alternative'] == {'status': 'unproven', 'tracking_issue': 181}
+    assert value_source['field_kind'] == 'property'
+    assert value_source['reference_semantics'] == 'not established by cited property-value documentation'
+    assert 'reference_alternative' not in value_source
     source = value_source['native_definition']
     assert source['version'] == version
     assert source['document'] == 'waapi_definitions.json'
@@ -103,7 +105,7 @@ def test_ordinary_and_override_source_meanings_share_one_exact_field_without_cas
 
 
 @pytest.mark.parametrize('version', VERSIONS)
-def test_override_source_reference_alternative_stays_unproven_without_data_query(tmp_path, version):
+def test_override_source_property_contract_does_not_admit_reference_metadata(tmp_path, version):
     import json
     from pathlib import Path
     # Exact Console 2025.1.7.9143 packet shape, simulated over all parsers;
@@ -121,7 +123,7 @@ def test_override_source_reference_alternative_stays_unproven_without_data_query
     code, rejected = task.run('query-object', '--exact-id', PROJECT_GUID,
         '--include-override-source-value', 'Playlist Object')
     assert code == 2, rejected
-    assert 'unproven under #181' in rejected['message']
+    assert 'property-value documentation' in rejected['message']
     assert not any(uri.endswith('object.get') for uri, _, _ in task.calls)
     assert not any('set' in uri for uri, _, _ in task.calls)
 

@@ -994,6 +994,7 @@ def test_query_schema_covers_every_named_native_return_through_closed_outputs(tm
     code, schema = gateway.execute_gateway(["query-schema"], env=env, client_factory=lambda _: pytest.fail("schema connected"))
     assert code == 0, schema
     covered = set(schema["identity_projection"])
+    covered_enum = set()
     for output in schema["business_outputs"]:
         code, detail = gateway.execute_gateway(["query-schema", "--output", output], env=env,
             client_factory=lambda _: pytest.fail("output disclosure connected"))
@@ -1002,12 +1003,52 @@ def test_query_schema_covers_every_named_native_return_through_closed_outputs(tm
         assert selected["available"] is True
         if selected["native_definition"] is None:
             continue
-        field = selected["native_definition"]["pointer"].rsplit("/", 1)[1]
+        pointer = selected["native_definition"]["pointer"]
+        if pointer.startswith("/definitions/returnExpression/items/anyOf/0/enum/"):
+            enum = definitions["documents"]["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"]
+            field = enum[int(pointer.rsplit("/", 1)[1])]
+            assert field == "blendTracks" and output == "blend-tracks"
+            assert selected["result_schema_source"]["pointer"].startswith("/definitions/objectReturn/patternProperties/")
+            covered_enum.add(field)
+            continue
+        field = pointer.rsplit("/", 1)[1]
         covered.add(field)
         assert selected["native_definition"]["pointer"] == "/definitions/objectReturn/properties/" + field
         assert selected["result_schema"] == native[field]
         assert selected["output_field"]
     assert covered == set(native)
+    # These existing closed outputs use documented colon-prefixed enum members
+    # rather than objectReturn.properties. Prove their actual public dispatch.
+    for output, field in {
+        "source-duration": "audioSource:playbackDuration",
+        "max-radius": "audioSource:maxRadiusAttenuation",
+        "source-language": "audioSource:language",
+    }.items():
+        assert output in schema["business_outputs"]
+        client = _AdvancedQueryClient(version)
+        code, result = gateway.execute_gateway(["query-object", "--exact-id", "{11111111-1111-1111-1111-111111111111}",
+            "--include", output], env=env, client_factory=lambda _: client)
+        assert code == 0, result
+        assert client.calls == [("ak.wwise.core.object.get", {"waql": 'from object "{11111111-1111-1111-1111-111111111111}"'},
+            {"return": ["id", "name", "type", "path", field]})]
+        covered_enum.add(field)
+    # These retained spellings remain source-reconciliation questions under
+    # #181, not dynamic public inputs or proven normalized-equivalent routes.
+    pending_enum = {
+        field: "legacy_spelling_for_existing_concept_exact_equivalence_unproven"
+        for field in (
+            "sound:convertedWemFilePath", "sound:originalWavFilePath", "soundbank:bnkFilePath",
+            "music:transitionRoot", "music:playlistRoot", "audioSource:maxDurationSource",
+            "audioSource:trimValues", "workunit:isDefault", "workunit:type", "workunit:isDirty",
+            "switchContainerChild:context",
+        )
+    }
+    if version == "2025.1":
+        pending_enum.update(states="specific_semantics_unproven",
+            suppportsRandomizer="spelling_conflicts_with_documented_supportsRandomizer")
+    enum = set(definitions["documents"]["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"])
+    assert enum - (covered | covered_enum) == set(pending_enum)
+    assert not set(pending_enum).intersection(covered | covered_enum)
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])

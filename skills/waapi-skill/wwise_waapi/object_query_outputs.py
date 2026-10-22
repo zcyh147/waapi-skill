@@ -7,8 +7,10 @@ input without a registry entry.
 from __future__ import annotations
 
 from functools import lru_cache
+import re
 from typing import Any, Mapping
 
+from .builders.common import ManifestSchemaLoader
 from .schema_inventory import DefinitionGraph, load_definition_graph, resolve_schema_reference
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -121,7 +123,12 @@ _NAMED_OUTPUT_PAIRS = (
 QUERY_BUSINESS_OUTPUTS = {
     **LEGACY_OUTPUTS,
     **{business: (native, business.replace("-", "_")) for native, business in _NAMED_OUTPUT_PAIRS},
+    "blend-tracks": ("blendTracks", "blend_tracks"),
 }
+
+# Reviewed built-ins absent from objectReturn.properties; enum membership alone
+# never admits another output or another version.
+_ENUM_OUTPUT_VERSIONS = {"blendTracks": ("2024.1", "2025.1")}
 
 
 @lru_cache(maxsize=5)
@@ -136,8 +143,10 @@ def _return_properties(version: str) -> Mapping[str, Any]:
 
 def available_query_outputs(version: str) -> dict[str, tuple[str | None, str]]:
     properties = _return_properties(version)
+    native_enum = _definition_graph(version).documents["waapi_definitions.json"]["definitions"]["returnExpression"]["items"]["anyOf"][0]["enum"]
     outputs = {name: binding for name, binding in QUERY_BUSINESS_OUTPUTS.items()
-               if name in LEGACY_OUTPUTS or binding[0] in properties}
+               if name in LEGACY_OUTPUTS or binding[0] in properties
+               or (version in _ENUM_OUTPUT_VERSIONS.get(binding[0], ()) and binding[0] in native_enum)}
     if version == "2021.1":
         # The pinned 2021 object.get return contract uses the older WAV accessor.
         # None marks an owned derivation, never a native return accessor.
@@ -158,7 +167,8 @@ def override_source_value_contract(version: str) -> dict[str, Any]:
         "ordinary_value_output_group": "properties",
         "units": "unchanged selected property units; unknown units remain unknown",
         "scope": "same exact live metadata scope as --include-field; advanced expressions and post-relationship fields remain unavailable",
-        "reference_alternative": {"status": "unproven", "tracking_issue": 181},
+        "field_kind": "property",
+        "reference_semantics": "not established by cited property-value documentation",
         "native_definition": {"version": version, "wwise_build": graph.wwise_build,
             "document": "waapi_definitions.json",
             "pointer": "/definitions/returnExpression/items/anyOf/1"},
@@ -166,6 +176,8 @@ def override_source_value_contract(version: str) -> dict[str, Any]:
 
 
 def query_output_detail(version: str, name: str) -> dict[str, Any]:
+    if name == "blend-tracks":
+        return _blend_tracks_detail(version)
     if version == "2021.1" and name == "active-source":
         return {
             "name": name, "output_field": "active_source", "available": True,
@@ -206,6 +218,44 @@ def query_output_detail(version: str, name: str) -> dict[str, Any]:
                              "scope": "child discovery alone does not certify which source is active"}}
            if version == "2021.1" and name == "active-source" else {}),
     }
+
+
+def _blend_tracks_detail(version: str) -> dict[str, Any]:
+    """Keep the enum's documented meaning separate from its broad result union."""
+    graph = _definition_graph(version)
+    available = "blend-tracks" in available_query_outputs(version)
+    result: dict[str, Any] = {
+        "name": "blend-tracks", "output_field": "blend_tracks", "available": available,
+        "supported_versions": list(_ENUM_OUTPUT_VERSIONS["blendTracks"]),
+        "description": "List the Blend Tracks of a Blend Container.",
+        "native_definition": None, "result_schema": None, "result_shape": None,
+        "native_absence_proven": False,
+        "presence": "optional; unavailable_fields preserves absence and explicit null stays null",
+    }
+    if not available:
+        reason = f"blendTracks is not advertised by the matching returnExpression definition for Wwise {version}; native absence is not proven"
+        result.update(availability_reason=reason, alternative={"guidance": reason})
+        return result
+    definitions = graph.documents["waapi_definitions.json"]["definitions"]
+    enum = definitions["returnExpression"]["items"]["anyOf"][0]["enum"]
+    matching = [(pattern, shape) for pattern, shape in definitions["objectReturn"]["patternProperties"].items()
+                if re.fullmatch(pattern, "blendTracks")]
+    if len(matching) != 1:
+        raise ValueError("The reviewed blendTracks result requires one matching native return pattern")
+    pattern, shape = matching[0]
+    uri = "ak.wwise.core.blendContainer.addTrack"
+    description = ManifestSchemaLoader().schema_for(uri, version)["description"]
+    source = {"version": version, "wwise_build": graph.wwise_build, "document": "waapi_definitions.json"}
+    result.update(
+        native_definition={**source, "pointer": f"/definitions/returnExpression/items/anyOf/0/enum/{enum.index('blendTracks')}"},
+        result_schema=shape, result_shape=_result_shape(shape, graph=graph),
+        result_schema_source={**source, "pointer": "/definitions/objectReturn/patternProperties/" + pattern.replace("~", "~0").replace("/", "~1")},
+        specific_result_shape_proven=False,
+        result_shape_boundary="matching native accessor result alternatives; no accessor-specific fixed shape is asserted",
+        meaning_source={"version": version, "wwise_build": graph.wwise_build,
+            "uri": uri, "schema_field": "description", "description": description},
+    )
+    return result
 
 
 def _result_shape(value: Any, *, graph: DefinitionGraph, document: str = "waapi_definitions.json", depth: int = 0) -> Any:

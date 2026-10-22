@@ -25307,15 +25307,24 @@ def _bind_query_custom_fields_from_live_metadata(
         if meaning in args.query_override_source_value_meanings:
             if kind != "property":
                 raise GatewayInputError(
-                    "--include-override-source-value requires a live property; "
-                    "the reference alternative remains unproven under #181; no data query was dispatched"
+                    "--include-override-source-value only admits live properties; "
+                    "the cited property-value documentation establishes no reference semantics; no data query was dispatched"
                 )
             bindings.append(("override_source_value", f"@@{token}", token))
     if unresolved:
+        for entry in unresolved:
+            meaning = entry.get("meaning")
+            entry["requested_options"] = [
+                option for option, selected in (
+                    ("--include-field", args.query_ordinary_field_meanings),
+                    ("--include-override-source-value", args.query_override_source_value_meanings),
+                ) if meaning in selected
+            ]
+        requested_options = list(dict.fromkeys(option for entry in unresolved for option in entry["requested_options"]))
         return {
             "metadata_authority": "live-waapi",
             "unresolved": unresolved,
-            "repair": "refine each --include-field meaning until one live field matches",
+            "repair": "refine each unresolved meaning until one live field matches, retaining its disclosed requested_options: " + ", ".join(requested_options),
         }
     native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
     if len(set(native_fields)) != len(native_fields):
