@@ -6,13 +6,52 @@ input without a registry entry.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
+import json
+from pathlib import Path
 import re
 from typing import Any, Mapping
 
 from .builders.common import ManifestSchemaLoader
 from .schema_inventory import DefinitionGraph, load_definition_graph, resolve_schema_reference
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
+
+
+@dataclass(frozen=True)
+class QueryFieldMode:
+    option: str
+    input_attribute: str
+    selected_attribute: str
+    bindings: Mapping[str, tuple[str, str]]
+
+
+# Native prefixes are owned here, never supplied by callers.
+QUERY_FIELD_MODES = (
+    QueryFieldMode("--include-field", "custom_field_meanings", "query_ordinary_field_meanings",
+                   {"property": ("property", "@"), "reference": ("reference", "")}),
+    QueryFieldMode("--include-override-source-value", "override_source_value_meanings", "query_override_source_value_meanings",
+                   {"property": ("override_source_value", "@@")}),
+    QueryFieldMode("--include-local-reference", "local_reference_meanings", "query_local_reference_meanings",
+                   {"reference": ("local_reference", "@")}),
+)
+QUERY_FIELD_OUTPUT_GROUPS = {"property": "properties", "reference": "references",
+                            "override_source_value": "override_source_values", "local_reference": "local_references"}
+
+
+def reference_value_source_contract(version: str) -> dict[str, Any]:
+    """Load pinned SDK semantics without requiring an installed SDK at runtime."""
+    path = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "query-reference-value-sources.json"
+    source = json.loads(path.read_text(encoding="utf-8"))
+    if source["version"] != version or source["wwise_build"] != _definition_graph(version).wwise_build:
+        raise ValueError("Reference value-source evidence does not match the selected definitions")
+    return {"option": "--include-local-reference <user-facing reference meaning>",
+            "output_group": "local_references", "field_kind": "reference",
+            "meaning": "directly stored reference on the queried object; may be hidden or unused under an override",
+            "ordinary_reference": {"option": "--include-field", "output_group": "references",
+                                   "meaning": "override-resolved reference", "native_equivalence": "no prefix is equivalent to @@"},
+            "scope": "same exact live metadata scope as --include-field; advanced expressions and post-relationship fields remain unavailable",
+            "same_reference_with_ordinary_value": True, "source": source}
 
 
 LEGACY_OUTPUTS: Mapping[str, tuple[str, str]] = {
@@ -168,7 +207,7 @@ def override_source_value_contract(version: str) -> dict[str, Any]:
         "units": "unchanged selected property units; unknown units remain unknown",
         "scope": "same exact live metadata scope as --include-field; advanced expressions and post-relationship fields remain unavailable",
         "field_kind": "property",
-        "reference_semantics": "not established by cited property-value documentation",
+        "reference_semantics": "separate local/resolved reference contract; this option remains property-only",
         "native_definition": {"version": version, "wwise_build": graph.wwise_build,
             "document": "waapi_definitions.json",
             "pointer": "/definitions/returnExpression/items/anyOf/1"},

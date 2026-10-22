@@ -1,0 +1,22 @@
+{
+  "contract": "waapi-skill.query-reference-value-sources/v1",
+  "version": "2021.1",
+  "wwise_build": "2021.1.14.8108",
+  "archive": "SDK/Help/WwiseSDK-Windows.chm",
+  "archive_sha256": "d3028d059a69a833d5f99646881c9c44e3c7a609db370ad27afa822c94d0d0d3",
+  "page": "waapi_query.html",
+  "page_sha256": "48b12b73e1d25a4cdf878b69e51e3e89a5ded1bf7297b5e8b72a5846a6bdf62d",
+  "section": "waapi_query_return",
+  "html_lines": [
+    99,
+    132
+  ],
+  "retained_section": "query-return-options.json",
+  "retained_section_sha256": "3583812afef304f9943995c69043c84c6f816ddf65d1a78b6943c027aaec11ab",
+  "semantics": {
+    "local_reference": "@reference reads the directly stored Work Unit value, potentially hidden or unused",
+    "resolved_reference": "reference and @@reference are equivalent and resolve override settings",
+    "absence": "incompatible or absent return expressions are omitted"
+  },
+  "retained_section_format": "JSON array of exact UTF-8 HTML lines, including source line endings"
+}

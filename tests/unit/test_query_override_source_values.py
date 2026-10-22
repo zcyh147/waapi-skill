@@ -43,7 +43,7 @@ def test_query_schema_discloses_exact_override_source_value_branch(tmp_path, ver
     assert value_source['meaning'] == 'value of the property for the source of override'
     assert value_source['not_observed'] == ['ancestor identity', 'runtime RTPC or mixed audio result']
     assert value_source['field_kind'] == 'property'
-    assert value_source['reference_semantics'] == 'not established by cited property-value documentation'
+    assert value_source['reference_semantics'] == 'separate local/resolved reference contract; this option remains property-only'
     assert 'reference_alternative' not in value_source
     source = value_source['native_definition']
     assert source['version'] == version
@@ -123,7 +123,7 @@ def test_override_source_property_contract_does_not_admit_reference_metadata(tmp
     code, rejected = task.run('query-object', '--exact-id', PROJECT_GUID,
         '--include-override-source-value', 'Playlist Object')
     assert code == 2, rejected
-    assert 'property-value documentation' in rejected['message']
+    assert 'only admits live property fields' in rejected['message']
     assert not any(uri.endswith('object.get') for uri, _, _ in task.calls)
     assert not any('set' in uri for uri, _, _ in task.calls)
 
