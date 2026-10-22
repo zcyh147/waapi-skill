@@ -39,6 +39,13 @@ Both transactions reached `verified`; source hashes/mtime/tree metadata were
 unchanged, processes exited cleanly and the passing sandbox was deleted.
 This is a two-step workflow, not an atomic `object.set` success.
 
+The reviewed final code at `0534b7ca` withdraws the direct-slot admission and
+its simulated success expectations. It retains the generalized metadata guard
+and rejects direct existing-slot `object.set` before Preview with a scoped
+diagnostic and the separately previewed alternative. Final affected checks
+passed **44 in 12.68s**; the final guidance/zero-write controls passed **9 in
+1.71s**. The existing standalone reference helper is unchanged from R64.
+
 Original native roots are under `.waapi-skill-state/full-coverage/`:
 `r66-playlist-compound-99d31eca-2025-r1`,
 `r66-playlist-compound-projection-2025-r2`, and
