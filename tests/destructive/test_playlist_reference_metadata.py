@@ -9,6 +9,7 @@ from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object,
     _complete_business_draft,
     _complete_object_metadata_business_transaction,
+    _discover_business_field,
     _start_business_draft,
     _update_business_draft,
     workflow_sandbox_runtime,
@@ -117,13 +118,11 @@ def _observe_existing_playlist_reference_change(runtime, *, compound_notes=None)
             draft = _start_business_draft(runtime, "object.set")
             source_handle = _bind_business_object(runtime, draft, object_id=slot)
             target_handle = _bind_business_object(runtime, draft, object_id=target)
-            discovered = _update_business_draft(runtime, draft, "draft-discover-fields",
-                ["--object-handle", source_handle, "--meaning", "PlaylistObject"], live=True)
-            candidates = discovered["field_candidates"]
-            assert len(candidates) == 1, discovered
+            field_handle = _discover_business_field(runtime, draft,
+                object_handle=source_handle, meaning="PlaylistObject")
             _update_business_draft(runtime, draft, "draft-declare-existing", [
                 "--declaration-id", "playlist-slot", "--object-handle", source_handle,
-                "--field-value", candidates[0]["handle"], target_handle,
+                "--field-value", field_handle, target_handle,
                 "--field", "notes", compound_notes,
             ], live=False)
             receipt = _complete_business_draft(runtime, draft)
