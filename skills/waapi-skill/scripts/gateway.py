@@ -136,6 +136,10 @@ from wwise_waapi.object_query_outputs import (  # noqa: E402
     override_source_value_contract,
     query_output_detail,
 )
+from wwise_waapi.object_query_related import (  # noqa: E402
+    compile_related_output,
+    related_query_contract,
+)
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
     STABLE_READ_RESULT_LIMIT_BYTES,
@@ -1994,6 +1998,11 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument(
+        "--include-related", nargs=2, action="append", default=[],
+        dest="related_outputs", metavar=("RELATION", "BUSINESS_OUTPUT"),
+        help="Return one closed output from a singleton related object, retaining the queried object's identity",
+    )
+    query_object.add_argument(
         "--include-field",
         action="append",
         default=[],
@@ -2058,7 +2067,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Select one Gateway-owned diagnostic view; the Gateway owns its "
             "complete projection and one exact-object bound. Do not combine "
-            "--include, --include-field, --include-override-source-value, --include-local-reference, --relationship, --predicate, or "
+            "--include, --include-related, --include-field, --include-override-source-value, --include-local-reference, --relationship, --predicate, or "
             "--max-results; use a separate exact-object query for extra fields"
         ),
     )
@@ -5638,6 +5647,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             (
                 relationships,
                 getattr(args, "business_outputs", None),
+                getattr(args, "related_outputs", None),
                 getattr(args, "custom_field_meanings", None),
                 getattr(args, "override_source_value_meanings", None),
                 getattr(args, "local_reference_meanings", None),
@@ -5848,9 +5858,10 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             if output not in requested
         )
     mode_meanings = [(mode, list(getattr(args, mode.input_attribute, ()) or ())) for mode in QUERY_FIELD_MODES]
-    if len(requested) > MAX_QUERY_BUSINESS_OUTPUTS:
+    related = list(getattr(args, "related_outputs", ()) or ())
+    if len(requested) + len(related) > MAX_QUERY_BUSINESS_OUTPUTS:
         raise GatewayInputError(
-            f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} --include values"
+            f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} total --include/--include-related values"
         )
     if sum(len(values) for _, values in mode_meanings) > MAX_QUERY_CUSTOM_OUTPUTS:
         raise GatewayInputError(
@@ -5860,7 +5871,7 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
     if len(set(requested)) != len(requested):
         raise GatewayInputError("query-object --include values must be unique")
 
-    bindings: list[tuple[str, str, str]] = []
+    bindings: list[tuple[str, str, Any]] = []
     for name in requested:
         if name not in available_query_outputs(version):
             detail = query_output_detail(version, name)
@@ -5870,6 +5881,19 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
                                     + (f"; {alternative}" if alternative else ""))
         native, output = available_query_outputs(version)[name]
         bindings.append(("derived" if native is None else "business", native or output, output))
+
+    if len({tuple(pair) for pair in related}) != len(related):
+        raise GatewayInputError("query-object --include-related pairs must be unique")
+    related_identities = set()
+    for relation, name in related:
+        try:
+            record = compile_related_output(version, relation, name)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        if relation not in related_identities:
+            bindings.append(("related_identity", record.relation_native, relation))
+            related_identities.add(relation)
+        bindings.append(record.binding())
 
     def bounded_custom_meaning(value: Any, option: str) -> str:
         if (
@@ -5905,11 +5929,12 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
     for mode, values in selected_modes:
         setattr(args, mode.selected_attribute, tuple(meanings_by_key[" ".join(value.split()).casefold()] for value in values))
 
-    native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
+    native_fields = [binding[1] for binding in bindings if binding[0] not in {"derived", "related_identity"}]
     if len(set(native_fields)) != len(native_fields):
         raise GatewayInputError(
             "query-object requested the same native result field more than once"
         )
+    native_fields = list(dict.fromkeys(binding[1] for binding in bindings if binding[0] != "derived"))
     args.query_output_bindings = tuple(bindings)
     args.query_derived_outputs = tuple(binding[2] for binding in bindings if binding[0] == "derived")
     if args.query_derived_outputs:
@@ -8763,6 +8788,7 @@ def query_business_schema_payload(
             "result_presence": _query_result_presence_contract(),
             "business_outputs": [name for name, binding in available_query_outputs(version).items() if binding[0] is not None],
             "output_detail": "query-schema --output <business-output>",
+            "related_outputs": related_query_contract(version, maximum_outputs=MAX_QUERY_BUSINESS_OUTPUTS),
             "custom_outputs": {
                 "available": False,
                 "reason": "advanced WAQL has no Gateway-provable live metadata scope",
@@ -8805,6 +8831,7 @@ def query_business_schema_payload(
         "result_presence": _query_result_presence_contract(),
         "business_outputs": list(available_query_outputs(version)),
         "output_detail": "query-schema --output <business-output>",
+        "related_outputs": related_query_contract(version, maximum_outputs=MAX_QUERY_BUSINESS_OUTPUTS),
         "custom_outputs": {
             "field_meaning": "--include-field <user-facing property/reference meaning>",
             "override_source_values": override_source_value_contract(version),
@@ -8872,12 +8899,12 @@ def query_business_schema_payload(
                 ),
                 "exact_object_bound": 1,
                 "cannot_combine_with": [
-                    "--include", "--include-field", "--include-override-source-value", "--include-local-reference", "--relationship", "--predicate", "--max-results",
+                    "--include", "--include-related", "--include-field", "--include-override-source-value", "--include-local-reference", "--relationship", "--predicate", "--max-results",
                 ],
                 "additional_fields": {
                     "route": "a separate query-object for the same exact GUID or object path",
                     "omit_options": ["--view"],
-                    "field_options": ["--include", "--include-field", "--include-override-source-value", "--include-local-reference"],
+                    "field_options": ["--include", "--include-related", "--include-field", "--include-override-source-value", "--include-local-reference"],
                 },
                 "automatic_outputs": [
                     "override-output",
@@ -24953,7 +24980,26 @@ def _project_query_business_rows(
         missing_identity = [field for field in SELECTED_REQUIRED_RETURN_FIELDS if field not in row]
         unavailable = list(missing_identity)
         grouped: dict[str, dict[str, Any]] = {}
+        related_groups: dict[str, dict[str, Any]] = {}
         for kind, native, output in bindings:
+            if kind in {"related", "related_identity"}:
+                relation = output if kind == "related_identity" else output["relation"]
+                context = related_groups.setdefault(relation, {})
+                field = "object" if kind == "related_identity" else output["field"]
+                group = None if kind == "related_identity" else output["group"]
+                if native not in row:
+                    context.setdefault("unavailable_fields", []).append(f"{group}.{field}" if group else field)
+                else:
+                    target = context.setdefault(group, {}) if group else context
+                    target[field] = row[native]
+                if kind == "related_identity":
+                    reference = row.get(native)
+                    missing = [key for key in ("id", "name") if not isinstance(reference, Mapping) or key not in reference]
+                    if isinstance(reference, Mapping) and not _canonical_guid(reference.get("id")) and "id" not in missing:
+                        missing.append("id")
+                    if missing:
+                        context["identity_completeness"] = {"complete": False, "unavailable_fields": missing, "mutation_authority": False}
+                continue
             group = QUERY_FIELD_OUTPUT_GROUPS.get(kind)
             if native not in row:
                 unavailable.append(f"{group}.{output}" if group else output)
@@ -24965,6 +25011,8 @@ def _project_query_business_rows(
         for group in QUERY_FIELD_OUTPUT_GROUPS.values():
             if group in grouped:
                 item[group] = grouped[group]
+        if related_groups:
+            item["related"] = related_groups
         if unavailable:
             item["unavailable_fields"] = unavailable
         if missing_identity:
@@ -24982,7 +25030,8 @@ def _query_incomplete_identity_observation(
 ) -> dict[str, Any]:
     """Retain the bounded native reply when identity facts cannot be certified."""
 
-    if any("identity_completeness" in row for row in rows):
+    if any("identity_completeness" in row or any("identity_completeness" in context
+            for context in row.get("related", {}).values()) for row in rows):
         return {"native_observation": result["result"]}
     return {}
 
@@ -25320,12 +25369,13 @@ def _bind_query_custom_fields_from_live_metadata(
             "unresolved": unresolved,
             "repair": "refine each unresolved meaning until one live field matches, retaining its disclosed requested_options: " + ", ".join(requested_options),
         }
-    native_fields = [binding[1] for binding in bindings if binding[0] != "derived"]
+    native_fields = [binding[1] for binding in bindings if binding[0] not in {"derived", "related_identity"}]
     if len(set(native_fields)) != len(native_fields):
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
         )
     args.query_field_selection = selected_observations
+    native_fields = list(dict.fromkeys(binding[1] for binding in bindings if binding[0] != "derived"))
     args.query_output_bindings = tuple(bindings)
     args.query_return_fields = (*SELECTED_REQUIRED_RETURN_FIELDS, *native_fields)
     return None
