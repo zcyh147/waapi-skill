@@ -5,6 +5,42 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R72 existing association ContinuePlay
+
+The existing public `object.setProperty` path passed a targeted macOS Console
+**2025.1.7.9143** case at `e3f224604f6e0672b192559eb34c39705b55bbd5`:
+**1 passed in 5.23s**, one verified transaction. The test resolves the current
+association GUID through Shells_Concrete's child-context output, rather than
+reusing an earlier sandbox's ephemeral GUID. Exact object-scoped metadata
+proves ContinuePlay is Boolean with an AssocParent/Enable dependency on
+SwitchBehavior=1; the owner's real int16 metadata discloses Step=0 and
+Continuous=1. Public property-state reads report enabled before and after.
+
+The separately previewed and authorized edit changes only that association's
+ContinuePlay from false to true. Independent readback preserves FadeInTime,
+observed association identity/owner, the owner's settings, the original child
+and the ordered child/context membership. Sixteen public observation commands
+(status, object queries and metadata reads) supplement the Draft transaction
+phases. All 75 retained native packet hashes were checked; final category is
+PASS, source hashes/mtime/tree metadata are unchanged, processes are cleaned
+and the passing sandbox is deleted. No runtime fix was needed.
+
+The original attempt at `e46ac6ea` retained **1 failure in 6.23s**, five
+successful reads and zero transactions. Its test incorrectly required explicit
+`parent:null`; the current query preserves native omission and reports
+`unavailable_fields:["parent"]`. The test-only repair keeps absence and null
+distinct and preserves exact before/after snapshots. That original FAIL and
+quarantined sandbox remain unchanged; its read observations are retained, but
+it grants no mutation credit.
+
+Evidence roots under `.waapi-skill-state/full-coverage/`:
+`r72-association-e46ac6ea-2025-r1/` and
+`r72-association-e3f22460-2025-r2/`, each with original category/observation files
+and `root-review.json`. Test inspection receipts are in
+`r72-association-program/`. Other-version association identities/applicability
+remain assigned #177 work; this is not five-version native effect, atomic
+object.set, Fresh, Windows or whole-ticket acceptance.
+
 ## 2026-10-23 R72 Parent/Show Weight evidence reuse
 
 Read-only review of the five original Parent/Show roots at
