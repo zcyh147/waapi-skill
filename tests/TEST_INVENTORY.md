@@ -5,6 +5,44 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R67 property values at the source of override
+
+Candidate `29cb2291ba87d67c1058dae6f5e77c106c25c302` adds the closed
+`query-object --include-override-source-value` option. Ordinary property values
+and values at their source of override can be requested together and remain in
+separate result groups. The Gateway owns native accessor construction; this is
+not ancestor identity or a runtime RTPC/audio result.
+
+Five-version fake-client controls cover exact dispatch, disclosure provenance,
+false/zero/null/absence, metadata scope, invalid declarations, duplicate output
+aliases, paging and continuation drift. The affected four-file run retained
+**623 passes / 2 stale baseline assertion failures in 77.62s**. Correcting only
+the old 2021 diagnostic-message expectations and running the failed/new/directly
+affected selection produced **127 passes in 4.71s**. Original logs and source
+notes are preserved under `.waapi-skill-state/full-coverage/r67-program-logs/`.
+
+The same read-only native test ran sequentially on five independently owned
+macOS Console sandbox copies, all on that single candidate:
+
+| Version/build | Result |
+| --- | --- |
+| 2021.1.14.8108 | 1 passed in 8.71s |
+| 2022.1.19.8584 | 1 passed in 8.40s |
+| 2023.1.19.8928 | 1 passed in 8.43s |
+| 2024.1.13.9056 | 1 passed in 7.93s |
+| 2025.1.7.9143 | 1 passed in 5.02s |
+
+Each case reads the child Sound, its parent and the same child again. Native
+packets and public results independently retain child `3DSpatialization=0`,
+`OverridePositioning=false`, and source-of-override value `2`; the parent's
+own and override-source values are both `2`, with its override enabled.
+All final category records are PASS, with no transactions, unchanged source
+hashes/mtime/tree metadata, clean process shutdown and deleted passing sandboxes.
+Exact roots are `.waapi-skill-state/full-coverage/r67-query-override-29cb2291-<year>-r1/`;
+the per-root `root-review.json` and aggregate `r67-five-version-native-review.json`
+pin original observations and hashes. No Windows, Authoring, Fresh or full-gate
+evidence is added; #181 remains open for its other query branches.
+
 ## 2026-10-23 R66 existing-field metadata and staged PlaylistSlot edits
 
 Public fake-client tests reproduced a shared `object.set` omission: metadata
