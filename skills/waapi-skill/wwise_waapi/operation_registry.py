@@ -6097,6 +6097,20 @@ def _prepare_object_set(
                 {"requested_type": row.type, "canonical_type": row.name})
         if any(type_matches(row) for row in type_catalog) and not type_matches(class_types[0]):
             raise OperationContractError("INVALID_TARGET_TYPE", "Existing ordinary native type contradicts its live class metadata.")
+        if (request.version == "2025.1" and target.row.get("type") == "PluginInnerObject"
+                and target_class == 5636096):
+            raise OperationContractError(
+                "PLAYLIST_SLOT_OBJECT_SET_UNPROVEN",
+                "Direct object.set on an existing PlaylistSlot is not admitted: Console 2025.1.7.9143 rejected the reference-and-notes request with objectType 50. Other direct shapes remain unproven. Use the closed object.setReference route for the reference outcome. For notes and reference together, use closed object.setNotes then a fresh object.setReference as two separately previewed and authorized transactions; atomic object.set support is not established.",
+                details={"tracking_issues": [177, 180], "object_id": target.object,
+                    "observed_host": "WwiseConsole", "observed_build": "2025.1.7.9143",
+                    "observed_error": {"uri": "ak.wwise.unexpected_error", "objectType": 50,
+                        "message": "Can't process object type."},
+                    "observed_request": "direct_existing_slot_reference_and_notes",
+                    "other_direct_shapes": "unproven", "reference_operation": "object.setReference",
+                    "separate_preview_operations": ["object.setNotes", "object.setReference"],
+                    "atomic_object_set": "not_established"},
+            )
         target_spec: dict[str, Any] = {
             "class_id": target_class,
             "class_metadata": class_types[0].as_dict(),
@@ -6305,7 +6319,7 @@ def _prepare_object_set(
             _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
                 platform=platform, desired_references=desired_references,
                 conditions=reference_target_conditions, property_info_cache=property_info_cache,
-                wwise_version=request.version, allow_playlist_slot=True)
+                wwise_version=request.version)
         reference_requirements: dict[str, Any] = {}
         override_applicability = {}
         for descriptor in (*properties, *references):
@@ -25785,7 +25799,7 @@ def _require_reference_target_allowed(
 ) -> None:
     if "mustChildOf" in (metadata.restriction.get("restrictions") or []):
         if not allow_playlist_slot or source_id is None or read is None or conditions is None:
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires a proven existing-object reference business path.")
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "PlaylistSlot hierarchy requires the existing object.setReference business path.")
         from .playlist_reference_conditions import observe
         try:
             condition = observe(version=wwise_version, source_id=source_id, target_id=target.object,
@@ -26048,12 +26062,7 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     for condition in conditions:
         if condition.get("kind") == "playlist_slot_direct_child":
             from .playlist_reference_conditions import assertion
-            source_changes = {}
-            for spec in pre_state.get("object_set_nodes", []):
-                if spec.get("target_id") == condition["source_id"] and spec.get("notes_supplied"):
-                    source_changes["notes"] = spec["requested_notes"]
-            assertions.append(assertion(condition, read=read, after_write=after_write,
-                source_changes=source_changes))
+            assertions.append(assertion(condition, read=read, after_write=after_write))
             continue
         source_metadata = condition.get("source_class_metadata")
         if source_metadata is not None:
