@@ -137,13 +137,17 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         source = objects("association-before", association, ("ContinuePlay", "FadeInTime"))
         owner = objects("owner-before", OWNER, ("SwitchBehavior",))
         members = objects("owner-children-before", OWNER, children=True, context=True)
-        if runtime.version != "2025.1":
-            # Older native context identities are not inferred from class names
-            # or the 2025 witness. Keep an incomplete observation read-only.
+        assert all(isinstance(source.get(key), str) for key in ("id", "name", "path")), source
+        assert source["path"] and source["name"] == "" and source["class_id"] == 1572880, source
+        needs_context_binding = "type" not in source
+        if needs_context_binding:
+            # The ordinary query remains an incomplete identity. Only the
+            # separate owner/child binding below can authorize a field target.
+            assert source["identity_completeness"] == {
+                "complete": False, "unavailable_fields": ["type"], "mutation_authority": False}, source
+        else:
+            assert source["type"] == "ObjectSettingAssociation", source
             assert source.get("identity_completeness", {}).get("complete") is not False, source
-            assert all(isinstance(source.get(key), str) for key in ("id", "name", "type", "path")), source
-            assert source["path"], source
-        assert source["type"] == "ObjectSettingAssociation" and source["name"] == "", source
         # Keep native omission distinct from explicit null in the saved snapshot.
         if "parent" in source:
             assert source["parent"] is None, source
@@ -182,7 +186,19 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         enabled("association-enabled-before", association, selection, enabled_platform)
 
         draft = _start_business_draft(runtime, "object.setProperty")
-        bound = _bind_business_object(runtime, draft, object_id=association)
+        if needs_context_binding:
+            owner_handle = _bind_business_object(runtime, draft, object_id=OWNER)
+            child_handle = _bind_business_object(runtime, draft, object_id=CHILD)
+            binding = _update_business_draft(runtime, draft, "draft-bind-switch-child-context",
+                ["--owner-handle", owner_handle, "--child-handle", child_handle], live=True)
+            observation["context_binding"] = binding
+            context = binding["bound_context"]
+            assert context["context_id"] == association and context["business_role"] == "switch_child_context", context
+            assert context["native_identity"]["id"] == association and "type" not in context["native_identity"], context
+            bound = context["handle"]
+            assert isinstance(bound, str) and bound, context
+        else:
+            bound = _bind_business_object(runtime, draft, object_id=association)
         field = _discover_business_field(runtime, draft, object_handle=bound, meaning="ContinuePlay", platform=platform)
         _update_business_draft(runtime, draft, "draft-declare-field-change",
             ["--object-handle", bound, "--field-handle", field, "--business-value", "true"], live=False)
