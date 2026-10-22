@@ -5,6 +5,31 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R73 older association identity observation
+
+Two targeted macOS Console **2021.1.14.8108** attempts remain failed,
+with zero transactions. At `1085ff19`, **1 failed in 9.18s** after a successful
+status read: the test required currentPlatformId, which native status omitted.
+Test-only `00d9bebf` uses the existing null-GUID enabled-read convention and
+omits mutation platform only when that status key is absent and both live
+scoped fields prove `supports.unlink=false`. Present invalid platform values
+still fail; the proven 2025 explicit-platform path is unchanged.
+
+The new attempt at `00d9bebf` retained **1 failed in 4.87s**, after five
+successful public reads. The actual association returned GUID, class ID
+1572880, owner, path and ContinuePlay/FadeInTime values, but omitted `type`.
+The complete-identity gate stopped before Draft creation. This establishes a
+version-specific interface gap, not native absence or mutation success.
+Closed association/owner/child identity support remains #177 implementation
+work; no type alias or general identity relaxation is inferred.
+
+Both attempts preserve source content hashes, project mtime and tree metadata;
+process cleanup completed and failed sandboxes remain quarantined. Original
+category/observation files and checked `root-review.json` records are under
+`.waapi-skill-state/full-coverage/r73-association-1085ff19-2021-r1/` and
+`r73-association-00d9bebf-2021-r2/`. All eleven second-attempt native packet
+hashes were checked. No 2022–2024 run, 2025 repeat, Fresh or full gate was added.
+
 ## 2026-10-23 R72 existing association ContinuePlay
 
 The existing public `object.setProperty` path passed a targeted macOS Console
