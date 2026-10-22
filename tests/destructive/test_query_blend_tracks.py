@@ -1,6 +1,7 @@
 """Read existing Blend Tracks through the closed, versioned public projection."""
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,11 @@ import pytest
 from tests.destructive.test_gateway_workflow_transaction_matrix import workflow_sandbox_runtime
 
 
-pytestmark = [pytest.mark.live, pytest.mark.destructive]
+pytestmark = [
+    pytest.mark.live, pytest.mark.destructive,
+    pytest.mark.skipif(os.environ.get("WWISE_VERSION") not in {"2024.1", "2025.1"},
+        reason="blendTracks is disclosed by the pinned 2024.1/2025.1 definitions"),
+]
 BUILDS = {"2024.1": (2024, 1, 13, 9056), "2025.1": (2025, 1, 7, 9143)}
 OWNER = "{97A58685-6231-4227-9BAB-451E089615A8}"
 TRACKS = {
