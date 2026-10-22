@@ -332,6 +332,21 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    # R70 clarifies only the five setReference null-target descriptions: a
+    # directly stored clear may retain an inherited effective reference. The
+    # other 144 machine contracts are unchanged from cb8f4391.
+    assert canonical_sha256(non_object_set_digests) == (
+        "dc0e1e57aa623a586b81003c955be87f7740e927eb1e3d4ae237b4ec42249b86"
+    )
+    # Restore exactly those pre-R70 lane seals before retaining every reviewed
+    # historical aggregate and its existing chained substitutions below.
+    non_object_set_digests.update({
+        "object.setReference@2021.1": "3004ce4d78ce9daa9994c6668c2e89996cd956f6f24462f7f716fc9abc14b023",
+        "object.setReference@2022.1": "5235bce690f33d2c5774997731d3042153e4beb34d50bb1278988b4283721cbd",
+        "object.setReference@2023.1": "e11667666b38d8324b0b69492fc5070f1aaf3529f60478acacd51521bbb8350c",
+        "object.setReference@2024.1": "c32f85045ab4fa3fec6ed2403ee89716ba7f3e3b5387cd2a8ca69a3f2fa00092",
+        "object.setReference@2025.1": "3e837a9dd5332f59bd03246a2ebad18e46b762f6f39deb1c7c17e55b71f564fd",
+    })
     # Reviewed owned ControlInput construction and result bindings change only
     # object.setRTPC in 2022.1–2025.1; the other 145 contracts are unchanged.
     assert canonical_sha256(non_object_set_digests) == (
@@ -546,6 +561,15 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     previous = dict(non_object_set_digests)
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         contract = operation_request_machine_contract("object.setReference", version)
+        # This older inverse rebuilds the live schema rather than reusing the
+        # substituted digest, so invert R70's exact wording here as well.
+        null_target = contract["argument_contract"]["properties"]["target"]["oneOf"][1]
+        assert null_target["description"] == (
+            "Explicitly clear the directly stored reference; an inherited reference may still apply. Omitted target is never interpreted as a clear request."
+        )
+        null_target["description"] = (
+            "Explicitly clear the reference; omitted target is never interpreted as a clear request."
+        )
         assert contract["constraints"][2:4] == [
             "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
             "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
