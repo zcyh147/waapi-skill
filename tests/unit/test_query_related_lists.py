@@ -427,3 +427,95 @@ def test_grouped_membership_reference_facts_cannot_be_hidden_by_member_readback(
     if change == 'typed-extension': task.rows[0]['children'][0]['classId'] = SOUND_CLASS
     code,result = task.run('query-object',*options())
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED', result
+
+
+@pytest.mark.parametrize('version',['2021.1','2025.1'])
+@pytest.mark.parametrize('encoding',['document','pointer'])
+def test_lossless_pages_keep_one_origin_packet_manifest_despite_fresh_dispatch_paths(tmp_path,version,encoding):
+    from wwise_waapi.canonical import canonical_sha256
+    class Extra(ListTask):
+        def projection(self,row,expressions):
+            value = super().projection(row,expressions)
+            if encoding == 'document' and row['id'] == SOUND:
+                value['extension' * 300] = {'unchanged':True}
+            return value
+    task = Extra(tmp_path,version)
+    evidence = tmp_path / 'packets'
+    evidence.mkdir()
+    task.env['WWISE_EVIDENCE_DIR'] = str(evidence)
+    for member in task.members.values(): member['notes'] = '音声' * 8000
+    before = set(evidence.glob('*.json'))
+    code,result = task.run('query-object',*options(),'--include-related','children','notes','--detail')
+    assert code == 0 and result['status'] == 'partial', json.dumps(result,ensure_ascii=False)
+    origin = set(evidence.glob('*.json')) - before
+    entries = []
+    while True:
+        page = result['agent_result']
+        assert page['entries_encoding'] == ('json-document-fragments' if encoding == 'document' else 'json-pointer-entries')
+        entries.extend(page['entries'])
+        assert len(json.dumps(result,ensure_ascii=False,indent=2).encode()) <= 32768
+        assert list(result)[-1] == 'agent_result'
+        if page['projection_complete']: break
+        code,result = task.run(*page['next_command']['gateway_argv'])
+        assert code == 0, result
+    if encoding == 'document':
+        observation = json.loads(''.join(entry['value'] for entry in entries))
+        manifest = observation['related_read_evidence']
+    else:
+        # Reconstruct exact atoms of the retained manifest without trusting
+        # independently rendered outer diagnostics from subsequent invocations.
+        atoms = {}
+        for entry in entries:
+            if entry['pointer'].startswith('/related_read_evidence/') and entry['kind'] in {'value','string-fragment'}:
+                atoms.setdefault(entry['pointer'],[]).append(entry)
+        manifest = []
+        count = next(entry['length'] for entry in entries if entry['pointer'] == '/related_read_evidence')
+        for index in range(count):
+            def atom(suffix):
+                fragments = atoms[f'/related_read_evidence/{index}/'+suffix]
+                if fragments[0]['kind'] == 'value': return fragments[0]['value']
+                return ''.join(fragment['value'] for fragment in sorted(fragments,key=lambda value:value['offset']))
+            manifest.append({'api':atom('api'),'result_sha256':atom('result_sha256'),'call':{'evidence_path':atom('call/evidence_path')}})
+    assert manifest
+    for read in manifest:
+        path = Path(read['call']['evidence_path'])
+        assert path in origin, f'Paged manifest mixed fresh-call diagnostics: {path}'
+        packet = json.loads(path.read_text())
+        assert packet['api'] == read['api']
+        assert canonical_sha256(packet['result']) == read['result_sha256']
+    assert set(evidence.glob('*.json')) - before - origin  # Actual paths changed on repeat reads.
+
+
+@pytest.mark.parametrize('version',VERSIONS)
+def test_unchanged_extra_native_terminal_survives_later_owned_projection_expansion(tmp_path,version):
+    class Extra(ListTask):
+        def projection(self,row,expressions):
+            value = super().projection(row,expressions)
+            if row['id'] == SOUND: value['@Pitch'] = copy.deepcopy(row['@Pitch'])
+            return value
+    task = Extra(tmp_path,version)
+    code,result = task.run('query-object',*options())
+    assert code == 0, result
+    assert result['agent_result'][0]['related']['children']['items'][0]['properties']['Pitch'] == -560
+
+
+@pytest.mark.parametrize('tamper',['origin','malformed-origin'])
+def test_query_page_rejects_changed_or_malformed_pinned_origin_before_delivering_data(tmp_path,tamper):
+    from wwise_waapi.canonical import canonical_sha256
+    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore
+    task = ListTask(tmp_path)
+    for member in task.members.values(): member['notes'] = '音声' * 8000
+    code,result = task.run('query-object',*options(),'--include-related','children','notes','--detail')
+    assert code == 0 and result['status'] == 'partial', result
+    argv = result['agent_result']['next_command']['gateway_argv']
+    handle = argv[argv.index('--result-query')+1]
+    record_path = Path(task.env['WAAPI_SKILL_STATE_DIR'])/ObjectQueryPlanStore.DIRECTORY/(handle+'.json')
+    record = json.loads(record_path.read_text())
+    if tamper == 'origin': record['plan']['origin_related_read_evidence'][0]['call']['evidence_path'] += '.changed'
+    else: record['plan']['origin_related_read_evidence'] = {'not':'a manifest'}
+    record.pop('sha256')
+    record['sha256'] = canonical_sha256(record)
+    record_path.write_text(json.dumps(record))
+    code,rejected = task.run(*argv)
+    assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
+    assert rejected.get('agent_result') is None

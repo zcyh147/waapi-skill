@@ -61,6 +61,7 @@ class RelatedListPlan:
         self.root = Frame(0, fields=list(dict.fromkeys((*IDENTITY, 'classId', *(native for kind, native, _ in self.bindings if kind != 'derived')))), scope=[*IDENTITY, 'classId'])
         self.frames = [self.root]
         self.snapshot, self.descriptors = {}, []
+        self.observed_extra_fields = {}
         self.return_scope = {}
         self.total_bytes = self.total_occurrences = 0
         self.unique_ids = set()
@@ -169,7 +170,10 @@ class RelatedListPlan:
             for loc, row in frame.rows.items():
                 requested = set(self.render(frame, root=frame is self.root))
                 requested.update(self.edge_key(frame, edge) for edge in frame.lists.values())
-                snapshot[f'{frame.number}:{loc}:native_extensions'] = {key:value for key,value in row.items() if key not in requested}
+                extras = self.observed_extra_fields.setdefault((frame.number,loc), set())
+                extras.update(key for key in row if key not in requested)
+                for key in extras:
+                    snapshot[f'{frame.number}:{loc}:native_extension:{key}'] = {'present':key in row,'value':row.get(key)}
                 for native in frame.scope:
                     snapshot[f'{frame.number}:{loc}:{native}'] = {'present': native in row, 'value': row.get(native)}
             for edge in frame.lists.values():

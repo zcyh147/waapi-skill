@@ -3643,7 +3643,7 @@ def _execute_gateway_unconstrained(
                 "entry point so every streamed record remains observable."
             )
         if args.command == "query-object":
-            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore
+            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError
             if args.result_query is not None or args.result_page is not None:
                 if args.result_query is None or args.result_page is None:
                     raise GatewayInputError("Query projection requires both returned --result-query and --result-page")
@@ -3651,7 +3651,10 @@ def _execute_gateway_unconstrained(
                 expected.state_dir = args.state_dir
                 if vars(expected) != vars(args):
                     raise GatewayInputError("A query result continuation accepts only its returned handle/page and existing state directory")
-                record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                try:
+                    record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                except QueryResultPageError as exc:
+                    raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
                 handle, page = args.result_query, args.result_page
                 original_argv = record["plan"]["argv"]
                 args = build_parser().parse_args(original_argv)
@@ -25585,6 +25588,7 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         payload["related_scope_binding"] = args.query_related_scope_binding
         if getattr(args, "query_related_read_evidence", None) is not None:
             payload["related_read_evidence"] = args.query_related_read_evidence
+            payload["related_read_evidence_provenance"] = "current_query_invocation"
         payload["agent_result"] = terminal
     if args.result_page is None and len(canonical_json_bytes(
             project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
@@ -25593,7 +25597,14 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         context = (args.result_record["context"] if getattr(args, "result_record", None) is not None else
             _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
                 dispatcher=dispatcher, common=common, live_info=live_info))
+        record = getattr(args, "result_record", None)
+        origin_evidence = (record["plan"].get("origin_related_read_evidence") if record is not None
+            else payload.get("related_read_evidence"))
+        if origin_evidence is not None:
+            payload["related_read_evidence"] = origin_evidence
+            payload["related_read_evidence_provenance"] = "origin_query_invocation_pinned_in_query_plan; current final native call is separate"
         binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
+            **({"origin_related_read_evidence_sha256": canonical_sha256(origin_evidence)} if origin_evidence is not None else {}),
             "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
             "output_bindings": getattr(args, "query_output_bindings", ()),
             "field_selection": getattr(args, "query_field_selection", None),
@@ -25606,7 +25617,8 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         if record is None:
             import time
             issued = int(time.time())
-            handle = store.issue(plan={"argv": args.original_query_argv}, context=context, issued=issued)
+            handle = store.issue(plan={"argv": args.original_query_argv,
+                **({"origin_related_read_evidence": origin_evidence} if origin_evidence is not None else {})}, context=context, issued=issued)
             expires = issued + 900
         else:
             handle, expires = args.result_query, record["expires_at"]
@@ -25636,6 +25648,7 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
                 "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
                 "related_read_evidence_source": "agent_result.entries/related_read_evidence" if evidence_fragment_required else "inline_when_detail_requested",
+                **({"related_read_evidence_provenance": "origin invocation pinned in existing query plan; live revalidation and final call are current invocation"} if origin_evidence is not None else {}),
                 "related_scope_binding_source": "agent_result.entries/related_scope_binding" if scope_fragment_required else "inline_when_detail_requested",
                 "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
             objects_source="agent_result.objects", agent_result=page)
