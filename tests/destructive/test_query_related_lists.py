@@ -78,16 +78,24 @@ def test_related_child_records_match_independent_children(workflow_sandbox_runti
         # A native composition must carry identity and values in each member;
         # a grouped read must supply member rows selected by those same GUIDs.
         witnesses = []
+        membership_lists = []
         for rows in native_results:
-            candidates = [rows] if strategy == "gateway-guid-grouped-reads" else [
+            root_lists = [
                 value for row in rows if row.get("id") == CONTAINER
                 for value in row.values() if isinstance(value, list)]
+            membership_lists.extend(members for members in root_lists
+                if len(members) == 5 and all(isinstance(member, dict) for member in members)
+                and {member.get("id") for member in members} == CHILDREN)
+            candidates = [rows] if strategy == "gateway-guid-grouped-reads" else root_lists
             for members in candidates:
                 if (len(members) == 5 and all(isinstance(member, dict) for member in members)
                         and {member.get("id") for member in members} == CHILDREN
                         and all("@Volume" in member and "@Pitch" in member for member in members)):
                     witnesses.append(members)
         assert witnesses, native_results
+        assert membership_lists, native_results
+        for members in membership_lists:
+            assert [member["id"] for member in members] == [item["object"]["id"] for item in items]
         for members in witnesses:
             for member in members:
                 actual = by_id[member["id"]]
