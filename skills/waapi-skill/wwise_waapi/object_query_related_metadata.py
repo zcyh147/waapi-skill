@@ -64,4 +64,3 @@ class RelatedFieldBinder:
             'selected': ({'name': selection['candidate'].get('name'), 'kind': selection['candidate'].get('kind')}
                          if selection['candidate'] else None)})
         return selection
-
