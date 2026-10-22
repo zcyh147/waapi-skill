@@ -5,6 +5,48 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R70 stored-reference clear and owned history
+
+Candidate `23f5b5d70e797e2ecee348033fe8421bdf3eb9b5` fixes the nullable
+`object.setReference` clear path. Its Preview binds the directly stored value
+and resolved inherited context separately; drift checks preserve both, while
+verification checks that the stored value was cleared. The public outcome
+explicitly allows an inherited reference to remain effective. Ordinary non-null
+reference assignment and its activation requirements are unchanged. Legacy
+unexecuted clear Previews require a new Preview; executed or indeterminate
+transactions are not reinterpreted or replayed.
+
+The matching five-version nullable metadata and native reference result shapes
+were checked before implementation. Focused fake-client selections cover all
+five versions, hidden local/context drift, missing/malformed observations,
+native JSON extensions, null identities, legacy state, authorization and owned
+history consumers. The final extension/control selection passed **91 in
+24.60s**; directly affected reference-presence, preservation and non-null
+activation callers passed **60 in 15.94s**. Earlier producer/consumer controls
+passed **35 in 2.01s**, targeted repaired/positive nodes **15 in 5.58s**, and
+merged Preview/history checks **9 in 4.53s**. These overlap and are not a summed
+fresh gate. Original REDs and intermediate failures remain in
+`.waapi-skill-state/full-coverage/r70-program-logs/`.
+
+One macOS WwiseConsole **2025.1.7.9143** workflow passed **1 test in 10.96s**.
+It uses one isolated lifecycle, three separately previewed/confirmed/executed
+and verified transactions (clear, undo, redo), and twelve independent reads.
+The Sound's stored Thunders Attenuation becomes the zero GUID while inherited
+Footsteps remains effective and OverridePositioning remains false. Undo
+restores the original local reference; redo restores the cleared state. The
+ancestor and peer remain unchanged after every step. Final category evidence
+is PASS, source hashes/mtime/tree metadata are unchanged, processes are cleaned
+and the passing sandbox is deleted.
+
+Evidence: `r70-stored-clear-23f5b5d7-2025-r1/` under the same state root, including
+original category records, observation packets and `root-review.json`. This
+proves receipt-bound history effects on the observed objects, not global undo
+stack ownership, preservation of unobserved project state, or a new automatic
+rollback mechanism. Five-version R69 read evidence is reused for the stored vs
+inherited distinction; it is not five-version clear/undo execution evidence.
+No Fresh, broad gate, Windows or Authoring run is claimed. Remaining #177,
+#181 and #190 obligations stay open.
+
 ## 2026-10-23 R69 directly stored reference values
 
 Candidate `850b163b8b56298c3d4dfa88db41e83d2fc1f6fa` adds the closed
