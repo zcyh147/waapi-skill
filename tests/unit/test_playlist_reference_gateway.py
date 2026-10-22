@@ -84,7 +84,7 @@ def preview_and_confirm(task):
 
 
 def writes(task):
-    return [(uri, args) for uri, args, _ in task.calls if uri.endswith(('setReference', 'setProperty', 'object.set'))]
+    return [(uri, args) for uri, args, _ in task.calls if uri.endswith(('setReference', 'setProperty', 'object.set', 'setName', 'setNotes'))]
 
 
 def damage(task, change):
@@ -239,3 +239,37 @@ def test_playlist_reference_retains_each_modification_policy(tmp_path, policy):
     code, verified = task.run('verify', tx)
     assert code == 0 and verified['verified'] is True, verified
     assert len(writes(task)) == 1
+
+
+@pytest.mark.parametrize('operation', ['object.setName', 'object.set'])
+def test_playlist_slot_identity_does_not_grant_intrinsic_rename_authority(tmp_path, operation):
+    task = PlaylistTask(tmp_path, operation=operation)
+    source = task.bind(FIRST)
+    if operation == 'object.setName':
+        code, rejected = task.step('draft-declare-object-change', '--new-name', 'Renamed')
+    else:
+        code, rejected = task.step('draft-declare-existing', '--declaration-id', 'rename',
+            '--object-handle', source, '--field', 'new_name', 'Renamed')
+    if code == 0:
+        code, rejected = task.step('draft-check')
+    if code == 0:
+        code, rejected = task.step('preview-from-draft')
+    assert code == 2 and rejected['error_code'] == 'OBJECT_NAME_MUTABILITY_UNPROVEN', rejected
+    assert writes(task) == []
+
+
+@pytest.mark.parametrize('operation,identity,argv', [
+    ('object.setName', SECOND, ['--new-name', 'Renamed']),
+    ('object.setNotes', FIRST, ['--notes', 'Documented without renaming']),
+])
+def test_playlist_name_boundary_preserves_other_proven_lifecycle_previews(tmp_path, operation, identity, argv):
+    task = PlaylistTask(tmp_path, operation=operation)
+    before = deepcopy(task.objects)
+    task.bind(identity)
+    code, declared = task.step('draft-declare-object-change', *argv)
+    assert code == 0, declared
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0 and preview['change_requested'] is True, preview
+    assert task.objects == before and writes(task) == []

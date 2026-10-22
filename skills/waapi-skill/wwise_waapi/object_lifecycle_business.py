@@ -9,6 +9,7 @@ from .business_declarations import (
     ExistingObjectTarget,
     bound_object_identity_for_handle,
     business_repair,
+    require_bound_name_mutability,
 )
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
@@ -109,6 +110,7 @@ def materialize_object_lifecycle_business_request(
             action="bind the exact object and copy its returned handle",
         )
     if operation == "object.setName":
+        require_bound_name_mutability(session.handles.resolve_object(declaration.target.object_handle))
         arguments["value"] = fields.pop("new_name")
     elif operation == "object.setNotes":
         arguments["value"] = fields.pop("notes")
