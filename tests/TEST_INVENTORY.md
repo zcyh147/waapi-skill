@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R72 scoped multi-hop query outputs
+
+Candidate `f9c3e81325ae7a64209337de2b22484652c7ee43` extends the closed
+related-output path with multiple singleton relations, metadata-bound custom
+terminals and resolved/local reference hops. Actual related class or exact
+object metadata owns field selection; root order, identity and observed path
+scopes are revalidated. Existing projection limits and sealed paging apply.
+Root review corrected typed scope equality, native extension preservation and
+exact-object fallback when class metadata cannot establish a field's kind.
+
+Focused program evidence includes 400 passed in 54.20s before the final
+preservation and review corrections. Subsequent affected selections passed
+92 in 8.97s, 35 in 3.23s, 90 in 4.65s and 62 in 4.50s. These overlapping runs
+are not additive or a post-fix full-gate result. Original RED logs and exact
+commands remain in `r72-program-logs/waapi-r72-implementation.md` under the
+retained full-coverage evidence root.
+
+The same final candidate passed one combined read-only case per pinned macOS
+Console version: **2021.1: 1 passed in 4.97s; 2022.1: 1 passed in 8.44s;
+2023.1: 1 passed in 4.16s; 2024.1: 1 passed in 3.91s;
+2025.1: 1 passed in 4.09s**. Each case uses four public queries: AudioFileSource
+through its Sound and container, an independent Sound read, an independent
+resolved Bus read and a repeated source read. Assertions prove the two-hop
+container Volume, scoped Pitch, local versus inherited OutputBus, reference-hop
+Bus Volume and actual Sound class metadata scope while preserving root identity.
+
+All five final category records are PASS, with zero transactions, unchanged
+source hashes/mtime/tree metadata, clean process shutdown and deleted passing
+sandboxes. Each root retains twenty native packets and an independently checked
+root review. Evidence: `.waapi-skill-state/full-coverage/`
+`r72-related-paths-f9c3e813-<year>-r1/` and
+`r72-five-version-native-review.json`. No Fresh, Windows, Authoring or full gate
+was added. List composition, functions, legacy spellings and other outstanding
+query obligations remain #181 work; this is not whole-ticket completion.
+
 ## 2026-10-23 R73 older association identity observation
 
 Two targeted macOS Console **2021.1.14.8108** attempts remain failed,
