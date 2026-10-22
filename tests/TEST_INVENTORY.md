@@ -5,6 +5,51 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R71 related fixed outputs
+
+Candidate `fd1c139e44e3fd39870d5fb3c6456a281a6be86a` adds
+`--include-related RELATION BUSINESS_OUTPUT`. The closed parent/owner/work-unit
+relations share one projection record with source-reviewed fixed outputs and
+version-specific descriptors. Root identities remain unchanged; related values
+and their native object reference appear in a separate group. Fixed related
+outputs require no property metadata lookup. Existing output budgets, native
+limits, platform/language scope and sealed lossless pages remain enforced.
+
+Matching SDK descriptor/chain rows are packaged for all five versions. The new
+142 fake-client controls were resolved through focused selections, not one
+combined all-green run: five initial positives passed in 0.44s; the expanded
+selection retained 101 passes and five budget-message failures in 1.72s, then
+the corrected message passed those five in 0.44s. Twenty-six list-valued output
+and paging controls passed in 2.76s; 35 affected existing caller checks passed
+in 1.33s. The final seven source/schema checks passed in 0.53s, including the
+corrected 2024 SDK descriptor row. Original REDs, intermediate failures and exact
+commands remain in `.waapi-skill-state/full-coverage/r71-program-logs/`.
+
+Sequential macOS Console runs on this same candidate passed:
+
+| Version/build | Result |
+| --- | --- |
+| 2021.1.14.8108 | 1 passed in 4.57s |
+| 2022.1.19.8584 | 1 passed in 4.31s |
+| 2023.1.19.8928 | 1 passed in 4.06s |
+| 2024.1.13.9056 | 1 passed in 3.79s |
+| 2025.1.7.9143 | 1 passed in 4.57s |
+
+Each performs three read-only queries: the Sound with parent outputs, an
+independent exact-parent read, then a repeated Sound read. All five distinguish
+the Sound's local Volume/Pitch (0/0) from FS_Concrete's (-12/-560), preserve both
+identities, and match native packets to public projections. Total: fifteen
+reads, zero transactions. Final categories are PASS, sources remain unchanged
+and all owned processes/sandboxes are cleaned. Roots:
+`r71-related-fd1c139e-<version>-r1/` under the same state directory, with original
+packets and `root-review.json`; aggregate `r71-five-version-native-review.json`.
+
+This proves the shared scalar parent projection and identity handling. It does
+not claim separate native execution of every terminal or owner branch. Custom
+related fields, multiple declared hops, list composition and unresolved native
+outputs remain #181 implementation work. No new Fresh, full gate, Windows or
+Authoring validation is claimed.
+
 ## 2026-10-23 R70 stored-reference clear and owned history
 
 Candidate `23f5b5d70e797e2ecee348033fe8421bdf3eb9b5` fixes the nullable
@@ -46,6 +91,18 @@ rollback mechanism. Five-version R69 read evidence is reused for the stored vs
 inherited distinction; it is not five-version clear/undo execution evidence.
 No Fresh, broad gate, Windows or Authoring run is claimed. Remaining #177,
 #181 and #192 obligations stay open.
+
+Published candidate `3c19b324` subsequently ran the hosted pure-code preflight:
+**825 passed / 1 failed in 46.39s** (run `39854162870`). Its only failure was
+the reviewed operation-schema aggregate. Exact comparison of all 149 lanes
+proved that only the five setReference null-target descriptions changed; the
+other 144 remained identical. Test-only repair `89f26343` adds the new aggregate
+and exact prior-lane substitutions while preserving all fifteen historical
+aggregate assertions. The original failed node passed **1 in 0.37s**; an
+intermediate historical-inverse failure is retained. Original CI logs, exact
+schema deltas and the focused repair are archived in `r70-program-logs/` and
+the adjacent `r70-published-ci-*` files. No native rerun was needed for this
+test-contract correction.
 
 ## 2026-10-23 R69 directly stored reference values
 
