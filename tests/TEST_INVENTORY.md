@@ -5,6 +5,42 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R75 reference applicability and R76 structural history
+
+R75 candidate `3898c8ad98253bdf49a8ae253073e0e720d5ad3c` replaces invalid
+reference-enabled probes with a source-bound topmost-Bus ancestry proof at Field
+binding/refresh, preparation, prewrite and verification. Scalar enabled-state
+checks remain. Focused final affected controls passed 69 in 12.95s; strengthening
+the fixture to existing System → distinct No_Output then passed 47 in 12.09s.
+These overlap. All 149 machine-contract seals remain unchanged; fourteen
+operation guidance lanes and five property-state disclosures changed. Twelve
+original log/schema files are hash-archived in `r75-reference-program-logs`.
+
+The 2024 native attempt `r75-master-bus-3898c8ad-2024-r3` reached one authorized
+`setReference` dispatch after structural checks, then received
+`ak.wwise.invalid_reference`. Original result: **1 failed in 10.01s**.
+Transaction `tx1-k7dva2jtg0mmvr1jvtgj` remains **indeterminate**: twelve public
+observation commands, 58 native packets, no reference `isPropertyEnabled` call,
+and no post-dispatch verification. Its journal, observation, packet hashes and
+source/cleanup checks are bound by `root-review.json`. The failed sandbox is
+quarantined; never verify or replay this transaction. The source project is
+unchanged. Matching plugin source identifies a `CanBeMasterSink=false` target
+restriction for No Output; its exact role applicability is under diagnosis.
+No successful reference effect or 2025 run is claimed.
+
+R76 structural property history is implemented at `988e60b1`, integrated with
+R75 at `c08ca046f3c28052ae1e83535f42ede677106fc0`. The existing receipt observer
+now accepts the tagged Switch-child proof without inventing native type, checks
+metadata/association conditions and typed values, and admits a certified
+nonlinkable omitted-platform view. Undo remains pinned to 2022–2025 and redo
+to 2023–2025. No global history-stack identity or automatic retry is claimed.
+Focused structural/context tests passed 152 in 100.34s; existing ordinary
+scalar/reference/policy/nonretry callers passed 37 in 25.51s. An additional
+zero-GUID platform boundary passed one in 0.81s; three post-merge shared-caller
+checks passed in 3.60s. Overlapping earlier runs and original fixture failures
+are retained in `r76-history-program-logs`. Structural history native witnesses
+remain pending. #177 and #192 stay open; no Fresh or full-gate result is added.
+
 ## 2026-10-23 R74 related list native acceptance
 
 Frozen candidate `e48bfcc378f8404b80f4ed1b7e959ed4a177f32c` passed the
