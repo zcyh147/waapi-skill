@@ -11,7 +11,7 @@ import pytest
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object,
     _complete_business_draft,
-    _discover_business_field,
+    discovered_business_field_handle,
     _start_business_draft,
     _update_business_draft,
     workflow_sandbox_runtime,
@@ -77,7 +77,7 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
 
     def context(suffix):
         # Collect all related context before asserting optional native shapes.
-        return {"bus": objects("bus-" + suffix, BUS, reference=True),
+        result = {"bus": objects("bus-" + suffix, BUS, reference=True),
             "peer": objects("peer-" + suffix, PEER, reference=True),
             "system": objects("system-" + suffix, SYSTEM),
             "target": objects("target-" + suffix, NO_OUTPUT),
@@ -85,6 +85,12 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
             "device_parent": objects("device-parent-" + suffix, DEVICE_PARENT),
             "children": objects("bus-children-" + suffix, BUS, children=True),
             "siblings": objects("bus-siblings-" + suffix, BUS_PARENT, children=True)}
+        # Independently retain the actual hierarchy boundary reached by the
+        # parent GUID. No root class/type or absent-parent shape is invented.
+        root_id = result["bus_parent"]["parent"]["id"]
+        assert isinstance(root_id, str) and uuid.UUID(root_id).int != 0, result["bus_parent"]
+        result["bus_hierarchy_root"] = objects("bus-hierarchy-root-" + suffix, root_id)
+        return result
 
     def selected_metadata():
         page, seen = None, set()
@@ -106,14 +112,6 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         detail = read(label, ["metadata", "detail", "--exact-id", BUS, "--selection", selection])["agent_result"]
         assert detail.get("complete") is True and detail["scope"] == {"kind": "object", "object": BUS}, detail
         return detail["metadata"]
-
-    def enabled(label, selection, platform):
-        result = read(label, ["metadata", "property-state", "--exact-id", BUS,
-            "--selection", selection, "--platform", platform])["agent_result"]
-        assert result["field"] == "AudioDevice" and result["kind"] == "reference", result
-        assert result["scope"] == {"kind": "object", "object": BUS}, result
-        assert result["platform"] == platform and result["enabled"] is True and result["mutation_authority"] is False, result
-        return result
 
     def same(actual, expected):
         assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True), (actual, expected)
@@ -146,7 +144,8 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         selection, metadata = selected_metadata()
         observation["metadata_before"] = metadata
         # A valid reference's raw type may be empty. Its restriction and the
-        # selected enabled-state result certify the actual reference field.
+        # selected reference kind certify the actual field; structural Show
+        # applicability is proved separately through the public Field/Preview.
         restriction = metadata["restriction"]
         assert restriction["type"] == "reference", metadata
         restrictions = restriction["restrictions"]
@@ -157,12 +156,23 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
             and set(row["type"]) <= {"Audio Device", "AudioDevice"} for row in restrictions), metadata
         master_dependency, = [row for row in metadata.get("dependencies", []) if row.get("type") == "isMasterBus"]
         assert master_dependency == {"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}, metadata
-        enabled("bus-enabled-before", selection, platform)
 
         draft = _start_business_draft(runtime, "object.setReference")
         source_handle = _bind_business_object(runtime, draft, object_id=BUS)
         target_handle = _bind_business_object(runtime, draft, object_id=NO_OUTPUT)
-        field = _discover_business_field(runtime, draft, object_handle=source_handle, meaning="AudioDevice", platform=platform)
+        discovered = _update_business_draft(runtime, draft, "draft-discover-fields", ["--object-handle", source_handle,
+            "--meaning", "AudioDevice", "--platform", platform], live=True)
+        field = discovered_business_field_handle(discovered, "AudioDevice")
+        candidate, = [row for result in discovered["meaning_results"] for row in result["candidates"] if row["handle"] == field]
+        applicability = candidate["applicability"]
+        observation["field_applicability_before"] = applicability
+        assert applicability["kind"] == "structural-reference-visibility", applicability
+        assert applicability["condition"] == master_dependency and applicability["native_enabled_state"] == "not_queried", applicability
+        assert applicability["object_id"] == BUS and applicability["field"] == "AudioDevice" and applicability["platform"] == platform, applicability
+        assert [row["id"] for row in applicability["rows"]] == [BUS, BUS_PARENT, before["bus_hierarchy_root"]["id"]], applicability
+        for actual, expected in zip(applicability["rows"], (bus, before["bus_parent"], before["bus_hierarchy_root"])):
+            same({("class_id" if key == "classId" else key): value for key, value in actual.items()},
+                {("class_id" if key == "classId" else key): expected["class_id" if key == "classId" else key] for key in actual})
         _update_business_draft(runtime, draft, "draft-declare-field-change", ["--object-handle", source_handle,
             "--field-handle", field, "--target-handle", target_handle], live=False)
 
@@ -171,7 +181,13 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
             assert not preview["preview_summary"].get("derived_changes"), preview
             shown = runtime.gateway(["transaction-show", preview["transaction_id"]], live=False)
             observation["immutable_preview_before_authorization"] = shown
-            dispatch = shown["artifact"]["prepared_operation"]["dispatch"]
+            prepared = shown["artifact"]["prepared_operation"]
+            structural, = prepared["pre_state"]["condition_metadata"]["structural_applicability"]
+            same(structural, applicability)
+            notice, = preview["preview_summary"]["reference_applicability"]
+            assert notice["native_enabled_state"] == "not_queried" and notice["condition"] == master_dependency, notice
+            assert notice["object_id"] == BUS and notice["field"] == "AudioDevice" and notice["platform"] == platform, notice
+            dispatch = prepared["dispatch"]
             assert dispatch["uri"] == "ak.wwise.core.object.setReference", dispatch
             assert dispatch["args"] == {"object": BUS, "reference": "AudioDevice", "value": NO_OUTPUT, "platform": platform}, dispatch
 
@@ -189,11 +205,10 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         expected_bus = deepcopy(bus)
         expected_bus["references"]["AudioDevice"] = actual_reference
         same(after["bus"], expected_bus)
-        for key in ("peer", "system", "target", "bus_parent", "device_parent", "children"):
+        for key in ("peer", "system", "target", "bus_parent", "device_parent", "children", "bus_hierarchy_root"):
             same(after[key], before[key])
         same(after["siblings"], before["siblings"])
         same(metadata_detail("bus-field-after", selection), metadata)
-        enabled("bus-enabled-after", selection, platform)
         host_after = read("host-and-current-platform-after", ["status"])
         assert host_after.get("project", {}).get("currentPlatformId") == platform, host_after
         assert len(observation["transactions"]) == 1

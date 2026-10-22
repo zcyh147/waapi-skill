@@ -6278,7 +6278,8 @@ def _prepare_object_set(
                 field_snapshots.extend(snapshots)
                 condition_metadata_guards.append({"object_id": target.object, "platform": platform, "fields": [info.as_dict()]})
                 continue
-            if platform is not None:
+            from .reference_applicability import needs_structural_proof
+            if platform is not None and not needs_structural_proof(info):
                 _require_platform_field_enabled(
                     read,
                     object_id=target.object,
@@ -6323,6 +6324,7 @@ def _prepare_object_set(
                 wwise_version=request.version)
         reference_requirements: dict[str, Any] = {}
         override_applicability = {}
+        structural_applicability = {}
         for descriptor in (*properties, *references):
             if descriptor.name.casefold() not in property_info_by_name:
                 continue  # Exact documented-list evidence is re-read independently; no property-info receipt is invented.
@@ -6335,6 +6337,7 @@ def _prepare_object_set(
                 request_path=descriptor.request_path,
                 property_info_cache=property_info_cache,
                 wwise_version=request.version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
                 _condition_sources=tuple(property_info_by_name.values()),
                 reference_requirements=reference_requirements,
                 desired_references=desired_references,
@@ -6354,6 +6357,7 @@ def _prepare_object_set(
                 "platform": platform,
                 "fields": [info.as_dict() for info in property_info_by_name.values()],
                 "override_applicability": [proof for proof in override_applicability.values() if proof is not None],
+                "structural_applicability": list(structural_applicability.values()),
             })
         for property_name, value in derived_target_properties.items():
             trusted[f"@{property_name}"] = value
@@ -8744,11 +8748,12 @@ def _prepare_object_node_specs(
             spec["reference_target_conditions"] = hierarchy
         if merge_target is not None:
             requirements, applicability, related = {}, {}, []
+            structural_applicability = {}
             for info in tuple(property_info_by_name.values()):
                 activators = _apply_reference_activation_dependencies(info, read=read, object_id=merge_target.object,
                     property_specs=spec["properties"], property_info_by_name=property_info_by_name,
                     derived_properties=node_derived_properties, request_path=node.request_path,
-                    property_info_cache=property_info_cache, wwise_version=version, override_applicability=applicability,
+                    property_info_cache=property_info_cache, wwise_version=version, override_applicability=applicability, structural_applicability=structural_applicability,
                     _condition_sources=tuple(property_info_by_name.values()), reference_requirements=requirements,
                     desired_references=desired_references, related_conditions=related, platform=platform)
                 for reference in spec["references"]:
@@ -8771,7 +8776,8 @@ def _prepare_object_node_specs(
                             resolution=target.resolution, row=observed[0])
             spec["condition_metadata_guard"] = {"object_id": merge_target.object, "platform": platform,
                 "fields": [info.as_dict() for info in property_info_by_name.values()],
-                "override_applicability": [proof for proof in applicability.values() if proof is not None]}
+                "override_applicability": [proof for proof in applicability.values() if proof is not None],
+                "structural_applicability": list(structural_applicability.values())}
             if related:
                 spec["related_conditions"] = related
         elif property_info_by_name:
@@ -9523,6 +9529,20 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
                                "evidence": {"expected": expected, "actual": observed}})
             if any(is_master_bus_visibility_dependency(item) and item["value"] is True
                    for item in expected.get("dependencies", [])):
+                from .reference_applicability import is_reference, proof_current
+                observed_info = observed_field(condition_metadata["object_id"], name)
+                if is_reference(expected):
+                    proofs = [proof for proof in condition_metadata.get("structural_applicability", [])
+                        if proof.get("field") == name and _same_identity(proof.get("object_id"), condition_metadata["object_id"])]
+                    try:
+                        passed = len(proofs) == 1 and proof_current(proofs[0], read=read, info=observed_info,
+                            after_write=after_write, edits=pre_state.get("object_set_nodes", []) if after_write else ())
+                        evidence = proofs
+                    except (ValueError, OSError, KeyError, TypeError, OperationContractError) as exc:
+                        passed, evidence = False, {"error": str(exc)}
+                    assertions.append({"name": f"reference {name} structural visibility remains bound; missing legacy proof requires fresh Preview",
+                        "passed": bool(passed), "evidence": evidence})
+                    continue
                 args = {"object": condition_metadata["object_id"], "property": name,
                         "platform": condition_metadata.get("platform") or "{00000000-0000-0000-0000-000000000000}"}
                 result = read(OBJECT_IS_PROPERTY_ENABLED_URI, args, {})
@@ -9670,6 +9690,7 @@ def _apply_reference_activation_dependencies(
     _closure_collected: bool = False,
     wwise_version: str | None = None,
     override_applicability: dict | None = None,
+    structural_applicability: dict | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded scalar and reference-presence activation requirements.
 
@@ -9708,9 +9729,18 @@ def _apply_reference_activation_dependencies(
         if is_master_bus_visibility_dependency(dependency):
             if dependency["value"] is True:
                 if object_id is None:
-                    raise OperationContractError("FIELD_OBJECT_SCOPE_REQUIRED", "Master-bus visibility needs fresh enabled-state proof on the selected existing object.")
-                _require_platform_field_enabled(read, object_id=object_id, field_name=metadata.name,
-                    platform=platform or "{00000000-0000-0000-0000-000000000000}")
+                    raise OperationContractError("FIELD_OBJECT_SCOPE_REQUIRED", "Master-bus visibility needs fresh object-scoped applicability proof on the selected existing object.")
+                from .reference_applicability import is_reference, prove
+                if is_reference(metadata):
+                    try:
+                        proof = prove(version=wwise_version, object_id=object_id, info=metadata, read=read, platform=platform)
+                    except (ValueError, KeyError, TypeError, OSError) as exc:
+                        raise OperationContractError("REFERENCE_APPLICABILITY_UNPROVEN", str(exc)) from exc
+                    if structural_applicability is not None:
+                        structural_applicability[metadata.name] = proof
+                else:
+                    _require_platform_field_enabled(read, object_id=object_id, field_name=metadata.name,
+                        platform=platform or "{00000000-0000-0000-0000-000000000000}")
             continue
         if dependency.get("type") == "reference" and reference_requirements is not None:
             expected_fields = {"type", "action", "context", "property", "conditions"}
@@ -9784,6 +9814,7 @@ def _apply_reference_activation_dependencies(
                 platform=platform,
                 _closure_collected=_closure_collected,
                 wwise_version=wwise_version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
             ))
             continue
         fields = set(dependency)
@@ -9984,6 +10015,7 @@ def _apply_reference_activation_dependencies(
             platform=platform,
             _closure_collected=_closure_collected,
             wwise_version=wwise_version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
         ))
 
         matching_specs = [
@@ -11975,6 +12007,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         related_conditions: list[dict[str, Any]] = []
         activation_metadata: dict[str, PropertyInfoMetadataRecord] = {}
         override_applicability = {}
+        structural_applicability = {}
         if request.operation == "object.setProperty" or arguments["target"] is not None:
             activation_specs: list[dict[str, Any]] = []
             _apply_reference_activation_dependencies(
@@ -11982,6 +12015,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 property_specs=activation_specs, property_info_by_name=activation_metadata,
                 derived_properties={}, request_path="$.reference",
                 wwise_version=request.version, override_applicability=override_applicability,
+                structural_applicability=structural_applicability,
                 reference_requirements=activation_reference_requirements,
                 related_conditions=related_conditions, context_binding=context_binding,
                 platform=platform,
@@ -11992,6 +12026,15 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if info.dependencies:
                 metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
         metadata["condition_metadata"]["override_applicability"] = [proof for proof in override_applicability.values() if proof is not None]
+        if request.operation == "object.setReference" and arguments["target"] is None:
+            from .reference_applicability import needs_structural_proof, prove
+            if needs_structural_proof(info):
+                try:
+                    structural_applicability[info.name] = prove(version=request.version, object_id=source.object,
+                        info=info, read=read, platform=platform)
+                except (ValueError, KeyError, TypeError, OSError) as exc:
+                    raise OperationContractError("REFERENCE_APPLICABILITY_UNPROVEN", str(exc)) from exc
+        metadata["condition_metadata"]["structural_applicability"] = list(structural_applicability.values())
         clearing_reference = request.operation == "object.setReference" and arguments["target"] is None
         observed_field = f"@{field_value}" if clearing_reference else field_value
         field_before_result = read(

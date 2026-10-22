@@ -7362,7 +7362,8 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
                 "object": {"exactly_one_of": ["--exact-id <canonical-object-guid>", "--path-segment <literal-hierarchy-name> (repeat)"]},
                 "field_choice": {"exactly_one_of": ["--meaning <one-property-meaning>", "--selection <opaque-field-selection>"],
                     "selection_source": "copy one field selection from metadata list/detail for the same object",
-                    "selected_kinds": ["property", "reference"], "class_scope": False,
+                    "selected_kinds": ["property"], "class_scope": False,
+                    "reference_boundary": "native property-enabled contract only; use operation Field/Preview structural applicability where supported",
                     "validity": "same live scope/version/project/session/inventory; 900 seconds"},
                 "platform": {"arguments": ["--platform", "<exact-platform-name-or-guid>"], "required": True},
             },
@@ -15968,10 +15969,10 @@ def dispatch_command(
                     details={"operation": args.operation},
                     error_code="INVALID_METADATA_RESULT",
                 )
-            if field_kind not in ({"property", "reference"} if selected_state is not None else {"property"}):
-                if selected_state is not None:
-                    raise GatewayResultShapeError("Selected metadata does not certify a property or reference.",
-                        details={"selection": args.selection, "kind": field_kind}, error_code="INVALID_METADATA_RESULT")
+            if field_kind not in {"property", "reference"}:
+                raise GatewayResultShapeError("Selected metadata does not certify a property or reference.",
+                    details={"selection": args.selection, "kind": field_kind}, error_code="INVALID_METADATA_RESULT")
+            if field_kind != "property":
                 return {
                     "ok": True,
                     "status": "needs_clarification",
@@ -15980,7 +15981,8 @@ def dispatch_command(
                     "metadata_authority": "live-waapi",
                     **metadata_call_evidence_projection(metadata_calls),
                     "agent_result": {
-                        "meaning": args.queries[0],
+                        **({"selection": args.selection, "scope": selected_state["scope"]} if selected_state is not None else {"meaning": args.queries[0]}),
+                        "platform": args.platform, "mutation_authority": False,
                         "candidate_count": 1,
                         "candidates": [
                             {
@@ -15989,8 +15991,9 @@ def dispatch_command(
                             }
                         ],
                         "repair": (
-                            "request a property meaning; references do not have "
-                            "an enabled-state query"
+                            "This route certifies native property enabled state only. "
+                            "For reference applicability use the operation Field/Preview evidence where supported; "
+                            "no reference enabled state is certified here."
                         ),
                     },
                 }
@@ -20545,6 +20548,7 @@ def dispatch_business_field_discovery(
                 "field_kind": bound.field_kind,
                 "value_type": bound.value_type,
                 "platform": bound.platform,
+                **({"applicability": dict(bound.applicability)} if bound.applicability is not None else {}),
                 "restrictions": restrictions,
                 "metadata": (dict(browsed["metadata"] if args.selection else metadata) if detail_projection is None else {"name": bound.token, "type": metadata["type"], "detail_projection": "metadata_detail", "complete": False}),
                 "unit": metadata_unit(metadata),
@@ -32156,6 +32160,16 @@ def transaction_show_summary(
     # Required user notice survives every compact variant; the existing byte
     # ceiling fails closed if the complete change list cannot fit.
     derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
+    condition_state = prepared.get("pre_state", {})
+    condition_groups = list(condition_state.get("condition_metadata_guards", []))
+    if isinstance(condition_state.get("condition_metadata"), Mapping):
+        condition_groups.append(condition_state["condition_metadata"])
+    structural = [proof for group in condition_groups for proof in group.get("structural_applicability", [])]
+    if structural:
+        derived_notice["reference_applicability"] = [{"kind": proof["kind"], "object_id": proof["object_id"],
+            "field": proof["field"], "condition": proof["condition"], "platform": proof["platform"],
+            "native_enabled_state": proof["native_enabled_state"], "ancestry_count": len(proof["rows"]),
+            "proof_sha256": canonical_sha256(proof)} for proof in structural]
     source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
     if isinstance(source_linkage, Mapping):
         derived_notice["source_linkage"] = dict(source_linkage)

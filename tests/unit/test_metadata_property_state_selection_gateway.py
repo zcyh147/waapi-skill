@@ -33,68 +33,50 @@ def selected_reference_task(tmp_path, version='2025.1'):
     return run, client, selection, reference
 
 
-def test_selected_reference_state_preserves_native_boolean_without_controller_lookup(tmp_path):
+def test_selected_reference_state_discloses_property_only_boundary_without_native_enabled_call(tmp_path):
     run, client, selection, _reference = selected_reference_task(tmp_path)
     code, payload = run('metadata', 'property-state', '--exact-id', OBJECT_GUID,
                         '--selection', selection, '--platform', 'Windows')
-    assert code == 0, payload
-    assert payload['agent_result']['enabled'] is True
-    assert payload['agent_result']['field'] == 'UserAuxSend0'
-    assert payload['agent_result']['kind'] == 'reference'
-    assert payload['agent_result']['mutation_authority'] is False
-    assert [(uri, args, options) for uri, args, options in client.calls if uri == IS_PROPERTY_ENABLED_URI] == [
-        (IS_PROPERTY_ENABLED_URI, {'object': OBJECT_GUID, 'property': 'UserAuxSend0', 'platform': 'Windows'}, {})]
+    assert code == 0 and payload['status'] == 'needs_clarification', payload
+    result = payload['agent_result']
+    assert result['candidates'] == [{'field': 'UserAuxSend0', 'kind': 'reference'}]
+    assert 'Field/Preview' in result['repair']
+    assert 'enabled' not in result
+    assert not any(uri == IS_PROPERTY_ENABLED_URI for uri, _, _ in client.calls)
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
-@pytest.mark.parametrize('enabled', [True, False])
-def test_selected_reference_state_is_versioned_current_object_observation_only(tmp_path, version, enabled):
+def test_selected_reference_state_boundary_preserves_versioned_metadata(tmp_path, version):
     run, client, selection, reference = selected_reference_task(tmp_path, version)
-    client.responses[IS_PROPERTY_ENABLED_URI] = {'return': enabled}
     code, schema = run('request-schema', IS_PROPERTY_ENABLED_URI)
-    assert code == 0 and schema['commands'][0]['input_forms']['field_choice']['selected_kinds'] == ['property', 'reference'], schema
+    assert code == 0 and schema['commands'][0]['input_forms']['field_choice']['selected_kinds'] == ['property'], schema
     code, detail = run('metadata', 'detail', '--exact-id', OBJECT_GUID, '--selection', selection)
     assert code == 0 and detail['agent_result']['metadata']['type'] == '', detail
     assert detail['agent_result']['metadata']['dependencies'] == reference['dependencies']
+    client.errors[IS_PROPERTY_ENABLED_URI] = RuntimeError("Reference enabled state is not certified")
     code, result = run('metadata', 'property-state', '--exact-id', OBJECT_GUID,
                        '--selection', selection, '--platform', 'Windows')
-    assert code == 0 and result['agent_result']['enabled'] is enabled, result
+    assert code == 0 and result['status'] == 'needs_clarification', result
     assert result['agent_result']['selection'] == selection
     assert result['agent_result']['scope'] == {'kind': 'object', 'object': OBJECT_GUID}
     assert result['agent_result']['mutation_authority'] is False
-    assert len([c for c in client.calls if c[0] == IS_PROPERTY_ENABLED_URI]) == 1
+    assert 'enabled' not in result['agent_result']
+    assert not any(c[0] == IS_PROPERTY_ENABLED_URI for c in client.calls)
     assert [c[1]['property'] for c in client.calls if c[0] == GET_PROPERTY_INFO_URI] == ['UserAuxSend0', 'UserAuxSend0']
 
 
-@pytest.mark.parametrize('failure', ['native-refusal', 'timeout', 'malformed', 'wrong-metadata-name', 'unknown-kind'])
-def test_selected_reference_state_preserves_failure_without_fallback_or_write(tmp_path, failure):
+@pytest.mark.parametrize('failure', ['wrong-metadata-name', 'unknown-kind'])
+def test_selected_reference_state_invalid_metadata_stops_without_fallback_or_write(tmp_path, failure):
     run, client, selection, reference = selected_reference_task(tmp_path)
-    if failure == 'native-refusal':
-        class WaapiRequestFailed(Exception):
-            uri = 'ak.wwise.invalid_arguments'
-            kwargs = {'details': {'property': 'UserAuxSend0', 'procedureUri': IS_PROPERTY_ENABLED_URI},
-                      'message': 'Property does not exist on this object.'}
-        client.errors[IS_PROPERTY_ENABLED_URI] = WaapiRequestFailed('native reference observation refusal')
-    elif failure == 'timeout':
-        client.errors[IS_PROPERTY_ENABLED_URI] = TimeoutError('reference enabled response unobserved')
-    elif failure == 'malformed':
-        client.responses[IS_PROPERTY_ENABLED_URI] = {'return': 'true'}
-    elif failure == 'wrong-metadata-name':
+    if failure == 'wrong-metadata-name':
         client.responses[GET_PROPERTY_INFO_URI] = {**reference, 'name': 'UserAuxSend1'}
     else:
         client.responses[GET_PROPERTY_INFO_URI] = {'name': 'UserAuxSend0', 'type': '', 'supports': {}}
     code, result = run('metadata', 'property-state', '--exact-id', OBJECT_GUID,
                        '--selection', selection, '--platform', 'Windows')
     assert code == 2 and result.get('agent_result') is None, result
-    calls = [c for c in client.calls if c[0] == IS_PROPERTY_ENABLED_URI]
-    assert len(calls) == (0 if failure in {'wrong-metadata-name', 'unknown-kind'} else 1)
-    if failure == 'native-refusal':
-        assert result['call']['waapi_error_uri'] == 'ak.wwise.invalid_arguments', result
-        assert result['call']['waapi_error_details']['details']['property'] == 'UserAuxSend0'
-    if failure == 'malformed':
-        assert result['details']['call']['api'] == IS_PROPERTY_ENABLED_URI, result
-        assert result['details']['native_result'] == {'return': 'true'}, result
-    assert all(c[0] in {GET_INFO_URI, GET_NAMES_URI, OBJECT_GET_URI, GET_PROPERTY_INFO_URI, IS_PROPERTY_ENABLED_URI} for c in client.calls)
+    assert not any(c[0] == IS_PROPERTY_ENABLED_URI for c in client.calls)
+    assert all(c[0] in {GET_INFO_URI, GET_NAMES_URI, OBJECT_GET_URI, GET_PROPERTY_INFO_URI} for c in client.calls)
 
 
 @pytest.mark.parametrize('drift', ['object', 'names', 'session', 'project', 'version', 'forged', 'expired'])
