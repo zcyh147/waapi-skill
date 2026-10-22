@@ -137,7 +137,7 @@ from wwise_waapi.object_query_outputs import (  # noqa: E402
     query_output_detail,
 )
 from wwise_waapi.object_query_related import (  # noqa: E402
-    compile_related_output,
+    RELATED_FIELD_MODES, parse_related_request, fixed_related_bindings, related_native_fields,
     related_query_contract,
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -1998,10 +1998,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument(
-        "--include-related", nargs=2, action="append", default=[],
-        dest="related_outputs", metavar=("RELATION", "BUSINESS_OUTPUT"),
+        "--include-related", nargs="+", action="append", default=[],
+        dest="related_outputs", metavar="PATH_OR_OUTPUT",
         help="Return one closed output from a singleton related object, retaining the queried object's identity",
     )
+    for related_option in RELATED_FIELD_MODES:
+        query_object.add_argument(related_option, nargs="+", action="append", default=[],
+            dest=related_option[2:].replace("-", "_"), metavar="PATH_OR_MEANING",
+            help="Read a live-discovered field on an actual singleton-related object; final argument is its user-facing meaning")
     query_object.add_argument(
         "--include-field",
         action="append",
@@ -5648,6 +5652,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 relationships,
                 getattr(args, "business_outputs", None),
                 getattr(args, "related_outputs", None),
+                *(getattr(args, option[2:].replace("-", "_"), None) for option in RELATED_FIELD_MODES),
                 getattr(args, "custom_field_meanings", None),
                 getattr(args, "override_source_value_meanings", None),
                 getattr(args, "local_reference_meanings", None),
@@ -5863,7 +5868,8 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         raise GatewayInputError(
             f"query-object accepts at most {MAX_QUERY_BUSINESS_OUTPUTS} total --include/--include-related values"
         )
-    if sum(len(values) for _, values in mode_meanings) > MAX_QUERY_CUSTOM_OUTPUTS:
+    related_custom = [(option, list(getattr(args, option[2:].replace("-", "_"), ()) or ())) for option in RELATED_FIELD_MODES]
+    if sum(len(values) for _, values in mode_meanings) + sum(len(values) for _, values in related_custom) > MAX_QUERY_CUSTOM_OUTPUTS:
         raise GatewayInputError(
             "query-object accepts at most "
             f"{MAX_QUERY_CUSTOM_OUTPUTS} custom field meanings"
@@ -5882,18 +5888,20 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         native, output = available_query_outputs(version)[name]
         bindings.append(("derived" if native is None else "business", native or output, output))
 
-    if len({tuple(pair) for pair in related}) != len(related):
-        raise GatewayInputError("query-object --include-related pairs must be unique")
-    related_identities = set()
-    for relation, name in related:
-        try:
-            record = compile_related_output(version, relation, name)
-        except ValueError as exc:
-            raise GatewayInputError(str(exc)) from exc
-        if relation not in related_identities:
-            bindings.append(("related_identity", record.relation_native, relation))
-            related_identities.add(relation)
-        bindings.append(record.binding())
+    try:
+        requests = [parse_related_request(version, list(values), "--include-related") for values in related]
+        requests.extend(parse_related_request(version, list(values), option)
+            for option, occurrences in related_custom for values in occurrences)
+        signatures = [(request["option"], tuple((kind, " ".join(value.split()).casefold()) for kind, value in request["hops"]),
+                       " ".join(request["terminal"].split()).casefold()) for request in requests]
+        if len(set(signatures)) != len(signatures):
+            raise ValueError("query-object related declarations must be unique")
+        args.query_related_requests = tuple(requests)
+        args.query_related_preparation_required = any(request["option"] != "--include-related" or
+            any(kind != "relation" for kind, _ in request["hops"]) for request in requests)
+        bindings.extend(fixed_related_bindings(version, requests))
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
 
     def bounded_custom_meaning(value: Any, option: str) -> str:
         if (
@@ -5935,6 +5943,11 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
             "query-object requested the same native result field more than once"
         )
     native_fields = list(dict.fromkeys(binding[1] for binding in bindings if binding[0] != "derived"))
+    if args.query_related_requests:
+        try:
+            related_native_fields(bindings, SELECTED_REQUIRED_RETURN_FIELDS)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     args.query_output_bindings = tuple(bindings)
     args.query_derived_outputs = tuple(binding[2] for binding in bindings if binding[0] == "derived")
     if args.query_derived_outputs:
@@ -8788,10 +8801,10 @@ def query_business_schema_payload(
             "result_presence": _query_result_presence_contract(),
             "business_outputs": [name for name, binding in available_query_outputs(version).items() if binding[0] is not None],
             "output_detail": "query-schema --output <business-output>",
-            "related_outputs": related_query_contract(version, maximum_outputs=MAX_QUERY_BUSINESS_OUTPUTS),
+            "related_outputs": related_query_contract(version, maximum_outputs=MAX_QUERY_BUSINESS_OUTPUTS, maximum_custom_outputs=MAX_QUERY_CUSTOM_OUTPUTS),
             "custom_outputs": {
                 "available": False,
-                "reason": "advanced WAQL has no Gateway-provable live metadata scope",
+                "reason": "root custom fields require a declared metadata scope; related custom terminals instead prepare their actual native endpoint scopes",
             },
             "continuation": {
                 "subcommand": "query-object",
@@ -8831,7 +8844,7 @@ def query_business_schema_payload(
         "result_presence": _query_result_presence_contract(),
         "business_outputs": list(available_query_outputs(version)),
         "output_detail": "query-schema --output <business-output>",
-        "related_outputs": related_query_contract(version, maximum_outputs=MAX_QUERY_BUSINESS_OUTPUTS),
+        "related_outputs": related_query_contract(version, maximum_outputs=MAX_QUERY_BUSINESS_OUTPUTS, maximum_custom_outputs=MAX_QUERY_CUSTOM_OUTPUTS),
         "custom_outputs": {
             "field_meaning": "--include-field <user-facing property/reference meaning>",
             "override_source_values": override_source_value_contract(version),
@@ -15382,6 +15395,15 @@ def dispatch_command(
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
+            def related_advanced_preview(fields):
+                return build_advanced_object_get_query({"contract": ADVANCED_QUERY_CONTRACT,
+                    "waql": args.advanced_waql, "return": list(fields), "max_results": args.max_results},
+                    version=detected_version, platform=args.query_platform, language=args.query_language)
+            clarification = _prepare_query_related_outputs(args, build_preview=related_advanced_preview,
+                connection=connection, detected_version=detected_version, dispatcher=dispatcher)
+            if clarification is not None:
+                return {"ok": True, "status": "needs_clarification", **common, "query_layer": "advanced-native-waql", "agent_result": clarification}
+            advanced_preview = related_advanced_preview(args.query_return_fields)
             envelope = advanced_preview.envelope
             maximum_rows = int(
                 advanced_preview.envelope.metadata["query_bound"]["value"]
@@ -15513,6 +15535,15 @@ def dispatch_command(
                 "agent_result": custom_field_clarification,
             }
         where = typed_query_predicates(args)
+        def related_business_preview(fields):
+            return build_object_get_query(path=args.path, object_id=args.object_id, object_ids=args.object_ids,
+                type=args.object_type, search=args.search, query=args.query, where=where,
+                select=tuple(args.select or ()), take=args.take, return_fields=fields, version=detected_version,
+                platform=args.query_platform, language=args.query_language)
+        clarification = _prepare_query_related_outputs(args, build_preview=related_business_preview,
+            connection=connection, detected_version=detected_version, dispatcher=dispatcher)
+        if clarification is not None:
+            return {"ok": True, "status": "needs_clarification", **common, "query_layer": "business-declaration", "agent_result": clarification}
         return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
         if getattr(args, "query_derived_outputs", ()):
@@ -24967,6 +24998,31 @@ def _query_result_presence_contract() -> dict[str, Any]:
     }
 
 
+def _prepare_query_related_outputs(args, *, build_preview, connection, detected_version, dispatcher):
+    if not getattr(args, "query_related_preparation_required", False):
+        return None
+    from wwise_waapi.object_query_related_runtime import RelatedQueryError, prepare_related_outputs
+    try:
+        bindings, proof, clarification = prepare_related_outputs(version=detected_version,
+            requests=args.query_related_requests, bindings=args.query_output_bindings,
+            build_preview=build_preview, read=transaction_read_call(dispatcher, connection=connection, version=detected_version),
+            maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
+            maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES)
+        if clarification is not None:
+            if args.result_page is not None:
+                raise RelatedQueryError("Related field selection changed; restart the original read", code="QUERY_RESULT_CONTINUATION_CHANGED")
+            return clarification
+        args.query_output_bindings = bindings
+        args.query_return_fields = related_native_fields(bindings, SELECTED_REQUIRED_RETURN_FIELDS)
+        args.query_related_scope_binding = proof
+    except RelatedQueryError as exc:
+        code = "QUERY_RESULT_CONTINUATION_CHANGED" if args.result_page is not None else exc.code
+        raise GatewayResultShapeError(str(exc), details={**exc.details, "related_boundary": exc.code}, error_code=code) from exc
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    return None
+
+
 def _project_query_business_rows(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
@@ -24974,21 +25030,46 @@ def _project_query_business_rows(
     """Rename Gateway-compiled native accessors into stable business fields."""
 
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
+    proof = getattr(args, "query_related_scope_binding", None)
+    if proof is not None:
+        from wwise_waapi.object_query_related_runtime import RelatedQueryError, validate_related_observation
+        try:
+            validate_related_observation(rows, proof)
+        except RelatedQueryError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     projected: list[dict[str, Any]] = []
-    for row in rows:
+    for row_index, row in enumerate(rows):
         item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS if field in row}
         missing_identity = [field for field in SELECTED_REQUIRED_RETURN_FIELDS if field not in row]
         unavailable = list(missing_identity)
         grouped: dict[str, dict[str, Any]] = {}
         related_groups: dict[str, dict[str, Any]] = {}
         for kind, native, output in bindings:
-            if kind in {"related", "related_identity"}:
-                relation = output if kind == "related_identity" else output["relation"]
-                context = related_groups.setdefault(relation, {})
+            if kind == "related_scope":
+                continue
+            if kind in {"related", "related_identity", "related_unavailable"}:
+                if "row_indices" in output and row_index not in output["row_indices"]:
+                    continue
+                path = output["path"] if "path" in output else (("relation", output["relation"]),)
+                context = item
+                nested = related_groups
+                for slot, name in path:
+                    if slot == "relation":
+                        context = nested.setdefault(name, {})
+                    else:
+                        context = nested.setdefault(slot, {}).setdefault(name, {})
+                    nested = context.setdefault("related", {})
+                if kind == "related_unavailable":
+                    context.setdefault("unavailable_field_requests", []).append({key: output[key]
+                        for key in ("meaning", "requested_option", "reason")})
+                    continue
                 field = "object" if kind == "related_identity" else output["field"]
                 group = None if kind == "related_identity" else output["group"]
                 if native not in row:
-                    context.setdefault("unavailable_fields", []).append(f"{group}.{field}" if group else field)
+                    missing = context.setdefault("unavailable_fields", [])
+                    name = f"{group}.{field}" if group else field
+                    if name not in missing:
+                        missing.append(name)
                 else:
                     target = context.setdefault(group, {}) if group else context
                     target[field] = row[native]
@@ -25012,6 +25093,13 @@ def _project_query_business_rows(
             if group in grouped:
                 item[group] = grouped[group]
         if related_groups:
+            def prune_empty_related(value):
+                if isinstance(value, dict):
+                    for child in list(value.values()):
+                        prune_empty_related(child)
+                    if value.get("related") == {}:
+                        value.pop("related")
+            prune_empty_related(related_groups)
             item["related"] = related_groups
         if unavailable:
             item["unavailable_fields"] = unavailable
@@ -25030,8 +25118,9 @@ def _query_incomplete_identity_observation(
 ) -> dict[str, Any]:
     """Retain the bounded native reply when identity facts cannot be certified."""
 
-    if any("identity_completeness" in row or any("identity_completeness" in context
-            for context in row.get("related", {}).values()) for row in rows):
+    def incomplete(value):
+        return isinstance(value, Mapping) and ("identity_completeness" in value or any(incomplete(child) for child in value.values()))
+    if any(incomplete(row) for row in rows):
         return {"native_observation": result["result"]}
     return {}
 
@@ -25413,6 +25502,10 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
     from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
     if not payload.get("ok"):
         return payload
+    if args.detail and getattr(args, "query_related_scope_binding", None) is not None:
+        terminal = payload.pop("agent_result")
+        payload["related_scope_binding"] = args.query_related_scope_binding
+        payload["agent_result"] = terminal
     if args.result_page is None and len(canonical_json_bytes(
             project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
         return payload
@@ -25423,7 +25516,8 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
         binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
             "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
             "output_bindings": getattr(args, "query_output_bindings", ()),
-            "field_selection": getattr(args, "query_field_selection", None)},
+            "field_selection": getattr(args, "query_field_selection", None),
+            "related_scope_binding": getattr(args, "query_related_scope_binding", None)},
             "native_result_sha256": canonical_sha256(native["result"]),
             "projection_sha256": canonical_sha256({key: payload[key] for key in ("objects", "native_observation") if key in payload})}
         offset = parse_offset(args.result_page, binding)
@@ -25438,7 +25532,9 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             handle, expires = args.result_query, record["expires_at"]
         prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
         detail_fragment_required = args.detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
-        page_payload = {**payload, "detail_fragment_required": detail_fragment_required}
+        scope_fragment_required = args.detail and len(canonical_json_bytes(payload.get("related_scope_binding"))) > 4096
+        page_payload = {**payload, "detail_fragment_required": detail_fragment_required,
+            "scope_fragment_required": scope_fragment_required}
         page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
             next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
                 "--result-query", handle, "--result-page", token]))
@@ -25450,10 +25546,13 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
         if detail_fragment_required:
             result.pop("semantic_preview", None)
+        if scope_fragment_required:
+            result.pop("related_scope_binding", None)
         result.update(status="ok" if page["projection_complete"] else "partial",
             projection_complete=page["projection_complete"],
             projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
                 "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
+                "related_scope_binding_source": "agent_result.entries/related_scope_binding" if scope_fragment_required else "inline_when_detail_requested",
                 "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
             objects_source="agent_result.objects", agent_result=page)
         if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) != "ok":

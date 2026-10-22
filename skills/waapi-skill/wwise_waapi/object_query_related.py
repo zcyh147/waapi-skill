@@ -6,9 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .object_query_outputs import QUERY_BUSINESS_OUTPUTS, available_query_outputs
+from .object_query_outputs import QUERY_BUSINESS_OUTPUTS, QUERY_FIELD_MODES, reference_value_source_contract, available_query_outputs
+from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS, MAX_ADVANCED_RETURN_EXPRESSION_BYTES
 from .schema_inventory import load_definition_graph
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
+from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
 
 RELATED_QUERY_RELATIONS = {"parent": "parent", "owner": "owner", "work-unit": "workunit"}
 
@@ -66,37 +68,102 @@ def related_output_detail(version: str, name: str) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class RelatedQueryOutput:
-    """One owned relation path and terminal binding; custom terminals can reuse it."""
+    """A rendered singleton path, terminal and collision-free business location."""
     relation: str
     relation_native: str
     terminal_native: str
     output_name: str
     output_group: str | None = None
+    path: tuple[tuple[str, str], ...] = ()
+    row_indices: tuple[int, ...] | None = None
 
     def binding(self) -> tuple[str, str, dict[str, Any]]:
-        return ("related", f"{self.relation_native}.{self.terminal_native}",
-                {"relation": self.relation, "group": self.output_group, "field": self.output_name})
+        location = {"path": self.path or (("relation", self.relation),),
+                    "group": self.output_group, "field": self.output_name}
+        if self.row_indices is not None:
+            location["row_indices"] = self.row_indices
+        return ("related", f"{self.relation_native}.{self.terminal_native}", location)
+
+
+RELATED_FIELD_MODES = {mode.option.replace("--include-", "--include-related-"): mode for mode in QUERY_FIELD_MODES}
+
+
+def _meaning(value: str) -> str:
+    if (not isinstance(value, str) or not value or value != value.strip() or len(value) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            or any(ord(c) < 32 or ord(c) == 127 or c in "@.\\;\"'()" for c in value)):
+        raise ValueError("related field meanings must be bounded user-facing phrases, not native accessor or function grammar")
+    return value
+
+
+def parse_related_request(version: str, values: list[str], option: str) -> dict[str, Any]:
+    if len(values) < 2:
+        raise ValueError(f"{option} requires a singleton path and one terminal")
+    tokens, terminal = values[:-1], values[-1]
+    hops, index = [], 0
+    while index < len(tokens):
+        name = tokens[index]
+        if name in RELATED_QUERY_RELATIONS:
+            hops.append(("relation", name))
+            index += 1
+        elif name in {"reference", "local-reference"} and index + 1 < len(tokens):
+            hops.append((name, _meaning(tokens[index + 1])))
+            index += 2
+        else:
+            raise ValueError(f"{option} requires disclosed singleton relation or reference/local-reference MEANING hops")
+    if option == "--include-related":
+        detail = related_output_detail(version, terminal)
+        if not detail["available"]:
+            raise ValueError(f"{option} {' '.join(values)}: {detail['reason']}")
+    else:
+        _meaning(terminal)
+    return {"hops": tuple(hops), "terminal": terminal, "option": option}
 
 
 def compile_related_output(version: str, relation: str, name: str) -> RelatedQueryOutput:
-    if relation not in RELATED_QUERY_RELATIONS:
-        raise ValueError("--include-related requires one disclosed singleton relation: " + ", ".join(RELATED_QUERY_RELATIONS))
-    detail = related_output_detail(version, name)
-    if not detail["available"]:
-        raise ValueError(f"--include-related {relation} {name}: {detail['reason']}")
-    native, output = available_query_outputs(version)[name]
-    assert native is not None
+    request = parse_related_request(version, [relation, name], "--include-related")
+    native, output = available_query_outputs(version)[request["terminal"]]
     return RelatedQueryOutput(relation, RELATED_QUERY_RELATIONS[relation], native, output)
 
 
-def related_query_contract(version: str, *, maximum_outputs: int) -> dict[str, Any]:
+def related_native_fields(bindings, identity_fields):
+    fields = tuple(dict.fromkeys((*identity_fields, *(native for kind, native, _ in bindings
+                  if kind not in {"derived", "related_unavailable"}))))
+    if len(fields) > MAX_ADVANCED_RETURN_EXPRESSIONS:
+        raise ValueError(f"related projection accepts at most {MAX_ADVANCED_RETURN_EXPRESSIONS} native return expressions including identity and scope helpers")
+    if any(len(field.encode("utf-8")) > MAX_ADVANCED_RETURN_EXPRESSION_BYTES for field in fields):
+        raise ValueError(f"each related return expression is limited to {MAX_ADVANCED_RETURN_EXPRESSION_BYTES} UTF-8 bytes")
+    return fields
+
+
+def fixed_related_bindings(version: str, requests):
+    """Render the fixed prefix once; metadata-bound suffixes are prepared live."""
+    bindings, seen = [], set()
+    for request in requests:
+        native, path = "", []
+        for kind, name in request["hops"]:
+            if kind != "relation":
+                break
+            native = f"{native}." if native else ""
+            native += RELATED_QUERY_RELATIONS[name]
+            path.append((kind, name))
+            if native not in seen:
+                bindings.append(("related_identity", native, {"path": tuple(path)}))
+                seen.add(native)
+        else:
+            if request["option"] == "--include-related":
+                terminal, output = available_query_outputs(version)[request["terminal"]]
+                bindings.append(RelatedQueryOutput(path[0][1], native, terminal, output, path=tuple(path)).binding())
+    return bindings
+
+
+def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom_outputs: int) -> dict[str, Any]:
     source_file = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "query-related-output-sources.json"
     source = json.loads(source_file.read_text(encoding="utf-8"))
     graph = load_definition_graph(version)
     if source["version"] != version or source["wwise_build"] != graph.wwise_build:
         raise ValueError("Related-query source evidence does not match the selected definitions")
     patterns = graph.documents["waapi_definitions.json"]["definitions"]["objectReturn"]["patternProperties"]
-    return {"option": "--include-related <singleton-relation> <business-output> (repeat)",
+    return {"option": "--include-related <singleton-hop>... <business-output> (repeat)",
             "relations": dict(RELATED_QUERY_RELATIONS),
             "outputs": {name: related_output_detail(version, name) for name in QUERY_BUSINESS_OUTPUTS},
             "result_schema": patterns,
@@ -104,9 +171,20 @@ def related_query_contract(version: str, *, maximum_outputs: int) -> dict[str, A
             "source": {key: source[key] for key in ("version", "wwise_build", "page", "page_sha256")},
             "chain_html_lines": [rule["html_line"] for rule in source["chain_rules"]],
             "return_options_source": source["return_options_source"],
-            "budget": {"shared_fixed_outputs": maximum_outputs, "automatic_identity_fields_per_relation": 1, "singleton_relations": len(RELATED_QUERY_RELATIONS)},
+            "budget": {"shared_fixed_outputs": maximum_outputs, "shared_custom_terminals_with_root": maximum_custom_outputs, "automatic_identity_fields_per_relation": 1, "identity_and_class_helpers": "each distinct path prefix counts against the native return-expression limit", "singleton_relations": len(RELATED_QUERY_RELATIONS)},
             "terminal_semantics": "same existing output contract; volume-db/pitch-cents read local values on the related object, not cumulative levels or runtime audio",
             "identity": "root id/name/type/path unchanged; related.<relation>.object is the native singleton reference; canonical GUID supports read-only hops, not mutation authority",
             "presence": "native absence uses group-local unavailable_fields; null/extensions/order preserved; no inferred join",
             "metadata_reads": False,
-            "followup": "custom related fields, multiple declared hops, list compositions and additional fixed-output combinations are not yet supported"}
+            "custom_metadata_reads": "actual related class/object discovery for custom terminals and reference hops; fixed paths and fixed outputs require none",
+            "custom_terminal_options": list(RELATED_FIELD_MODES),
+            "custom_terminal_modes": {option: {kind: {"native_prefix": prefix, "output_group": {"property": "properties", "reference": "references", "override_source_value": "override_source_values", "local_reference": "local_references"}[binding_kind]}
+                for kind, (binding_kind, prefix) in mode.bindings.items()} for option, mode in RELATED_FIELD_MODES.items()},
+            "field_value_source_evidence": reference_value_source_contract(version)["source"],
+            "reference_hops": {"reference MEANING": "override-resolved singleton reference", "local-reference MEANING": "directly stored singleton reference"},
+            "path_result": "one-hop keys retained; further contexts under related; reference contexts under related.references.<discovered token> or related.local_references.<discovered token>",
+            "field_token_boundary": "only freshly discovered single identifier tokens compose; unexpressible tokens are an interface boundary, not native absence",
+            "metadata_scope": "actual endpoint classId or canonical GUID only; complete no-match scopes can report unavailable_field_requests when another actual scope binds; empty roots or absent contexts establish no metadata authority",
+            "applicability": "ordinary, broad and bounded advanced reads retain root membership, ordered identities and prefix scope facts through preparation/final read/paging; no mutation authority",
+            "native_limits": {"return_expressions_including_helpers": MAX_ADVANCED_RETURN_EXPRESSIONS, "each_expression_utf8_bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES},
+            "followup": "list compositions, functions, additional legacy spellings, states and other unproved fixed-output combinations remain unavailable through this related-output interface; this does not establish native absence"}

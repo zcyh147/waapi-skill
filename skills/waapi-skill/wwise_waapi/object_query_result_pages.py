@@ -86,6 +86,8 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
         observation["native_observation"] = payload["native_observation"]
     if payload.get("detail_fragment_required"):
         observation["semantic_preview"] = payload["semantic_preview"]
+    if payload.get("scope_fragment_required"):
+        observation["related_scope_binding"] = payload["related_scope_binding"]
     encoded_observation = canonical_json_bytes(observation)
     document_fragments = _has_oversized_pointer(observation)
     # Canonical traversal makes entry positions stable when only native object
