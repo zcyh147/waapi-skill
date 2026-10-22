@@ -1250,7 +1250,7 @@ def test_compound_current_platform_membership_drift_blocks_before_begin_group(tm
     assert not any(row[0].endswith("setProperty") for row in client.calls)
 
 
-def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}", source_platform_observer_error=False):
+def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None, compound_ancestor=False, compound_property=False, omitted_property_name=False, reference_clear=False, reference_platform="{55555555-5555-5555-5555-555555555555}", omitted_reference_metadata=False, source_prepared_only=False, compound_reference=False, platform_inventory=True, property_platform="{55555555-5555-5555-5555-555555555555}", source_platform_observer_error=False, inherited_reference=False):
     from tests.unit.test_remaining_core_business_gateway import _env
     from tests.unit.test_object_graph_business_gateway import _info
     reference_case = source_operation == "object.setReference" or compound_reference
@@ -1292,6 +1292,10 @@ def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", e
                     for row in result["return"]:
                         if row["id"] == self.source["id"]:
                             row["@Attenuation"] = self.other_reference
+                for row in result["return"]:
+                    if row["id"] == self.source["id"] and "Attenuation" in options.get("return", []) and "@Attenuation" in row:
+                        row["Attenuation"] = ({"id": "{77777777-7777-7777-7777-777777777777}"}
+                            if inherited_reference else row.get("@Attenuation"))
                 return result
             if uri == "ak.wwise.core.object.getTypes" and reference_case:
                 self.calls.append((uri, args, options))
@@ -1924,6 +1928,27 @@ def test_standalone_history_observes_verified_reference_receipt_in_exact_platfor
     assert binding["observations"][0]["before"] == (client.parent["id"] if clear else None)
     assert binding["observations"][0]["after"] == (None if clear else client.parent["id"])
     assert binding["observations"][0]["platform"] == "{55555555-5555-5555-5555-555555555555}"
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.undo." + direction]) == 1
+
+
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+@pytest.mark.parametrize("effect", [True, False])
+def test_standalone_history_clear_receipt_observes_stored_state_despite_inheritance(tmp_path, direction, effect):
+    client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="object.setReference", reference_clear=True, inherited_reference=True,
+        direction=direction, effect=effect)
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["history_binding"]
+    observation = binding["observations"][0]
+    assert observation["reference_observation"]["value_source"] == "local_stored"
+    assert observation["before"] == client.parent["id"] and observation["after"] is None
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == (0 if effect else 2) and verified["verified"] is effect, verified
+    events = TransactionStore(state).read_events(preview["transaction_id"])
+    readbacks = next(event["details"]["verification"]["readbacks"] for event in reversed(events)
+        if event["event_type"] == "verification_recorded")
+    assert any(read["uri"] == "ak.wwise.core.object.get" and "@Attenuation" in read["options"].get("return", []) for read in readbacks)
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.undo." + direction]) == 1
 
 

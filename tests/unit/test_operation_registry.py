@@ -2958,6 +2958,7 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
                             "id": GUID,
                             "path": object_row()["path"],
                             "OutputBus": {"id": TARGET_GUID},
+                            "@OutputBus": {"id": TARGET_GUID},
                         }
                     ]
                 },
@@ -3010,6 +3011,8 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
         result_row["OutputBus"] = {}
     elif case == "malformed-zero":
         result_row["OutputBus"] = {"id": "{00000000-0000-0000-0000-000000000000}", "unexpected": True}
+    if "OutputBus" in result_row:
+        result_row["@OutputBus"] = copy.deepcopy(result_row["OutputBus"])
     verified = verify_prepared_operation(
         prepared,
         execution_result={},
@@ -3029,7 +3032,7 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
     assert verified.ok is succeeds
     assert verified.business_state_verified is succeeds
     assert next(
-        item for item in verified.assertions if item["name"] == "reference is cleared"
+        item for item in verified.assertions if item["name"] == "stored reference is cleared; an inherited reference may still apply"
     )["passed"] is succeeds
 
 
@@ -3068,6 +3071,7 @@ def test_reference_clear_rejects_live_not_null_restriction() -> None:
                             "id": GUID,
                             "path": object_row()["path"],
                             "OutputBus": {"id": TARGET_GUID},
+                            "@OutputBus": {"id": TARGET_GUID},
                         }
                     ]
                 },
@@ -4284,6 +4288,7 @@ def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_delete = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.delete",
+        "pre_state": {},
         "verification_plan": {"kind": "guid-absent", "object_id": GUID},
     }
     deleted = verify_prepared_operation(
@@ -4296,6 +4301,7 @@ def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_property = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.setProperty",
+        "pre_state": {},
         "verification_plan": {
             "kind": "same-guid-property",
             "object_id": GUID,
@@ -4316,6 +4322,7 @@ def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_reference = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.setReference",
+        "pre_state": {},
         "verification_plan": {
             "kind": "same-guid-reference",
             "object_id": GUID,

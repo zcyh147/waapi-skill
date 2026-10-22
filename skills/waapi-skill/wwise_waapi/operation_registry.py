@@ -2544,7 +2544,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.setReference",
         "ak.wwise.core.object.setReference",
         "property-reference",
-        "Set or clear one reference for the current or an explicit platform after resolving every non-null identity.",
+        "Set one active reference or clear its directly stored value for the current or an explicit platform; an inherited reference may still apply after a stored clear.",
         ("object", "reference", "target"),
         ("platform",),
         argument_contract=_object_contract(
@@ -2558,7 +2558,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         {
                             "type": "null",
                             "description": (
-                                "Explicitly clear the reference; omitted target is "
+                                "Explicitly clear the directly stored reference; an inherited reference may still apply. Omitted target is "
                                 "never interpreted as a clear request."
                             ),
                         },
@@ -11974,11 +11974,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if info.dependencies:
                 metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
         metadata["condition_metadata"]["override_applicability"] = [proof for proof in override_applicability.values() if proof is not None]
+        clearing_reference = request.operation == "object.setReference" and arguments["target"] is None
+        observed_field = f"@{field_value}" if clearing_reference else field_value
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
             {
-                "return": ["id", "path", field_value, *activation_requirements, *activation_reference_requirements],
+                "return": ["id", "path", observed_field, *([field_value] if clearing_reference else []),
+                    *activation_requirements, *activation_reference_requirements],
                 **({"platform": observation_platform} if observation_platform is not None else {}),
             },
         )
@@ -11986,7 +11989,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         if (
             len(field_before_rows) != 1
             or not _same_identity(field_before_rows[0].get("id"), source.object)
-            or not _has_field(field_before_rows[0], field_value)
+            or (clearing_reference and (
+                observed_field not in field_before_rows[0] or field_value not in field_before_rows[0]
+                or not _reference_value_is_observed(field_before_rows[0].get(observed_field))
+                or not _reference_value_is_observed(field_before_rows[0].get(field_value))))
+            or (not clearing_reference and not _has_field(field_before_rows[0], field_value))
         ):
             raise OperationContractError(
                 "INVALID_READBACK",
@@ -12018,13 +12025,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             )
         metadata["field_before"] = {
             "field": field_value,
-            "value": _field_value(field_before_rows[0], field_value),
+            "value": field_before_rows[0][observed_field] if clearing_reference else _field_value(field_before_rows[0], field_value),
             "platform": platform,
             "row": field_before_rows[0],
             "observation_platform": observation_platform,
             **({"activation_requirements": activation_requirements} if activation_requirements else {}),
             **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
         }
+        if clearing_reference:
+            metadata["field_before"]["reference_observation"] = _stored_reference_clear_observation(field_value)
+            metadata["field_before"]["resolved_value"] = field_before_rows[0][field_value]
         if request.operation == "object.setProperty":
             from .effect_render_conditions import prepare_property, EffectRenderConditionError
             try:
@@ -12086,6 +12096,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                     target.object if target is not None else None
                 ),
                 "expected_clear": target is None,
+                **({"reference_observation": _stored_reference_clear_observation(field_value)} if target is None else {}),
                 "platform": platform,
                 "observation_platform": observation_platform,
             }
@@ -16367,6 +16378,13 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
     roles = prepared.get("resolved_roles")
     if not isinstance(operation, str) or not isinstance(roles, Mapping):
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks operation or resolved_roles.")
+    try:
+        clear_field = _require_stored_reference_clear_observation(prepared)
+    except OperationContractError as exc:
+        return {"contract": ROLE_VALIDATION_CONTRACT, "operation": operation,
+            "ok": False, "status": "repreview_required",
+            "assertions": [{"name": "stored reference clear requires a fresh Preview",
+            "passed": False, "evidence": exc.as_dict()}], "readbacks": []}
     assertions: list[Mapping[str, Any]] = []
     readbacks: list[Mapping[str, Any]] = []
     if operation == "waapi.undoGroup":
@@ -17108,7 +17126,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             args = {"from": {"id": [object_id]}}
             activation_requirements = field_before.get("activation_requirements", {})
             activation_reference_requirements = field_before.get("activation_reference_requirements", {})
-            options = {"return": ["id", "path", field_name, *activation_requirements, *activation_reference_requirements]}
+            observed_field = f"@{field_name}" if clear_field is not None else field_name
+            options = {"return": ["id", "path", observed_field, *([field_name] if clear_field is not None else []),
+                *activation_requirements, *activation_reference_requirements]}
             platform = field_before.get("observation_platform", field_before.get("platform"))
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
@@ -17122,14 +17142,21 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 raise OperationContractError("INVALID_READBACK", "Field precondition readback must be an object.")
             rows = _rows(result)
             readbacks.append({"role": "object-field", "uri": OBJECT_GET_URI, "args": args, "options": options, "result": dict(result)})
-            actual = _field_value(rows[0], field_name) if len(rows) == 1 else None
+            actual = (rows[0].get(observed_field) if clear_field is not None else _field_value(rows[0], field_name)) if len(rows) == 1 else None
             assertions.append(
                 {
                     "name": f"object.{field_name} pre-state unchanged",
-                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id) and _has_field(rows[0], field_name) and actual == field_before.get("value"),
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
+                        and (observed_field in rows[0] if clear_field is not None else _has_field(rows[0], field_name))
+                        and actual == field_before.get("value"),
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
+            if clear_field is not None:
+                assertions.append({"name": "reference clear inherited context unchanged",
+                    "passed": len(rows) == 1 and field_name in rows[0]
+                        and rows[0][field_name] == field_before["resolved_value"],
+                    "evidence": {"expected": field_before["resolved_value"], "rows": rows}})
 
             for name, expected in activation_requirements.items():
                 actual = _field_value(rows[0], name) if len(rows) == 1 else None
@@ -18759,6 +18786,12 @@ def verify_prepared_operation(
     plan = prepared.get("verification_plan")
     if not isinstance(plan, Mapping):
         raise OperationContractError("INVALID_PREVIEW", "Prepared operation lacks a verification plan.")
+    try:
+        clear_field = _require_stored_reference_clear_observation(prepared)
+    except OperationContractError as exc:
+        return VerificationResult(operation, "indeterminate", (), (),
+            "This historical clear has no bound stored-reference observation; do not execute it again. " + str(exc),
+            verification_strength="unobserved_stored_reference", business_state_verified=False)
     readbacks: list[Mapping[str, Any]] = []
     assertions: list[Mapping[str, Any]] = []
     success_status = "verified"
@@ -22158,29 +22191,32 @@ def verify_prepared_operation(
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
+        observed_field = f"@{field_name}" if clear_field is not None else field_name
         platform = plan.get("observation_platform", plan.get("platform"))
         activation_requirements = plan.get("activation_requirements", {})
         activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name, *activation_requirements, *activation_reference_requirements),
+            fields=("id", "path", observed_field, *([field_name] if clear_field is not None else []),
+                *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
         if len(rows) == 1:
-            raw_actual = _field_value(rows[0], field_name)
+            raw_actual = rows[0].get(observed_field) if clear_field is not None else _field_value(rows[0], field_name)
             projection_matches = (
                 _same_identity(rows[0].get("id"), plan.get("object_id"))
-                and _has_field(rows[0], field_name)
+                and (observed_field in rows[0] if clear_field is not None else _has_field(rows[0], field_name))
             )
             actual = _reference_identity(raw_actual)
             expected = plan.get("expected_target_id")
             expected_clear = plan.get("expected_clear") is True
             if expected_clear:
                 check(
-                    "reference is cleared",
+                    "stored reference is cleared; an inherited reference may still apply",
                     projection_matches and _reference_value_is_null(raw_actual),
-                    {"actual": raw_actual, "expected": None},
+                    {"actual": raw_actual, "expected": None, "value_source": "local_stored",
+                        "resolved_reference": rows[0].get(field_name), "resolved_reference_present": field_name in rows[0]},
                 )
             elif actual is None:
                 return VerificationResult(
@@ -26507,6 +26543,37 @@ def _direct_child_parent_relationship_matches(
     return None
 
 
+def _stored_reference_clear_observation(field_name: str) -> dict[str, str]:
+    return {"contract": "waapi-skill.stored-reference-clear/v1", "value_source": "local_stored",
+        "field": field_name, "outcome": "stored reference cleared; an inherited reference may still apply"}
+
+
+def _require_stored_reference_clear_observation(prepared: Mapping[str, Any]) -> str | None:
+    plan = prepared.get("verification_plan", {})
+    if not isinstance(plan, Mapping):
+        return None
+    if prepared.get("operation") != "object.setReference" or plan.get("expected_clear") is not True:
+        return None
+    field_name = plan.get("field")
+    state = prepared.get("pre_state", {})
+    before = state.get("field_before", {}) if isinstance(state, Mapping) else {}
+    row = before.get("row", {}) if isinstance(before, Mapping) else {}
+    if (not isinstance(field_name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(field_name) is None
+            or plan.get("reference_observation") != _stored_reference_clear_observation(field_name)
+            or not isinstance(before, Mapping) or not isinstance(row, Mapping)
+            or before.get("reference_observation") != plan["reference_observation"]
+            or before.get("field") != field_name or "value" not in before or "resolved_value" not in before
+            or f"@{field_name}" not in row or field_name not in row
+            or not _reference_value_is_observed(before.get("value"))
+            or not _reference_value_is_observed(before["resolved_value"])
+            or before.get("value") != row[f"@{field_name}"]
+            or before["resolved_value"] != row[field_name]):
+        raise OperationContractError("REFERENCE_CLEAR_REPREVIEW_REQUIRED",
+            "A clear requires a fresh Preview with its directly stored reference bound; legacy resolved values cannot be reinterpreted as stored values.",
+            details={"automatic_retry": False, "stored_reference_observation_required": True})
+    return field_name
+
+
 def _has_field(row: Mapping[str, Any], field_name: str) -> bool:
     return any(key in row for key in (field_name, f"@{field_name}", f"@@{field_name}"))
 
@@ -26524,6 +26591,18 @@ def _reference_identity(value: Any) -> Any:
     if isinstance(value, (str, int)) and not isinstance(value, bool):
         return value
     return None
+
+
+def _reference_value_is_observed(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, Mapping):
+        if "id" not in value or set(value) - {"id", "name", "type", "path"}:
+            return False
+        if any(not isinstance(member, str) for member in value.values()):
+            return False
+        value = value["id"]
+    return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
 
 
 def _reference_value_is_null(value: Any) -> bool:

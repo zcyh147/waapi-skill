@@ -173,7 +173,8 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
     if plan.get("kind") == "undo-group-result-schemas":
         raise ValueError("Compound history needs actual parent-owned child execution and verification associations")
     if plan.get("kind") == "same-guid-reference":
-        from .operation_registry import _has_field, _field_value
+        from .operation_registry import _has_field, _field_value, _require_stored_reference_clear_observation
+        clear_field = _require_stored_reference_clear_observation(prepared)
         identity = _identity(state.get("object"))
         field, platform = plan.get("field"), _receipt_platform(plan, state)
         before, info = state.get("field_before", {}), state.get("field_info", {})
@@ -186,14 +187,16 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
                     or info.get("supports", {}).get("reference") is True)):
             raise ValueError("Reference receipt requires exact metadata, identity and an observed before value/platform")
         old = _reference_value(before["value"])
-        if _reference_value(_field_value(before["row"], field)) != old:
+        observed_before = before["row"].get(f"@{field}") if clear_field else _field_value(before["row"], field)
+        if _reference_value(observed_before) != old:
             raise ValueError("Reference receipt before projection disagrees with its sealed value")
         new = None if plan.get("expected_clear") is True else _reference_value(plan.get("expected_target_id"))
         if new is None and plan.get("expected_clear") is not True:
             raise ValueError("Reference receipt lacks its canonical expected target")
         return [{"object_before": identity, "object_after": dict(identity), "field": field,
             "before": old, "after": new, "platform": platform, "field_kind": "reference",
-            "metadata_type": info.get("type"), "field_info": dict(info)}]
+            "metadata_type": info.get("type"), "field_info": dict(info),
+            **({"reference_observation": dict(plan["reference_observation"])} if clear_field else {})}]
     if plan.get("kind") == "same-guid-property":
         if any(chain.get("derived") for chain in state.get("effect_render_chains", [])):
             raise ValueError("Render chain side effects require a complete multi-field history observation; a single-field receipt cannot certify them")
@@ -757,6 +760,17 @@ def resolved_prepared_history(prepared: Mapping[str, Any], resolver):
     return binding
 
 
+def _history_observation_field(expected: Mapping[str, Any]) -> str:
+    field = expected["field"]
+    if "reference_observation" not in expected:
+        return field
+    from .operation_registry import _stored_reference_clear_observation
+    if (expected.get("field_kind") != "reference"
+            or expected["reference_observation"] != _stored_reference_clear_observation(field)):
+        raise ValueError("History reference observation mode is not bound to its exact field")
+    return f"@{field}"
+
+
 def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, read: Callable[..., Any]) -> dict[str, Any]:
     uri, version = binding["uri"], binding["version"]
     validate_history_binding(uri, version, binding)
@@ -815,7 +829,7 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
             ids = list(dict.fromkeys(row["object_" + side]["id"] for row in group))
             args = {"from": {"id": ids}}
             options = {"return": list(dict.fromkeys([*IDENTITY,
-                *(["classId"] if any("class_id" in row for row in group) else []), *(row["field"] for row in group)])),
+                *(["classId"] if any("class_id" in row for row in group) else []), *(_history_observation_field(row) for row in group)])),
                 **({"platform": platform} if platform is not None else {})}
             result = retained_read(GET, args, options)
             rows = result.get("return") if isinstance(result, Mapping) else None
@@ -832,13 +846,18 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                 row = found[identity["id"]]
                 field = expected["field"]
                 from .operation_registry import _has_field, _field_value
-                actual = _field_value(row, field)
-                equal = (_has_field(row, field) and _reference_value(actual) == expected[side]
+                observed_field = _history_observation_field(expected)
+                local_stored = observed_field != field
+                actual = row.get(observed_field) if local_stored else _field_value(row, field)
+                present = observed_field in row if local_stored else _has_field(row, field)
+                equal = (present and _reference_value(actual) == expected[side]
                     if expected.get("field_kind") == "reference" else
                     _scalar_matches(actual, expected[side], expected["metadata_type"])
                     if "metadata_type" in expected else isinstance(actual, str) and actual == expected[side])
                 checks.append({"object": identity, "field": field, "platform": platform,
-                    "expected": expected[side], "actual": actual, "passed": _identity(row) == identity and equal
+                    "expected": expected[side], "actual": actual,
+                    **({"reference_observation": expected["reference_observation"]} if local_stored else {}),
+                    "passed": _identity(row) == identity and equal
                     and ("class_id" not in expected or type(row.get("classId")) is int and row["classId"] == expected["class_id"])})
         targets = {}
         for expected in observations:

@@ -32327,6 +32327,11 @@ def transaction_verification_summary(
         summary["verification_scope"] = dict(plan["verification_scope"])
     if isinstance(plan.get("source_copy_saved_proof"), Mapping):
         summary["source_copy_saved_proof"] = dict(plan["source_copy_saved_proof"])
+    if isinstance(plan.get("reference_observation"), Mapping):
+        from wwise_waapi.operation_registry import _stored_reference_clear_observation
+        if plan["reference_observation"] == _stored_reference_clear_observation(plan.get("field")):
+            summary["reference_observation"] = {key: plan["reference_observation"][key]
+                for key in ("contract", "value_source", "outcome")}
     for key in (
         "kind",
         "strategy",
