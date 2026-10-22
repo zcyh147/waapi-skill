@@ -11,6 +11,7 @@ import pytest
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object,
     _complete_business_draft,
+    _created_object_id,
     discovered_business_field_handle,
     _start_business_draft,
     _update_business_draft,
@@ -31,6 +32,10 @@ DEVICE_PARENT = "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}"
 # Matching 2024/25 packaged getTypes rows classify these concrete plugins as
 # AudioDevice. The base WObject AudioDevice class is not an instance class.
 DEVICE_PLUGIN_CLASSES = {"System": 11403271, "No Output": 11862023}
+# Both pinned DefaultSink.xml System definitions expose these parameters. Read
+# actual values; source defaults are never substituted for missing observations.
+SYSTEM_PARAMETERS = ("Allow3DAudio", "MainMixHeadphoneConfiguration", "MainMixSpeakerConfiguration",
+    "AllowSystemAudioObjects", "MinSystemAudioObjectsRequired")
 
 
 def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_runtime):
@@ -60,31 +65,39 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
             assert list(payload)[-1] == "agent_result"
         return payload
 
-    def objects(label, identity, *, reference=False, children=False):
+    def objects(label, identity, *, reference=False, children=False, parameters=False, platform=None):
         argv = ["query-object", "--exact-id", identity, "--max-results", "16" if children else "2",
             "--detail", "--include", "class-id", "--include", "notes", "--include", "parent", "--include", "owner"]
         if reference:
             argv.extend(["--include-field", "AudioDevice"])
         if children:
             argv.extend(["--relationship", "children"])
+        if parameters:
+            assert isinstance(platform, str) and uuid.UUID(platform).int != 0
+            argv.extend(["--platform", platform])
+            for parameter in SYSTEM_PARAMETERS:
+                argv.extend(["--include-field", parameter])
         payload = read(label, argv)
         rows = payload["agent_result"]
         assert isinstance(rows, list) and len(rows) < (16 if children else 2), payload
         if children:
             return rows
         assert len(rows) == 1 and rows[0]["id"] == identity, rows
+        if parameters:
+            assert set(rows[0]["properties"]) == set(SYSTEM_PARAMETERS), rows[0]
         return rows[0]
 
-    def context(suffix):
+    def context(suffix, platform):
         # Collect all related context before asserting optional native shapes.
         result = {"bus": objects("bus-" + suffix, BUS, reference=True),
             "peer": objects("peer-" + suffix, PEER, reference=True),
-            "system": objects("system-" + suffix, SYSTEM),
+            "system": objects("system-" + suffix, SYSTEM, parameters=True, platform=platform),
             "target": objects("target-" + suffix, NO_OUTPUT),
             "bus_parent": objects("bus-parent-" + suffix, BUS_PARENT),
             "device_parent": objects("device-parent-" + suffix, DEVICE_PARENT),
             "children": objects("bus-children-" + suffix, BUS, children=True),
-            "siblings": objects("bus-siblings-" + suffix, BUS_PARENT, children=True)}
+            "siblings": objects("bus-siblings-" + suffix, BUS_PARENT, children=True),
+            "device_children": objects("device-children-" + suffix, DEVICE_PARENT, children=True)}
         # Independently retain the actual hierarchy boundary reached by the
         # parent GUID. No root class/type or absent-parent shape is invented.
         root_id = result["bus_parent"]["parent"]["id"]
@@ -118,12 +131,12 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
 
     try:
         host = read("host-and-current-platform-before", ["status"])
-        before = context("before")
-        observation["before"] = before
         platform = host.get("project", {}).get("currentPlatformId")
         assert isinstance(platform, str) and uuid.UUID(platform).int != 0, host
         observation["platform"] = platform
-        bus, peer, target = before["bus"], before["peer"], before["target"]
+        before = context("before", platform)
+        observation["before"] = before
+        bus, peer = before["bus"], before["peer"]
         bus_hierarchy = "Busses" if runtime.version == "2025.1" else "Master-Mixer Hierarchy"
         device_hierarchy = "Devices" if runtime.version == "2025.1" else "Audio Devices"
         bus_name = "Main Audio Bus" if runtime.version == "2025.1" else "Master Audio Bus"
@@ -157,9 +170,55 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         master_dependency, = [row for row in metadata.get("dependencies", []) if row.get("type") == "isMasterBus"]
         assert master_dependency == {"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}, metadata
 
+        # No_Output was a test-owned selection rejected in the retained R3
+        # attempt. CanBeMasterSink=false does not establish its complete role
+        # semantics. Keep it untouched; do not add a blanket compatibility gate.
+        # A separately verified copy of the already assigned System keeps this
+        # positive witness on the actual same plugin class and parameter profile.
+        setup = _start_business_draft(runtime, "object.copy")
+        _bind_business_object(runtime, setup, object_id=SYSTEM, role="object")
+        _bind_business_object(runtime, setup, object_id=DEVICE_PARENT, role="parent")
+        _update_business_draft(runtime, setup, "draft-declare-object-change", ["--name-conflict", "rename"], live=False)
+
+        def inspect_setup(preview):
+            observation["setup_preview_before_authorization"] = preview
+            shown = runtime.gateway(["transaction-show", preview["transaction_id"]], live=False)
+            observation["immutable_setup_preview_before_authorization"] = shown
+            dispatch = shown["artifact"]["prepared_operation"]["dispatch"]
+            assert dispatch["uri"] == "ak.wwise.core.object.copy", dispatch
+            assert dispatch["args"] == {"object": SYSTEM, "parent": DEVICE_PARENT, "onNameConflict": "rename",
+                "autoAddToSourceControl": False, "autoCheckOutToSourceControl": False}, dispatch
+
+        setup_receipt = _complete_business_draft(runtime, setup, inspect_preview=inspect_setup)
+        observation["transactions"].append(setup_receipt)
+        copy_id = _created_object_id(setup_receipt["execute"])
+        assert uuid.UUID(copy_id).int != 0 and copy_id not in {SYSTEM, NO_OUTPUT}, copy_id
+        observation["owned_copy_id"] = copy_id
+        after_setup = context("after-setup", platform)
+        observation["after_setup"] = after_setup
+        target = objects("owned-system-copy-after-setup", copy_id, parameters=True, platform=platform)
+        observation["owned_copy_after_setup"] = target
+        original = before["system"]
+        assert target["type"] == original["type"] == "AudioDevice", (target, original)
+        assert target["class_id"] == original["class_id"] == DEVICE_PLUGIN_CLASSES["System"], (target, original)
+        assert target["parent"]["id"] == DEVICE_PARENT, target
+        assert isinstance(target["name"], str) and target["name"] and target["name"] != original["name"], target
+        assert target["path"] == before["device_parent"]["path"] + "\\" + target["name"], target
+        same(target["properties"], original["properties"])
+        same(target["notes"], original["notes"])
+        for key in before:
+            if key != "device_children":
+                same(after_setup[key], before[key])
+        copied_member, = [row for row in after_setup["device_children"] if row["id"] == copy_id]
+        same(copied_member, {key: value for key, value in target.items() if key != "properties"})
+        same([row for row in after_setup["device_children"] if row["id"] != copy_id], before["device_children"])
+        assert len(after_setup["device_children"]) == len(before["device_children"]) + 1, after_setup
+        host_before_reference = read("host-and-current-platform-before-reference", ["status"])
+        assert host_before_reference.get("project", {}).get("currentPlatformId") == platform, host_before_reference
+
         draft = _start_business_draft(runtime, "object.setReference")
         source_handle = _bind_business_object(runtime, draft, object_id=BUS)
-        target_handle = _bind_business_object(runtime, draft, object_id=NO_OUTPUT)
+        target_handle = _bind_business_object(runtime, draft, object_id=copy_id)
         discovered = _update_business_draft(runtime, draft, "draft-discover-fields", ["--object-handle", source_handle,
             "--meaning", "AudioDevice", "--platform", platform], live=True)
         field = discovered_business_field_handle(discovered, "AudioDevice")
@@ -189,16 +248,19 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
             assert notice["object_id"] == BUS and notice["field"] == "AudioDevice" and notice["platform"] == platform, notice
             dispatch = prepared["dispatch"]
             assert dispatch["uri"] == "ak.wwise.core.object.setReference", dispatch
-            assert dispatch["args"] == {"object": BUS, "reference": "AudioDevice", "value": NO_OUTPUT, "platform": platform}, dispatch
+            assert dispatch["args"] == {"object": BUS, "reference": "AudioDevice", "value": copy_id, "platform": platform}, dispatch
 
         receipt = _complete_business_draft(runtime, draft, inspect_preview=inspect_preview)
         observation["transactions"].append(receipt)
-        after = context("after")
+        after = context("after", platform)
         observation["after"] = after
+        copy_after = objects("owned-system-copy-after-reference", copy_id, parameters=True, platform=platform)
+        observation["owned_copy_after_reference"] = copy_after
+        same(copy_after, target)
         # Only the declared reference value may differ. Preserve every other
         # observed member, including notes and native omission/null distinctions.
         actual_reference = after["bus"]["references"]["AudioDevice"]
-        assert actual_reference["id"] == NO_OUTPUT, actual_reference
+        assert actual_reference["id"] == copy_id, actual_reference
         for key in ("name", "type", "path"):
             if key in actual_reference:
                 assert actual_reference[key] == target[key], (actual_reference, target)
@@ -208,10 +270,12 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         for key in ("peer", "system", "target", "bus_parent", "device_parent", "children", "bus_hierarchy_root"):
             same(after[key], before[key])
         same(after["siblings"], before["siblings"])
+        same(after["device_children"], after_setup["device_children"])
         same(metadata_detail("bus-field-after", selection), metadata)
         host_after = read("host-and-current-platform-after", ["status"])
         assert host_after.get("project", {}).get("currentPlatformId") == platform, host_after
-        assert len(observation["transactions"]) == 1
+        assert len(observation["transactions"]) == 2
+        assert setup_receipt["preview"]["transaction_id"] != receipt["preview"]["transaction_id"]
         observation["business_effect_verified"] = True
         status = "PASS"
     except BaseException as exc:
