@@ -1,0 +1,21 @@
+{
+  "contract": "waapi-skill.query-list-output-sources/v1",
+  "archive": "SDK/Help/WwiseSDK-Windows.chm",
+  "archive_sha256": "d3028d059a69a833d5f99646881c9c44e3c7a609db370ad27afa822c94d0d0d3",
+  "version": "2021.1",
+  "wwise_build": "2021.1.14.8108",
+  "page": "waql_reference.html",
+  "page_sha256": "87b10aecdd13083c0a2d75fb0659119fbe08ba54ea5bfa85f041576033074ac4",
+  "sections": [
+    {
+      "html_lines": [
+        260,
+        304
+      ],
+      "html": "$ from type Sound select effect0, effect1, effect2, effect3<br  />\n$ from type Sound select @@Effect0, @@Effect1, @@Effect2, @@Effect3<br  />\n$ from type Sound where outputBus=\"Bus:Master Audio Bus\"</p>\n<p class=\"endtd\"></p>\n</td></tr>\n<tr>\n<td colspan=\"1\">children </td><td colspan=\"1\">Returns the direct children of the object. </td><td colspan=\"1\">$ from object \"\\Actor-Mixer Hierarchy\\Default Work Unit\" select children </td></tr>\n<tr>\n<td colspan=\"1\"><p class=\"starttd\"></p>\n<p class=\"intertd\">descendants</p>\n<p class=\"endtd\"></p>\n</td><td colspan=\"1\"><p class=\"starttd\"></p>\n<p class=\"intertd\">Returns all descendants of the object in a single sequence. The descendants include all children recursively.</p>\n<p class=\"intertd\"></p>\n<p class=\"intertd\"><b>Note</b>: The current object is not included. To include the current object use: select descendants, this</p>\n<p class=\"endtd\"></p>\n</td><td colspan=\"1\"><p class=\"starttd\"></p>\n<p class=\"intertd\">$ from object \"\\Actor-Mixer Hierarchy\\Default Work Unit\" select descendants<br  />\n$ from object \"\\Actor-Mixer Hierarchy\\Default Work Unit\" select descendants, this</p>\n<p class=\"endtd\"></p>\n</td></tr>\n<tr>\n<td colspan=\"1\">this </td><td colspan=\"1\">Returns the current object. </td><td colspan=\"1\">$ from object \"\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\" select this, descendants </td></tr>\n<tr>\n<td>parent </td><td>Returns the direct parent of the object. Returns no object if the object does not have a parent. </td><td><p class=\"starttd\"></p>\n<p class=\"intertd\">$ from type Sound select parent<br  />\n$ from type Sound where parent.name : \"*engine\"</p>\n<p class=\"endtd\"></p>\n</td></tr>\n<tr>\n<td colspan=\"1\">ancestors </td><td colspan=\"1\"><p class=\"starttd\"></p>\n<p class=\"intertd\">Returns all ancestors of the object in a single sequence. The descendants include all parents recursively.</p>\n<p class=\"intertd\"></p>\n<p class=\"intertd\"><b>Note</b>: The current object is not included. To include the current object use: select ancestors, this</p>\n<p class=\"endtd\"></p>\n</td><td colspan=\"1\">$ from object \"Event:Play_Hello\" select ancestors<br  />\n$ from object \"Event:Play_Hello\" select ancestors, this </td></tr>\n<tr>\n<td colspan=\"1\">referencesTo </td><td colspan=\"1\">Returns all objects having a reference to the current object. </td><td colspan=\"1\"><p class=\"starttd\"></p>\n<p class=\"intertd\">$ from type Effect select referencesTo<br  />\n$ \"Event:Play_Hello\" select referencesTo</p>\n<p class=\"endtd\"></p>\n</td></tr>\n<tr>\n<td>owner </td><td><p class=\"starttd\"></p>"
+    }
+  ],
+  "strategy": "gateway-guid-grouped-reads",
+  "scope": "children, descendants, ancestors, referencesTo object lists; source-matching return-only composition and alias where documented",
+  "older_version_boundary": "No matching native member-composition rule established in these retained pages; canonical-GUID grouped reads are Gateway-owned, non-atomic."
+}

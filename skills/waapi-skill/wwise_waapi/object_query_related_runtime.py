@@ -7,13 +7,11 @@ against the final data read. No endpoint is inferred from a root type or name.
 from __future__ import annotations
 
 import copy
-import re
 import uuid
 from collections.abc import Mapping
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS
-from .metadata_discovery import discover_metadata, MAX_METADATA_DISCOVERY_RESULT_BYTES
 from .object_query_outputs import QUERY_FIELD_OUTPUT_GROUPS, available_query_outputs
 from .object_query_related import (RELATED_FIELD_MODES, RELATED_QUERY_RELATIONS,
     RelatedQueryOutput, related_native_fields)
@@ -50,8 +48,7 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
     observed_fields = list(IDENTITY)
     fields = []
     rows = None
-    observations, metadata_cache, selections, discoveries = [], {}, [], {}
-    total_bytes = metadata_bytes = 0
+    total_bytes = 0
 
     def observe(wanted):
         nonlocal rows, total_bytes
@@ -75,63 +72,15 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
         rows = copy.deepcopy(native_rows)
         fields[:] = wanted
 
-    def cache_read(uri, args, options):
-        nonlocal total_bytes, metadata_bytes
-        key = canonical_sha256({'uri': uri, 'args': args, 'options': options})
-        if key not in metadata_cache:
-            result = read(uri, args, options)
-            size = len(canonical_json_bytes(result))
-            total_bytes += size
-            metadata_bytes += size
-            # Scope/metadata remains bounded across heterogeneous queries as well
-            # as within each discover_metadata invocation.
-            if metadata_bytes > MAX_METADATA_DISCOVERY_RESULT_BYTES:
-                raise RelatedQueryError('Related metadata observation exceeded its aggregate byte budget; refine the query', code='RELATED_QUERY_METADATA_LIMIT')
-            metadata_cache[key] = copy.deepcopy(result)
-            observations.append({'api': uri, 'args': copy.deepcopy(args), 'result': copy.deepcopy(result)})
-        return copy.deepcopy(metadata_cache[key])
-
+    from .object_query_related_metadata import RelatedFieldBinder
+    binder = RelatedFieldBinder(read, RelatedQueryError)
     def bind(meaning, native, index, option):
         row = rows[index]
         reference = row if not native else row.get(native)
         if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
             return None
         class_id = row.get(f'{native}.classId' if native else 'classId')
-        scope = {'classId': class_id} if type(class_id) is int and 0 <= class_id <= 4294967295 else {'object': reference['id'].upper()}
-        def lookup(scope):
-            key = (canonical_sha256(scope), meaning)
-            if key not in discoveries:
-                discovery = discover_metadata(read_call=cache_read, queries=(meaning,),
-                    class_id=scope.get('classId'), object=scope.get('object'))
-                query = discovery.query_results[0]
-                candidates = {item['name']: item for item in discovery.candidates}
-                names = query.get('candidate_names', [])
-                exact = [name for name in names if name.casefold() == meaning.casefold() or
-                    (isinstance(candidates[name].get('metadata', {}).get('display'), Mapping) and
-                     candidates[name]['metadata']['display'].get('name', '').casefold() == meaning.casefold())]
-                chosen = exact if len(exact) == 1 else names
-                candidate = candidates.get(chosen[0]) if len(chosen) == 1 else None
-                complete = discovery.fallback_detail_scan.get('status') in {'complete', 'not_needed'}
-                if candidate and not re.fullmatch(r'[A-Za-z0-9_]+', candidate.get('name', '')):
-                    raise RelatedQueryError('The discovered field token cannot be safely composed by this related-output contract; refine the field request', code='RELATED_QUERY_FIELD_TOKEN')
-                discoveries[key] = {'scope': scope, 'meaning': meaning, 'candidate': candidate,
-                    'candidate_names': names, 'complete': complete}
-            return discoveries[key]
-        selection = lookup(scope)
-        # Shared class facts need no per-row reads when they bind. A complete
-        # class no-match does not rule out instance/plugin-specific metadata.
-        unknown_kind = selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}
-        if 'classId' in scope and selection['complete'] and (not selection['candidate_names'] or unknown_kind):
-            selection = lookup({'object': reference['id'].upper()})
-        # Unknown kind is insufficient authority, not a known wrong kind. If
-        # exact-object facts remain insufficient, retain scoped clarification.
-        if selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}:
-            selection = {**selection, 'insufficient_kind': selection['candidate'].get('kind'), 'candidate': None}
-        selections.append({'path': native, 'requested_option': option, 'row_index': index,
-            **{key: value for key, value in selection.items() if key != 'candidate'},
-            'selected': ({'name': selection['candidate'].get('name'), 'kind': selection['candidate'].get('kind')}
-                         if selection['candidate'] else None)})
-        return selection
+        return binder.bind(meaning, reference, class_id, native, index, option)
 
     # Read all statically known prefixes together, including actual endpoint class.
     initial = list(IDENTITY)
@@ -242,6 +191,6 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
     related_native_fields(bindings, IDENTITY)
     proof = {'observed_fields': observed_fields,
         'observed_rows': [{key: row[key] for key in observed_fields if key in row} for row in rows],
-        'metadata_observations_sha256': canonical_sha256(observations), 'scopes': selections,
+        'metadata_observations_sha256': canonical_sha256(binder.observations), 'scopes': binder.selections,
         'metadata_authority': 'live-waapi', 'mutation_authority': False}
     return tuple(bindings), proof, None
