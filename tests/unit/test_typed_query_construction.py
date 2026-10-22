@@ -527,11 +527,12 @@ def test_query_schema_discloses_diagnostic_view_exclusions_before_transport(tmp_
     forbidden = {
         "--include": ["volume-db"], "--include-field": ["attenuation"],
         "--include-override-source-value": ["Volume"],
+        "--include-local-reference": ["Output Bus"],
         "--relationship": ["children"], "--predicate": ["name-is", "Sound"], "--max-results": ["1"],
     }
     assert set(view["cannot_combine_with"]) == set(forbidden)
     assert view["additional_fields"]["omit_options"] == ["--view"]
-    assert view["additional_fields"]["field_options"] == ["--include", "--include-field", "--include-override-source-value"]
+    assert view["additional_fields"]["field_options"] == ["--include", "--include-field", "--include-override-source-value", "--include-local-reference"]
     identity = ["--exact-id", "{33333333-3333-3333-3333-333333333333}"]
     for option in view["cannot_combine_with"]:
         code, payload = gateway.execute_gateway(["query-object", *identity,
