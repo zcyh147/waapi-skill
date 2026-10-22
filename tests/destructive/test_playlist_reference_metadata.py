@@ -6,7 +6,11 @@ import os
 import pytest
 
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
+    _bind_business_object,
+    _complete_business_draft,
     _complete_object_metadata_business_transaction,
+    _start_business_draft,
+    _update_business_draft,
     workflow_sandbox_runtime,
 )
 from tests.support.playlist_reference_observation import (
@@ -42,8 +46,11 @@ def test_playlist_slot_native_identity(workflow_sandbox_runtime):
 
 
 def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workflow_sandbox_runtime):
+    _observe_existing_playlist_reference_change(workflow_sandbox_runtime)
+
+
+def _observe_existing_playlist_reference_change(runtime, *, compound_notes=None):
     """One reference change on existing objects in the copied SampleProject."""
-    runtime = workflow_sandbox_runtime
     version = runtime.sandbox.metadata.get_info_version
     assert isinstance(version, dict) and tuple(
         version.get(key) for key in ("year", "major", "minor", "build")
@@ -53,10 +60,12 @@ def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workfl
     owner = "{8C0FD1AD-E45D-408D-9BF3-874970CCC123}"
     old_target = "{0DD1BBE3-BB1E-424A-9648-BEBFBB212426}"
     target = "{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}"
-    output = runtime.state_dir / "playlist-reference-effect.json"
+    compound = compound_notes is not None
+    output = runtime.state_dir / ("playlist-object-set-effect.json" if compound else "playlist-reference-effect.json")
     observation = {"candidate": runtime.candidate, "version": runtime.version,
+        "operation": "object.set" if compound else "object.setReference",
         "reads": [], "transactions": [], "business_effect_verified": False}
-    category = {"category": "existing-playlist-reference-change", "status": "FAIL",
+    category = {"category": "existing-playlist-object-set" if compound else "existing-playlist-reference-change", "status": "FAIL",
         "verifier_strength": "independent_reference_membership_and_peer_readback",
         "observation_path": str(output)}
     runtime.category_results.append(category)
@@ -65,7 +74,8 @@ def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workfl
     def read(label, selector):
         assert len(observation["reads"]) < 14
         argv = ["query-object", *selector, "--max-results", "4", "--include", "class-id",
-                "--include", "owner", "--include", "parent"]
+                "--include", "owner", "--include", "parent",
+                *(["--include", "notes"] if compound else [])]
         code, payload = runtime.raw_gateway(argv)
         observation["reads"].append({"label": label, "argv": argv, "exit_code": code, "payload": payload})
         assert code == 0 and payload.get("ok") is True, payload
@@ -102,10 +112,27 @@ def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workfl
         before_members = members("before-playlist")
         assert [row["id"] for row in before_members] == [slot, peer], before_members
 
-        receipt = _complete_object_metadata_business_transaction(
-            runtime, operation="object.setReference", object_id=slot,
-            field_name="PlaylistObject", target_id=target,
-        )
+        if compound:
+            assert isinstance(compound_notes, str) and compound_notes != before["slot"].get("notes")
+            draft = _start_business_draft(runtime, "object.set")
+            source_handle = _bind_business_object(runtime, draft, object_id=slot)
+            target_handle = _bind_business_object(runtime, draft, object_id=target)
+            discovered = _update_business_draft(runtime, draft, "draft-discover-fields",
+                ["--object-handle", source_handle, "--meaning", "PlaylistObject"], live=True)
+            candidates = discovered["field_candidates"]
+            assert len(candidates) == 1, discovered
+            _update_business_draft(runtime, draft, "draft-declare-existing", [
+                "--declaration-id", "playlist-slot", "--object-handle", source_handle,
+                "--field-value", candidates[0]["handle"], target_handle,
+                "--field", "notes", compound_notes,
+            ], live=False)
+            receipt = _complete_business_draft(runtime, draft)
+            assert receipt["verify"]["verification"]["operation"] == "object.set"
+        else:
+            receipt = _complete_object_metadata_business_transaction(
+                runtime, operation="object.setReference", object_id=slot,
+                field_name="PlaylistObject", target_id=target,
+            )
         observation["transactions"].append(receipt)
         assert reference("after-slot-target", slot) == target
         assert reference("after-peer-target", peer) == target
@@ -116,6 +143,12 @@ def test_existing_playlist_slot_reference_change_preserves_peer_and_order(workfl
         assert [stable(row) for row in after_members] == [stable(row) for row in before_members]
         for key, identity in (("peer", peer), ("owner", owner), ("target", target)):
             assert exact("after-" + key, identity) == before[key]
+        if compound:
+            after_slot = exact("after-slot", slot)
+            expected_slot = {**before["slot"], "notes": compound_notes}
+            expected_path = before["owner"]["path"] + "\\[PlaylistSlot: (" + before["target"]["name"] + ")]"
+            assert after_slot["path"] in {before["slot"]["path"], expected_path}, after_slot
+            assert {**after_slot, "path": before["slot"]["path"]} == expected_slot
         observation["business_effect_verified"] = True
         status = "PASS"
     except BaseException as exc:
