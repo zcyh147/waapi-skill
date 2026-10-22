@@ -1,4 +1,4 @@
-"""One existing 2025 Switch association edit through public Gateway phases."""
+"""One existing Switch association edit through version-pinned Gateway phases."""
 import hashlib
 import json
 import os
@@ -17,21 +17,31 @@ from tests.destructive.test_gateway_workflow_transaction_matrix import (
 )
 
 
+BUILDS = {
+    "2021.1": (2021, 1, 14, 8108),
+    "2022.1": (2022, 1, 19, 8584),
+    "2023.1": (2023, 1, 19, 8928),
+    "2024.1": (2024, 1, 13, 9056),
+    "2025.1": (2025, 1, 7, 9143),
+}
+
+
 pytestmark = [
     pytest.mark.live,
     pytest.mark.destructive,
-    pytest.mark.skipif(os.environ.get("WWISE_VERSION") != "2025.1",
-        reason="Exact observed 2025 association; older effective identities remain separate work"),
+    pytest.mark.skipif(os.environ.get("WWISE_VERSION") not in BUILDS,
+        reason="Requires one of the five pinned Wwise builds"),
 ]
 CHILD = "{0CB83139-F17F-40DB-8221-48AA8A20B807}"
 OWNER = "{8A261B8F-89AA-490E-A62A-2551D87F3E56}"
-OWNER_PATH = r"\Containers\Minigun\Minigun\Shells"
 
 
 def test_existing_association_continue_play_preserves_owner_and_child(workflow_sandbox_runtime):
     runtime = workflow_sandbox_runtime
     version = runtime.sandbox.metadata.get_info_version
-    assert tuple(version.get(key) for key in ("year", "major", "minor", "build")) == (2025, 1, 7, 9143)
+    assert tuple(version.get(key) for key in ("year", "major", "minor", "build")) == BUILDS[runtime.version]
+    hierarchy = "Containers" if runtime.version == "2025.1" else "Actor-Mixer Hierarchy"
+    owner_path = "\\" + hierarchy + r"\Minigun\Minigun\Shells"
     output = runtime.state_dir / "association-continue-play.json"
     assert not output.exists(), "An earlier observation must not be overwritten"
     evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
@@ -111,21 +121,29 @@ def test_existing_association_continue_play_preserves_owner_and_child(workflow_s
         observation["platform"] = platform
         child = objects("child-before", CHILD, context=True)
         assert child["type"] == "RandomSequenceContainer" and child["name"] == "Shells_Concrete", child
-        assert child["path"] == OWNER_PATH + r"\Shells_Concrete" and child["parent"]["id"] == OWNER, child
+        assert child["path"] == owner_path + r"\Shells_Concrete" and child["parent"]["id"] == OWNER, child
         association = child["switch_container_child_context"]["id"]
         assert isinstance(association, str) and uuid.UUID(association).int != 0, child
         source = objects("association-before", association, ("ContinuePlay", "FadeInTime"))
         owner = objects("owner-before", OWNER, ("SwitchBehavior",))
         members = objects("owner-children-before", OWNER, children=True, context=True)
+        if runtime.version != "2025.1":
+            # Older native context identities are not inferred from class names
+            # or the 2025 witness. Keep an incomplete observation read-only.
+            assert source.get("identity_completeness", {}).get("complete") is not False, source
+            assert all(isinstance(source.get(key), str) for key in ("id", "name", "type", "path")), source
+            assert source["path"], source
         assert source["type"] == "ObjectSettingAssociation" and source["name"] == "", source
         # Keep native omission distinct from explicit null in the saved snapshot.
         if "parent" in source:
             assert source["parent"] is None, source
         else:
             assert "parent" in source["unavailable_fields"], source
-        assert source["owner"]["id"] == OWNER and source["path"] == OWNER_PATH + r"\<Unnamed Object Setting Association>", source
+        assert source["owner"]["id"] == OWNER, source
+        if runtime.version == "2025.1":
+            assert source["path"] == owner_path + r"\<Unnamed Object Setting Association>", source
         assert source["properties"]["ContinuePlay"] is False and source["properties"]["FadeInTime"] == 0.0, source
-        assert owner["type"] == "SwitchContainer" and owner["name"] == "Shells" and owner["path"] == OWNER_PATH, owner
+        assert owner["type"] == "SwitchContainer" and owner["name"] == "Shells" and owner["path"] == owner_path, owner
         assert type(owner["properties"]["SwitchBehavior"]) is int and owner["properties"]["SwitchBehavior"] == 1, owner
         member, = [row for row in members if row["id"] == CHILD]
         same(member, child)
