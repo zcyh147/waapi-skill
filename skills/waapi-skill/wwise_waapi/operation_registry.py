@@ -6333,8 +6333,7 @@ def _prepare_object_set(
         for name, identity in reference_requirements.items():
             if name.casefold() not in desired_references:
                 target_spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
-        if any(info.dependencies or "mustChildOf" in (info.restriction.get("restrictions") or [])
-                for info in property_info_by_name.values()):
+        if property_info_by_name:
             condition_metadata_guards.append({
                 "object_id": target.object,
                 "platform": platform,
