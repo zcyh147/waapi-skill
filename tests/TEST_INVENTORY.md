@@ -38,6 +38,19 @@ semantics remain work under #177/#178/#180. This result closes only the tested
 existing-slot reference outcome; it does not close any of those tickets or
 refresh historical branch-completion evidence automatically.
 
+The follow-up interface-inventory check found older unreconciled seals. Extracted
+contracts are identical at `ee55f8e5`, `518edce3` and `09ae4b8e`; the Playlist
+slice adds no contract-row drift. The prior difference from policy `c5b93c31`
+is 13 operation rows, two parser rows and one Topic continuation row, with no
+added/removed rows. A provisional interface regeneration succeeded in a separate
+worktree, but dependent branch generation failed on the historical Source
+attachments: all five versions have the same five changed runtime-file hashes
+among 547 source keys. The incomplete reconciliation is not merged or counted
+as a passing inventory check. Preserve the original evidence; consolidate the
+source review and dependent inventories once the runtime batch settles, before
+the required final gates under #195. No native recapture was performed for this
+bookkeeping failure.
+
 ## 2026-10-21 R62 targeted PlaylistSlot metadata observation
 
 Candidate `7572b2d7` ran one read-only observation on macOS Console
