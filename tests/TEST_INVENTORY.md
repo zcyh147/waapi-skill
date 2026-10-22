@@ -5,6 +5,54 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R69 directly stored reference values
+
+Candidate `850b163b8b56298c3d4dfa88db41e83d2fc1f6fa` adds the closed
+`--include-local-reference` mode, with fresh live reference discovery and
+separate `local_references` results. Ordinary reference reads retain their
+existing override-resolved behavior. The shared field-mode table preserves
+property modes, result bounds, paging and exact terminal output. Matching
+five-version SDK Return Options evidence is packaged with exact page/build
+and section hashes; no installed SDK is required at runtime.
+
+New fake-client controls ran as bounded selections: the expanded file retained
+**105 passes / 15 test-fixture failures in 6.08s**; correcting parser/cap/inventory
+fixture assumptions and rerunning only the affected parameterized functions
+passed **75 in 3.40s**. The existing affected regression selection retained
+**140 passes / 2 source-hash assertion failures in 4.68s**. Exact older-version
+HTML hashes corrected those two guards (**2 passed in 0.34s**); the final
+source-packaging guards passed **5 in 0.38s**. Together these selections resolve
+the new 120 controls and affected existing checks; they are not a single fresh
+combined all-green run. Original REDs, intermediate failures and exact commands
+remain in `.waapi-skill-state/full-coverage/r69-program-logs/`.
+
+Sequential real macOS Console cases all passed on the same candidate:
+
+| Version/build | Result |
+| --- | --- |
+| 2021.1.14.8108 | 1 passed in 9.23s |
+| 2022.1.19.8584 | 1 passed in 8.17s |
+| 2023.1.19.8928 | 1 passed in 8.76s |
+| 2024.1.13.9056 | 1 passed in 7.47s |
+| 2025.1.7.9143 | 1 passed in 8.51s |
+
+Each case performs five read-only queries on existing source-selected objects.
+It proves that the Sound stores Master/Main Audio Bus and Thunders Attenuation
+while resolving SFX and Footsteps Attenuation from its ancestor; its local
+OverridePositioning remains false. Exact native packets and public groups agree,
+the ancestor's values and both Bus identities are read independently, and the
+Sound repeats unchanged. All final category records are PASS, with zero
+transactions, unchanged source hashes/mtime/tree metadata, clean process
+shutdown and deleted passing sandboxes.
+
+Roots: `.waapi-skill-state/full-coverage/r69-local-reference-850b163b-<year>-r1/`;
+each has `root-review.json`, original packet hashes and captured Attenuation
+metadata. The aggregate is `r69-five-version-native-review.json`. The captured
+nullable/inherited reference facts also support the separate clear-verifier
+repair; they do not prove a clear mutation. No Fresh, full gate, Windows/Authoring
+or inventory regeneration is claimed. Related-field projections and other #181
+branches remain assigned work.
+
 ## 2026-10-23 R68 Blend Track output and field-refinement guidance
 
 Candidate `f437f57cfa22cf03d0983be66dfc3864940a00c0` exposes the fixed
