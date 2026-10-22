@@ -129,6 +129,13 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
     def same(actual, expected):
         assert json.dumps(actual, sort_keys=True) == json.dumps(expected, sort_keys=True), (actual, expected)
 
+    def device_members(rows):
+        # WorkUnit children prove ownership/set membership, not semantic order.
+        # Keep every observed row and reject duplicate canonical GUIDs.
+        members = {str(uuid.UUID(row["id"])): row for row in rows}
+        assert len(members) == len(rows), rows
+        return members
+
     try:
         host = read("host-and-current-platform-before", ["status"])
         platform = host.get("project", {}).get("currentPlatformId")
@@ -211,7 +218,11 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
                 same(after_setup[key], before[key])
         copied_member, = [row for row in after_setup["device_children"] if row["id"] == copy_id]
         same(copied_member, {key: value for key, value in target.items() if key != "properties"})
-        same([row for row in after_setup["device_children"] if row["id"] != copy_id], before["device_children"])
+        setup_members = device_members(after_setup["device_children"])
+        expected_members = device_members(before["device_children"])
+        assert str(uuid.UUID(copy_id)) not in expected_members, copy_id
+        expected_members[str(uuid.UUID(copy_id))] = copied_member
+        same(setup_members, expected_members)
         assert len(after_setup["device_children"]) == len(before["device_children"]) + 1, after_setup
         host_before_reference = read("host-and-current-platform-before-reference", ["status"])
         assert host_before_reference.get("project", {}).get("currentPlatformId") == platform, host_before_reference
@@ -270,7 +281,7 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         for key in ("peer", "system", "target", "bus_parent", "device_parent", "children", "bus_hierarchy_root"):
             same(after[key], before[key])
         same(after["siblings"], before["siblings"])
-        same(after["device_children"], after_setup["device_children"])
+        same(device_members(after["device_children"]), setup_members)
         same(metadata_detail("bus-field-after", selection), metadata)
         host_after = read("host-and-current-platform-after", ["status"])
         assert host_after.get("project", {}).get("currentPlatformId") == platform, host_after
