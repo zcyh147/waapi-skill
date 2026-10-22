@@ -259,6 +259,8 @@ def test_scoped_binding_never_guesses_or_dispatches_final_values_when_declaratio
     else:
         assert code == 2, result
         assert result['error_code'] == ('RELATED_QUERY_DUPLICATE_FIELD' if failure == 'duplicate-alias' else 'RELATED_QUERY_FIELD_KIND')
+    if failure in {'ambiguous', 'partial-no-match', 'wrong-property-kind', 'wrong-reference-kind'}:
+        assert [args for uri, args, _ in task.calls if uri.endswith('getPropertyAndReferenceNames')] == [{'classId': REFERENCE_CLASS}]
     data_reads = [options for uri, _, options in task.calls if uri.endswith('object.get')]
     assert all('parent.@Pitch' not in options['return'] and 'parent.PlaylistObject' not in options['return'] for options in data_reads)
     assert not any(uri.endswith(('setProperty', 'setReference')) for uri, _, _ in task.calls)
@@ -510,3 +512,111 @@ def test_continuation_field_kind_change_is_a_continuation_boundary_not_a_new_req
     code, rejected = task.run(*result['agent_result']['next_command']['gateway_argv'])
     assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
     assert rejected.get('agent_result') is None
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('drift', ['class-bool', 'class-float', 'extension-bool'])
+def test_related_scope_revalidation_rejects_typed_drift_even_when_python_values_compare_equal(tmp_path, version, drift):
+    class TypedDriftTask(PathTask):
+        reads = 0
+        def call(self, uri, args=None, options=None):
+            if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}:
+                self.reads += 1
+                if self.reads == 2:
+                    if drift == 'class-bool':
+                        self.row['parent.classId'] = True
+                    elif drift == 'class-float':
+                        self.row['parent.classId'] = float(REFERENCE_CLASS)
+                    else:
+                        self.row['parent']['extension']['enabled'] = 0
+            return super().call(uri, args, options)
+    task = TypedDriftTask(tmp_path, version)
+    task.rows = task.rows[:1]
+    if drift == 'class-bool':
+        task.row['parent.classId'] = 1
+        task.metadata[1] = {'Pitch': {'name': 'Pitch', 'type': 'int32'}}
+    else:
+        task.metadata[REFERENCE_CLASS] = {'Pitch': {'name': 'Pitch', 'type': 'int32'}}
+    task.row['parent'] = {**PARENT, 'extension': {'enabled': False}}
+    task.row['parent.@Pitch'] = -560
+    code, rejected = task.run('query-object', '--exact-id', SOUND, '--include-related-field', 'parent', 'Pitch')
+    assert code == 2 and rejected['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED', rejected
+    assert rejected.get('agent_result') is None
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('slot', ['identity', 'fixed-reference', 'custom-reference'])
+def test_projection_preserves_native_related_extensions_and_does_not_mutate_transport_result(tmp_path, version, slot):
+    class RetainedResultTask(PathTask):
+        native_result = None
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}:
+                self.native_result = result
+            return result
+    task = RetainedResultTask(tmp_path, version)
+    task.rows = task.rows[:1]
+    extension = {'related': {}, 'nested': {'related': {}, 'amount': 0}, 'list': [{'related': {}, 'enabled': False}]}
+    native = {**TARGET, **copy.deepcopy(extension)}
+    if slot == 'identity':
+        native = {**PARENT, **copy.deepcopy(extension)}
+        task.row['parent'] = native
+        options = ['--include-related', 'parent', 'volume-db']
+        field, output = 'parent', 'object'
+    elif slot == 'fixed-reference':
+        task.row['parent.OutputBus'] = native
+        options = ['--include-related', 'parent', 'output-bus']
+        field, output = 'parent.OutputBus', 'output_bus'
+    else:
+        task.row['parent.PlaylistObject'] = native
+        options = ['--include-related-field', 'parent', 'Playlist Object']
+        field, output = 'parent.PlaylistObject', None
+    code, result = task.run('query-object', '--exact-id', SOUND, *options)
+    assert code == 0, result
+    parent = result['agent_result'][0]['related']['parent']
+    actual = parent[output] if output else parent['references']['PlaylistObject']
+    assert actual == native
+    assert task.native_result['return'][0][field] == native
+    assert 'related' not in parent  # No empty Gateway-owned child namespace.
+    assert list(result)[-1] == 'agent_result'
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('route', ['ordinary', 'local-reference', 'reference-hop'])
+def test_unknown_class_kind_uses_exact_endpoint_metadata_without_inventing_action_instance_typing(tmp_path, version, route):
+    # Real class-unknown packets exist for 2021–2023. The two later lanes are
+    # fake public controls of that same valid metadata shape, not native credit.
+    samples = json.loads((Path(__file__).parents[1] / 'fixtures/metadata-conditions/action-target-class-unknown.json').read_text())['samples']
+    assert {key: value['source_sha256'] for key, value in samples.items()} == {
+        '2021.1': '6be8fcda9b186e704b74aa479abab0273e4f66edc2f2dce10d71dbc774ca0df4',
+        '2022.1': '85779fd6872354b2759ec6fd6148e6b5445a7abfdad1a9b34bc0b7c31cb7f7d2',
+        '2023.1': 'f3f47350ac5cfc84f153e4b151682102628c1001eb62dad8273a563b7d03f362'}
+    sample = samples.get(version, samples['2023.1'])
+    assert sample['metadata']['name'] == 'Target' and sample['metadata']['type'] == '' and sample['metadata']['restriction'] == {}
+    task = PathTask(tmp_path, version)
+    task.rows = task.rows[:1]
+    class_id = sample['scope']['resolved']['classId']
+    task.row['parent.classId'] = class_id
+    task.metadata[class_id] = {'Target': copy.deepcopy(sample['metadata'])}
+    # Exact-object positive kind uses the unmodified R62 PlaylistObject packet.
+    # This does NOT assert that an actual Action.Target instance is reference-typed.
+    task.metadata[PARENT['id']] = {'PlaylistObject': copy.deepcopy(REFERENCE_PACKET['metadata'])}
+    options = {
+        'ordinary': ['--include-related-field', 'parent', 'Target object'],
+        'local-reference': ['--include-related-local-reference', 'parent', 'Target object'],
+        'reference-hop': ['--include-related', 'parent', 'reference', 'Target object', 'volume-db'],
+    }[route]
+    code, result = task.run('query-object', '--exact-id', SOUND, *options, '--detail')
+    assert code == 0 and result['status'] == 'ok', result
+    parent = result['agent_result'][0]['related']['parent']
+    if route == 'ordinary':
+        assert parent['references'] == {'PlaylistObject': TARGET}
+    elif route == 'local-reference':
+        assert parent['local_references'] == {'PlaylistObject': LOCAL}
+    else:
+        assert parent['related']['references']['PlaylistObject'] == {'object': TARGET, 'volume_db': -2}
+    selected = result['related_scope_binding']['scopes'][0]
+    assert selected['scope'] == {'object': PARENT['id']}
+    assert selected['selected'] == {'name': 'PlaylistObject', 'kind': 'reference'}
+    assert [args for uri, args, _ in task.calls if uri.endswith('getPropertyAndReferenceNames')] == [
+        {'classId': class_id}, {'object': PARENT['id']}]

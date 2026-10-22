@@ -38,7 +38,7 @@ def canonical_guid(value):
 def validate_related_observation(rows, proof):
     fields = proof['observed_fields']
     actual = [{key: copy.deepcopy(row[key]) for key in fields if key in row} for row in rows]
-    if actual != proof['observed_rows']:
+    if canonical_json_bytes(actual) != canonical_json_bytes(proof['observed_rows']):
         raise RelatedQueryError('Query membership, related identity or metadata scope changed during the read; restart the original query',
             details={'restart_original_read': True, 'native_query_dispatched': True, 'expected_rows': len(proof['observed_rows']), 'actual_rows': len(rows),
                 'expected_scope_sha256': canonical_sha256(proof['observed_rows']), 'actual_scope_sha256': canonical_sha256(actual)})
@@ -120,8 +120,13 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
         selection = lookup(scope)
         # Shared class facts need no per-row reads when they bind. A complete
         # class no-match does not rule out instance/plugin-specific metadata.
-        if 'classId' in scope and selection['complete'] and not selection['candidate_names']:
+        unknown_kind = selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}
+        if 'classId' in scope and selection['complete'] and (not selection['candidate_names'] or unknown_kind):
             selection = lookup({'object': reference['id'].upper()})
+        # Unknown kind is insufficient authority, not a known wrong kind. If
+        # exact-object facts remain insufficient, retain scoped clarification.
+        if selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}:
+            selection = {**selection, 'insufficient_kind': selection['candidate'].get('kind'), 'candidate': None}
         selections.append({'path': native, 'requested_option': option, 'row_index': index,
             **{key: value for key, value in selection.items() if key != 'candidate'},
             'selected': ({'name': selection['candidate'].get('name'), 'kind': selection['candidate'].get('kind')}

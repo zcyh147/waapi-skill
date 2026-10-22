@@ -25053,12 +25053,13 @@ def _project_query_business_rows(
                 path = output["path"] if "path" in output else (("relation", output["relation"]),)
                 context = item
                 nested = related_groups
-                for slot, name in path:
+                for path_index, (slot, name) in enumerate(path):
                     if slot == "relation":
                         context = nested.setdefault(name, {})
                     else:
                         context = nested.setdefault(slot, {}).setdefault(name, {})
-                    nested = context.setdefault("related", {})
+                    if path_index + 1 < len(path):
+                        nested = context.setdefault("related", {})
                 if kind == "related_unavailable":
                     context.setdefault("unavailable_field_requests", []).append({key: output[key]
                         for key in ("meaning", "requested_option", "reason")})
@@ -25093,13 +25094,6 @@ def _project_query_business_rows(
             if group in grouped:
                 item[group] = grouped[group]
         if related_groups:
-            def prune_empty_related(value):
-                if isinstance(value, dict):
-                    for child in list(value.values()):
-                        prune_empty_related(child)
-                    if value.get("related") == {}:
-                        value.pop("related")
-            prune_empty_related(related_groups)
             item["related"] = related_groups
         if unavailable:
             item["unavailable_fields"] = unavailable
