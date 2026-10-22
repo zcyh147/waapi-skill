@@ -5,6 +5,47 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R74 Switch-child property identity support
+
+Candidate `e53b15e380ac05a58ee86c57462c882bf8d6e922` adds a closed
+`draft-bind-switch-child-context` target for `object.setProperty`. Normal owner
+and child handles establish the documented context edge, reverse owner and
+version-pinned class/source proof. The tagged target preserves native type
+omission and revalidates its proof at discovery, preparation, execution and
+verification. Ordinary incomplete-ID binding stays rejected. Live metadata
+authorizes scalar fields; the implementation is not limited to ContinuePlay.
+
+Focused program selections passed 55 in 16.71s and 112 in 26.03s before the
+final early-discovery guard correction. The failing discovery/continuation
+nodes were repaired and passed; final ordinary schema, materializer, discovery,
+formal receipt and history-boundary consumers passed 20 in 1.15s. The exact
+overlapping selections and original failure-to-fix mapping are retained in
+`r74-association-program-logs/waapi-r74-association-implementation.md`; all
+seventeen original logs were hash-checked and preserved. Five setProperty
+schema lanes changed; the other 144 reviewed schema digests remain identical.
+
+One real macOS Console case per older version passed on the same candidate:
+**2021.1: 1 passed in 9.06s; 2022.1: 1 passed in 8.30s;
+2023.1: 1 passed in 4.72s; 2024.1: 1 passed in 4.23s**. Native 2021/2022
+association rows omit type and use the new structural target. Native 2023/2024
+rows report ObjectSettingAssociation and use the ordinary typed route.
+Each run makes one separately previewed, authorized, executed and verified
+ContinuePlay false-to-true change, with sixteen public observation commands.
+Independent readback preserves FadeInTime, owner state, the child and ordered
+child/context membership. Packet counts are respectively 91, 93, 75 and 75;
+all recorded hashes match. Source content/mtime/tree metadata are unchanged,
+process cleanup completed and passing sandboxes were deleted.
+
+Evidence under `.waapi-skill-state/full-coverage/`:
+`r74-association-e53b15e3-<year>-r1/root-review.json` and
+`r74-association-native-review.json`. The original R73 failures stay unchanged.
+The previously proven 2025 ordinary route at `e3f22460` is reused, not rerun
+or relabeled as same-candidate structural-route evidence. Structural targets
+with present native type have program proof, not an extra 2025 native run.
+Structural history recovery remains explicitly unavailable and assigned #192;
+Fresh discovery of the new route is unproven and no Fresh budget was spent.
+Other condition mechanisms and full #177 acceptance remain open.
+
 ## 2026-10-23 R72 scoped multi-hop query outputs
 
 Candidate `f9c3e81325ae7a64209337de2b22484652c7ee43` extends the closed
