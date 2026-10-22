@@ -5,6 +5,71 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R74 related list native acceptance
+
+Frozen candidate `e48bfcc378f8404b80f4ed1b7e959ed4a177f32c` passed the
+root-preserving child-record workflow on all five pinned macOS Console builds:
+
+| Version | Selected result | Native packets | Strategy |
+| --- | --- | --- | --- |
+| 2021.1 | 1 passed, 9.55s | 31 | Owner-specific relationship queries and GUID-keyed value reads |
+| 2022.1 | 1 passed, 9.40s | 31 | Owner-specific relationship queries and GUID-keyed value reads |
+| 2023.1 | 1 passed, 4.70s | 15 | Native composed member records |
+| 2024.1 | 1 passed, 4.18s | 15 | Native composed member records |
+| 2025.1 | 1 passed, 4.67s | 15 | Native composed member records |
+
+Each case uses three read-only public commands. The container remains the root;
+five child GUIDs, their native order, Volume and metadata-bound Pitch agree with
+raw packets and an independent fixed-field children query. Repeating the root
+query returns the same values. All fifteen commands succeeded, with zero
+transactions, unchanged source hash/mtime/tree inventory, clean process teardown
+and deleted passing sandboxes. Original packet hashes and observations are
+bound in `r74-lists-e48bfcc3-<year>-r3/root-review.json`; the local aggregate is
+`r74-five-version-list-native-review.json`.
+
+The older implementation uses documented SELECT membership and positive-offset
+skip windows, never a bare list return accessor or `skip 0`. The latter caused
+the separate original 2021 failure at `6af29be7` (1 failed, 8.47s, zero writes).
+The 2023 original case on that candidate first proved native composed values,
+then failed at a test-only unsupported relationship/custom-field combination
+(1 failed, 8.42s, zero writes); the independent oracle now uses the existing
+fixed `pitch-cents` output. Both original verdicts and quarantines are retained.
+
+Focused repair evidence includes twelve passing first/positive-window,
+overflow and origin-page controls in 17.66s; earlier affected page reconstruction
+passed five in 19.30s and caller checks passed 27 in 15.88s. These overlap and
+are not a full gate. Page fitting reduces the number of unchanged entries,
+preserving absolute offsets, values and existing output limits. The native
+workflow proves the selected child-list path, not every list relation, function
+or pagination branch. Remaining query functions stay in #181. No Fresh,
+Windows, Authoring or full-gate result is claimed.
+
+## 2026-10-23 R74 list and R75 master-bus native findings
+
+The list implementation and test-only master-bus corrections were combined at
+`f5ecfd8240ac4f1cd87820ba63385a27a21b201b`. The list review repaired origin
+diagnostics changing between result pages and unchanged native extensions
+being mistaken for scope drift. Focused correction selections passed 14 in
+0.98s, 17 in 10.96s and 27 in 49.13s; these overlap and are not a full gate.
+Twenty original program logs, including failures, are hash-indexed under the
+local full-coverage `r74-list-program-logs` directory.
+
+Native observations remain failures, with no mutation or acceptance credit:
+
+| Root / candidate | Original result | Finding |
+| --- | --- | --- |
+| `r75-master-bus-0b9a0dc8-2024-r1` / `0b9a0dc8` | 1 failed, 7.30s | Test assumed the base AudioDevice class for plugin instances; matching catalogs and native packets instead prove System 11403271 and No Output 11862023. Native reference metadata uses the label `Audio Device`. Test-only repair preserved exact identities. |
+| `r74-lists-f5ecfd82-2021-r1` / `f5ecfd82` | 1 failed, 8.20s | Wwise rejected `children` as a return accessor before returning members. The older-version strategy requires documented relationship-query semantics; this is unfinished interface support. |
+| `r75-master-bus-f5ecfd82-2024-r2` / `f5ecfd82` | 1 failed, 7.35s | Reference metadata discovery succeeded, but native `isPropertyEnabled(AudioDevice)` reported that the property did not exist. Property-versus-reference applicability must be resolved before another attempt. |
+
+The three roots respectively contain 9, 1 and 12 public invocations, zero
+transactions, unchanged source hashes/mtimes/tree inventories and clean process
+teardown. Their failed sandboxes remain quarantined. Each root's
+`root-review.json` binds the original observation and packet evidence. Other
+versions are held pending diagnosis, not counted as tested. #177 and #181 retain
+the intended master-bus reference effect and five-version list requirements.
+No new Fresh, Windows, Authoring or full-gate result is claimed.
+
 ## 2026-10-23 R74 Switch-child property identity support
 
 Candidate `e53b15e380ac05a58ee86c57462c882bf8d6e922` adds a closed

@@ -1,6 +1,7 @@
 """Keep a container and its child values together through the public query."""
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -92,6 +93,24 @@ def test_related_child_records_match_independent_children(workflow_sandbox_runti
                         and {member.get("id") for member in members} == CHILDREN
                         and all("@Volume" in member and "@Pitch" in member for member in members)):
                     witnesses.append(members)
+        if strategy == "gateway-guid-grouped-reads":
+            from wwise_waapi.canonical import canonical_sha256
+            # Old versions establish membership with query SELECT, not a bare
+            # list return accessor. Trace each owner-specific request association
+            # to its independently sealed native packet and actual ordered rows.
+            captured_paths = {packet["path"] for packet in observation["reads"][0]["native_packets"]}
+            for association in payload["related_read_evidence"]:
+                waql = association["args"].get("waql", "")
+                if not re.fullmatch(r'from object "' + re.escape(CONTAINER) + r'" select children take [1-9][0-9]*', waql):
+                    continue
+                path = association["call"]["evidence_path"]
+                assert path in captured_paths, association
+                packet = json.loads(Path(path).read_text())
+                assert packet["api"] == "ak.wwise.core.object.get" and packet["ok"] is True, packet
+                assert canonical_sha256(packet["result"]) == association["result_sha256"], association
+                members = packet["result"]["return"]
+                assert len(members) == 5 and {member["id"] for member in members} == CHILDREN, members
+                membership_lists.append(members)
         assert witnesses, native_results
         assert membership_lists, native_results
         for members in membership_lists:
@@ -105,13 +124,13 @@ def test_related_child_records_match_independent_children(workflow_sandbox_runti
                 assert [member["id"] for member in members] == [item["object"]["id"] for item in items]
 
         children, _, _ = read("children-independent", ["--relationship", "children",
-            "--include", "volume-db", "--include-field", "Pitch"])
+            "--include", "volume-db", "--include", "pitch-cents"])
         assert len(children) == 5 and {child["id"] for child in children} == CHILDREN, children
         for child in children:
             item = by_id[child["id"]]
             assert all(item["object"][field] == child[field] for field in ("id", "name", "type", "path")), item
             assert item["volume_db"] == child["volume_db"]
-            assert item["properties"]["Pitch"] == child["properties"]["Pitch"]
+            assert item["properties"]["Pitch"] == child["pitch_cents"]
         repeated, _, _ = read("container-after", projection)
         assert json.dumps(repeated, sort_keys=True) == json.dumps(roots, sort_keys=True)
         observation["business_effect_verified"] = True
