@@ -35,3 +35,15 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
 
 Next business slice: change an existing 2025 PlaylistSlot.PlaylistObject to a direct child of its owning container through discovery, Change Preview, execution and readback. Reuse the retained R62 field metadata and R63 exact identity packets; the R63 collection's failed report-writing verdict remains unchanged. First repair exact class-bound recognition of the observed unnamed PluginInnerObject, then the owner/membership/target-parent proof and scoped native type-label mapping. Reuse shared reference/identity tests; add focused ordinary-object preservation, class/owner/parent/metadata drift and invalid-target controls. One native effect case on the existing sandbox fixture follows a stable code path. New-slot and older list variants remain under #178/#180; this slice does not close #177.
+
+### Scoped result — 2026-10-23
+
+The above existing-slot flow passed on Console 2025.1.7.9143 at `ee55f8e5`:
+one public transaction and independent target, peer and ordered-list readback;
+1 native test passed in 6.04s. Affected fake-client checks passed 1291 at
+`23008fa31`; the subsequent class-specific rename-boundary checks passed 19 at
+`ee55f8e5`. See [the exact test record](../../../../tests/TEST_INVENTORY.md).
+No Fresh run was used. The newly bindable unnamed class must not silently gain
+rename authority; its native name semantics remain owned by #180, with a truthful
+`OBJECT_NAME_MUTABILITY_UNPROVEN` boundary until established. New-slot and older
+list variants remain assigned work. This ticket stays open.

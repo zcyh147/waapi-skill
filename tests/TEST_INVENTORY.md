@@ -5,6 +5,39 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R64 existing PlaylistSlot reference change
+
+Candidate `ee55f8e5` passed one public-Gateway mutation on macOS Console
+**2025.1.7.9143: 1 passed in 6.04s**. The existing unnamed PlaylistSlot was
+bound by its exact native class, its `PlaylistObject` field was discovered,
+and one separately previewed and authorized transaction changed its reference
+to a direct child of the owning RandomSequenceContainer. Thirteen independent
+bounded query observations established the requested target, unchanged peer,
+unchanged list order/membership, and unchanged owner and target identities.
+The transaction reached `verified`; source hashes, mtime and tree metadata
+were unchanged, the process exited cleanly, and the passing sandbox was deleted.
+
+Original log, final lifecycle record, observation and Root review are retained
+under `.waapi-skill-state/full-coverage/r64-playlist-effect-ee55f8e5-2025-r1/`.
+The observation SHA-256 is
+`52b157ba15d0f98949ef03c1bdb24e0e19bac4104e0b78bc485fe99a9d5ee1a6`.
+The fixture's separate Authoring-host boundary grants no Authoring coverage.
+
+At `23008fa31`, affected fake-client tests passed **1291 in 290.24s**, including
+55 new Playlist cases. This result is retained as an explicitly transcript-derived
+receipt (`r64-playlist-23008fa31-focused-transcript-receipt.json`); original stdout
+was not saved to a file. Review then reproduced an unproved rename reaching a
+Preview. A class-specific `OBJECT_NAME_MUTABILITY_UNPROVEN` guard at `ee55f8e5`
+passed **19 focused checks in 1.55s**; the original RED and final logs are retained
+under `.waapi-skill-state/full-coverage/r64-playlist-rename-*.log`.
+That guard does not claim Wwise prohibits renaming this class.
+
+No full Program/Non-live, Fresh or older-version native gate ran for this slice.
+The 2023/2024 list-level variants, new-slot construction and unproved name
+semantics remain work under #177/#178/#180. This result closes only the tested
+existing-slot reference outcome; it does not close any of those tickets or
+refresh historical branch-completion evidence automatically.
+
 ## 2026-10-21 R62 targeted PlaylistSlot metadata observation
 
 Candidate `7572b2d7` ran one read-only observation on macOS Console
