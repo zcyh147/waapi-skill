@@ -29,3 +29,9 @@ Users can create or edit valid object trees and perform copy, move, rename, dele
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Retain the original five-version Source-copy observations and their exact scoped acceptance. Recheck only dependencies affected by a change; a report or binding correction alone does not require recopying in Wwise. Continue the playlist/list business slice with ordered membership, exact owner and target relationships, and preservation of other members. Share identity/reference regressions with #177/#178 while retaining separate creation, copy and list-operation outcomes. Pin version differences before native cases. Additional graph/lifecycle omissions remain owned by this ticket; the verified Source subset does not establish whole-ticket completion.

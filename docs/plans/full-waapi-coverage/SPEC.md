@@ -131,3 +131,9 @@ The user confirmed the direct reflection → comparison → wrapper completion �
 Historical Authoring inventories exist for all five versions, but full independent Authoring schema sets were not found in the inspected roots. The initial history review and wayfinder checkpoint are supporting evidence, not completion claims. Current structural counts contain duplicated version/profile occurrences and shared definitions, not an equivalent number of separate bugs.
 
 Previous PR #173 remains a completed known-repair delivery. This specification restores the broader requested outcome and supersedes its deferral allowance for newly discovered in-scope gaps. The next phase is English implementation tickets with native blocking links, organized around reusable mechanisms and concrete business completion. Each ticket must retain its branch identities, version obligations, public-route tests and required outcome proof.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Retain all 21 tickets, native dependency edges and the full 2021.1–2025.1 scope. Organize affected tests by shared implementation, with independent case outcomes and isolated state. Preserve valid historical evidence and distinguish business failures from report/evidence-tool failures. Required full gates run on settled integration batches; Fresh remains separately budgeted. Material increases in verification depth or cost require the user's decision before implementation. No unresolved omission is removed from this parent by these scheduling changes.

@@ -30,3 +30,9 @@ The integrated Skill is ready for delivery only when every in-scope native-suppo
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+For each settled integration batch, deduplicate the union of affected test nodes while retaining independent case results, source attribution and version scope. Reconcile only affected inventories and evidence dependencies. Run the required full Program/Non-live gates once on the stable candidate, expanding reruns only for new relevant changes or failures. Verify the complete parent scope across all five versions before final acceptance; neither a passing CI preflight nor a corrected report substitutes for missing business effects. Keep the PR draft and parent open while in-scope implementation or required evidence remains unfinished.

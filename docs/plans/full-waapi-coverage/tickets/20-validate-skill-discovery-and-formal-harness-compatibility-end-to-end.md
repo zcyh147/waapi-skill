@@ -52,3 +52,9 @@ An Agent following only the Skill and Gateway discoveries can reach every comple
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+First prove each changed public Gateway business path with code integration tests, including disclosure, discovery, binding, Preview and exact terminal results. Then propose only the Fresh cases needed to check Agent discovery/use of changed interfaces; obtain an exact separate Mac-only budget before launch. Reuse valid routing/harness evidence and attribute infrastructure failures before scheduling a rerun. Code integration and native Wwise cases are distinct from Fresh Agent acceptance.

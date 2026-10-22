@@ -29,3 +29,9 @@ Valid property and reference changes work across applicable object classes becau
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Next business slice: change an existing 2025 PlaylistSlot.PlaylistObject to a direct child of its owning container through discovery, Change Preview, execution and readback. Reuse the retained R62 field metadata and R63 exact identity packets; the R63 collection's failed report-writing verdict remains unchanged. First repair exact class-bound recognition of the observed unnamed PluginInnerObject, then the owner/membership/target-parent proof and scoped native type-label mapping. Reuse shared reference/identity tests; add focused ordinary-object preservation, class/owner/parent/metadata drift and invalid-target controls. One native effect case on the existing sandbox fixture follows a stable code path. New-slot and older list variants remain under #178/#180; this slice does not close #177.

@@ -29,3 +29,9 @@ A user can create an object with its requested valid initial fields even when th
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Extend the proved existing-object condition mechanisms to one complete new-object flow: declaration, prerequisite planning, creation and independent field/reference readback. Reuse shared condition and identity regressions; test creation-specific planned identities, conflicting intent and references between newly created objects separately. PlaylistSlot creation remains distinct from updating an existing slot. Use matching five-version definitions, including the 2023/2024 list-level versus 2025 slot-reference difference. Schedule native validation only after the whole public code path works; an existing-object pass grants no creation acceptance.

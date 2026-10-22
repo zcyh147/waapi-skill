@@ -39,3 +39,9 @@ Users can express valid in-scope read semantics and inspect every applicable pro
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
 
 The structured Short-ID type mapping is a shared source-consistency prerequisite with [09 / #183](https://github.com/zcyh147/waapi-skill/issues/183): the Definition resolver's unversioned Event/Effect/AuxBus codes cannot establish the unresolved 2021 query codes. Preserve the exact per-version source proof and keep 2021 pending until reconciled; do not infer codes from PluginID, classId, or later releases.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Use one parameterized five-version code selection for metadata shapes, query projections, pagination and size/error behavior, adding native reads only for missing native facts. Reuse the recorded metadata observations when their exact scope and source dependencies remain valid. Scope helpers and simulated identities to actual native packets rather than XML serialization names. Test evidence-producer and completion-reader corrections locally through their affected chain; do not repeat a live property query solely to repair an old expectation or report. Keep uncovered query semantics and field alternatives explicit.

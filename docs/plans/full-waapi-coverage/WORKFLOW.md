@@ -4,6 +4,11 @@ Use this sequence for the current coverage implementation. Historical acceptance
 belongs in [the test inventory](../../../tests/TEST_INVENTORY.md); current Fresh
 scheduling and failure classification belong in [business acceptance](../../../tests/semantic/TEST_ACCEPTANCE.md).
 
+The 2026-10-23 test-selection and evidence-reuse rules in that document govern
+batch planning and reruns. Each active ticket's execution note identifies its
+next complete business flow, reusable checks and remaining native evidence.
+The five-version scope and existing blocking edges remain unchanged.
+
 Every agent dispatch must explicitly set `fork_turns="none"`. Send only the
 objective, constraints, acceptance criteria, relevant document/code pointers and
 essential decisions not yet recorded. Require descendants to use the same rule;
@@ -30,10 +35,15 @@ task can produce and replay its final result.
    affected existing public-route matrix rows. Confirm negative tests reach the
    intended boundary from a valid baseline. Keep later successors separate and
    merge only the selected refs with one integration source owner.
-2. Reconcile reviewed source seals before regenerating artifacts. Finish
+2. Identify which generated artifacts the batch actually changes. Reconcile
+   their reviewed source seals before regeneration; preserve unchanged artifacts
+   and evidence. When both inventories are affected, finish
    `tests/maintenance/generate_interface_depth_inventory.py`, then generate
    `tests/maintenance/branch_coverage_audit.py`; use their `--check` modes to prove
    the final artifacts are current. Preserve all native IDs, owners and evidence.
+   A documentation-only change does not itself call for inventory regeneration
+   or recapturing native behavior. Keep unvalidated source-dependency changes
+   explicit until the affected checks establish that reuse is valid.
 3. Deduplicate the affected selection and run one proportional combined focus
    for behavior beyond the preflight. Keep each original verdict bound to its
    tested candidate; an unchanged worker check need not be repeated wholesale.

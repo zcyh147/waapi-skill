@@ -34,3 +34,9 @@ dependencies are recorded in [Topic monitoring](../TOPIC_MONITORING.md). That
 checkpoint does not close this ticket or grant native/Fresh coverage.
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Group native delivery cases by materially different trigger/host behavior, keeping each Topic's subscription, filtering, event-content and cleanup assertions separate. A single observed event may support multiple exact payload obligations; unobserved alternatives retain no native credit. Use code tests for malformed payloads, nonmatching events, count/idle/total timeout and cleanup-error handling. Reuse existing matching-host receipts where valid, and implement missing triggers through their linked dependencies. Branch counts are not a requested count of separate native or Fresh runs.

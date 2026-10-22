@@ -46,6 +46,43 @@ votes on the same sealed notice is not a substitute for that diagnosis.
 
 ## 3. Prove the affected chain and rerun proportionally
 
+### Test selection and evidence reuse (approved 2026-10-23)
+
+Select tests from the changed implementation and its callers. Group independent
+cases into one affected run while retaining separate assertions, outcomes and
+isolated mutable state. Share expensive setup only when it cannot leak state
+between cases. Similar ticket titles or matching schema shapes alone do not
+establish equivalent behavior or justify omitting a version.
+
+For each implementation slice, record the requested business outcome, changed
+shared mechanism, reusable evidence, selected test nodes and remaining version
+differences. Parameterize common mechanisms over the five pinned definitions;
+use targeted native cases for behavior that code tests or retained matching-host
+evidence do not establish. One native workflow may support several obligations
+only when its actual observations prove each one individually.
+
+Build one public Gateway business flow end to end in code tests first, then
+perform the necessary native validation. Extend the flow to new shapes and
+version differences after its shared path works. Fresh separately tests Agent
+discovery/use of that interface; it is not required for every code integration
+test and still needs an explicitly approved case budget.
+
+Classify a failure before selecting reruns. Wrong Wwise state, changed unrelated
+objects or missing material authorization require the affected business checks.
+A report, directory, stale test expectation or inventory-accounting defect
+requires focused checks of that producer/consumer chain. Reuse original native
+observations when their relevant source, contracts and material evidence remain
+valid; missing or ambiguous outcome evidence still requires targeted collection.
+Preserve the original failed verdict and record the separate assessment. A new
+commit or unrelated documentation edit alone does not invalidate native effects.
+
+Before materially increasing verification depth, test cost or required runtime
+behavior, present the current proof, remaining user-visible risk and proposed
+extra work to the user for a decision. Keep the unresolved requirement assigned
+to its existing parent while awaiting that decision. Do not silently remove it
+or expand it into a stronger completion requirement. This applies to complete
+waveform mathematical verification as well as other costly special cases.
+
 Use the existing focused tests and `notice-fast` command during repair. For
 changed evidence plumbing, exercise the actual producer, Broker/consumer,
 judgment input and archive/verify-only path together, with a meaningful negative

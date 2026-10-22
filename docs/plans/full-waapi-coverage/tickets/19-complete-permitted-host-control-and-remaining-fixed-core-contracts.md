@@ -279,3 +279,9 @@ the exact final machine result inside the ordinary output ceiling. No new
 native, Windows, Fresh, full gate or coverage credit follows. Complete triangle
 phase-search behavior, triangle/non-sine envelopes, noise, other native settings,
 builds/hosts and the rest of #193/#188/#194 remain owned unfinished work.
+
+## Execution detail — 2026-10-23
+
+Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
+
+Continue already-defined bounded host/Core business paths with affected code checks and proportional native effects. Before further complete triangle-phase mathematics or another material verification-depth/cost increase, present the existing proof, remaining user-visible risk and additional work for the user's decision. Preserve the current partial verdicts and assigned omissions while awaiting that decision; do not claim completion or infer an exclusion. Reuse retained waveform files for deterministic verifier regressions and keep utility groups independently testable so one unresolved waveform method does not prevent progress on other routes.
