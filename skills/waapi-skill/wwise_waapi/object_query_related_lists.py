@@ -7,6 +7,7 @@ by canonical GUID; they never zip unrelated arrays or claim an atomic snapshot.
 from __future__ import annotations
 
 import copy
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -16,7 +17,7 @@ from .builders.query import (build_object_get_query, build_advanced_object_get_q
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .object_query_outputs import QUERY_FIELD_OUTPUT_GROUPS, available_query_outputs
 from .object_query_related import (RELATED_QUERY_RELATIONS, RELATED_QUERY_LIST_RELATIONS,
-    RELATED_FIELD_MODES, RelatedQueryOutput, related_native_fields)
+    RELATED_FIELD_MODES, RelatedQueryOutput, related_native_fields, parse_related_request, related_sequence_source)
 from .object_query_related_runtime import RelatedQueryError, canonical_guid, IDENTITY, OBJECT_GET
 from .object_query_related_metadata import RelatedFieldBinder
 
@@ -41,6 +42,7 @@ class Frame:
     lists: dict = field(default_factory=dict)
     rows: dict = field(default_factory=dict)
     outputs: list = field(default_factory=list)
+    origins: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -49,12 +51,14 @@ class ListEdge:
     path: tuple
     child: Frame
     states: dict = field(default_factory=dict)
+    sequence: dict | None = None
 
 
 class RelatedListPlan:
-    def __init__(self, *, version, requests, bindings, build_preview, read, maximum_rows, maximum_read_bytes):
+    def __init__(self, *, version, requests, bindings, build_preview, read, maximum_rows, maximum_read_bytes, compile_condition):
         self.version, self.requests, self.bindings = version, requests, tuple(binding for binding in bindings if not binding[0].startswith('related'))
         self.build_preview, self.read = build_preview, read
+        self.compile_condition = compile_condition
         self.maximum_rows, self.maximum_read_bytes = maximum_rows, maximum_read_bytes
         self.composed = version not in {'2021.1', '2022.1'}
         self.strategy = 'native-composed-members' if self.composed else 'gateway-guid-grouped-reads'
@@ -67,6 +71,15 @@ class RelatedListPlan:
         self.unique_ids = set()
         self.binder = RelatedFieldBinder(self.measured_read, RelatedQueryError)
         self.aliases = set()
+        self.sequence_origins = {}
+        self.has_sequences = any(kind == 'sequence' for request in requests for kind,_ in request['hops'])
+
+    def charge_sequence_members(self, rows):
+        if not self.has_sequences: return
+        self.unique_ids.update(row['id'].upper() for row in rows)
+        self.total_occurrences += len(rows)
+        if len(self.unique_ids) > MULTI_IDENTITY_READ_MAX_IDS or self.total_occurrences > MAX_RELATED_MEMBER_OBSERVATIONS:
+            raise RelatedQueryError('Sequence helper reads exceeded their owned identity/observation budget',code='RELATED_QUERY_MEMBER_LIMIT')
 
     def measured_read(self, uri, args, options):
         result = self.read(uri, args, options)
@@ -79,6 +92,8 @@ class RelatedListPlan:
     def render(self, frame, *, root=False):
         result = list(frame.fields)
         for edge in frame.lists.values():
+            if edge.sequence:
+                continue  # Selection is owned query SELECT, never guessed return syntax.
             if self.composed:
                 expression = f'{edge.native}.{{{",".join(self.render(edge.child))}}}'
                 if root:
@@ -92,6 +107,8 @@ class RelatedListPlan:
         return related_native_fields([('related_scope', value, {}) for value in result], ())
 
     def edge_key(self, frame, edge):
+        if edge.sequence:
+            return f'projection{edge.child.number}'
         if not self.composed:
             return edge.native
         if frame is self.root:
@@ -125,20 +142,47 @@ class RelatedListPlan:
             found.update(batch)
         return found
 
-    def relationship_rows(self, owner, relation):
+    def relationship_rows(self, owner, relation, sequence=None):
         """Return a complete bounded sequence for one actual owner/relation.
 
         The compiler owns SELECT, skip and final take. A final overflow sentinel
         distinguishes exactly4096 members from a silently truncated prefix.
         """
+        if sequence and sequence['source'] == 'combine':
+            return self.combination_rows(owner,sequence)
         source = build_object_get_query(object_id=owner, select=relation,
             return_fields=IDENTITY, version=self.version)
         rows = []
+        limit, suffix, after = None, '', []
+        stages = list((sequence or {}).get('stages', []))
+        reducer = (sequence or {}).get('reducer',{})
+        if reducer.get('operation') == 'any-match':
+            stages.append({'selection':'matching', **reducer['condition']})
+        if reducer.get('operation') in {'any','any-match'}:
+            stages.append({'selection':'first'})
+        for stage in stages:
+            selection = stage['selection']
+            if after or selection == 'last':
+                after.append(stage); continue
+            if selection in {'first','take','at'}:
+                count = stage['count'] if selection == 'take' else 1
+                if selection == 'at' and stage['count']:
+                    suffix += f" skip {stage['count']}"
+                    if limit is not None: limit = max(0,limit-stage['count'])
+                limit = min(limit,count) if limit is not None else count
+                if count: suffix += f' take {count}'
+            elif selection == 'skip':
+                if stage['count']: suffix += f" skip {stage['count']}"
+                if limit is not None: limit = max(0,limit-stage['count'])
+            elif selection == 'matching':
+                suffix += ' ' + self.compile_condition(stage)
+        if limit == 0: return []
         while True:
             count = min(MAX_QUERY_TAKE, MAX_RELATED_MEMBER_OCCURRENCES - len(rows) + 1)
+            if limit is not None: count = min(count, limit-len(rows))
             # COUNT is not documented to accept zero, and pinned2021 native
             # rejects skip 0. The initial sequence needs no skip transform.
-            waql = source.envelope.args["waql"]
+            waql = source.envelope.args["waql"] + suffix
             if rows:
                 waql += f" skip {len(rows)}"
             preview = build_advanced_object_get_query({"contract": ADVANCED_QUERY_CONTRACT,
@@ -147,11 +191,139 @@ class RelatedListPlan:
                 platform=self.return_scope.get('platform'), language=self.return_scope.get('language'))
             result = self.measured_read(OBJECT_GET, preview.envelope.args, preview.envelope.options)
             chunk = self.validate_rows(result, count)
+            self.charge_sequence_members(chunk)
             rows.extend(chunk)
             if len(rows) > MAX_RELATED_MEMBER_OCCURRENCES:
                 raise RelatedQueryError('Relationship membership exceeded its owned occurrence budget; refine the query', code='RELATED_QUERY_MEMBER_LIMIT')
-            if len(chunk) < count:
+            if len(chunk) < count or limit is not None and len(rows) == limit:
+                for stage in after:
+                    kind, count = stage['selection'], stage.get('count')
+                    if kind == 'last': rows = rows[-1:]
+                    elif kind == 'first': rows = rows[:1]
+                    elif kind == 'at': rows = rows[count:count+1]
+                    elif kind == 'take': rows = rows[:count]
+                    elif kind == 'skip': rows = rows[count:]
+                    elif kind == 'matching': rows = self.filter_rows(rows,stage)
                 return rows
+
+    def filter_rows(self, rows, condition):
+        """Keep native predicate semantics and original occurrence order."""
+        identities = list(dict.fromkeys(row['id'].upper() for row in rows))
+        selected = set()
+        for start in range(0,len(identities),MAX_STRUCTURED_SOURCE_ITEMS):
+            chunk = identities[start:start+MAX_STRUCTURED_SOURCE_ITEMS]
+            source = build_object_get_query(object_ids=chunk,return_fields=IDENTITY,version=self.version)
+            preview = build_advanced_object_get_query({'contract':ADVANCED_QUERY_CONTRACT,
+                'waql':source.envelope.args['waql']+' '+self.compile_condition(condition),
+                'return':list(IDENTITY),'max_results':len(chunk)},version=self.version,
+                platform=self.return_scope.get('platform'),language=self.return_scope.get('language'))
+            values = self.validate_rows(self.measured_read(OBJECT_GET,preview.envelope.args,preview.envelope.options),len(chunk))
+            ids = [row['id'].upper() for row in values]
+            if len(set(ids)) != len(ids) or set(ids)-set(chunk):
+                raise RelatedQueryError('Conditional member reads returned extra or duplicate identities',code='RELATED_QUERY_MEMBER_BATCH')
+            selected.update(ids)
+            self.charge_sequence_members(values)
+        return [row for row in rows if row['id'].upper() in selected]
+
+    def object_row(self, owner, extra=()):
+        preview = build_object_get_query(object_id=owner,return_fields=(*IDENTITY,'classId',*extra),version=self.version,
+            platform=self.return_scope.get('platform'),language=self.return_scope.get('language'))
+        rows = self.validate_rows(self.measured_read(OBJECT_GET,preview.envelope.args,preview.envelope.options),1)
+        if len(rows) != 1 or rows[0]['id'].upper() != owner.upper():
+            raise RelatedQueryError('A combination arm lost its actual canonical owner',code='RELATED_QUERY_MEMBER_BATCH')
+        return rows[0]
+
+    def arm_rows(self, owner, arm, limit=None, conditions=()):
+        if limit == 0: return []
+        if arm == ['self']:
+            rows = [self.object_row(owner)]
+            for condition in conditions: rows = self.filter_rows(rows,condition)
+            return rows
+        hops = parse_related_request(self.version,[*arm,'volume-db'],'--include-related')['hops']
+        values = [self.object_row(owner)]
+        for hop_index,(kind,name) in enumerate(hops):
+            following = []
+            for row in values:
+                if kind in {'list','sequence'}:
+                    spec = json.loads(name) if kind == 'sequence' else {'source':name,'stages':[]}
+                    if hop_index == len(hops)-1:
+                        spec = {**spec,'stages':[*spec['stages'],*conditions]}
+                        if limit is not None:
+                            spec['stages'].append({'selection':'take','count':max(0,limit-len(following))})
+                    selected = self.relationship_rows(row['id'],RELATED_QUERY_LIST_RELATIONS.get(spec['source'],'__combine__'),spec)
+                    following.extend(selected)
+                else:
+                    if kind == 'relation': token = RELATED_QUERY_RELATIONS[name]
+                    else:
+                        selected = self.binder.bind(name,row,row.get('classId'),'',{'arm':arm,'object':row['id']},kind)
+                        candidate = selected['candidate']
+                        if candidate is None:
+                            raise RelatedQueryError('Combination reference metadata is unresolved in its actual scope; refine the meaning',
+                                code='RELATED_QUERY_SEQUENCE_SCOPE_UNAVAILABLE',details={'unresolved':selected,'requested_option':kind,'meaning':name})
+                        if candidate['kind'] != 'reference':
+                            raise RelatedQueryError('Combination reference hops require actual reference metadata',code='RELATED_QUERY_FIELD_KIND')
+                        token = ('@' if kind == 'local-reference' else '') + candidate['name']
+                    observation = self.object_row(row['id'],(token,))
+                    reference = observation.get(token)
+                    if reference is None: continue
+                    if not isinstance(reference,Mapping) or not canonical_guid(reference.get('id')):
+                        raise RelatedQueryError('Combination singleton arms require one canonical reference',code='RELATED_QUERY_RESULT_SHAPE')
+                    target = self.object_row(reference['id'])
+                    for key,value in reference.items():
+                        if key in target and canonical_json_bytes(value) != canonical_json_bytes(target[key]):
+                            raise RelatedQueryError('Combination reference identity changed during its read')
+                    following.append({**target,**reference})
+                    self.charge_sequence_members([target])
+            values = following
+            if hop_index == len(hops)-1 and kind not in {'list','sequence'}:
+                for condition in conditions: values = self.filter_rows(values,condition)
+            if len(values) > MAX_RELATED_MEMBER_OCCURRENCES:
+                raise RelatedQueryError('Combination arm exceeded its member occurrence budget',code='RELATED_QUERY_MEMBER_LIMIT')
+        return values[:limit] if limit is not None else values
+
+    def combination_rows(self, owner, sequence):
+        rows, origins = [], {}
+        stages = list(sequence['stages'])
+        reducer = sequence.get('reducer',{}).get('operation')
+        if reducer == 'any-match':
+            stages.append({'selection':'matching',**sequence['reducer']['condition']})
+        if reducer in {'any','any-match'}: stages.append({'selection':'first'})
+        conditions = []
+        while stages and stages[0]['selection'] == 'matching': conditions.append(stages.pop(0))
+        # A finite initial window can stop later arms without materializing an
+        # unbounded prefix. Complex later stages keep the existing explicit cap.
+        required, offset, limit = None, 0, None
+        if all(stage['selection'] in {'first','at','skip','take'} for stage in stages):
+            for stage in stages:
+                kind,count = stage['selection'],stage.get('count',1)
+                if kind in {'skip','at'}:
+                    amount = min(count,limit) if limit is not None else count
+                    offset += amount
+                    if limit is not None: limit -= amount
+                if kind in {'first','at','take'}:
+                    count = count if kind == 'take' else 1
+                    limit = min(limit,count) if limit is not None else count
+            if limit is not None: required = offset+limit
+        for arm_index,arm in enumerate(sequence['arms']):
+            if required is not None and len(rows) >= required: break
+            values = self.arm_rows(owner,arm,None if required is None else required-len(rows),conditions)
+            for occurrence,value in enumerate(values):
+                value = copy.deepcopy(value)
+                origins[id(value)] = {'arm':arm_index,'occurrence':occurrence,
+                    **({'occurrence_scope':'arm sequence after pushed matching'} if conditions else {})}
+                rows.append(value)
+            if len(rows) > MAX_RELATED_MEMBER_OCCURRENCES:
+                raise RelatedQueryError('Combined sequence exceeded its member occurrence budget',code='RELATED_QUERY_MEMBER_LIMIT')
+        for stage in stages:
+            kind,count = stage['selection'],stage.get('count',1)
+            if kind == 'first': rows = rows[:1]
+            elif kind == 'last': rows = rows[-1:]
+            elif kind == 'at': rows = rows[count:count+1]
+            elif kind == 'take': rows = rows[:count]
+            elif kind == 'skip': rows = rows[count:]
+            else: rows = self.filter_rows(rows,stage)
+        self.sequence_origins[(owner.upper(),canonical_sha256(sequence))] = [origins[id(row)] for row in rows]
+        return rows
 
     def decode(self, root_rows):
         self.root.rows = {(index,): row for index, row in enumerate(root_rows)}
@@ -159,13 +331,14 @@ class RelatedListPlan:
         record_bytes = 0
         memberships = {}
         membership_facts = {}
+        self.reductions = {}
         for frame in self.frames:
             for edge in frame.lists.values():
-                edge.states, edge.child.rows = {}, {}
+                edge.states, edge.child.rows, edge.child.origins = {}, {}, {}
                 members = []
                 key = self.edge_key(frame, edge)
                 for loc, row in frame.rows.items():
-                    if not self.composed:
+                    if not self.composed or edge.sequence:
                         prefix, _, relation = edge.native.rpartition('.')
                         owner = row.get(prefix) if prefix else row
                         if owner is None:
@@ -173,11 +346,18 @@ class RelatedListPlan:
                             continue
                         if not isinstance(owner, Mapping) or not canonical_guid(owner.get('id')):
                             raise RelatedQueryError('Relationship membership requires an actual canonical owner', code='RELATED_QUERY_RESULT_SHAPE')
-                        association = (owner['id'].upper(), relation)
+                        association = (owner['id'].upper(), relation, canonical_sha256(edge.sequence))
                         if association not in memberships:
-                            memberships[association] = self.relationship_rows(*association)
-                        values = memberships[association]
-                        membership_facts[(frame.number,loc,edge.native)] = {'owner':association[0], 'relation':relation, 'members':values}
+                            values = self.relationship_rows(association[0], relation, edge.sequence)
+                            reducer = (edge.sequence or {}).get('reducer',{})
+                            matched = self.filter_rows(values,reducer['condition']) if reducer.get('operation') == 'all-match' else values
+                            origins = self.sequence_origins.get((association[0],canonical_sha256(edge.sequence)))
+                            memberships[association] = (values,matched,origins)
+                        values,matched,origins = memberships[association]
+                        if origins is not None:
+                            edge.child.origins.update({loc+(index,):origin for index,origin in enumerate(origins)})
+                        self.reductions[(edge.child.number,loc)] = bool(values) and len(matched) == len(values)
+                        membership_facts[(frame.number,loc,edge.native,edge.child.number)] = {'owner':association[0], 'relation':relation, 'members':values,'matched':matched,'origins':origins}
                     else:
                         if key not in row:
                             edge.states[loc] = ('absent', None)
@@ -194,7 +374,7 @@ class RelatedListPlan:
                         raise RelatedQueryError('Related members exceeded their occurrence or unique-identity budget; refine the query', code='RELATED_QUERY_MEMBER_LIMIT')
                     edge.states[loc] = ('items', [(loc + (index,)) for index in range(len(values))])
                     members.extend((loc + (index,), value) for index, value in enumerate(values))
-                if not self.composed:
+                if not self.composed or edge.sequence:
                     records = self.grouped_rows([value['id'] for _, value in members], edge.child)
                     sizes = {identity: len(canonical_json_bytes(record)) for identity,record in records.items()}
                     for loc, reference in members:
@@ -225,9 +405,9 @@ class RelatedListPlan:
                     snapshot[f'{frame.number}:{loc}:{native}'] = {'present': native in row, 'value': row.get(native)}
             for edge in frame.lists.values():
                 for loc, state in edge.states.items():
-                    snapshot[f'{frame.number}:{loc}:list:{edge.native}'] = state
-                    if not self.composed:
-                        snapshot[f'{frame.number}:{loc}:membership:{edge.native}'] = membership_facts.get((frame.number,loc,edge.native))
+                    snapshot[f'{frame.number}:{loc}:list:{edge.child.number}'] = state
+                    if not self.composed or edge.sequence:
+                        snapshot[f'{frame.number}:{loc}:membership:{edge.child.number}'] = membership_facts.get((frame.number,loc,edge.native,edge.child.number))
         return snapshot
 
     def accept(self, root_rows):
@@ -273,19 +453,22 @@ class RelatedListPlan:
             terminal_states = []
             for kind, name in request['hops']:
                 next_states, unresolved = [], []
-                if kind == 'list':
+                if kind in {'list','sequence'}:
+                    sequence = json.loads(name) if kind == 'sequence' else None
+                    relation = sequence['source'] if sequence else name
                     # One frame per structural edge; no per-row schema/discovery.
                     edges = {}
                     for frame, loc, prefix, path in states:
-                        native = '.'.join(value for value in (prefix, RELATED_QUERY_LIST_RELATIONS[name]) if value)
-                        business = (*path, ('relation', name))
-                        if native not in frame.lists:
+                        native = '.'.join(value for value in (prefix, RELATED_QUERY_LIST_RELATIONS.get(relation,'__combine__')) if value)
+                        business = (*path, ('relation', relation))
+                        edge_id = native if sequence is None else native + ':' + canonical_sha256(sequence)
+                        if edge_id not in frame.lists:
                             child = Frame(len(self.frames)); self.frames.append(child)
-                            frame.lists[native] = ListEdge(native, business, child)
-                        edges[(frame.number, native)] = frame.lists[native]
+                            frame.lists[edge_id] = ListEdge(native, business, child, sequence=sequence)
+                        edges[(frame.number, native)] = frame.lists[edge_id]
                     self.observe()
                     for frame, loc, prefix, path in states:
-                        native = '.'.join(value for value in (prefix, RELATED_QUERY_LIST_RELATIONS[name]) if value)
+                        native = '.'.join(value for value in (prefix, RELATED_QUERY_LIST_RELATIONS.get(relation,'__combine__')) if value)
                         edge = edges[(frame.number, native)]
                         status, locations = edge.states[loc]
                         if status == 'items':
@@ -321,8 +504,10 @@ class RelatedListPlan:
                         valid.append((frame,loc,prefix,path))
                     next_states = valid
                 states = next_states
-            if request['option'] == '--include-related' and request['hops'][-1][0] != 'list':
+            if request['option'] == '--include-related' and request['hops'][-1][0] not in {'list','sequence'}:
                 states = terminal_states
+            if request['terminal'] == '__sequence_value__':
+                continue
             unresolved, matched = [], []
             for frame, loc, prefix, path in states:
                 if request['option'] == '--include-related':
@@ -357,6 +542,10 @@ class RelatedListPlan:
 
     def proof(self):
         return {'strategy':self.strategy,'atomic_snapshot':False,
+            **({'sequence_semantics':'Gateway business derivation; no native function-return equality or atomic snapshot'}
+               if self.has_sequences else {}),
+            **({'sequence_source':related_sequence_source(self.version)}
+               if self.has_sequences else {}),
             'observed_scope_sha256':canonical_sha256(self.snapshot),
             'metadata_observations_sha256':canonical_sha256(self.binder.observations),
             'scopes':self.binder.selections,'read_associations':self.descriptors,
@@ -380,6 +569,7 @@ class RelatedListPlan:
                     hidden = set(frame.fields) - set(IDENTITY)
                     hidden.update(self.edge_key(frame, edge) for edge in frame.lists.values())
                     item = {'object':copy.deepcopy({key:value for key,value in row.items() if key not in hidden})}
+                    if loc in frame.origins: item['origin'] = copy.deepcopy(frame.origins[loc])
                     missing = [key for key in IDENTITY if key not in row]
                     if missing:
                         item['identity_completeness'] = {'complete':False,'unavailable_fields':missing,'mutation_authority':False}
@@ -400,10 +590,20 @@ class RelatedListPlan:
                     else:
                         (target.setdefault(group,{}) if group else target)[output] = copy.deepcopy(row[native])
                 for edge in frame.lists.values():
-                    target = context_at(item,edge.path)
+                    if edge.sequence:
+                        context = context_at(item,edge.path[:-1]).setdefault('related',{})
+                        target = {'spec':copy.deepcopy(edge.sequence)}
+                        target['derivation'] = 'gateway-business-sequence'
+                        context.setdefault('projections',[]).append(target)
+                    else:
+                        target = context_at(item,edge.path)
                     status, locations = edge.states[loc]
                     if status == 'absent': target.setdefault('unavailable_fields',[]).append('items')
                     elif status == 'null': target['items'] = None
+                    elif edge.sequence and edge.sequence.get('reducer'):
+                        operation = edge.sequence['reducer']['operation']
+                        target['value'] = (len(locations) if operation == 'count' else self.reductions[(edge.child.number,loc)]
+                                           if operation == 'all-match' else bool(locations))
                     else: target['items'] = [projected[(edge.child.number,childloc)] for childloc in locations]
                 projected[(frame.number,loc)] = item
         return [projected[(0,(index,))] for index in range(len(rows))]
