@@ -170,7 +170,8 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(plan, Mapping) or not isinstance(state, Mapping):
         raise ValueError("History expectation receipt lacks a prepared business observation")
     if state.get("switch_child_context") is not None:
-        raise ValueError("Switch-child context history recovery is not yet implemented (#192); this receipt does not authorize recovery")
+        from .switch_child_history import receipt_observations
+        return receipt_observations(prepared)
     if plan.get("kind") == "undo-group-result-schemas":
         raise ValueError("Compound history needs actual parent-owned child execution and verification associations")
     if plan.get("kind") == "same-guid-reference":
@@ -802,6 +803,10 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                 checks.append({"field": "created_graph_membership", "object_id": root,
                     "passed": _created_membership_matches(result, graph_nodes)})
         for expected in observations:
+            if expected.get("kind") == "switch_child_property":
+                from .switch_child_history import observe
+                checks.append(observe(expected, side, read=retained_read))
+                continue
             if expected.get("kind") == "existing_render_chain":
                 from .render_history_observations import observe_chain
                 checks.append(observe_chain(expected, side, read=retained_read))
@@ -895,6 +900,13 @@ def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
         for row in binding["observations"] if row.get("kind") == "existing_render_chain"
         for field in row["chain"]["metadata"]}
     for row in binding["observations"]:
+        if row.get("kind") == "switch_child_property":
+            proof = row["guards"]["switch_child_context"]
+            observations.append({key: value for key, value in row.items() if key not in {"guards", "field_info"}} | {
+                "metadata_bound": True, "structural_identity_bound": True,
+                "owner_id": proof["owner_id"], "child_id": proof["child_id"],
+                "native_type_present": "type" in proof["rows"]["context"]})
+            continue
         if row.get("kind") == "existing_render_chain":
             from .render_history_observations import summary
             observations.append(summary(row))

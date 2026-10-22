@@ -91,7 +91,12 @@ def object_metadata_business_contract_data(
             "scope": "exact SwitchContainer owner and its directly bound child; Gateway derives the child context GUID",
             "result": "copy bound_context.handle as object_handle for metadata-authorized scalar property discovery",
             "native_identity": "preserved without inventing an absent native type",
-            "history_recovery": {"status": "unavailable", "tracking_issue": 192},
+            "history_recovery": {"status": "owned_receipt_observation_only", "tracking_issue": 192,
+                "undo_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+                "redo_versions": ["2023.1", "2024.1", "2025.1"],
+                "requires": ["verified_property_receipt", "unchanged_structural_and_condition_proofs",
+                    "certified_platform_or_nonlinkable_no_platform_value_view"],
+                "stack_head_observed": False, "automatic_retry": False},
         }} if operation == "object.setProperty" else {}),
         "field_discovery": {
             "subcommand": "draft-discover-fields",
