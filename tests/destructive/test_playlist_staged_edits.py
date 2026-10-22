@@ -1,4 +1,4 @@
-"""Compound PlaylistSlot acceptance in its own module-owned project copy."""
+"""Separately previewed PlaylistSlot edits in one module-owned project copy."""
 import os
 
 import pytest
@@ -15,8 +15,8 @@ pytestmark = [
 ]
 
 
-def test_existing_playlist_slot_compound_reference_and_notes(workflow_sandbox_runtime):
+def test_existing_playlist_slot_reference_and_notes_use_separate_previews(workflow_sandbox_runtime):
     # Keep this case in its own module: the shared lifecycle is module-scoped,
     # and the standalone reference case changes the same source-selected slot.
     _observe_existing_playlist_reference_change(workflow_sandbox_runtime,
-        compound_notes="Verified compound playlist reference update")
+        staged_notes="Verified separately previewed playlist reference update")
