@@ -91,6 +91,14 @@ def test_offline_related_catalog_is_pinned_to_matching_descriptor_and_chain_sour
             continue
         # Public output detail supplies the exact existing native descriptor;
         # these source guards do not synthesize a return allowlist from enums.
+        if name == 'curve-points':
+            assert detail['native_definition'] == {'version': version, 'document': 'waapi_definitions.json',
+                'pointer': '/definitions/objectReturn/properties/points'}
+            definitions = graph['documents']['waapi_definitions.json']['definitions']
+            assert definitions['objectReturn']['properties']['points']['$ref'] == '#/definitions/pointsDefinition'
+            assert detail['result_shape']['type'] == 'array'
+            assert set(detail['result_shape']['items']['required']) == {'x','y','shape'}
+            continue
         if name in {'volume-db', 'pitch-cents', 'output-bus'}:
             assert name in source['property_terminal_proof']
             continue
