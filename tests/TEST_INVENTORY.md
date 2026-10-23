@@ -7,6 +7,16 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-23 R90 attenuation and retained object identity
 
+Transport-create association repair `cf5a8df2`, reviewed as `3cb8699c` and
+integrated at `bb73ba87`, seals the selected object GUID and optional explicit
+Game Object ID in the Preview. Verification compares the existing `getList`
+readback before publishing a transport handle. Omitted native defaults,
+transport ID zero and exact uint64 Game Object IDs remain supported. The
+affected public Gateway, Registry, transaction, lifetime and cleanup selection
+passed **115 checks** (838 deselected); independent review found no issue.
+No additional native read, native run or Fresh attempt was needed for this
+comparison repair. This is five-version program proof, not whole #186 acceptance.
+
 Reviewed GET disclosure `6eb66b29`, integrated at `a3dd01be`, exposes the exact
 reflected attenuation curve choices for all five versions: 7/19/19/19/24.
 The original seven meanings remain stable; GET DSF and SET HSF are not treated
