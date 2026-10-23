@@ -114,6 +114,18 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert sum(uri == entry.uri for uri, _, _ in task.calls) == 1
         return
 
+    if entry.uri in {"ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"}:
+        from tests.unit.test_runtime_business_gateway import _LogControlClient, _public_runtime_preview
+        client = _LogControlClient(tmp_path, version=entry.version)
+        declaration = (("--message", "retained") if entry.uri.endswith("addItem")
+            else ("--log-channel", "general"))
+        previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state", entry.uri, declaration)
+        executed = invoke(["execute", previewed["transaction_id"]])
+        verified = invoke(executed["next_command"]["gateway_argv"])
+        assert verified["verification"]["business_state_verified"] is True, verified
+        assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
+        return
+
     if entry.uri == "ak.wwise.core.blendContainer.addAssignment":
         # Complete live owner/index facts are mandatory; synthesized schema
         # arguments and an empty observation cannot prepare this public route.

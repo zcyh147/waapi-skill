@@ -44,6 +44,10 @@ the pure-code check. Reuse its authenticated receipts for focused corruption and
 retry-prefix controls. Lower-level Broker passes alone do not prove that the
 task can produce and replay its final result.
 
+Before running a new or changed native collector, apply the final-report-writer
+check in `tests/semantic/TEST_ACCEPTANCE.md` section 3. Collector-only checks do
+not establish that the native attempt can save its final acceptance record.
+
 1. Freeze one bounded batch of explicitly selected immutable worker refs. Workers
    run their relevant focused cases; changed preparation or verification also
    selects its affected existing public-route matrix rows. Confirm negative tests reach the

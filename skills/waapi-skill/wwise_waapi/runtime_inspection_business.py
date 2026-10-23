@@ -26,6 +26,7 @@ from .runtime_inspection_business_contracts import (
     PROFILER_GET_AUDIO_OBJECTS_URI,
     PROFILER_GET_BUSSES_URI,
     PROFILER_GET_CURSOR_TIME_URI,
+    PROFILER_GET_METERS_URI,
     PROFILER_GET_VOICES_URI,
     PROFILER_MOVE_CURSOR_URI,
     PROFILER_REGISTER_METER_URI,
@@ -430,6 +431,8 @@ def normalize_runtime_inspection_result(
             else {"profiler_position": business_request["profiler_position"]}
         ),
         source_field: selected,
+        **({'meter_object_projection': result['meter_object_projection']}
+           if operation == PROFILER_GET_METERS_URI and 'meter_object_projection' in result else {}),
         "returned_count": len(selected),
         "truncated": len(rows) > len(selected),
     }

@@ -1378,6 +1378,8 @@ class _RuntimeControlDraftClient:
         self.project_file.write_text("fixture", encoding="utf-8")
 
     def call(self, uri: str, args: object = None, options: object = None) -> object:
+        if uri == LOG_GET_URI:
+            return {"items": []}
         if uri == "ak.wwise.core.remote.getConnectionStatus":
             return {"isConnected": False, "status": "Not connected"}
         if uri == "ak.wwise.core.getInfo":
@@ -1752,6 +1754,277 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
     assert artifact["prepared_operation"]["verification_plan"]["kind"] == (
         "profiler-user-cursor"
     )
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation", ("ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"))
+def test_log_controls_disclose_bounded_observation_and_concurrency_limits(tmp_path: Path, version: str, operation: str) -> None:
+    code, schema = gateway.execute_gateway(["request-schema", operation], env=_env(tmp_path, version=version),
+        client_factory=lambda _: pytest.fail("Schema is offline"))
+    assert code == 0, schema
+    verification = schema["business_adapter"]["declaration"]["verification"]
+    assert verification["observer"] == LOG_GET_URI
+    assert verification["maximum_channel_items"] == 1000
+    assert verification["maximum_channel_bytes"] == 65536
+    assert verification["row_identity"] == "none; messageId and time are not treated as unique or ordered"
+    assert verification["console_effect"] == "unverified by this getter; Topic delivery is not established here"
+
+
+class _LogControlClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str = "2025.1") -> None:
+        super().__init__(tmp_path, version=version)
+        self.calls = []
+        self.rows = [{"message": "retained", "severity": "Message", "time": 1720000000, "messageId": "Custom"}]
+        self.after = None
+        self.control_result = {}
+        self.console = False
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == LOG_GET_URI:
+            return {"items": list(self.rows)}
+        if uri == "ak.wwise.core.log.addItem":
+            self.rows = self.after if self.after is not None else [*self.rows,
+                {"message": args["message"], "severity": args["severity"], "time": 1720000000, "messageId": "Custom"}]
+            return self.control_result
+        if uri == "ak.wwise.core.log.clear":
+            self.rows = self.after if self.after is not None else []
+            return self.control_result
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result["isCommandLine"] = self.console
+        return result
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_log_add_verifies_new_identical_item_through_public_transaction(tmp_path: Path, version: str) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state",
+        "ak.wwise.core.log.addItem", ("--message", "retained"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    observation = verified["verification"]["verification_scope"]["log_observation"]
+    assert observation["outcome"] == "new_matching_item"
+    assert observation["matching_items_before"] == 1
+    assert observation["matching_items_after"] == 2
+    assert observation["exclusive_causation_verified"] is False
+    assert all(args == {"channel": "general"} and options == {} for uri, args, options in client.calls if uri == LOG_GET_URI)
+    assert sum(uri == "ak.wwise.core.log.addItem" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("remaining", ("empty", "competing", "identical"))
+def test_log_clear_observes_prior_channel_contents_without_promising_empty_forever(
+    tmp_path: Path, version: str, remaining: str,
+) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    old = dict(client.rows[0])
+    client.after = ([] if remaining == "empty" else [old] if remaining == "identical" else
+        [{"message": "concurrent", "severity": "Warning", "messageId": "Custom", "time": 1}])
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state",
+        "ak.wwise.core.log.clear", ("--log-channel", "source-control"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is (remaining != "identical"), verified
+    observation = verified["verification"]["verification_scope"]["log_observation"]
+    assert observation["outcome"] == ("indistinguishable_prior_contents" if remaining == "identical" else "prior_contents_absent")
+    assert observation["post_channel_empty"] is (remaining == "empty")
+    assert observation["continuing_channel_state_verified"] is False
+    assert all(args == {"channel": "sourceControl"} for uri, args, _ in client.calls if uri == LOG_GET_URI)
+    assert sum(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("after", ("unchanged", "wrong-severity", "missing", "competitor"))
+def test_log_add_preexisting_or_competing_content_does_not_prove_a_new_matching_item(tmp_path: Path, after: str) -> None:
+    client = _LogControlClient(tmp_path)
+    client.after = {"unchanged": list(client.rows), "wrong-severity": [*client.rows,
+        {"message": "retained", "severity": "Warning", "time": 2, "messageId": "Custom"}],
+        "missing": [], "competitor": [{"message": "another", "severity": "Message", "time": 3, "messageId": "Custom"}]}[after]
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state",
+        "ak.wwise.core.log.addItem", ("--message", "retained"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is False, verified
+    assert verified["state"] == "result_schema_checked"
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == "no_matching_increase"
+    code, replay = gateway.execute_gateway(["--state-dir", str(tmp_path / "log-state"), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == "ak.wwise.core.log.addItem" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("operation,declaration", [
+    ("ak.wwise.core.log.addItem", ("--message", "Console probe")),
+    ("ak.wwise.core.log.clear", ("--log-channel", "general")),
+])
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_log_console_empty_observation_never_proves_the_effect(tmp_path: Path, operation: str, declaration: tuple, version: str) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    client.console = True
+    client.rows = client.after = []
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state", operation, declaration)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is False, verified
+    assert verified["state"] == "result_schema_checked"
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == "console_log_unobservable"
+
+
+@pytest.mark.parametrize("operation", ("ak.wwise.core.log.addItem", "ak.wwise.core.log.clear"))
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+@pytest.mark.parametrize("command", ("request-schema", "draft-start"))
+def test_log_controls_preserve_older_packaged_route_boundary(tmp_path: Path, operation: str, version: str, command: str) -> None:
+    code, result = gateway.execute_gateway([command, operation], env=_env(tmp_path, version=version),
+        client_factory=lambda _: pytest.fail("Older packaged route must fail before connection"))
+    assert code == 2, result
+    assert result["error_code"] == "TypedRequestError"
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("severity,native", (("message", "Message"), ("warning", "Warning"), ("error", "Error"), ("fatal", "Fatal Error")))
+def test_log_add_native_severity_and_optional_result_fields_are_verified(tmp_path: Path, version: str, severity: str, native: str) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    message = '日志 "Weather"\n$HOME; second line'
+    client.after = [*client.rows, {"message": message, "severity": native, "time": 1, "messageId": "Custom",
+        "parameters": ["Weather"], "platform": {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Windows"}}]
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "log-state", "ak.wwise.core.log.addItem",
+        ("--message", message, "--log-channel", "soundbank-generation", "--severity", severity))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    assert ("ak.wwise.core.log.addItem", {"message": message, "channel": "soundbankGenerate", "severity": native}, {}) in client.calls
+    assert all(args == {"channel": "soundbankGenerate"} for uri, args, _ in client.calls if uri == LOG_GET_URI)
+    observed = verified["verification"]["verification_scope"]["log_observation"]
+    assert observed["post_channel"]["items"][-1]["parameters"] == ["Weather"]
+    assert list(verified)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("change", ("new-message", "reordered"))
+def test_log_preview_revalidates_complete_channel_multiset_before_execution(tmp_path: Path, change: str) -> None:
+    client = _LogControlClient(tmp_path)
+    client.rows.append({"message": "other", "severity": "Warning", "time": 2, "messageId": "Custom"})
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.clear", ("--log-channel", "general"))
+    client.rows = list(reversed(client.rows))
+    if change == "new-message":
+        client.rows.append({"message": "new", "severity": "Message", "time": 1, "messageId": "Custom"})
+    code, result = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    if change == "new-message":
+        assert code == 2, result
+        assert result["error_code"] == "STALE_LOG_CHANNEL"
+        assert not any(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls)
+    else:
+        assert code == 0, result
+        assert invoke(result["next_command"]["gateway_argv"])["verified"] is True
+
+
+@pytest.mark.parametrize("stage", ("preview", "execute", "verify"))
+@pytest.mark.parametrize("overflow", ("rows", "bytes"))
+def test_log_oversized_channel_observations_stay_bounded_and_never_prove_effect(tmp_path: Path, stage: str, overflow: str) -> None:
+    client = _LogControlClient(tmp_path)
+    oversized = ([client.rows[0]] * 1001 if overflow == "rows" else
+        [{**client.rows[0], "message": "日志" * 12000}])
+    state = tmp_path / "log-state"
+    if stage == "preview":
+        client.rows = oversized
+        code, started = gateway.execute_gateway(["--state-dir", str(state), "draft-start", "ak.wwise.core.log.clear"],
+            env=_env(tmp_path), client_factory=lambda _: client)
+        assert code == 0, started
+        code, result = gateway.execute_gateway(["--state-dir", str(state), "draft-declare-runtime-control-plan", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]), "--log-channel", "general"],
+            env=_env(tmp_path), client_factory=lambda _: client)
+        # Declaration preparation is allowed to expose the limit before Preview.
+        if code == 0:
+            code, result = gateway.execute_gateway(["--state-dir", str(state), "draft-check", started["draft"]["draft_id"],
+                "--task-authority", started["task_authority"], "--expected-revision", str(result["draft"]["revision"])],
+                env=_env(tmp_path), client_factory=lambda _: client)
+        assert code == 2, result
+        assert "LOG_OBSERVATION_TOO_LARGE" in json.dumps(result), result
+        assert not any(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls)
+    else:
+        previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.clear", ("--log-channel", "general"))
+        if stage == "execute":
+            client.rows = oversized
+        else:
+            client.after = oversized
+        code, result = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+            env=_env(tmp_path), client_factory=lambda _: client)
+        if stage == "execute":
+            assert code == 2 and result["error_code"] == "LOG_OBSERVATION_TOO_LARGE", result
+            assert not any(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls)
+        else:
+            assert code == 0, result
+            result = invoke(result["next_command"]["gateway_argv"])
+            assert result["state"] == "result_schema_checked", result
+            assert result["verified"] is False
+            observation = result["verification"]["verification_scope"]["log_observation"]
+            assert observation["outcome"] == "oversized"
+            assert "items" not in observation["post_channel"]
+    assert len(json.dumps(result, ensure_ascii=False).encode("utf-8")) < 100000
+
+
+@pytest.mark.parametrize("stage", ("control", "readback"))
+@pytest.mark.parametrize("malformed", ({"unexpected": True}, {"items": [{"message": "looks-right", "severity": "Message"}]}))
+def test_log_invalid_native_shapes_cannot_verify_effect(tmp_path: Path, stage: str, malformed: dict) -> None:
+    client = _LogControlClient(tmp_path)
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.addItem", ("--message", "looks-right"))
+    if stage == "control":
+        client.control_result = malformed
+    executed = invoke(["execute", previewed["transaction_id"]])
+    if stage == "readback":
+        original = client.call
+        client.call = lambda uri, args=None, options=None: malformed if uri == LOG_GET_URI else original(uri, args, options)
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == ("malformed" if stage == "readback" else "malformed_control_result")
+    assert verified["automatic_retry"] is False
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("invalid", ({"severity": "fatal"}, {"time": True}, {"parameters": [42]}))
+def test_log_referenced_native_definition_rejects_wrong_enum_and_nested_types(tmp_path: Path, version: str, invalid: dict) -> None:
+    client = _LogControlClient(tmp_path, version=version)
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.addItem", ("--message", "retained"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    client.rows = [{**row, **invalid} for row in client.rows]
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2 and verified["state"] == "verification_failed", verified
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["log_observation"]["outcome"] == "malformed"
+
+
+@pytest.mark.parametrize("native_result,error_code", (([], "INVALID_READBACK"), (RuntimeError("log observation unavailable"), "READBACK_FAILED")))
+def test_log_unavailable_readback_retains_once_executed_unverified_transaction(tmp_path: Path, native_result: object, error_code: str) -> None:
+    client = _LogControlClient(tmp_path)
+    state = tmp_path / "log-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, "ak.wwise.core.log.clear", ("--log-channel", "general"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri == LOG_GET_URI:
+            if isinstance(native_result, Exception):
+                raise native_result
+            return native_result
+        return original(uri, args, options)
+    client.call = call
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and verified["state"] == "executed_unverified", verified
+    assert verified["status"] == "verification_deferred"
+    assert verified["error_code"] == error_code
+    assert verified["automatic_retry"] is False
+    code, replay = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == "ak.wwise.core.log.clear" for uri, _, _ in client.calls) == 1
 
 
 class _ProfilerCursorControlClient(_RuntimeControlDraftClient):

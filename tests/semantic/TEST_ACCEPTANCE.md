@@ -67,6 +67,15 @@ version differences after its shared path works. Fresh separately tests Agent
 discovery/use of that interface; it is not required for every code integration
 test and still needs an explicitly approved case budget.
 
+For a new or changed native evidence collector, that code test must reach the
+existing final report/category writer and its persisted result, not stop at the
+collector's returned dictionary. Substitute the external Wwise execution while
+exercising the real collector, outcome checks and finalizer. Cover successful
+and failed outcomes, including retained partial evidence; exercise bounded
+fallbacks when changed. Reuse this proof while those consumers remain unchanged.
+Do not spend a native attempt discovering missing report fields or incompatible
+producer/consumer shapes that this code test can establish.
+
 Classify a failure before selecting reruns. Wrong Wwise state, changed unrelated
 objects or missing material authorization require the affected business checks.
 A report, directory, stale test expectation or inventory-accounting defect
@@ -93,6 +102,9 @@ Finish a frozen batch before repairing ordinary failures. Stop for systemic
 source, evidence, authorization or cleanup faults that make further runs unsafe
 or uninterpretable. Consolidate confirmed repairs, then test the failed and
 directly affected units in fresh roots. Change no code or options mid-batch.
+During code repair, rerun the failed cases and callers affected by the fix;
+retain unaffected passing results. A single failed case does not by itself
+justify rerunning the whole Program, Non-live or native selection.
 
 At promotion, run the required development gate once on the combined change.
 Choose additional Fresh coverage by what the change could invalidate. A new
