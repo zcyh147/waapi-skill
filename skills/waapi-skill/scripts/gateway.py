@@ -8831,6 +8831,7 @@ def query_business_schema_payload(
     output: str | None = None,
 ) -> dict[str, Any]:
     """Describe the one deep direct-read continuation for an object query."""
+    from wwise_waapi.reference_kind_evidence import query_read_kind_contract
 
     if output is not None:
         return {
@@ -8906,7 +8907,8 @@ def query_business_schema_payload(
             "field_meaning": "--include-field <user-facing property/reference meaning>",
             "override_source_values": override_source_value_contract(version),
             "local_references": reference_value_source_contract(version),
-            "authority": "live WAAPI metadata bound by the Gateway before object.get",
+            "authority": "live WAAPI metadata bound by the Gateway before object.get; the disclosed exact read-only kind source can certify an omitted kind",
+            "reference_kind_evidence": query_read_kind_contract(version),
             "repair": "refine the meaning when live discovery is not unique",
         },
         "sources": {
@@ -25690,6 +25692,11 @@ def _bind_query_custom_fields_from_live_metadata(
             unresolved.append({"meaning": meaning, "candidate_names": names})
             continue
         candidate = candidates.get(selected_names[0])
+        if isinstance(candidate, Mapping) and candidate.get("kind") == "unknown" and args.object_id is not None:
+            from wwise_waapi.reference_kind_evidence import certify_query_candidate
+            candidate = certify_query_candidate(candidate, version=detected_version, object_id=args.object_id, read=selection_read)
+        if isinstance(candidate, Mapping):
+            candidates[selected_names[0]] = candidate
         kind = candidate.get("kind") if isinstance(candidate, Mapping) else None
         token = candidate.get("name") if isinstance(candidate, Mapping) else None
         if kind not in {"property", "reference"} or not isinstance(token, str):
@@ -25721,6 +25728,7 @@ def _bind_query_custom_fields_from_live_metadata(
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
         )
+    args.query_reference_kind_proofs = [candidate['kind_evidence'] for candidate in candidates.values() if candidate.get('kind_evidence')]
     args.query_field_selection = selected_observations
     native_fields = list(dict.fromkeys(binding[1] for binding in bindings if binding[0] != "derived"))
     args.query_output_bindings = tuple(bindings)
@@ -25760,6 +25768,15 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
     from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
     if not payload.get("ok"):
         return payload
+    kind_proofs = list(getattr(args, 'query_reference_kind_proofs', ()))
+    kind_proofs.extend((getattr(args, 'query_related_scope_binding', None) or {}).get('reference_kind_proofs', ()))
+    if kind_proofs:
+        from wwise_waapi.reference_kind_evidence import revalidate_query_read_proofs
+        try:
+            revalidate_query_read_proofs(kind_proofs,
+                read=transaction_read_call(dispatcher, connection=connection, version=detected_version))
+        except ValueError as exc:
+            raise GatewayResultShapeError(str(exc), details={'restart_original_read': True, 'mutation_authority': False}, error_code='QUERY_REFERENCE_KIND_CHANGED') from exc
     root_conditions = getattr(args,'query_root_condition_plan',None)
     if root_conditions is not None:
         args.query_related_scope_binding = {**(getattr(args,'query_related_scope_binding',None) or {}),

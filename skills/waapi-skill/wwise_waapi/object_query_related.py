@@ -269,6 +269,7 @@ def fixed_related_bindings(version: str, requests):
 
 
 def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom_outputs: int) -> dict[str, Any]:
+    from .reference_kind_evidence import query_read_kind_contract
     source_file = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "query-related-output-sources.json"
     source = json.loads(source_file.read_text(encoding="utf-8"))
     graph = load_definition_graph(version)
@@ -322,6 +323,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "metadata_reads": False,
             "custom_metadata_reads": "actual related class/object discovery for custom terminals and reference hops; fixed paths and fixed outputs require none",
             "custom_terminal_options": list(RELATED_FIELD_MODES),
+            "reference_kind_evidence": query_read_kind_contract(version),
             "randomizers": randomizer_contract(version),
             "local_object_lists": local_list_contract(version),
             "custom_terminal_modes": {option: {kind: {"native_prefix": prefix, "output_group": {"property": "properties", "reference": "references", "override_source_value": "override_source_values", "local_reference": "local_references"}[binding_kind]}
