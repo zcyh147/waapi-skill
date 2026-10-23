@@ -5924,6 +5924,7 @@ def _prepare_object_set(
     *,
     arguments: Mapping[str, Any],
     read: ReadCall,
+    stage_new_graphs: bool = False,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     all_documented_bindings = list(arguments.get("documented_list_bindings", []))
     planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
@@ -7168,7 +7169,7 @@ def _prepare_object_set(
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
                 "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
-                if result_context and result_context['renames'] else {}),
+                if result_context and (result_context['renames'] or stage_new_graphs) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -7243,10 +7244,11 @@ def _prepare_object_set(
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
+    if result_context or stage_new_graphs:
         from .owned_result_stages import prepare as prepare_owned_stages
         try:
             stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
-                node_specs, result_context, request.version)
+                node_specs, result_context, request.version, force=stage_new_graphs)
         except ValueError as exc:
             raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
         if stage_plan is not None:
@@ -11140,9 +11142,9 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
                 groups = ordinary_set_creation_graphs(plan, state)
             except ValueError as exc:
                 raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
-            facts = state['planned_reference_context']['facts']
+            paths = state['owned_result_stages']['prospective_paths']
             from .owned_result_stages import preservation_rows
-            return [{"object_id": "path:" + facts[node['request_path']]['path'].casefold(),
+            return [{"object_id": "path:" + paths[node['request_path']].casefold(),
                 "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
                 {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
                 for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
@@ -11192,7 +11194,7 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     return scopes
 
 
-def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None, copy_proof_context=None) -> PreparedOperation:
+def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None, copy_proof_context=None, compound_child=False) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
     spec = describe_operation(request.operation)
@@ -11230,7 +11232,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if child_request.operation == "waapi.call":
                 prepared_children.append(dict(child_plan))
                 continue
-            child_prepared = prepare_operation(child_request, read_call=read)
+            child_prepared = prepare_operation(child_request, read_call=read, compound_child=True)
             for scope in _compound_outcome_scopes(child_prepared, version=request.version, read=read, evidence=metadata):
                 field_key = (_identity_key(scope["object_id"]), str(scope["field"]))
                 previous_scopes = platform_outcomes.setdefault(field_key, [])
@@ -11741,6 +11743,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             request,
             arguments=arguments,
             read=read,
+            stage_new_graphs=compound_child,
         )
         roles.update(workflow_roles)
         metadata.update(workflow_state)

@@ -26,8 +26,10 @@ def native_node(args, path):
     return node
 
 
-def prepare(uri, args, options, specs, context, version):
-    if not context or not context.get('renames'):
+def prepare(uri, args, options, specs, context, version, *, force=False):
+    if not force and (not context or not context.get('renames')):
+        return None
+    if force and not any(not node.get('existing_target') for node in specs):
         return None
     if version == '2021.1' or uri != SET:
         raise ValueError('This native-name dependency alternative requires the pinned object.set new-child association; other constructors remain #178/#192 obligations')
@@ -41,7 +43,7 @@ def prepare(uri, args, options, specs, context, version):
     deferred = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path'],
                  'platform': node.get('platform', args.get('platform'))}
         for node in specs for field in node.get('references', []) if 'target_request_path' in field]
-    if not deferred or len(deferred) > DEFAULT_MAX_NODES:
+    if len(deferred) > DEFAULT_MAX_NODES:
         raise ValueError('Native-name staging requires bounded ordinary result-reference dependencies')
     by_path = {node['request_path']: node for node in specs}
     for node in specs:
@@ -60,7 +62,21 @@ def prepare(uri, args, options, specs, context, version):
     for field in deferred:
         del native_node(creation, field['source'])['@' + field['field']]
     return {'kind': KIND, 'version': version, 'uri': uri, 'creation_args': creation,
-            'options': deepcopy(options), 'deferred': deferred}
+            'options': deepcopy(options), 'deferred': deferred, 'prospective_paths': prospective_paths(specs)}
+
+
+def prospective_paths(specs):
+    """Business overlap scope only; these paths never certify created identity."""
+    paths = {node['request_path']: node['pre_state']['path'] for node in specs if node.get('existing_target')}
+    pending = {node['request_path']: node for node in specs if not node.get('existing_target')}
+    while pending:
+        ready = [path for path, node in pending.items() if node.get('parent_request_path') in paths]
+        if not ready:
+            raise ValueError('Owned creation overlap scope lacks connected declared parents')
+        for path in ready:
+            node = pending.pop(path)
+            paths[path] = paths[node['parent_request_path']] + '\\' + node['requested_name']
+    return paths
 
 
 def bind(prepared, result, *, read):
@@ -150,7 +166,7 @@ def bind(prepared, result, *, read):
         if len(actual) != len(set(actual)) or set(actual) != expected:
             raise ValueError('Actual parent membership differs from complete sealed and returned GUID roster')
     from .operation_registry import _read_property_info
-    context = prepared['pre_state']['planned_reference_context']
+    context = prepared['pre_state'].get('planned_reference_context') or {'metadata': []}
     for field in plan['deferred']:
         source = by_path[field['source']]
         metadata = [row['metadata'] for row in context['metadata'] if row['name'] == field['field']
@@ -189,12 +205,13 @@ def execute(prepared, *, write, read, context=None):
         preservation = observe_preservation(prepared, identities, read=read, context=context)
         if not all(row['passed'] for row in preservation):
             raise ValueError('Creation changed its sealed retained parent/collision scope; dependent write stopped')
-        args = reference_args(plan, identities)
-        second = write(SET, args, plan['options'])
-        records.append({'uri': SET, 'args': args, 'options': plan['options'], 'dispatch_result': second})
-        if second.get('ok') is not True:
-            raise ValueError('Dependent reference stage was not acknowledged; do not replay')
-        validate_semantic_result(SET, second.get('result'), version=plan['version'])
+        if plan['deferred']:
+            args = reference_args(plan, identities)
+            second = write(SET, args, plan['options'])
+            records.append({'uri': SET, 'args': args, 'options': plan['options'], 'dispatch_result': second})
+            if second.get('ok') is not True:
+                raise ValueError('Dependent reference stage was not acknowledged; do not replay')
+            validate_semantic_result(SET, second.get('result'), version=plan['version'])
         return {**first, 'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan),
             'stages': records, 'identities': identities, 'readbacks': observations,
             'preservation': preservation, 'phase_context': context}}
@@ -210,7 +227,7 @@ def validate(prepared, execution, *, context=None):
     plan = prepared['pre_state']['owned_result_stages']
     proof = execution.get('owned_result_execution', {})
     stages = proof.get('stages', [])
-    if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan) or len(stages) != 2
+    if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan) or len(stages) != 1 + bool(plan['deferred'])
             or proof.get('phase_context') != context
             or stages[0].get('uri') != plan['uri'] or stages[0].get('args') != plan['creation_args']
             or stages[0].get('options') != plan['options']
@@ -240,7 +257,7 @@ def validate(prepared, execution, *, context=None):
     preserved = observe_preservation(prepared, identities, read=retained_preservation, context=context)
     if next(preserved_reads, None) is not None or preserved != proof.get('preservation') or not all(row['passed'] for row in preserved):
         raise ValueError('Owned creation preservation differs from its complete actual stage proof')
-    if stages[1].get('uri') != SET or stages[1].get('args') != reference_args(plan, identities) or stages[1].get('options') != plan['options']:
+    if plan['deferred'] and (stages[1].get('uri') != SET or stages[1].get('args') != reference_args(plan, identities) or stages[1].get('options') != plan['options']):
         raise ValueError('Dependent stage did not use the observed owned GUID and native path')
     for stage in stages:
         if stage.get('dispatch_result', {}).get('ok') is not True:
@@ -271,7 +288,7 @@ def preservation_rows(prepared):
         if spec.get('existing_target'):
             before = {**spec['pre_state'], 'classId': spec['class_id']}
             rows[before['id'].upper()] = (before, sorted(str(row['id']).upper() for row in spec.get('preexisting_children', [])))
-    for rename in prepared['pre_state']['planned_reference_context']['renames']:
+    for rename in (prepared['pre_state'].get('planned_reference_context') or {}).get('renames', []):
         for snapshot in rename['collision_state']:
             for before in snapshot['rows']:
                 children = [row['id'].upper() for row in snapshot['rows']
