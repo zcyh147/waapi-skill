@@ -2566,6 +2566,10 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None) -> LiveObje
     )
     reviewed_relative_display_path = (
         path in object_identity_semantics(object_type).relative_display_paths
+        or (certified_owned and descriptor['version'] == '2025.1'
+            and descriptor['native_type'] == 'Marker' and descriptor['class_id'] == 5373968
+            and descriptor['owner_class_id'] == 16 and descriptor['collection'] == 'Markers'
+            and path == '[Marker]')
     )
     if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path:
         raise ValueError(

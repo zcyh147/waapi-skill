@@ -6460,10 +6460,23 @@ def _prepare_object_set(
                 )
                 for root in children.roots
             ]
-        target_path = _absolute_live_object_path(
-            target.row.get("path"),
-            field=f"objects[{index}].path",
-        )
+        if (request.version == "2025.1" and target_class == 5373968
+                and target.row.get("type") == "Marker" and target.row.get("name") == ""
+                and target.row.get("path") == "[Marker]" and "name" not in item
+                and not children.nodes and not lists and "import" not in item):
+            from .documented_list_fields import capture_owned_empty_identity
+            from .business_declarations import normalize_live_object_identity
+            try:
+                owned = capture_owned_empty_identity(request.version, class_rows[0], read=read)
+                target_path = normalize_live_object_identity(class_rows[0], owned_identity=owned).path
+            except (ValueError, KeyError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", "A relative Marker display requires its exact owned identity proof.") from exc
+            target_spec["owned_identity"] = owned
+        else:
+            target_path = _absolute_live_object_path(
+                target.row.get("path"),
+                field=f"objects[{index}].path",
+            )
         target_spec["old_path"] = target_path
         future_target_path = target_path
         if "name" in item:
@@ -9568,8 +9581,9 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
-    owned = pre_state.get("owned_identity") if isinstance(pre_state, Mapping) else None
-    if owned is not None:
+    owned_proofs = ([pre_state["owned_identity"]] if isinstance(pre_state, Mapping) and pre_state.get("owned_identity") is not None else [])
+    owned_proofs.extend(node["owned_identity"] for node in pre_state.get("object_set_nodes", []) if node.get("owned_identity") is not None)
+    for owned in owned_proofs:
         from .documented_list_fields import capture_owned_empty_identity
         try:
             rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owned["object_id"]]}},
