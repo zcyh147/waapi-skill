@@ -1636,9 +1636,10 @@ def test_new_slot_scalar_reference_uses_same_graph_target_result_handle_and_actu
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-@pytest.mark.parametrize("fault", (None, "wrong-reference-effect", "nullable"))
+@pytest.mark.parametrize("fault", (None, "wrong-reference-effect", "nullable", "native-collision", "native-collision-parent-drift", "native-collision-bad-result"))
 def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_value(tmp_path, version, fault):
     """AuxBus.UserAuxSend0 is a scalar AuxBus reference in all five Objects References."""
+    native_collision = isinstance(fault, str) and fault.startswith('native-collision')
     task = OwnedGraphTask(tmp_path, version, "object.create")
     task.require_class_projection = True
     task.types = [{"classId": cid, "name": name, "type": "WObject"} for name, cid in (
@@ -1647,31 +1648,47 @@ def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_valu
     task.objects[bus_parent_id] = {"id": bus_parent_id, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
         "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep buses"}
     parent = task.bind(bus_parent_id)
+    if native_collision:
+        task.objects[CHILD] = {'id': CHILD, 'name': 'Routing', 'type': 'Bus', 'classId': 1376272,
+            'path': task.objects[bus_parent_id]['path'] + r'\Routing', 'parent': {'id': bus_parent_id}, 'notes': 'Keep collision'}
+        assert task.step('draft-business-configure', '--name-conflict', 'rename')[0] == 0
     target_id, source_id = "{55555555-5555-5555-5555-555555555555}", "{66666666-6666-6666-6666-666666666666}"
     original = task.call
     def call(uri, args=None, options=None):
         if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            assert args.get("classId") == 3997712, args
+            assert args.get("classId") == 3997712 or args.get('object') in {target_id, source_id}, args
             if uri.endswith("getPropertyAndReferenceNames"):
                 return {"return": ["UserAuxSend0"]}
             assert args["property"] == "UserAuxSend0", args
             return {"name": "UserAuxSend0", "type": "Reference", "display": {"name": "User-Defined Auxiliary Send 0"},
                 "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
+        if uri == 'ak.wwise.core.object.setReference':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert native_collision
+            assert args == {'object': source_id, 'reference': 'UserAuxSend0', 'value': target_id}
+            task.objects[source_id]['@UserAuxSend0'] = {'id': target_id}
+            return {}
         if uri == "ak.wwise.core.object.create":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             target_value = None if fault == "nullable" else r"\Master-Mixer Hierarchy\Default Work Unit\Routing\Destination"
+            sender = {"type": "AuxBus", "name": "Sender", **({"@UserAuxSend0": target_value} if not native_collision else {})}
             assert args == {"parent": bus_parent_id, "type": "Bus", "name": "Routing", "children": [
-                {"type": "AuxBus", "name": "Destination"}, {"type": "AuxBus", "name": "Sender", "@UserAuxSend0": target_value}],
-                "onNameConflict": "fail", "autoAddToSourceControl": False}
-            base = task.objects[bus_parent_id]["path"] + r"\Routing"
-            task.objects[ROOT] = {"id": ROOT, "name": "Routing", "type": "Bus", "classId": 1376272,
+                {"type": "AuxBus", "name": "Destination"}, sender],
+                "onNameConflict": "rename" if native_collision else "fail", "autoAddToSourceControl": False}
+            actual_name = 'Routing19' if native_collision else 'Routing'
+            base = task.objects[bus_parent_id]["path"] + '\\' + actual_name
+            task.objects[ROOT] = {"id": ROOT, "name": actual_name, "type": "Bus", "classId": 1376272,
                 "path": base, "parent": {"id": bus_parent_id}, "notes": ""}
             for identity, name in ((target_id, "Destination"), (source_id, "Sender")):
                 task.objects[identity] = {"id": identity, "name": name, "type": "AuxBus", "classId": 3997712,
                     "path": base + "\\" + name, "parent": {"id": ROOT}, "notes": ""}
-            task.objects[source_id]["@UserAuxSend0"] = None if fault == "nullable" else {"id": ROOT if fault == "wrong-reference-effect" else target_id}
-            return {"id": ROOT, "name": "Routing", "children": [{"id": target_id, "name": "Destination"}, {"id": source_id, "name": "Sender"}]}
+            if not native_collision:
+                task.objects[source_id]["@UserAuxSend0"] = None if fault == "nullable" else {"id": ROOT if fault == "wrong-reference-effect" else target_id}
+            children = [{"id": target_id, "name": "Destination"}, {"id": source_id, "name": "Sender"}]
+            if fault == 'native-collision-bad-result':
+                children.append(deepcopy(children[0]))
+            return {"id": ROOT, "name": actual_name, "children": list(reversed(children)) if native_collision else children}
         return original(uri, args, options)
     task.call = call
     kinds = {}
@@ -1691,10 +1708,31 @@ def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_valu
         "--field-value", field, "null" if fault == "nullable" else target["draft"]["declared_object"]["result_handle"])
     assert code == 0, source
     tx, shown = task.preview()
+    if fault in {'native-collision-parent-drift', 'native-collision-bad-result'}:
+        assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+        if fault == 'native-collision-parent-drift':
+            task.objects[bus_parent_id]['classId'] = 65552
+        code, failed = task.run('execute', tx)
+        assert code == 2, failed
+        assert len([row for row in task.calls if row[0].endswith('object.create')]) == (0 if fault.endswith('parent-drift') else 1)
+        assert not any(row[0].endswith('object.setReference') for row in task.calls)
+        if fault.endswith('bad-result'):
+            assert failed['state'] == 'indeterminate' and failed['automatic_retry'] is False, failed
+        count = len(task.calls)
+        assert task.run('execute', tx)[0] == 2
+        assert not any(row[0].endswith(('object.create', 'object.setReference')) for row in task.calls[count:])
+        return
     code, verified = task.finish(tx, shown)
     assert code == (2 if fault == "wrong-reference-effect" else 0), verified
     assert (verified.get("verified") is True) == (fault != "wrong-reference-effect"), verified
     assert len([uri for uri, _, _ in task.calls if uri.endswith("object.create")]) == 1
+
+    if native_collision:
+        assert task.objects[ROOT]['name'] == 'Routing19'
+        assert task.objects[CHILD]['notes'] == 'Keep collision'
+        assert task.objects[source_id]['@UserAuxSend0'] == {'id': target_id}
+        assert len([uri for uri, _, _ in task.calls if uri.endswith('object.setReference')]) == 1
+        assert '_waapi_' not in json.dumps(task.calls)
 
 
 @pytest.mark.parametrize("receiver,field_style,rename_case", (("existing", "handle", None), ("existing", "stable", None), ("new", "handle", None), ("new", "stable", None),

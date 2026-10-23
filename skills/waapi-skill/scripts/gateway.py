@@ -2032,6 +2032,9 @@ def build_parser() -> argparse.ArgumentParser:
         dest="local_reference_meanings", metavar="MEANING",
         help="Read one live-discovered reference stored directly on the queried object",
     )
+    query_object.add_argument('--where-field', nargs=4, action='append', default=[],
+        metavar=('MODE','MEANING','COMPARISON','VALUE'),
+        help='Filter the complete business source using one live-discovered scalar property before the final root limit')
     query_object.add_argument(
         "--predicate",
         nargs=2,
@@ -5600,6 +5603,11 @@ def preflight_typed_zero_input(
 
 def _query_sequence_condition(version, condition):
     """Reuse the ordinary business vocabulary and literal/type compiler."""
+    if 'field_condition' in condition:
+        from wwise_waapi.object_query_field_conditions import parse_field_condition
+        field = condition['field_condition']
+        parse_field_condition([field[key] for key in ('mode','meaning','comparison','value')])
+        return None  # Actual class/GUID metadata must bind before compilation.
     name, value = condition['condition'], condition['value']
     if name == QUERY_BUSINESS_KIND_PREDICATE:
         if value not in QUERY_BUSINESS_KINDS:
@@ -5681,6 +5689,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 getattr(args, "override_source_value_meanings", None),
                 getattr(args, "local_reference_meanings", None),
                 getattr(args, "business_predicates", None),
+                getattr(args, "where_field", None),
                 args.max_results is not None,
             )
         ):
@@ -5719,6 +5728,16 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         raise GatewayInputError(str(exc)) from exc
     (projection_version,) = resolve_catalog_versions(args, env=env)
     _compile_query_business_projection(args, version=projection_version)
+    from wwise_waapi.object_query_field_conditions import parse_field_condition
+    try:
+        args.query_field_conditions = tuple(parse_field_condition(values) for values in args.where_field)
+        if len(args.query_field_conditions) > MAX_QUERY_CUSTOM_OUTPUTS:
+            raise ValueError('Field conditions exceed the existing custom-meaning declaration budget')
+        signatures = [json.dumps({**item['field_condition'],'meaning':' '.join(item['field_condition']['meaning'].split()).casefold()},sort_keys=True) for item in args.query_field_conditions]
+        if len(signatures)!=len(set(signatures)):
+            raise ValueError('Root field conditions must be unique')
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
     args.where = []
     args.select = [
         QUERY_BUSINESS_RELATIONSHIPS[value]
@@ -6025,9 +6044,9 @@ def validate_original_file_reference_match_input(
             "--match-original-file-path owns its Audio File Source query and "
             "cannot be combined with another query source"
         )
-    if args.where:
+    if args.where or args.query_field_conditions:
         raise GatewayInputError(
-            "--match-original-file-path cannot be combined with --where"
+            "--match-original-file-path owns its fixed query and cannot be combined with predicates or --where-field"
         )
     if args.select:
         raise GatewayInputError(
@@ -8818,6 +8837,7 @@ def query_business_schema_payload(
             "ok": True, "status": "ok", "command": "query-schema", "version": version,
             "business_output": query_output_detail(version, output),
         }
+    from wwise_waapi.object_query_field_conditions import field_condition_contract
     if advanced:
         advanced_schema = advanced_query_schema(version=version)
         waql_schema = advanced_schema["properties"]["waql"]
@@ -8832,6 +8852,7 @@ def query_business_schema_payload(
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
             "return_scope": _query_return_scope_contract(),
+            "field_conditions": field_condition_contract(version, maximum_conditions=MAX_QUERY_CUSTOM_OUTPUTS),
             "result_presence": _query_result_presence_contract(),
             "business_outputs": [name for name, binding in available_query_outputs(version).items() if binding[0] is not None],
             "output_detail": "query-schema --output <business-output>",
@@ -8875,6 +8896,7 @@ def query_business_schema_payload(
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
         "return_scope": _query_return_scope_contract(),
+        "field_conditions": field_condition_contract(version, maximum_conditions=MAX_QUERY_CUSTOM_OUTPUTS),
         "result_presence": _query_result_presence_contract(),
         "business_outputs": list(available_query_outputs(version)),
         "output_detail": "query-schema --output <business-output>",
@@ -15432,7 +15454,12 @@ def dispatch_command(
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
+            root_conditions = (_prepare_root_field_conditions(args,args.advanced_waql,
+                connection=connection,detected_version=detected_version,dispatcher=dispatcher)
+                if args.query_field_conditions else None)
             def related_advanced_preview(fields):
+                if root_conditions is not None:
+                    return root_conditions.preview(fields)
                 return build_advanced_object_get_query({"contract": ADVANCED_QUERY_CONTRACT,
                     "waql": args.advanced_waql, "return": list(fields), "max_results": args.max_results},
                     version=detected_version, platform=args.query_platform, language=args.query_language)
@@ -15572,7 +15599,17 @@ def dispatch_command(
                 "agent_result": custom_field_clarification,
             }
         where = typed_query_predicates(args)
+        root_conditions = None
+        if args.query_field_conditions:
+            source = build_object_get_query(path=args.path,object_id=args.object_id,object_ids=args.object_ids,
+                type=args.object_type,search=args.search,query=args.query,where=where,
+                select=tuple(args.select or ()),return_fields=SELECTED_REQUIRED_RETURN_FIELDS,version=detected_version,
+                platform=args.query_platform,language=args.query_language)
+            root_conditions = _prepare_root_field_conditions(args,source.envelope.args['waql'],
+                connection=connection,detected_version=detected_version,dispatcher=dispatcher)
         def related_business_preview(fields):
+            if root_conditions is not None:
+                return root_conditions.preview(fields)
             return build_object_get_query(path=args.path, object_id=args.object_id, object_ids=args.object_ids,
                 type=args.object_type, search=args.search, query=args.query, where=where,
                 select=tuple(args.select or ()), take=args.take, return_fields=fields, version=detected_version,
@@ -15585,9 +15622,10 @@ def dispatch_command(
         _require_exact_identity_return_field(args, return_fields)
         if getattr(args, "query_derived_outputs", ()):
             from wwise_waapi.object_query_active_source import ActiveSourceQueryError, resolve_2021_active_source
+            from wwise_waapi.object_query_related_runtime import RelatedQueryError
             from wwise_waapi.canonical import canonical_json_bytes
             _require_explicit_query_bound(args)
-            broad = not ((args.object_id is not None or args.path is not None) and not args.select and not where)
+            broad = root_conditions is not None or not ((args.object_id is not None or args.path is not None) and not args.select and not where)
             selector = ({"object_id": args.object_id} if args.object_id is not None else {"path": args.path})
             if broad:
                 selector = {"path": args.path, "object_id": args.object_id, "object_ids": args.object_ids,
@@ -15604,8 +15642,15 @@ def dispatch_command(
                         details={"completed_calls": len(calls), "limit_calls": read_limit,
                                  "observed_bytes": observed_bytes},
                         error_code="ACTIVE_SOURCE_OBSERVATION_INCOMPLETE")
-                call = dispatch(dispatcher, api, connection=connection, version=detected_version,
-                    args=native_args, options=native_options)
+                if root_conditions is not None:
+                    try:
+                        observed = root_conditions.read(api,native_args,native_options)
+                    except RelatedQueryError as exc:
+                        raise GatewayResultShapeError(str(exc),details=exc.details,error_code=exc.code) from exc
+                    call = {'ok':True,'result':observed,**args.query_related_read_evidence[-1]['call']}
+                else:
+                    call = dispatch(dispatcher, api, connection=connection, version=detected_version,
+                        args=native_args, options=native_options)
                 result_bytes = len(canonical_json_bytes(call.get("result")))
                 if result_bytes > read_limit * MAX_GATEWAY_RESULT_JSON_BYTES - observed_bytes:
                     raise GatewayResultShapeError("Active-source observation exceeded its aggregate byte budget",
@@ -15620,6 +15665,7 @@ def dispatch_command(
             try:
                 native_rows, preview, source_proof, project_observation = resolve_2021_active_source(read=read_active_source,
                     selector=selector, broad=broad,
+                    selector_preview=(lambda fields,view: root_conditions.preview(fields,view=view)) if root_conditions is not None else None,
                     maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
                     platform=args.query_platform, language=args.query_language,
                     return_fields=tuple(return_fields), live_info=live_info,
@@ -15651,21 +15697,7 @@ def dispatch_command(
                 native={"result": {"return": native_rows, "active_source_resolution": source_proof}},
                 envelope=preview.envelope, env=env, connection=connection, detected_version=detected_version,
                 dispatcher=dispatcher, common=common, live_info=live_info)
-        preview = build_object_get_query(
-            path=args.path,
-            object_id=args.object_id,
-            object_ids=args.object_ids,
-            type=args.object_type,
-            search=args.search,
-            query=args.query,
-            where=where,
-            select=tuple(args.select or ()),
-            take=args.take,
-            return_fields=return_fields,
-            version=detected_version,
-            platform=args.query_platform,
-            language=args.query_language,
-        )
+        preview = related_business_preview(return_fields)
         _require_explicit_query_bound(args)
         envelope = preview.envelope
         result = dispatch(
@@ -25122,6 +25154,35 @@ def _query_result_presence_contract() -> dict[str, Any]:
     }
 
 
+def _prepare_root_field_conditions(args, body, *, connection, detected_version, dispatcher):
+    from wwise_waapi.object_query_field_conditions import RootScalarConditionPlan
+    from wwise_waapi.object_query_related_runtime import RelatedQueryError
+    from wwise_waapi.canonical import canonical_sha256
+    calls, evidence = [], []
+    read = transaction_read_call(dispatcher,connection=connection,version=detected_version,call_sink=calls)
+    def observed_read(uri,native_args,options):
+        try:
+            result = read(uri,native_args,options)
+        except OperationContractError as exc:
+            raise RelatedQueryError(str(exc),code='QUERY_FIELD_CONDITION_READ_FAILED',details=exc.details) from exc
+        evidence.append({'api':uri,'args':native_args,'options':options,'result_sha256':canonical_sha256(result),'call':calls[-1]})
+        return result
+    plan = RootScalarConditionPlan(version=detected_version,body=body,conditions=args.query_field_conditions,
+        read=observed_read,maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES,
+        final_limit=(args.max_results if args.advanced_waql is not None else _query_result_maximum(args)) or MAX_QUERY_TAKE,
+        platform=args.query_platform,language=args.query_language)
+    try:
+        plan.prepare()
+    except RelatedQueryError as exc:
+        code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+        raise GatewayResultShapeError(str(exc),details={**exc.details,'calls':calls},error_code=code) from exc
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    args.query_root_condition_plan = plan
+    args.query_related_read_evidence = evidence
+    return plan
+
+
 def _prepare_query_related_outputs(args, *, build_preview, connection, detected_version, dispatcher):
     if not getattr(args, "query_related_preparation_required", False):
         return None
@@ -25130,7 +25191,10 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
         if getattr(args, "query_related_has_lists", False):
             from wwise_waapi.object_query_related_lists import RelatedListPlan
             from wwise_waapi.canonical import canonical_sha256
+            root_conditions = getattr(args,'query_root_condition_plan',None)
             calls, evidence = [], []
+            if root_conditions is not None:
+                evidence = args.query_related_read_evidence
             raw_read = transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=calls)
             def read(uri, native_args, options):
                 try:
@@ -25140,7 +25204,10 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
                 evidence.append({"api": uri, "args": native_args, "options": options,
                     "result_sha256": canonical_sha256(result), "call": calls[-1]})
                 return result
+            if root_conditions is not None:
+                read = root_conditions.read
             plan = RelatedListPlan(version=detected_version, requests=args.query_related_requests,
+                binder=root_conditions.binder if root_conditions is not None else None,
                 bindings=args.query_output_bindings, build_preview=build_preview, read=read,
                 compile_condition=lambda condition: _query_sequence_condition(detected_version, condition),
                 maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
@@ -25182,6 +25249,14 @@ def _project_query_business_rows(
 ) -> list[dict[str, Any]]:
     """Rename Gateway-compiled native accessors into stable business fields."""
 
+    root_conditions = getattr(args,'query_root_condition_plan',None)
+    if root_conditions is not None:
+        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+        try:
+            root_conditions.validate(rows)
+        except RelatedQueryError as exc:
+            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+            raise GatewayResultShapeError(str(exc),details=exc.details,error_code=code) from exc
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     proof = getattr(args, "query_related_scope_binding", None)
     list_plan = getattr(args, "query_related_list_plan", None)
@@ -25661,6 +25736,10 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
     from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
     if not payload.get("ok"):
         return payload
+    root_conditions = getattr(args,'query_root_condition_plan',None)
+    if root_conditions is not None:
+        args.query_related_scope_binding = {**(getattr(args,'query_related_scope_binding',None) or {}),
+            'root_field_conditions':root_conditions.proof()}
     if args.detail and getattr(args, "query_related_scope_binding", None) is not None:
         terminal = payload.pop("agent_result")
         payload["related_scope_binding"] = args.query_related_scope_binding
@@ -25686,6 +25765,7 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
             "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
             "output_bindings": getattr(args, "query_output_bindings", ()),
             "field_selection": getattr(args, "query_field_selection", None),
+            "root_field_conditions": root_conditions.proof() if root_conditions is not None else None,
             "related_scope_binding": getattr(args, "query_related_scope_binding", None)},
             "native_result_sha256": canonical_sha256(native["result"]),
             "projection_sha256": canonical_sha256({key: payload[key] for key in ("objects", "native_observation") if key in payload})}

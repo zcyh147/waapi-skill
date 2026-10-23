@@ -5246,7 +5246,8 @@ def _prepare_object_create(
             **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
-                "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
+                "dependent_write": "after actual GUID/class/parent/membership binding",
+                "stage_count": 1 + sum(1 for node in node_specs for field in node.get("references", []) if "target_request_path" in field)}}
                 if result_context and result_context['renames'] else {}),
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
@@ -5343,10 +5344,19 @@ def _prepare_object_create(
         from .owned_result_stages import prepare as prepare_owned_stages
         try:
             stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
-                node_specs, result_context, request.version)
+                node_specs, result_context, request.version, root_parent=parent.row, parent_children=parent_children)
         except ValueError as exc:
             raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
         if stage_plan is not None:
+            from .owned_result_stages import FIELDS as stage_fields
+            parent_rows = _rows(read(OBJECT_GET_URI, {'from': {'id': [parent.object]}}, {'return': stage_fields}))
+            if (len(parent_rows) != 1 or not _same_identity(parent_rows[0].get('id'), parent.object)
+                    or any(parent_rows[0].get(key) != parent.row.get(key) for key in ('name', 'type', 'path'))
+                    or type(parent_rows[0].get('classId')) is not int or not any(info.class_id == parent_rows[0]['classId']
+                        and info.name == parent_rows[0].get('type') for info in type_catalog)):
+                raise OperationContractError('INVALID_READBACK', 'Staged creation parent requires its exact live GUID/class identity')
+            stage_plan['parent_before'] = parent_rows[0]
+            graph_guard['field_snapshots'].append({'object_id': parent.object, 'fields': stage_fields, 'platform': None, 'rows': parent_rows})
             state["owned_result_stages"] = stage_plan
             from .owned_result_stages import preservation_rows
             try:
@@ -5924,6 +5934,7 @@ def _prepare_object_set(
     *,
     arguments: Mapping[str, Any],
     read: ReadCall,
+    stage_new_graphs: bool = False,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
     all_documented_bindings = list(arguments.get("documented_list_bindings", []))
     planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
@@ -7157,6 +7168,7 @@ def _prepare_object_set(
         dispatch_args["platform"] = global_platform
     from .planned_references import apply_result_name_choices
     apply_result_name_choices(node_specs, result_context)
+    deferred_reference_stage = any('target_request_path' in field for node in node_specs for field in node.get('references', []))
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.set",
         args=dispatch_args,
@@ -7167,8 +7179,9 @@ def _prepare_object_set(
             "closed_object_batch": True,
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
-                "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
-                if result_context and result_context['renames'] else {}),
+                "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
+                "stage_count": 1 + bool(deferred_reference_stage)}}
+                if (result_context and result_context['renames']) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -7243,10 +7256,11 @@ def _prepare_object_set(
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
+    if result_context or stage_new_graphs:
         from .owned_result_stages import prepare as prepare_owned_stages
         try:
             stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
-                node_specs, result_context, request.version)
+                node_specs, result_context, request.version, force=stage_new_graphs)
         except ValueError as exc:
             raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
         if stage_plan is not None:
@@ -11148,9 +11162,9 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
                 groups = ordinary_set_creation_graphs(plan, state)
             except ValueError as exc:
                 raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
-            facts = state['planned_reference_context']['facts']
+            paths = state['owned_result_stages']['prospective_paths']
             from .owned_result_stages import preservation_rows
-            return [{"object_id": "path:" + facts[node['request_path']]['path'].casefold(),
+            return [{"object_id": "path:" + paths[node['request_path']].casefold(),
                 "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
                 {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
                 for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
@@ -11200,7 +11214,7 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     return scopes
 
 
-def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None, copy_proof_context=None) -> PreparedOperation:
+def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history_resolver=None, copy_proof_context=None, compound_child=False) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
     spec = describe_operation(request.operation)
@@ -11238,7 +11252,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if child_request.operation == "waapi.call":
                 prepared_children.append(dict(child_plan))
                 continue
-            child_prepared = prepare_operation(child_request, read_call=read)
+            child_prepared = prepare_operation(child_request, read_call=read, compound_child=True)
             for scope in _compound_outcome_scopes(child_prepared, version=request.version, read=read, evidence=metadata):
                 field_key = (_identity_key(scope["object_id"]), str(scope["field"]))
                 previous_scopes = platform_outcomes.setdefault(field_key, [])
@@ -11749,6 +11763,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             request,
             arguments=arguments,
             read=read,
+            stage_new_graphs=compound_child,
         )
         roles.update(workflow_roles)
         metadata.update(workflow_state)
@@ -20611,7 +20626,16 @@ def verify_prepared_operation(
         result_nodes: tuple[ObjectResultNode, ...] = ()
         result_by_path: dict[str, ObjectResultNode] = {}
         try:
-            if kind == "object-create-graph":
+            if owned_stage_identities is not None:
+                # Project the validated business association roster, never a
+                # synthetic merged native response. Every native stage stays
+                # separately retained in owned_result_execution.
+                result_by_path = {spec['request_path']: ObjectResultNode(spec['request_path'], spec.get('parent_request_path'),
+                    owned_stage_identities[spec['request_path']]['id'], owned_stage_identities[spec['request_path']]['name'],
+                    len([child for child in specs if child.get('parent_request_path') == spec['request_path']]), spec.get('collection'))
+                    for spec in specs}
+                result_nodes = tuple(result_by_path.values())
+            elif kind == "object-create-graph":
                 result_nodes = flatten_create_result(payload)
                 result_by_path = {row.request_path: row for row in result_nodes}
             else:

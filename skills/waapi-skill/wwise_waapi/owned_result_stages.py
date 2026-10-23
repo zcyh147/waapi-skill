@@ -10,11 +10,13 @@ from copy import deepcopy
 from typing import Mapping
 
 from .canonical import canonical_sha256
-from .operation_object import DEFAULT_MAX_NODES, flatten_set_result
+from .operation_object import DEFAULT_MAX_NODES, flatten_set_result, flatten_create_result
 
 KIND = 'owned-ordinary-result-stages/v1'
 GET = 'ak.wwise.core.object.get'
 SET = 'ak.wwise.core.object.set'
+CREATE = 'ak.wwise.core.object.create'
+SET_REFERENCE = 'ak.wwise.core.object.setReference'
 FIELDS = ['id', 'name', 'type', 'path', 'parent', 'classId', 'notes']
 
 
@@ -26,11 +28,13 @@ def native_node(args, path):
     return node
 
 
-def prepare(uri, args, options, specs, context, version):
-    if not context or not context.get('renames'):
+def prepare(uri, args, options, specs, context, version, *, force=False, root_parent=None, parent_children=()):
+    if not force and (not context or not context.get('renames')):
         return None
-    if version == '2021.1' or uri != SET:
-        raise ValueError('This native-name dependency alternative requires the pinned object.set new-child association; other constructors remain #178/#192 obligations')
+    if force and not any(not node.get('existing_target') for node in specs):
+        return None
+    if uri not in {SET, CREATE} or uri == SET and version == '2021.1':
+        raise ValueError('Owned ordinary creation requires its pinned native constructor')
     if (not specs or len(specs) > DEFAULT_MAX_NODES or any(
             node.get('collection') not in {None, 'children'} or node.get('preexisting_id') is not None
             or node.get('list_request_paths') or node.get('list_snapshots') or node.get('import_requested')
@@ -41,7 +45,7 @@ def prepare(uri, args, options, specs, context, version):
     deferred = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path'],
                  'platform': node.get('platform', args.get('platform'))}
         for node in specs for field in node.get('references', []) if 'target_request_path' in field]
-    if not deferred or len(deferred) > DEFAULT_MAX_NODES:
+    if len(deferred) > DEFAULT_MAX_NODES:
         raise ValueError('Native-name staging requires bounded ordinary result-reference dependencies')
     by_path = {node['request_path']: node for node in specs}
     for node in specs:
@@ -54,13 +58,31 @@ def prepare(uri, args, options, specs, context, version):
             raise ValueError('Native-name association currently needs one new child per retained parent; multi-collision alternatives remain #178/#192')
         if len({child['requested_name'].casefold() for child in children}) != len(children):
             raise ValueError('Fresh-parent siblings require distinct exact declared names')
-        if not node.get('existing_target') and node.get('parent_request_path') not in by_path:
+        if not node.get('existing_target') and node.get('parent_request_path') not in by_path and not (uri == CREATE and node['request_path'] == '$'):
             raise ValueError('Every staged new occurrence needs its declared parent association')
     creation = deepcopy(args)
     for field in deferred:
         del native_node(creation, field['source'])['@' + field['field']]
     return {'kind': KIND, 'version': version, 'uri': uri, 'creation_args': creation,
-            'options': deepcopy(options), 'deferred': deferred}
+            'options': deepcopy(options), 'deferred': deferred,
+            'prospective_paths': prospective_paths(specs, root_parent=root_parent),
+            **({'parent_before': dict(root_parent), 'parent_children': list(parent_children), 'parent_id': args['parent']} if uri == CREATE else {})}
+
+
+def prospective_paths(specs, *, root_parent=None):
+    """Business overlap scope only; these paths never certify created identity."""
+    paths = {node['request_path']: node['pre_state']['path'] for node in specs if node.get('existing_target')}
+    if root_parent is not None:
+        paths['$'] = root_parent['path'] + '\\' + specs[0]['requested_name']
+    pending = {node['request_path']: node for node in specs if not node.get('existing_target') and node['request_path'] not in paths}
+    while pending:
+        ready = [path for path, node in pending.items() if node.get('parent_request_path') in paths]
+        if not ready:
+            raise ValueError('Owned creation overlap scope lacks connected declared parents')
+        for path in ready:
+            node = pending.pop(path)
+            paths[path] = paths[node['parent_request_path']] + '\\' + node['requested_name']
+    return paths
 
 
 def bind(prepared, result, *, read):
@@ -69,7 +91,7 @@ def bind(prepared, result, *, read):
     specs = prepared['verification_plan']['nodes']
     plan = prepared['pre_state']['owned_result_stages']
     by_path = {node['request_path']: node for node in specs}
-    returned = flatten_set_result(result)
+    returned = flatten_create_result(result) if plan['uri'] == CREATE else flatten_set_result(result)
     returned_children, bound, seen = {}, {}, set()
     for node in returned:
         if node.parent_request_path is not None:
@@ -94,7 +116,7 @@ def bind(prepared, result, *, read):
             bind_occurrence(child, matches[0])
     for node in returned:
         if node.parent_request_path is None:
-            matches = [spec for spec in specs if spec.get('existing_target') and _same_identity(spec.get('target_id'), node.object)]
+            matches = ([by_path['$']] if plan['uri'] == CREATE else [spec for spec in specs if spec.get('existing_target') and _same_identity(spec.get('target_id'), node.object)])
             if len(matches) != 1:
                 raise ValueError('Native parent association is not one sealed exact GUID')
             bind_occurrence(node, matches[0])
@@ -113,6 +135,9 @@ def bind(prepared, result, *, read):
         return rows
     all_before = {str(row['id']).upper() for node in specs for row in node.get('preexisting_children', [])}
     all_before.update(str(node['target_id']).upper() for node in specs if node.get('existing_target'))
+    if plan['uri'] == CREATE:
+        all_before.update(str(row['id']).upper() for row in plan['parent_children'])
+        all_before.add(plan['parent_id'].upper())
     for path, spec in by_path.items():
         returned = bound.get(path)
         object_id = spec.get('target_id') if spec.get('existing_target') else returned.object if returned else None
@@ -150,7 +175,7 @@ def bind(prepared, result, *, read):
         if len(actual) != len(set(actual)) or set(actual) != expected:
             raise ValueError('Actual parent membership differs from complete sealed and returned GUID roster')
     from .operation_registry import _read_property_info
-    context = prepared['pre_state']['planned_reference_context']
+    context = prepared['pre_state'].get('planned_reference_context') or {'metadata': []}
     for field in plan['deferred']:
         source = by_path[field['source']]
         metadata = [row['metadata'] for row in context['metadata'] if row['name'] == field['field']
@@ -173,6 +198,14 @@ def reference_args(plan, identities):
     return {'objects': rows}
 
 
+def reference_calls(plan, identities):
+    if plan['uri'] == SET:
+        return [{'uri': SET, 'args': reference_args(plan, identities), 'options': plan['options']}] if plan['deferred'] else []
+    return [{'uri': SET_REFERENCE, 'args': {'object': identities[field['source']]['id'], 'reference': field['field'],
+        'value': identities[field['target']]['id'], **({'platform': field['platform']} if field['platform'] is not None else {})},
+        'options': {}} for field in plan['deferred']]
+
+
 def execute(prepared, *, write, read, context=None):
     """Execute the sealed stage pair once, retaining uncertainty as evidence."""
     from .builders.schema import validate_semantic_result
@@ -189,12 +222,12 @@ def execute(prepared, *, write, read, context=None):
         preservation = observe_preservation(prepared, identities, read=read, context=context)
         if not all(row['passed'] for row in preservation):
             raise ValueError('Creation changed its sealed retained parent/collision scope; dependent write stopped')
-        args = reference_args(plan, identities)
-        second = write(SET, args, plan['options'])
-        records.append({'uri': SET, 'args': args, 'options': plan['options'], 'dispatch_result': second})
-        if second.get('ok') is not True:
-            raise ValueError('Dependent reference stage was not acknowledged; do not replay')
-        validate_semantic_result(SET, second.get('result'), version=plan['version'])
+        for call in reference_calls(plan, identities):
+            second = write(call['uri'], call['args'], call['options'])
+            records.append({**call, 'dispatch_result': second})
+            if second.get('ok') is not True:
+                raise ValueError('Dependent reference stage was not acknowledged; do not replay')
+            validate_semantic_result(call['uri'], second.get('result'), version=plan['version'])
         return {**first, 'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan),
             'stages': records, 'identities': identities, 'readbacks': observations,
             'preservation': preservation, 'phase_context': context}}
@@ -210,7 +243,7 @@ def validate(prepared, execution, *, context=None):
     plan = prepared['pre_state']['owned_result_stages']
     proof = execution.get('owned_result_execution', {})
     stages = proof.get('stages', [])
-    if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan) or len(stages) != 2
+    if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan) or len(stages) != 1 + (len(plan['deferred']) if plan['uri'] == CREATE else bool(plan['deferred']))
             or proof.get('phase_context') != context
             or stages[0].get('uri') != plan['uri'] or stages[0].get('args') != plan['creation_args']
             or stages[0].get('options') != plan['options']
@@ -240,8 +273,10 @@ def validate(prepared, execution, *, context=None):
     preserved = observe_preservation(prepared, identities, read=retained_preservation, context=context)
     if next(preserved_reads, None) is not None or preserved != proof.get('preservation') or not all(row['passed'] for row in preserved):
         raise ValueError('Owned creation preservation differs from its complete actual stage proof')
-    if stages[1].get('uri') != SET or stages[1].get('args') != reference_args(plan, identities) or stages[1].get('options') != plan['options']:
-        raise ValueError('Dependent stage did not use the observed owned GUID and native path')
+    calls = reference_calls(plan, identities)
+    if any(any(stage.get(key) != call[key] for key in ('uri', 'args', 'options'))
+            for stage, call in zip(stages[1:], calls, strict=True)):
+        raise ValueError('Dependent stage did not use the observed owned GUID and native reference identity')
     for stage in stages:
         if stage.get('dispatch_result', {}).get('ok') is not True:
             raise ValueError('Owned stage acknowledgement is incomplete')
@@ -267,11 +302,15 @@ def public_result(result):
 def preservation_rows(prepared):
     """Complete ordinary retained parent and collision subtree images."""
     rows = {}
+    stage_plan = prepared['pre_state']['owned_result_stages']
+    if stage_plan['uri'] == CREATE:
+        before = stage_plan['parent_before']
+        rows[before['id'].upper()] = (before, sorted(str(row['id']).upper() for row in stage_plan['parent_children']))
     for spec in prepared['verification_plan']['nodes']:
         if spec.get('existing_target'):
             before = {**spec['pre_state'], 'classId': spec['class_id']}
             rows[before['id'].upper()] = (before, sorted(str(row['id']).upper() for row in spec.get('preexisting_children', [])))
-    for rename in prepared['pre_state']['planned_reference_context']['renames']:
+    for rename in (prepared['pre_state'].get('planned_reference_context') or {}).get('renames', []):
         for snapshot in rename['collision_state']:
             for before in snapshot['rows']:
                 children = [row['id'].upper() for row in snapshot['rows']
