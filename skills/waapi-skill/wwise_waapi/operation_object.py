@@ -504,8 +504,10 @@ def normalize_object_tree(
     """Normalize one root and return its deterministic request-relative list."""
 
     request_size = _request_size(payload, limits=limits, path=base_path)
+    conflict = normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned)
     state = _NormalizationState(
         limits,
+        on_name_conflict=conflict,
         allow_platform=allow_platform,
         allow_language=allow_language,
         allow_import=allow_import,
@@ -514,7 +516,7 @@ def normalize_object_tree(
     return NormalizedObjectTree(
         root=root,
         nodes=flatten_request_nodes((root,)),
-        on_name_conflict=normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned),
+        on_name_conflict=conflict,
         request_size_bytes=request_size,
     )
 
@@ -567,8 +569,10 @@ def normalize_object_forest(
             f"{base_path} exceeds the per-parent child limit.",
             details={"path": base_path, "count": len(payload), "limit": limits.max_children_per_node},
         )
+    conflict = normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned)
     state = _NormalizationState(
         limits,
+        on_name_conflict=conflict if root_collection == "children" else "fail",
         allow_platform=allow_platform,
         allow_language=allow_language,
         allow_import=allow_import,
@@ -583,11 +587,11 @@ def normalize_object_forest(
         )
         for index, item in enumerate(payload)
     )
-    _reject_duplicate_sibling_names(roots, path=base_path)
+    _reject_duplicate_sibling_names(roots, path=base_path, on_name_conflict=conflict)
     return NormalizedObjectForest(
         roots=roots,
         nodes=flatten_request_nodes(roots),
-        on_name_conflict=normalize_conflict_policy(on_name_conflict, replace_owned=replace_owned),
+        on_name_conflict=conflict,
         request_size_bytes=request_size,
     )
 
@@ -1282,11 +1286,13 @@ class _NormalizationState:
         self,
         limits: ObjectTreeLimits,
         *,
+        on_name_conflict: str,
         allow_platform: bool,
         allow_language: bool,
         allow_import: bool,
     ) -> None:
         self.limits = limits
+        self.on_name_conflict = on_name_conflict
         self.allow_platform = allow_platform
         self.allow_language = allow_language
         self.allow_import = allow_import
@@ -1300,7 +1306,9 @@ class _NormalizationState:
         parent_path: str | None,
         depth: int,
         collection: str = "children",
+        on_name_conflict: str | None = None,
     ) -> ObjectNodeDescriptor:
+        conflict = self.on_name_conflict if on_name_conflict is None else on_name_conflict
         if depth > self.limits.max_depth:
             raise ObjectOperationContractError(
                 "DEPTH_LIMIT_EXCEEDED",
@@ -1469,6 +1477,7 @@ class _NormalizationState:
                 request_path=f"{request_path}.children[{index}]",
                 parent_path=request_path,
                 depth=depth + 1,
+                on_name_conflict=conflict if plugin is None and not anonymous else "fail",
             )
             for index, child in enumerate(raw_children)
         )
@@ -1478,7 +1487,8 @@ class _NormalizationState:
                 raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN_PLACEMENT", "One new local Effect belongs to one new anonymous slot and cannot conflict with another Effect target")
             from dataclasses import replace
             children = tuple(replace(child, collection="Effect") if child in owned else child for child in children)
-        _reject_duplicate_sibling_names(children, path=f"{request_path}.children")
+        _reject_duplicate_sibling_names(children, path=f"{request_path}.children",
+            on_name_conflict=conflict if plugin is None and not anonymous else "fail")
         lists: list[ObjectListDescriptor] = []
         for index, raw_list in enumerate(_descriptor_rows(
             mapping.get("lists", []), request_path=f"{request_path}.lists", limit=self.limits.max_children_per_node,
@@ -1490,7 +1500,7 @@ class _NormalizationState:
                 raise ObjectOperationContractError("DUPLICATE_FIELD", "A nested list must not collide with another list, property or reference.")
             members = _descriptor_rows(raw_list.get("objects"), request_path=f"{list_path}.objects", limit=self.limits.max_children_per_node)
             objects = tuple(self.node(member, request_path=f"{list_path}.objects[{member_index}]", parent_path=request_path,
-                                      depth=depth + 1, collection=list_name) for member_index, member in enumerate(members))
+                                      depth=depth + 1, collection=list_name, on_name_conflict="fail") for member_index, member in enumerate(members))
             _reject_duplicate_sibling_names(objects, path=f"{list_path}.objects")
             lists.append(ObjectListDescriptor(list_path, list_name, objects, flatten_request_nodes(objects)))
         return ObjectNodeDescriptor(
@@ -2070,8 +2080,10 @@ def _require_object_id(value: Any, *, path: str) -> None:
         )
 
 
-def _reject_duplicate_sibling_names(nodes: Sequence[ObjectNodeDescriptor], *, path: str) -> None:
-    seen: dict[str, str] = {}
+def _reject_duplicate_sibling_names(
+    nodes: Sequence[ObjectNodeDescriptor], *, path: str, on_name_conflict: str = "fail",
+) -> None:
+    seen: dict[str, ObjectNodeDescriptor] = {}
     duplicates: list[str] = []
     for node in nodes:
         if node.anonymous or node.rtpc is not None and isinstance(node.rtpc.control_input, OwnedControlInputDescriptor):
@@ -2079,13 +2091,18 @@ def _reject_duplicate_sibling_names(nodes: Sequence[ObjectNodeDescriptor], *, pa
         key = ("rtpc:" + json.dumps([node.rtpc.property, node.rtpc.control_input.as_dict()], sort_keys=True)
                if node.rtpc is not None else node.name.casefold())
         if key in seen:
-            duplicates.append(node.name)
+            previous = seen[key]
+            if not (on_name_conflict == "rename" and all(
+                item.collection == "children" and item.plugin is None
+                and item.rtpc is None and not item.anonymous for item in (previous, node)
+            )):
+                duplicates.append(node.name)
         else:
-            seen[key] = node.name
+            seen[key] = node
     if duplicates:
         raise ObjectOperationContractError(
             "DUPLICATE_SIBLING_NAME",
-            "One request must not contain case-insensitive duplicate sibling names.",
+            "Duplicate sibling names require ordinary new children with rename conflict policy.",
             details={"path": path, "duplicates": duplicates},
         )
 

@@ -3891,6 +3891,7 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
         return source, before, shown
     code, result = task.finish(source, shown)
     assert code == (0 if expected_verified else 2) and result["verified"] is expected_verified, json.dumps(result)
+    task.source_verification = result
     after = deepcopy(task.objects)
     source_call = task.call
     def history(uri, args=None, options=None):
@@ -4212,7 +4213,7 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False, duplicate_siblings=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     operation = 'object.set' if native_rename or set_graph else 'object.create'
@@ -4248,6 +4249,7 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         'Destination': '{77777777-7777-7777-7777-777777777777}', 'Sender': '{88888888-8888-8888-8888-888888888888}'}
     platform = '{44444444-4444-4444-4444-444444444444}'
     original = task.call
+    duplicate_created = []
     def call(uri, args=None, options=None):
         if platform_certified and uri.endswith('getProjectInfo'):
             return {**original(uri, args, options), 'currentPlatformId': platform, 'platforms': [{'id': platform, 'name': 'Windows'}]}
@@ -4255,22 +4257,30 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             if any('children' in item for item in args['objects']):
                 assert args['onNameConflict'] == ('rename' if native_rename else 'fail')
-                assert args['objects'][0]['children'][0]['name'] in ({'Routing', 'Backup'} if multiple_roots else {'Routing'})
+                if not duplicate_siblings:
+                    assert args['objects'][0]['children'][0]['name'] in ({'Routing', 'Backup'} if multiple_roots else {'Routing'})
                 if multiple_roots:
                     assert len(args['objects']) == 1 and len(args['objects'][0]['children']) == 1
                     assert set(args['objects'][0]) == {'object', 'children'}
                 def create(node, parent):
-                    identity = ids[node['name']]
-                    name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and node['name'] in {'Routing', 'Backup'} else node['name']
+                    if duplicate_siblings and node['name'] == 'Send':
+                        key = ('Destination', 'Sender')[len(duplicate_created)]
+                        duplicate_created.append(key)
+                        identity, name = ids[key], ('Send' if key == 'Destination' else 'Send37')
+                    else:
+                        identity = ids[node['name']]
+                        name = node['name']
+                    name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and node['name'] in {'Routing', 'Backup'} else name
                     task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
                         'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
                         'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
                         **{key: {'id': value} for key, value in node.items() if key.startswith('@')}}
                     children = [create(child, identity) for child in node.get('children', [])]
                     return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
-                children = [create(child, SECOND) for child in args['objects'][0]['children']]
+                parent_id = args['objects'][0]['object']
+                children = [create(child, parent_id) for child in args['objects'][0]['children']]
                 assert '@UserAuxSend0' not in task.objects.get(ids['Sender'], {})
-                return {'objects': [{'id': SECOND, 'name': task.objects[SECOND]['name'], 'children': children}]}
+                return {'objects': [{'id': parent_id, 'name': task.objects[parent_id]['name'], 'children': children}]}
             for item in args['objects']:
                 assert set(item) == {'object', '@UserAuxSend0'}, item
                 matches = [row['id'] for row in task.objects.values() if row['path'] == item['@UserAuxSend0']]
@@ -4315,13 +4325,13 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     assert code == 0, root
     root = root['draft']['declared_object']['result_handle']
     external_fields = ['--field-value', field, task.bind(ROOT)] if external else []
-    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', target_name, *external_fields)
+    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Send' if duplicate_siblings else target_name, *external_fields)
     assert code == 0, target
     if multiple_roots:
         code, second = task.step('draft-declare-new', '--declaration-id', 'backup', '--parent-handle', parent, '--kind', kinds['Bus'], '--name', 'Backup')
         assert code == 0, second
         root = second['draft']['declared_object']['result_handle']
-    code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Sender',
+    code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Send' if duplicate_siblings else 'Sender',
         *(['--field-value', field, target['draft']['declared_object']['result_handle']] if planned_reference else []))
     assert code == 0, sender
     before = deepcopy(task.objects)
@@ -5383,3 +5393,23 @@ def test_split_creation_verification_requires_retained_complete_earlier_owned_me
     assert 'Owned creation stage lost its exact read association' in json.dumps(failed), failed
     assert task.run('execute', source)[0] == 2
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == count
+
+
+def test_compound_nested_duplicate_siblings_keep_occurrence_reference_and_owned_history(tmp_path):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, native_rename=True, duplicate_siblings=True)
+    destination, sender = '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}'
+    assert after[destination]['name'] == 'Send' and after[sender]['name'] == 'Send37'
+    assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    assert after[destination]['parent'] == after[sender]['parent'] == {'id': '{66666666-6666-6666-6666-666666666666}'}
+    assert after['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] == before['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes']
+    writes = [args for uri, args, _ in task.calls if uri == 'ak.wwise.core.object.set']
+    assert len(writes) == 4
+    assert writes[1]['objects'][0]['object'] == writes[2]['objects'][0]['object'] == '{66666666-6666-6666-6666-666666666666}'
+    assert writes[1]['objects'][0]['children'][0]['name'] == writes[2]['objects'][0]['children'][0]['name'] == 'Send'
+    assert all('name' not in row for args in writes for row in args['objects'])
+    roster = task.source_verification['agent_result']['business_result']['created_objects']
+    assert {row['object']['id'] for row in roster} == set(after) - set(before)
+    duplicates = [row for row in roster if row['requested_name'] == 'Send']
+    assert len(duplicates) == 2 and len({row['result_handle'] for row in duplicates}) == 2
+    assert {row['object']['name'] for row in duplicates} == {'Send', 'Send37'}
