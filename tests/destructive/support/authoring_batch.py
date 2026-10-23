@@ -19,7 +19,10 @@ from wwise_waapi.native_catalog import load_native_catalog
 from wwise_waapi.host_paths import localize_waapi_host_path
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from wwise_waapi.filesystem_security import path_is_link_or_reparse
-from tests.destructive.support.profiler_capture import NODEID as PROFILER_CAPTURE_NODEID, OUTCOMES as PROFILER_CAPTURE_OUTCOMES
+from tests.destructive.support.profiler_capture import (
+    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, CAPTURE_NODE_OUTCOMES,
+    stage_owned_2024_meter_media,
+)
 
 
 MEDIA_PRESERVATION_DIAGNOSTIC_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
@@ -244,12 +247,12 @@ class AuthoringBatchAdapter:
                          **({'observation_artifact': self.observation_artifacts[row['nodeid']]}
                             if row['nodeid'] in self.observation_artifacts else {}),
                          **({'batch_finalization': self.batch_seal_descriptor}
-                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] != PROFILER_CAPTURE_NODEID]
-        if PROFILER_CAPTURE_NODEID in self.selected_nodeids:
+                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] not in CAPTURE_NODE_OUTCOMES]
+        for capture_nodeid in (node for node in self.selected_nodeids if node in CAPTURE_NODE_OUTCOMES):
             # Consume the exact archived collector output, including partial
             # observations. A passing sibling never fills another outcome.
             report = {}
-            descriptor = self.observation_artifacts.get(PROFILER_CAPTURE_NODEID)
+            descriptor = self.observation_artifacts.get(capture_nodeid)
             if descriptor:
                 archived = json.loads(Path(descriptor['path']).read_text(encoding='utf-8'))
                 root = Path(archived['artifacts']['native-evidence']['path'])
@@ -259,10 +262,10 @@ class AuthoringBatchAdapter:
                     if (report.get('contract') != 'waapi-skill.owned-profiler-capture/v1'
                             or report.get('candidate') != self.candidate or report.get('version') != runtime.version):
                         raise ValueError('Profiler capture report context differs from its owned batch')
-            for name in PROFILER_CAPTURE_OUTCOMES:
+            for name in CAPTURE_NODE_OUTCOMES[capture_nodeid]:
                 observation = report.get('outcomes', {}).get(name, {'outcome': 'BLOCKED'})
                 business = observation.get('outcome', 'BLOCKED')
-                categories.append({'category': name, 'nodeid': PROFILER_CAPTURE_NODEID,
+                categories.append({'category': name, 'nodeid': capture_nodeid,
                     'status': 'PASS' if outcome == 'PASS' and business == 'PASS' else 'FAIL' if business == 'FAIL' else 'blocked',
                     'business_outcome': business, 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
                     'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
@@ -431,6 +434,7 @@ def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path
 OWNED_AUTHORING_NODEIDS = (
     *DIAGNOSTIC_NODEIDS,
     PROFILER_CAPTURE_NODEID,
+    METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
       for variant in ('omitted', 'x-only', 'y-only', 'both')),
@@ -461,6 +465,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')
     if PROFILER_CAPTURE_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
+    if METER_2024_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1'):
+        raise pytest.UsageError('Owned meter projection requires only its matching 2024 Authoring node')
     root = Path(raw_root)
     if (not root.is_absolute() or os.path.lexists(root)
             or any(path_is_link_or_reparse(part) for part in root.parents)
@@ -470,8 +476,10 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
     def check_frozen_source(_sandbox, _assets, _io):
         if candidate_source_context(repo_root) != source_context:
             raise ValueError('Owned Authoring source candidate changed before launch')
+        if selected == (METER_2024_NODEID,):
+            stage_owned_2024_meter_media(_sandbox, _io)
     live_environment = dict(os.environ)
-    if selected == (PROFILER_CAPTURE_NODEID,):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (METER_2024_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',

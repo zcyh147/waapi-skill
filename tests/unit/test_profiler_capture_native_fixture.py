@@ -3,6 +3,7 @@
 The external host is fake. These tests grant no native capture evidence.
 """
 from copy import deepcopy
+from dataclasses import replace
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -53,40 +54,98 @@ def _committed_capture_objects():
     return rows
 
 
-def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
+def _committed_2024_capture_objects():
+    fixture = Path(__file__).resolve().parents[1] / '_org/2024.1'
+    rows = {}
+    for section, filename, names in (
+        ('Actor-Mixer Hierarchy', 'Minigun.wwu', ('MnGn_Barrel_Loop',)),
+        ('Master-Mixer Hierarchy', 'Default Work Unit.wwu', ('Guns', 'SFX')),
+    ):
+        root = ET.parse(fixture / section / filename).getroot()
+        parents = {child: parent for parent in root.iter() for child in parent}
+        for node in root.iter():
+            if node.tag not in ('Sound', 'Bus') or node.get('Name') not in names:
+                continue
+            lineage, current = [], node
+            while current is not root:
+                if current.get('Name'):
+                    lineage.append(current)
+                current = parents[current]
+            row = {'id': node.get('ID'), 'name': node.get('Name'), 'type': node.tag,
+                'path': '\\' + '\\'.join([section, *[item.get('Name') for item in reversed(lineage)]])}
+            if node.tag == 'Bus':
+                row.update({'classId': 1376272, '@Volume': 0.0,
+                    'parent': {'id': lineage[1].get('ID'), 'name': lineage[1].get('Name')}, 'parent.@Volume': 0.0})
+            else:
+                assert node.find("PropertyList/Property[@Name='IsLoopingEnabled']").get('Value') == 'True'
+                # Stored child Master references are unused: no child overrides;
+                # the top ActorMixer's ordinary OutputBus resolves to Guns.
+                assert all(item.find("PropertyList/Property[@Name='OverrideOutput']") is None for item in lineage[:-2])
+                output = lineage[-2].find("ReferenceList/Reference[@Name='OutputBus']/ObjectRef")
+                row.update({'classId': 65552, '@IsLoopingEnabled': True, '@IsLoopingInfinite': True,
+                    'OutputBus': {'id': output.get('ID'), 'name': output.get('Name')}})
+                source = node.find('ChildrenList/AudioFileSource')
+                assert source.findtext('AudioFile') == r'Minigun\MnGn_Barrel_Loop.wav'
+                assert node.find('ActiveSourceList/ActiveSource').get('ID') == source.get('ID')
+            rows[row['id']] = row
+    return rows
+
+
+def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1'):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
         NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
     )
     runtime = owner.runtime
-    runtime.lifecycle.ready_result['version']['displayName'] = 'v2025.1.7.9143'
-    media = runtime.sandbox.sandbox_path / 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav'
+    nodeid, sound_id, bus_id = NODEID, SOUND_ID, BUS_ID
+    media_relative = 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav'
+    build = '2025.1.7.9143'
+    if version == '2024.1':
+        nodeid = 'tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2024_meter_projection'
+        sound_id, bus_id = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}', '{06362E8D-5A32-497A-B063-3DA95963CE47}'
+        media_relative, build = 'Originals/SFX/Minigun/MnGn_Barrel_Loop.wav', '2024.1.13.9056'
+        owner.version = version
+        owner.runtime = runtime = replace(runtime, version=version)
+        runtime.sandbox.metadata.wwise_version = version
+        runtime.lifecycle.ready_result['version'].update(year=2024, minor=13, build=9056)
+    runtime.lifecycle.ready_result['version']['displayName'] = 'v' + build
+    media = (tmp_path / 'matching-installed-originals/SFX/Minigun/MnGn_Barrel_Loop.wav'
+        if version == '2024.1' else runtime.sandbox.sandbox_path / media_relative)
     media.parent.mkdir(parents=True)
     import wave
     with wave.open(str(media), 'wb') as output:
         output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000)
         output.writeframes(b'\x01\x00' * 5567)
+    if version == '2024.1':
+        from tests.destructive.support import profiler_capture
+        monkeypatch.setattr(profiler_capture, 'METER_2024_MEDIA_SOURCE', media)
+        # Synthetic external file, pinned independently; no native media credit.
+        monkeypatch.setattr(profiler_capture, 'METER_2024_MEDIA_SHA256',
+            'e352d2a9e296b862eebc1a2d357a0dea696774b257db04da1abd2ecccb70fa52')
+        runtime.io_root.mkdir(parents=True, exist_ok=True)
+        profiler_capture.stage_owned_2024_meter_media(runtime.sandbox, runtime.io_root)
 
     class Client(_RuntimeControlDraftClient):
         def __init__(self):
-            super().__init__(tmp_path)
+            super().__init__(tmp_path, version=version)
             self.calls, self.transport, self.playing, self.user_time = [], False, False, 0
             self.registered = False
             self.logs = {'general': [], 'sourceControl': [{'message': 'preserve unselected channel',
                 'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]}
-            self.rows = _committed_capture_objects()
-            self.rows[SOUND_ID].update({'classId': 65552, '@IsLoopingEnabled': False, '@IsLoopingInfinite': True})
-            self.rows[BUS_ID]['classId'] = 1376272
+            self.rows = _committed_2024_capture_objects() if version == '2024.1' else _committed_capture_objects()
+            if version == '2025.1':
+                self.rows[sound_id].update({'classId': 65552, '@IsLoopingEnabled': False, '@IsLoopingInfinite': True})
+            self.rows[bus_id]['classId'] = 1376272
             if failure == 'wrong-parent':
                 sibling = next(row for row in self.rows.values() if row['name'] == 'Main Audio Bus')
-                self.rows[BUS_ID]['parent'] = {key: sibling[key] for key in ('id', 'name')}
+                self.rows[bus_id]['parent'] = {key: sibling[key] for key in ('id', 'name')}
 
         def call(self, uri, args=None, options=None):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             if uri.endswith('getInfo'):
                 info = super().call(uri, args, options)
                 info['version'].update(runtime.lifecycle.ready_result['version'])
-                info['version']['displayName'] = 'v2025.1.7.9143'
+                info['version']['displayName'] = 'v' + build
                 return {**info, **deepcopy(runtime.lifecycle.ready_result), 'version': info['version']}
             if uri.endswith('getProjectInfo'):
                 return {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'SampleProject',
@@ -99,7 +158,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
                     for key in options['return'] if key in row or '@' + key in row}
                     for identity in ids if (row := self.rows.get(identity))]}
             if uri.endswith('getPropertyAndReferenceNames'):
-                return {'return': ['IsLoopingEnabled', 'IsLoopingInfinite'] if args.get('object') == SOUND_ID
+                return {'return': ['IsLoopingEnabled', 'IsLoopingInfinite'] if args.get('object') == sound_id
                     else ['Volume']}
             if uri.endswith('getPropertyInfo'):
                 token = args['property']
@@ -111,7 +170,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
                 self.rows[args['object']]['@' + args['property']] = args['value']
                 return {}
             if uri.endswith('transport.getList'):
-                return {'list': [{'transport': 74, 'object': SOUND_ID, 'gameObject': 1}] if self.transport else []}
+                return {'list': [{'transport': 74, 'object': sound_id, 'gameObject': 1}] if self.transport else []}
             if uri.endswith('transport.create'):
                 self.transport = True
                 return {'transport': 74}
@@ -131,7 +190,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
             if uri.endswith('profiler.getMeters'):
                 if failure == 'empty-meter':
                     return {'meters': []}
-                row = self.rows[BUS_ID]
+                row = self.rows[bus_id]
                 return {'meters': [{'object': {key: deepcopy(row[key]) for key in options.get('return', ['id', 'name']) if key in row},
                     'source': 'Bus', 'configurationName': '1.0', 'configurationMask': 4,
                     'configurationType': 'Standard', 'channels': [{'name': 'C', 'value': -12.5}]}]}
@@ -165,8 +224,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
 
     client = Client()
     def factory(*, skill_source, runtime, version, receipts):
-        env = _env(runtime.owned_root)
-        set_gateway_config(env, wwise_version='2025.1', project_modification_policy='ask_before_changes')
+        env = _env(runtime.owned_root, version=version)
+        set_gateway_config(env, wwise_version=version, project_modification_policy='ask_before_changes')
         env['WWISE_EVIDENCE_DIR'] = runtime.runner_environment['WWISE_EVIDENCE_DIR']
         def call(argv):
             code, payload = gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'setup-state'), *argv],
@@ -176,8 +235,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
             return payload
         return call
     monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
-    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[NODEID])
-    call = batch.node_gateway(NODEID)
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[nodeid])
+    call = batch.node_gateway(nodeid)
     return batch, call, client, collect_owned_capture
 
 
@@ -201,6 +260,52 @@ def _finish(batch, tmp_path, monkeypatch, *, passed):
     item._waapi_phase_reports['teardown'] = 'passed'
     final = batch.finalize([item], terminal=True, exitstatus=0 if passed else 1)
     return final, json.loads(target.read_text().splitlines()[-1])
+
+
+def test_owned_2024_meter_public_flow_reaches_its_archived_final_category(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, version='2024.1')
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS' and record['version'] == '2024.1'
+    category, = record['categories']
+    assert category['category'] == 'profiler-meter-object-observation'
+    assert category['status'] == category['business_outcome'] == 'PASS' and category['batch_finalization']
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert list(report['outcomes']) == ['profiler-meter-object-observation']
+    obj = report['outcomes']['profiler-meter-object-observation']['evidence']['meters'][0]['object']
+    assert obj['path'] == r'\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\Environmental\SFX\Guns'
+    assert obj['volume_db'] == 0.0 and obj['related']['parent']['volume_db'] == 0.0
+    assert obj['related']['parent']['object'] == {'id': '{ED2BCAC8-D7B6-4448-8900-439B557894F4}', 'name': 'SFX'}
+    assert report['fixture_before']['sound']['output_bus']['id'] == '{06362E8D-5A32-497A-B063-3DA95963CE47}'
+    assert report['fixture_after'] == report['fixture_before'] and report['cleanup']['complete'] is True
+    assert report['fixture_media']['proof']['sha256'] == report['fixture_media']['staging']['source']['sha256']
+    assert report['cleanup']['capture_settings_prior_state_restored'] is False
+    assert report['cleanup']['audition_media_prior_state_restored'] is False
+    assert not client.transport and not client.registered and not batch.runtime.owned_root.exists()
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    assert not any(uri.endswith(('setCursorTime', 'saveCapture', 'log.addItem', 'log.clear', 'object.setProperty')) for uri, _, _ in client.calls)
+
+
+def test_owned_2024_empty_meter_fails_final_acceptance_after_complete_cleanup(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, version='2024.1', failure='empty-meter')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and record['version'] == '2024.1'
+    category, = record['categories']
+    assert category['category'] == 'profiler-meter-object-observation'
+    assert category['status'] == category['business_outcome'] == 'FAIL'
+    assert category['cleanup_complete'] is True and 'batch_finalization' not in category
+    assert batch.lifecycle_result.quarantine_path and not client.transport and not client.registered
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    observation, = report['outcomes'].values()
+    assert observation['outcome'] == 'FAIL' and 'missing from actual meter frame' in observation['error']['message']
+    assert report['fixture_after'] == report['fixture_before']
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    cleanup = [uri for uri, _, _ in client.calls if uri.endswith(('profiler.stopCapture', 'transport.destroy', 'profiler.unregisterMeter'))]
+    assert cleanup == ['ak.wwise.core.profiler.stopCapture', 'ak.wwise.core.transport.destroy', 'ak.wwise.core.profiler.unregisterMeter']
 
 
 def test_owned_capture_public_flow_reaches_archived_final_categories(owned_authoring, tmp_path, monkeypatch):
