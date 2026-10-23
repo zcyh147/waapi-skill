@@ -163,7 +163,7 @@ NATIVE_CPU_2025 = json.loads(r'''{"return":[{"elementName":"CAkAudioMgr::Perform
 
 def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1', readers=False,
         capture_reads=False, cpu_native_version=None, native_rtpc=False, mixing_bus=None, missing_reads=False,
-        partial_seed=None):
+        partial_seed=None, cursor_moves=False):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
         NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
@@ -171,8 +171,11 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
     runtime = owner.runtime
     capture_reads = capture_reads or missing_reads
     game_object = 18446744073709551614 if native_rtpc else 1
-    capture_time = {'2024.1': 45621, '2025.1': 46869}.get(cpu_native_version, 1500)
+    capture_time = 100 if failure == 'cursor-single-frame' else {'2024.1': 45621, '2025.1': 46869}.get(cpu_native_version, 1500)
     nodeid, sound_id, bus_id = NODEID, SOUND_ID, BUS_ID
+    if cursor_moves:
+        from tests.destructive.support.profiler_capture import CURSOR_MOVES_NODEID
+        nodeid = CURSOR_MOVES_NODEID
     if readers:
         from tests.destructive.support.profiler_capture import READERS_2025_NODEID
         nodeid = READERS_2025_NODEID
@@ -208,11 +211,12 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
     media = (tmp_path / 'installed' / ('SampleProject' + ('2025.1.7.9143' if version == '2022.1' else build)) / 'SampleProject' / media_relative
         if capture_reads else tmp_path / 'matching-installed-originals/SFX/Minigun/MnGn_Barrel_Loop.wav'
         if version == '2024.1' else runtime.sandbox.sandbox_path / media_relative)
-    media.parent.mkdir(parents=True)
     import wave
-    with wave.open(str(media), 'wb') as output:
-        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000)
-        output.writeframes(b'\x01\x00' * 5567)
+    if not cursor_moves:
+        media.parent.mkdir(parents=True)
+        with wave.open(str(media), 'wb') as output:
+            output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000)
+            output.writeframes(b'\x01\x00' * 5567)
     if capture_reads:
         from tests.destructive.support import profiler_capture
         monkeypatch.setattr(profiler_capture, 'CAPTURE_SAMPLE_ROOT', tmp_path / 'installed')
@@ -232,7 +236,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
     class Client(_RuntimeControlDraftClient):
         def __init__(self):
             super().__init__(tmp_path, version=version)
-            self.calls, self.transport, self.playing, self.user_time = [], False, False, 0
+            self.calls, self.transport, self.playing, self.user_time = [], False, False, 100 if cursor_moves else 0
             self.registered = False
             self.logs = {'general': [], 'sourceControl': [{'message': 'preserve unselected channel',
                 'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]}
@@ -318,6 +322,16 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 return {'state': 'playing' if self.playing else 'stopped'}
             if uri.endswith('profiler.getCursorTime'):
                 return {'return': capture_time if args['cursor'] == 'capture' else self.user_time}
+            if uri.endswith('profiler.moveCursor'):
+                self.user_time = {'first': 100, 'next': 110, 'last': 1500, 'previous': 1490}[args['position']]
+                if failure == 'cursor-single-frame':
+                    self.user_time = 100
+                if failure == 'cursor-unavailable' and args['position'] == 'next':
+                    self.user_time = -1
+                if failure == 'cursor-mismatch' and args['position'] == 'next':
+                    self.user_time = 111
+                    return {'return': 110}
+                return {'return': self.user_time}
             if uri.endswith('profiler.getRTPCs'):
                 if native_rtpc:
                     return {'return': [{'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'name': 'RPM',
@@ -452,9 +466,13 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 return {}
             if uri.endswith('profiler.stopCapture') and failure == 'explicit-stop-capture':
                 raise RuntimeError('fake explicit stop capture failure')
+            if uri.endswith('profiler.startCapture') and failure == 'cursor-setup-verification':
+                return {'return': 'not an integer capture time'}
             if uri.endswith(('profiler.startCapture', 'profiler.stopCapture')):
                 return {'return': 1500}
             if uri.endswith(('profiler.enableProfilerData', 'transport.useOriginals', 'transport.prepare')):
+                if failure == 'cursor-cleanup' and uri.endswith('enableProfilerData') and not args['dataTypes'][0]['enable']:
+                    raise RuntimeError('fake cursor capture-data cleanup uncertainty')
                 if failure == 'disable-readers' and uri.endswith('enableProfilerData') and not args['dataTypes'][0]['enable']:
                     raise RuntimeError('fake capture-data cleanup uncertainty')
                 return {}
@@ -472,7 +490,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             if '--runtime-page' in argv:
                 assert len(client.calls) == native_calls_before, 'Cached continuation dispatched an external native call'
             receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
-            assert code == 0, json.dumps(payload, ensure_ascii=False)
+            if not (failure == 'cursor-setup-verification' and argv[0] == 'verify'):
+                assert code == 0, json.dumps(payload, ensure_ascii=False)
             return payload
         return call
     monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
@@ -501,6 +520,162 @@ def _finish(batch, tmp_path, monkeypatch, *, passed):
     item._waapi_phase_reports['teardown'] = 'passed'
     final = batch.finalize([item], terminal=True, exitstatus=0 if passed else 1)
     return final, json.loads(target.read_text().splitlines()[-1])
+
+
+def test_cursor_moves_reach_four_persisted_final_categories(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, cursor_moves=True)
+    assert not (batch.runtime.sandbox.sandbox_path / 'Originals').exists()
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS'
+    categories = record['categories']
+    assert [row['category'] for row in categories] == [
+        'profiler-cursor-first-frame', 'profiler-cursor-next-frame',
+        'profiler-cursor-last-frame', 'profiler-cursor-previous-frame']
+    assert all(row['status'] == row['business_outcome'] == 'PASS' and row['batch_finalization']
+        for row in categories)
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report_path = Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json'
+    report = json.loads(report_path.read_text())
+    assert report['complete'] is True and report['cleanup']['complete'] is True
+    assert [row['evidence']['returned_time_ms'] for row in report['outcomes'].values()] == [100, 110, 1500, 1490]
+    assert all(row['evidence']['observed_time_ms'] == row['evidence']['returned_time_ms']
+        and row['evidence']['capture_data_completeness_verified'] is False
+        for row in report['outcomes'].values())
+    moves = [args['position'] for uri, args, _ in client.calls if uri.endswith('profiler.moveCursor')]
+    assert moves == ['first', 'next', 'last', 'previous']
+    assert sum(uri.endswith('profiler.getCursorTime') and args['cursor'] == 'user'
+        for uri, args, _ in client.calls) == 4
+    assert not any(uri.endswith(('setCursorTime', 'getMeters', 'saveCapture', 'log.addItem',
+        'log.clear', 'object.setProperty', 'getRTPCs', 'getCpuUsage', 'getLoadedMedia'))
+        for uri, _, _ in client.calls)
+    assert not any(uri.startswith('ak.wwise.core.transport.') for uri, _, _ in client.calls)
+    assert report['public_call_count'] == len(archive['receipts'])
+    assert report['total_reply_bytes'] == sum(len(json.dumps(row.get('payload', row), ensure_ascii=False).encode())
+        for row in archive['receipts'])
+    assert not client.transport and not client.registered and not batch.runtime.owned_root.exists()
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    assert report['public_call_count'] <= report['limits']['public_calls']
+    (tmp_path / 'cursor-measured-budget.json').write_text(json.dumps({
+        'public_calls': report['public_call_count'], 'substituted_native_calls': len(client.calls),
+        'total_reply_bytes': report['total_reply_bytes'], 'report_bytes': report_path.stat().st_size,
+        'archive_bytes': Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).stat().st_size,
+        'limits': report['limits'], 'report_path': str(report_path)}, indent=2) + '\n')
+
+
+def test_cursor_move_unavailable_retains_other_moves_and_blocks_final_acceptance(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        cursor_moves=True, failure='cursor-unavailable')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    categories = {row['category']: row for row in record['categories']}
+    unavailable = report['outcomes']['profiler-cursor-next-frame']
+    assert unavailable['outcome'] == 'BLOCKED'
+    assert unavailable['evidence']['returned_time_ms'] == unavailable['evidence']['observed_time_ms'] == -1
+    assert unavailable['evidence']['transaction']['state'] == 'result_schema_checked'
+    assert categories['profiler-cursor-next-frame']['business_outcome'] == 'BLOCKED'
+    assert all(row['business_outcome'] == 'PASS' for name, row in categories.items()
+        if name != 'profiler-cursor-next-frame')
+    assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in categories.values())
+    assert report['cleanup']['complete'] is True and not client.transport
+    assert [args['position'] for uri, args, _ in client.calls if uri.endswith('profiler.moveCursor')] == [
+        'first', 'next', 'last', 'previous']
+
+
+def test_cursor_move_failed_setup_verification_stops_before_moves_and_retains_cleanup(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        cursor_moves=True, failure='cursor-setup-verification')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL'
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert all(row['business_outcome'] == 'BLOCKED' and row['status'] != 'PASS' for row in record['categories'])
+    assert report['cleanup']['complete'] is True
+    assert not any(uri.endswith('profiler.moveCursor') or uri.startswith('ak.wwise.core.transport.')
+        for uri, _, _ in client.calls)
+    failed = [row for row in archive['receipts'] if row['argv'][0] == 'verify'
+        and row['payload'].get('state') == 'verification_failed']
+    assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
+    assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('failure', ['cursor-mismatch', 'cursor-cleanup', 'cursor-single-frame'])
+def test_cursor_move_failures_preserve_partial_final_writer_evidence(
+        owned_authoring, tmp_path, monkeypatch, failure):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        cursor_moves=True, failure=failure)
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    outcomes = {name: row['outcome'] for name, row in report['outcomes'].items()}
+    categories = {row['category']: row for row in record['categories']}
+    assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in categories.values())
+    assert {name: row['business_outcome'] for name, row in categories.items()} == outcomes
+    assert report['public_call_count'] == len(archive['receipts'])
+    assert report['total_reply_bytes'] == sum(len(json.dumps(row.get('payload', row), ensure_ascii=False).encode())
+        for row in archive['receipts'])
+    assert sum(uri.endswith('profiler.moveCursor') for uri, _, _ in client.calls) == 4
+    assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
+    assert not client.transport and not batch.batch_seal_path.exists()
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    if failure == 'cursor-mismatch':
+        assert outcomes == {'profiler-cursor-first-frame': 'PASS', 'profiler-cursor-next-frame': 'FAIL',
+            'profiler-cursor-last-frame': 'PASS', 'profiler-cursor-previous-frame': 'PASS'}
+        failed = [row for row in archive['receipts'] if row['argv'][0] == 'verify'
+            and row['payload'].get('state') == 'verification_failed']
+        assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
+        scope = failed[0]['payload']['verification']['verification_scope']['cursor_observation']
+        assert scope['returned_time_ms'] == 110 and scope['observed_time_ms'] == 111
+        assert report['cleanup']['complete'] is True
+
+
+    elif failure == 'cursor-cleanup':
+        assert set(outcomes.values()) == {'PASS'}
+        assert report['cleanup']['complete'] is False
+        assert [row['action'] for row in report['cleanup']['errors']] == ['disable-voices-data']
+        failed = [row for row in archive['receipts'] if row['argv'][0] == 'execute'
+            and row['payload'].get('state') == 'indeterminate']
+        assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
+        assert sum(uri.endswith('enableProfilerData') and args['dataTypes'][0]['enable'] is False
+            for uri, args, _ in client.calls) == 1
+    else:
+        assert outcomes == {'profiler-cursor-first-frame': 'PASS', 'profiler-cursor-next-frame': 'BLOCKED',
+            'profiler-cursor-last-frame': 'PASS', 'profiler-cursor-previous-frame': 'BLOCKED'}
+        assert report['frame_relationship_scope']['distinct_endpoint_times_observed'] is False
+        assert report['cleanup']['complete'] is True
+
+
+@pytest.mark.parametrize('version,extra', [('2021.1', False), ('2022.1', False), ('2023.1', False),
+    ('2024.1', False), ('2025.1', True), ('2025.1', False)])
+def test_cursor_move_owner_requires_exact_single_2025_node(tmp_path, monkeypatch, version, extra):
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.profiler_capture import CURSOR_MOVES_NODEID
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('WWISE_VERSION', version)
+    config = _config(tmp_path)
+    config.args = [CURSOR_MOVES_NODEID, *([NODE] if extra else [])]
+    items = [SimpleNamespace(nodeid=name) for name in config.args]
+    if version != '2025.1' or extra:
+        message = 'not available on the requested version' if version != '2025.1' else 'exact single 2025'
+        with pytest.raises(pytest.UsageError, match=message):
+            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert not events
+    else:
+        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert [row[0] for row in events] == ['construct', 'start', 'install']
+        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])

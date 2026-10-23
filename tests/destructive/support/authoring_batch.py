@@ -27,7 +27,7 @@ from tests.destructive.support.transport_semantics import (
     OLDER_FIXTURES, stage_owned_older_transport_media,
 )
 from tests.destructive.support.profiler_capture import (
-    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, CAPTURE_NODE_OUTCOMES,
+    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, CURSOR_MOVES_NODEID, CAPTURE_NODE_OUTCOMES,
     stage_owned_2024_meter_media,
     capture_node_outcomes,
     stage_owned_capture_read_media,
@@ -517,6 +517,7 @@ OWNED_AUTHORING_NODEIDS = (
     TRANSPORT_MIXED_NODEID,
     TRANSPORT_OLDER_NODEID,
     PROFILER_CAPTURE_NODEID,
+    CURSOR_MOVES_NODEID,
     READERS_2025_NODEID,
     CAPTURE_READS_NODEID,
     LOADED_EVENT_NODEID,
@@ -534,6 +535,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     **dict.fromkeys(DIAGNOSTIC_NODEIDS, ('2024.1',)),
     METER_2024_NODEID: ('2024.1',),
     PROFILER_CAPTURE_NODEID: ('2025.1',),
+    CURSOR_MOVES_NODEID: ('2025.1',),
     READERS_2025_NODEID: ('2025.1',),
     CAPTURE_READS_NODEID: SUPPORTED_WWISE_VERSION_KEYS,
     LOADED_EVENT_NODEID: ('2025.1',),
@@ -572,6 +574,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
     if READERS_2025_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
         raise pytest.UsageError('Owned Profiler readers require only their matching 2025 Authoring node')
+    if CURSOR_MOVES_NODEID in selected and len(selected) != 1:
+        raise pytest.UsageError('Owned cursor moves require their exact single 2025 Authoring node')
     if set(selected).intersection((CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID)) and len(selected) != 1:
         raise pytest.UsageError('Owned capture reads require their exact single node')
     if LOADED_EVENT_NODEID in selected and len(selected) != 1:
@@ -598,7 +602,7 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         if selected in ((CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,)):
             stage_owned_capture_read_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
     live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (CURSOR_MOVES_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
