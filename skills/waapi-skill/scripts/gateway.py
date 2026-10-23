@@ -59,6 +59,7 @@ from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissi
     canonical_sha256,
 )
 from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ManifestSchemaLoader,
     SemanticPreview,
     SemanticValidationError,
 )
@@ -809,6 +810,25 @@ METADATA_CURVE_ROLES: Mapping[str, str] = {
     "high-pass-filter": "HighPassFilterUsage",
     "spread": "SpreadUsage",
     "focus": "FocusUsage",
+    "obstruction-volume": "ObstructionVolumeUsage",
+    "obstruction-low-pass-filter": "ObstructionLPFUsage",
+    "obstruction-high-pass-filter": "ObstructionHPFUsage",
+    "occlusion-volume": "OcclusionVolumeUsage",
+    "occlusion-low-pass-filter": "OcclusionLPFUsage",
+    "occlusion-high-pass-filter": "OcclusionHPFUsage",
+    "diffraction-volume": "DiffractionVolumeUsage",
+    "diffraction-low-pass-filter": "DiffractionLPFUsage",
+    "diffraction-high-pass-filter": "DiffractionHPFUsage",
+    "transmission-volume": "TransmissionVolumeUsage",
+    "transmission-low-pass-filter": "TransmissionLPFUsage",
+    "transmission-high-pass-filter": "TransmissionHPFUsage",
+    # GET's 2025 reflection names DualShelf/DSF; SET names HighShelf/HSF.
+    # These are read meanings only, with no implied setter equivalence.
+    "dual-shelf": "DualShelfUsage",
+    "obstruction-dual-shelf": "ObstructionDSFUsage",
+    "occlusion-dual-shelf": "OcclusionDSFUsage",
+    "diffraction-dual-shelf": "DiffractionDSFUsage",
+    "transmission-dual-shelf": "TransmissionDSFUsage",
 }
 PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS = (
     "pipelineID",
@@ -2157,19 +2177,11 @@ def build_parser() -> argparse.ArgumentParser:
     metadata.add_argument("--platform")
     metadata.add_argument(
         "--curve-role",
-        choices=(
-            "volume-dry",
-            "game-defined-aux-send-volume",
-            "user-defined-aux-send-volume",
-            "low-pass-filter",
-            "high-pass-filter",
-            "spread",
-            "focus",
-        ),
+        metavar="CURVE_ROLE",
         dest="curve_role",
         help=(
             "User-facing attenuation curve role; the Gateway derives Wwise's "
-            "exact curveType token"
+            "exact curveType token. Use request-schema for the configured version's choices"
         ),
     )
     metadata.set_defaults(
@@ -6120,6 +6132,17 @@ def normalize_original_file_system_path(value: Any) -> tuple[str, ...]:
     return host_path_comparison_key(value)
 
 
+def metadata_attenuation_curve_roles(version: str) -> dict[str, str]:
+    """Bind read meanings to the exact getter reflection, independently of SET."""
+    schema = ManifestSchemaLoader().schema_for(
+        "ak.wwise.core.object.getAttenuationCurve", version)
+    native_choices = schema["argsSchema"]["properties"]["curveType"]["enum"]
+    if set(native_choices) - set(METADATA_CURVE_ROLES.values()):
+        raise GatewayInputError("The attenuation read contract has an unmapped reflected curve role")
+    return {role: native for role, native in METADATA_CURVE_ROLES.items()
+            if native in native_choices}
+
+
 def preflight_metadata_input(
     args: argparse.Namespace,
     *,
@@ -6285,11 +6308,15 @@ def preflight_metadata_input(
             )
         if meanings:
             raise GatewayInputError("metadata attenuation does not accept --meaning")
-        if args.curve_role not in METADATA_CURVE_ROLES:
-            raise GatewayInputError(
-                "metadata attenuation requires one disclosed --curve-role"
+        (version,) = resolve_catalog_versions(args, env=env)
+        curve_roles = metadata_attenuation_curve_roles(version)
+        if args.curve_role not in curve_roles:
+            raise BusinessFieldInputError(
+                "metadata attenuation requires a --curve-role disclosed for the configured Wwise version",
+                details={"version": version, "field": "curve_role", "choices": list(curve_roles),
+                         "next_command": ["request-schema", "ak.wwise.core.object.getAttenuationCurve"]},
             )
-        args.curve_type = METADATA_CURVE_ROLES[args.curve_role]
+        args.curve_type = curve_roles[args.curve_role]
         if args.platform is not None:
             args.platform = validate_metadata_platform_name(args.platform)
         return
@@ -7446,7 +7473,7 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
                 },
                 "curve_role": {
                     "arguments": ["--curve-role", "<curve-role>"],
-                    "choices": list(METADATA_CURVE_ROLES),
+                    "choices": list(metadata_attenuation_curve_roles(capability.version)),
                 },
                 "platform": {
                     "arguments": ["--platform", "<exact-platform-name>"],
