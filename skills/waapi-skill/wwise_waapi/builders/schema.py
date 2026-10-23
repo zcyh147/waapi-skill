@@ -215,14 +215,17 @@ def validate_resolved_semantic_payload(
                                       version=version, authoring_ui_profile=authoring_ui_profile)
 
 
-def validate_resolved_semantic_result(uri: str, result: Any, *, version: str) -> SchemaValidationResult:
+def validate_resolved_semantic_result(
+    uri: str, result: Any, *, version: str, meter_projection_fields: tuple[str, ...] = (),
+) -> SchemaValidationResult:
     """Validate native results in memory before a protected call can publish them."""
-    return _validate_resolved_sections(uri, (("result", result),), version=version)
+    return _validate_resolved_sections(uri, (("result", result),), version=version,
+                                       meter_projection_fields=meter_projection_fields)
 
 
 def _validate_resolved_sections(
     uri: str, sections: tuple[tuple[str, Any], ...], *, version: str,
-    authoring_ui_profile: bool = False,
+    authoring_ui_profile: bool = False, meter_projection_fields: tuple[str, ...] = (),
 ) -> SchemaValidationResult:
     """Validate Gateway-owned native sections against reachable pinned definitions.
 
@@ -238,6 +241,7 @@ def _validate_resolved_sections(
         graph = load_definition_graph(version)
     schema = SemanticSchemaValidator(version=version, authoring_ui_profile=authoring_ui_profile).schema_for(uri)
     compatibility_rules: list[Mapping[str, Any]] = []
+    result_compatibility_seen: set[tuple[str, str]] = set()
 
     class ResolvedWalker(_SchemaWalker):
         context: Mapping[str, Any]
@@ -273,6 +277,14 @@ def _validate_resolved_sections(
                         target, compatibility = resolved_request_schema(version, uri, resolved, value)
                     except SchemaInventoryError as exc:
                         raise _schema_error(uri, version, str(exc), section=path) from exc
+                    if sections[0][0] == "result":
+                        target, result_compatibility = _runtime_result_reference_schema(
+                            uri, version, resolved, target, meter_projection_fields)
+                        if result_compatibility is not None:
+                            key = (result_compatibility["rule_id"], result_compatibility["definition_pointer"])
+                            if key not in result_compatibility_seen:
+                                result_compatibility_seen.add(key)
+                                compatibility_rules.append({**result_compatibility, "section": path})
                     self.validate(target, value, path=path, depth=depth)
                     if compatibility is not None:
                         compatibility_rules.append({**compatibility, "section": path + ".audioFileBase64"})
@@ -291,6 +303,50 @@ def _validate_resolved_sections(
     return SchemaValidationResult(uri=uri, version=version,
         section="result" if sections[0][0] == "result" else "request", validated_nodes=walker.nodes,
         compatibility_rules=tuple(compatibility_rules))
+
+
+def _runtime_result_reference_schema(
+    uri: str, version: str, resolved: Any, target: Mapping[str, Any],
+    meter_projection_fields: tuple[str, ...],
+) -> tuple[Mapping[str, Any], Mapping[str, Any] | None]:
+    """Preserve two exact existing runtime contracts while resolving base fields."""
+    if resolved.document_name != "waapi_definitions.json":
+        return target, None
+    if (uri == "ak.wwise.core.profiler.getVoiceContributions"
+            and version in {"2021.1", "2022.1", "2023.1"}
+            and resolved.pointer == "/definitions/voiceContributionsObject"):
+        from wwise_waapi.canonical import canonical_sha256
+        digest = "65a31a502cc581aebc372d674d16d60e772329b957474418d10aec3fa70f02f7"
+        if canonical_sha256(target) != digest:
+            raise _schema_error(uri, version, "Contribution driver definition changed; review its documented union")
+        properties = target["properties"]
+        parameters = properties["parameters"]
+        item = parameters["items"]
+        driver = item["properties"]["driver"]
+        # Its pinned description explicitly permits a driving reason OR GUID.
+        # A GUID is also a string: these native alternatives overlap.
+        driver = {**{key: value for key, value in driver.items() if key != "oneOf"},
+                  "anyOf": driver["oneOf"]}
+        projected = {**target, "properties": {**properties, "parameters": {**parameters,
+            "items": {**item, "properties": {**item["properties"], "driver": driver}}}}}
+        return projected, {"rule_id": "profiler-contribution-driver-reason-or-guid/v1",
+            "uri": uri, "version": version, "document": resolved.document_name,
+            "reflected_definition_sha256": digest, "definition_pointer": resolved.pointer,
+            "preserved_contract": "driver accepts a string reason or GUID; driverValue remains number or GUID"}
+    if (uri == "ak.wwise.core.profiler.getMeters" and version in {"2024.1", "2025.1"}
+            and resolved.pointer == "/definitions/objectReturn" and meter_projection_fields):
+        # Only Gateway-selected dynamic fields retain the existing meter
+        # projection's nullable-value behavior. Every reflected named field and
+        # all other dynamic fields still cross their original resolved schema.
+        properties = target.get("properties", {})
+        selected = sorted(set(meter_projection_fields) - set(properties))
+        if selected:
+            return {**target, "properties": {**properties, **{name: {} for name in selected}}}, {
+                "rule_id": "meter-selected-dynamic-values-preserved/v1",
+                "uri": uri, "version": version, "document": resolved.document_name,
+                "definition_pointer": resolved.pointer, "fields": selected,
+                "preserved_contract": "Gateway-bound meter dynamic selections preserve explicit null and native values; no additional value-type claim"}
+    return target, None
 
 
 def validate_semantic_result(
