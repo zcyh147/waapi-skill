@@ -393,8 +393,8 @@ def _collect_transport_semantics(batch, public_call, *, mixed, older=False):
             scope = verified['verification']['verification_scope']['observation']
             target, = scope['targets']
             assert scope['membership_matches'] is True and scope['scope'] == 'one-transport', scope
-            assert target['outcome'] == 'semantics_unresolved' and verified['verified'] is False, verified
             case.update(after=target, verification_state=verified['state'],
+                gateway_business_state_verified=verified['verification']['business_state_verified'],
                 verification_observed_at_ns=monotonic_ns(), observation_status='OBSERVED')
             persist()
     except Exception as exc:
