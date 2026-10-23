@@ -5243,6 +5243,11 @@ def test_compound_set_graph_without_collision_keeps_public_stage_and_owned_histo
 def test_compound_set_graph_without_result_reference_still_owns_complete_creation_history(tmp_path):
     task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
         compound=True, creation_first=True, external=True, set_graph=True, collision=False, planned_reference=False)
+    code, shown = task.run('transaction-show', source)
+    assert code == 0, shown
+    child = next(call['prepared_operation'] for call in shown['artifact']['prepared_operation']['pre_state']['execution_plan']['calls']
+        if 'owned_result_stages' in call['prepared_operation']['pre_state'])
+    assert child['semantic_preview']['envelope']['metadata']['result_reference_execution']['stage_count'] == 1
     assert after['{77777777-7777-7777-7777-777777777777}']['@UserAuxSend0'] == {'id': '{33333333-3333-3333-3333-333333333333}'}
     assert '@UserAuxSend0' not in after['{88888888-8888-8888-8888-888888888888}']
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == 1

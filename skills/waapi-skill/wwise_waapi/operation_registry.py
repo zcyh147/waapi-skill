@@ -7168,6 +7168,7 @@ def _prepare_object_set(
         dispatch_args["platform"] = global_platform
     from .planned_references import apply_result_name_choices
     apply_result_name_choices(node_specs, result_context)
+    deferred_reference_stage = any('target_request_path' in field for node in node_specs for field in node.get('references', []))
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.set",
         args=dispatch_args,
@@ -7178,8 +7179,9 @@ def _prepare_object_set(
             "closed_object_batch": True,
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
-                "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
-                if result_context and (result_context['renames'] or stage_new_graphs) else {}),
+                "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
+                "stage_count": 1 + bool(deferred_reference_stage)}}
+                if (result_context and result_context['renames']) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
