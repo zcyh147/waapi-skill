@@ -1,0 +1,54 @@
+{
+  "version": "2021.1",
+  "wwise_build": "2021.1.14.8108",
+  "domain": "query-predicates-and-selection",
+  "definitions_sha256": "1e23d3f4d2d9a654c4fd90655c955c20a43aadbccea4f393158cc4925e3139b4",
+  "archive": "SDK/Help/WwiseSDK-Windows.chm",
+  "archive_sha256": "d3028d059a69a833d5f99646881c9c44e3c7a609db370ad27afa822c94d0d0d3",
+  "page": "waql_reference.html",
+  "page_sha256": "87b10aecdd13083c0a2d75fb0659119fbe08ba54ea5bfa85f041576033074ac4",
+  "sections": {
+    "reference_object_expression": {
+      "html_lines": [
+        247,
+        264
+      ],
+      "html": "<td colspan=\"1\"><b>REFERENCE_NAME</b><br  />\r\n@<b>REFERENCE_NAME</b><br  />\r\n@@<b>REFERENCE_NAME</b> </td><td colspan=\"1\"><p class=\"starttd\"></p>\r\n<p class=\"intertd\">Returns the object being referenced by the current object for a specific reference name.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">When using @, the reference directly defined on the object is used.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\">Without the @, the override settings are used to find the reference value. This is the actual value used at playback. If there is an accessor of the same name, it will take precedance; in those rare cases, @@ must be used before the reference name.</p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><b>REFERENCE_NAME</b> refers to the name of a reference for the current object. Refer to <a class=\"el\" href=\"wobjects_index.html\">Wwise Objects Reference</a> for the complete list of object types and their references. The name is case-insensitive.</p>\r\n<p class=\"endtd\"></p>\r\n</td><td colspan=\"1\"><p class=\"starttd\"></p>\r\n<p class=\"intertd\">$ from type Sound select OutputBus<br  />\r\n$ from type Sound select effect0, effect1, effect2, effect3<br  />\r\n$ from type Sound select @@Effect0, @@Effect1, @@Effect2, @@Effect3<br  />\r\n$ from type Sound where outputBus=\"Bus:Master Audio Bus\"</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>\r\n",
+      "html_sha256": "05eb64a9e46cc7a9c203f95e31a63b40efba299126c6a1ed5c4ed9c7d3acb754"
+    },
+    "where_examples": {
+      "html_lines": [
+        154,
+        172
+      ],
+      "html": "<td colspan=\"1\">where <b>BOOLEAN_EXPRESSION</b> </td><td colspan=\"1\"><p class=\"starttd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,23,23);\">Filters objects of the input sequence by rejecting objects that don't match the specified expression</span><span style=\"color: rgb(23,23,23);\">.</span></p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,23,23);\"><b>BOOLEAN_EXPRESSION</b> refers to an expression that returns true or false. The expression will be executed on each object of the input sequence and will reject the objects with an expression returning false.</span></p>\r\n<p class=\"intertd\"></p>\r\n<p class=\"intertd\"><span style=\"color: rgb(23,23,23);\">Refer to the expressions section for more information.</span></p>\r\n<p class=\"endtd\"></p>\r\n</td><td colspan=\"1\"><p class=\"starttd\"></p>\r\n<p class=\"intertd\">$ from type Sound where @Volume &lt; 0<br  />\r\n$ from type Sound where -1 = @Volume<br  />\r\n$ from type Sound where @OutputBus=\"Bus:Master Audio Bus\"<br  />\r\n$ from type Sound where @UserAuxSend0=\"AuxBus:Hangar_Env\"<br  />\r\n$ from type Event select children where @Target.path : \"hello\"<br  />\r\n$ from type RandomSequenceContainer where childrenCount &gt; 2 and childrenCount &lt;= 4<br  />\r\n$ from type Sound where notes : \"All\"<br  />\r\n$ from type Sound where notes : \"*audiokinetic*\"<br  />\r\n$ from type Sound where @UserAuxSend0 != null</p>\r\n<p class=\"endtd\"></p>\r\n</td></tr>\r\n",
+      "html_sha256": "9751f0eff9ec5c932b451ae4be1d5d03662af85c54c6d3127582078cdb3a5428"
+    },
+    "reference_identity_chain": {
+      "html_lines": [
+        384,
+        384
+      ],
+      "html": "</td><td colspan=\"1\">Chain zero to many object expression, followed by a value expression to return a value on the chained object. Separate each expression with a dot. </td><td colspan=\"1\">$ where OutputBus.id = \"{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}\" </td></tr>\r\n",
+      "html_sha256": "1f4e55ec87f23700ce80bb089e265d2eca0cbb4523fd720f6d54971f62d4df67"
+    },
+    "boolean_negation": {
+      "html_lines": [
+        711,
+        711
+      ],
+      "html": "<td colspan=\"1\">! </td><td colspan=\"1\">Negates an expression. </td><td colspan=\"1\"><p class=\"starttd\"></p>\r\n",
+      "html_sha256": "418d98e3092d05afdb9305536c4856ad0385804247985f3dd7ad14b8b050a506"
+    },
+    "property_value": {
+      "html_lines": [
+        386,
+        406
+      ],
+      "html": "<td><b>PROPERTY_NAME</b><br  />\n@<b>PROPERTY</b><b>_NAME</b><br  />\n@@<b>PROPERTY</b><b>_NAME</b> </td><td><p class=\"starttd\"></p>\n<p class=\"intertd\">Returns the value of the property for a specific object.</p>\n<p class=\"intertd\"></p>\n<p class=\"intertd\">Without the @, the override settings are used to find the reference value. This is the actual value used at playback (i.e. the effective value). If there is an accessor of the same name, it will take precedence; in those rare cases, @@ must be used before the reference name.</p>\n<p class=\"intertd\"></p>\n<p class=\"intertd\">When using @, the property directly defined on the object is used, even if it is not overridden.</p>\n<p class=\"intertd\"></p>\n<p class=\"intertd\">@@ is the same as no @.</p>\n<p class=\"intertd\"></p>\n<p class=\"intertd\"><b>PROPERTY_NAME</b> refers to the name of a property for the current object. Refer to <a class=\"el\" href=\"wobjects_index.html\">Wwise Objects Reference</a> for the complete list of object types and their references. The name is case-insensitive.</p>\n<p class=\"endtd\"></p>\n</td><td><p class=\"starttd\"></p>\n<p class=\"intertd\">$ from type Sound select OutputBus<br  />\n$ from type Sound select @OutputBus<br  />\n$ from type Sound select effect0, effect1, effect2, effect3<br  />\n$ from type Sound select @@Effect0, @@Effect1, @@Effect2, @@Effect3<br  />\n$ from type Sound where outputBus=\"Bus:Master Audio Bus\"</p>\n<p class=\"endtd\"></p>\n</td></tr>\n",
+      "html_sha256": "ea2cd6e132a127e14a11cca242086e382ca9be3d2ada4ecc00b7177e994f4175"
+    }
+  },
+  "return_domain_source": "query-reference-value-sources.json",
+  "semantic_boundary": "Query WHERE reference/local/reference identity/null and authoring override-property expressions; RETURN descriptors are separately documented and observed. No runtime RTPC/mix or mutation authority."
+}

@@ -154,7 +154,7 @@ def test_offline_field_condition_schema_pins_where_sources_and_shows_limits_and_
     code,result = task.run('query-schema')
     assert code == 0,json.dumps(result,ensure_ascii=False)
     contract = result['field_conditions']
-    assert contract['modes'] == ['ordinary']
+    assert set(contract['modes']) == {'ordinary','reference','local-reference','override-source-value'}
     assert contract['root_limit_order'] == 'native field predicates before final root take'
     assert contract['source']['version'] == version
     assert contract['source']['domain'] == 'query-predicates-and-selection'

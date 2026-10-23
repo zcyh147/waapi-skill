@@ -2034,7 +2034,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     query_object.add_argument('--where-field', nargs=4, action='append', default=[],
         metavar=('MODE','MEANING','COMPARISON','VALUE'),
-        help='Filter the complete business source using one live-discovered scalar property before the final root limit')
+        help='Filter the complete source using a live-discovered property/reference and closed value-source mode before the final root limit')
     query_object.add_argument(
         "--predicate",
         nargs=2,
