@@ -91,11 +91,11 @@ class OwnedMacAuthoringContext:
         # The validated environment retains the logical private/managed bottle.
         command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
             f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe']
-        # AK_AUTOMATION_MODE is the existing test-owned request marker, not a
-        # documented Wwise environment setting. The matching 2021.1 SDK's
-        # wwise_cli_legacy.html#wwise_authoring_from_commandline documents the
-        # startup argument; later version sources have not established it.
-        if self.build.startswith('2021.1.') and self.environment.get('AK_AUTOMATION_MODE') == '1':
+        # AK_AUTOMATION_MODE is the existing test-owned request marker. The
+        # 2021.1 SDK documents the startup flag; matching 2022.1–2025.1
+        # Wwiselib.dll builds retain its command-line option string. Delivery
+        # here does not establish native mode effects on those later builds.
+        if self.environment.get('AK_AUTOMATION_MODE') == '1':
             command.append('-AutomationMode')
         command.append(native)
         requested_startup_environment = {key: self.environment[key] for key in ('AK_AUTOMATION_MODE',)

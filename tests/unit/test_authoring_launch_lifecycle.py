@@ -112,9 +112,9 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
         '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe'}[build]
     # Actual retained owned 2024/2025 readiness used this direct-Wine route,
     # without native-app alternate-loader/wait-child options.
-    # The exact installed 2021.1 SDK documents this Wwise.exe startup option.
-    # Later matching SDKs omit it, so their current launch stays unchanged.
-    startup_arguments = ['-AutomationMode'] if automation_requested and build == '2021.1.14.8108' else []
+    # The 2021 SDK documents the flag; exact later Wwiselib.dll builds retain
+    # its command-line option string. This tests delivery, not native effect.
+    startup_arguments = ['-AutomationMode'] if automation_requested else []
     assert command == [str(facts.cx / 'bin/wine'), 'start.exe', '/wait', native_executable,
                        *startup_arguments, native_project]
     assert options['cwd'] == str(facts.project.parent)
@@ -132,8 +132,20 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
             'configuration': str(facts.cx / 'support/Wwise2019x64/cxbottle.conf'),
             'environment': {key: options['env'][key] for key in
                 ('HOME', 'WINEPREFIX', 'CX_BOTTLE', 'CX_BOTTLE_PATH', 'CX_MANAGED_BOTTLE_PATH')}}}
-    from tests.destructive.support.sandbox_fixture import require_authoring_launch_proof
+    from tests.destructive.support.sandbox_fixture import SandboxFixtureError, require_authoring_launch_proof
     require_authoring_launch_proof(lifecycle, project=facts.project, build=build)
+    # The proof admits exactly the requested flag, never arbitrary startup argv.
+    invalid_commands = [command[:-1] + ['-Unexpected', native_project]]
+    if automation_requested:
+        invalid_commands.extend((command[:4] + [native_project],
+            command[:4] + ['-AutomationMode', '-AutomationMode', native_project]))
+    else:
+        invalid_commands.append(command[:4] + ['-AutomationMode', native_project])
+    for invalid_command in invalid_commands:
+        lifecycle.command = invalid_command
+        with pytest.raises(SandboxFixtureError, match='private project path and fixed command'):
+            require_authoring_launch_proof(lifecycle, project=facts.project, build=build)
+    lifecycle.command = command
     assert [Path(row[0][0]).name for row in preparation] == ['wineprefixcreate', 'wwise_prepare', 'wine', 'wine']
     assert all(row[1]['env']['WINEPREFIX'] == str(facts.prefix) and 0 < row[1]['timeout'] <= 120 for row in preparation)
 

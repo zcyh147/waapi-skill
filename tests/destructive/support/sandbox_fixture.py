@@ -756,8 +756,8 @@ def require_authoring_launch_proof(
     proof = getattr(lifecycle, 'launch_project_attestation', None)
     command = lifecycle.command
     environment = getattr(lifecycle, 'launch_env', None)
-    startup_arguments = (['-AutomationMode'] if build.startswith('2021.1.')
-        and isinstance(environment, Mapping) and environment.get('AK_AUTOMATION_MODE') == '1' else [])
+    startup_arguments = (['-AutomationMode'] if isinstance(environment, Mapping)
+        and environment.get('AK_AUTOMATION_MODE') == '1' else [])
     expected_executable = f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe'
     if (not isinstance(proof, Mapping) or proof.get('method') != 'owned_winepath_roundtrip'
             or proof.get('project') != str(project) or proof.get('roundtrip_project') != str(project)
