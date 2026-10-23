@@ -5,6 +5,36 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R81 reference and override query conditions
+
+Reviewed implementation `6316028a`, integrated at `39052582`, adds metadata-bound
+`reference`, `local-reference` and `override-source-value` predicates to the
+shared root/related query mechanism. Five pinned WHERE source sections support
+the owned identity, null/setness, negation and override expressions separately
+from RETURN projection evidence. Canonical GUID comparison constants require
+no target-existence read; named selectors use bounded unique resolution and
+revalidation. Native predicates determine results, including inequality with
+unset references. The public interface does not accept arbitrary accessors.
+
+Original failures and their narrow repairs are retained. Initial unsupported
+modes failed 11 checks. Runtime expansion passed 75 while five schema assertions
+failed, then those five passed after disclosure was added. A later selection
+passed 80 and exposed five named-selector drift failures; those five passed
+after revalidation was repaired. Additional mode/type controls passed 50.
+The final affected selections passed 122 in 16.24s and 60 in 16.06s, including
+existing scalar consumers, source completeness, typed pages and reducers. Counts
+overlap and do not represent a full-file or full-gate total. Independent static
+review found no material issue; originals, source notes and review are archived
+in `r81-reference-condition-program-logs`.
+
+No native or Fresh run accompanied this query increment. Existing projection
+and ordinary-condition native results prove their original scopes only. Native
+resolved/local/override predicates, known-unset and collision-specific behavior
+still need targeted observation. Exact namespaced custom-property WHERE token
+spelling remains a source question under #181; the disclosed current token
+boundary is not a finding of native absence. Other query records, reference
+chains, functions and legacy alternatives remain assigned to the same ticket.
+
 ## 2026-10-23 R80 owned Action history and multiple-root creation
 
 Action history implementation `274119a3`, integrated at `62e4bac0`, retains the
