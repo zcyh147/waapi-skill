@@ -1,4 +1,4 @@
-"""Closed scalar conditions bound to actual object metadata, evaluated by WAQL.
+"""Closed scalar/reference conditions bound to live metadata, evaluated by WAQL.
 
 This module owns no Python predicate evaluator. Binding and ordered occurrence
 association are Gateway work; only native WHERE decides which identities match.
@@ -9,6 +9,7 @@ import copy
 import json
 import math
 import re
+from dataclasses import dataclass
 
 from .builders.query import (QueryPredicate, _where_clause, build_object_get_query,
     MAX_STRUCTURED_SOURCE_ITEMS, MAX_ADVANCED_RETURN_EXPRESSIONS, MAX_STRUCTURED_LITERAL_LENGTH)
@@ -17,22 +18,74 @@ from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_discovery import metadata_typed_value_type, MAX_METADATA_DISCOVERY_QUERY_CHARS
 from .object_query_related_runtime import IDENTITY, OBJECT_GET, canonical_guid, RelatedQueryError
 
+MODES = {'ordinary': ('property', '@'), 'override-source-value': ('property', '@@'),
+    'reference': ('reference', '@@'), 'local-reference': ('reference', '@')}
+
+
+def reference_constant(value):
+    from .operation_object import normalize_object_identity, DEFAULT_MAX_REQUEST_BYTES
+    if len(value.encode('utf-8')) > DEFAULT_MAX_REQUEST_BYTES:
+        raise ValueError('Reference selector exceeds the owning identity request budget')
+    if canonical_guid(value): return {'kind':'id','value':value.upper()}
+    def unique(pairs):
+        result = {}
+        for key,item in pairs:
+            if key in result: raise ValueError('Reference selectors reject duplicate JSON keys')
+            result[key] = item
+        return result
+    try:
+        selector = json.loads(value,object_pairs_hook=unique)
+        if selector is None: return None
+        if len(canonical_json_bytes(selector)) > DEFAULT_MAX_REQUEST_BYTES:
+            raise ValueError('Reference selector exceeds the owning identity request budget')
+        return normalize_object_identity(selector,path='field_condition.value').as_dict()
+    except (TypeError, ValueError) as exc:
+        raise ValueError('Reference comparisons require a canonical GUID, a closed identity selector or null: '+str(exc)) from exc
+
+
+@dataclass(frozen=True)
+class BoundCondition:
+    # Only a freshly metadata-bound token reaches this record. Neither the
+    # renderer nor its grammar is a public expression input.
+    field: str
+    reference: bool
+    operator: str
+    value: object
+
+    def clause(self):
+        from .builders.query import _literal
+        if not self.reference:
+            return _where_clause(QueryPredicate(self.field,self.operator,self.value))
+        if self.value is None:
+            present = self.field+' != null'
+            return 'where '+('!('+present+')' if self.operator=='=' else present)
+        return 'where '+self.field+'.id '+self.operator+' '+_literal(self.value)
+
+
+def observed_field(row, field):
+    return {'present':field in row, **({'value':row[field]} if field in row else {})}
+
+
 COMPARISONS = {'is':'=', 'is-not':'!=', 'below':'<', 'at-most':'<=', 'above':'>', 'at-least':'>=', 'matches-text':':'}
 
 
 def parse_field_condition(values):
     if len(values) != 4:
-        raise ValueError('field conditions require ordinary MEANING COMPARISON VALUE')
+        raise ValueError('field conditions require MODE MEANING COMPARISON VALUE')
     mode, meaning, comparison, value = values
-    if mode != 'ordinary':
-        raise ValueError('scalar field conditions currently admit ordinary object-local properties')
+    if mode not in MODES:
+        raise ValueError('field mode must be one of: '+', '.join(MODES))
     if (not isinstance(meaning, str) or not meaning or meaning != meaning.strip()
             or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS
             or any(ord(c) < 32 or ord(c) == 127 or c in "@.\\;\"'()" for c in meaning)):
         raise ValueError('field conditions require a bounded user-facing meaning, not native accessor grammar')
     if comparison not in COMPARISONS:
         raise ValueError('field comparison must be one of: ' + ', '.join(COMPARISONS))
-    if not isinstance(value, str) or len(value.encode('utf-8')) > MAX_STRUCTURED_LITERAL_LENGTH:
+    if not isinstance(value,str): raise ValueError('Field comparison value must be text')
+    if MODES[mode][0]=='reference':
+        if comparison not in {'is','is-not'}: raise ValueError('Reference conditions admit is/is-not identity or null comparisons')
+        reference_constant(value)  # Owning identity limits, not scalar literal limits.
+    elif len(value.encode('utf-8')) > MAX_STRUCTURED_LITERAL_LENGTH:
         raise ValueError('field comparison value exceeds the existing literal budget')
     return {'field_condition':{'mode':mode, 'meaning':meaning, 'comparison':comparison, 'value':value}}
 
@@ -69,6 +122,39 @@ class ScalarConditionPlan:
         self.validate_rows, self.platform, self.language = validate_rows, platform, language
         self.observations, self.value_reads = [], {}
         self.charge_selection = charge_selection
+        self.target_cache, self.target_observations = {}, []
+
+    def target_value(self, condition):
+        selector = reference_constant(condition['value'])
+        if selector is None: return None
+        if selector['kind']=='id' and canonical_guid(selector['value']):
+            # Literal comparison values have no target existence/name authority.
+            return selector['value'].upper()
+        from .operation_registry import _resolve_identity, OperationContractError
+        key = canonical_sha256(selector)
+        if key not in self.target_cache:
+            try:
+                target = _resolve_identity(selector,role='query comparison',read=self.read,identity_cache={})
+            except OperationContractError as exc:
+                raise RelatedQueryError(str(exc),code='QUERY_FIELD_CONDITION_TARGET',details=exc.details) from exc
+            if not canonical_guid(target.object):
+                raise RelatedQueryError('Named reference comparison must resolve one canonical GUID',code='QUERY_FIELD_CONDITION_TARGET')
+            self.target_cache[key] = str(target.object).upper()
+            self.target_observations.append({'selector':selector,'identity':copy.deepcopy(dict(target.row))})
+            self.observations.append({'comparison_target':self.target_observations[-1]})
+        return self.target_cache[key]
+
+    def validate_targets(self):
+        # Canonical GUID literals never enter this list. Only selectors whose
+        # meaning required a live identity resolution are revalidated.
+        from .operation_registry import _resolve_identity, OperationContractError
+        for observation in self.target_observations:
+            try:
+                current = _resolve_identity(observation['selector'],role='query comparison',read=self.read,identity_cache={})
+            except OperationContractError as exc:
+                raise RelatedQueryError(str(exc),code='QUERY_FIELD_CONDITION_TARGET',details=exc.details) from exc
+            if canonical_json_bytes(dict(current.row)) != canonical_json_bytes(observation['identity']):
+                raise RelatedQueryError('Named comparison selector changed its observed identity',code='QUERY_FIELD_CONDITION_TARGET')
 
     def actual_rows(self, rows):
         ids = list(dict.fromkeys(row['id'].upper() for row in rows))
@@ -105,14 +191,15 @@ class ScalarConditionPlan:
             if candidate is None or not selection['complete']:
                 raise RelatedQueryError('The field condition cannot be decided in every actual metadata scope; refine the meaning or source',
                     code='QUERY_FIELD_CONDITION_UNAVAILABLE', details={'condition':condition,'requested_option':option,'unresolved_scope':selection})
-            if candidate.get('kind') != 'property':
-                raise RelatedQueryError('Scalar field conditions require a live property, not a reference/list',code='QUERY_FIELD_CONDITION_KIND')
-            value = condition_value(candidate.get('metadata',{}),condition)
-            predicate = QueryPredicate('@'+candidate['name'],COMPARISONS[condition['comparison']],value)
-            clause = _where_clause(predicate)
+            kind,prefix = MODES[condition['mode']]
+            if candidate.get('kind') != kind:
+                raise RelatedQueryError('The field condition mode requires a live '+kind,code='QUERY_FIELD_CONDITION_KIND')
+            value = self.target_value(condition) if kind=='reference' else condition_value(candidate.get('metadata',{}),condition)
+            predicate = BoundCondition(prefix+candidate['name'],kind=='reference',COMPARISONS[condition['comparison']],value)
+            clause = predicate.clause()
             key = canonical_sha256({'scope':selection['scope'],'clause':clause})
             group = groups.setdefault(key,{'scope':selection['scope'],'predicate':predicate,'clause':clause,'ids':[],
-                'value_type':metadata_typed_value_type(candidate.get('metadata',{}).get('type')), 'condition':condition})
+                'value_type':'reference' if kind=='reference' else metadata_typed_value_type(candidate.get('metadata',{}).get('type')), 'condition':condition})
             identity = row['id'].upper()
             if identity not in group['ids']: group['ids'].append(identity)
         return list(groups.values())
@@ -138,8 +225,10 @@ class ScalarConditionPlan:
                 value,kind = row.get(field),group['value_type']
                 valid = (type(value) is bool if kind=='boolean' else type(value) is int if kind=='integer'
                     else (type(value) is int or type(value) is float and math.isfinite(value)) if kind=='number' else isinstance(value,str))
-                if field not in row or value is None or not valid:
-                    raise RelatedQueryError('A predicate value is absent, null or incompatible with its observed scalar type; it is not a nonmatch',
+                if kind=='reference':
+                    valid = field not in row or value is None or isinstance(value,dict) and canonical_guid(value.get('id'))
+                if (kind!='reference' and (field not in row or value is None)) or not valid:
+                    raise RelatedQueryError('A predicate value is unavailable or incompatible with its bound field kind/type; it is not a nonmatch',
                         code='QUERY_FIELD_CONDITION_UNAVAILABLE',details={'condition':group['condition'],'scope':group['scope'],
                             'object':identity,'field':field,'presence':'absent' if field not in row else 'null' if value is None else 'incompatible_type'})
                 batch[identity] = row
@@ -163,9 +252,12 @@ class ScalarConditionPlan:
             observed = self.observe_values(group,actual)
             for start in range(0,len(group['ids']),MAX_STRUCTURED_SOURCE_ITEMS):
                 chunk = group['ids'][start:start+MAX_STRUCTURED_SOURCE_ITEMS]
-                preview = build_object_get_query(object_ids=chunk,where=group['predicate'],
-                    return_fields=(*IDENTITY,'classId',group['predicate'].field),version=self.version,
-                    platform=self.platform,language=self.language)
+                from .builders.query import build_advanced_object_get_query, ADVANCED_QUERY_CONTRACT
+                source = build_object_get_query(object_ids=chunk,return_fields=IDENTITY,version=self.version)
+                preview = build_advanced_object_get_query({'contract':ADVANCED_QUERY_CONTRACT,
+                    'waql':source.envelope.args['waql']+' '+group['clause'],
+                    'return':[*IDENTITY,'classId',group['predicate'].field],'max_results':len(chunk)},
+                    version=self.version,platform=self.platform,language=self.language)
                 result = self.read(OBJECT_GET,preview.envelope.args,preview.envelope.options)
                 values = self.validate_rows(result,len(chunk))
                 ids = [row['id'].upper() for row in values]
@@ -176,7 +268,7 @@ class ScalarConditionPlan:
                            for key in (*IDENTITY,'classId')) for row in values):
                     raise RelatedQueryError('Selected field-condition identity or actual class changed during the native read')
                 field = group['predicate'].field
-                if any(field not in row or canonical_json_bytes(row[field]) != canonical_json_bytes(observed[row['id'].upper()][field])
+                if any(canonical_json_bytes(observed_field(row,field)) != canonical_json_bytes(observed_field(observed[row['id'].upper()],field))
                        for row in values):
                     raise RelatedQueryError('Selected predicate value differs from its checked source observation')
                 if self.charge_selection is not None:
@@ -184,6 +276,7 @@ class ScalarConditionPlan:
                 selected.update(ids)
                 self.observations.append({'condition':condition,'scope':group['scope'], 'api':OBJECT_GET,
                     'args':preview.envelope.args,'options':preview.envelope.options,'result_sha256':canonical_sha256(result)})
+        self.validate_targets()
         return [row for row in rows if row['id'].upper() in selected]
 
 
@@ -272,10 +365,11 @@ class RootScalarConditionPlan:
         after = self.scan()
         if canonical_json_bytes(after)!=canonical_json_bytes(self.source_rows):
             raise RelatedQueryError('Root predicate source membership or actual class changed during the read')
+        self.scalar.validate_targets()
         for group in self.bound_groups:
             values = self.scalar.observe_values(group,after)
             for row in rows:
-                if row['id'].upper() in values and canonical_json_bytes(row.get(group['predicate'].field))!=canonical_json_bytes(values[row['id'].upper()][group['predicate'].field]):
+                if row['id'].upper() in values and canonical_json_bytes(observed_field(row,group['predicate'].field))!=canonical_json_bytes(observed_field(values[row['id'].upper()],group['predicate'].field)):
                     raise RelatedQueryError('The final predicate value differs from its actual source observation')
 
     def proof(self):
@@ -295,17 +389,32 @@ def field_condition_contract(version, *, maximum_conditions):
     source = json.loads((Path(__file__).resolve().parents[1]/'references/semantic'/version/'query-field-condition-sources.json').read_text())
     if source['version']!=version or source['wwise_build']!=_definition_graph(version).wwise_build:
         raise ValueError('Scalar query condition sources do not match selected definitions')
-    return {'root_option':'--where-field ordinary MEANING COMPARISON VALUE',
-        'related_selection':'matching-field ordinary MEANING COMPARISON VALUE',
-        'related_reducers':['any-match-field ordinary MEANING COMPARISON VALUE','all-match-field ordinary MEANING COMPARISON VALUE'],
-        'modes':['ordinary'],'value_source':'direct object-local property value, matching ordinary property output',
-        'comparisons':list(COMPARISONS),'types':'exact live scalar metadata; is/is-not scalar, ordered comparisons numeric only, matches-text native word-prefix/wildcard string matching; thresholds are not mutation assignments or enum choices',
+    reference_source = json.loads((Path(__file__).resolve().parents[1]/'references/semantic'/version/'query-reference-condition-sources.json').read_text())
+    if reference_source['version']!=version or reference_source['wwise_build']!=_definition_graph(version).wwise_build:
+        raise ValueError('Reference condition source does not match selected definitions')
+    from .operation_object import DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH, DEFAULT_MAX_NAME_LENGTH, DEFAULT_MAX_TYPE_LENGTH
+    return {'root_option':'--where-field MODE MEANING COMPARISON VALUE',
+        'related_selection':'matching-field MODE MEANING COMPARISON VALUE',
+        'related_reducers':['any-match-field MODE MEANING COMPARISON VALUE','all-match-field MODE MEANING COMPARISON VALUE'],
+        'modes':list(MODES),'value_source':{'ordinary':'direct object-local scalar property',
+            'override-source-value':'query authoring override-resolved scalar property; value, not override ancestor identity or runtime RTPC/mix',
+            'reference':'override-resolved reference identity, explicitly disambiguated from built-in accessors',
+            'local-reference':'directly stored reference identity, potentially hidden by an override'},
+        'reference_constants':{'comparisons':['is','is-not'],'canonical_guid_requires_existence':False,
+            'target':'bare canonical GUID or existing closed id/path/exact-type-name/direct-child/scoped-name selector; canonical GUIDs are literal IDs, other selectors resolve bounded unique GUIDs',
+            'null':'native reference setness/complement; RETURN absence stays absent and does not establish unset versus inapplicable; identity inequality is native, not Python complement',
+            'selector_limits':{'request_bytes':DEFAULT_MAX_REQUEST_BYTES,'scoped_parent_characters':DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH,
+                'name_characters':DEFAULT_MAX_NAME_LENGTH,'type_characters':DEFAULT_MAX_TYPE_LENGTH},
+            'assignment_constraints':False},
+        'comparisons':list(COMPARISONS),'types':'properties use exact live scalar metadata; references require discovered reference kind and canonical identity/null observations; ordered comparisons numeric only, matches-text native word-prefix/wildcard string matching; comparison constants are not mutation assignments or enum choices',
+        'field_token_boundary':'metadata-selected ASCII alphanumeric/underscore tokens; namespaced custom-token WHERE spelling is not yet established by the retained query evidence and is not classified as native absence',
         'authority':'complete actual source/member class or GUID live metadata; unknown is not false or zero',
         'root_limit_order':'native field predicates before final root take',
         'root_unknown':'bounded refinement/failure; never return unfiltered roots as matches',
         'related_unknown':'preserve roots and independent views; scoped unavailable_predicates without definitive items/value',
         'scope':'ordinary, broad and advanced roots and nested/combined object lists; no exact-ID-only requirement',
         'limits':{'root_condition_declarations':maximum_conditions,'complete_source_identities':MULTI_IDENTITY_READ_MAX_IDS,
-            'literal_utf8_bytes':MAX_STRUCTURED_LITERAL_LENGTH,'other':'existing member/path/native expression, aggregate bytes, deadline and sealed-page bounds; no hidden prefix'},
-        'source':source,'source_boundary':'pinned query WHERE/SELECT evidence, separate from RETURN; no runtime SDK dependency',
-        'followup':'reference/local-reference/property override-source comparisons and non-object record-list conditions are not yet supported; this does not establish native absence'}
+            'literal_utf8_bytes':MAX_STRUCTURED_LITERAL_LENGTH,'literal_scope':'scalar property constants only; reference selector limits are separately disclosed',
+            'other':'existing member/path/native expression, aggregate bytes, deadline and sealed-page bounds; no hidden prefix'},
+        'source':source,'reference_source':reference_source,'source_boundary':'pinned query WHERE/SELECT evidence, separate from RETURN; no runtime SDK dependency',
+        'followup':'reference-chain condition operands, non-object records and functions remain unavailable; native unset/collision edge observations remain distinct from documented syntax; this does not establish native absence'}
