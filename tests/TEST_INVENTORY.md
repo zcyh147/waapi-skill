@@ -5,6 +5,33 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R78 Bed Mixer condition acceptance
+
+No runtime change was needed. Four-version public ShareSet setup/edit checks,
+existing policy alternatives and the 2021 constructor boundary passed 17 focused
+tests in 5.99s. The original four fixture failures (missing requested stored-field
+projection in a fake client) and corrected result are retained in
+`r78-bed-program-logs`; five files are hash-archived with their handoff/source plan.
+
+Frozen `df9af555619219b430c33b43f4392f91ebc08bae` passed one native workflow on
+each matching macOS Console: 2022.1 = 9.79s, 2023.1 = 10.03s, 2024.1 = 10.44s,
+2025.1 = 10.08s. Each has 25 independent observations, 115 hashed native packets
+and two separately authorized verified transactions. A standalone Bed Mixer
+ShareSet is created with policy1 only; its existing limit is then changed64→128.
+Every parameter read, setup, edit and verifier uses the same actual nonzero
+platform. Actual scalar metadata/enabled state, all four plugin parameters,
+identity/notes, WorkUnit membership, parent and existing RoomVerb peer are checked.
+Source integrity and cleanup passed; no audio rendering is claimed.
+
+Evidence: `r78-bed-mixer-native-review.json` and
+`r78-bed-df9af555-<year>-r1/root-review.json`. Matching 2021 captured host catalog
+and primary plugin corpus contain no Bed Mixer class, and its constructor
+backend is separately unavailable in the pinned function surface. No 2021 Bed
+case ran or received PASS credit; this is a scoped host/version boundary, not
+universal absence on every possible host. The source rationale remains in the
+archived plan. No Fresh, Windows, Authoring or full gate was added. #177 and the
+broader construction/plugin tickets remain open pending their full criteria.
+
 ## 2026-10-23 R76 sequence and R77 Time native acceptance
 
 The R76 closed sequence workflow passed on all five pinned macOS Console
