@@ -1265,6 +1265,59 @@ def test_blend_assignment_negative_index_preview_and_independent_order(tmp_path,
     assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
 
 
+def test_blend_assignment_null_observation_blocks_preview(tmp_path):
+    task = _BlendAssignmentTask(tmp_path, "2024.1")
+    task.assignments[0]["child"] = "{00000000-0000-0000-0000-000000000000}"
+    task.step("draft-declare-core-plan", *task.handles, "--value", "insertion_index", "-9")
+    code, result = task.raw("draft-check", *task.binding, "--expected-revision", str(task.draft["revision"]))
+    assert code != 0
+    assert "INVALID_BLEND_ASSIGNMENT_OBSERVATION" in json.dumps(result)
+    assert not any(uri == task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("damage", ["assignment-null", "owner-null", "owner-malformed-guid"])
+@pytest.mark.parametrize("phase", ["preview", "prewrite", "postwrite"])
+def test_blend_assignment_invalid_member_observations_fail_closed(tmp_path, damage, phase):
+    task = _BlendAssignmentTask(tmp_path, "2024.1")
+    if phase != "preview":
+        task.preview(-9)
+    if phase == "postwrite":
+        assert task.execute()[0] == 0
+    null = "{00000000-0000-0000-0000-000000000000}"
+    if damage == "assignment-null":
+        task.assignments[-1]["child"] = null
+    else:
+        identity = null if damage == "owner-null" else "{1234567-81234-1234-1234-123456789ABC}"
+        task.objects[task.owner]["blendTracks"].append({"id": identity})
+    if phase == "preview":
+        task.step("draft-declare-core-plan", *task.handles, "--value", "insertion_index", "-9")
+        code, result = task.raw("draft-check", *task.binding, "--expected-revision", str(task.draft["revision"]))
+        assert code == 2 and "INVALID_BLEND_ASSIGNMENT_OBSERVATION" in json.dumps(result), result
+    elif phase == "prewrite":
+        code, result = task.execute()
+        assert code == 2 and "STALE_BLEND_ASSIGNMENT" in json.dumps(result), result
+    else:
+        code, result = task.raw("verify", task.tx)
+        assert code == 2 and result["verified"] is False, result
+        assert result["verification"]["business_state_verified"] is False
+        assert task.raw("execute", task.tx)[0] == 2
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == (1 if phase == "postwrite" else 0)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_assignment_valid_mixedcase_member_observations_remain_accepted(tmp_path, version):
+    task = _BlendAssignmentTask(tmp_path, version)
+    task.assignments[0]["child"] = "{aBcDeFaB-1234-5678-9AbC-aBcDeF123456}"
+    task.objects[task.owner]["blendTracks"].append({"id": "{BcDeFaBc-2345-6789-aBcD-bCdEfA234567}"})
+    task.preview(-9)
+    assert task.artifact["verification_plan"]["expected_order"] == [
+        TARGET_ID, "{ABCDEFAB-1234-5678-9ABC-ABCDEF123456}", task.second]
+    assert task.execute()[0] == 0
+    result = task.run("verify", task.tx)
+    assert result["verification"]["business_state_verified"] is True
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
 @pytest.mark.parametrize(("index", "expected"), [(None, 2), (0, 0), (1, 1), (99, 2)])
 def test_blend_assignment_documented_positions_and_retained_edges(tmp_path, version, index, expected):

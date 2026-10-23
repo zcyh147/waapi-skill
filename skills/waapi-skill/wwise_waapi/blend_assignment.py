@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Mapping
+import re
 import uuid
 
 from .canonical import canonical_json_bytes
@@ -14,6 +15,7 @@ GET = "ak.wwise.core.blendContainer.getAssignments"
 OBJECT_GET = "ak.wwise.core.object.get"
 # Same byte ceiling as the existing public bounded getAssignments read.
 MAX_BYTES = 256 * 1024
+_GUID = re.compile(r"\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}")
 
 
 class BlendAssignmentError(ValueError):
@@ -21,12 +23,12 @@ class BlendAssignmentError(ValueError):
 
 
 def _guid(value):
-    if not isinstance(value, str) or len(value) != 38 or not value.startswith("{") or not value.endswith("}"):
+    if not isinstance(value, str) or _GUID.fullmatch(value) is None:
         raise BlendAssignmentError("Blend assignment observations require canonical GUIDs")
-    try:
-        return "{" + str(uuid.UUID(value)).upper() + "}"
-    except ValueError as exc:
-        raise BlendAssignmentError("Blend assignment observations require canonical GUIDs") from exc
+    parsed = uuid.UUID(value)
+    if parsed.int == 0:
+        raise BlendAssignmentError("Blend assignment observations require nonzero GUIDs")
+    return "{" + str(parsed).upper() + "}"
 
 
 def _reference(value):
