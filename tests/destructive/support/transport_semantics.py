@@ -33,7 +33,9 @@ def collect_selected_transport_semantics(batch, public_call):
         'cases': [{'case_id': case, 'action': action, 'required_prestate': state,
                    'observation_status': 'BLOCKED', 'business_effect_verified': False,
                    'coverage_credit': 'none_pending_semantics'} for case, action, state in CASES],
-        'setup': [], 'errors': [], 'cleanup': {'complete': False, 'receipts': [], 'errors': []}}
+        'setup': [], 'errors': [], 'cleanup': {'complete': False, 'receipts': [], 'errors': [],
+            'audition_media_prior_state_restored': False,
+            'audition_media_scope': 'Explicit originals setup only; prior global mode is not observed or restored'}}
     cleanup_phase, unsafe, handle, restore_loop = False, False, None, False
     original = None
 
@@ -149,6 +151,14 @@ def collect_selected_transport_semantics(batch, public_call):
         props = original['properties']
         assert type(props['IsLoopingEnabled']) is bool and props['IsLoopingInfinite'] is True, props
         report['fixture_before'] = {'sound': original, 'source': source}
+        # The copied fixture owns the original PCM, not a converted cache.
+        # Select it explicitly through the same public setup used by capture.
+        originals = {'business_effect_verified': False}
+        report['setup'].append({'originals': originals})
+        selected = execute(draft(PREFIX + 'useOriginals', ['--audition-media', 'originals']), record=originals)
+        originals['verification_state'] = selected['state']
+        assert selected['state'] == 'result_schema_checked' and selected['verified'] is False, selected
+        persist()
         if not props['IsLoopingEnabled']:
             # Restoration ownership precedes the attempted write.
             restore_loop = True

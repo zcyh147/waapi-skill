@@ -34,6 +34,7 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None):
             super().__init__(tmp_path)
             self.project_file = owner.runtime.sandbox.sandbox_project
             self.calls, self.active, self.state = [], False, 'stopped'
+            self.originals = False
             self.rows = _committed_capture_objects()
             self.rows[sound_id].update({'classId': 65552, '@IsLoopingEnabled': False,
                 '@IsLoopingInfinite': True, 'activeSource': {'id': source_id, 'name': 'audit_tail'}})
@@ -59,6 +60,11 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None):
             if uri.endswith('object.setProperty'):
                 self.rows[args['object']]['@' + args['property']] = args['value']
                 return {}
+            if uri.endswith('transport.useOriginals'):
+                if failure == 'originals-setup':
+                    raise RuntimeError('fake originals setup unavailable')
+                self.originals = args['enable']
+                return {}
             if uri.endswith('transport.getList'):
                 return {'list': [{'transport': 0, 'object': sound_id, 'gameObject': 1}] if self.active else []}
             if uri.endswith('transport.create'):
@@ -74,7 +80,7 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None):
             if uri.endswith('transport.executeAction'):
                 action = args['action']
                 if action == 'stop': self.state = 'stopped'
-                elif action in ('play', 'playDirectly'): self.state = 'playing'
+                elif action in ('play', 'playDirectly'): self.state = 'playing' if self.originals else 'stopped'
                 elif action == 'pause':
                     self.state = ('stopped' if failure == 'missing-paused' else 'paused') if self.state == 'playing' else 'playing' if self.state == 'paused' else 'stopped'
                 elif action == 'playStop': self.state = 'stopped' if self.state in ('playing','paused') else 'playing'
@@ -114,6 +120,9 @@ def test_selected_observations_archive_without_business_or_coverage_pass(owned_a
         ('D-one','stopped','playing'), ('P-one','stopped','stopped'), ('T-one','paused','stopped')]
     assert all(c['observation_status'] == 'OBSERVED' and c['business_effect_verified'] is False for c in saved['cases'])
     assert saved['cleanup']['complete'] is True and saved['public_call_count'] <= 210
+    assert saved['cleanup']['audition_media_prior_state_restored'] is False
+    originals, = [args for uri, args, _ in client.calls if uri.endswith('transport.useOriginals')]
+    assert originals == {'enable': True}
     assert client.rows['{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}']['@IsLoopingEnabled'] is False
 
 
@@ -164,3 +173,23 @@ def test_selected_semantics_node_uses_exact_2025_owner_and_child_startup_recipe(
         assert [e[0] for e in events] == ['construct','start','install']
         assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
         assert 'AK_AUTOMATION_MODE' not in authoring_batch.os.environ
+
+
+def test_originals_setup_failure_archives_blocked_cases_before_playback(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _host(owned_authoring, tmp_path, monkeypatch, failure='originals-setup')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL'
+    category, = record['categories']
+    assert category['status'] != 'PASS' and category['observation_task_status'] == 'BLOCKED'
+    assert category['business_effect_verified'] is False and category['coverage_credit'] == 'none_pending_semantics'
+    assert 'batch_finalization' not in category
+    archive = json.loads(Path(category['observation_artifact']['path']).read_text())
+    saved = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'transport-semantics.json').read_text())
+    assert saved['errors'] and not saved['complete'] and not saved['cleanup']['complete']
+    assert all(case['observation_status'] == 'BLOCKED' for case in saved['cases'])
+    assert saved['cleanup']['audition_media_prior_state_restored'] is False
+    assert sum(uri.endswith('transport.useOriginals') for uri, _, _ in client.calls) == 1
+    assert not any(uri.endswith(('transport.create', 'transport.executeAction')) for uri, _, _ in client.calls)
+    assert record['residual_state']['quarantine_path']
