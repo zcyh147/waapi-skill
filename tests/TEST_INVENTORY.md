@@ -5,6 +5,28 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R87 bounded condition evidence reuse
+
+Reviewed condition accounting `b4cf930e`, integrated at `d8fb3e44`, preserves
+the frozen original receipts and distinguishes six selected 2025 LFO members'
+reviewed mechanism reuse from directly observed recipient effects. Native,
+class metadata and current public program evidence remain separate; controlled
+captures grant no product publication credit and original native witness IDs
+are deduplicated. The source resolver retains all 5,669 original scalar IDs and
+shapes with no source-only coverage credit. This does not complete #177.
+
+Original focused evidence remains 139 PASS / 1 FAIL in 307.21s; subsequent
+scoped corrections passed nine checks in 56.43s and two in 8.61s with one
+overlap. Independent review then reproduced an uncaught malformed-trace URI
+error. The repaired negative and retained scope positive passed two checks in
+8.92s; the intermediate 1 PASS / 1 FAIL compatibility result is retained.
+Correction review verified source/hunk reconciliation and original receipt
+lineage without another green test run. No native or Fresh test was added for
+this accounting change. Reports: `r87-handoff-review/condition-correction-hashes.json`
+and `r87-condition-reviewed-evidence/correction-review.md`. Remaining grouped
+source-to-proof assignments, Music/BatchRename/fieldless dependencies and
+non-scalar condition coverage remain same-parent work.
+
 ## 2026-10-23 R86/R87 local Lists and plug-in result identity
 
 Reviewed query implementation `22ff1cb5` adds closed local RTPC outputs for
