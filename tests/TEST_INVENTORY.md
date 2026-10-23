@@ -5,6 +5,56 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R84 related property outputs and existing EQ witness
+
+Reviewed `6e0aa118` extends existing related scalar-property terminals to fresh
+metadata-selected namespaced fields, in both ordinary and override-source-value
+modes. Singleton, list, selected sequence and combined outputs use their existing
+planners; reference hops and reference terminals retain their previous kind and
+token boundaries. Root output behavior and general expression grammar are
+unchanged. The final five-version affected selection passed 227 checks in
+12.24s; earlier failed assertions and repairs remain in the original logs.
+Test-only output controls passed five checks in 1.33s before native execution.
+
+Frozen `a5439459` passed one matching macOS Console2025.1.7.9143 workflow in
+6.78s: seven public read groups, seven invocations, 30 hashed native packets and
+zero transactions. Root, AudioFileSource-to-parent and selected child-list
+outputs returned actual typed integer-zero values for both @MyCompany:Status
+and @@MyCompany:Status. Fresh scoped metadata, actual parent identity/class,
+complete selected membership and repeated root values matched the public output.
+Source hash/mtime/tree and lifecycle cleanup passed. Evidence:
+`r84-namespaced-outputs-a5439459-2025-r1/root-review.json`. This establishes the
+selected 2025 native outputs, not an inheritance difference or five-version
+native execution. Earlier R82/R83 condition witnesses were not repeated.
+
+The separate existing-EQ test on the same candidate failed in 4.14s before any
+Draft or write. Its collector incorrectly required the query-only terminal
+`agent_result` field on the successful `status` response, which has no such
+field. One public status invocation and two hashed read-only native packets were
+captured; no transaction occurred. Source integrity and process cleanup passed;
+the failed sandbox remains quarantined. The original FAIL is retained at
+`r84-eq-gain-a5439459-2025-r1/root-review.json`. This is a test-oracle mismatch,
+not evidence of an EQ implementation failure or a passing EQ business outcome.
+The test-only repair `477b0049` added a complete public Gateway/fake-transport
+collector flow, which also caught a nine-field request exceeding the existing
+eight-field ceiling. The corrected 8+1 queries compare identity envelopes;
+`66a2a1f1` preserves each original response before joining the separate context.
+The affected controls passed 25 in 2.14s, followed by four full-flow controls in
+2.12s after Main's exact-response preservation finding. These runs overlap.
+
+Frozen `66a2a1f1` then passed the selected existing-EQ native workflow on macOS
+Console2025.1.7.9143 in 7.04s. One verified transaction changed Voice_EQ GainBand1
+from 4 to 3; 19 independent reads and 114 hashed native packets establish the
+actual Effect class6881283, all three Gain dependency clauses and recursive
+controller metadata. NumBands3, OnOffBand1true, FilterTypeBand1=4, other observed
+target values, peer values, complete ordered folder membership and selected
+metadata remained unchanged. The platform came from actual project status.
+No setup/history transaction occurred; source integrity and cleanup passed.
+Evidence: `r84-eq-gain-66a2a1f1-2025-r2/root-review.json`. The original failed
+root remains unchanged. This is one actual existing-EQ composition witness,
+not every plugin, band, version or audio-state verification. Neither slice adds
+Fresh or full-gate evidence.
+
 ## 2026-10-23 R82 duplicate creation and namespaced query witness
 
 Reviewed SET implementation `878cde58`, integrated at `79f76858`, gives duplicate
