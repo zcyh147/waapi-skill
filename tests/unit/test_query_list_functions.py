@@ -127,8 +127,8 @@ def test_offline_sequence_contract_pins_domain_sources_and_discloses_business_de
     contract = result['related_outputs']['list_members']['sequences']
     assert contract['versions'] == list(VERSIONS)
     assert contract['result_location'] == 'related.projections'
-    assert contract['selection_tokens'] == ['matching','first','last','at','skip','take']
-    assert contract['reducer_tokens'] == ['count','any','any-match','all-match']
+    assert contract['selection_tokens'] == ['matching','matching-field','first','last','at','skip','take']
+    assert contract['reducer_tokens'] == ['count','any','any-match','all-match','any-match-field','all-match-field']
     assert 'Gateway' in contract['derivation'] and 'native function-return equality' in contract['derivation']
     source = json.loads((Path(gateway.__file__).parents[1]/'references/semantic'/version/'query-list-output-sources.json').read_text())
     sections = source['sequence_sources']

@@ -55,7 +55,7 @@ class ListEdge:
 
 
 class RelatedListPlan:
-    def __init__(self, *, version, requests, bindings, build_preview, read, maximum_rows, maximum_read_bytes, compile_condition):
+    def __init__(self, *, version, requests, bindings, build_preview, read, maximum_rows, maximum_read_bytes, compile_condition, binder=None):
         self.version, self.requests, self.bindings = version, requests, tuple(binding for binding in bindings if not binding[0].startswith('related'))
         self.build_preview, self.read = build_preview, read
         self.compile_condition = compile_condition
@@ -69,7 +69,10 @@ class RelatedListPlan:
         self.return_scope = {}
         self.total_bytes = self.total_occurrences = 0
         self.unique_ids = set()
-        self.binder = RelatedFieldBinder(self.measured_read, RelatedQueryError)
+        self.binder = binder or RelatedFieldBinder(self.measured_read, RelatedQueryError)
+        from .object_query_field_conditions import ScalarConditionPlan
+        self.scalar_conditions = ScalarConditionPlan(version=version, read=self.measured_read, binder=self.binder, validate_rows=self.validate_rows,
+            charge_selection=self.charge_sequence_members)
         self.aliases = set()
         self.sequence_origins = {}
         self.has_sequences = any(kind == 'sequence' for request in requests for kind,_ in request['hops'])
@@ -162,7 +165,7 @@ class RelatedListPlan:
             stages.append({'selection':'first'})
         for stage in stages:
             selection = stage['selection']
-            if after or selection == 'last':
+            if after or selection == 'last' or 'field_condition' in stage:
                 after.append(stage); continue
             if selection in {'first','take','at'}:
                 count = stage['count'] if selection == 'take' else 1
@@ -208,6 +211,10 @@ class RelatedListPlan:
 
     def filter_rows(self, rows, condition):
         """Keep native predicate semantics and original occurrence order."""
+        if 'field_condition' in condition:
+            self.scalar_conditions.platform = self.return_scope.get('platform')
+            self.scalar_conditions.language = self.return_scope.get('language')
+            return self.scalar_conditions.filter(rows,condition)
         identities = list(dict.fromkeys(row['id'].upper() for row in rows))
         selected = set()
         for start in range(0,len(identities),MAX_STRUCTURED_SOURCE_ITEMS):
@@ -353,9 +360,14 @@ class RelatedListPlan:
                             raise RelatedQueryError('Relationship membership requires an actual canonical owner', code='RELATED_QUERY_RESULT_SHAPE')
                         association = (owner['id'].upper(), relation, canonical_sha256(edge.sequence))
                         if association not in memberships:
-                            values = self.relationship_rows(association[0], relation, edge.sequence)
-                            reducer = (edge.sequence or {}).get('reducer',{})
-                            matched = self.filter_rows(values,reducer['condition']) if reducer.get('operation') == 'all-match' else values
+                            try:
+                                values = self.relationship_rows(association[0], relation, edge.sequence)
+                                reducer = (edge.sequence or {}).get('reducer',{})
+                                matched = self.filter_rows(values,reducer['condition']) if reducer.get('operation') == 'all-match' else values
+                            except RelatedQueryError as exc:
+                                if exc.code != 'QUERY_FIELD_CONDITION_UNAVAILABLE': raise
+                                edge.states[loc] = ('predicate-unavailable', copy.deepcopy(exc.details))
+                                continue
                             origins = self.sequence_origins.get((association[0],canonical_sha256(edge.sequence)))
                             memberships[association] = (values,matched,origins)
                         values,matched,origins = memberships[association]
@@ -551,6 +563,7 @@ class RelatedListPlan:
                if self.has_sequences else {}),
             **({'sequence_source':related_sequence_source(self.version)}
                if self.has_sequences else {}),
+            'scalar_condition_observations_sha256':canonical_sha256(self.scalar_conditions.observations),
             'observed_scope_sha256':canonical_sha256(self.snapshot),
             'metadata_observations_sha256':canonical_sha256(self.binder.observations),
             'scopes':self.binder.selections,'read_associations':self.descriptors,
@@ -603,7 +616,8 @@ class RelatedListPlan:
                     else:
                         target = context_at(item,edge.path)
                     status, locations = edge.states[loc]
-                    if status == 'absent': target.setdefault('unavailable_fields',[]).append('items')
+                    if status == 'predicate-unavailable': target['unavailable_predicates'] = [copy.deepcopy(locations)]
+                    elif status == 'absent': target.setdefault('unavailable_fields',[]).append('items')
                     elif status == 'null': target['items'] = None
                     elif edge.sequence and edge.sequence.get('reducer'):
                         operation = edge.sequence['reducer']['operation']

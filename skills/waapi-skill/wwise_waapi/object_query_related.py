@@ -104,7 +104,11 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
     if len(values) > MAX_ADVANCED_RETURN_EXPRESSIONS * 4:
         raise ValueError('related paths and sequence arguments exceed their bounded declaration size')
     reducer = None
-    if option == '--include-related' and len(values) >= 4 and values[-3] in {'any-match','all-match'}:
+    if option == '--include-related' and len(values) >= 6 and values[-5] in {'any-match-field','all-match-field'}:
+        from .object_query_field_conditions import parse_field_condition
+        reducer = {'operation':values[-5].removesuffix('-field'), 'condition':parse_field_condition(values[-4:])}
+        values = [*values[:-5], '__sequence_value__']
+    elif option == '--include-related' and len(values) >= 4 and values[-3] in {'any-match','all-match'}:
         reducer = {'operation':values[-3], 'condition':{'condition':values[-2],'value':values[-1]}}
         values = [*values[:-3], '__sequence_value__']
     elif option == '--include-related' and values[-1] in {'count','any'}:
@@ -141,9 +145,13 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
                 index += 1
             if spec is not None or name in RELATED_QUERY_LIST_RELATIONS:
                 stages = []
-                while index < len(tokens) and tokens[index] in {"first", "last", "at", "skip", "take", "matching"}:
+                while index < len(tokens) and tokens[index] in {"first", "last", "at", "skip", "take", "matching", "matching-field"}:
                     selection = tokens[index]; index += 1
                     stage = {"selection": selection}
+                    if selection == 'matching-field':
+                        from .object_query_field_conditions import parse_field_condition
+                        stage = {'selection':'matching', **parse_field_condition(tokens[index:index+4])}
+                        index += 4
                     if selection == 'matching':
                         if index+1 >= len(tokens):
                             raise ValueError('matching requires one disclosed business condition and value')
@@ -260,9 +268,9 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "relations": dict(RELATED_QUERY_RELATIONS),
             "list_members": {"relations": dict(RELATED_QUERY_LIST_RELATIONS), "strategy": list_source["strategy"],
                 "sequences": {"versions":list(SUPPORTED_WWISE_VERSION_KEYS),
-                    "selection_tokens":['matching','first','last','at','skip','take'],
-                    "reducer_tokens":['count','any','any-match','all-match'],
-                    "condition_vocabulary":"same exact query-schema /predicates and /predicates/kind-is/choices; no native accessor, operator or parallel alias input",
+                    "selection_tokens":['matching','matching-field','first','last','at','skip','take'],
+                    "reducer_tokens":['count','any','any-match','all-match','any-match-field','all-match-field'],
+                    "condition_vocabulary":"fixed matching uses exact query-schema /predicates and /predicates/kind-is/choices; metadata-bound forms use /field_conditions, freshly bound on actual members; no native accessor/operator input",
                     "combination":"combine <closed relative path> and <closed relative path> ... end; self names the current context; arm and selected-arm occurrence origins retained, explicitly scoped after any pushed matching",
                     "examples":[['children','matching','kind-is','sound','first','volume-db'],['children','count'],['children','all-match','kind-is','sound'],['combine','self','and','ancestors','end','volume-db']],
                     "arguments":"canonical nonnegative decimal integers; skip 0 is omitted; zero selection is Gateway-empty, never an unproved native take 0",
