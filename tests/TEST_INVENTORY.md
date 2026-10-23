@@ -56,6 +56,38 @@ test before another native selection. No retry or native-absence claim follows.
 
 No Fresh, broad gate, Windows acceptance or whole-ticket completion is claimed.
 
+The reviewed retained Marker adapter and operation-wide notes expectations
+(`39228fc7`) are integrated at `fed49590`. Exact 2025 `[Marker]` display text
+requires the existing certified ownership proof and remains comparison-only;
+scalar changes use the actual GUID. Postwrite proof expectations apply every
+declared existing target's notes by GUID, while prewrite and undeclared peers
+retain their original state. The final batch repair passed 13 focused cases in
+14.72s. A shared-normalizer merge conflict was resolved by retaining both
+reviewed Marker and BlendTrack conditions; its directly affected selection
+passed 13 checks in 3.04s. These overlapping checks are separate component
+evidence, not a new aggregate gate or native Marker edit result.
+
+Reviewed Blend insertion and collector work was integrated at `d0b68da9`.
+The selected 2024.1.13.9056 native attempt **failed with a teardown error in
+11.13s**. Transaction `tx1-qngfentbbdxc0cy8eens` executed once and ended
+`verification_failed`: native index -9 appended the child at explicit index6,
+contrary to the documented clamp and the Preview's expected index0. The prior
+last assignment's Automatic right-edge positions also changed; its mode/shape
+and the other existing rows were retained. All 26 stored native packets match
+their recorded hashes. The collector preserved the failed verification, but
+its category row omitted required `verifier_strength`, so the final lifecycle
+record was not emitted. No sealed source/cleanup PASS is claimed from that
+missing record. Root review:
+`r90-blend-d0b68da9-2024-r1/root-review.json`.
+
+The planned 2025 attempt was stopped for this evidence-finalization fault.
+The failed transaction was not replayed or queried again. Repair work must
+establish the native clamp materialization and Automatic-neighbor semantics,
+and exercise the existing category writer. The two directly affected public
+route-matrix rows also failed on their older generic fake identities (0.99s);
+their fixture repair remains part of this same increment. No additional native
+attempt is selected while the observed-edge oracle remains unresolved.
+
 The omitted-projection repair `6330b8b9`, reviewed as `5031a90b` and integrated
 at `42bc090c`, reuses the existing source-bound empty-list proof. Only an exact
 modern Marker owner/profile and a fresh independent `select @Markers take 1`
