@@ -332,4 +332,11 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
             category["status"] = "FAIL"
             raise
         finally:
-            retain()
+            try:
+                retain()
+                category.update(observation_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
+                    business_effect_verified=observation["complete"] and observation["business_effect_verified"])
+            except BaseException:
+                category.update(status="FAIL", business_effect_verified=False)
+                category.pop("observation_sha256", None)
+                raise
