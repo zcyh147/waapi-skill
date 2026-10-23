@@ -165,7 +165,7 @@ def _identity(row: Any) -> dict[str, Any]:
     return {"id": bound.object_id, "name": bound.name, "type": bound.object_type, "path": bound.path}
 
 
-def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _receipt_observations(prepared: Mapping[str, Any], verification=None) -> list[dict[str, Any]]:
     plan, state = prepared.get("verification_plan"), prepared.get("pre_state")
     if not isinstance(plan, Mapping) or not isinstance(state, Mapping):
         raise ValueError("History expectation receipt lacks a prepared business observation")
@@ -180,25 +180,32 @@ def _receipt_observations(prepared: Mapping[str, Any]) -> list[dict[str, Any]]:
         identity = _identity(state.get("object"))
         field, platform = plan.get("field"), _receipt_platform(plan, state)
         before, info = state.get("field_before", {}), state.get("field_info", {})
+        from .derived_reference_history import applies, receipt_context
+        derived = receipt_context(prepared, verification) if applies(identity["type"], field) else None
         if (identity["id"] != str(plan.get("object_id")).upper() or not isinstance(field, str)
             or not isinstance(before, Mapping) or "value" not in before or before.get("field") != field
             or before.get("platform") != plan.get("platform") or not isinstance(before.get("row"), Mapping)
             or not _has_field(before["row"], field) or not isinstance(info, Mapping)
             or not ((info.get("type") or "").casefold() in {"reference", "objectreference"}
                     or str(info.get("restriction", {}).get("type", "")).casefold() == "reference"
-                    or info.get("supports", {}).get("reference") is True)):
+                    or info.get("supports", {}).get("reference") is True
+                    or derived is not None and info.get("reference_kind_evidence", {}).get("kind") == "documented-reference-kind")):
             raise ValueError("Reference receipt requires exact metadata, identity and an observed before value/platform")
         old = _reference_value(before["value"])
         observed_before = before["row"].get(f"@{field}") if clear_field else _field_value(before["row"], field)
         if _reference_value(observed_before) != old:
             raise ValueError("Reference receipt before projection disagrees with its sealed value")
+        if derived is not None:
+            from .derived_reference_history import native_metadata
+            info = {**info, "raw": native_metadata(state)}
         new = None if plan.get("expected_clear") is True else _reference_value(plan.get("expected_target_id"))
         if new is None and plan.get("expected_clear") is not True:
             raise ValueError("Reference receipt lacks its canonical expected target")
         return [{"object_before": identity, "object_after": dict(identity), "field": field,
             "before": old, "after": new, "platform": platform, "field_kind": "reference",
             "metadata_type": info.get("type"), "field_info": dict(info),
-            **({"reference_observation": dict(plan["reference_observation"])} if clear_field else {})}]
+            **({"reference_observation": dict(plan["reference_observation"])} if clear_field else {}),
+            **({"kind": "derived_action_reference", **derived} if derived is not None else {})}]
     if plan.get("kind") == "same-guid-property":
         if any(chain.get("derived") for chain in state.get("effect_render_chains", [])):
             raise ValueError("Render chain side effects require a complete multi-field history observation; a single-field receipt cannot certify them")
@@ -379,7 +386,7 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
         raise ValueError("Created Render chain effects require complete multi-field history observations")
     if plan.get("kind") != "object-create-graph":
-        return _receipt_observations(prepared)
+        return _receipt_observations(prepared, verification)
     if prepared.get("operation") != "object.create":
         raise ValueError("Creation history requires its actual object.create source")
     from .creation_observations import ordinary_creation_graph, ordinary_creation_fields, verified_created_root_identity
@@ -906,6 +913,9 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                     names = [row.name for row in parse_property_and_reference_names_result(retained_read(NAMES, {"object": object_id}, {}))]
                     info = bind_get_property_info_result(retained_read(INFO, {"object": object_id, "property": field}, {}),
                         field_token=field, available_names=names)
+                    if expected.get("field_info", {}).get("reference_kind_evidence"):
+                        from .reference_kind_evidence import certify
+                        info = certify(info, version=version, object_id=object_id, read=retained_read)
                     if info.name != field or info.type != expected["metadata_type"]:
                         raise ValueError("History property metadata does not match its exact field/type")
                     metadata_cache[key] = info.as_dict(include_raw="raw" in expected["field_info"])
@@ -916,7 +926,8 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
             args = {"from": {"id": ids}}
             options = {"return": list(dict.fromkeys([*IDENTITY,
                 *(["classId"] if any("class_id" in row for row in group) else []),
-                *(["parent"] if any("parent_id" in row for row in group) else []), *(_history_observation_field(row) for row in group)])),
+                *(["parent"] if any("parent_id" in row for row in group) else []),
+                *(name for item in group for name in item.get("controller_values", {})), *(_history_observation_field(row) for row in group)])),
                 **({"platform": platform} if platform is not None else {})}
             result = retained_read(GET, args, options)
             rows = result.get("return") if isinstance(result, Mapping) else None
@@ -943,6 +954,11 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                     if "metadata_type" in expected else isinstance(actual, str) and actual == expected[side])
                 if "parent_id" in expected:
                     equal = equal and "parent" in row and _reference_value(row['parent']) == expected['parent_id']
+                from .operation_registry import _native_snapshot_equal
+                if "parent_reference" in expected:
+                    equal = equal and "parent" in row and _native_snapshot_equal(row["parent"], expected["parent_reference"])
+                for name, value in expected.get("controller_values", {}).items():
+                    equal = equal and name in row and type(row[name]) is type(value) and _native_snapshot_equal(row[name], value)
                 membership_key = 'preserved_children_' + side
                 if membership_key in expected:
                     membership = retained_read(GET, {'from': {'id': [identity['id']]}, 'transform': [{'select': ['children']}]}, {'return': ['id']})
@@ -1022,6 +1038,9 @@ def history_summary(binding: Mapping[str, Any]) -> dict[str, Any]:
             continue
         compact = {**{key: value for key, value in row.items() if key != "field_info"},
             **({"metadata_bound": True} if "field_info" in row else {})}
+        if row.get("kind") == "derived_action_reference":
+            compact["reference_kind_authority"] = ("pinned_sdk_field_kind" if row.get("field_info", {}).get("reference_kind_evidence") else "native_metadata")
+            compact["identity_paths"] = "original_observed_before_and_after; not_reconstructed"
         if row.get("kind") == "creation_presence":
             fields = [field for field in binding["observations"] if field.get("kind") == "creation_field"
                 and field["object_id"] == row["object"]["id"]]

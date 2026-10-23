@@ -12114,11 +12114,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         metadata["condition_metadata"]["structural_applicability"] = list(structural_applicability.values())
         clearing_reference = request.operation == "object.setReference" and arguments["target"] is None
         observed_field = f"@{field_value}" if clearing_reference else field_value
+        from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, capture_before
+        derived_fields = derived_reference_fields if request.operation == "object.setReference" and derived_reference(source.row.get("type"), field_value) else ()
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
             {
-                "return": ["id", "path", observed_field, *([field_value] if clearing_reference else []),
+                "return": ["id", "path", *derived_fields, observed_field, *([field_value] if clearing_reference else []),
                     *activation_requirements, *activation_reference_requirements],
                 **({"platform": observation_platform} if observation_platform is not None else {}),
             },
@@ -12138,6 +12140,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 "Property/reference pre-state must return the exact source and requested field.",
                 details={"field": field_value, "rows": field_before_rows},
             )
+        if derived_fields:
+            try:
+                metadata["derived_reference_context"] = capture_before(field_before_rows[0], source.row)
+            except (ValueError, TypeError) as exc:
+                raise OperationContractError("INVALID_READBACK", str(exc)) from exc
         missing_activators = [
             name for name, value in activation_requirements.items()
             if not _has_field(field_before_rows[0], name)
@@ -17265,7 +17272,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             activation_requirements = field_before.get("activation_requirements", {})
             activation_reference_requirements = field_before.get("activation_reference_requirements", {})
             observed_field = f"@{field_name}" if clear_field is not None else field_name
-            options = {"return": ["id", "path", observed_field, *([field_name] if clear_field is not None else []),
+            from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, matches as derived_reference_matches
+            derived_fields = derived_reference_fields if derived_reference(source.get("row", {}).get("type"), field_name) else ()
+            options = {"return": ["id", "path", *derived_fields, observed_field, *([field_name] if clear_field is not None else []),
                 *activation_requirements, *activation_reference_requirements]}
             platform = field_before.get("observation_platform", field_before.get("platform"))
             if platform is not None:
@@ -17291,6 +17300,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
+            if derived_fields:
+                context = pre_state.get("derived_reference_context")
+                assertions.append({"name": "derived reference identity/controller frame unchanged; legacy Preview requires refresh",
+                    "passed": isinstance(context, Mapping) and len(rows) == 1 and derived_reference_matches(context, rows[0]),
+                    "evidence": {"expected": context, "rows": rows}})
             if clear_field is not None:
                 assertions.append({"name": "reference clear inherited context unchanged",
                     "passed": len(rows) == 1 and field_name in rows[0]
@@ -22364,13 +22378,20 @@ def verify_prepared_operation(
         platform = plan.get("observation_platform", plan.get("platform"))
         activation_requirements = plan.get("activation_requirements", {})
         activation_reference_requirements = plan.get("activation_reference_requirements", {})
+        from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, witness as derived_reference_witness
+        derived_fields = derived_reference_fields if derived_reference(pre_state.get("object", {}).get("type"), field_name) else ()
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", observed_field, *([field_name] if clear_field is not None else []),
+            fields=("id", "path", *derived_fields, observed_field, *([field_name] if clear_field is not None else []),
                 *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
+        if derived_fields and len(rows) == 1:
+            try:
+                assertions.append(derived_reference_witness(rows[0], pre_state))
+            except (ValueError, TypeError) as exc:
+                check("derived reference actual identity/controller frame is observed", False, {"error": str(exc)})
         if len(rows) == 1:
             raw_actual = rows[0].get(observed_field) if clear_field is not None else _field_value(rows[0], field_name)
             projection_matches = (
