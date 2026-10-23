@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/@definition/waapi_definitions.json/definitions/gameObject",
+  "proof": {
+    "artifact": "2025.1-wwise-authoring-data-proof-6.json",
+    "sha256": "daf31073382e39ec2fd1c0125669bfbcba9a5ba73cca6e606d86755a0017d368"
+  },
+  "evidence": {
+    "artifact": "2025.1-wwise-authoring-data-native.json",
+    "sha256": "27d621462dfec641bc3e6d8d91f80c08b24a42578e5d992d70581943ced7aaa9",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_missing_profiler_reads"
+  },
+  "native_equivalence": {
+    "artifact": "2025.1-wwise-authoring-data-native-equivalence-6.json",
+    "sha256": "256ec3f40aee9f3428223570f7c74b6e000a371451124b98ea56ae6fc9464f12"
+  }
+}
