@@ -556,3 +556,42 @@ def test_source_successor_equivalence_cannot_drop_current_context(source_success
         source_root=audit.ROOT, reference_edges={row['id']: row for row in case['inventory']['native_coverage']['obligations'] if row['kind'] == 'reference'})
     assert result[0] == 'missing'
     assert 'successor equivalence context differs' in result[1]
+
+
+@pytest.mark.parametrize('phase,missing', (
+    ('setup', False), ('call', False), ('teardown', False),
+    ('setup', True), ('call', True), ('teardown', True),
+))
+def test_source_successor_rejects_incomplete_capture_phases(source_successor_case, phase, missing):
+    """Re-sealed failed/missing phases cannot authorize the old native facts."""
+    import os
+    import uuid
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_successor_case
+    # Establish that the unchanged baseline reaches both real final readers.
+    baseline, base, _ = audit.portable_binding_inputs(case['index'], case['requirements'])
+    rows = {row['id']: row for row in case['inventory']['native_coverage']['obligations']}
+    references = {key: row for key, row in rows.items() if row['kind'] == 'reference'}
+    for identity, binding in baseline['bindings'].items():
+        for category in ('program', 'native'):
+            assert completion.evidence_result(binding['evidence'][category], rows[identity],
+                case['inventory']['native_coverage']['candidate_sha256'], category, 'product', base,
+                binding, source_root=audit.ROOT, reference_edges=references) == ('passed', None)
+    index = json.loads(case['index'].read_bytes())
+    capture = completion.read_sealed_artifact(index['entries'][0]['origin']['capture'], base)
+    assert capture['phase_reports'] == dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
+    if missing:
+        capture['phase_reports'].pop(phase)
+    else:
+        capture['phase_reports'][phase] = 'failed'
+    output = case['output'] / ('phase-control-' + uuid.uuid4().hex)
+    output.mkdir()
+    path = output / 'capture.json'
+    index['entries'][0]['origin']['capture'] = {
+        **write_json(path, capture), 'artifact': path.relative_to(base).as_posix()}
+    index['base'] = os.path.relpath(base, output)
+    changed = output / 'index.json'
+    write_json(changed, index)
+    with pytest.raises(ValueError, match='complete successful capture phases'):
+        audit.portable_binding_inputs(changed, case['requirements'])

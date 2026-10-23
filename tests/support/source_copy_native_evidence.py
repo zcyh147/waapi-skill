@@ -219,10 +219,10 @@ def validate_source_native(record, binding, branch, base):
             raise ValueError('Original Source four-transaction category binding differs')
 
 
-def portable_source_native_attachments(descriptors, bindings, read, base):
+def portable_source_native_attachments(descriptors, bindings, read, base, *, capture_origins=None):
     """Attach only reviewed Source native records to existing program bindings."""
     from copy import deepcopy
-    from tests.support.source_copy_branch_evidence import source_facts, native_route, pointer_contract
+    from tests.support.source_copy_branch_evidence import source_facts, native_route, pointer_contract, PUBLIC_NODES
     if not isinstance(descriptors, list): raise ValueError('Closed Source native attachment list required')
     attached = set()
     for descriptor in descriptors:
@@ -257,6 +257,23 @@ def portable_source_native_attachments(descriptors, bindings, read, base):
                         or program.get('relevant_sources') != successor_context['current_sources']
                         or program.get('invocation', {}).get('outcome') != 'PASS'):
                     raise ValueError('Source successor requires its current complete product program')
+                # The generic importer already read this sealed origin receipt.
+                # Only v2 reuse requires the complete Source product finalizer.
+                capture = (capture_origins or {}).get(identity)
+                node = PUBLIC_NODES[facts['version']]
+                if (not isinstance(capture, dict)
+                        or set(capture) != {'contract', 'candidate_sha256', 'git_candidate', 'native_credit',
+                            'outcome', 'phase_reports', 'scope_kind', 'source_unchanged'}
+                        or capture['contract'] != 'waapi-skill.source-copy-program-capture/v1'
+                        or capture['candidate_sha256'] != program['candidate_sha256']
+                        or capture['git_candidate'] != program.get('git_candidate')
+                        or capture['native_credit'] is not False
+                        or capture['outcome'] != 'PASS' or capture['scope_kind'] != 'product'
+                        or capture['source_unchanged'] is not True
+                        or capture['phase_reports'] != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
+                        or program.get('invocation') != {'phase': 'final', 'outcome': 'PASS',
+                            'node_outcomes': [{'nodeid': node, 'outcome': 'PASS'}]}):
+                    raise ValueError('Source successor requires complete successful capture phases')
                 binding['source_copy_successor_context'] = deepcopy(attachment['successor_context'])
             if (set(binding['evidence']) != {'program'} or program.get('scope_kind') != 'product'
                     or binding.get('source_business_fact') != facts['business_fact_id']
