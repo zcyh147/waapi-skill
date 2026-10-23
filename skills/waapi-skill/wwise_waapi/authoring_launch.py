@@ -91,7 +91,10 @@ class OwnedMacAuthoringContext:
         # The validated environment retains the logical private/managed bottle.
         command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
             f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe', native]
+        requested_startup_environment = {key: self.environment[key] for key in ('AK_AUTOMATION_MODE',)
+            if key in self.environment}
         return command, {'method': 'owned_winepath_roundtrip', 'project': str(self.project), 'native_project': native,
+                         **({'requested_startup_environment': requested_startup_environment} if requested_startup_environment else {}),
                          'roundtrip_project': str(self.project), 'build': self.build, 'bottle_resolution': resolution}
 
     def _require_bottle_resolution(self) -> dict:

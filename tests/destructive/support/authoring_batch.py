@@ -470,8 +470,11 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
     def check_frozen_source(_sandbox, _assets, _io):
         if candidate_source_context(repo_root) != source_context:
             raise ValueError('Owned Authoring source candidate changed before launch')
+    live_environment = dict(os.environ)
+    if selected == (PROFILER_CAPTURE_NODEID,):
+        live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
-        scenario_root=root, live_environment=dict(os.environ), host_kind='wwise-authoring',
+        scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
         launch_environment_overrides={'HOME': str(root / 'owned/private-home')},
         prelaunch_hook=check_frozen_source)
     owner.start()

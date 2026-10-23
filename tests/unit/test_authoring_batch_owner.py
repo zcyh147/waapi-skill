@@ -57,6 +57,31 @@ def test_after_exact_collection_the_existing_lifecycle_owns_the_single_batch(mon
     assert events[2][1]['selected_nodeids'] == (NODE,)
 
 
+def test_owned_profiler_capture_selects_automation_only_in_child_environment(monkeypatch, tmp_path):
+    from tests.destructive.support.profiler_capture import NODEID
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.delenv('AK_AUTOMATION_MODE', raising=False)
+    monkeypatch.setenv('WWISEROOT', '/Applications/Audiokinetic/Wwise2022.1.19.8584')
+    config = _config(tmp_path)
+    config.args = [NODEID]
+    authoring_batch.configure_authoring_batch_owner(config, [SimpleNamespace(nodeid=NODEID)], repo_root=tmp_path)
+    child = events[0][1]['live_environment']
+    requested_mode = child.get('AK_AUTOMATION_MODE')
+    assert requested_mode == '1'
+    assert 'AK_AUTOMATION_MODE' not in authoring_batch.os.environ
+    assert child['WWISEROOT'] == authoring_batch.os.environ['WWISEROOT']
+    assert events[0][1]['launch_environment_overrides'] == {'HOME': str(tmp_path / 'batch/owned/private-home')}
+
+
+def test_other_owned_authoring_node_preserves_parent_automation_environment(monkeypatch, tmp_path):
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('AK_AUTOMATION_MODE', 'parent-choice')
+    config = _config(tmp_path)
+    authoring_batch.configure_authoring_batch_owner(config, [SimpleNamespace(nodeid=NODE)], repo_root=tmp_path)
+    assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == 'parent-choice'
+    assert authoring_batch.os.environ['AK_AUTOMATION_MODE'] == 'parent-choice'
+
+
 @pytest.mark.parametrize('failure', ['other-node', 'changed-selection', 'empty', 'filter', 'parallel', 'existing-root', 'wrong-version', 'no-live', 'dirty-source'])
 def test_collection_or_context_failure_never_constructs_or_starts_owner(monkeypatch, tmp_path, failure):
     events = _fakes(monkeypatch, tmp_path)
