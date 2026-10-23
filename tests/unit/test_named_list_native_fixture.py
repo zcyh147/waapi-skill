@@ -68,6 +68,10 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                         'path': r'\opaque observed MetadataSlot' if owned else self.objects[parent]['path'] + '\\' + name,
                         **({'owner': {'id': collector.CONTAINERS if fault == 'wrong-slot-owner' else parent}}
                             if owned else {'parent': {'id': parent}})}
+                    if role == 'sound':
+                        self.objects[oid]['@OverrideOutput'] = self.metadata['OverrideOutput']['default']
+                    self.objects[oid].update({key: deepcopy(value) for key, value in node.items()
+                        if key.startswith('@') and key != '@Metadata'})
                     returned = {'id': oid, 'name': name}
                     if '@Metadata' in node:
                         slots = [create(slot, oid, owned=True) for slot in node['@Metadata']]
@@ -92,8 +96,10 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
             return result
 
     task = ListTask(tmp_path, '2025.1', 'object.set')
-    task.metadata = {'OutputBus': {'name': 'OutputBus', 'type': 'Reference',
-        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Bus']}, 'notNull']}}}
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'named-list-sound-2025-output-bus.json').read_text())
+    task.metadata = {name: deepcopy(row['result']) for name, row in fixture['fields'].items()}
+    assert task.metadata['OverrideOutput']['default'] is False
+    assert task.metadata['OutputBus']['type'] == ''
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for name, cid in (
         ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560), ('WorkUnit', 1638416), ('PropertyContainer', 524304))]
     task.objects = {
@@ -152,6 +158,11 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         assert observation['independent_created']['slot']['name'] == collector.REQUESTED['slot']
         assert observation['independent_created']['slot']['class_id'] == 5570560
         assert observation['independent_created']['slot']['owner']['id'] == new['sound']
+        assert observation['output_bus_field']['restrictions']['allowed_target_types'] == ['Audio Bus']
+        assert observation['output_bus_field']['metadata']['type'] == ''
+        assert observation['output_bus_field']['metadata']['dependencies'] == task.metadata['OutputBus']['dependencies']
+        assert observation['independent_created']['sound']['properties']['OverrideOutput'] is True
+        assert writes[1][1]['objects'][0]['children'][0]['@OverrideOutput'] is True
         assert observation['created']['bus']['name'] == observed_bus_name
         assert observation['independent_created']['slot']['type'] == 'PluginInnerObject'
         assert 'parent' not in observation['independent_created']['slot']

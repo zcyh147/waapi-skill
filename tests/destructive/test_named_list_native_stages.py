@@ -7,6 +7,8 @@ import uuid
 
 import pytest
 
+from wwise_waapi.metadata_restrictions import reference_type_token
+
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object, _complete_business_draft, _discover_business_type,
     _start_business_draft, _update_business_draft, declared_business_object_handle,
@@ -98,7 +100,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
     def exact(label, identity, *, platform=False, reference=False):
         args = ['--exact-id', identity, *([] if platform else projection)]
         if reference:
-            args += ['--include-field', 'OutputBus', '--platform', WINDOWS]
+            args += ['--include-field', 'OutputBus', '--include-field', 'OverrideOutput', '--platform', WINDOWS]
         row, = query(label, args, 2)
         assert row['id'].upper() == identity.upper(), row
         return row
@@ -157,7 +159,8 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
             ['--type-handle', types['Sound'], '--selection', output_choice['selection']], live=True)
         field = discovered_business_field_handle(selected, 'OutputBus')
         candidate, = [row for result in selected['meaning_results'] for row in result['candidates'] if row['handle'] == field]
-        assert candidate['field_kind'] == 'reference' and 'Bus' in candidate['restrictions']['allowed_target_types'], candidate
+        assert candidate['field_kind'] == 'reference' and reference_type_token('Bus') in {
+            reference_type_token(value) for value in candidate['restrictions']['allowed_target_types']}, candidate
         observation['output_bus_field'] = candidate
         handles = {}
         for role, name, kind, parent in (('bus', REQUESTED['bus'], 'Bus', parents['bus']),
@@ -178,6 +181,8 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
             specs = observation['specs'] = {role: next(node for node in prepared['verification_plan']['nodes']
                 if facts.get(node['request_path'], {}).get('result_handle') == handle) for role, handle in handles.items()}
             assert all(specs[role]['class_id'] == CLASSES[role] and specs[role]['requested_name'] == REQUESTED[role] for role in ROLES), specs
+            activation, = [row for row in specs['sound']['properties'] if row['name'] == 'OverrideOutput']
+            assert activation['value'] is True and activation.get('derived') is True, activation
             assert specs['slot']['collection'] == 'Metadata' and specs['slot']['parent_request_path'] == specs['sound']['request_path'], specs
             plan = prepared['pre_state']['owned_result_stages']
             assert len(plan['creation_stages']) == 2 and len(plan['deferred']) == 1 and len(plan['lists']) == 1, plan
@@ -232,6 +237,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         independent = {'bus': next(row for row in after['buses'] if row['id'] == ids['bus']),
             'sound': exact('source-sound-reference', ids['sound'], reference=True)}
         assert independent['sound']['references']['OutputBus']['id'] == ids['bus'], independent
+        assert independent['sound']['properties']['OverrideOutput'] is True, independent
         assert query('source-sound-children', ['--exact-id', ids['sound'], '--relationship', 'children', *projection], 2) == []
         gateway.gateway(['query-schema', '--advanced'], live=False)
         slots = query('source-metadata-members', ['--advanced-waql', f'from object "{ids["sound"]}" select @Metadata',
