@@ -470,17 +470,32 @@ def test_batch_cannot_substitute_a_process_list_without_prefix_environment_proof
     assert owned_authoring.runtime.owned_root.exists()
 
 
-@pytest.mark.parametrize('release', [True, False], ids=['busy-then-free', 'still-busy-at-deadline'])
-def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_authoring, tmp_path, monkeypatch, release):
+@pytest.mark.parametrize('platform_name,release_at,explicit_timeout,deadline', [
+    pytest.param('linux', 0.2, None, 15, id='busy-then-free'),
+    pytest.param('linux', None, None, 15, id='still-busy-at-deadline'),
+    pytest.param('darwin', 30, None, 45, id='mac-released-after-old-deadline'),
+    pytest.param('darwin', None, None, 45, id='mac-still-busy-at-deadline'),
+    pytest.param('darwin', 0, None, 45, id='mac-already-free'),
+    pytest.param('darwin', 30, 1, 1, id='mac-explicit-short-bound'),
+])
+def test_authoring_finalization_waits_boundedly_for_exact_port_release(
+    owned_authoring, tmp_path, monkeypatch, platform_name, release_at, explicit_timeout, deadline,
+):
     import errno
     import json
+    from functools import partial
+    from types import SimpleNamespace
     from tests.destructive.support import authoring_batch, sandbox_fixture
     from wwise_waapi import headless
     batch, item, target = _batch_ready_for_final_reports(owned_authoring, tmp_path, monkeypatch)
     item._waapi_phase_reports['teardown'] = 'passed'
     # Keep the real existing wildcard-bind probe and release helper. Only the
     # OS socket/time boundaries are fake; final categories and owner are real.
-    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', sandbox_fixture.wait_for_port_release)
+    wait = sandbox_fixture.wait_for_port_release
+    if explicit_timeout is not None:
+        wait = partial(wait, timeout_seconds=explicit_timeout)
+    monkeypatch.setattr(authoring_batch, 'wait_for_port_release', wait)
+    monkeypatch.setattr(sandbox_fixture, 'sys', SimpleNamespace(platform=platform_name))
     clock, attempts, socket_options = [0.0], [], []
     class Socket:
         def __enter__(self):
@@ -491,7 +506,7 @@ def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_aut
             socket_options.append(option)
         def bind(self, endpoint):
             attempts.append(endpoint)
-            if not release or len(attempts) < 3:
+            if release_at is None or clock[0] < release_at:
                 if len(attempts) == 1:
                     raise OSError(errno.EADDRINUSE, 'earlier simulated socket conflict')
                 raise OSError(errno.EACCES, 'last simulated bind denial')
@@ -502,19 +517,23 @@ def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_aut
     records = [json.loads(line) for line in target.read_text().splitlines()]
     assert attempts and set(attempts) == {('0.0.0.0', 31337)}
     assert not any(option[1] == headless.socket.SO_REUSEADDR for option in socket_options)
-    if release:
+    if release_at is not None and release_at <= deadline:
         assert outcome['outcome'] == 'PASS'
-        assert len(attempts) == 3 and 0 < clock[0] < 15
+        assert release_at <= clock[0] <= release_at + 0.11
+        assert clock[0] < deadline
+        if release_at == 0:
+            assert len(attempts) == 1 and clock[0] == 0
         assert records[-1]['invocation']['outcome'] == 'PASS'
         assert records[-1]['residual_state']['sandbox'] == 'deleted'
     else:
         assert outcome['outcome'] == 'BLOCKED'
-        assert 15 <= clock[0] <= 15.11
+        assert deadline <= clock[0] <= deadline + 0.11
         assert all(row['invocation']['outcome'] != 'PASS' for row in records)
         assert owned_authoring.runtime.sandbox.sandbox_project.exists()
         for filename in ('lifecycle-release-error.json', 'authoring-batch-finalization-error.json'):
             error = json.loads((owned_authoring.runtime.evidence_root / filename).read_text())
             persisted = json.dumps(error)
+            assert f'the {deadline}-second release wait' in persisted
             assert 'last bind error: PermissionError' in persisted
             assert 'errno=13' in persisted and 'last simulated bind denial' in persisted
             assert 'earlier simulated socket conflict' not in persisted

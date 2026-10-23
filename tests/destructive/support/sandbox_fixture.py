@@ -59,6 +59,7 @@ _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
 _PORT_RELEASE_TIMEOUT_SECONDS = 15.0
+_MACOS_PORT_RELEASE_TIMEOUT_SECONDS = 45.0
 _PORT_RELEASE_POLL_SECONDS = 0.1
 _MACOS_WWISE_2022_VERSION = "2022.1"
 _WINE_COREAUDIO_OVERRIDE = "winecoreaudio.drv="
@@ -110,11 +111,19 @@ def wait_for_port_release(
     host: str,
     port: int,
     *,
-    timeout_seconds: float = _PORT_RELEASE_TIMEOUT_SECONDS,
+    timeout_seconds: float | None = None,
     poll_interval_seconds: float = _PORT_RELEASE_POLL_SECONDS,
 ) -> None:
     """Wait until a stopped Wwise host has released its exact server port."""
 
+    if timeout_seconds is None:
+        # macOS can retain a closed connection for its roughly 30-second
+        # TIME_WAIT quiet period. Keep requiring a successful bare bind.
+        timeout_seconds = (
+            _MACOS_PORT_RELEASE_TIMEOUT_SECONDS
+            if sys.platform == "darwin"
+            else _PORT_RELEASE_TIMEOUT_SECONDS
+        )
     if timeout_seconds <= 0 or poll_interval_seconds < 0:
         raise SandboxFixtureError("port-release timing bounds are invalid")
     deadline = time.monotonic() + timeout_seconds
