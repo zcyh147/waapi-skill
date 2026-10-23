@@ -27,6 +27,14 @@ PROFILER_GET_PERFORMANCE_MONITOR_URI = (
 PROFILER_GET_STREAMED_MEDIA_URI = "ak.wwise.core.profiler.getStreamedMedia"
 PROFILER_GET_METERS_URI = "ak.wwise.core.profiler.getMeters"
 PROFILER_ENABLE_DATA_URI = "ak.wwise.core.profiler.enableProfilerData"
+PROFILER_CAPTURE_DATA_VERIFICATION = {
+    "strategy": "native_result_schema_only",
+    "enabled_settings_verified": False,
+    "empty_effect_verified": False,
+    "repeated_data_set_resolution_verified": False,
+    "prior_settings_restoration_verified": False,
+    "boundary": "Native acknowledgment does not establish final enabled settings, empty-list effects, repeated-data-set resolution, or prior-setting restoration.",
+}
 PROFILER_REGISTER_METER_URI = "ak.wwise.core.profiler.registerMeter"
 PROFILER_SAVE_CAPTURE_URI = "ak.wwise.core.profiler.saveCapture"
 PROFILER_UNREGISTER_METER_URI = "ak.wwise.core.profiler.unregisterMeter"
@@ -313,7 +321,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "execution_shape": "draft_mutation",
         "required_fields": ("cursor_target_ms",),
         "optional_fields": (),
-        "field_types": {"cursor_target_ms": "non_negative_milliseconds"},
+        "field_types": {"cursor_target_ms": "signed_integer_milliseconds"},
         "input_forms": {
             "cursor_target_ms": {
                 "flag": "--cursor-target-ms",
@@ -333,6 +341,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "capture_data_changes": {
                 "flag": "--capture-data",
                 "repeatable": True,
+                "empty_flag": "--capture-data-empty",
+                "empty_flag_exclusive_with": "--capture-data",
                 "values_per_occurrence": 2,
             },
         },
@@ -758,6 +768,25 @@ def runtime_inspection_business_contract_data(
                 if name in exposed_fields
             } | (meter_contract['fields'] if meter_contract else {}),
             **({'meter_object_projection':meter_contract} if meter_contract else {}),
+            **({"field_semantics": {"capture_data_changes": {
+                "preserve_rows_and_order": True,
+                "missing_input": "required; use the explicit empty flag to submit zero rows",
+                "empty_effect": "unspecified_by_native_documentation",
+                "repeated_data_set_resolution": "unspecified_by_native_documentation",
+                "native_legality_established_by_schema": False,
+                "enable_default": "explicit enable represents the documented omitted-true native default",
+            }}, "verification": dict(PROFILER_CAPTURE_DATA_VERIFICATION)} if operation == PROFILER_ENABLE_DATA_URI else {}),
+            **({"field_semantics": {"cursor_target_ms": {
+                "units": "signed integer milliseconds",
+                "negative_value_meaning": "not_specified_by_native_documentation",
+                "native_legality_established_by_schema": False,
+                "native_snapping": "the returned time may differ from the requested time",
+            }}, "verification": {
+                "observer": PROFILER_GET_CURSOR_TIME_URI,
+                "cursor": "user",
+                "comparison": "returned_time_not_requested_time",
+                "boundary": "One available user-cursor observation must match the returned snapped time; unavailable or changed observations do not verify the effect. Continuing position and capture completeness remain unverified.",
+            }} if operation == PROFILER_SET_CURSOR_TIME_URI else {}),
             **({"field_semantics": {"audition_action": {
                 "play": "play the selected scope; a later stopped state cannot disprove transient playback",
                 "stop": "stop the selected scope; a stopped read is an observed postcondition, not proof of causality",
