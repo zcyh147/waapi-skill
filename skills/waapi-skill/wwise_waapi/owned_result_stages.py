@@ -229,17 +229,47 @@ def split_stage_prepared(prepared, stage, identities):
         'pre_state': {**prepared['pre_state'], 'owned_result_stages': {**prepared['pre_state']['owned_result_stages'], 'deferred': []}}}
 
 
-def bind_split_stage(prepared, stage, result, identities, *, read, context):
+def observe_owned_roster(prepared, identities, *, read):
+    """Recheck every cumulative new identity and its complete direct membership."""
+    nodes = prepared['verification_plan']['nodes']
+    if len(nodes) > DEFAULT_MAX_NODES or len(identities) > DEFAULT_MAX_NODES:
+        raise ValueError('Owned creation roster exceeds its sealed node bound')
+    for node in nodes:
+        path = node['request_path']
+        if node.get('existing_target') or path not in identities:
+            continue
+        expected = identities[path]
+        actual = read(GET, {'from': {'id': [expected['id']]}}, {'return': FIELDS})
+        if not isinstance(actual, Mapping) or actual.get('return') != [expected]:
+            raise ValueError('An earlier owned created identity changed between creation stages')
+        children = {identities[child['request_path']]['id'].upper() for child in nodes
+            if child.get('parent_request_path') == path and child['request_path'] in identities}
+        payload = read(GET, {'from': {'id': [expected['id']]}, 'transform': [{'select': ['children']}]}, {'return': ['id']})
+        rows = payload.get('return') if isinstance(payload, Mapping) else None
+        if (not isinstance(rows, list) or any(not isinstance(row, Mapping) or not isinstance(row.get('id'), str) for row in rows)
+                or len(rows) != len(children) or {row['id'].upper() for row in rows} != children):
+            raise ValueError('An earlier owned created subtree changed its complete child membership')
+
+
+def bind_split_stage(prepared, stage, result, identities, *, read, context, binding=None):
+    binding = binding if binding is not None else {'readbacks': [], 'preservation': []}
+    def observed_read(uri, args, options):
+        payload = read(uri, args, options)
+        binding['readbacks'].append({'uri': uri, 'args': args, 'options': options, 'result': payload})
+        return payload
     scoped = split_stage_prepared(prepared, stage, identities)
-    bound, observations = bind(scoped, result, read=read)
+    bound, _ = bind(scoped, result, read=observed_read)
     old_ids = {row['id'].upper() for row in identities.values()}
     if any(bound[path]['id'].upper() in old_ids for path in stage['node_paths']):
         raise ValueError('A later creation stage reused an earlier owned GUID')
     actual = {**identities, **bound}
+    if identities:
+        observe_owned_roster(prepared, actual, read=observed_read)
     preserved = observe_preservation(prepared, actual, read=read, context=context)
+    binding['preservation'] = preserved
     if not all(row['passed'] for row in preserved):
         raise ValueError('A creation stage changed its sealed retained scope; remaining writes stopped')
-    return actual, observations, preserved
+    return actual, binding['readbacks'], preserved
 
 
 def reference_args(plan, identities):
@@ -310,8 +340,9 @@ def execute_split(prepared, *, write, read, context):
             if result.get('ok') is not True:
                 raise ValueError('Creation stage was not acknowledged; do not replay')
             validate_semantic_result(plan['uri'], result.get('result'), version=plan['version'])
-            identities, observations, preservation = bind_split_stage(prepared, stage, result['result'], identities, read=read, context=context)
-            bindings.append({'readbacks': observations, 'preservation': preservation})
+            binding = {'readbacks': [], 'preservation': []}
+            bindings.append(binding)
+            identities, _, _ = bind_split_stage(prepared, stage, result['result'], identities, read=read, context=context, binding=binding)
         def metadata_read(uri, args, options):
             result = read(uri, args, options)
             metadata_reads.append({'uri': uri, 'args': args, 'options': options, 'result': result})

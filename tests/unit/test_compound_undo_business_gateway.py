@@ -5294,7 +5294,7 @@ def test_compound_two_collision_roots_bind_each_actual_result_before_cross_tree_
         '{66666666-6666-6666-6666-666666666666}', '{99999999-9999-9999-9999-999999999999}']
 
 
-@pytest.mark.parametrize('fault', ['earlier-target-drift', 'reused-guid', 'prewrite-parent-drift', 'second-collision-drift', 'prewrite-second-collision-drift'])
+@pytest.mark.parametrize('fault', ['earlier-target-drift', 'earlier-owned-extra-child', 'earlier-owned-class-drift', 'reused-guid', 'prewrite-parent-drift', 'second-collision-drift', 'prewrite-second-collision-drift'])
 def test_two_owned_creation_stages_stop_bad_association_before_reference_and_never_retry(tmp_path, fault):
     task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
         compound=True, creation_first=False, external=True, native_rename=True, multiple_roots=True, prepared_only=True)
@@ -5310,6 +5310,13 @@ def test_two_owned_creation_stages_stop_bad_association_before_reference_and_nev
             if len(creations) == 2:
                 if fault == 'earlier-target-drift':
                     task.objects['{77777777-7777-7777-7777-777777777777}']['path'] += 'Changed'
+                elif fault == 'earlier-owned-extra-child':
+                    identity = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+                    parent = task.objects['{66666666-6666-6666-6666-666666666666}']
+                    task.objects[identity] = {'id': identity, 'name': 'Rogue', 'type': 'AuxBus', 'classId': 3997712,
+                        'parent': {'id': parent['id']}, 'path': parent['path'] + r'\Rogue', 'notes': ''}
+                elif fault == 'earlier-owned-class-drift':
+                    task.objects['{66666666-6666-6666-6666-666666666666}']['classId'] = 3997712
                 elif fault == 'reused-guid':
                     result['objects'][0]['children'][0]['id'] = '{66666666-6666-6666-6666-666666666666}'
         return result
@@ -5326,6 +5333,53 @@ def test_two_owned_creation_stages_stop_bad_association_before_reference_and_nev
     assert all(any('children' in item for item in args['objects']) for _, args, _ in writes)
     if not fault.startswith('prewrite-'):
         assert failed['state'] == 'indeterminate' and failed['automatic_retry'] is False, failed
+    if fault == 'earlier-owned-extra-child':
+        code, full = task.run('transaction-show', source)
+        assert code == 0, full
+        execution = next(event['details']['compound_execution'] for event in full['events'] if event['event_type'] == 'execution_indeterminate')
+        actual = execution['failed_phase']['dispatch_result']
+        records = actual['owned_result_execution']['creation_bindings'][1]['readbacks']
+        membership = [row for row in records if row['args'] == {'from': {'id': ['{66666666-6666-6666-6666-666666666666}']},
+            'transform': [{'select': ['children']}]}]
+        assert len(membership) == 1
+        assert {row['id'] for row in membership[0]['result']['return']} == {
+            '{77777777-7777-7777-7777-777777777777}', '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'}
     count = len(task.calls)
     assert task.run('execute', source)[0] == 2
     assert not any(uri == 'ak.wwise.core.object.set' for uri, _, _ in task.calls[count:])
+
+
+def test_split_creation_verification_requires_retained_complete_earlier_owned_membership(tmp_path):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, creation_first=False, external=True, native_rename=True, multiple_roots=True, prepared_only=True)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    code, full = task.run('transaction-show', source)
+    assert code == 0, full
+    events = full['events']
+    execution = next(event['details']['dispatch_result'] for event in events if event['event_type'] == 'execution_completed')
+    actual = next(phase['dispatch_result'] for phase in execution['result']['phases'] if 'owned_result_execution' in phase['dispatch_result'])
+    records = actual['owned_result_execution']['creation_bindings'][1]['readbacks']
+    membership = [row for row in records if row['args'] == {'from': {'id': ['{66666666-6666-6666-6666-666666666666}']},
+        'transform': [{'select': ['children']}]}]
+    assert len(membership) == 1
+    records.remove(membership[0])
+    # A valid journal hash cannot replace the missing semantic ownership read.
+    previous = ''
+    for event in events:
+        event['previous_event_hash'] = previous
+        event.pop('event_hash')
+        event['event_hash'] = previous = canonical_sha256(event)
+    directory = task.path / 'state' / 'transactions' / source
+    (directory / 'events.jsonl').write_bytes(b''.join(canonical_json_bytes(event) + b'\n' for event in events))
+    state_path = directory / 'state.json'
+    record = json.loads(state_path.read_text())
+    record['last_event_hash'] = previous
+    state_path.write_bytes(canonical_json_bytes(record))
+    count = len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set'])
+    code, failed = task.run('verify', source)
+    assert code == 2 and failed.get('verified') is not True, failed
+    assert 'Owned creation stage lost its exact read association' in json.dumps(failed), failed
+    assert task.run('execute', source)[0] == 2
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == count
