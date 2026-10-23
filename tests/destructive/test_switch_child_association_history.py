@@ -10,8 +10,8 @@ from tests.destructive.test_gateway_workflow_transaction_matrix import workflow_
 pytestmark = [
     pytest.mark.live,
     pytest.mark.destructive,
-    pytest.mark.skipif(os.environ.get("WWISE_VERSION") not in {"2022.1", "2023.1"},
-        reason="Owned structural history witnesses: type-absent 2022 undo and type-present 2023 undo/redo"),
+    pytest.mark.skipif(os.environ.get("WWISE_VERSION") not in {"2022.1", "2023.1", "2024.1", "2025.1"},
+        reason="Owned structural history witnesses: type-absent 2022 undo and type-present 2023–2025 undo/redo"),
 ]
 
 

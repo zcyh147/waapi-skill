@@ -146,7 +146,7 @@ def _exercise_existing_association_continue_play(runtime, *, history_actions=())
         assert source["path"] and source["name"] == "" and source["class_id"] == 1572880, source
         needs_context_binding = "type" not in source
         if history:
-            assert runtime.version in {"2022.1", "2023.1"}
+            assert runtime.version in {"2022.1", "2023.1", "2024.1", "2025.1"}
             assert needs_context_binding is (runtime.version == "2022.1"), source
         if needs_context_binding:
             # The ordinary query remains an incomplete identity. Only the
