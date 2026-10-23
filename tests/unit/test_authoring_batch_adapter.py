@@ -472,6 +472,7 @@ def test_batch_cannot_substitute_a_process_list_without_prefix_environment_proof
 
 @pytest.mark.parametrize('release', [True, False], ids=['busy-then-free', 'still-busy-at-deadline'])
 def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_authoring, tmp_path, monkeypatch, release):
+    import errno
     import json
     from tests.destructive.support import authoring_batch, sandbox_fixture
     from wwise_waapi import headless
@@ -480,22 +481,27 @@ def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_aut
     # Keep the real existing wildcard-bind probe and release helper. Only the
     # OS socket/time boundaries are fake; final categories and owner are real.
     monkeypatch.setattr(authoring_batch, 'wait_for_port_release', sandbox_fixture.wait_for_port_release)
-    clock, attempts = [0.0], []
+    clock, attempts, socket_options = [0.0], [], []
     class Socket:
         def __enter__(self):
             return self
         def __exit__(self, *_):
             pass
+        def setsockopt(self, *option):
+            socket_options.append(option)
         def bind(self, endpoint):
             attempts.append(endpoint)
             if not release or len(attempts) < 3:
-                raise OSError('owned socket not yet bindable')
+                if len(attempts) == 1:
+                    raise OSError(errno.EADDRINUSE, 'earlier simulated socket conflict')
+                raise OSError(errno.EACCES, 'last simulated bind denial')
     monkeypatch.setattr(headless.socket, 'socket', lambda *_: Socket())
     monkeypatch.setattr(sandbox_fixture.time, 'monotonic', lambda: clock[0])
     monkeypatch.setattr(sandbox_fixture.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + seconds))
     outcome = batch.finalize([item], terminal=True)
     records = [json.loads(line) for line in target.read_text().splitlines()]
     assert attempts and set(attempts) == {('0.0.0.0', 31337)}
+    assert not any(option[1] == headless.socket.SO_REUSEADDR for option in socket_options)
     if release:
         assert outcome['outcome'] == 'PASS'
         assert len(attempts) == 3 and 0 < clock[0] < 15
@@ -506,7 +512,12 @@ def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_aut
         assert 15 <= clock[0] <= 15.11
         assert all(row['invocation']['outcome'] != 'PASS' for row in records)
         assert owned_authoring.runtime.sandbox.sandbox_project.exists()
-        assert (owned_authoring.runtime.evidence_root / 'lifecycle-release-error.json').exists()
+        for filename in ('lifecycle-release-error.json', 'authoring-batch-finalization-error.json'):
+            error = json.loads((owned_authoring.runtime.evidence_root / filename).read_text())
+            persisted = json.dumps(error)
+            assert 'last bind error: PermissionError' in persisted
+            assert 'errno=13' in persisted and 'last simulated bind denial' in persisted
+            assert 'earlier simulated socket conflict' not in persisted
     assert [row['argv'][0] for row in batch.receipts['last-node']] == ['config-set', 'status']
 
 

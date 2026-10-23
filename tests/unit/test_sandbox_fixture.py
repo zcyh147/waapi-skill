@@ -70,7 +70,7 @@ def test_wait_for_port_release_fails_closed_after_its_bound(
         ),
     )
 
-    with pytest.raises(SandboxFixtureError, match="remained occupied"):
+    with pytest.raises(SandboxFixtureError, match="remained unavailable for binding"):
         sandbox_fixture.wait_for_port_release(
             "127.0.0.1",
             30485,
