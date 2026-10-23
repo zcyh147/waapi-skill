@@ -32,6 +32,7 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
 from .runtime_inspection_business_contracts import (
+    LOG_ADD_ITEM_URI, LOG_CLEAR_URI, LOG_GET_URI,
     PROFILER_GET_CURSOR_TIME_URI,
     PROFILER_MOVE_CURSOR_URI,
     PROFILER_SET_CURSOR_TIME_URI,
@@ -80,6 +81,7 @@ from .host_paths import (
     parse_relative_host_path,
 )
 from .io_policy import IOPolicyError, validate_isolated_io
+from .profiler_capture_artifact import SAVE_CAPTURE_URI, prepare_capture_artifact, validate_capture_artifact, verify_capture_artifact
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .condition_limits import MAX_CONDITION_CONTROLLERS, MAX_CONDITION_PATH_FIELDS
 from .metadata_restrictions import (
@@ -312,6 +314,7 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
         PROFILER_GET_CURSOR_TIME_URI,
+        LOG_GET_URI,
         "ak.soundengine.getState",
         "ak.soundengine.getSwitch",
         UI_COMMAND_GET_COMMANDS_URI,
@@ -4677,6 +4680,10 @@ def _public_call_verification_plan(
             "strategy": "operation_specific_readback", "base_result_strategy": strategy,
             "action": args["action"],
             **({"transport_id": args["transport"]} if "transport" in args else {})}
+    if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} and version in {"2023.1", "2024.1", "2025.1"}:
+        return {"kind": "log-channel-effect", **common, "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy, "channel": args.get("channel", "general"),
+            **({"message": args["message"], "severity": args.get("severity", "Message")} if api == LOG_ADD_ITEM_URI else {})}
     if api == TRANSPORT_CREATE_URI:
         object_id = args.get("object")
         if not isinstance(object_id, str) or _PLUGIN_GUID.fullmatch(object_id) is None:
@@ -11581,8 +11588,30 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             except (ValueError, SemanticValidationError) as exc:
                 raise OperationContractError("INVALID_TRANSPORT_OBSERVATION", str(exc)) from exc
             verification["before"] = metadata["transport_action_before"]
+        if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI}:
+            from .runtime_log_effects import channel_snapshot
+            host = read(GET_INFO_URI, {}, {})
+            if type(host.get("isCommandLine")) is not bool:
+                raise OperationContractError("INVALID_LOG_OBSERVATION", "Log verification requires the actual host kind.")
+            try:
+                before = channel_snapshot(read_call(LOG_GET_URI, {"channel": verification["channel"]}, {}), version=request.version)
+            except OperationContractError:
+                raise
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_LOG_OBSERVATION", "Log prestate did not match its pinned native schema.") from exc
+            if before["outcome"] != "complete":
+                raise OperationContractError("LOG_OBSERVATION_TOO_LARGE", "Log prestate exceeds the bounded complete-channel observation policy.", details=before)
+            verification["console"] = host["isCommandLine"]
+            metadata["log_channel_before"] = before
+            warnings.append("Log verification compares one bounded channel observation; concurrent identical messages cannot be attributed, and continuing channel state is unverified.")
         if blend_plan is not None:
             verification = {"kind": "blend-assignment", "uri": api, "version": request.version, **blend_plan}
+        if api == SAVE_CAPTURE_URI:
+            try:
+                verification = prepare_capture_artifact(call_args, arguments["io_root"], execution_contract["io_audit"], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+            warnings.append("Capture save verifies only a nonempty created or content-changed destination and bounded output-directory file preservation. Native capture format and capture-data completeness remain unverified.")
         if api == "ak.wwise.core.sound.setActiveSource":
             source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
             if source_guard is not None:
@@ -16952,6 +16981,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                     "status": "repreview_required", "assertions": [{"name": "Transport targets and toggle prestate remain unchanged",
                         "passed": False, "evidence": {"expected": before, "actual": current,
                             "transport_mutation_dispatched": False}}], "readbacks": readbacks}
+        if api == SAVE_CAPTURE_URI:
+            try:
+                validate_capture_artifact(prepared.get("verification_plan", {}), call_args,
+                    arguments["io_root"], execution_contract["io_audit"], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == "ak.wwise.core.blendContainer.addAssignment" and "blend_assignment" in prepared.get("pre_state", {}):
             from .blend_assignment import observe as observe_blend, materialize_index, BlendAssignmentError
             plan = prepared.get("pre_state", {}).get("blend_assignment")
@@ -16964,6 +16999,20 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             if any(current[key] != value for key, value in plan["before"].items() if key != "native_assignments"):
                 raise OperationContractError("STALE_BLEND_ASSIGNMENT", "Blend identities, owner membership or assignments changed after Preview")
             call_args = materialize_index(call_args, len(current["assignments"]))
+        if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI}:
+            from .runtime_log_effects import channel_snapshot, same_channel_contents
+            before = prepared.get("pre_state", {}).get("log_channel_before")
+            plan = prepared.get("verification_plan", {})
+            try:
+                current = channel_snapshot(read_call(LOG_GET_URI, {"channel": call_args.get("channel", "general")}, {}), version=version)
+            except OperationContractError:
+                raise
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_LOG_OBSERVATION", "Current log channel did not match its pinned native schema.") from exc
+            if current["outcome"] != "complete":
+                raise OperationContractError("LOG_OBSERVATION_TOO_LARGE", "Current log channel exceeds the complete observation policy.", details=current)
+            if not isinstance(before, Mapping) or not same_channel_contents(before, current) or plan.get("kind") != "log-channel-effect":
+                raise OperationContractError("STALE_LOG_CHANNEL", "Log channel changed after Preview; inspect and preview again before changing it.")
         if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
             from .remote_transition import remote_connection_snapshot
             before = prepared.get("pre_state", {}).get("remote_connection_before")
@@ -19608,6 +19657,21 @@ def verify_prepared_operation(
                 else "complete_reflected_schema"
             )
         )
+    elif kind == "profiler-capture-artifact":
+        check_result_schema(plan["uri"], plan["version"])
+        business_state_verified = False
+        verification_strength = "profiler_capture_artifact"
+        try:
+            observed = verify_capture_artifact(plan)
+        except SoundBankContractError as exc:
+            check("Exact authorized capture artifact can be observed safely", False, exc.as_dict())
+        else:
+            readbacks.append(observed)
+            check("Exact authorized capture artifact was created or changed and is nonempty",
+                observed["changed"] and observed["nonempty"], observed)
+            check("Unrelated regular-file contents in the bounded output directory are preserved",
+                observed["unrelated_files_preserved"], observed)
+            business_state_verified = all(item.get("passed") is True for item in assertions)
     elif kind == 'tone-wav-artifact':
         check_result_schema(TONE_URI, plan['version'])
         business_state_verified = False
@@ -20142,6 +20206,29 @@ def verify_prepared_operation(
                 business_state_verified = False
                 success_status = "result_schema_checked"
                 verification_strength = "partial_remote_target_observation"
+    elif kind == "log-channel-effect":
+        from .runtime_log_effects import channel_snapshot, compare_channel
+        uri, version = plan.get("uri"), plan.get("version")
+        before = (pre_state or {}).get("log_channel_before")
+        if uri not in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} or version not in {"2023.1", "2024.1", "2025.1"} or not isinstance(before, Mapping) or before.get("outcome") != "complete" or type(plan.get("console")) is not bool:
+            raise OperationContractError("INVALID_PREVIEW", "Log effect verification lacks its bounded channel prestate and host.")
+        business_state_verified = False
+        verification_strength = "bounded_log_channel_observation"
+        check_result_schema(uri, version)
+        if all(item["passed"] for item in assertions):
+            try:
+                after = channel_snapshot(read_call(LOG_GET_URI, {"channel": plan["channel"]}, {}), version=version)
+            except OperationContractError:
+                raise
+            except (ValueError, SemanticValidationError) as exc:
+                check("Log channel readback matches its pinned schema", False, {"outcome": "malformed"})
+                readbacks.append({"kind": "log-channel-observation", "outcome": "malformed", "effect_observed": False})
+            else:
+                observation = compare_channel(plan, before, after)
+                readbacks.append({"kind": "log-channel-observation", **observation, "post_channel": after})
+                business_state_verified = observation["effect_observed"]
+                if not business_state_verified:
+                    success_status = "result_schema_checked"
     elif kind == "profiler-user-cursor":
         uri, version = plan.get("uri"), plan.get("version")
         if uri not in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI} or version != "2025.1":
@@ -24641,6 +24728,13 @@ def verify_prepared_operation(
             message = 'The Console command failed verification; inspect the retained checks and do not retry execution.'
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "profiler-capture-artifact":
+        message = ("The exact authorized capture destination was created or content-changed and is nonempty; bounded unrelated output-file contents are preserved. "
+            if outcome.business_state_verified else
+            "The exact authorized capture artifact or unrelated output-file preservation could not be verified. Do not replay the executed save. ")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            message + "Native capture format validity and capture-data completeness remain unverified.",
+            outcome.verification_strength, outcome.business_state_verified, plan["verification_scope"])
     if kind == 'tone-wav-artifact':
         message = ('The requested Tone WAV artifact failed independent verification.'
             if outcome.status == 'verification_failed' else
@@ -24666,6 +24760,14 @@ def verify_prepared_operation(
             {"comparison": "one_state_read_per_preview_target", "continuous_state_verified": False,
                 "atomic_scope_verified": False, "causality_verified": False,
                 "observation": next((dict(row) for row in outcome.readbacks if row.get("kind") == "transport-action-observation"), {})})
+    if kind == "log-channel-effect":
+        observation = next((dict(row) for row in outcome.readbacks if row.get("kind") == "log-channel-observation"), {"outcome": "malformed_control_result"})
+        message = ("The requested log effect was observed in one bounded channel comparison. Concurrent identical writers, individual entry identity and continuing channel state are unverified."
+            if outcome.business_state_verified else
+            "The log effect remains unverified; inspect the bounded channel observation. Missing or indistinguishable content does not prove the call never took effect. Do not replay the executed control.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            {"log_observation": observation, "unrelated_channels": "not requested by the compiled native call; not independently observed"})
     if kind == "profiler-user-cursor":
         message = ("The user cursor matched the control's returned snapped time at one independent observation. "
             "Capture data completeness and a continuing cursor position are unverified."

@@ -5,6 +5,56 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R91 runtime verification and focused repair
+
+Reviewed log-effect candidate `71a86adf`, integrated at `927f4468`, observes the
+selected channel before execution and once afterward. Adding a message needs
+increased matching multiplicity; clearing reports remaining or competing
+content without assuming unique message IDs or timestamp ordering. Resolved
+native definitions validate each bounded snapshot. Console's empty getter
+cannot establish the effect and remains explicitly unverified. The initial
+focused selection retained 116 passes and two error-classification failures;
+the repair passed 12 failed/affected controls. Six schema checks passed after
+the F1 contract merge. Independent review found no remaining issue and reused
+these results. No native log effect or Console Topic behavior is established
+by this program increment.
+
+Reviewed getMeters candidate `50d70910`, integrated at `30df878d`, exposes
+2024.1/2025.1 nested meter-object outputs, live property/reference fields,
+related outputs and platform/language scope through the existing closed read
+contract. Native defaults and explicit empty selection remain distinct. The
+earlier meter selection passed 40 checks; its shared-consumer selection retained
+964 passes and ten stale-test failures reproduced on the old baseline. Only
+those ten repaired expectations were rerun. Independent review then exposed a
+related-planner comparison of raw GUID letter case. Repair `6f01102b` uses copied
+canonical root identities without changing native evidence or public strings:
+ten directly affected controls passed in 4.92s, and four integration controls
+passed in 1.98s. Focused rereview found no remaining issue. These overlapping
+component runs are not a new complete gate. Matching native meter projections,
+scopes and actual capture measurements still need their specific effect proof.
+
+Reviewed cursor candidate `6c045363`, integrated at `5a7d15c4`, verifies the
+2025.1 user cursor with one bounded read of the returned, buffer-snapped time.
+Unavailable results remain explicitly weaker; a mismatch is not described as
+proof that execution never occurred. The implementer reported 62 focused passes
+(258 deselected, 31.69s); the independent review checked the implementation and
+test definitions but did not locate a retained run log, so this count remains
+worker-reported. No extra run was started just to recreate that log. This proves
+neither capture-data completeness nor a new native cursor execution.
+
+Blend repair `3885c0e1`, reviewed and integrated at `b025f134`, materializes the
+documented explicit index clamp consistently at preparation, prewrite and the
+post-execution dispatch guard. The final category writer now receives its
+required verifier field; the actual collector-to-writer success/failure checks
+passed 2/2 in 2.38s. Four earlier count-drift/omission controls are retained;
+the six failed/affected clamp and route-matrix controls passed in 3.34s after
+repair. There was no repeated complete matrix or native attempt. The original
+2024 failure below stays unchanged, and Automatic-neighbor geometry remains
+unresolved under #191; the unstarted 2025 attempt earns no credit.
+
+No additional Fresh, full Program/Non-live, Windows or whole-ticket acceptance
+is claimed by these increments. #186 remains the current closeout focus.
+
 ## 2026-10-23 R90 attenuation and retained object identity
 
 Transport-create association repair `cf5a8df2`, reviewed as `3cb8699c` and
