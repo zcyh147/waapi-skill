@@ -90,7 +90,14 @@ class OwnedMacAuthoringContext:
         # Native-app macdrv/wait-child options belong to its enclosing app strategy.
         # The validated environment retains the logical private/managed bottle.
         command = [str(self.cx / 'bin/wine'), 'start.exe', '/wait',
-            f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe', native]
+            f'c:/Program Files/Audiokinetic/Wwise {self.build}/Authoring/x64/Release/bin/Wwise.exe']
+        # AK_AUTOMATION_MODE is the existing test-owned request marker, not a
+        # documented Wwise environment setting. The matching 2021.1 SDK's
+        # wwise_cli_legacy.html#wwise_authoring_from_commandline documents the
+        # startup argument; later version sources have not established it.
+        if self.build.startswith('2021.1.') and self.environment.get('AK_AUTOMATION_MODE') == '1':
+            command.append('-AutomationMode')
+        command.append(native)
         requested_startup_environment = {key: self.environment[key] for key in ('AK_AUTOMATION_MODE',)
             if key in self.environment}
         return command, {'method': 'owned_winepath_roundtrip', 'project': str(self.project), 'native_project': native,
