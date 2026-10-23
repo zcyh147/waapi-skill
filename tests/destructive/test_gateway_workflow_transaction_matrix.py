@@ -11175,3 +11175,74 @@ def test_structure_changed_notes_filtered_diagnostic(workflow_sandbox_runtime: _
         pytest.skip('Filtered Notes diagnostic is pinned to Console 2025.1.7.9143')
     _collect_structure_changed_notes_diagnostic(workflow_sandbox_runtime,
         name='WAAPI_NOTES_FILTERED_' + uuid.uuid4().hex[:12], filtered=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """One pending actual insertion slice using the unchanged Porsche fixture."""
+    runtime = workflow_sandbox_runtime
+    fixtures = {
+        "2024.1": ("Actor-Mixer Hierarchy", "e6984d157c7b6418a3d9729fdf7d3ff295d551314656ce76e985185dda6257cc"),
+        "2025.1": ("Containers", "f9ee5098445ebe1e66b649e4af90699362796186c81fa04dc2d0e18f39209f52"),
+    }
+    if runtime.version not in fixtures:
+        pytest.skip("Blend assignment actual insertion slice is pinned to 2024/2025")
+    folder, source_hash = fixtures[runtime.version]
+    source = runtime.sandbox.source_root / folder / "Car Engine.wwu"
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == source_hash, "Fixture prerequisite: exact offline source"
+    track = "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}"
+    child = "{CFAF8A1B-1DF5-4711-80DA-D61A42F859D7}"
+    getter = "ak.wwise.core.blendContainer.getAssignments"
+    category = {"category": "blend-assignment", "status": "FAIL", "version": runtime.version}
+    runtime.category_results.append(category)
+    receipt = {"candidate": runtime.candidate, "version": runtime.version, "source_member": str(source),
+               "source_sha256": source_hash, "native_assignment_effect_verified": False, "transactions": {}}
+    output = runtime.state_dir / "blend-negative-insertion.json"
+    native_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous_native = set(native_root.glob("*.json"))
+    try:
+        before_payload = runtime.gateway(["core-call", getter, "--object-id", track], live=True)
+        receipt["before"] = before_payload
+        before = before_payload["agent_result"]["return"]
+        assert len(before) == 6 and {row["index"] for row in before} == set(range(6)), "Fixture prerequisite: complete native explicit indices"
+        assert all("edges" in row for row in before) and child not in {row["child"] for row in before}, "Fixture prerequisite: returned edges and unassigned child"
+        before_order = [next(row["child"] for row in before if row["index"] == index) for index in range(6)]
+        draft = _start_business_draft(runtime, "ak.wwise.core.blendContainer.addAssignment")
+        handles = {}
+        for role, identity in (("blend_track", track), ("child", child)):
+            bound = _update_business_draft(runtime, draft, "draft-bind-object", ["--role", role, "--object-id", identity], live=True)
+            handles[role] = bound["bound_object"]["handle"]
+        _update_business_draft(runtime, draft, "draft-declare-core-plan", [
+            "--role", "blend_track_handle", handles["blend_track"], "--role", "child_handle", handles["child"],
+            "--value", "insertion_index", "-9"], live=False)
+        def inspect(preview):
+            notice = preview["preview_summary"]["blend_assignment"]
+            assert notice["expected_position"] == 0 and notice["observed_assignment_count"] == 6, preview
+            assert notice["verification_scope"]["unobserved"] == [], preview
+        receipt["transactions"] = _complete_business_draft(runtime, draft, inspect_preview=inspect)
+        after_payload = runtime.gateway(["core-call", getter, "--object-id", track], live=True)
+        receipt["after"] = after_payload
+        after = after_payload["agent_result"]["return"]
+        assert len(after) == 7 and {row["index"] for row in after} == set(range(7)), after
+        after_order = [next(row["child"] for row in after if row["index"] == index) for index in range(7)]
+        assert after_order == [child, *before_order], after
+        after_by_id = {row["child"]: row for row in after}
+        assert all(all(after_by_id[row["child"]].get(key) == value for key, value in row.items() if key != "index") for row in before), after
+        verification = receipt["transactions"]["verify"]["verification"]
+        assert verification["verification_strength"] == "blend_assignment_order_and_observed_preservation", verification
+        assert all(item["passed"] for item in verification["assertions"]), verification
+        receipt["native_assignment_effect_verified"] = True
+        category["status"] = "PASS"
+    except Exception as exc:
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+        raise
+    finally:
+        paths = sorted(set(native_root.glob("*.json")) - previous_native)
+        assert len(paths) <= 64, "Blend dispatcher evidence file bound"
+        assert sum(path.stat().st_size for path in paths) <= 16 * 1024 * 1024, "Blend dispatcher evidence byte bound"
+        receipt["native_evidence"] = [{"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths]
+        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024, "Blend receipt byte bound"
+        output.write_bytes(body)
+        category.update(observation_path=str(output), observation_sha256=hashlib.sha256(body).hexdigest())
