@@ -8,6 +8,7 @@ import uuid
 import pytest
 
 from wwise_waapi.metadata_restrictions import reference_type_token
+from wwise_waapi.operation_object import flatten_set_result
 
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object, _complete_business_draft, _discover_business_type,
@@ -23,6 +24,10 @@ GUNS = '{06362E8D-5A32-497A-B063-3DA95963CE47}'
 CARS = '{33329D23-BCDD-4D1A-9734-2403A3428FAE}'
 CONTAINERS = '{B7237E6E-5972-4B02-A4C9-267862F2241B}'
 RETAINED_CONTAINER = '{69D14C5F-00CF-445E-B163-A53DBC2AFB80}'
+METADATA_WU = '{2C7B8E5D-3DF1-41AF-A767-BAFAE19ABCD3}'
+METADATA_PATH = r'\Metadata\Default Work Unit'
+METADATA_CLASS = 58982409
+METADATA_NAME = 'R84 System Output Settings'
 WINDOWS = '{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}'
 OWNER_PATH = r'\Busses\Default Work Unit\Main Audio Bus\Environmental\SFX'
 CONTAINERS_PATH = r'\Containers\Default Work Unit'
@@ -45,7 +50,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
     previous = set(evidence_root.glob('*.json'))
     endpoint = {'host': runtime.lifecycle.host, 'port': runtime.port, 'url': runtime.lifecycle.waapi_url}
     observation = {'candidate': runtime.candidate, 'version': runtime.version, 'endpoint': endpoint,
-        'calls': [], 'reads': [], 'transactions': [], 'native_evidence': [], 'setup_transaction_count': 0,
+        'calls': [], 'reads': [], 'transactions': [], 'native_evidence': [], 'setup_transaction_count': 1,
         'history_executed': False, 'complete': False, 'business_effect_verified': False,
         'lifecycle_acceptance': 'Requires final host-category-evidence/v3 source/cleanup/process PASS'}
     category = {'category': 'native-named-set-owned-metadata-list', 'status': 'FAIL',
@@ -61,7 +66,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
 
     class ReceiptGateway:
         def raw_gateway(self, argv):
-            assert len(observation['calls']) < 128, 'Named List public command bound exceeded'
+            assert len(observation['calls']) < 160, 'Named List public command bound exceeded'
             record = {'argv': list(argv)}
             observation['calls'].append(record)
             try:
@@ -84,7 +89,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
     gateway = ReceiptGateway()
 
     def query(label, argv, ceiling):
-        assert len(observation['reads']) < 15
+        assert len(observation['reads']) < 23
         observation['reads'].append({'label': label, 'call_index': len(observation['calls'])})
         payload = gateway.gateway(['query-object', *argv, '--max-results', str(ceiling), '--detail'], live=True)
         assert payload.get('projection_complete') is not False and payload.get('status') != 'partial', payload
@@ -126,6 +131,38 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         assert {row['id'] for row in before['children']} == {RETAINED_CONTAINER}, before
         assert {row['name'] for row in before['buses']} == {'Guns', 'Cars'}, before
         assert all(row['class_id'] == 1376272 and row['parent']['id'] == OWNER for row in before['buses']), before
+        metadata_wu = observation['metadata_workunit_before'] = exact('metadata-workunit-before', METADATA_WU)
+        assert metadata_wu['type'] == 'WorkUnit' and metadata_wu['class_id'] == 1638416 and metadata_wu['path'] == METADATA_PATH, metadata_wu
+        assert query('metadata-children-before', ['--exact-id', METADATA_WU, '--relationship', 'children', *projection], 2) == []
+        setup_draft = _start_business_draft(gateway, 'object.createPlugin')
+        setup_parent = _bind_business_object(gateway, setup_draft, object_id=METADATA_WU)
+        metadata_type = _discover_business_type(gateway, setup_draft, meaning='Wwise System Output Settings',
+            role='metadata', expected_label='Wwise System Output Settings')
+        _update_business_draft(gateway, setup_draft, 'draft-declare-existing', ['--declaration-id', 'metadata-setup',
+            '--object-handle', setup_parent, '--field', 'plugin_role', 'metadata', '--field', 'plugin_placement', 'shareset',
+            '--field', 'plugin_name', METADATA_NAME, '--field', 'plugin_type_handle', metadata_type], live=False)
+        setup = {'role': 'metadata-setup'}
+        observation['transactions'].append(setup)
+        setup.update(_complete_business_draft(gateway, setup_draft))
+        assert setup['execute']['automatic_retry'] is False and setup['verify']['verified'] is True, setup
+        setup_result = flatten_set_result(setup['execute']['dispatch_result']['result'])
+        setup_root, = [row for row in setup_result if row.parent_request_path is None and row.object == METADATA_WU]
+        setup_child, = [row for row in setup_result if row.parent_request_path == setup_root.request_path and row.collection == 'children']
+        assert METADATA_NAME == 'R84 System Output Settings'
+        assert len(setup_result) == 2 and setup_child.name == 'R84_System_Output_Settings', setup_result
+        observation['metadata_name_binding'] = {'requested_name': METADATA_NAME, 'actual_name': setup_child.name}
+        metadata_id = setup_child.object
+        metadata_target = observation['metadata_target'] = exact('metadata-target-after-setup', metadata_id)
+        assert metadata_target['type'] == 'Metadata' and metadata_target['class_id'] == METADATA_CLASS, metadata_target
+        assert metadata_target['name'] == setup_child.name and metadata_target['parent']['id'] == METADATA_WU, metadata_target
+        assert uuid.UUID(metadata_id).int != 0 and metadata_id not in {METADATA_WU, OWNER, ANCESTOR, GUNS, CARS, CONTAINERS, RETAINED_CONTAINER, WINDOWS}
+        assert query('metadata-children-after-setup', ['--exact-id', METADATA_WU, '--relationship', 'children', *projection], 2) == [metadata_target]
+        setup_packet = Path(setup['execute']['dispatch_result']['evidence_path'])
+        assert setup_packet.parent.resolve() == evidence_root.resolve() and setup_packet not in previous
+        setup_native = json.loads(setup_packet.read_bytes())
+        assert setup_native['api'] == SET and setup_native['version'] == runtime.version and setup_native['ok'] is True, setup_native
+        assert setup_native['result'] == setup['execute']['dispatch_result']['result']
+        observation['setup_packet_path'] = str(setup_packet)
         draft = _start_business_draft(gateway, 'object.set')
         parents = {role: _bind_business_object(gateway, draft, object_id=identity) for role, identity in (('bus', OWNER), ('sound', CONTAINERS))}
         _update_business_draft(gateway, draft, 'draft-business-configure', ['--name-conflict', 'rename', '--platform', WINDOWS], live=False)
@@ -141,6 +178,11 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         assert list_candidate['field_kind'] == 'list' and list_candidate['evidence']['declaration']['name'] == 'Metadata', selected
         list_field = list_candidate['handle']
         observation['list_selection'] = selected
+        metadata_handle = _bind_business_object(gateway, draft, object_id=metadata_id)
+        metadata_field = _update_business_draft(gateway, draft, 'draft-discover-fields',
+            ['--type-handle', types['MetadataSlot'], '--meaning', 'Metadata'], live=True)
+        scalar_metadata = discovered_business_field_handle(metadata_field, 'Metadata')
+        observation['metadata_reference_field'] = metadata_field
         page, seen, output_choice = None, set(), None
         for _ in range(4):
             fields = _update_business_draft(gateway, draft, 'draft-discover-fields',
@@ -168,7 +210,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
             declared = _update_business_draft(gateway, draft, 'draft-declare-new', ['--declaration-id', role,
                 '--parent-handle', handles[parent] if parent in handles else parent, '--name', name, '--kind', types[kind],
                 *(['--field-value', field, handles['bus']] if role == 'sound' else []),
-                *(['--field', 'object_list', list_field] if role == 'slot' else [])], live=False)
+                *(['--field', 'object_list', list_field, '--field-value', scalar_metadata, metadata_handle] if role == 'slot' else [])], live=False)
             handles[role] = declared_business_object_handle(declared, role)
         observation['declared_handles'] = handles
         phase = {'role': 'source'}
@@ -214,11 +256,11 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         assert first['args']['objects'][0]['object'] == OWNER and first['args']['objects'][0]['children'][0]['name'] == 'Guns', first
         assert second['args']['objects'][0]['object'] == CONTAINERS, second
         sound = second['args']['objects'][0]['children'][0]
-        assert sound['name'] == REQUESTED['sound'] and sound['@Metadata'] == [{'type': 'MetadataSlot', 'name': REQUESTED['slot']}], second
+        assert sound['name'] == REQUESTED['sound'] and sound['@Metadata'] == [{'type': 'MetadataSlot', 'name': REQUESTED['slot'], '@Metadata': metadata_id}], second
         assert '@OutputBus' not in sound, second
         assert reference['args'] == {'objects': [{'object': ids['sound'], 'platform': WINDOWS, '@OutputBus': created['bus']['path']}]}, reference
         assert proof['creation_bindings'][1]['before_readbacks'] and all(row['passed'] for row in proof['creation_bindings'][1]['before_preservation']), proof
-        membership_reads = [row for row in proof['creation_bindings'][1]['readbacks'] if row['options'] == {'return': ['id', '@Metadata']}]
+        membership_reads = [row for row in proof['creation_bindings'][1]['readbacks'] if row['args'] == {'from': {'id': [ids['sound']]}} and row['options'] == {'return': ['id', '@Metadata']}]
         assert membership_reads, proof
         for row in membership_reads:
             owner, = row['result']['return']
@@ -244,6 +286,14 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
             *projection, '--include', 'owner'], 2)
         slot, = slots
         assert slot['id'] == ids['slot'] and slot['class_id'] == 5570560 and slot['owner']['id'] == ids['sound'], slot
+        slot_reference, = query('source-metadata-slot-reference', ['--exact-id', ids['slot'], *projection,
+            '--include', 'owner', '--include-field', 'Metadata'], 2)
+        assert {key: slot_reference[key] for key in slot} == slot, slot_reference
+        assert slot_reference['references']['Metadata']['id'] == metadata_id, slot_reference
+        observation['independent_slot_reference'] = slot_reference
+        assert exact('metadata-workunit-after-source', METADATA_WU) == metadata_wu
+        assert query('metadata-children-after-source', ['--exact-id', METADATA_WU, '--relationship', 'children', *projection], 2) == [metadata_target]
+        assert exact('metadata-target-after-source', metadata_id) == metadata_target
         independent['slot'] = slot
         observation['independent_created'] = independent
         business = phase['verify']['agent_result']['business_result']
@@ -261,7 +311,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
                 parent = OWNER if role == 'bus' else CONTAINERS
                 assert row['parent_id'] == parent == actual['parent']['id'], row
                 assert actual['path'] == (OWNER_PATH if role == 'bus' else CONTAINERS_PATH) + '\\' + actual['name'], row
-        assert len(observation['reads']) == 15 and len(observation['transactions']) == 1
+        assert len(observation['reads']) == 23 and len(observation['transactions']) == 2
         observation.update(complete=True, business_effect_verified=True)
         category['status'] = 'PASS'
     except BaseException as exc:
@@ -283,7 +333,7 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
                     actual_sets.append(str(packet))
                 observation['native_evidence'].append({'path': str(packet), 'bytes': len(body), 'sha256': hashlib.sha256(body).hexdigest()})
             if observation['complete']:
-                assert set(actual_sets) == set(observation['stage_packet_paths']) and len(actual_sets) == 3, actual_sets
+                assert set(actual_sets) == {*observation['stage_packet_paths'], observation['setup_packet_path']} and len(actual_sets) == 4, actual_sets
         except BaseException as exc:
             observation.update(complete=False, business_effect_verified=False, collection_failure={'type': type(exc).__name__, 'message': str(exc)})
             category['status'] = 'FAIL'

@@ -99,6 +99,8 @@ def fields_for(spec):
 def observe_lists(prepared, identities, *, read):
     """Prove exact ordered partial membership, typed ownership and retained prefix."""
     from .documented_list_fields import observe_planned_list
+    from .constructor_inputs import observe as observe_constructor_inputs
+    observe_constructor_inputs(prepared['verification_plan']['nodes'], identities, read=read)
     for profile in prepared['pre_state']['owned_result_stages'].get('lists', []):
         owner = identities.get(profile['owner'])
         if owner is None:
@@ -142,6 +144,11 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
     deferred = [{'source': node['request_path'], 'field': field['name'], 'target': field['target_request_path'],
                  'platform': node.get('platform', args.get('platform'))}
         for node in specs for field in node.get('references', []) if 'target_request_path' in field]
+    # Required constructor references cannot be repaired after creation. This
+    # stage seam only substitutes owned parents, not reference dependencies.
+    if any(field['field'] in node.get('constructor_inputs', {}).get('required_references', [])
+            for field in deferred for node in specs if node['request_path'] == field['source']):
+        raise ValueError('Mandatory constructor reference needs a previously verified target; planned-target staging remains assigned to #178/#179/#192')
     if len(deferred) > DEFAULT_MAX_NODES:
         raise ValueError('Native-name staging requires bounded ordinary result-reference dependencies')
     by_path = {node['request_path']: node for node in specs}

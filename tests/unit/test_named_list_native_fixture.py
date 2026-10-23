@@ -29,7 +29,8 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask
     from tests.destructive import test_gateway_workflow_transaction_matrix as workflow
     new = {'bus': '{11111111-1111-1111-1111-111111111111}',
-        'sound': '{22222222-2222-2222-2222-222222222222}', 'slot': '{33333333-3333-3333-3333-333333333333}'}
+        'sound': '{22222222-2222-2222-2222-222222222222}', 'slot': '{33333333-3333-3333-3333-333333333333}',
+        'metadata': '{44444444-4444-4444-4444-444444444444}'}
     observed_bus_name = 'Observed native Bus'
 
     class ListTask(OwnedGraphTask):
@@ -60,11 +61,12 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
                 result = []
                 def create(node, parent, *, owned=False):
-                    role = {collector.REQUESTED['bus']: 'bus', collector.REQUESTED['sound']: 'sound', collector.REQUESTED['slot']: 'slot'}[node['name']]
+                    role = {collector.REQUESTED['bus']: 'bus', collector.REQUESTED['sound']: 'sound', collector.REQUESTED['slot']: 'slot', collector.METADATA_NAME: 'metadata'}[node['name']]
                     oid = new[role]
-                    name = observed_bus_name if role == 'bus' else node['name']
+                    name = ('R84_System_Output_Settings' if role == 'metadata' else
+                        observed_bus_name if role == 'bus' else node['name'])
                     self.objects[oid] = {'id': oid, 'name': name, 'type': 'PluginInnerObject' if owned else node['type'],
-                        'classId': collector.CLASSES[role], 'notes': '',
+                        'classId': collector.METADATA_CLASS if role == 'metadata' else collector.CLASSES[role], 'notes': '',
                         'path': r'\opaque observed MetadataSlot' if owned else self.objects[parent]['path'] + '\\' + name,
                         **({'owner': {'id': collector.CONTAINERS if fault == 'wrong-slot-owner' else parent}}
                             if owned else {'parent': {'id': parent}})}
@@ -73,7 +75,10 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                     self.objects[oid].update({key: deepcopy(value) for key, value in node.items()
                         if key.startswith('@') and key != '@Metadata'})
                     returned = {'id': oid, 'name': name}
-                    if '@Metadata' in node:
+                    if owned:
+                        assert node.get('@Metadata') == new['metadata'], 'MetadataSlot requires its verified Metadata ShareSet'
+                        self.objects[oid]['@Metadata'] = {'id': node['@Metadata']}
+                    if '@Metadata' in node and isinstance(node['@Metadata'], list):
                         slots = [create(slot, oid, owned=True) for slot in node['@Metadata']]
                         self.objects[oid]['@Metadata'] = [{'id': row['id'], 'name': row['name']} for row in slots]
                         returned['@Metadata'] = slots
@@ -98,11 +103,17 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
     task = ListTask(tmp_path, '2025.1', 'object.set')
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'named-list-sound-2025-output-bus.json').read_text())
     task.metadata = {name: deepcopy(row['result']) for name, row in fixture['fields'].items()}
+    # Matching MetadataSlot SDK/WObjects constructor semantics; program transport, not native metadata capture.
+    task.metadata['Metadata'] = {'name': 'Metadata', 'type': 'Reference',
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Metadata']}, 'notNull']}}
     assert task.metadata['OverrideOutput']['default'] is False
     assert task.metadata['OutputBus']['type'] == ''
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for name, cid in (
         ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560), ('WorkUnit', 1638416), ('PropertyContainer', 524304))]
+    task.types.append({'classId': collector.METADATA_CLASS, 'name': 'Wwise System Output Settings', 'type': 'Metadata'})
     task.objects = {
+        collector.METADATA_WU: {'id': collector.METADATA_WU, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
+            'path': collector.METADATA_PATH, 'parent': None, 'notes': 'keep Metadata WorkUnit'},
         collector.OWNER: {'id': collector.OWNER, 'name': 'SFX', 'type': 'Bus', 'classId': 1376272,
             'path': collector.OWNER_PATH, 'parent': {'id': collector.ANCESTOR}, 'notes': 'keep SFX'},
         collector.ANCESTOR: {'id': collector.ANCESTOR, 'name': 'Environmental', 'type': 'Bus', 'classId': 1376272,
@@ -145,14 +156,14 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
     assert not any(uri.startswith('ak.wwise.core.undo.') for uri, _, _ in task.calls)
     if fault == 'none':
         assert category['status'] == 'PASS' and category['business_effect_verified'] is True
-        assert len(observation['reads']) == 15 and len(observation['transactions']) == 1
-        assert [argv[0] for argv in commands].count('execute') == [argv[0] for argv in commands].count('verify') == 1
-        assert [argv[0] for argv in commands].count('draft-start') == 1
-        assert len(writes) == 3 and len(observation['native_evidence']) > 0
+        assert len(observation['reads']) == 23 and len(observation['transactions']) == 2
+        assert [argv[0] for argv in commands].count('execute') == [argv[0] for argv in commands].count('verify') == 2
+        assert [argv[0] for argv in commands].count('draft-start') == 2
+        assert len(writes) == 4 and len(observation['native_evidence']) > 0
         assert len(observation['stage_packet_paths']) == 3
         memberships = [row['result']['return'][0]['@Metadata']
             for row in observation['stage_proof']['creation_bindings'][1]['readbacks']
-            if row['options'] == {'return': ['id', '@Metadata']}]
+            if row['args'] == {'from': {'id': [new['sound']]}} and row['options'] == {'return': ['id', '@Metadata']}]
         assert memberships and all(rows == [{'id': new['slot'], 'name': collector.REQUESTED['slot']}]
             for rows in memberships)
         assert observation['independent_created']['slot']['name'] == collector.REQUESTED['slot']
@@ -162,10 +173,14 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         assert observation['output_bus_field']['metadata']['type'] == ''
         assert observation['output_bus_field']['metadata']['dependencies'] == task.metadata['OutputBus']['dependencies']
         assert observation['independent_created']['sound']['properties']['OverrideOutput'] is True
-        assert writes[1][1]['objects'][0]['children'][0]['@OverrideOutput'] is True
+        assert writes[2][1]['objects'][0]['children'][0]['@OverrideOutput'] is True
+        assert observation['independent_slot_reference']['references']['Metadata']['id'] == new['metadata']
+        assert writes[0][1]['objects'][0]['children'][0]['name'] == 'R84 System Output Settings'
+        assert observation['metadata_target']['name'] == 'R84_System_Output_Settings'
+        assert observation['metadata_target']['class_id'] == 58982409
         assert observation['created']['bus']['name'] == observed_bus_name
         assert observation['independent_created']['slot']['type'] == 'PluginInnerObject'
         assert 'parent' not in observation['independent_created']['slot']
     else:
         assert category['status'] == 'FAIL' and category['business_effect_verified'] is False
-        assert len(writes) == 2 and 'after' not in observation
+        assert len(writes) == 3 and 'after' not in observation

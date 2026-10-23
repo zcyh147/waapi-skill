@@ -143,6 +143,8 @@ from .operation_plugin import (
     PluginOperationContractError,
     ValidatedPluginProperty,
     build_plugin_creation_plan,
+    bind_plugin_name,
+    plugin_name_policy,
     normalize_plugin_creation,
     validate_plugin_target,
     plugin_property_metadata_requests,
@@ -5576,7 +5578,7 @@ def _read_plugin_prestate(
             parent_id = _plugin_guid(row.get("parent"), field="shareset_child.parent")
             if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
                 raise OperationContractError("INVALID_READBACK", "ShareSet children must expose exact names, types, and parent bindings.")
-            if row["name"].casefold() == descriptor.name.casefold():
+            if row["name"].casefold() in {name.casefold() for name in plugin_name_policy(descriptor, version=version)["accepted_names"]}:
                 raise OperationContractError("SHARESET_NAME_CONFLICT", "The Effects Work Unit already contains the requested name.")
             normalized.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
         normalized.sort(key=lambda row: row["id"].casefold())
@@ -5900,6 +5902,8 @@ def _prepare_object_create_plugin(
     }
     if default_evidence:
         verification["new_object_default_evidence"] = default_evidence
+    if "name_binding" in plugin_plan.verification:
+        verification["name_binding"] = dict(plugin_plan.verification["name_binding"])
     if plugin_prestate["kind"] == "shareset_children":
         verification["preexisting_children"] = list(plugin_prestate["rows"])
     if plugin_prestate["kind"] == "fixed_effect_references":
@@ -8640,7 +8644,7 @@ def _prepare_object_node_specs(
             "requested_notes": node.notes,
             "properties": [],
             "references": [],
-            "collection": node.collection,
+            "collection": root_collection if node.request_path == "$" else node.collection,
         }
         if node.plugin is not None and node.plugin.kind == "source":
             spec["structural_class_id"] = type_info.class_id
@@ -8699,6 +8703,20 @@ def _prepare_object_node_specs(
                 )
             spec["construction_language"] = {"requested": node.language, "role": "voice-construction-context",
                 "mode": "new", "expected_sources": [], "version": version}
+        from .constructor_inputs import authority as constructor_authority, public_requirements
+        try:
+            constructor = constructor_authority(spec, version=version)
+        except ValueError as exc:
+            raise OperationContractError("CONSTRUCTOR_INPUT_AUTHORITY_INVALID", str(exc)) from exc
+        if constructor is not None:
+            for name in constructor["required_references"]:
+                if not any(field.name == name for field in node.references):
+                    raise OperationContractError("REQUIRED_CONSTRUCTOR_REFERENCE_MISSING",
+                        "Choose the required reference target before creating this owned List member.",
+                        details={"request_path": node.request_path, "reference": name,
+                            "required_inputs": public_requirements(constructor), "field_discovery": {"class_id": type_info.class_id,
+                                "meaning": name, "value": "verified_existing_object_handle"}, "mutation_dispatched": False})
+            spec["constructor_inputs"] = constructor
         metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
         property_info_by_name: dict[str, PropertyInfoMetadataRecord] = {}
         node_derived_properties: dict[str, Any] = {}
@@ -9479,7 +9497,17 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
             "evidence": {"expected": list(expected_classes.values()),
                 "actual": [row for row in actual_classes if row.get("classId") in
                     {expected.get("classId") for expected in expected_classes.values()}]}})
+    from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
+        try:
+            required = constructor_authority(node)
+            valid = constructor_complete(node)
+        except (ValueError, OSError, KeyError, TypeError):
+            required, valid = True, False
+        if required or "constructor_inputs" in node:
+            assertions.append({"name": "source-certified constructor inputs remain complete",
+                "passed": valid, "evidence": {"request_path": node.get("request_path"),
+                    "constructor_inputs": public_requirements(required)}})
         for evidence in node.get("new_object_default_evidence", []):
             scope = evidence["class_scope"]
             for field, expected in evidence["metadata"].items():
@@ -18817,6 +18845,7 @@ def _extract_plugin_result_binding(
     target_id: str,
     descriptor: PluginCreationDescriptor,
     placement: Mapping[str, Any],
+    version: str,
 ) -> dict[str, Any]:
     raw_associations = payload.get("objects")
     if not isinstance(raw_associations, list) or not all(
@@ -18880,16 +18909,18 @@ def _extract_plugin_result_binding(
         )
     expected_name = "" if expected_type == "EffectSlot" else descriptor.name
     result_name = created.get("name")
-    if result_name is not None and result_name != expected_name:
-        raise OperationContractError(
-            "PLUGIN_RESULT_NAME_MISMATCH",
-            "object.set returned a different created object name.",
-            details={
-                "expected": expected_name,
-                "actual": result_name,
-                "created": created,
-            },
-        )
+    if result_name is not None:
+        try:
+            if expected_type == "EffectSlot":
+                if result_name != expected_name:
+                    raise PluginOperationContractError("PLUGIN_NAME_MISMATCH", "EffectSlot must remain unnamed.")
+            else:
+                bind_plugin_name(descriptor, version=version, actual_name=result_name)
+        except PluginOperationContractError as exc:
+            raise OperationContractError("PLUGIN_RESULT_NAME_MISMATCH",
+                "object.set returned a different created object name.",
+                details={"expected": expected_name, "actual": result_name, "created": created,
+                         "name_binding": exc.as_dict()}) from exc
     return {
         "association": association,
         "created": created,
@@ -20334,6 +20365,11 @@ def verify_prepared_operation(
             "readback_fields",
             "readback_view",
         }
+        expected_name_policy = plugin_name_policy(descriptor, version=version)
+        if "space_substitution" in expected_name_policy:
+            base_plan_fields.add("name_binding")
+            if plan.get("name_binding") != expected_name_policy:
+                raise OperationContractError("INVALID_PREVIEW", "Plug-in name acceptance must match the immutable version and placement.")
         default_evidence = plan.get("new_object_default_evidence", [])
         if default_evidence:
             base_plan_fields.add("new_object_default_evidence")
@@ -20436,6 +20472,7 @@ def verify_prepared_operation(
                 target_id=target_id,
                 descriptor=descriptor,
                 placement=placement,
+                version=version,
             )
         except OperationContractError as exc:
             check(
@@ -20466,7 +20503,18 @@ def verify_prepared_operation(
                     if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
                         raise OperationContractError("INVALID_READBACK", "ShareSet child ownership is malformed.")
                     after.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
-                expected = [dict(row) for row in before] + [{"id": created_id, "name": descriptor.name, "type": descriptor.object_type, "parent": target_id}]
+                created_rows = [row for row in after if _same_identity(row["id"], created_id)]
+                if len(created_rows) != 1:
+                    raise OperationContractError("INVALID_READBACK", "Created ShareSet must occur exactly once in its complete parent roster.")
+                actual_name = created_rows[0]["name"]
+                try:
+                    bind_plugin_name(descriptor, version=version, actual_name=actual_name)
+                except PluginOperationContractError as exc:
+                    raise OperationContractError("PLUGIN_READBACK_MISMATCH", str(exc), details=exc.as_dict()) from exc
+                if result_binding["created"].get("name", actual_name) != actual_name:
+                    raise OperationContractError("PLUGIN_READBACK_MISMATCH", "Returned and independently observed ShareSet names disagree.")
+                result_binding["observed_name"] = actual_name
+                expected = [dict(row) for row in before] + [{"id": created_id, "name": actual_name, "type": descriptor.object_type, "parent": target_id}]
                 order = lambda row: row["id"].casefold()
                 preserved = sorted(after, key=order) == sorted(expected, key=order)
             except OperationContractError as exc:
@@ -20557,6 +20605,20 @@ def verify_prepared_operation(
         )
         if len(plugin_rows) != 1:
             return _verification(operation, assertions, readbacks)
+        actual_plugin_id = plugin_rows[0].get("id")
+        exact_plugin_id = (isinstance(actual_plugin_id, str)
+            and _PLUGIN_GUID.fullmatch(actual_plugin_id) is not None
+            and _same_identity(actual_plugin_id, plugin_id))
+        check("created plug-in exact readback retains its resolved GUID", exact_plugin_id,
+              {"expected_id": plugin_id, "actual_id": actual_plugin_id})
+        if not exact_plugin_id:
+            return _verification(operation, assertions, readbacks)
+        bound_name = result_binding.get("observed_name", result_binding["created"].get("name"))
+        if descriptor.placement == "shareset":
+            check("created ShareSet name agrees across native result and independent reads",
+                  bound_name is not None and plugin_rows[0].get("name") == bound_name,
+                  {"returned_name": result_binding["created"].get("name"), "roster_name": result_binding.get("observed_name"),
+                   "readback_name": plugin_rows[0].get("name")})
         if default_evidence:
             fields = _dedupe_fields(["id", *("@" + requirement["name"]
                 for item in default_evidence for requirement in item["requirements"])])

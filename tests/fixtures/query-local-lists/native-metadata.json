@@ -1,0 +1,698 @@
+{
+  "scope": "program-only native transport samples; new business projection not native-accepted here",
+  "versions": {
+    "2022.1": {
+      "metadata": {
+        "1441808": {
+          "Color": {
+            "audioEngineId": 4294967295,
+            "default": 0,
+            "dependencies": [
+              {
+                "action": "Enable",
+                "context": "Self",
+                "property": "OverrideColor",
+                "type": "override"
+              }
+            ],
+            "display": {
+              "group": "Common",
+              "index": 1330,
+              "name": "Color"
+            },
+            "name": "Color",
+            "restriction": {
+              "max": 26,
+              "min": 0,
+              "type": "range"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "int16",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0.0,
+                "max": 26.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "OverrideColor": {
+            "audioEngineId": 4294967295,
+            "default": false,
+            "dependencies": [
+              {
+                "action": "Enable",
+                "context": "Self",
+                "property": "OverrideColor",
+                "type": "override"
+              }
+            ],
+            "display": {
+              "group": "Common",
+              "index": 1329,
+              "name": "Override Color"
+            },
+            "name": "OverrideColor",
+            "restriction": {},
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "bool",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0.0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "PropertyName": {
+            "audioEngineId": 4294967295,
+            "default": "",
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 1860,
+              "name": "Property"
+            },
+            "name": "PropertyName",
+            "restriction": {},
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "string",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0.0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "ControlInput": {
+            "audioEngineId": 4294967295,
+            "default": null,
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 1861,
+              "name": "Control Input"
+            },
+            "name": "ControlInput",
+            "restriction": {
+              "restrictions": [
+                {
+                  "sharedOnlyTypes": [
+                    "Game Parameter",
+                    "MIDI Parameter"
+                  ],
+                  "type": [
+                    "Game Parameter",
+                    "MIDI Parameter",
+                    "Modulator LFO",
+                    "Modulator Envelope",
+                    "Modulator Time"
+                  ]
+                }
+              ],
+              "type": "reference"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0.0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "Curve": {
+            "audioEngineId": 4294967295,
+            "default": null,
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 1862,
+              "name": "Curve"
+            },
+            "name": "Curve",
+            "restriction": {
+              "restrictions": [
+                {
+                  "sharedOnlyTypes": [],
+                  "type": [
+                    "Curve"
+                  ]
+                },
+                "notNull"
+              ],
+              "type": "reference"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0.0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          }
+        }
+      },
+      "provenance": {
+        "1441808": {
+          "Color": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "9a068c5a2fdf73d9f3d3d62a78cca64748336f182087d92510957a9c42417485",
+            "cache_sha256": "00ce2082eae5306e4bad2d2528988b4027864048a5b55f6c292ff851988eb982"
+          },
+          "OverrideColor": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "448c3165424c3bed8ece46d476ecf629b2e717bf00e5a60ae421b2a36fb5ce0e",
+            "cache_sha256": "818905b53d091ff96b2b63cb5efeba90e23c611cc793203aa424d145923dab08"
+          },
+          "PropertyName": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "da00890d947510bf6a643afb98d973a8d191f6254e86b65cf251e341ecb12dc2",
+            "cache_sha256": "a2ae7e645b7e7705658058c030e31534877f507d36f3bf3b68e7e3d3dc3f769a"
+          },
+          "ControlInput": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "826c5ec57494183ddaf78d95087e138585df16697db3ffaf1c160127d36101ab",
+            "cache_sha256": "da63093e2c1b574c545e4a438859a649ff82748bc29be7af1e105a366aa65472"
+          },
+          "Curve": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "8305687806452add9c4363c67f9fb40d827229ba1a4647580a8785bad483d8d3",
+            "cache_sha256": "8c579137e4054b1b26ef43ea97c522a15de1db5b95c5656baaa86c674c62f6cf"
+          }
+        }
+      },
+      "metadata_inventory": "complete retained exact-object inventory; runtime still discovers fresh actual scopes"
+    },
+    "2025.1": {
+      "metadata": {
+        "1441808": {
+          "Color": {
+            "audioEngineId": 4294967295,
+            "default": 0,
+            "dependencies": [
+              {
+                "action": "Enable",
+                "context": "Self",
+                "property": "OverrideColor",
+                "type": "override"
+              }
+            ],
+            "display": {
+              "group": "",
+              "index": 1511,
+              "name": "Color"
+            },
+            "name": "Color",
+            "restriction": {
+              "max": 26,
+              "min": 0,
+              "type": "range"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "int16",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 26.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "OverrideColor": {
+            "audioEngineId": 4294967295,
+            "default": false,
+            "dependencies": [
+              {
+                "action": "Enable",
+                "context": "Self",
+                "property": "OverrideColor",
+                "type": "override"
+              }
+            ],
+            "display": {
+              "group": "",
+              "index": 1510,
+              "name": "Override Color"
+            },
+            "name": "OverrideColor",
+            "restriction": {},
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "bool",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "PropertyName": {
+            "audioEngineId": 4294967295,
+            "default": "",
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 2047,
+              "name": "Property"
+            },
+            "name": "PropertyName",
+            "restriction": {},
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "string",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "ControlInput": {
+            "audioEngineId": 4294967295,
+            "default": null,
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 2048,
+              "name": "Control Input"
+            },
+            "name": "ControlInput",
+            "restriction": {
+              "restrictions": [
+                {
+                  "sharedOnlyTypes": [
+                    "Game Parameter",
+                    "MIDI Parameter"
+                  ],
+                  "type": [
+                    "Game Parameter",
+                    "MIDI Parameter",
+                    "Modulator LFO",
+                    "Modulator Envelope",
+                    "Modulator Time"
+                  ]
+                }
+              ],
+              "type": "reference"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "Curve": {
+            "audioEngineId": 4294967295,
+            "default": null,
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 2049,
+              "name": "Curve"
+            },
+            "name": "Curve",
+            "restriction": {
+              "restrictions": [
+                {
+                  "sharedOnlyTypes": [],
+                  "type": [
+                    "Curve"
+                  ]
+                },
+                "notNull"
+              ],
+              "type": "reference"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          }
+        },
+        "5505040": {
+          "Bypass": {
+            "audioEngineId": 50,
+            "default": false,
+            "dependencies": [
+              {
+                "action": "Enable",
+                "conditions": [
+                  {
+                    "referenceIsSet": true
+                  }
+                ],
+                "context": "Self",
+                "property": "Effect",
+                "type": "reference"
+              }
+            ],
+            "display": {
+              "group": "",
+              "index": 2057,
+              "name": "Bypass"
+            },
+            "name": "Bypass",
+            "restriction": {},
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "bool",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "Effect": {
+            "audioEngineId": 4294967295,
+            "default": null,
+            "dependencies": [],
+            "display": {
+              "group": "",
+              "index": 2055,
+              "name": "Effect"
+            },
+            "name": "Effect",
+            "restriction": {
+              "restrictions": [
+                {
+                  "sharedOnlyTypes": [],
+                  "type": [
+                    "Effect"
+                  ]
+                }
+              ],
+              "type": "reference"
+            },
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          },
+          "Render": {
+            "audioEngineId": 4294967295,
+            "default": false,
+            "dependencies": [
+              {
+                "action": "Enable",
+                "conditions": [
+                  {
+                    "referenceIsSet": true
+                  }
+                ],
+                "context": "Self",
+                "property": "Effect",
+                "type": "reference"
+              }
+            ],
+            "display": {
+              "group": "",
+              "index": 2056,
+              "name": "Render"
+            },
+            "name": "Render",
+            "restriction": {},
+            "supports": {
+              "randomizer": false,
+              "rtpc": "None",
+              "unlink": false
+            },
+            "type": "bool",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "None",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false,
+                "percentage": false
+              },
+              "value": {
+                "decimals": 0,
+                "fine": 0.0,
+                "infinity": 0,
+                "max": 0.0,
+                "min": 0.0,
+                "step": 0.0
+              }
+            }
+          }
+        }
+      },
+      "provenance": {
+        "1441808": {
+          "Color": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "65e1d5d09be331edbc8fb5ee03ecd91d369b6a973dc23529cbea17cd74487504",
+            "cache_sha256": "e46bf744c1b8d6991abff2e06fa3e66af7bcbc5731353dbb923e3c7057395c23"
+          },
+          "OverrideColor": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "d655d25483507ab107bbfa6d6932b72fdb255d9cfc5f59dc80eca73717bbc23b",
+            "cache_sha256": "dab62f01a251025f2ac22e65131058919603aa425126de5c371b084f04cb79fb"
+          },
+          "PropertyName": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "d2ae65a67c8f5f2c9119d5ac383a398d064bcbd43e51ed2bf39e68919b25f3e1",
+            "cache_sha256": "e83ae56492c8aef925dbf2d6767db996acfe76136e709753646899b19e892430"
+          },
+          "ControlInput": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "27dde4e8ed7d41909501a33270d3ff9161efa6fcb6c291b81441b4a5035e744c",
+            "cache_sha256": "3f4291d9137b5a978957c715992b49a46dd2553ecf2e7946a83f9300d389ddd9"
+          },
+          "Curve": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "scope_object": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+            "packet_sha256": "d9ea3e6e84536d7ec322698844220f9a3a53b5f01509a7ba7db9c43be4ea7944",
+            "cache_sha256": "02abaa82af06df2757bb6d086102f747e89f42f41649cebbb793d1342480010b"
+          }
+        },
+        "5505040": {
+          "Bypass": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "packet_sha256": "d27f4bead6c7ed1df79e13ccfcda3fae502cd3aa413e992449bcc3747f453618"
+          },
+          "Effect": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "packet_sha256": "8ecd40bbeb69c04482cbd9fa270ab43eb2088fac4b01ef25cc94046b0d63619f"
+          },
+          "Render": {
+            "api": "ak.wwise.core.object.getPropertyInfo",
+            "packet_sha256": "4c0ef884c461b834404825a3203be8ce7bd529e7c67002ce80917e1c19fb788c"
+          }
+        }
+      },
+      "metadata_inventory": "complete retained exact-object inventory; runtime still discovers fresh actual scopes"
+    }
+  },
+  "slot_boolean_sample": {
+    "Bypass": false,
+    "Render": false,
+    "packet_sha256": "ace2cd161588014f2cb32b264ca3bd2f8c618eda8f3bd542d0b7588bcda67933",
+    "scope": "retained owned Gain slot; fake transport sample only, no selected RoomVerb default claim"
+  }
+}

@@ -99,6 +99,31 @@ infer constructor requirements: ordinary Sound creation may inherit OutputBus.
 The failed empty-slot witness, stronger List history and richer creation
 branches are not accepted as complete. No Fresh or broad gate was added.
 
+Reviewed successor `3971b13e` implements that exact constructor guard and keeps
+required references inline through staged creation and verification. Fifteen
+affected controls passed in 19.47s; the complete corrected collector passed
+three checks in 5.09s. Independent review found a public-output issue: the
+missing-input details exposed internal campaign provenance. The correction
+keeps that provenance sealed internally and projects only the business input
+requirements. Its two public regressions failed before the fix, then passed in
+2.31s; correction review found no further issue. Counts overlap; the successful
+collector was not repeated for this output-only correction.
+
+The fresh macOS Console2025.1.7.9143 attempt at `3971b13e` failed in 12.17s
+during the separately previewed Metadata ShareSet setup. Wwise acknowledged its
+one SET, returning `R84_System_Output_Settings` for the requested
+`R84 System Output Settings`. The plugin verifier rejected the actual name with
+`PLUGIN_RESULT_NAME_MISMATCH` before independent object readbacks. Transaction
+`tx1-c8e88z2bratefbmpw6tk` is **verification_failed**, not indeterminate or
+business-verified. The original Bus/Sound/slot source Draft never started.
+Nineteen public commands, nine independent reads and 27 hashed packets are
+retained in `r84-named-list-3971b13e-2025-r3/root-review.json`; source integrity
+and process cleanup passed, and the failed sandbox is quarantined. The original
+transaction was not replayed. This adds a concrete plugin name-normalization/
+result-binding gap under #179; changing only the fixture name would not resolve
+it. Matching-source diagnosis and a closed repair are required before another
+attempt. No Metadata setup or named-List native success is claimed.
+
 ## 2026-10-23 R84 related property outputs and existing EQ witness
 
 Reviewed `6e0aa118` extends existing related scalar-property terminals to fresh

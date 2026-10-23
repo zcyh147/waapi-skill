@@ -225,6 +225,31 @@ class PluginCreationDescriptor:
         return result
 
 
+def plugin_name_policy(descriptor: PluginCreationDescriptor, *, version: str) -> dict[str, Any]:
+    """Closed name acceptance, independent of conflict-rename selection.
+
+    The 2025 Metadata ShareSet relation is grounded in the retained R84 r3
+    native SET acknowledgement. It is not a general Wwise sanitizer or a
+    promise that native creation always substitutes spaces.
+    """
+    policy: dict[str, Any] = {"requested_name": descriptor.name, "accepted_names": [descriptor.name]}
+    if version == "2025.1" and descriptor.kind == "metadata" and descriptor.placement == "shareset":
+        adjusted = descriptor.name.replace(" ", "_")
+        if adjusted != descriptor.name:
+            policy["accepted_names"].append(adjusted)
+        policy["space_substitution"] = "ASCII spaces may be returned as underscores; other characters are preserved."
+    return policy
+
+
+def bind_plugin_name(descriptor: PluginCreationDescriptor, *, version: str, actual_name: Any) -> dict[str, Any]:
+    policy = plugin_name_policy(descriptor, version=version)
+    if not isinstance(actual_name, str) or actual_name not in policy["accepted_names"]:
+        raise PluginOperationContractError("PLUGIN_NAME_MISMATCH",
+            "Created plug-in name does not match the requested spelling or its disclosed native relation.",
+            details={**policy, "actual_name": actual_name})
+    return {**policy, "actual_name": actual_name}
+
+
 @dataclass(frozen=True, slots=True)
 class PluginCreationPlan:
     """One dispatch-ready create/append-only object.set plan."""
@@ -268,11 +293,13 @@ class PluginVerificationEvidence:
     readback_view: Mapping[str, Any]
     requested_state: Mapping[str, Any]
     placement: Mapping[str, Any]
+    name_binding: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.plugin_id,
             "name": self.name,
+            **({"name_binding": _json_copy(self.name_binding)} if self.name_binding is not None else {}),
             "type": self.type,
             "classId": self.class_id,
             "parent": self.parent_id,
@@ -672,7 +699,9 @@ def build_plugin_creation_plan(
         expected_plugin["notes"] = descriptor.notes
     if descriptor.language is not None:
         expected_plugin["language"] = descriptor.language
+    name_policy = plugin_name_policy(descriptor, version=version)
     verification = {
+        **({"name_binding": name_policy} if "space_substitution" in name_policy else {}),
         "readback_fields": list(plugin_verification_fields(descriptor)),
         "readback_view": {
             "language": descriptor.language,
@@ -868,9 +897,14 @@ def verify_created_plugin_row(
     if shareset:
         expected.pop("owner")
         actual.pop("owner")
+    try:
+        name_binding = bind_plugin_name(descriptor, version=version, actual_name=actual["name"])
+    except PluginOperationContractError as exc:
+        raise PluginOperationContractError("PLUGIN_READBACK_MISMATCH",
+            "Created plug-in name/type/classId/parent/owner did not match the immutable plan.",
+            details={"expected": expected, "actual": actual, "name_binding": exc.as_dict()}) from exc
     matches = (
-        actual["name"] == expected["name"]
-        and actual["type"] == expected["type"]
+        actual["type"] == expected["type"]
         and type(actual["classId"]) is int
         and actual["classId"] == expected["classId"]
         and _same_guid(parent_id, expected_parent_id)
@@ -891,7 +925,8 @@ def verify_created_plugin_row(
     )
     return PluginVerificationEvidence(
         plugin_id=plugin_id,
-        name=descriptor.name,
+        name=name_binding["actual_name"],
+        name_binding=name_binding if "space_substitution" in name_binding else None,
         type=descriptor.object_type,
         class_id=descriptor.class_id,
         parent_id=parent_id,
