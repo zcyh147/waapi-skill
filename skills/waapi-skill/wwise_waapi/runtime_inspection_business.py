@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
+from .builders.query import STRUCTURED_GUID_PATTERN
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import business_repair
 from .host_paths import HostPathError, parse_absolute_host_path, parse_relative_host_path
@@ -374,6 +375,35 @@ def materialize_runtime_inspection_business_request(
     )
 
 
+def _validate_rtpc_rows(rows: list[Mapping[str, Any]]) -> None:
+    """Check present scalar domains shared by the five pinned RTPC schemas.
+
+    GUID and gameObject definitions agree across 2021.1–2025.1. The existing
+    reflected-result validator owns versioned field presence and finite value
+    checks. Legacy uniqueName's pattern excludes real native MIDI names, so
+    only its string type is enforced here; names are never rewritten.
+    """
+    for index, row in enumerate(rows):
+        if "id" in row and (
+            not isinstance(row["id"], str)
+            or re.fullmatch(STRUCTURED_GUID_PATTERN, row["id"]) is None
+        ):
+            raise RuntimeInspectionBusinessError(
+                f"RTPC result return[{index}].id must be a braced GUID string"
+            )
+        if "gameObjectId" in row and (
+            type(row["gameObjectId"]) is not int
+            or not 0 <= row["gameObjectId"] <= 0xFFFFFFFFFFFFFFFF
+        ):
+            raise RuntimeInspectionBusinessError(
+                f"RTPC result return[{index}].gameObjectId must be an unsigned 64-bit integer"
+            )
+        if "name" in row and not isinstance(row["name"], str):
+            raise RuntimeInspectionBusinessError(
+                f"RTPC result return[{index}].name must be a string"
+            )
+
+
 def normalize_runtime_inspection_result(
     operation: str,
     result: Any,
@@ -418,6 +448,8 @@ def normalize_runtime_inspection_result(
         raise RuntimeInspectionBusinessError(
             f"runtime inspection result must contain a {source_field} array"
         )
+    if operation == "ak.wwise.core.profiler.getRTPCs":
+        _validate_rtpc_rows(rows)
     selected = [dict(item) for item in rows[-max_results:]]
     if business_request.get("result_view") != "diagnostics":
         field = "busPipelineID" if operation == PROFILER_GET_AUDIO_OBJECTS_URI else "pipelineID"
