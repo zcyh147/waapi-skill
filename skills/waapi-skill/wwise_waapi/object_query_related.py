@@ -310,7 +310,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "field_value_source_evidence": reference_value_source_contract(version)["source"],
             "reference_hops": {"reference MEANING": "override-resolved singleton reference", "local-reference MEANING": "directly stored singleton reference"},
             "path_result": "one-hop keys retained; further contexts under related; reference contexts under related.references.<discovered token> or related.local_references.<discovered token>",
-            "field_token_boundary": "only freshly discovered single identifier tokens compose; unexpressible tokens are an interface boundary, not native absence",
+            "field_token_boundary": "freshly discovered ASCII alphanumeric/underscore tokens; property terminals additionally admit one namespace:property token with ASCII alphanumeric/underscore components for ordinary/override-source-value modes; reference terminals and hops retain single identifiers; unexpressible tokens are an interface boundary, not native absence",
             "metadata_scope": "actual endpoint classId or canonical GUID only; complete no-match scopes can report unavailable_field_requests when another actual scope binds; empty roots or absent contexts establish no metadata authority",
             "applicability": "ordinary, broad and bounded advanced reads retain root membership, ordered identities and prefix scope facts through preparation/final read/paging; no mutation authority",
             "native_limits": {"return_expressions_including_helpers": MAX_ADVANCED_RETURN_EXPRESSIONS, "each_expression_utf8_bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES},

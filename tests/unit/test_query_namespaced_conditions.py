@@ -134,10 +134,10 @@ def test_namespaced_conditions_refresh_metadata_on_each_invocation(tmp_path, ver
 
 
 @pytest.mark.parametrize('version', VERSIONS)
-def test_namespaced_condition_scope_does_not_grant_custom_output_authority(tmp_path, version):
+def test_namespaced_condition_scope_does_not_grant_local_reference_output_authority(tmp_path, version):
     task = NamespacedTask(tmp_path, version)
     code, result = task.run('query-object', '--kind', 'all-sounds', '--max-results', '2',
-        '--include-related-field', 'children', 'matching-field', 'ordinary', 'Status', 'is', '0', 'Status')
+        '--include-related-local-reference', 'children', 'matching-field', 'ordinary', 'Status', 'is', '0', 'Status')
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_FIELD_TOKEN', result
 
 
@@ -154,7 +154,8 @@ def test_schema_separates_namespaced_where_sources_from_existing_return_grammar(
     assert contract['source']['version'] == version and contract['source']['domain'] == 'query-property-predicates'
     assert contract['source']['native_component']['version'] == '2025.1'
     assert contract['source']['native_component']['custom_return_proof'] is False
-    assert contract['custom_output_token_grammar_changed'] is False
+    assert contract['related_property_output_modes'] == ['ordinary', 'override-source-value']
+    assert 'property terminals' in result['related_outputs']['field_token_boundary']
     assert contract['predicate_value_readback_required'] is True
     source = contract['source']
     definitions = Path(__file__).parents[2] / 'skills/waapi-skill/resources/manifest' / version / 'definitions.json'

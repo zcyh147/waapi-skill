@@ -422,7 +422,7 @@ def field_condition_contract(version, *, maximum_conditions):
         'field_token_boundary':'metadata-selected ASCII alphanumeric/underscore tokens; ordinary/override scalar conditions additionally admit one namespace:property token, each component ASCII alphanumeric/underscore; no caller accessor grammar',
         'namespaced_properties':{'modes':['ordinary','override-source-value'],
             'token_pattern':'[A-Za-z0-9_]+:[A-Za-z0-9_]+','source':namespaced_source,
-            'custom_output_token_grammar_changed':False,'reference_token_grammar_changed':False,
+            'related_property_output_modes':['ordinary','override-source-value'],'reference_token_grammar_changed':False,
             'predicate_value_readback_required':True,
             'native_boundary':'live typed predicate-value RETURN/readbacks remain mandatory before and after selection; absent or incompatible values stop the query'},
         'authority':'complete actual source/member class or GUID live metadata; unknown is not false or zero',
