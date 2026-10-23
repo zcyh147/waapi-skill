@@ -57,6 +57,23 @@ packets, three public invocations, zero transactions, unchanged source hashes/
 mtime/tree, clean process teardown and a quarantined sandbox. The2021 attempt
 was deferred pending a test-only correction; the failed root is not reused.
 
+The test-only correction `aa82ea1e` uses compact business replies and a passive
+capture of actual Gateway dispatch inputs, linked to the unchanged original
+native packets. Complete returned continuations execute verbatim. On frozen
+`d4183c6a6942f38cf07d9ab4f66fec928cc46b2a`, the same five-group read-only workflow
+passed2025.1 in6.02s and2021.1 in9.37s. Each made five public queries, captured119
+native packets and created zero transactions. Independent child order/values,
+actual Pitch metadata, related matching/count/empty-root preservation and complete
+root scope before native WHERE/final take1 all passed. All packet hashes and
+actual dispatch associations, source integrity and cleanup were checked; passing
+sandboxes were deleted by the existing lifecycle. See
+`r77-query-fields-native-review-2021-2025.json` and each original root review.
+
+The2022–2024 native matrix was not repeated for this shared predicate mechanism;
+matching source and program checks still cover all five versions. The two real
+runs do not establish every scalar kind, heterogeneous predicate, reference mode
+or record/function variant. Original2025 fixture FAIL remains unchanged.
+
 No Fresh, Windows native, full Program or full Non-live gate ran for this
 increment. The PR remains draft and all affected functional tickets stay open.
 
