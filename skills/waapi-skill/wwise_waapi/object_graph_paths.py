@@ -326,7 +326,8 @@ def compound_phase_arguments(calls, index, context):
     child = calls[index].get('prepared_operation', {})
     original = child.get('dispatch', {}).get('args', calls[index].get('args', {}))
     args = deepcopy(original)
-    if not context or child.get('verification_plan', {}).get('kind') != 'object-create-graph':
+    if (not context or child.get('verification_plan', {}).get('kind') != 'object-create-graph'
+            or child.get('pre_state', {}).get('owned_result_stages')):
         return args
     from .creation_observations import ordinary_creation_graph
     plan = child['verification_plan']
@@ -365,7 +366,7 @@ def compound_created_child_roots(calls, phases):
         plan = child.get('verification_plan', {})
         if child.get('pre_state', {}).get('owned_result_stages'):
             from .owned_result_stages import validate as validate_owned_stages
-            from .creation_observations import ordinary_set_creation_graphs
+            from .creation_observations import ordinary_staged_creation_graphs
             phase = phases[index + 1]
             if phase.get('phase') != 'inner' or type(phase.get('index')) is not int or phase['index'] != index:
                 raise ValueError('Staged created root lacks its actual indexed parent-owned phase')
@@ -373,7 +374,7 @@ def compound_created_child_roots(calls, phases):
             if result.get('ok') is not True:
                 raise ValueError('Staged created root lacks successful actual native acknowledgements')
             actual = validate_owned_stages(child, result, context={'edits': compound_rename_edits(calls[:index])})
-            for group in ordinary_set_creation_graphs(plan, child['pre_state']):
+            for group in ordinary_staged_creation_graphs(plan, child['pre_state']):
                 roots.append({'child_index': index, 'request_path': group['root'],
                     'parent_id': group['parent_id'].upper(), 'object_id': actual[group['root']]['id'].upper()})
             continue
