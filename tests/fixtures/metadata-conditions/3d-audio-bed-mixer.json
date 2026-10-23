@@ -1,6 +1,6 @@
 {
   "contract": "waapi-skill.recorded-plugin-condition-facts/v1",
-  "evidence_scope": "class-scoped read-only metadata; existing-object instances and native effects unverified",
+  "evidence_scope": "Native class-scoped read-only metadata for2022/25; explicitly labeled installed-definition models for2023/24; existing instances and native effects unverified.",
   "versions": {
     "2022.1": {
       "build": "2022.1.19.8584",
@@ -156,6 +156,166 @@
             "sha256": "f6fd2ec3958737e866c6c255afd4c28f9dffb433c1a70484de78c964715f780a"
           }
         }
+      }
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "class": {
+        "classId": 12451843,
+        "name": "Wwise 3D Audio Bed Mixer",
+        "type": "Effect"
+      },
+      "fields": {
+        "SystemAudioObjectLimit": {
+          "metadata": {
+            "name": "SystemAudioObjectLimit",
+            "type": "Uint16",
+            "restriction": {
+              "type": "range",
+              "min": 0,
+              "max": 512
+            },
+            "dependencies": [
+              {
+                "type": "property",
+                "action": "Enable",
+                "property": "SystemAudioObjectsPolicy",
+                "context": "Self",
+                "conditions": [
+                  {
+                    "restriction": {
+                      "type": "enum",
+                      "values": [
+                        {
+                          "value": 0,
+                          "displayName": "0"
+                        },
+                        {
+                          "value": 1,
+                          "displayName": "1"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "SystemAudioObjectsPolicy": {
+          "metadata": {
+            "name": "SystemAudioObjectsPolicy",
+            "type": "Uint16",
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "value": 0,
+                  "displayName": "When Audio Device supports it"
+                },
+                {
+                  "value": 1,
+                  "displayName": "Always"
+                },
+                {
+                  "value": 2,
+                  "displayName": "Never"
+                }
+              ]
+            },
+            "dependencies": []
+          }
+        }
+      },
+      "evidence_scope": "Installed-definition model only, not native metadata or effect evidence.",
+      "source": {
+        "file": "Ak3DAudioBedMixer.xml",
+        "sha256": "3c140d3d768f2e4e1a94d4ff5fea3deec9ca0cadc906d97222168336755f674d",
+        "field_lines": {
+          "SystemAudioObjectsPolicy": 52,
+          "SystemAudioObjectLimit": 65
+        },
+        "dependency_line": 77
+      }
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "class": {
+        "classId": 12451843,
+        "name": "Wwise 3D Audio Bed Mixer",
+        "type": "Effect"
+      },
+      "fields": {
+        "SystemAudioObjectLimit": {
+          "metadata": {
+            "name": "SystemAudioObjectLimit",
+            "type": "Uint16",
+            "restriction": {
+              "type": "range",
+              "min": 0,
+              "max": 512
+            },
+            "dependencies": [
+              {
+                "type": "property",
+                "action": "Enable",
+                "property": "SystemAudioObjectsPolicy",
+                "context": "Self",
+                "conditions": [
+                  {
+                    "restriction": {
+                      "type": "enum",
+                      "values": [
+                        {
+                          "value": 0,
+                          "displayName": "0"
+                        },
+                        {
+                          "value": 1,
+                          "displayName": "1"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "SystemAudioObjectsPolicy": {
+          "metadata": {
+            "name": "SystemAudioObjectsPolicy",
+            "type": "Uint16",
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "value": 0,
+                  "displayName": "When Audio Device supports it"
+                },
+                {
+                  "value": 1,
+                  "displayName": "Always"
+                },
+                {
+                  "value": 2,
+                  "displayName": "Never"
+                }
+              ]
+            },
+            "dependencies": []
+          }
+        }
+      },
+      "evidence_scope": "Installed-definition model only, not native metadata or effect evidence.",
+      "source": {
+        "file": "Ak3DAudioBedMixer.xml",
+        "sha256": "3c140d3d768f2e4e1a94d4ff5fea3deec9ca0cadc906d97222168336755f674d",
+        "field_lines": {
+          "SystemAudioObjectsPolicy": 52,
+          "SystemAudioObjectLimit": 65
+        },
+        "dependency_line": 77
       }
     }
   }
