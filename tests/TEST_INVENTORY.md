@@ -5,6 +5,43 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R98 Console log and R99 Authoring startup observations
+
+Three separate Mac Console runs on candidate
+`263624cc0b2162e117524096168c0e935f720722` retain these exact results:
+
+| Build | Raw node result | Observed addition outcome |
+| --- | --- | --- |
+| 2023.1.19.8928 | FAIL, 13.25s | Acknowledged subscription ID `0`; zero decoded EVENT messages/callback entries during the five-second bound; addition acknowledged, schema-only verification. |
+| 2024.1.13.9056 | FAIL, 18.27s | Acknowledged subscription and addition; zero observed events, schema-only verification. |
+| 2025.1.7.9143 | PASS, 8.65s | Exact unique General/Message event persisted at execution and reused by later verification; transaction verified. |
+
+All three observers unsubscribed. All three Console `log.get` snapshots were
+empty, including the successful event case; empty snapshots do not establish
+whether addition occurred. Timeouts prove neither native Topic absence nor a
+callback defect. Source hash/mtime/tree and process/port cleanup were checked;
+failed sandboxes remain quarantined. Evidence roots below
+`.waapi-skill-state/full-coverage/` are
+`r98-console-log-diagnostic-native-2023-r2`,
+`r98-console-log-native-2024-r1`, and `r98-console-log-native-2025-r1`, each
+with `root-review.json`. Required unresolved observations remain under #186;
+original failures and transactions are not replayed or regraded.
+
+Candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` then launched owned
+Authoring 2021.1.14.8108 with the documented `-AutomationMode` argument and
+reached WAAPI readiness in 28.79s. The transport node failed in 32.85s before
+any transport case or transaction: the Gateway rejected the successful native
+Platform result `name: Mac, path: Mac` as a hierarchy path. This is a query
+validation failure, not a transport-effect result. Source hash/mtime and sealed
+quarantine tree were checked, process cleanup completed without residuals, and
+port 8080 was released. The retained root is
+`.waapi-skill-state/full-coverage/r99-transport-older-native-2021-r1`, with
+`root-review.json`; all eight transport cases remain unproved by this attempt.
+
+These are targeted, different-candidate Mac observations, not native Windows,
+Fresh, broad Program/Non-live, or whole-#186 acceptance. Existing 2025
+Authoring add/clear evidence remains reusable at its original candidate.
+
 ## 2026-10-23 R98 remaining signed cursor observation
 
 Exact candidate `8a582235fbbb1718da17450da9f05cd551d98d02` ran only the
