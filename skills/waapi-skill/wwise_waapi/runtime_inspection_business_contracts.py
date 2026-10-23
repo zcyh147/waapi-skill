@@ -743,6 +743,18 @@ def runtime_inspection_business_contract_data(
                 if name in exposed_fields
             } | (meter_contract['fields'] if meter_contract else {}),
             **({'meter_object_projection':meter_contract} if meter_contract else {}),
+            **({"verification": {
+                "observer": LOG_GET_URI,
+                "maximum_channel_items": 1000,
+                "maximum_channel_bytes": 64 * 1024,
+                "prestate": "complete selected channel at Preview, revalidated before execution; drift requires a new Preview",
+                "row_identity": "none; messageId and time are not treated as unique or ordered",
+                "add_effect": "matching message/severity multiplicity increases from prestate",
+                "clear_effect": "prior complete row contents absent at one observation; new messages can remain",
+                "unresolved": "oversized, unchanged matching multiplicity, indistinguishable prior rows, or unavailable readback never prove effect",
+                "console_effect": "unverified by this getter; Topic delivery is not established here",
+                "concurrency": "no exclusive causation, atomic clear, permanent emptiness or unrelated-channel observation claim",
+            }} if operation in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} else {}),
             **({"field_semantics": {
                 "notification_port": {
                     "native_effect": "paired_notification_port" if version == "2021.1" else "unused",
