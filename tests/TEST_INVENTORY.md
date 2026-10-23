@@ -39,13 +39,26 @@ selected no rows. The implementation preserves that native inequality outcome,
 not a Python complement. Source hash/mtime/tree and cleanup passed. Evidence root
 `r81-reference-query-eb02a239-2025-r1` includes the original final-v3 record and
 Root review. Existing all-five projection/program evidence remains separately
-attributed; the minimal oldest-backend predicate follow-up is being assessed.
+attributed.
+
+The reduced oldest-backend successor `e3abcbfa165906dda6b7ac3812b83d078a422c1c`
+passed macOS Console2021.1.14.8108 in9.25s. One lifecycle covered four core groups
+plus three separately observed unassigned-reference predicates: seven public
+queries,73 hashed native packets and zero transactions. Matching2021 observations
+establish a present zero-GUID UserAuxSend0 value, null selecting the Sound, and
+setness/identity inequality selecting no rows; these facts were observed afresh,
+not inferred from2025. Source/cleanup passed. The original2025 native run was not
+repeated for this test-only variant. Aggregate evidence is
+`r81-reference-query-native-review-2021-2025.json`; exact roots retain original
+candidates and final-v3 records. Five-version primary semantics/program controls
+and earlier matching-host projection/ordinary-condition evidence support shared
+mechanism reuse; no intermediate-version native matrix was added.
 
 No Fresh or full gate ran. Collision-specific and exact namespaced custom-property
 WHERE token facts remain #181 work; the disclosed current token boundary is not
 native absence. Other query records, reference chains, functions and legacy
-alternatives remain assigned to the same ticket. This is2025 selected predicate
-evidence, not every-version native query coverage.
+alternatives remain assigned to the same ticket. These are selected2021/2025 predicate
+observations, not every-version native query coverage.
 
 ## 2026-10-23 R80 owned Action history and multiple-root creation
 
