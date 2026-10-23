@@ -12,7 +12,7 @@ VERSIONS = ('2023.1', '2024.1', '2025.1')
 MARKER = '{99999999-9999-9999-9999-999999999999}'
 
 
-def marker_task(path, version='2025.1', *, fault=None):
+def marker_task(path, version='2025.1', *, fault=None, omit_empty_markers=False):
     task = OwnedGraphTask(path, version, 'object.set')
     base = r'\Containers' if version == '2025.1' else r'\Actor-Mixer Hierarchy'
     task.types = [{'name': kind, 'classId': cid, 'type': 'WObject'} for kind, cid in
@@ -70,7 +70,12 @@ def marker_task(path, version='2025.1', *, fault=None):
             elif fault == 'mode': task.objects[FIRST]['@MarkerInputMode'] = 0
             elif fault == 'source-notes': task.objects[FIRST]['notes'] = 'Changed'
             return {'objects': [{'id': FIRST, 'name': task.objects[FIRST]['name'], '@Markers': [{'id': MARKER, 'name': ''}]}]}
-        return original(uri, args, options)
+        result = original(uri, args, options)
+        if omit_empty_markers and uri.endswith('object.get'):
+            for row in result.get('return', []):
+                if row.get('@Markers') == []:
+                    row.pop('@Markers')
+        return result
     task.call = native
     return task
 
@@ -277,3 +282,68 @@ def test_retained_marker_binding_revalidates_actual_guid_and_complete_fresh_pref
         task.objects[FIRST]['@Markers'].append({'id': CHILD})
     code, result = task.step('draft-check')
     assert code == 2 and task.writes == [], result
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_omitted_empty_marker_projection_uses_fresh_source_bound_proof_through_public_transaction(tmp_path, version):
+    task = marker_task(tmp_path, version, omit_empty_markers=True)
+    code, result = declare_marker(task); assert code == 0, result
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(task.writes) == 1 and task.objects[FIRST]['@Markers'] == [{'id': MARKER}]
+    proofs = [args for uri, args, options in task.calls if uri.endswith('object.get')
+        and args == {'waql': f'from object "{FIRST}" select @Markers take 1'} and options == {'return': ['id']}]
+    assert len(proofs) >= 3, 'Preparation and execution must independently prove the still-empty List'
+
+
+@pytest.mark.parametrize('fault', ['hidden-member', 'malformed-proof', 'extra-proof-field', 'native-error', 'owner-extra-field', 'owner-type', 'owner-class'])
+def test_omitted_marker_projection_is_not_empty_without_exact_source_and_independent_read(tmp_path, fault):
+    task = marker_task(tmp_path, omit_empty_markers=True)
+    code, result = declare_marker(task); assert code == 0, result
+    if fault == 'hidden-member':
+        task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'Marker', 'classId': 5373968,
+            'path': r'\hidden-marker', 'owner': {'id': FIRST}, '@Time': 0.02, '@Label': 'Retain'}
+        task.objects[FIRST]['@Markers'] = [{'id': CHILD}]
+    elif fault == 'owner-type': task.objects[FIRST]['type'] = 'Sound'
+    elif fault == 'owner-class': task.objects[FIRST]['classId'] = 65552
+    original = task.call
+    def native(uri, args=None, options=None):
+        if uri.endswith('object.get') and args == {'waql': f'from object "{FIRST}" select @Markers take 1'}:
+            if fault == 'malformed-proof': return {'return': None}
+            if fault == 'extra-proof-field': return {'return': [], 'extra': True}
+            if fault == 'native-error': raise RuntimeError('independent empty proof failed')
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and options == {'return': ['id', '@Markers']}:
+            for row in result['return']:
+                row.pop('@Markers', None)
+                if fault == 'owner-extra-field': row['unexpected'] = True
+        return result
+    task.call = native
+    code, rejected = task.step('draft-check')
+    assert code == 2 and task.writes == [], rejected
+
+
+@pytest.mark.parametrize('stage', ['execute', 'verify'])
+def test_omitted_marker_projection_is_rechecked_at_prewrite_and_verification_without_reexecution(tmp_path, stage):
+    task = marker_task(tmp_path, omit_empty_markers=True)
+    code, result = declare_marker(task); assert code == 0, result
+    tx, shown = task.preview()
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
+    if stage == 'verify':
+        code, result = task.run('execute', tx); assert code == 0 and len(task.writes) == 1, result
+    task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'Marker', 'classId': 5373968,
+        'path': r'\late-marker', 'owner': {'id': FIRST}, '@Time': 0.02, '@Label': 'Late member'}
+    task.objects[FIRST]['@Markers'].append({'id': CHILD})
+    original = task.call
+    def native(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and options == {'return': ['id', '@Markers']}:
+            for row in result['return']: row.pop('@Markers', None)
+        return result
+    task.call = native
+    code, rejected = task.run(stage, tx)
+    count = 1 if stage == 'verify' else 0
+    assert code == 2 and len(task.writes) == count, rejected
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == count, rejected
