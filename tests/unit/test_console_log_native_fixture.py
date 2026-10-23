@@ -110,10 +110,11 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
 
 
 @pytest.mark.parametrize('scenario', ('matched', 'native-error', 'missing'))
-def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks(tmp_path, monkeypatch, scenario):
+def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks(tmp_path, monkeypatch, scenario, subscription_id=42):
+    import asyncio
     from autobahn.asyncio.wamp import ApplicationSession
-    from autobahn.wamp.message import Event
-    from autobahn.wamp.request import Handler, Subscription
+    from autobahn.wamp.message import Event, Subscribed
+    from autobahn.wamp.request import Handler, SubscribeRequest
     from waapi.client.event import EventHandler
     import sys
 
@@ -131,9 +132,16 @@ def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks
             self.order.append('subscribed')
             self.original_callback = callback
             self.handler = EventHandler(self, callback)
-            subscription = Subscription(42, uri, self.session, Handler(self.handler.on_event))
-            self.handler.subscription = subscription
-            self.session._subscriptions[42] = [subscription]
+            # External WAMP acknowledgment follows the pinned parser and actual
+            # session's SUBSCRIBED dispatch, including its valid zero-ID edge.
+            loop = asyncio.new_event_loop()
+            try:
+                replied = loop.create_future()
+                self.session._subscribe_reqs[1] = SubscribeRequest(1, uri, replied, Handler(self.handler.on_event))
+                self.session.onMessage(Subscribed.parse([Subscribed.MESSAGE_TYPE, 1, subscription_id]))
+                self.handler.subscription = replied.result()
+            finally:
+                loop.close()
             return self.handler
 
         def unsubscribe(self, handler):
@@ -150,7 +158,7 @@ def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks
                 raise RuntimeError('external add failed without an EVENT')
             if scenario == 'missing':
                 return {}
-            self.session.onMessage(Event(42, 99, kwargs={'channel': args['channel'],
+            self.session.onMessage(Event(subscription_id, 99, kwargs={'channel': args['channel'],
                 'item': {'message': args['message'], 'severity': args['severity'], 'time': 1720000000, 'messageId': 'Custom'}}))
             return {}
 
@@ -164,7 +172,7 @@ def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks
     receipt = json.loads((tmp_path / 'state/console-log-addition-observer.json').read_text())
     diagnostic = receipt['delivery_diagnostic']
     assert diagnostic['contract'] == 'waapi-skill.console-log-decoded-event-diagnostic/v1'
-    assert diagnostic['subscription_id'] == 42 and diagnostic['installed'] is True
+    assert diagnostic['subscription_id'] == subscription_id and diagnostic['installed'] is True
     expected = 1 if scenario == 'matched' else 0
     assert diagnostic['decoded_events'] == diagnostic['callback_entries'] == expected
     assert diagnostic['restored'] is True
@@ -173,6 +181,12 @@ def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks
     assert 'onMessage' not in vars(client.session)
     assert 'subscribe' not in vars(client)
     assert client.handler._callback is client.original_callback
+
+
+@pytest.mark.parametrize('scenario', ('matched', 'missing', 'native-error'))
+def test_zero_subscription_ack_diagnostic_reaches_final_writer(tmp_path, monkeypatch, scenario):
+    test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks(
+        tmp_path, monkeypatch, scenario, subscription_id=0)
 
 
 @pytest.mark.parametrize('boundary', ('message', 'callback', 'body'))
