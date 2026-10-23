@@ -32482,6 +32482,15 @@ def transaction_show_summary(
         derived_notice['optional_none_state_materialization'] = notice
 
     plugin_verification_plan = prepared.get("verification_plan")
+    inner_nodes = ([node for node in plugin_verification_plan.get("nodes", []) if node.get("inner_identity") and not node.get("preexisting_id")]
+        if isinstance(plugin_verification_plan, Mapping) else [])
+    if inner_nodes:
+        derived_notice["owned_inner_naming"] = {"occurrence_count": len(inner_nodes),
+            "class_name": "MetadataSlot", "collection": "Metadata",
+            "declaration_name_role": "label", "native_name": "",
+            "identity": "actual_GUID_exact_class_owner_and_ordered_List",
+            "notice": "The supplied name labels the declaration; Wwise returns an unnamed owned member."}
+
     plugin_name_binding = (plugin_verification_plan.get("name_binding")
         if isinstance(plugin_verification_plan, Mapping) else None)
     if isinstance(plugin_name_binding, Mapping):

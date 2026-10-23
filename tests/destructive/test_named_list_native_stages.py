@@ -303,7 +303,12 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         for role, handle in handles.items():
             actual, row = independent[role], roster[handle]
             assert row['object'] == {key: actual[key] for key in ('id', 'name', 'type', 'path')}, row
-            assert row['class_id'] == CLASSES[role] and row['requested_name'] == REQUESTED[role], row
+            assert row['class_id'] == CLASSES[role], row
+            if role == 'slot':
+                assert row['declaration_label'] == REQUESTED[role] and row['name_role'] == 'declaration_label', row
+                assert row['native_name'] == actual['name'] == '', row
+            else:
+                assert row['requested_name'] == REQUESTED[role], row
             assert row['request_path'] == specs[role]['request_path'], row
             if role == 'slot':
                 assert row['owner_id'] == ids['sound'] and row['list_name'] == 'Metadata' and 'parent_id' not in row, row

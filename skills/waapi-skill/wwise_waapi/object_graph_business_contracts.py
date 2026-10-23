@@ -294,6 +294,11 @@ def object_graph_business_contract_data(
                 },
                 "existing_required_fields": ["object_handle"],
                 "new_required_fields": ["parent_handle", "name", "kind"],
+                "source_certified_inner_names": {
+                    "initial_profile": {"version": "2025.1", "owner_classes": ["AuxBus", "BlendContainer", "Bus", "MusicPlaylistContainer", "MusicSegment", "MusicSwitchContainer", "MusicTrack", "PropertyContainer", "RandomSequenceContainer", "Sound", "SwitchContainer"], "collection": "Metadata", "class": "MetadataSlot"},
+                    "name_meaning": "declaration_label_not_intrinsic_Wwise_name",
+                    "observed_native_name": "", "identity": "actual_GUID_class_owner_ordered_collection",
+                    "other_profiles": "require_their_own_source_and_representation_proof"},
                 "anonymous_list_member": {
                     "subcommand": "draft-declare-new", "omit": ["name"],
                     "requires": ["EffectSlot_Type_Handle", "source_proven_Effects_List_Field_Handle"],
