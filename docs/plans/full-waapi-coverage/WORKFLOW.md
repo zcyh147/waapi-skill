@@ -47,6 +47,20 @@ task can produce and replay its final result.
 Before running a new or changed native collector, apply the final-report-writer
 check in `tests/semantic/TEST_ACCEPTANCE.md` section 3. Collector-only checks do
 not establish that the native attempt can save its final acceptance record.
+The handoff must point to the persisted success record and a retained partial
+failure from that check. Reuse those records while the collector and relevant
+consumers remain unchanged. If only the report writer fails, repair and test
+that writer against retained input before considering another Wwise run.
+
+Each repair assignment lists the failed pytest node IDs and directly affected
+callers, with a reason for any additional selection. Use explicit nodes after
+`ci/test.sh --mode nonlive --` (or the matching real version/mode). The launcher
+replaces native defaults when explicit paths/nodes are supplied; `-k` alone
+filters the default selection. Do not use `--mode focused` for a repair: it is
+the historical alias for the full real matrix. After the selected checks pass,
+handoff and stop; a final repeat of green tests is not a separate acceptance step.
+If a check fails, keep the passing results and select only the failed and newly
+affected nodes after the fix. Any broader gate belongs to the stable batch below.
 
 1. Freeze one bounded batch of explicitly selected immutable worker refs. Workers
    run their relevant focused cases; changed preparation or verification also
