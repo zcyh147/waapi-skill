@@ -4,6 +4,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -61,6 +62,11 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1):
     proof = hash_project(runtime.sandbox.source_root, preferred_strategy='full')
     runtime.sandbox.metadata.source_hash = proof
     owner.runtime = runtime = replace(runtime, source_hash_before=proof)
+    if failure == 'wrong-target':
+        rows['{8257E0BC-513A-4DFA-B85C-22C6997A5B19}']['Target']['id'] = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
+    if failure == 'bad-media':
+        with (runtime.sandbox.sandbox_path / files[-1]).open('ab') as changed:
+            changed.write(b'changed owned media')
 
     class Client(_RuntimeControlDraftClient):
         def __init__(self):
@@ -133,6 +139,8 @@ def test_loaded_event_probe_reaches_final_writer_without_claiming_prepare_effect
     assert row['preparation_or_streaming_control_effect_verified'] is False
     report = _archived(batch)
     assert report['public_call_count'] == len(batch.receipts[probe.NODEID]) <= 96
+    assert report['total_reply_bytes'] == sum(len(json.dumps(receipt['payload'], ensure_ascii=False).encode())
+        for receipt in batch.receipts[probe.NODEID])
     assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
     assert report['preparation']['verification']['status'] == 'result_schema_checked'
     assert report['preparation']['verification']['business_state_verified'] is False
@@ -191,3 +199,36 @@ def test_loaded_probe_consumes_cached_pages_with_one_native_read(owned_authoring
     assert len({page['snapshot_sha256'] for page in evidence['pages']}) == 1
     assert report['public_call_count'] == len(batch.receipts[probe.NODEID]) <= 96
     assert sum(uri.endswith('profiler.getLoadedMedia') for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('failure', ['wrong-target', 'bad-media'])
+def test_loaded_probe_requires_fixture_identity_and_bytes_before_any_control(owned_authoring, tmp_path, monkeypatch, failure):
+    batch, call, client, probe = _host(owned_authoring, tmp_path, monkeypatch, failure=failure)
+    with pytest.raises(AssertionError):
+        probe.collect_loaded_event_probe(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    report = _archived(batch)
+    assert final['outcome'] == 'FAIL' and record['categories'][0]['status'] == 'blocked'
+    assert report['errors'] and report['outcomes'][probe.OUTCOME]['outcome'] == 'BLOCKED'
+    assert not any('.transport.' in uri or '.profiler.' in uri for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('version,extra', [('2021.1', False), ('2022.1', False), ('2023.1', False),
+    ('2024.1', False), ('2025.1', True), ('2025.1', False)])
+def test_loaded_probe_owner_accepts_only_its_single_2025_node(tmp_path, monkeypatch, version, extra):
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.loaded_media_probe import NODEID
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('WWISE_VERSION', version)
+    config = _config(tmp_path)
+    config.args = [NODEID, *([NODE] if extra else [])]
+    items = [SimpleNamespace(nodeid=name) for name in config.args]
+    if version != '2025.1' or extra:
+        with pytest.raises(pytest.UsageError, match='not available|exact single 2025 node'):
+            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert not events
+    else:
+        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert [row[0] for row in events] == ['construct', 'start', 'install']
+        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'

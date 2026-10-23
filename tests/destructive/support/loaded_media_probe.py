@@ -39,7 +39,9 @@ def collect_loaded_event_probe(batch, public_call):
         'limits': {'public_calls': 96, 'reply_bytes': 1024 * 1024,
             'total_reply_bytes': 8 * 1024 * 1024, 'reader_pages': 8},
         # node_gateway already performed config-set/status ownership checks.
-        'public_call_count': len(batch.receipts[NODEID]), 'total_reply_bytes': 0,
+        'public_call_count': len(batch.receipts[NODEID]),
+        'total_reply_bytes': sum(len(json.dumps(receipt.get('payload', receipt), ensure_ascii=False).encode())
+            for receipt in batch.receipts[NODEID]),
         'cleanup': {'complete': False, 'receipts': [], 'errors': [],
             'capture_settings_prior_state_restored': False, 'audition_media_prior_state_restored': False,
             'boundary': 'Explicit owned capture stop/disable only; prior settings unknown; owned host teardown required'}}
@@ -55,13 +57,15 @@ def collect_loaded_event_probe(batch, public_call):
     def call(argv):
         assert report['public_call_count'] < 96, 'Loaded probe public call bound exceeded'
         report['public_call_count'] += 1
+        before = len(batch.receipts[NODEID])
         try:
-            result = public_call(argv)
-            size = len(json.dumps(result, ensure_ascii=False).encode())
-            report['total_reply_bytes'] += size
-            assert size <= report['limits']['reply_bytes'] and report['total_reply_bytes'] <= report['limits']['total_reply_bytes']
-            return result
+            return public_call(argv)
         finally:
+            for receipt in batch.receipts[NODEID][before:]:
+                size = len(json.dumps(receipt.get('payload', receipt), ensure_ascii=False).encode())
+                report['total_reply_bytes'] += size
+                assert size <= report['limits']['reply_bytes'], 'Loaded probe reply exceeds byte bound'
+            assert report['total_reply_bytes'] <= report['limits']['total_reply_bytes'], 'Loaded probe replies exceed aggregate byte bound'
             persist()
 
     def execute(preview, before_execute=None):
@@ -131,8 +135,10 @@ def collect_loaded_event_probe(batch, public_call):
             before_execute=lambda: cleanup.append(('disable-loaded-media', disable))))
         report['setup'].append(zero('profiler.startCapture',
             lambda: cleanup.append(('stop-capture', lambda: zero('profiler.stopCapture')))))
-        report['preparation'] = effect('transport.prepare', event=True)
-        report['preparation']['sdk_prepare_event_equivalence_verified'] = False
+        prepared = effect('transport.prepare', event=True)
+        report['preparation'] = {'transaction': prepared, 'verification': prepared['verification'],
+            'sdk_prepare_event_equivalence_verified': False}
+        assert report['preparation']['verification']['status'] == 'result_schema_checked'
         assert report['preparation']['verification']['business_state_verified'] is False
         time.sleep(0.25)
         position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
@@ -146,6 +152,8 @@ def collect_loaded_event_probe(batch, public_call):
         snapshot = None
         while True:
             payload = call(argv)
+            if evidence['pages']:
+                assert payload.get('retained_observation') is True and payload.get('native_read_dispatched') is False
             result = payload['agent_result']
             evidence['pages'].append(result)
             assert result.get('observation') == 'retained_profiler_capture_snapshot'
@@ -157,6 +165,8 @@ def collect_loaded_event_probe(batch, public_call):
             evidence['nonempty'] |= bool(result['return'])
             evidence['complete'] = result.get('complete') is True and not any('row_fragment' in page for page in evidence['pages'])
             if result.get('complete') is True:
+                if evidence['complete']:
+                    assert sum(len(page['return']) for page in evidence['pages']) == result['total_count'], 'Retained observation is missing rows'
                 break
             if len(evidence['pages']) >= 8 or 'next_command' not in result:
                 observation['reason'] = 'Retained page bound exhausted or continuation unavailable; partial observation retained'
