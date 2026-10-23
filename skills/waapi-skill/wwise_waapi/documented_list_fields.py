@@ -239,6 +239,21 @@ def is_manual_marker_class(version, name, class_id):
     return version in {"2023.1", "2024.1", "2025.1"} and (name, class_id) == ("Marker", 5373968)
 
 
+def is_manual_marker_list_source(binding):
+    """Exact modern source/List profile for an independently proven empty read."""
+    if not isinstance(binding, Mapping):
+        return False
+    profile = manual_marker_profile(binding.get("version"))
+    if profile is None:
+        return False
+    scope = binding.get("scope", {})
+    expected = profile["list_source"]
+    return (scope.get("scope_kind") == "object" and scope.get("class_id") == 16
+        and scope.get("owner", {}).get("type") == "AudioFileSource"
+        and all(binding.get(key) == expected[key] for key in
+            ("kind", "version", "catalog_sha256", "source_member", "source_sha256", "declaration")))
+
+
 def certify_anonymous_marker(spec, binding):
     """Bind the actual owner scope, never a base-name or Inner substitution."""
     if not spec.get("manual_marker"):
@@ -342,21 +357,22 @@ def prove_source_owned_empty_list(evidence, owner_row, *, read, platform=None):
     """Normalize only a source-proven fixed owned List with an independent empty read.
 
     A missing projection alone is never membership evidence. The fixed owned
-    Lists and certified 2025 MetadataSlot profile require an independently
+    Lists, certified 2025 MetadataSlot and modern manual Marker profiles require an independently
     empty bounded relationship read; other Lists need their own authority.
     """
     scope = evidence.get("scope", {})
     name = evidence.get("declaration", {}).get("name")
     owner = scope.get("scope_value")
     if (evidence.get("kind") != "documented-list" or scope.get("scope_kind") != "object"
-            or (name not in {"RTPC", "Effects"} and owned_inner_identity(evidence, 5570560) is None)
+            or (name not in {"RTPC", "Effects"} and owned_inner_identity(evidence, 5570560) is None
+                and not is_manual_marker_list_source(evidence))
             or not isinstance(owner_row, Mapping)
             or set(owner_row) != {"id"} or owner_row.get("id", "").upper() != owner
             or not isinstance(evidence.get("source_sha256"), str)):
         raise ValueError("Missing List projection requires its exact documented owner/source and supported empty-list representation")
     from .operation_registry import _prove_omitted_object_list_empty
     empty = _prove_omitted_object_list_empty(owner, name, read=read, platform=platform,
-        **({"documented_list": evidence} if name == "Metadata" else {}))
+        **({"documented_list": evidence} if name in {"Metadata", "Markers"} else {}))
     return {"kind": "missing-empty-object-list", "version": evidence["version"],
         "field": "@" + name, "observed_row_keys": ["id"], "normalized_value": [],
         "list_source": dict(evidence), "emptiness_readback": empty}
