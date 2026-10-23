@@ -397,3 +397,67 @@ def test_relative_marker_display_cannot_derive_mutation_paths(tmp_path, shape):
         code, result = task.step('draft-add-media', '--declaration-id', 'edit', '--media-file', str(media))
     if code == 0: code, result = task.step('draft-check')
     assert code == 2 and task.writes == [], result
+
+
+def relative_marker_notes_task(path, *, value='Requested Marker notes', fault=None):
+    task = retained_marker_task(path)
+    task.objects[MARKER]['notes'] = 'Keep selected notes'
+    task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'Marker', 'classId': 5373968,
+        'path': '[Marker]', 'owner': {'id': FIRST}, 'notes': 'Keep peer notes', '@Time': 0.02, '@Label': 'Peer'}
+    task.objects[FIRST]['@Markers'].append({'id': CHILD})
+    handle = task.bind(MARKER)
+    code, result = task.step('draft-declare-existing', '--declaration-id', 'edit', '--object-handle', handle,
+        '--field', 'notes', value); assert code == 0, result
+    original = task.call
+    def native(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            assert args['objects'] == [{'object': MARKER, 'notes': value}]
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); task.writes.append(deepcopy(args))
+            task.objects[MARKER]['notes'] = 'Wrong selected notes' if fault == 'selected-notes' else value
+            if fault == 'peer-notes': task.objects[CHILD]['notes'] = 'Unexpected peer edit'
+            elif fault == 'peer-path': task.objects[CHILD]['path'] = '[Other]'
+            elif fault == 'owner': task.objects[MARKER]['owner'] = {'id': SECOND}
+            elif fault == 'order': task.objects[FIRST]['@Markers'].reverse()
+            elif fault == 'class': task.objects[MARKER]['classId'] = 16
+            elif fault == 'path': task.objects[MARKER]['path'] = '[Other]'
+            return {'objects': [{'id': MARKER, 'name': ''}]}
+        return original(uri, args, options)
+    task.call = native
+    return task
+
+
+@pytest.mark.parametrize('value', ['Requested Marker notes', ''])
+def test_relative_marker_declared_notes_execute_once_and_verify_without_identity_drift(tmp_path, value):
+    task = relative_marker_notes_task(tmp_path, value=value)
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True and len(task.writes) == 1, verified
+    assert task.objects == {**before, MARKER: {**before[MARKER], 'notes': value}}
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, rejected
+
+
+@pytest.mark.parametrize('fault', ['selected-notes', 'peer-notes', 'peer-path', 'owner', 'order', 'class', 'path'])
+def test_relative_marker_notes_verifier_preserves_selected_intent_and_owned_context_without_retry(tmp_path, fault):
+    task = relative_marker_notes_task(tmp_path, fault=fault)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified['verified'] is False and len(task.writes) == 1, verified
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, rejected
+
+
+@pytest.mark.parametrize('fault', ['selected-notes', 'peer-notes', 'order', 'owner'])
+def test_relative_marker_notes_prewrite_keeps_original_selected_and_peer_proof(tmp_path, fault):
+    task = relative_marker_notes_task(tmp_path)
+    tx, shown = task.preview()
+    if fault == 'selected-notes': task.objects[MARKER]['notes'] = 'Requested Marker notes'
+    elif fault == 'peer-notes': task.objects[CHILD]['notes'] = 'Unexpected peer edit'
+    elif fault == 'order': task.objects[FIRST]['@Markers'].reverse()
+    else: task.objects[MARKER]['owner'] = {'id': SECOND}
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected

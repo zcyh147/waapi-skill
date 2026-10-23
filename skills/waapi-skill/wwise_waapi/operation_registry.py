@@ -6472,6 +6472,7 @@ def _prepare_object_set(
             except (ValueError, KeyError, TypeError) as exc:
                 raise OperationContractError("INVALID_READBACK", "A relative Marker display requires its exact owned identity proof.") from exc
             target_spec["owned_identity"] = owned
+            target_spec["expected_path"] = target_path
         else:
             target_path = _absolute_live_object_path(
                 target.row.get("path"),
@@ -9582,7 +9583,16 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
     owned_proofs = ([pre_state["owned_identity"]] if isinstance(pre_state, Mapping) and pre_state.get("owned_identity") is not None else [])
-    owned_proofs.extend(node["owned_identity"] for node in pre_state.get("object_set_nodes", []) if node.get("owned_identity") is not None)
+    for node in pre_state.get("object_set_nodes", []):
+        owned = node.get("owned_identity")
+        if owned is None:
+            continue
+        if (after_write and node.get("existing_target") is True and node.get("notes_supplied") is True
+                and _same_identity(node.get("target_id"), owned["object_id"])):
+            owned = {**owned, "members": [
+                {**member, "notes": node["requested_notes"]} if _same_identity(member["id"], owned["object_id"]) else member
+                for member in owned["members"]]}
+        owned_proofs.append(owned)
     for owned in owned_proofs:
         from .documented_list_fields import capture_owned_empty_identity
         try:
