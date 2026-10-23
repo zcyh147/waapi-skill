@@ -66,6 +66,13 @@ def owned_authoring_layout_node(owned_authoring_layout_batch, request):
     return batch, batch.node_gateway(request.node.nodeid)
 
 
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_2025_meter_cursor_capture(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
 def _layout_effect(call, suffix, *, layout_handle, fields=()):
     schema = call(['request-schema', 'ak.wwise.ui.layout.' + suffix])
     started = call(schema['continuation']['gateway_argv'])
