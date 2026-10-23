@@ -25,7 +25,7 @@ def decoded_log_diagnostic(gateway, receipt, *, version):
     assert version == '2023.1' and os.getenv(ENV) == 'decoded-event-v1', 'Diagnostic opt-in requires its exact 2023.1 scope'
     assert distribution_version('waapi-client') == '0.8.1' and distribution_version('autobahn') == '24.4.2', 'Diagnostic dependency versions differ'
     from autobahn.asyncio.wamp import ApplicationSession
-    from autobahn.wamp.message import Event
+    from autobahn.wamp.message import Event, check_or_raise_id
     from autobahn.wamp.request import Subscription
     from waapi.client.event import EventHandler
     assert callable(ApplicationSession.onMessage) and callable(EventHandler.on_event), 'Diagnostic hooks unavailable'
@@ -49,7 +49,7 @@ def decoded_log_diagnostic(gateway, receipt, *, version):
                 assert isinstance(handler, EventHandler), 'Diagnostic requires the pinned EventHandler'
                 subscription = handler.subscription
                 assert isinstance(subscription, Subscription) and subscription.topic == TOPIC, 'Diagnostic subscription shape differs'
-                assert type(subscription.id) is int and 0 < subscription.id <= 9007199254740992, 'Diagnostic subscription ID invalid'
+                check_or_raise_id(subscription.id, 'Diagnostic subscription ID invalid')
                 session = subscription.session
                 assert isinstance(session, ApplicationSession), 'Diagnostic requires the acknowledged session'
                 original_message = session.onMessage
