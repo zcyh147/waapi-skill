@@ -1,0 +1,22 @@
+{
+  "provenance": {
+    "source_receipt": ".waapi-skill-state/full-coverage/r104-capture-reads-native-2022-r1/evidence/authoring-node-observations/d87a1375cafae330c7be7f7f-native-evidence/1792788875220726000-a4386ef57bc44989a096f8c546fbfa94-ak_wwise_core_profiler_getGameObjects.json",
+    "source_receipt_sha256": "ea07f23bed22b4697040fa2748e00fec8ce384c5979c92827a37ce2d619c3848",
+    "candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "host": "wwise-authoring",
+    "build": "2022.1.19.8584",
+    "capture_ms": 39861,
+    "api": "ak.wwise.core.profiler.getGameObjects",
+    "scope": "Exact retained native result; not a replay or regrade of the failed root."
+  },
+  "result": {
+    "return": [
+      {
+        "id": 18446744073709551614,
+        "name": "Transport/Soundcaster",
+        "registerTime": 22634,
+        "unregisterTime": 2147483647
+      }
+    ]
+  }
+}

@@ -195,13 +195,12 @@ def test_game_objects_result_mismatch_is_not_converted_to_an_empty_list() -> Non
                         "id": 1001,
                         "name": "Player",
                         "registerTime": 20,
-                        "unregisterTime": -1,
                     }
                 ]
             },
         )
     assert exc.value.error_code == "INVALID_STABLE_READ_RESULT"
-    assert exc.value.details["missing_field"] == "registrationTime"
+    assert exc.value.details["missing_field"] == "unregisterTime"
 
 
 def test_game_objects_builder_closes_the_2021_absence() -> None:
@@ -359,8 +358,123 @@ def test_gateway_game_objects_dispatches_one_closed_request_per_exact_lane(
     assert client.disconnected is True
 
 
-def test_gateway_game_objects_returns_structured_result_mismatch(
+def test_gateway_game_objects_accepts_recorded_2022_authoring_timestamps(
     tmp_path: Path,
+) -> None:
+    recorded = json.loads(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "query"
+         / "profiler-game-objects-2022-authoring-recorded.json").read_text(encoding="utf-8")
+    )
+    info = _live_info("2022.1")
+    info["version"].update(minor=19, build=8584, displayName="v2022.1.19")
+    client = FakeClient({
+        "ak.wwise.core.getInfo": info,
+        GET_GAME_OBJECTS_URI: recorded["result"],
+    })
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["profiler-game-objects", "--capture-ms", "39861"],
+        env=_gateway_env(tmp_path, "2022.1"),
+        client_factory=lambda url: client,
+    )
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {
+        "count": 1,
+        "game_objects": [{
+            "id": 18446744073709551614,
+            "name": "Transport/Soundcaster",
+            "register_time": 22634,
+            "unregister_time": 2147483647,
+        }],
+    }
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls == [
+        ("ak.wwise.core.getInfo", None, None),
+        (GET_GAME_OBJECTS_URI, {"time": 39861}, {}),
+    ]
+    assert client.disconnected is True
+
+
+def test_gateway_game_objects_keeps_2022_alias_selection_row_local(
+    tmp_path: Path,
+) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": _live_info("2022.1"),
+        GET_GAME_OBJECTS_URI: {"return": [
+            {"id": 1001, "name": "Reflected", "registrationTime": 20, "unregistrationTime": -1},
+            {"id": 1002, "name": "Observed", "registerTime": 21, "unregisterTime": -1},
+            {"id": 1003, "name": "Matching aliases", "registrationTime": -(1 << 31),
+             "unregistrationTime": 2147483647, "registerTime": -(1 << 31),
+             "unregisterTime": 2147483647, "futureNativeField": "ignored as before"},
+            {"id": 1004, "name": "Reflected again", "registrationTime": 22, "unregistrationTime": -1},
+        ]},
+    })
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["profiler-game-objects", "--capture", "latest"],
+        env=_gateway_env(tmp_path, "2022.1"),
+        client_factory=lambda url: client,
+    )
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {"count": 4, "game_objects": [
+        {"id": 1001, "name": "Reflected", "register_time": 20, "unregister_time": -1},
+        {"id": 1002, "name": "Observed", "register_time": 21, "unregister_time": -1},
+        {"id": 1003, "name": "Matching aliases", "register_time": -2147483648, "unregister_time": 2147483647},
+        {"id": 1004, "name": "Reflected again", "register_time": 22, "unregister_time": -1},
+    ]}
+    assert list(payload)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_gateway_game_objects_does_not_extend_2022_aliases_to_later_versions(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": _live_info(version),
+        GET_GAME_OBJECTS_URI: {"return": [
+            {"id": 1001, "name": "Player", "registrationTime": 20, "unregistrationTime": -1},
+        ]},
+    })
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["profiler-game-objects", "--capture", "latest"],
+        env=_gateway_env(tmp_path, version),
+        client_factory=lambda url: client,
+    )
+    assert exit_code == 2
+    # Later schemas require the modern fields before normalization is reached.
+    assert payload["error_code"] == "SemanticValidationError"
+    assert "agent_result" not in payload
+    assert client.disconnected is True
+
+
+@pytest.mark.parametrize(
+    ("timestamps", "expected_detail"),
+    [
+        ({"registerTime": 20}, {"missing_field": "unregisterTime"}),
+        ({"unregisterTime": -1}, {"missing_field": "registerTime"}),
+        ({"registrationTime": 20}, {"missing_field": "unregistrationTime"}),
+        ({"unregistrationTime": -1}, {"missing_field": "registrationTime"}),
+        ({"registrationTime": 20, "unregisterTime": -1}, {"missing_field": "unregistrationTime"}),
+        ({"registerTime": 20, "unregistrationTime": -1}, {"missing_field": "registrationTime"}),
+        ({"registrationTime": 20, "unregistrationTime": -1, "registerTime": 20},
+         {"missing_field": "unregisterTime"}),
+        ({"registrationTime": 20, "registerTime": 20, "unregisterTime": -1},
+         {"missing_field": "unregistrationTime"}),
+        ({"registrationTime": 21, "unregistrationTime": -1, "registerTime": 20, "unregisterTime": -1},
+         {"conflicting_fields": ["registrationTime", "registerTime"]}),
+        ({"registrationTime": 20, "unregistrationTime": 0, "registerTime": 20, "unregisterTime": -1},
+         {"conflicting_fields": ["unregistrationTime", "unregisterTime"]}),
+        ({"registerTime": True, "unregisterTime": -1}, {"field": "registerTime"}),
+        ({"registerTime": 20, "unregisterTime": 1 << 31}, {"field": "unregisterTime"}),
+        ({"registrationTime": True, "unregistrationTime": -1, "registerTime": 1, "unregisterTime": -1},
+         {"field": "registrationTime"}),
+        ({"registrationTime": 20, "unregistrationTime": -(1 << 31) - 1, "registerTime": 20, "unregisterTime": -1},
+         {"field": "unregistrationTime"}),
+    ],
+)
+def test_gateway_game_objects_rejects_incomplete_or_conflicting_2022_timestamps(
+    tmp_path: Path,
+    timestamps: dict[str, Any],
+    expected_detail: dict[str, Any],
 ) -> None:
     client = FakeClient(
         {
@@ -370,8 +484,7 @@ def test_gateway_game_objects_returns_structured_result_mismatch(
                     {
                         "id": 1001,
                         "name": "Player",
-                        "registerTime": 20,
-                        "unregisterTime": -1,
+                        **timestamps,
                     }
                 ]
             },
@@ -385,7 +498,9 @@ def test_gateway_game_objects_returns_structured_result_mismatch(
     assert exit_code == 2
     assert payload["ok"] is False
     assert payload["error_code"] == "INVALID_STABLE_READ_RESULT"
-    assert payload["details"]["missing_field"] == "registrationTime"
+    assert expected_detail.items() <= payload["details"].items()
+    assert "agent_result" not in payload
+    assert client.disconnected is True
 
 
 @pytest.mark.parametrize(

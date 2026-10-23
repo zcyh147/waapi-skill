@@ -286,7 +286,7 @@ def normalize_profiler_game_objects_result(
     version: str,
     result: Any,
 ) -> dict[str, Any]:
-    """Project 2022 and 2023+ registration-field spellings to one shape."""
+    """Project reflected and observed registration timestamps to one shape."""
 
     _require_version(version, _GAME_OBJECT_VERSIONS, GET_GAME_OBJECTS_URI)
     payload = _require_result_mapping(GET_GAME_OBJECTS_URI, result)
@@ -305,11 +305,6 @@ def normalize_profiler_game_objects_result(
             maximum_rows=MAX_GAME_OBJECT_ROWS,
             actual_count=len(rows),
         )
-    register_field, unregister_field = (
-        ("registrationTime", "unregistrationTime")
-        if version == "2022.1"
-        else ("registerTime", "unregisterTime")
-    )
     normalized: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
@@ -319,6 +314,46 @@ def normalize_profiler_game_objects_result(
                 row_index=index,
                 actual_type=type(row).__name__,
             )
+        register_field, unregister_field = (
+            ("registrationTime", "unregistrationTime")
+            if version == "2022.1"
+            else ("registerTime", "unregisterTime")
+        )
+        if version == "2022.1":
+            # Console reflection uses registrationTime; retained Authoring
+            # 2022.1.19.8584 rows use registerTime. Never mix partial pairs or
+            # silently prefer one of two contradictory timestamp values.
+            timestamp_pairs = (
+                ("registrationTime", "unregistrationTime"),
+                ("registerTime", "unregisterTime"),
+            )
+            timestamp_values = None
+            for pair in timestamp_pairs:
+                if not any(field in row for field in pair):
+                    continue
+                for field in pair:
+                    if field not in row:
+                        raise _result_error(
+                            GET_GAME_OBJECTS_URI,
+                            "A game-object row omitted a required stable field.",
+                            row_index=index,
+                            missing_field=field,
+                        )
+                values = tuple(
+                    _int32_result(GET_GAME_OBJECTS_URI, row[field], field=field, row_index=index)
+                    for field in pair
+                )
+                if timestamp_values is not None:
+                    for position, (expected, actual) in enumerate(zip(timestamp_values, values)):
+                        if expected != actual:
+                            raise _result_error(
+                                GET_GAME_OBJECTS_URI,
+                                "A game-object row returned conflicting timestamp aliases.",
+                                row_index=index,
+                                conflicting_fields=[timestamp_pairs[0][position], pair[position]],
+                            )
+                timestamp_values = values
+                register_field, unregister_field = pair
         for field in ("id", "name", register_field, unregister_field):
             if field not in row:
                 raise _result_error(
