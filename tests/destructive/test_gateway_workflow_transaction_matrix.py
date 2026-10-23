@@ -16,6 +16,7 @@ import time
 import uuid
 import wave
 import xml.etree.ElementTree as ET
+from contextlib import nullcontext
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -2040,7 +2041,12 @@ def test_console_log_addition_observer(
         draft = _start_business_draft(runtime, 'ak.wwise.core.log.addItem')
         _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
             ['--message', message, '--log-channel', 'general', '--severity', 'message'], live=True)
-        result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'])
+        diagnostic = nullcontext()
+        if os.getenv('WWISE_CONSOLE_LOG_DIAGNOSTIC'):
+            from tests.destructive.support.console_log_diagnostic import decoded_log_diagnostic
+            diagnostic = decoded_log_diagnostic(waapi_gateway, receipt, version=runtime.version)
+        with diagnostic:
+            result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'])
         transaction_id = result['preview']['transaction_id']
         category['transaction_ids'] = [transaction_id]
         shown = runtime.gateway(['transaction-show', transaction_id], live=False)
