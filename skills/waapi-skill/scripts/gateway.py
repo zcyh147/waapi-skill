@@ -196,6 +196,7 @@ from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[report
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_resolved_semantic_event as validate_semantic_event,
+    validate_resolved_semantic_result,
     validate_semantic_payload,
     validate_semantic_result,
 )
@@ -11888,7 +11889,7 @@ def dispatch_profiler_voice_contributions_request(
             "call": dispatch_call_summary(result),
         }
     raw_result = result.get("result")
-    result_validation = validate_semantic_result(
+    result_validation = validate_resolved_semantic_result(
         request.uri,
         raw_result,
         version=detected_version,
@@ -12690,11 +12691,23 @@ def dispatch_runtime_inspection_business_read(
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
     )
+    # These captured result families contain referenced rows/subobjects. Validate
+    # the complete native payload before projection, pagination, or authority is issued.
+    result_validator = (validate_resolved_semantic_result if args.api in {
+        "ak.wwise.core.profiler.getVoices", "ak.wwise.core.profiler.getBusses",
+        "ak.wwise.core.profiler.getAudioObjects",
+        "ak.wwise.core.profiler.getPerformanceMonitor",
+        "ak.wwise.core.log.get", "ak.wwise.core.profiler.getMeters",
+    } else validate_semantic_result)
+    result_validation_options = {}
+    if args.api == "ak.wwise.core.profiler.getMeters" and meter_options is not None and (meter_options.meanings or meter_options.related):
+        result_validation_options["meter_projection_fields"] = tuple(request["options"].get("return", ()))
     result_validation = (
-        validate_semantic_result(
+        result_validator(
             request["api"],
             result.get("result"),
             version=detected_version,
+            **result_validation_options,
         )
         if result.get("ok")
         else None

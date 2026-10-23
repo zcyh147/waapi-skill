@@ -470,3 +470,36 @@ def test_related_meter_root_identity_comparison_preserves_native_text_and_real_d
             assert row["object"]["related"]["parent"] == {"object":parent,"notes":notes}
         assert all(row["object"]["name"] == name and row["object"]["parent.notes"] == notes
             for row in client.rows)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("bad", [None, "name", "id", "classId", "unselected-null"])
+def test_enriched_meter_preserves_nullable_selection_while_validating_base_fields(tmp_path, version, bad):
+    client, run = task(tmp_path, version)
+    client.metadata[BUS_CLASS]["OutputBus"] = {"name": "OutputBus", "type": "ObjectReference",
+        "display": {"name": "Output Bus"}, "restriction": {"type": "reference", "restrictions": []}}
+    for row in client.rows:
+        row["object"]["@OutputBus"] = None
+        if bad in {"name", "id", "classId"}:
+            row["object"][bad] = -1 if bad == "classId" else 7
+    if bad == "classId":
+        client.metadata[-1] = client.metadata[BUS_CLASS]
+    if bad == "unselected-null":
+        original = client.call
+        def call(uri, args=None, options=None):
+            result = original(uri, args, options)
+            if uri == METERS:
+                for row in result["meters"]:
+                    row["object"]["@Unselected"] = None
+            return result
+        client.call = call
+    code, result = run("core-call", METERS, "--profiler-position", "123", "--meter-object-include-local-reference", "Output Bus")
+    if bad:
+        assert code == 2, result
+        assert "agent_result" not in result
+        assert not list((tmp_path / "state" / "runtime-inspection-observations-v1").glob("**/*.json"))
+    else:
+        assert code == 0, result
+        assert all(row["object"]["local_references"] == {"OutputBus": None} for row in result["agent_result"]["meters"])
+        rules = result["schema_validation"]["result"]["compatibility_rules"]
+        assert any(rule["rule_id"] == "meter-selected-dynamic-values-preserved/v1" and "@OutputBus" in rule["fields"] for rule in rules)

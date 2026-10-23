@@ -335,9 +335,9 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
             LOG_GET_URI: [
                 {
                     "items": [
-                        {"message": "old", "severity": "Message"},
-                        {"message": "warning", "severity": "Warning"},
-                        {"message": "latest", "severity": "Error"},
+                        {"message": "old", "severity": "Message", "time": 1, "messageId": "Custom"},
+                        {"message": "warning", "severity": "Warning", "time": 2, "messageId": "Custom"},
+                        {"message": "latest", "severity": "Error", "time": 3, "messageId": "Custom"},
                     ]
                 }
             ],
@@ -363,8 +363,8 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
     assert {key: payload["agent_result"][key] for key in ("channel", "items", "returned_count", "truncated")} == {
         "channel": "soundbank-generation",
         "items": [
-            {"message": "warning", "severity": "Warning"},
-            {"message": "latest", "severity": "Error"},
+            {"message": "warning", "severity": "Warning", "time": 2, "messageId": "Custom"},
+            {"message": "latest", "severity": "Error", "time": 3, "messageId": "Custom"},
         ],
         "returned_count": 2,
         "truncated": True,
@@ -828,7 +828,7 @@ def test_runtime_snapshot_fragments_preserve_every_character_under_terminal_boun
     client = _RuntimeControlDraftClient(tmp_path)
     original = client.call
     def call(uri, args=None, options=None):
-        return {"items": [{"message": message, "severity": "Message"}]} if uri == LOG_GET_URI else original(uri, args, options)
+        return {"items": [{"message": message, "severity": "Message", "time": 1, "messageId": "Custom"}]} if uri == LOG_GET_URI else original(uri, args, options)
     client.call = call
     env = _env(tmp_path)
     code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", LOG_GET_URI,
@@ -845,7 +845,7 @@ def test_runtime_snapshot_fragments_preserve_every_character_under_terminal_boun
         code, payload = gateway.execute_gateway(result["next_command"]["full_argv"][3:], env=env,
             client_factory=lambda _url: pytest.fail("Fragment continuation must be offline"))
         assert code == 0, payload
-    assert json.loads("".join(fragments)) == {"message": message, "severity": "Message"}
+    assert json.loads("".join(fragments)) == {"message": message, "severity": "Message", "time": 1, "messageId": "Custom"}
 
 
 def _public_runtime_preview(tmp_path, client, state_dir, operation, declaration=()):
