@@ -9560,6 +9560,19 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    owned = pre_state.get("owned_identity") if isinstance(pre_state, Mapping) else None
+    if owned is not None:
+        from .documented_list_fields import capture_owned_empty_identity
+        try:
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owned["object_id"]]}},
+                {"return": ["id", "name", "type", "path", "classId"]}))
+            actual = capture_owned_empty_identity(owned['descriptor']['version'], rows[0], read=read) if len(rows) == 1 else None
+            passed = actual == owned
+        except (ValueError, TypeError, KeyError) as exc:
+            actual, passed = {"error": str(exc)}, False
+        assertions.append({"name": "retained owned identity source and complete typed List remain unchanged",
+            "passed": passed, "evidence": {"expected": owned, "actual": actual}})
+
     from .switch_child_context import assertions as context_assertions
     assertions.extend(context_assertions(pre_state, read=read))
     transfer = pre_state.get("source_transfer_parent_guard") if isinstance(pre_state, Mapping) else None
@@ -9711,6 +9724,7 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
 
 def _related_condition_assertions(requirements, *, read):
     assertions = []
+
     readbacks = []
     for requirement in requirements:
         source_id, owner_id, name = requirement["source_id"], requirement["owner_id"], requirement["property"]
@@ -12159,6 +12173,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         info = _read_property_info(read, object_id=source.object, name=field_value,
             reference_kind_version=request.version if request.operation == "object.setReference" else None)
         metadata["field_info"] = info.as_dict()
+        if (request.operation == "object.setReference" and request.version == "2025.1" and field_value == "Metadata"
+                and source.row.get("type") == "PluginInnerObject" and source.row.get("name") == ""):
+            from .documented_list_fields import capture_owned_empty_identity
+            typed_rows = _read_object_id_rows(source.object, fields=(*IDENTITY_RETURN_FIELDS, "classId", "owner"), read=read)
+            if (len(typed_rows) != 1 or any(typed_rows[0].get(key) != source.row.get(key)
+                    for key in ("id", "name", "type", "path"))):
+                raise OperationContractError("INVALID_READBACK", "Retained reference source changed its exact identity")
+            owned = capture_owned_empty_identity(request.version, typed_rows[0], read=read)
+            if owned is not None:
+                metadata["owned_identity"] = owned
         # Every exact selected field stays bound through prewrite and verify,
         # including dependency-free fields and cleared references. Raw facts
         # distinguish native omission from explicit null/default containers.
@@ -12208,7 +12232,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                     raise OperationContractError("REFERENCE_APPLICABILITY_UNPROVEN", str(exc)) from exc
         metadata["condition_metadata"]["structural_applicability"] = list(structural_applicability.values())
         clearing_reference = request.operation == "object.setReference" and arguments["target"] is None
-        observed_field = f"@{field_value}" if clearing_reference else field_value
+        from .constructor_inputs import local_reference_field
+        observed_field = (f"@{field_value}" if clearing_reference else
+            local_reference_field({"owned_identity": metadata.get("owned_identity")}, field_value))
         from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, capture_before
         derived_fields = derived_reference_fields if request.operation == "object.setReference" and derived_reference(source.row.get("type"), field_value) else ()
         field_before_result = read(
@@ -17366,7 +17392,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             args = {"from": {"id": [object_id]}}
             activation_requirements = field_before.get("activation_requirements", {})
             activation_reference_requirements = field_before.get("activation_reference_requirements", {})
-            observed_field = f"@{field_name}" if clear_field is not None else field_name
+            from .constructor_inputs import local_reference_field
+            observed_field = (f"@{field_name}" if clear_field is not None else
+                local_reference_field({"owned_identity": pre_state.get("owned_identity")}, field_name))
             from .derived_reference_history import applies as derived_reference, FIELDS as derived_reference_fields, matches as derived_reference_matches
             derived_fields = derived_reference_fields if derived_reference(source.get("row", {}).get("type"), field_name) else ()
             options = {"return": ["id", "path", *derived_fields, observed_field, *([field_name] if clear_field is not None else []),
@@ -22538,7 +22566,9 @@ def verify_prepared_operation(
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
-        observed_field = f"@{field_name}" if clear_field is not None else field_name
+        from .constructor_inputs import local_reference_field, local_reference_value
+        observed_field = (f"@{field_name}" if clear_field is not None else
+            local_reference_field({"owned_identity": pre_state.get("owned_identity")}, field_name))
         platform = plan.get("observation_platform", plan.get("platform"))
         activation_requirements = plan.get("activation_requirements", {})
         activation_reference_requirements = plan.get("activation_reference_requirements", {})
@@ -22562,7 +22592,7 @@ def verify_prepared_operation(
                 _same_identity(rows[0].get("id"), plan.get("object_id"))
                 and (observed_field in rows[0] if clear_field is not None else _has_field(rows[0], field_name))
             )
-            actual = _reference_identity(raw_actual)
+            actual = _reference_identity(local_reference_value({"owned_identity": pre_state.get("owned_identity")}, field_name, raw_actual))
             expected = plan.get("expected_target_id")
             expected_clear = plan.get("expected_clear") is True
             if expected_clear:
