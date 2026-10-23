@@ -19,6 +19,7 @@ from wwise_waapi.native_catalog import load_native_catalog
 from wwise_waapi.host_paths import localize_waapi_host_path
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from wwise_waapi.filesystem_security import path_is_link_or_reparse
+from tests.destructive.support.profiler_capture import NODEID as PROFILER_CAPTURE_NODEID, OUTCOMES as PROFILER_CAPTURE_OUTCOMES
 
 
 MEDIA_PRESERVATION_DIAGNOSTIC_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
@@ -231,9 +232,7 @@ class AuthoringBatchAdapter:
                 mtime_after = sandbox.source_project.stat().st_mtime_ns
             except (OSError, ValueError):
                 pass
-        append_category_evidence(repo_root=self.repo_root, candidate=self.candidate, version=runtime.version,
-            host={'display_name': self.info['displayName'], 'is_command_line': False, 'version': self.info['version']},
-            categories=[{'category': ('soundcaster-frontend-diagnostic' if row['nodeid'] == SOUNDCASTER_FRONTEND_DIAGNOSTIC_NODEID else 'media-preservation-diagnostic' if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else 'authoring-layout'), 'nodeid': row['nodeid'],
+        categories = [{'category': ('soundcaster-frontend-diagnostic' if row['nodeid'] == SOUNDCASTER_FRONTEND_DIAGNOSTIC_NODEID else 'media-preservation-diagnostic' if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else 'authoring-layout'), 'nodeid': row['nodeid'],
                          'status': ('FAIL' if row['outcome'] == 'FAIL' else 'blocked') if row['nodeid'] in DIAGNOSTIC_NODEIDS else ('PASS' if outcome == 'PASS' else 'FAIL' if row['outcome'] == 'FAIL' else 'blocked'),
                          'verifier_strength': ('bounded_public_diagnostic_no_business_effect_proof' if row['nodeid'] == SOUNDCASTER_FRONTEND_DIAGNOSTIC_NODEID else 'bounded_public_read_only_diagnostic_no_business_effect_proof' if row['nodeid'] == MEDIA_PRESERVATION_DIAGNOSTIC_NODEID else 'public_gateway_exact_node_and_post_teardown_owned_proofs'),
                          **({'business_preservation_verified': False,
@@ -245,7 +244,33 @@ class AuthoringBatchAdapter:
                          **({'observation_artifact': self.observation_artifacts[row['nodeid']]}
                             if row['nodeid'] in self.observation_artifacts else {}),
                          **({'batch_finalization': self.batch_seal_descriptor}
-                            if outcome == 'PASS' else {})} for row in outcomes],
+                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] != PROFILER_CAPTURE_NODEID]
+        if PROFILER_CAPTURE_NODEID in self.selected_nodeids:
+            # Consume the exact archived collector output, including partial
+            # observations. A passing sibling never fills another outcome.
+            report = {}
+            descriptor = self.observation_artifacts.get(PROFILER_CAPTURE_NODEID)
+            if descriptor:
+                archived = json.loads(Path(descriptor['path']).read_text(encoding='utf-8'))
+                root = Path(archived['artifacts']['native-evidence']['path'])
+                report_path = root / 'profiler-capture.json'
+                if report_path.exists():
+                    report = json.loads(report_path.read_text(encoding='utf-8'))
+                    if (report.get('contract') != 'waapi-skill.owned-profiler-capture/v1'
+                            or report.get('candidate') != self.candidate or report.get('version') != runtime.version):
+                        raise ValueError('Profiler capture report context differs from its owned batch')
+            for name in PROFILER_CAPTURE_OUTCOMES:
+                observation = report.get('outcomes', {}).get(name, {'outcome': 'BLOCKED'})
+                business = observation.get('outcome', 'BLOCKED')
+                categories.append({'category': name, 'nodeid': PROFILER_CAPTURE_NODEID,
+                    'status': 'PASS' if outcome == 'PASS' and business == 'PASS' else 'FAIL' if business == 'FAIL' else 'blocked',
+                    'business_outcome': business, 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
+                    'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
+                    **({'observation_artifact': descriptor} if descriptor else {}),
+                    **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})})
+        append_category_evidence(repo_root=self.repo_root, candidate=self.candidate, version=runtime.version,
+            host={'display_name': self.info['displayName'], 'is_command_line': False, 'version': self.info['version']},
+            categories=categories,
             source={'project': str(sandbox.source_project), 'hash_scope': 'all-source-regular-file-content',
                     'hash_algorithm': 'sha256', 'hash_before': runtime.source_hash_before.digest,
                     'hash_after': source_after, 'mtime_before_ns': runtime.source_mtime_before_ns, 'mtime_after_ns': mtime_after},
@@ -405,6 +430,7 @@ def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path
 # families remain explicit integration work until they use the same protocol.
 OWNED_AUTHORING_NODEIDS = (
     *DIAGNOSTIC_NODEIDS,
+    PROFILER_CAPTURE_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
       for variant in ('omitted', 'x-only', 'y-only', 'both')),
@@ -433,6 +459,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
     if (set(selected).intersection(DIAGNOSTIC_NODEIDS)
             and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1')):
         raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')
+    if PROFILER_CAPTURE_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
+        raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
     root = Path(raw_root)
     if (not root.is_absolute() or os.path.lexists(root)
             or any(path_is_link_or_reparse(part) for part in root.parents)
