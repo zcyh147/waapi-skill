@@ -122,12 +122,35 @@ def test_native_source_requires_exact_original_finalized_node_and_receipt(tmp_pa
             {'artifact': 'absent-config', 'sha256': '0' * 64}, tmp_path)
 
 
-def _assert_complete_source_review_bridge(tmp_path, version):
+def _assert_complete_source_review_bridge(tmp_path, version, monkeypatch):
     from copy import deepcopy
     from tests.support.source_copy_branch_evidence import dependency_review, SYMBOLS, REVIEW_SHA256, write_json
     from tests.maintenance import branch_audit_completion as completion
     from tests.support.source_copy_native_evidence import write_source_dependency_review, native_source_maps
-    from tests.support.source_copy_branch_evidence import native_route, relevant_sources
+    from tests.support.source_copy_branch_evidence import native_route
+    import hashlib
+    import subprocess
+    review = dependency_review()
+    basis = review['current_source_basis']
+    historical = {**review['current_sources'],
+        **review['launcher_and_dependency_config_source_maps'][basis],
+        **review['pinned_project_input_source_maps'][basis]}
+    # This is the v1 reader's historical filesystem, not a current-source exemption.
+    # Current-source v1 rejection is independently exercised by the successor controls.
+    original_read = Path.read_bytes
+    historical_bytes = {}
+    def read_historical(path):
+        name = path.relative_to(audit.ROOT).as_posix() if path.is_relative_to(audit.ROOT) else None
+        if name not in historical:
+            return original_read(path)
+        if name not in historical_bytes:
+            raw = original_read(path)
+            if hashlib.sha256(raw).hexdigest() != historical[name]:
+                raw = subprocess.check_output(['git', 'show', basis + ':' + name], cwd=audit.ROOT)
+            assert hashlib.sha256(raw).hexdigest() == historical[name]
+            historical_bytes[name] = raw
+        return historical_bytes[name]
+    monkeypatch.setattr(Path, 'read_bytes', read_historical)
     origin = tmp_path / 'original-evidence'
     (origin / 'native').mkdir(parents=True)
     review_descriptor = write_source_dependency_review(origin / 'native')
@@ -143,7 +166,7 @@ def _assert_complete_source_review_bridge(tmp_path, version):
     pointer = '/argsSchema/properties/onNameConflict/enum/2'
     branch = {'id': route + '|' + pointer, 'route': route,
         'shape_sha256': review['selected_native_shapes'][route + '|' + pointer], 'pointer': pointer}
-    binding = {'relevant_sources': list(relevant_sources()), 'source_copy_native_proof': {'artifact': 'native/proof.json', 'sha256': 'b' * 64},
+    binding = {'relevant_sources': sorted(historical), 'source_copy_native_proof': {'artifact': 'native/proof.json', 'sha256': 'b' * 64},
         **{key: {'source': symbol} for key, symbol in SYMBOLS.items()}}
     proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1', 'from_candidate': original_candidate,
         'to_candidate': 'c' * 64, 'branch_id': branch['id'], 'native_shape_sha256': branch['shape_sha256'],
@@ -199,8 +222,7 @@ def _assert_complete_source_review_bridge(tmp_path, version):
             completion.validate_equivalence(descriptor, {'sha256': 'd' * 64},
                 {'candidate_sha256': original_candidate, 'relevant_sources': sources},
                 branch, 'c' * 64, binding, relocated, audit.ROOT)
-    from tests.support.source_copy_branch_evidence import relevant_sources
-    current_sources = relevant_sources()
+    current_sources = historical
     read_bytes = Path.read_bytes
     for dependency in review['current_added_dependencies']:
         assert dependency not in sources and dependency in current_sources
@@ -231,10 +253,306 @@ def _assert_complete_source_review_bridge(tmp_path, version):
             branch, 'c' * 64, binding, relocated, audit.ROOT)
 
 
-def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_bridge(tmp_path):
-    _assert_complete_source_review_bridge(tmp_path, '2021.1')
+def test_2021_source_equivalence_accepts_only_the_reviewed_complete_six_delta_bridge(tmp_path, monkeypatch):
+    _assert_complete_source_review_bridge(tmp_path, '2021.1', monkeypatch)
 
 
 @pytest.mark.parametrize('version', ('2022.1', '2023.1', '2024.1', '2025.1'))
-def test_modern_source_equivalence_accepts_only_reviewed_complete_bridge(tmp_path, version):
-    _assert_complete_source_review_bridge(tmp_path, version)
+def test_modern_source_equivalence_accepts_only_reviewed_complete_bridge(tmp_path, version, monkeypatch):
+    _assert_complete_source_review_bridge(tmp_path, version, monkeypatch)
+
+
+@pytest.fixture(scope='module')
+def source_successor_case(tmp_path_factory, inventory):
+    """Current public program + untouched original native proof in one importer."""
+    from copy import deepcopy
+    import tempfile
+    import importlib
+    from tests.support.source_copy_branch_evidence import (
+        source_capture_plan, finish_source_capture, write_json)
+    from tests.unit.test_source_copy_modern_collector import modern_collector_runtime
+    from tests.maintenance import branch_audit_completion as completion
+    product = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    import os
+    from contextlib import nullcontext
+    cache = os.getenv('WAAPI_SOURCE_SUCCESSOR_READER_FIXTURE')
+    cache = str(Path(cache).resolve()) if cache else None
+    if cache and (Path(cache)/'case.json').exists():
+        saved=json.loads((Path(cache)/'case.json').read_bytes())
+        for key in ('index','base','output'):saved[key]=Path(saved[key])
+        # Common reader corruption controls reuse these frozen program bytes.
+        # Final current-source acceptance uses the separate five-node capture.
+        audit.portable_binding_inputs(saved['index'],saved['requirements'])
+        yield saved
+        return
+    if cache:
+        Path(cache).mkdir(parents=True,exist_ok=False)
+    manager=nullcontext(cache) if cache else tempfile.TemporaryDirectory(prefix='.source-successor-test-',dir=product)
+    with manager as directory:
+        output = Path(directory)
+        reuse_program = os.getenv('WAAPI_SOURCE_SUCCESSOR_PROGRAM_INDEX')
+        if reuse_program:
+            program_index=Path(reuse_program).resolve(strict=True)
+            frozen=json.loads((program_index.parent/'program.json').read_bytes())
+            inventory={**inventory,'native_coverage':{**inventory['native_coverage'],
+                'candidate_sha256':frozen['candidate_sha256']}}
+        else:
+            public = tmp_path_factory.mktemp('source-successor-public')
+            with pytest.MonkeyPatch.context() as environment:
+                environment.setenv('WWISE_LIVE', '1'); environment.setenv('WWISE_DESTRUCTIVE', '1')
+                workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
+            runtime, _, _ = modern_collector_runtime(public)
+            category = workflow._collect_legacy_source_copy_feasibility(runtime, prefix='SUCCESSOR', saved_copy=True,
+                saved_copy_protocol='gateway-owned-save-children/v1', fixture_profile='modern-original-owned-source/v1')
+            plan = source_capture_plan(output / 'capture', inventory=inventory)
+            node = next(k for k,v in plan['nodes'].items() if v['version'] == '2022.1')
+            context = {**plan, **plan['nodes'][node], 'nodeid': node}
+            program_index = finish_source_capture(context,
+                {'setup':'passed','call':'passed','teardown':'passed'}, Path(category['observation_path']))
+        bundle = program_index.parent
+        def emit(name, value):
+            path = output / name
+            return {**write_json(path,value),'artifact':path.relative_to(product).as_posix()}
+        def ref(name):
+            path = bundle / name
+            import hashlib
+            return {'artifact':path.relative_to(product).as_posix(),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
+        from tests.support.source_copy_native_evidence import successor_dependency_review
+        predecessor=next(x for x in successor_dependency_review()['predecessor_attachments'] if '2022.1' in x['artifact'])
+        native=completion.read_sealed_artifact(predecessor,product)
+        original_binding=json.loads((bundle/'bindings.json').read_bytes())
+        projected=deepcopy(original_binding)
+        for binding in projected['bindings'].values():binding['evidence']['program']['artifact']=ref('program.json')['artifact']
+        proof=json.loads((bundle/'proof.json').read_bytes())
+        for value in proof['files'].values():value['artifact']=(bundle/value['artifact']).relative_to(product).as_posix()
+        attachment=json.loads((bundle/'attachment.json').read_bytes());attachment['proof']=emit('program-proof.json',proof)
+        program_attachment=emit('program-attachment.json',attachment)
+        program_projection=emit('bindings.json',projected)
+        successor_review=json.loads((audit.ROOT/'tests/fixtures/source-copy/branch-successor-review-r92.json').read_bytes())
+        native_record=completion.read_sealed_artifact({k:native['evidence'][k] for k in ('artifact','sha256')},product)
+        import hashlib
+        review_raw=(audit.ROOT/'tests/fixtures/source-copy/branch-successor-review-r92.json').read_bytes()
+        (output/'review.json').write_bytes(review_raw)
+        review_descriptor={'artifact':(output/'review.json').relative_to(product).as_posix(),
+            'sha256':hashlib.sha256(review_raw).hexdigest()}
+        successor_context=emit('successor-context.json',{
+            'contract':'waapi-skill.source-copy-successor-context/v1',
+            'review':review_descriptor,'predecessor':predecessor,
+            'original_source_context':native_record['source_context'],
+            'current_candidate_sha256':inventory['native_coverage']['candidate_sha256'],
+            'current_sources':successor_review['current_sources']})
+        successor={**deepcopy(native),'contract':'waapi-skill.source-copy-native-attachment/v2',
+            'predecessor':predecessor,'successor_context':successor_context,'equivalence':{},'native_equivalence':{}}
+        program=json.loads((bundle/'program.json').read_bytes())
+        for identity,binding in projected['bindings'].items():
+            binding=deepcopy(binding)
+            binding.update(source_copy_proof=attachment['proof'],source_business_fact=attachment['business_fact_id'],
+                source_copy_native_proof=native['proof'],source_copy_successor_context=successor_context,
+                native_observations_sha256={k:v['sha256'] for k,v in native_record['observation_artifacts'].items()})
+            for kind in ('equivalence','native_equivalence'):
+                oldproof=completion.read_sealed_artifact(native[kind][identity],product)
+                proof={**oldproof,'to_candidate':inventory['native_coverage']['candidate_sha256'],
+                    'binding_semantics_sha256':audit.digest(completion.binding_semantics(binding)),
+                    'source_copy_successor_context':successor_context}
+                successor[kind][identity]=emit(kind+'-'+str(len(successor[kind]))+'.json',proof)
+        successor_descriptor=emit('native-successor.json',successor)
+        index={'contract':'waapi-skill.branch-evidence-index/v1','base':os.path.relpath(product,output),
+            'entries':[{'id':'source-successor-2022.1','bindings':program_projection,
+                'origin':{k:ref(v) for k,v in {'bindings':'bindings.json','program':'program.json',
+                    'requirements':'requirements.json','capture':'capture.json'}.items()}}],
+            'source_attachments':[program_attachment],'source_native_attachments':[successor_descriptor]}
+        path=output/'index.json';write_json(path,index)
+        case={'index':path,'requirements':json.loads((bundle/'requirements.json').read_bytes()),
+            'base':product,'output':output,'inventory':inventory,'predecessor':predecessor,
+            'successor':successor_descriptor}
+        if cache:
+            from tests.support.source_copy_branch_evidence import native_route
+            compact={**case,'inventory':{'native_coverage':{
+                'candidate_sha256':inventory['native_coverage']['candidate_sha256'],
+                'obligations':[r for r in inventory['native_coverage']['obligations']
+                    if r['route']==native_route('2022.1')]}}}
+            (output/'case.json').write_text(json.dumps(compact,default=str,sort_keys=True)+'\n')
+        yield case
+
+
+def test_current_source_successor_reuses_unchanged_original_native_through_importer(source_successor_case):
+    from tests.maintenance import branch_audit_completion as completion
+    case=source_successor_case
+    bindings,base,_=audit.portable_binding_inputs(case['index'],case['requirements'])
+    assert len(bindings['bindings'])==4
+    rows={row['id']:row for row in case['inventory']['native_coverage']['obligations']}
+    for identity,binding in bindings['bindings'].items():
+        for category in ('program','native'):
+            assert completion.evidence_result(binding['evidence'][category],rows[identity],
+                case['inventory']['native_coverage']['candidate_sha256'],category,'product',base,
+                binding,source_root=audit.ROOT, reference_edges={k:v for k,v in rows.items() if v['kind']=='reference'})==('passed',None)
+
+
+def test_source_successor_rejects_resigned_predecessor_substitution(source_successor_case):
+    """Equal parsed v1 JSON is not permission to substitute its original bytes."""
+    import hashlib
+    from copy import deepcopy
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case=source_successor_case; base=case['base']; output=case['output']
+    import uuid
+    prefix='substitution-'+uuid.uuid4().hex+'-'
+    original=base/case['predecessor']['artifact']; raw=original.read_bytes()+b' '
+    changed=output/(prefix+'predecessor.json'); changed.write_bytes(raw)
+    replacement={'artifact':changed.relative_to(base).as_posix(),'sha256':hashlib.sha256(raw).hexdigest()}
+    attachment=deepcopy(completion.read_sealed_artifact(case['successor'],base))
+    context=completion.read_sealed_artifact(attachment['successor_context'],base)
+    context['predecessor']=replacement
+    def emit(name,value):
+        target=output/(prefix+name)
+        return {**write_json(target,value),'artifact':target.relative_to(base).as_posix()}
+    attachment['predecessor']=replacement;attachment['successor_context']=emit('substituted-context.json',context)
+    index=json.loads(case['index'].read_bytes());index['source_native_attachments']=[emit('substituted-native.json',attachment)]
+    target=output/(prefix+'index.json');write_json(target,index)
+    with pytest.raises(ValueError,match='original predecessor'):
+        audit.portable_binding_inputs(target,case['requirements'])
+
+
+@pytest.mark.parametrize('fault,reason',(
+    ('omitted_current','successor context differs'),
+    ('extra_current','successor context differs'),
+    ('changed_current','successor context differs'),
+    ('wrong_review','successor context differs'),
+    ('forged_review','successor context differs'),
+    ('wrong_original_context','artifact digest mismatch'),
+    ('wrong_candidate','current complete product program'),
+    ('wrong_predecessor','original predecessor'),
+    ('absolute_context','path|relative'),
+    ('traversal_context','path|traversal|relative'),
+    ('escaped_context','escapes'),
+    ('original_proof_replaced','original native attribution'),
+    ('branch_replaced','original native attribution'),
+    ('v1_stale','Original Source proof/context'),
+))
+def test_source_successor_inner_guards_reject_resigned_outer_descriptors(source_successor_case,fault,reason,tmp_path):
+    from copy import deepcopy
+    import hashlib
+    import uuid
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case=source_successor_case; base=case['base']; prefix=fault+'-'+uuid.uuid4().hex+'-'
+    def emit(name,value):
+        target=case['output']/(prefix+name)
+        return {**write_json(target,value),'artifact':target.relative_to(base).as_posix()}
+    attachment=deepcopy(completion.read_sealed_artifact(case['successor'],base))
+    context=deepcopy(completion.read_sealed_artifact(attachment['successor_context'],base))
+    if fault=='omitted_current':context['current_sources'].pop('skills/waapi-skill/scripts/gateway.py')
+    elif fault=='extra_current':context['current_sources']['unreviewed.py']='0'*64
+    elif fault=='changed_current':context['current_sources']['skills/waapi-skill/scripts/gateway.py']='0'*64
+    elif fault=='wrong_review':context['review']['sha256']='0'*64
+    elif fault=='forged_review':
+        review=completion.read_sealed_artifact(context['review'],base);review['scope']='self-authorized'
+        context['review']=emit('review.json',review)
+    elif fault=='wrong_original_context':context['original_source_context']['sha256']='0'*64
+    elif fault=='wrong_candidate':context['current_candidate_sha256']='f'*64
+    elif fault=='wrong_predecessor':context['predecessor']['sha256']='0'*64
+    elif fault=='original_proof_replaced':attachment['proof']['sha256']='0'*64
+    elif fault=='branch_replaced':attachment['branch_ids'][0]=attachment['branch_ids'][0].replace('/anyOf/1','/anyOf/0')
+    descriptor=emit('context.json',context)
+    if fault=='absolute_context':descriptor['artifact']=str((base/descriptor['artifact']).resolve())
+    elif fault=='traversal_context':descriptor['artifact']='../'+descriptor['artifact']
+    elif fault=='escaped_context':
+        external=tmp_path/(prefix+'outside.json')
+        external.write_bytes((base/descriptor['artifact']).read_bytes())
+        link=case['output']/(prefix+'link.json');link.symlink_to(external)
+        descriptor['artifact']=link.relative_to(base).as_posix()
+    attachment['successor_context']=descriptor
+    index=json.loads(case['index'].read_bytes())
+    index['source_native_attachments']=[case['predecessor'] if fault=='v1_stale' else emit('attachment.json',attachment)]
+    path=case['output']/(prefix+'index.json');write_json(path,index)
+    with pytest.raises((ValueError,TypeError),match=reason):
+        audit.portable_binding_inputs(path,case['requirements'])
+
+
+def test_source_successor_producer_preserves_original_native_descriptors(source_successor_case):
+    import uuid
+    from tests.support.source_copy_native_evidence import publish_source_native_successor
+    from tests.maintenance import branch_audit_completion as completion
+    case=source_successor_case
+    index=json.loads(case['index'].read_bytes())
+    program_index=(case['base']/index['entries'][0]['origin']['program']['artifact']).parent/'index.json'
+    published=publish_source_native_successor(program_index,predecessor=case['predecessor'],
+        inventory=case['inventory'],product_base=case['base'],
+        destination=case['output']/('published-'+uuid.uuid4().hex))
+    output=json.loads(published.read_bytes())
+    successor=completion.read_sealed_artifact(output['source_native_attachments'][0],case['base'])
+    original=completion.read_sealed_artifact(case['predecessor'],case['base'])
+    assert {k:successor[k] for k in ('branch_ids','business_fact_id','proof','evidence')}=={
+        k:original[k] for k in ('branch_ids','business_fact_id','proof','evidence')}
+    assert successor['predecessor']==case['predecessor']
+    bindings,base,_=audit.portable_binding_inputs(published,case['requirements'])
+    assert len(bindings['bindings'])==4
+
+
+def test_source_successor_reads_portable_proof_with_old_origins_unavailable(source_successor_case,monkeypatch):
+    from tests.maintenance import branch_audit_completion as completion
+    case=source_successor_case
+    attachment=completion.read_sealed_artifact(case['successor'],case['base'])
+    proof=completion.read_sealed_artifact(attachment['proof'],case['base'])
+    old_origins=set(proof['files'])
+    read_bytes=Path.read_bytes
+    def bounded_read(path):
+        if str(path) in old_origins:
+            raise OSError('Original native provenance origin is unavailable')
+        return read_bytes(path)
+    monkeypatch.setattr(Path,'read_bytes',bounded_read)
+    bindings,base,_=audit.portable_binding_inputs(case['index'],case['requirements'])
+    rows={r['id']:r for r in case['inventory']['native_coverage']['obligations']}
+    for identity,binding in bindings['bindings'].items():
+        assert completion.evidence_result(binding['evidence']['native'],rows[identity],
+            case['inventory']['native_coverage']['candidate_sha256'],'native','product',base,binding,
+            source_root=audit.ROOT,reference_edges={k:v for k,v in rows.items() if v['kind']=='reference'})==('passed',None)
+
+
+def test_source_successor_rejects_new_dependency_bytes(source_successor_case, monkeypatch):
+    from tests.support.source_copy_native_evidence import successor_dependency_review
+    case = source_successor_case
+    review = successor_dependency_review()
+    dependency = next(name for name in review['added_dependencies'] if name.endswith('.py'))
+    target = audit.ROOT / dependency
+    read_bytes = Path.read_bytes
+    monkeypatch.setattr(Path, 'read_bytes', lambda path: read_bytes(path) + b' ' if path == target else read_bytes(path))
+    with pytest.raises(ValueError, match='current dependency changed'):
+        audit.portable_binding_inputs(case['index'], case['requirements'])
+
+
+def test_source_successor_rejects_malformed_review_descriptor(source_successor_case):
+    from copy import deepcopy
+    import uuid
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_successor_case
+    attachment = deepcopy(completion.read_sealed_artifact(case['successor'], case['base']))
+    context = completion.read_sealed_artifact(attachment['successor_context'], case['base'])
+    context['review'] = None
+    path = case['output'] / ('malformed-review-' + uuid.uuid4().hex + '.json')
+    descriptor = {**write_json(path, context), 'artifact': path.relative_to(case['base']).as_posix()}
+    from tests.support.source_copy_native_evidence import validate_successor_context
+    with pytest.raises(ValueError, match='descriptor'):
+        validate_successor_context(descriptor, case['base'])
+
+
+def test_source_successor_equivalence_cannot_drop_current_context(source_successor_case):
+    from copy import deepcopy
+    import uuid
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    case = source_successor_case
+    bindings, base, _ = audit.portable_binding_inputs(case['index'], case['requirements'])
+    identity, binding = next(iter(bindings['bindings'].items()))
+    binding = deepcopy(binding)
+    proof = completion.read_sealed_artifact(binding['equivalence'], base)
+    proof.pop('source_copy_successor_context')
+    path = case['output'] / ('unbound-equivalence-' + uuid.uuid4().hex + '.json')
+    binding['equivalence'] = {**write_json(path, proof), 'artifact': path.relative_to(base).as_posix()}
+    branch = next(row for row in case['inventory']['native_coverage']['obligations'] if row['id'] == identity)
+    result = completion.evidence_result(binding['evidence']['native'], branch,
+        case['inventory']['native_coverage']['candidate_sha256'], 'native', 'product', base, binding,
+        source_root=audit.ROOT, reference_edges={row['id']: row for row in case['inventory']['native_coverage']['obligations'] if row['kind'] == 'reference'})
+    assert result[0] == 'missing'
+    assert 'successor equivalence context differs' in result[1]
