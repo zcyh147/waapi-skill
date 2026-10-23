@@ -5,6 +5,67 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R105–R107 targeted Profiler follow-up and lifecycle repair
+
+R105 candidate `503688449ba9f9db964a5fb7116ac6be2fb07198` ran only the
+missing bus-contribution observation on all five Mac Authoring builds and
+RTPC observations on 2022–2025. Every selected business observation passed;
+whole-run lifecycle outcomes remain distinct:
+
+| Build | Raw pytest result | Final lifecycle result | Public calls |
+| --- | --- | --- | ---: |
+| 2021.1.14.8108 | 1 passed, 73.70s | BLOCKED: port-release deadline | 77 |
+| 2022.1.19.8584 | 1 passed, 73.32s | PASS | 78 |
+| 2023.1.19.8928 | 1 passed, 78.91s | BLOCKED: port-release deadline | 86 |
+| 2024.1.13.9056 | 1 passed, 81.45s | BLOCKED: port-release deadline | 86 |
+| 2025.1.7.9143 | 1 passed, 83.12s | PASS | 86 |
+
+The collector now selects the unique complete observed mixing-Bus instance,
+which can differ from the authored logical OutputBus, and accepts attributed
+RTPC read values without demanding an unrelated global setter effect. Partial
+voice/bus seeds fail closed before selection. The 2021 RTPC read is retained
+from R104; it was not repeated. CPU delivery was repaired and checked against
+copied exact native rows through fresh Gateway state and cached continuations,
+without repeating native measurements or using original continuation tokens.
+Separate focused checks passed: 13 affected integration cases, 13 matching-
+version delivery/admission cases, and six partial-seed/final-writer cases.
+These are cumulative focused results, not a full Program or Non-live gate.
+
+Evidence roots are `r105-missing-profiler-native-<year>-r1` below
+`.waapi-skill-state/full-coverage/`, summarized in `r105-native-summary.json`.
+All 616 source-context hashes per root and 172/156/168/168/168 archived files
+were checked without mismatches. Collector cleanup completed; fixture
+readbacks and original-project hash/mtime were unchanged. Later process and
+bind observations do not replace the original failed cleanup deadlines or
+change their formal verdicts. Failed trees remain retained.
+
+R106 candidate `5b183841676ff802811d77973296794b780ba0b7` ran one bounded
+2025.1.7.9143 Event-preparation probe after starting capture. The existing
+Play_Rifle_Close Event and committed media were used without new fixture
+objects, streaming-property changes or SDK installation. LoadedMedia at
+22794ms returned a complete empty list: raw node failed in 61.27s and formal
+outcome stayed BLOCKED. All 57 public calls are archived; collector cleanup,
+fixture and source checks succeeded, with 617 source-context hashes and 86
+archive files checked. The root is `r106-loaded-event-native-2025-r1`.
+Nonempty LoadedMedia remains unresolved under #186/#174; an acknowledgement
+of Event preparation does not establish SDK PrepareEvent equivalence or
+native absence. No other-version repetition followed this empty result.
+
+A separate post-terminal observation recorded local port 8080 in TIME_WAIT
+and an actual bare-bind EADDRINUSE error, then a later successful bind. This
+does not diagnose earlier R105 failures whose errno was not retained. The
+lifecycle now preserves the last bind error; R107 candidate `51b539e1` gives
+macOS a 45-second default release window (other platforms retain 15 seconds).
+Explicit deadlines, immediate return when free, strict bare bind and failed
+quarantine remain unchanged. Eight focused fake-socket/time checks passed,
+including the causal old-deadline failure and release at 30 seconds. This
+repair grants no new native cleanup or API-coverage credit.
+
+All native launches used `-AutomationMode`. No Fresh, Windows, full combined
+gate or whole-#186 acceptance is claimed. GitHub Pure-code preflight for
+`50368844` passed after five stale acknowledgement-message expectations were
+corrected; that preflight is not the full Program/Non-live promotion gate.
+
 ## 2026-10-24 R104 remaining Profiler capture reads
 
 Candidate `a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8` ran one owned Mac
