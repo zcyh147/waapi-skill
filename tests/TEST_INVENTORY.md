@@ -5,6 +5,33 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R88 legacy ControlInput typed query
+
+Reviewed runtime `bf57bd55` certifies only the source-defined 2021 RTPC
+class1441808 ControlInput reference whose native metadata omits its kind.
+Root and related query binders require current field inventory, unchanged raw
+metadata and exact object/class identity, then revalidate those observations
+before returning results. Mutation discovery and target restrictions remain
+unchanged. The directly affected selection passed 207 checks in 13.31s,
+including 25 new controls; independent review found no actionable issue.
+
+Frozen `17ccde20` passed the selected Mac Console2021.1.14.8108 workflow in
+10.69s: five groups, nine live public invocations, 86 hash-checked native
+packets, zero continuations and zero transactions. Fresh exact Source/RTPC/LFO
+baselines matched ordinary/local ControlInput RETURN, chained LfoFrequency4
+and LfoDepth90 values, and two combined occurrences sharing the same GUID.
+Repeated business baselines, source/prepared-file preservation and lifecycle
+cleanup passed. Root: `r88-controlinput-17ccde20-2021-r1/root-review.json`.
+
+The fixture uses the existing lifecycle and real-Gateway/fake-client seam;
+its final five controls passed in 1.25s, following an overlapping 30-check
+selection in 2.03s. Original development failures remain retained. The first
+Main report script expected an unrecorded source_after key; its correction
+used the actual baseline records and frozen source-frame equality assertion,
+without rerunning or regrading the native test. Complete legacy RTPC membership,
+property association, points, Marker and BatchRename discovery remain separate
+obligations. No modern green family, full gate or Fresh run was added.
+
 ## 2026-10-23 R87 bounded condition evidence reuse
 
 Reviewed condition accounting `b4cf930e`, integrated at `d8fb3e44`, preserves
