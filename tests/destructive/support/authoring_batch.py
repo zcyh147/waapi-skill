@@ -19,7 +19,10 @@ from wwise_waapi.native_catalog import load_native_catalog
 from wwise_waapi.host_paths import localize_waapi_host_path
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from wwise_waapi.filesystem_security import path_is_link_or_reparse
-from tests.destructive.support.transport_semantics import NODEID as TRANSPORT_SEMANTICS_NODEID, CONTRACT as TRANSPORT_SEMANTICS_CONTRACT
+from tests.destructive.support.transport_semantics import (
+    NODEID as TRANSPORT_SEMANTICS_NODEID, CONTRACT as TRANSPORT_SEMANTICS_CONTRACT,
+    MIXED_NODEID as TRANSPORT_MIXED_NODEID, MIXED_CONTRACT as TRANSPORT_MIXED_CONTRACT,
+)
 from tests.destructive.support.profiler_capture import (
     NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, CAPTURE_NODE_OUTCOMES,
     stage_owned_2024_meter_media,
@@ -32,6 +35,10 @@ MEDIA_PRESERVATION_DIAGNOSTIC_NODEID = ('tests/destructive/test_authoring_ui_bus
 SOUNDCASTER_FRONTEND_DIAGNOSTIC_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_authoring_2024_soundcaster_frontend_image_diagnostic')
 DIAGNOSTIC_NODEIDS = (MEDIA_PRESERVATION_DIAGNOSTIC_NODEID, SOUNDCASTER_FRONTEND_DIAGNOSTIC_NODEID)
+TRANSPORT_OBSERVATION_NODES = {
+    TRANSPORT_SEMANTICS_NODEID: (TRANSPORT_SEMANTICS_CONTRACT, 'transport-semantics.json', 'selected-transport-semantics-observations'),
+    TRANSPORT_MIXED_NODEID: (TRANSPORT_MIXED_CONTRACT, 'transport-mixed-semantics.json', 'mixed-transport-semantics-observations'),
+}
 
 
 class AuthoringBatchAdapter:
@@ -248,7 +255,7 @@ class AuthoringBatchAdapter:
                          **({'observation_artifact': self.observation_artifacts[row['nodeid']]}
                             if row['nodeid'] in self.observation_artifacts else {}),
                          **({'batch_finalization': self.batch_seal_descriptor}
-                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] not in CAPTURE_NODE_OUTCOMES and row['nodeid'] != TRANSPORT_SEMANTICS_NODEID]
+                            if outcome == 'PASS' else {})} for row in outcomes if row['nodeid'] not in CAPTURE_NODE_OUTCOMES and row['nodeid'] not in TRANSPORT_OBSERVATION_NODES]
         for capture_nodeid in (node for node in self.selected_nodeids if node in CAPTURE_NODE_OUTCOMES):
             # Consume the exact archived collector output, including partial
             # observations. A passing sibling never fills another outcome.
@@ -272,15 +279,16 @@ class AuthoringBatchAdapter:
                     'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
                     **({'observation_artifact': descriptor} if descriptor else {}),
                     **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})})
-        if TRANSPORT_SEMANTICS_NODEID in self.selected_nodeids:
-            descriptor = self.observation_artifacts.get(TRANSPORT_SEMANTICS_NODEID)
+        for nodeid in (node for node in self.selected_nodeids if node in TRANSPORT_OBSERVATION_NODES):
+            contract, filename, category = TRANSPORT_OBSERVATION_NODES[nodeid]
+            descriptor = self.observation_artifacts.get(nodeid)
             report = {}
             if descriptor:
                 archive = json.loads(Path(descriptor['path']).read_text(encoding='utf-8'))
-                path = Path(archive['artifacts']['native-evidence']['path']) / 'transport-semantics.json'
+                path = Path(archive['artifacts']['native-evidence']['path']) / filename
                 if path.exists():
                     report = json.loads(path.read_text(encoding='utf-8'))
-                    if (report.get('contract') != TRANSPORT_SEMANTICS_CONTRACT
+                    if (report.get('contract') != contract
                             or report.get('candidate') != self.candidate or report.get('version') != '2025.1'
                             or report.get('business_effect_verified') is not False
                             or report.get('coverage_credit') != 'none_pending_semantics'):
@@ -288,8 +296,8 @@ class AuthoringBatchAdapter:
             observed = (outcome == 'PASS' and report.get('complete') is True
                 and report.get('cleanup', {}).get('complete') is True
                 and report.get('observation_task_status') == 'PASS')
-            categories.append({'category': 'selected-transport-semantics-observations',
-                'nodeid': TRANSPORT_SEMANTICS_NODEID, 'status': 'blocked',
+            categories.append({'category': category,
+                'nodeid': nodeid, 'status': 'blocked',
                 'observation_task_status': 'PASS' if observed else 'BLOCKED',
                 'business_effect_verified': False, 'coverage_credit': 'none_pending_semantics',
                 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
@@ -460,6 +468,7 @@ def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path
 OWNED_AUTHORING_NODEIDS = (
     *DIAGNOSTIC_NODEIDS,
     TRANSPORT_SEMANTICS_NODEID,
+    TRANSPORT_MIXED_NODEID,
     PROFILER_CAPTURE_NODEID,
     METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
@@ -494,8 +503,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
     if METER_2024_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1'):
         raise pytest.UsageError('Owned meter projection requires only its matching 2024 Authoring node')
-    if TRANSPORT_SEMANTICS_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
-        raise pytest.UsageError('Selected transport observations require only their matching 2025 Authoring node')
+    if set(selected).intersection(TRANSPORT_OBSERVATION_NODES) and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
+        raise pytest.UsageError('Transport observations require only their matching 2025 Authoring node')
     root = Path(raw_root)
     if (not root.is_absolute() or os.path.lexists(root)
             or any(path_is_link_or_reparse(part) for part in root.parents)
@@ -508,7 +517,7 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         if selected == (METER_2024_NODEID,):
             stage_owned_2024_meter_media(_sandbox, _io)
     live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',

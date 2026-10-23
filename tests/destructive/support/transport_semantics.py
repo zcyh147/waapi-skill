@@ -1,4 +1,4 @@
-"""Three owned 2025 selected-edge observations; no inferred native semantics."""
+"""Owned 2025 selected and mixed observations; no inferred native semantics."""
 from __future__ import annotations
 
 import json
@@ -11,32 +11,58 @@ from tests.semantic.support.typed_gateway_input import discovered_business_field
 NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_selected_transport_semantics')
 CONTRACT = 'waapi-skill.selected-transport-observations/v1'
+MIXED_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_runtime_owned_2025_mixed_transport_semantics')
+MIXED_CONTRACT = 'waapi-skill.mixed-transport-observations/v1'
 SOUND_ID = '{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}'
 SOURCE_ID = '{6F767F75-9ED2-4860-A745-A5D905C6DF9C}'
+FIXTURES = (
+    (SOUND_ID, SOURCE_ID, 'RFL_Tail', 'audit_tail.wav'),
+    ('{80876919-C42E-4807-9595-900CC8405222}', '{66BDDC06-5699-4C17-A9DD-58119D7CE6BC}',
+     'Rifle_Mechanical', 'rifle_mechanical_old.wav'),
+)
 PREFIX = 'ak.wwise.core.transport.'
 CASES = (('D-one', 'play-directly', 'stopped'), ('P-one', 'pause', 'stopped'),
          ('T-one', 'toggle-play-stop', 'paused'))
+MIXED_CASES = (('D-all', 'play-directly', ('playing', 'paused')),
+    ('P-all-SP', 'pause', ('stopped', 'playing')),
+    ('P-all-PQ', 'pause', ('playing', 'paused')),
+    ('T-all-SP', 'toggle-play-stop', ('stopped', 'playing')),
+    ('T-all-QS', 'toggle-play-stop', ('paused', 'stopped')))
 
 
 def collect_selected_transport_semantics(batch, public_call):
-    assert batch.runtime.version == '2025.1' and batch.selected_nodeids == (NODEID,)
-    destination = Path(batch.node_runtimes[NODEID].runner_environment['WWISE_EVIDENCE_DIR'])
+    return _collect_transport_semantics(batch, public_call, mixed=False)
+
+
+def collect_mixed_transport_semantics(batch, public_call):
+    return _collect_transport_semantics(batch, public_call, mixed=True)
+
+
+def _collect_transport_semantics(batch, public_call, *, mixed):
+    nodeid = MIXED_NODEID if mixed else NODEID
+    assert batch.runtime.version == '2025.1' and batch.selected_nodeids == (nodeid,)
+    destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
     destination.mkdir(parents=True, exist_ok=True)
-    report_path = destination / 'transport-semantics.json'
-    report = {'contract': CONTRACT, 'candidate': batch.candidate, 'version': '2025.1',
+    report_path = destination / ('transport-mixed-semantics.json' if mixed else 'transport-semantics.json')
+    report = {'contract': MIXED_CONTRACT if mixed else CONTRACT, 'candidate': batch.candidate, 'version': '2025.1',
         'host': batch.info, 'complete': False, 'observation_task_status': 'BLOCKED',
         'business_effect_verified': False, 'coverage_credit': 'none_pending_semantics',
-        'scope': 'three selected edges only; no all-active, acoustic, restart or bypass proof',
-        'limits': {'public_calls': 210, 'cleanup_reserved_calls': 48,
+        'scope': ('five mixed all-active pairs only; no acoustic, restart or bypass proof' if mixed else
+            'three selected edges only; no all-active, acoustic, restart or bypass proof'),
+        **({'observation_time_boundary': 'Sequential verifier reads within the recorded call interval; no atomic snapshot or exact per-member observation time'} if mixed else {}),
+        'limits': {'public_calls': 480 if mixed else 210, 'cleanup_reserved_calls': 64 if mixed else 48,
             'reply_bytes': 1024 * 1024, 'total_reply_bytes': 8 * 1024 * 1024,
             'report_bytes': 1024 * 1024}, 'public_call_count': 0, 'total_reply_bytes': 0,
-        'cases': [{'case_id': case, 'action': action, 'required_prestate': state,
+        'cases': [{'case_id': case, 'action': action, 'required_prestate': list(state) if mixed else state,
                    'observation_status': 'BLOCKED', 'business_effect_verified': False,
-                   'coverage_credit': 'none_pending_semantics'} for case, action, state in CASES],
+                   'coverage_credit': 'none_pending_semantics'} for case, action, state in (MIXED_CASES if mixed else CASES)],
         'setup': [], 'errors': [], 'cleanup': {'complete': False, 'receipts': [], 'errors': [],
             'audition_media_prior_state_restored': False,
             'audition_media_scope': 'Explicit originals setup only; prior global mode is not observed or restored'}}
-    cleanup_phase, unsafe, handle, restore_loop = False, False, None, False
+    cleanup_phase, unsafe, handle = False, False, None
+    handles, restore_loops, fixture_before = [], [], []
+    list_command = None
     original = None
 
     def persist():
@@ -117,40 +143,62 @@ def collect_selected_transport_semantics(batch, public_call):
             record['acknowledgement'] = {'state': executed['state'], 'executed': executed.get('executed'),
                 'observed_at_ns': monotonic_ns()}
             persist()
+        if mixed and record is not None:
+            record['verification_interval'] = {'started_ns': monotonic_ns()}
+            try:
+                return call(['verify', tx])
+            finally:
+                record['verification_interval']['finished_ns'] = monotonic_ns()
+                persist()
         return call(['verify', tx])
 
-    def action(name, *, before_execute=None, record=None):
+    def action(name, *, selected_handle=None, all_active=False, before_execute=None, record=None):
         return execute(draft(PREFIX + 'executeAction', ['--audition-action', name,
-            '--transport-scope','one-transport','--transport-handle', handle]),
+            '--transport-scope', *(['all-active'] if all_active else
+                ['one-transport', '--transport-handle', selected_handle or handle])]),
             before_execute=before_execute, record=record)
 
-    def state():
-        value = call(['core-call', PREFIX + 'getState', '--transport-handle', handle])['agent_result']
-        assert value['transport_handle'] == handle and value['state'] in {'playing','paused','stopped'}, value
+    def state(selected_handle=None):
+        selected_handle = selected_handle or handle
+        value = call(['core-call', PREFIX + 'getState', '--transport-handle', selected_handle])['agent_result']
+        assert value['transport_handle'] == selected_handle and value['state'] in {'playing','paused','stopped'}, value
         return {**value, 'observed_at_ns': monotonic_ns()}
 
-    def set_loop(value):
-        result = execute(draft('object.setProperty', [json.dumps(value)], identity=SOUND_ID, field=True))
+    def set_loop(value, identity=SOUND_ID):
+        result = execute(draft('object.setProperty', [json.dumps(value)], identity=identity, field=True))
         assert result['verification']['business_state_verified'] is True, result
         return result
+
+    def membership():
+        nonlocal list_command
+        if list_command is None:
+            list_command = call(['request-schema', PREFIX + 'getList'])['continuation']['gateway_argv']
+        rows = call(list_command)['agent_result']['list']
+        assert len(rows) == 2 and len({row['transport'] for row in rows}) == 2, rows
+        assert len({row['object'] for row in rows}) == 2, rows
+        return sorted(rows, key=lambda row: row['transport'])
 
     persist()
     try:
         from wwise_waapi.operation_soundbank import capture_file_proof
-        media = batch.runtime.sandbox.sandbox_path / 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav'
-        report['media'] = capture_file_proof(media, field='owned existing transport media',
-            io_root=batch.runtime.owned_root, max_bytes=16 * 1024 * 1024)
-        with wave.open(str(media)) as source:
-            assert source.getnframes() > 0 and source.getframerate() > 0
         fields = ['--include-field','IsLoopingEnabled','--include-field','IsLoopingInfinite','--include','active-source']
-        original = exact(SOUND_ID, *fields)
-        assert original['name'] == 'RFL_Tail' and original['type'] == 'Sound', original
-        assert original['active_source']['id'] == SOURCE_ID, original
-        source = exact(SOURCE_ID)
-        assert source['type'] == 'AudioFileSource', source
-        props = original['properties']
-        assert type(props['IsLoopingEnabled']) is bool and props['IsLoopingInfinite'] is True, props
-        report['fixture_before'] = {'sound': original, 'source': source}
+        media_proofs = []
+        for sound_id, source_id, name, filename in (FIXTURES if mixed else FIXTURES[:1]):
+            media = batch.runtime.sandbox.sandbox_path / 'Originals/SFX/WAAPI Skill Integration V2' / filename
+            media_proofs.append(capture_file_proof(media, field='owned existing transport media',
+                io_root=batch.runtime.owned_root, max_bytes=16 * 1024 * 1024))
+            with wave.open(str(media)) as source:
+                assert source.getnframes() > 0 and source.getframerate() > 0
+            original = exact(sound_id, *fields)
+            assert original['name'] == name and original['type'] == 'Sound', original
+            assert original['active_source']['id'] == source_id, original
+            source = exact(source_id)
+            assert source['type'] == 'AudioFileSource', source
+            props = original['properties']
+            assert type(props['IsLoopingEnabled']) is bool and props['IsLoopingInfinite'] is True, props
+            fixture_before.append({'sound': original, 'source': source})
+        report['fixture_before'] = fixture_before if mixed else fixture_before[0]
+        report['media'] = media_proofs if mixed else media_proofs[0]
         # The copied fixture owns the original PCM, not a converted cache.
         # Select it explicitly through the same public setup used by capture.
         originals = {'business_effect_verified': False}
@@ -159,14 +207,53 @@ def collect_selected_transport_semantics(batch, public_call):
         originals['verification_state'] = selected['state']
         assert selected['state'] == 'result_schema_checked' and selected['verified'] is False, selected
         persist()
-        if not props['IsLoopingEnabled']:
-            # Restoration ownership precedes the attempted write.
-            restore_loop = True
-            report['setup'].append({'loop_enabled': set_loop(True)})
-        created = execute(draft(PREFIX + 'create', [], identity=SOUND_ID))
-        handle = created['agent_result']['business_result']['transport_handle']
-        report['setup'].append({'created': created})
-        for case in report['cases']:
+        for fixture in fixture_before:
+            original = fixture['sound']
+            if not original['properties']['IsLoopingEnabled']:
+                # Restoration ownership precedes the attempted write.
+                restore_loops.append(original['id'])
+                report['setup'].append({'loop_enabled': set_loop(True, original['id'])})
+            created = execute(draft(PREFIX + 'create', [], identity=original['id']))
+            handle = created['agent_result']['business_result']['transport_handle']
+            handles.append(handle)
+            report['setup'].append({'created': created})
+        if mixed:
+            assert len(set(handles)) == 2, handles
+            bound = membership()
+            members = []
+            for fixture, selected_handle, setup in zip(fixture_before, handles,
+                    [step['created'] for step in report['setup'] if 'created' in step]):
+                association, = [row for row in bound if row['object'] == fixture['sound']['id']]
+                members.append({**association, 'transport_handle': selected_handle,
+                    'controlled_object': {key: fixture['sound'][key] for key in ('id','name','type','path')},
+                    'source_id': fixture['source']['id'],
+                    'association_journal_relative_path': f"setup-state/transactions/{setup['transaction_id']}/events.jsonl"})
+            report['members'] = members
+            for case in report['cases']:
+                case['setup'] = []
+                # Never use an investigated outcome as the next precondition.
+                for selected_handle, required in zip(handles, case['required_prestate']):
+                    controls = ['stop'] + ([] if required == 'stopped' else ['play']) + (['pause'] if required == 'paused' else [])
+                    for control in controls:
+                        record = {'action': control, 'transport_handle': selected_handle}
+                        case['setup'].append(record)
+                        result = action(control, selected_handle=selected_handle, record=record)
+                        assert result['verification']['business_state_verified'] is True, result
+                def observe_pair():
+                    case['membership_before'] = membership()
+                    assert case['membership_before'] == bound, case
+                    case['before'] = [state(selected_handle) for selected_handle in handles]
+                    assert [row['state'] for row in case['before']] == list(case['required_prestate']), case
+                verified = action(case['action'], all_active=True, before_execute=observe_pair, record=case)
+                scope = verified['verification']['verification_scope']['observation']
+                assert scope['membership_matches'] is True and scope['scope'] == 'all-active', scope
+                assert {row['transport'] for row in scope['targets']} == {row['transport'] for row in members}, scope
+                case.update(after=[next(row for row in scope['targets'] if row['transport'] == member['transport'])
+                        for member in members], verification_state=verified['state'],
+                    gateway_business_state_verified=verified['verification']['business_state_verified'],
+                    verification_observed_at_ns=monotonic_ns(), observation_status='OBSERVED')
+                persist()
+        for case in ([] if mixed else report['cases']):
             # Each case starts afresh from a known stopped target. These are
             # separately previewed setup calls, never retries of an edge action.
             stopped = action('stop')
@@ -199,11 +286,11 @@ def collect_selected_transport_semantics(batch, public_call):
                 'reason': 'Gateway outcome unavailable/uncertain; owner must stop and quarantine host'})
         else:
             steps = []
-            if handle:
-                steps.extend([('stop', lambda: action('stop')),
-                    ('destroy', lambda: execute(draft(PREFIX + 'destroy', ['--transport-handle', handle])))])
-            if restore_loop:
-                steps.append(('restore-loop', lambda: set_loop(False)))
+            for selected_handle in handles:
+                steps.extend([('stop', lambda selected_handle=selected_handle: action('stop', selected_handle=selected_handle)),
+                    ('destroy', lambda selected_handle=selected_handle: execute(draft(PREFIX + 'destroy', ['--transport-handle', selected_handle])))])
+            for identity in restore_loops:
+                steps.append(('restore-loop', lambda identity=identity: set_loop(False, identity)))
             for label, operation in steps:
                 try:
                     result = operation()
@@ -216,7 +303,9 @@ def collect_selected_transport_semantics(batch, public_call):
                     persist()
             if not report['cleanup']['errors'] and original is not None:
                 try:
-                    report['fixture_after'] = {'sound': exact(SOUND_ID, *fields), 'source': exact(SOURCE_ID)}
+                    after = [{'sound': exact(fixture['sound']['id'], *fields), 'source': exact(fixture['source']['id'])}
+                        for fixture in fixture_before]
+                    report['fixture_after'] = after if mixed else after[0]
                     assert report['fixture_after'] == report['fixture_before'], 'Selected transport fixture changed after cleanup'
                 except Exception as exc:
                     report['cleanup']['errors'].append({'action': 'fixture-preservation', 'message': str(exc)[:4096]})
