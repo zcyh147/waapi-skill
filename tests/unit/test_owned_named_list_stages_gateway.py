@@ -1,5 +1,6 @@
 """Named documented List members retain typed ownership through native-name stages."""
 from copy import deepcopy
+import json
 
 import pytest
 
@@ -205,6 +206,19 @@ def test_native_named_set_proves_named_list_owner_and_all_public_occurrences(tmp
     assert {row['object']['id'] for row in roster} == {BUS, SOUND, SLOT}
     slot = next(row for row in roster if row['object']['id'] == SLOT)
     assert slot['owner_id'] == SOUND and slot['list_name'] == 'Metadata' and 'parent_id' not in slot
+    code, full = task.run('transaction-show', tx)
+    assert code == 0, full
+    internal = [node['constructor_inputs'] for node in full['artifact']['prepared_operation']['pre_state']['object_set_nodes']
+        if 'constructor_inputs' in node]
+    assert internal and all('constructor_packet_sha256' in proof and 'constructor_evidence' in proof for proof in internal)
+    public = [assertion['evidence']['constructor_inputs'] for event in full['events']
+        for phase in ('role_validation', 'verification')
+        for assertion in event['details'].get(phase, {}).get('assertions', [])
+        if 'constructor_inputs' in assertion.get('evidence', {})]
+    assert len(public) >= 2, full['events']
+    expected = {'version': '2025.1', 'class_name': 'MetadataSlot', 'class_id': 5570560,
+        'collection': 'Metadata', 'required_references': ['Metadata']}
+    assert all(proof == expected for proof in public), public
 
 
 def test_staged_named_list_append_retains_ordered_prefix_and_member_state(tmp_path):
@@ -335,6 +349,12 @@ def test_new_metadata_slot_requires_constructor_reference_before_preview(tmp_pat
     code, checked = task.step('draft-check')
     assert code == 2 and checked.get('error_code') == 'REQUIRED_CONSTRUCTOR_REFERENCE_MISSING', checked
     assert checked['details']['reference'] == 'Metadata'
+    assert checked['details']['field_discovery']['meaning'] == 'Metadata'
+    encoded = json.dumps(checked)
+    assert 'r84-named-list-2a3037eb-2025-r2' not in encoded, checked['details']['required_inputs']
+    assert 'constructor_packet_sha256' not in encoded
+    assert checked['details']['required_inputs'] == {'version': '2025.1', 'class_name': 'MetadataSlot',
+        'class_id': 5570560, 'collection': 'Metadata', 'required_references': ['Metadata']}
     assert task.writes == []
 
 

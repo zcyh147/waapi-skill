@@ -4,6 +4,7 @@ MetadataSlot's owned Metadata placement is certified by matching WObjects/SDK
 and the retained 9143 constructor rejection. This is not a generic notNull rule.
 """
 from copy import deepcopy
+from collections.abc import Mapping
 from uuid import UUID
 
 from .documented_list_fields import load_catalog
@@ -33,6 +34,15 @@ def authority(spec, *, version=VERSION):
             or row['source_sha256'] != SOURCE['sdk_sha256'] or FIELD not in row['scalar_references']):
         raise ValueError('Required constructor input lost its matching class/placement source')
     return {**deepcopy(SOURCE), 'catalog_sha256': catalog['catalog_sha256']}
+
+
+def public_requirements(proof):
+    """Project the business requirement without exposing developer provenance."""
+    if not isinstance(proof, Mapping):
+        return None
+    return {"version": proof["version"], "class_name": "MetadataSlot",
+        "class_id": proof["class_id"], "collection": proof["collection"],
+        "required_references": list(proof["required_references"])}
 
 
 def complete(spec):

@@ -8699,7 +8699,7 @@ def _prepare_object_node_specs(
                 )
             spec["construction_language"] = {"requested": node.language, "role": "voice-construction-context",
                 "mode": "new", "expected_sources": [], "version": version}
-        from .constructor_inputs import authority as constructor_authority
+        from .constructor_inputs import authority as constructor_authority, public_requirements
         try:
             constructor = constructor_authority(spec, version=version)
         except ValueError as exc:
@@ -8710,7 +8710,7 @@ def _prepare_object_node_specs(
                     raise OperationContractError("REQUIRED_CONSTRUCTOR_REFERENCE_MISSING",
                         "Choose the required reference target before creating this owned List member.",
                         details={"request_path": node.request_path, "reference": name,
-                            "required_inputs": constructor, "field_discovery": {"class_id": type_info.class_id,
+                            "required_inputs": public_requirements(constructor), "field_discovery": {"class_id": type_info.class_id,
                                 "meaning": name, "value": "verified_existing_object_handle"}, "mutation_dispatched": False})
             spec["constructor_inputs"] = constructor
         metadata_scope = {"object_id": merge_target.object} if merge_target is not None else {"class_id": type_info.class_id}
@@ -9493,7 +9493,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
             "evidence": {"expected": list(expected_classes.values()),
                 "actual": [row for row in actual_classes if row.get("classId") in
                     {expected.get("classId") for expected in expected_classes.values()}]}})
-    from .constructor_inputs import authority as constructor_authority, complete as constructor_complete
+    from .constructor_inputs import authority as constructor_authority, complete as constructor_complete, public_requirements
     for node in nodes:
         try:
             required = constructor_authority(node)
@@ -9503,7 +9503,7 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
         if required or "constructor_inputs" in node:
             assertions.append({"name": "source-certified constructor inputs remain complete",
                 "passed": valid, "evidence": {"request_path": node.get("request_path"),
-                    "constructor_inputs": node.get("constructor_inputs")}})
+                    "constructor_inputs": public_requirements(required)}})
         for evidence in node.get("new_object_default_evidence", []):
             scope = evidence["class_scope"]
             for field, expected in evidence["metadata"].items():
