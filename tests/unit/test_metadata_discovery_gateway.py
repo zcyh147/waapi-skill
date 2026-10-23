@@ -44,6 +44,46 @@ SESSION_A = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
 SESSION_B = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
 SOUND_CLASS_ID = 65552
 
+# Independent expected meanings from each getter's reflected curveType enum.
+ATTENUATION_BASE_READ_ROLES = (
+    ("volume-dry", "VolumeDryUsage"),
+    ("game-defined-aux-send-volume", "VolumeWetGameUsage"),
+    ("user-defined-aux-send-volume", "VolumeWetUserUsage"),
+    ("low-pass-filter", "LowPassFilterUsage"),
+    ("high-pass-filter", "HighPassFilterUsage"),
+    ("spread", "SpreadUsage"),
+    ("focus", "FocusUsage"),
+)
+ATTENUATION_SPATIAL_READ_ROLES = (
+    ("obstruction-volume", "ObstructionVolumeUsage"),
+    ("obstruction-low-pass-filter", "ObstructionLPFUsage"),
+    ("obstruction-high-pass-filter", "ObstructionHPFUsage"),
+    ("occlusion-volume", "OcclusionVolumeUsage"),
+    ("occlusion-low-pass-filter", "OcclusionLPFUsage"),
+    ("occlusion-high-pass-filter", "OcclusionHPFUsage"),
+    ("diffraction-volume", "DiffractionVolumeUsage"),
+    ("diffraction-low-pass-filter", "DiffractionLPFUsage"),
+    ("diffraction-high-pass-filter", "DiffractionHPFUsage"),
+    ("transmission-volume", "TransmissionVolumeUsage"),
+    ("transmission-low-pass-filter", "TransmissionLPFUsage"),
+    ("transmission-high-pass-filter", "TransmissionHPFUsage"),
+)
+ATTENUATION_DSF_READ_ROLES = (
+    ("dual-shelf", "DualShelfUsage"),
+    ("obstruction-dual-shelf", "ObstructionDSFUsage"),
+    ("occlusion-dual-shelf", "OcclusionDSFUsage"),
+    ("diffraction-dual-shelf", "DiffractionDSFUsage"),
+    ("transmission-dual-shelf", "TransmissionDSFUsage"),
+)
+ATTENUATION_READ_ROLES_BY_VERSION = {
+    "2021.1": ATTENUATION_BASE_READ_ROLES,
+    "2022.1": ATTENUATION_BASE_READ_ROLES + ATTENUATION_SPATIAL_READ_ROLES,
+    "2023.1": ATTENUATION_BASE_READ_ROLES + ATTENUATION_SPATIAL_READ_ROLES,
+    "2024.1": ATTENUATION_BASE_READ_ROLES + ATTENUATION_SPATIAL_READ_ROLES,
+    "2025.1": ATTENUATION_BASE_READ_ROLES + ATTENUATION_SPATIAL_READ_ROLES + ATTENUATION_DSF_READ_ROLES,
+}
+
+
 ResponseFactory = Callable[
     [Mapping[str, Any] | None, Mapping[str, Any] | None],
     Any,
@@ -507,19 +547,11 @@ def test_metadata_property_state_resolves_meaning_before_exact_native_read(
     )
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 @pytest.mark.parametrize("exact_id_scope", (False, True))
 @pytest.mark.parametrize(
-    ("curve_role", "native_curve_type"),
-    (
-        ("volume-dry", "VolumeDryUsage"),
-        ("game-defined-aux-send-volume", "VolumeWetGameUsage"),
-        ("user-defined-aux-send-volume", "VolumeWetUserUsage"),
-        ("low-pass-filter", "LowPassFilterUsage"),
-        ("high-pass-filter", "HighPassFilterUsage"),
-        ("spread", "SpreadUsage"),
-        ("focus", "FocusUsage"),
-    ),
+    ("version", "curve_role", "native_curve_type"),
+    [(version, role, native) for version, roles in ATTENUATION_READ_ROLES_BY_VERSION.items()
+     for role, native in roles],
 )
 def test_metadata_attenuation_compiles_business_curve_role(
     tmp_path: Path,
@@ -571,6 +603,8 @@ def test_metadata_attenuation_compiles_business_curve_role(
         "use": "Custom",
         "points": [],
     }
+    assert list(payload)[-1] == "agent_result"
+    assert client.disconnected is True
     assert client.calls[-1] == (
         GET_ATTENUATION_CURVE_URI,
         {
@@ -1399,10 +1433,12 @@ def test_attenuation_read_schema_discloses_complete_business_inputs(
     assert forms["object"]["path_segments"]["maximum_items"] == 64
     assert forms["object"]["path_segments"]["maximum_item_utf8_bytes"] == 512
     assert forms["object"]["path_segments"]["maximum_path_utf8_bytes"] == 8192
-    assert forms["curve_role"] == {"arguments": ["--curve-role", "<curve-role>"], "choices": [
-        "volume-dry", "game-defined-aux-send-volume", "user-defined-aux-send-volume",
-        "low-pass-filter", "high-pass-filter", "spread", "focus",
-    ]}
+    expected_roles = ATTENUATION_READ_ROLES_BY_VERSION[version]
+    assert forms["curve_role"] == {"arguments": ["--curve-role", "<curve-role>"],
+        "choices": [role for role, _ in expected_roles]}
+    source = json.loads((SCRIPT_PATH.parents[1] / "resources" / "manifest" / version / "schemas.json").read_text(encoding="utf-8"))
+    native_schema = next(row["schema"] for row in source["schemas"] if row["uri"] == GET_ATTENUATION_CURVE_URI)
+    assert {native for _, native in expected_roles} == set(native_schema["argsSchema"]["properties"]["curveType"]["enum"])
     assert command["optional_inputs"] == ["platform"]
     assert forms["platform"]["arguments"] == ["--platform", "<exact-platform-name>"]
     assert forms["platform"]["maximum_characters"] == 256
@@ -1458,7 +1494,6 @@ def test_attenuation_read_schema_rejects_unavailable_version_without_connecting(
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 @pytest.mark.parametrize("inputs", [
     ["--exact-id", OBJECT_GUID, "--path-segment", "Outdoor", "--curve-role", "volume-dry"],
-    ["--exact-id", OBJECT_GUID, "--curve-role", "arbitrary-curve"],
     ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--curve-type", "VolumeDryUsage"],
 ])
 def test_attenuation_cli_parser_rejects_ambiguous_unknown_and_native_inputs(
@@ -1470,6 +1505,40 @@ def test_attenuation_cli_parser_rejects_ambiguous_unknown_and_native_inputs(
             client_factory=lambda _url: pytest.fail("parser rejection must precede connection"),
         )
     assert rejected.value.code == 2
+
+
+@pytest.mark.parametrize(("version", "role"), [
+    (version, role)
+    for version, legal_roles in ATTENUATION_READ_ROLES_BY_VERSION.items()
+    for role in ("arbitrary-curve", "VolumeDryUsage", "DualShelfUsage", "high-shelf",
+                 "obstruction-high-shelf", "obstruction-volume", "dual-shelf",
+                 "obstruction-dual-shelf", "x" * 10000)
+    if role not in dict(legal_roles)
+])
+def test_attenuation_read_rejects_unavailable_roles_with_versioned_choices(tmp_path, version, role):
+    code, result = waapi_gateway.execute_gateway(
+        ["metadata", "attenuation", "--exact-id", OBJECT_GUID, "--curve-role", role],
+        env=_gateway_env(tmp_path, version=version),
+        client_factory=lambda _: pytest.fail("unavailable role must not connect"),
+    )
+    assert code == 2 and result["ok"] is False, result
+    assert result["details"] == {"version": version, "field": "curve_role",
+        "choices": [name for name, _ in ATTENUATION_READ_ROLES_BY_VERSION[version]],
+        "next_command": ["request-schema", GET_ATTENUATION_CURVE_URI]}
+    assert len(json.dumps(result).encode()) < 4096
+    assert "agent_result" not in result
+
+
+def test_attenuation_read_does_not_dispatch_new_role_to_another_live_version(tmp_path):
+    responses = _metadata_responses(tmp_path, version="2024.1")
+    client = FakeClient(responses)
+    code, result = waapi_gateway.execute_gateway(
+        ["metadata", "attenuation", "--exact-id", OBJECT_GUID, "--curve-role", "dual-shelf"],
+        env=_gateway_env(tmp_path, version="2025.1"), client_factory=lambda _: client,
+    )
+    assert code == 2 and result["ok"] is False, result
+    assert all(uri != GET_ATTENUATION_CURVE_URI for uri, _, _ in client.calls)
+    assert client.disconnected is True
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 @pytest.mark.parametrize("scope", [("--exact-id", OBJECT_GUID), ("--kind", "sound")])
