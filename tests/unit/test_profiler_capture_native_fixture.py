@@ -211,11 +211,12 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
     media = (tmp_path / 'installed' / ('SampleProject' + ('2025.1.7.9143' if version == '2022.1' else build)) / 'SampleProject' / media_relative
         if capture_reads else tmp_path / 'matching-installed-originals/SFX/Minigun/MnGn_Barrel_Loop.wav'
         if version == '2024.1' else runtime.sandbox.sandbox_path / media_relative)
-    media.parent.mkdir(parents=True)
     import wave
-    with wave.open(str(media), 'wb') as output:
-        output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000)
-        output.writeframes(b'\x01\x00' * 5567)
+    if not cursor_moves:
+        media.parent.mkdir(parents=True)
+        with wave.open(str(media), 'wb') as output:
+            output.setnchannels(1); output.setsampwidth(2); output.setframerate(48000)
+            output.writeframes(b'\x01\x00' * 5567)
     if capture_reads:
         from tests.destructive.support import profiler_capture
         monkeypatch.setattr(profiler_capture, 'CAPTURE_SAMPLE_ROOT', tmp_path / 'installed')
@@ -465,6 +466,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 return {}
             if uri.endswith('profiler.stopCapture') and failure == 'explicit-stop-capture':
                 raise RuntimeError('fake explicit stop capture failure')
+            if uri.endswith('profiler.startCapture') and failure == 'cursor-setup-verification':
+                return {'return': 'not an integer capture time'}
             if uri.endswith(('profiler.startCapture', 'profiler.stopCapture')):
                 return {'return': 1500}
             if uri.endswith(('profiler.enableProfilerData', 'transport.useOriginals', 'transport.prepare')):
@@ -487,7 +490,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             if '--runtime-page' in argv:
                 assert len(client.calls) == native_calls_before, 'Cached continuation dispatched an external native call'
             receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
-            assert code == 0, json.dumps(payload, ensure_ascii=False)
+            if not (failure == 'cursor-setup-verification' and argv[0] == 'verify'):
+                assert code == 0, json.dumps(payload, ensure_ascii=False)
             return payload
         return call
     monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
@@ -520,6 +524,7 @@ def _finish(batch, tmp_path, monkeypatch, *, passed):
 
 def test_cursor_moves_reach_four_persisted_final_categories(owned_authoring, tmp_path, monkeypatch):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, cursor_moves=True)
+    assert not (batch.runtime.sandbox.sandbox_path / 'Originals').exists()
     collect(batch, call)
     final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
     assert final['outcome'] == 'PASS'
@@ -544,6 +549,10 @@ def test_cursor_moves_reach_four_persisted_final_categories(owned_authoring, tmp
     assert not any(uri.endswith(('setCursorTime', 'getMeters', 'saveCapture', 'log.addItem',
         'log.clear', 'object.setProperty', 'getRTPCs', 'getCpuUsage', 'getLoadedMedia'))
         for uri, _, _ in client.calls)
+    assert not any(uri.startswith('ak.wwise.core.transport.') for uri, _, _ in client.calls)
+    assert report['public_call_count'] == len(archive['receipts'])
+    assert report['total_reply_bytes'] == sum(len(json.dumps(row.get('payload', row), ensure_ascii=False).encode())
+        for row in archive['receipts'])
     assert not client.transport and not client.registered and not batch.runtime.owned_root.exists()
     assert record['source']['hash_before'] == record['source']['hash_after']
     assert report['public_call_count'] <= report['limits']['public_calls']
@@ -578,6 +587,26 @@ def test_cursor_move_unavailable_retains_other_moves_and_blocks_final_acceptance
         'first', 'next', 'last', 'previous']
 
 
+def test_cursor_move_failed_setup_verification_stops_before_moves_and_retains_cleanup(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        cursor_moves=True, failure='cursor-setup-verification')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL'
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert all(row['business_outcome'] == 'BLOCKED' and row['status'] != 'PASS' for row in record['categories'])
+    assert report['cleanup']['complete'] is True
+    assert not any(uri.endswith('profiler.moveCursor') or uri.startswith('ak.wwise.core.transport.')
+        for uri, _, _ in client.calls)
+    failed = [row for row in archive['receipts'] if row['argv'][0] == 'verify'
+        and row['payload'].get('state') == 'verification_failed']
+    assert len(failed) == 1 and failed[0]['payload']['automatic_retry'] is False
+    assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
+
+
 @pytest.mark.parametrize('failure', ['cursor-mismatch', 'cursor-cleanup', 'cursor-single-frame'])
 def test_cursor_move_failures_preserve_partial_final_writer_evidence(
         owned_authoring, tmp_path, monkeypatch, failure):
@@ -593,6 +622,9 @@ def test_cursor_move_failures_preserve_partial_final_writer_evidence(
     categories = {row['category']: row for row in record['categories']}
     assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in categories.values())
     assert {name: row['business_outcome'] for name, row in categories.items()} == outcomes
+    assert report['public_call_count'] == len(archive['receipts'])
+    assert report['total_reply_bytes'] == sum(len(json.dumps(row.get('payload', row), ensure_ascii=False).encode())
+        for row in archive['receipts'])
     assert sum(uri.endswith('profiler.moveCursor') for uri, _, _ in client.calls) == 4
     assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
     assert not client.transport and not batch.batch_seal_path.exists()

@@ -407,21 +407,13 @@ def stage_owned_2024_meter_media(sandbox, io_root):
 
 def _collect_cursor_moves(call, report, persist, *, effect, zero, own, clean_one):
     """One stopped buffer; each source-defined move executes exactly once."""
-    report['setup'].append({'originals': effect('transport.useOriginals', ['--audition-media', 'originals'])})
     report['setup'].append({'enable_voices': effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'enable'],
         before_execute=lambda: own('disable-voices-data',
             lambda: effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'disable'])))})
     report['setup'].append({'start_capture': zero('profiler.startCapture',
         before_execute=lambda: own('stop-capture', lambda: zero('profiler.stopCapture')))})
-    created = effect('transport.create', role='target', identity=SOUND_ID)
-    handle = created['agent_result']['business_result']['transport_handle']
-    own('destroy-transport', lambda: effect('transport.destroy', ['--transport-handle', handle]))
-    own('stop-transport', lambda: effect('transport.executeAction', ['--audition-action', 'stop',
-        '--transport-scope', 'one-transport', '--transport-handle', handle]))
-    report['setup'].append({'create_transport': created})
-    report['setup'].append({'play': effect('transport.executeAction', ['--audition-action', 'play',
-        '--transport-scope', 'one-transport', '--transport-handle', handle])})
-    # Same fixed capture interval as the existing fixture, never a retry/poll loop.
+    # Capture does not require audition. Reuse the single fixed interval without
+    # depending on a Sound's duration, converted media, or transport state.
     time.sleep(0.25)
     report['setup'].append({'stop_capture': clean_one('stop-capture')})
     position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
@@ -533,8 +525,13 @@ def collect_owned_capture(batch, public_call):
     cleanup_active = False
     if cursor_moves:
         report['scope'] = 'Four 2025.1 user-cursor moves on one stopped capture; no acoustic or capture-content completeness proof'
-        report['limits'].update(public_calls=128, cleanup_reserve_calls=30,
+        report['limits'].update(public_calls=80, cleanup_reserve_calls=14,
             cleanup_reserve_reply_bytes=2 * 1024 * 1024)
+        initial = batch.receipts[nodeid]
+        initial_sizes = [len(json.dumps(receipt.get('payload', receipt), ensure_ascii=False).encode())
+            for receipt in initial]
+        report['public_call_count'] = report['initial_public_call_count'] = len(initial)
+        report['total_reply_bytes'] = sum(initial_sizes)
 
     def persist():
         raw = (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode()
@@ -548,14 +545,26 @@ def collect_owned_capture(batch, public_call):
             assert report['total_reply_bytes'] + report['limits']['reply_bytes'] <= (
                 report['limits']['total_reply_bytes'] - report['limits']['cleanup_reserve_reply_bytes']), 'Capture cleanup byte reserve unavailable'
         report['public_call_count'] += 1
+        before = len(batch.receipts[nodeid]) if cursor_moves else None
         try:
             result = public_call(argv)
-            size = len(json.dumps(result, ensure_ascii=False).encode())
-            report['total_reply_bytes'] += size
-            assert size <= report['limits']['reply_bytes'] and report['total_reply_bytes'] <= report['limits']['total_reply_bytes']
+            if not cursor_moves:
+                size = len(json.dumps(result, ensure_ascii=False).encode())
+                report['total_reply_bytes'] += size
+                assert size <= report['limits']['reply_bytes'] and report['total_reply_bytes'] <= report['limits']['total_reply_bytes']
             return result
         finally:
-            persist()
+            try:
+                if cursor_moves:
+                    # The public fixture appends failed/nonzero receipts before
+                    # raising. Charge them too; exceptions grant no byte bypass.
+                    for receipt in batch.receipts[nodeid][before:]:
+                        size = len(json.dumps(receipt.get('payload', receipt), ensure_ascii=False).encode())
+                        report['total_reply_bytes'] += size
+                        assert size <= report['limits']['reply_bytes'], 'Capture reply byte bound exceeded'
+                    assert report['total_reply_bytes'] <= report['limits']['total_reply_bytes'], 'Capture aggregate reply byte bound exceeded'
+            finally:
+                persist()
 
     def exact(identity, *fields):
         result = call(['query-object', '--exact-id', identity, *fields])
@@ -610,6 +619,9 @@ def collect_owned_capture(batch, public_call):
         executed = call(['execute', tx])
         assert executed['state'] == 'executed_unverified', executed
         verified = call(['verify', tx])
+        if cursor_moves:
+            assert verified.get('state') in ('verified', 'result_schema_checked'), verified
+            assert verified.get('verification', {}).get('status') in ('verified', 'result_schema_checked'), verified
         return verified
 
     def effect(suffix, fields=(), *, role=None, identity=None, before_execute=None):
@@ -697,6 +709,8 @@ def collect_owned_capture(batch, public_call):
     if cursor_moves:
         persist()
         try:
+            assert all(size <= report['limits']['reply_bytes'] for size in initial_sizes), 'Initial Capture reply byte bound exceeded'
+            assert report['total_reply_bytes'] <= report['limits']['total_reply_bytes'], 'Initial Capture aggregate reply byte bound exceeded'
             _collect_cursor_moves(call, report, persist, effect=effect, zero=zero,
                 own=own, clean_one=clean_one)
         except Exception as exc:
