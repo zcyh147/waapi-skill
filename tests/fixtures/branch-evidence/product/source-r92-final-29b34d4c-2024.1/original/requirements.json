@@ -1,0 +1,53 @@
+{
+  "branches": {
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/@definition/waapi_definitions.json/definitions/objectArg/anyOf/1": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "4fff39f986c29b080d0dca730d66b06199c24289a3491946c501724086007565",
+      "reason": "Exact Source copy leaf and scoped #180 graph fact; separate native evidence required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/properties/autoAddToSourceControl/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact Source copy leaf and scoped #180 graph fact; separate native evidence required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/properties/autoCheckOutToSourceControl/@boolean/false": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "reason": "Exact Source copy leaf and scoped #180 graph fact; separate native evidence required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/argsSchema/properties/onNameConflict/enum/2": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "34e382cfb94027bb2ebfad2bcd3affd03b843b3d285b73bc2760d19b65abd85f",
+      "reason": "Exact Source copy leaf and scoped #180 graph fact; separate native evidence required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
+      "reason": "Exact Source copy leaf and scoped #180 graph fact; separate native evidence required."
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": {
+      "categories": [
+        "program",
+        "native"
+      ],
+      "native_shape_sha256": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059",
+      "reason": "Exact Source copy leaf and scoped #180 graph fact; separate native evidence required."
+    }
+  },
+  "contract": "waapi-skill.branch-evidence-requirements/v1"
+}
