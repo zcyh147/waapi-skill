@@ -99,13 +99,16 @@ def _committed_2024_capture_objects():
     return rows
 
 
-def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1'):
+def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1', readers=False):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
         NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
     )
     runtime = owner.runtime
     nodeid, sound_id, bus_id = NODEID, SOUND_ID, BUS_ID
+    if readers:
+        from tests.destructive.support.profiler_capture import READERS_2025_NODEID
+        nodeid = READERS_2025_NODEID
     media_relative = 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav'
     build = '2025.1.7.9143'
     if version == '2024.1':
@@ -143,6 +146,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             self.rows = _committed_2024_capture_objects() if version == '2024.1' else _committed_capture_objects()
             if version == '2025.1':
                 self.rows[sound_id].update({'classId': 65552, '@IsLoopingEnabled': False, '@IsLoopingInfinite': True})
+                self.rows[sound_id]['OutputBus'] = {'id': bus_id, 'name': 'WAAPI_V2_Weapons'}
             self.rows[bus_id]['classId'] = 1376272
             if failure == 'wrong-parent':
                 sibling = next(row for row in self.rows.values() if row['name'] == 'Main Audio Bus')
@@ -197,6 +201,35 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 return {'state': 'playing' if self.playing else 'stopped'}
             if uri.endswith('profiler.getCursorTime'):
                 return {'return': 1500 if args['cursor'] == 'capture' else self.user_time}
+            if uri.endswith(('profiler.getVoices', 'profiler.getBusses', 'profiler.getAudioObjects')):
+                if failure == 'reader-error' and uri.endswith('getVoices'):
+                    raise RuntimeError('fake voice read unavailable')
+                common = {'gameObjectID': 1, 'gameObjectName': 'Transport/Soundcaster'}
+                if uri.endswith('getVoices'):
+                    row = {**common, 'pipelineID': 42, 'objectGUID': sound_id, 'objectName': 'RFL_Tail',
+                        'playingID': 7, 'soundID': 8, 'playTargetID': 8, 'playTargetGUID': sound_id,
+                        'playTargetName': 'RFL_Tail', 'baseVolume': -3.5, 'gameAuxSendVolume': 0,
+                        'envelope': 0, 'normalizationGain': 0, 'lowPassFilter': 0, 'highPassFilter': 0,
+                        'priority': 50, 'isStarted': True, 'isVirtual': False, 'isForcedVirtual': False}
+                elif uri.endswith('getBusses'):
+                    row = {**common, 'pipelineID': 43, 'objectGUID': bus_id, 'objectName': 'WAAPI_V2_Weapons',
+                        'mixBusID': 123, 'deviceID': 0, 'volume': 0, 'downstreamGain': 0,
+                        'voiceCount': 1, 'depth': 1, 'effectCount': 0}
+                else:
+                    row = {**common, 'audioObjectID': 44, 'audioObjectName': '', 'busPipelineID': 43,
+                        'busGUID': bus_id, 'busID': 123, 'busName': 'WAAPI_V2_Weapons', 'instigatorPipelineID': 42,
+                        'effectClassID': 0, 'effectIndex': 0, 'effectPluginName': '', 'spatializationMode': 0,
+                        'x': 0, 'y': 0, 'z': 0, 'spread': 0, 'focus': 0, 'channelConfig': 4,
+                        'metadata': [], 'rmsMeter': [-12.5], 'peakMeter': [-10.5]}
+                if failure == 'unattributed-readers':
+                    row.update(gameObjectID=2, gameObjectName='Unrelated capture participant')
+                    row['busGUID' if uri.endswith('getAudioObjects') else 'objectGUID'] = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
+                rows = [] if failure == 'empty-readers' else [row]
+                return {'return': [{key: value for key, value in item.items() if key in options['return']} for item in rows]}
+            if uri.endswith('profiler.getGameObjects'):
+                return {'return': [] if failure == 'empty-readers' else [
+                    {'id': 2 if failure == 'unattributed-readers' else 1,
+                        'name': 'Transport/Soundcaster', 'registerTime': 0, 'unregisterTime': -1}]}
             if uri.endswith('profiler.setCursorTime'):
                 self.user_time = 1490
                 return {'return': self.user_time}
@@ -234,6 +267,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             if uri.endswith(('profiler.startCapture', 'profiler.stopCapture')):
                 return {'return': 1500}
             if uri.endswith(('profiler.enableProfilerData', 'transport.useOriginals')):
+                if failure == 'disable-readers' and uri.endswith('enableProfilerData') and not args['dataTypes'][0]['enable']:
+                    raise RuntimeError('fake capture-data cleanup uncertainty')
                 return {}
             return super().call(uri, args, options)
 
@@ -275,6 +310,134 @@ def _finish(batch, tmp_path, monkeypatch, *, passed):
     item._waapi_phase_reports['teardown'] = 'passed'
     final = batch.finalize([item], terminal=True, exitstatus=0 if passed else 1)
     return final, json.loads(target.read_text().splitlines()[-1])
+
+
+def test_owned_2025_reader_flow_reaches_seven_independent_archived_categories(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, readers=True)
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS' and record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert {row['category'] for row in record['categories']} == {
+        'profiler-voices-observation', 'profiler-busses-observation', 'profiler-audio-objects-observation',
+        'profiler-game-objects-observation', 'profiler-voice-instance-filter',
+        'profiler-bus-instance-filter', 'profiler-audio-objects-bus-filter'}
+    assert all(row['status'] == row['business_outcome'] == 'PASS' and row['cleanup_complete']
+        and row['batch_finalization'] and row['reader_observation_status'] == 'PASS'
+        and row['owned_identity_observed'] is True for row in record['categories'])
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert report['reader_call_count'] == 7 and report['capture_position']['position_ms'] == 1500
+    assert all(row['evidence']['position_ms'] == 1500 for row in report['outcomes'].values())
+    voice = report['outcomes']['profiler-voices-observation']['evidence']
+    assert voice['agent_result']['return'][0]['baseVolume'] == -3.5
+    assert voice['identity_ties']['sound_row_indexes'] == [0]
+    assert voice['identity_ties']['transport_game_object_row_indexes'] == [0]
+    assert report['outcomes']['profiler-audio-objects-observation']['evidence']['agent_result']['return'][0]['metadata'] == []
+    assert report['outcomes']['profiler-game-objects-observation']['evidence']['agent_result']['game_objects'] == [
+        {'id': 1, 'name': 'Transport/Soundcaster', 'register_time': 0, 'unregister_time': -1}]
+    reader_argv = [row['argv'] for row in archive['receipts'] if row['argv'][0] == 'profiler-game-objects'
+        or row['argv'][:1] == ['core-call'] and row['argv'][1].endswith(('getVoices', 'getBusses', 'getAudioObjects'))]
+    assert len(reader_argv) == 7
+    native = [(uri, args) for uri, args, _ in client.calls if uri.endswith(('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects'))]
+    assert len(native) == 10 and all(args['time'] == 1500 for _, args in native)
+    assert [args for uri, args in native if 'voicePipelineID' in args] == [{'time': 1500, 'voicePipelineID': 42}]
+    assert [args for uri, args in native if 'busPipelineID' in args] == [
+        {'time': 1500, 'busPipelineID': 43}, {'time': 1500, 'busPipelineID': 43}]
+    assert not any(uri.endswith(('getMeters', 'registerMeter', 'unregisterMeter', 'setCursorTime', 'saveCapture', 'log.addItem', 'log.clear'))
+        for uri, _, _ in client.calls)
+    assert not client.transport and report['fixture_before'] == report['fixture_after']
+    assert not batch.runtime.owned_root.exists()
+    assert [(args['dataTypes'][0]['dataType'], args['dataTypes'][0]['enable'])
+        for uri, args, _ in client.calls if uri.endswith('enableProfilerData')] == [
+        ('voices', True), ('audioObjects', True), ('audioObjects', False), ('voices', False)]
+
+
+@pytest.mark.parametrize('failure', ['empty-readers', 'reader-error', 'disable-readers', 'explicit-stop-capture'])
+def test_owned_reader_missing_or_uncertain_results_retain_independent_archive_without_acceptance(
+        owned_authoring, tmp_path, monkeypatch, failure):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        readers=True, failure=failure)
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
+    assert record['contract'] == 'waapi-skill.host-category-evidence/v3'
+    assert all(row['status'] != 'PASS' and 'batch_finalization' not in row for row in record['categories'])
+    archived = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archived['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    categories = {row['category']: row for row in record['categories']}
+    assert report['complete'] is False and len(report['outcomes']) == 7
+    assert not client.transport
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    assert sum(uri.endswith('profiler.stopCapture') for uri, _, _ in client.calls) == 1
+    assert report['fixture_before'] == report['fixture_after']
+    if failure == 'empty-readers':
+        assert report['reader_call_count'] == 4
+        assert all(row['outcome'] == 'BLOCKED' for row in report['outcomes'].values())
+        assert all(row['business_outcome'] == 'BLOCKED' for row in categories.values())
+        assert all(row['evidence']['nonempty'] is False for row in list(report['outcomes'].values())[:4])
+        assert not any('voicePipelineID' in args or 'busPipelineID' in args
+            for uri, args, _ in client.calls if uri.endswith(('getVoices', 'getBusses', 'getAudioObjects')))
+    elif failure == 'reader-error':
+        assert report['reader_call_count'] == 6
+        assert categories['profiler-voices-observation']['business_outcome'] == 'FAIL'
+        assert categories['profiler-voice-instance-filter']['business_outcome'] == 'BLOCKED'
+        assert all(row['business_outcome'] == 'PASS' for name, row in categories.items()
+            if name not in ('profiler-voices-observation', 'profiler-voice-instance-filter'))
+        assert 'fake voice read unavailable' in json.dumps(archived['receipts'])
+    else:
+        assert report['reader_call_count'] == 7
+        assert all(row['business_outcome'] == 'PASS' and row['cleanup_complete'] is False for row in categories.values())
+        failed = [row for row in archived['receipts'] if row['argv'][0] == 'execute'
+            and row['payload'].get('state') == 'indeterminate']
+        assert len(failed) == (2 if failure == 'disable-readers' else 1)
+        assert all(row['payload']['automatic_retry'] is False for row in failed)
+        assert report['cleanup']['complete'] is False
+        assert len(report['cleanup']['errors']) == len(failed)
+    if failure in ('empty-readers', 'reader-error'):
+        assert report['cleanup']['complete'] is True
+    assert not batch.batch_seal_path.exists()
+
+
+def test_nonempty_unattributed_reader_rows_never_grant_owned_capture_credit(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        readers=True, failure='unattributed-readers')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
+    archived = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archived['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert report['reader_call_count'] == 7 and report['cleanup']['complete'] is True
+    assert all(row['outcome'] == 'BLOCKED' and row['evidence']['observation_status'] == 'PASS'
+        and row['evidence']['nonempty'] is True and row['evidence']['owned_identity_observed'] is False
+        for row in report['outcomes'].values())
+    assert all(row['business_outcome'] == 'BLOCKED' and row['status'] == 'blocked'
+        and row['reader_observation_status'] == 'PASS' and row['owned_identity_observed'] is False
+        and 'batch_finalization' not in row for row in record['categories'])
+    assert not client.transport and not batch.batch_seal_path.exists()
+
+
+@pytest.mark.parametrize('version,extra', [('2021.1', False), ('2022.1', False), ('2023.1', False),
+    ('2024.1', False), ('2025.1', True), ('2025.1', False)])
+def test_reader_owner_requires_exact_single_2025_selection(tmp_path, monkeypatch, version, extra):
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.profiler_capture import READERS_2025_NODEID
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('WWISE_VERSION', version)
+    config = _config(tmp_path)
+    config.args = [READERS_2025_NODEID, *([NODE] if extra else [])]
+    items = [SimpleNamespace(nodeid=name) for name in config.args]
+    if version != '2025.1' or extra:
+        message = 'Selected owned Authoring node is not available on the requested version' if version != '2025.1' else 'only their matching 2025'
+        with pytest.raises(pytest.UsageError, match=message):
+            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert not events
+    else:
+        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert [row[0] for row in events] == ['construct', 'start', 'install']
+        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
 
 
 def test_owned_2024_meter_public_flow_reaches_its_archived_final_category(owned_authoring, tmp_path, monkeypatch):

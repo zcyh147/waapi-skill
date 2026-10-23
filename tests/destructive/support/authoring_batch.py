@@ -27,7 +27,7 @@ from tests.destructive.support.transport_semantics import (
     OLDER_FIXTURES, stage_owned_older_transport_media,
 )
 from tests.destructive.support.profiler_capture import (
-    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, CAPTURE_NODE_OUTCOMES,
+    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_NODE_OUTCOMES,
     stage_owned_2024_meter_media,
 )
 
@@ -302,6 +302,10 @@ class AuthoringBatchAdapter:
                     'status': 'PASS' if outcome == 'PASS' and business == 'PASS' else 'FAIL' if business == 'FAIL' else 'blocked',
                     'business_outcome': business, 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
                     'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
+                    **({'reader_observation_status': observation.get('evidence', {}).get('observation_status', 'BLOCKED'),
+                        'owned_identity_observed': observation.get('evidence', {}).get('owned_identity_observed', False),
+                        'attribution_boundary': 'A nonempty read alone grants no owned reader-obligation credit; no acoustic or measurement-effect proof'}
+                        if capture_nodeid == READERS_2025_NODEID else {}),
                     **({'observation_artifact': descriptor} if descriptor else {}),
                     **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})})
         for nodeid in (node for node in self.selected_nodeids if node in TRANSPORT_OBSERVATION_NODES):
@@ -496,6 +500,7 @@ OWNED_AUTHORING_NODEIDS = (
     TRANSPORT_MIXED_NODEID,
     TRANSPORT_OLDER_NODEID,
     PROFILER_CAPTURE_NODEID,
+    READERS_2025_NODEID,
     METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
@@ -509,6 +514,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     **dict.fromkeys(DIAGNOSTIC_NODEIDS, ('2024.1',)),
     METER_2024_NODEID: ('2024.1',),
     PROFILER_CAPTURE_NODEID: ('2025.1',),
+    READERS_2025_NODEID: ('2025.1',),
     TRANSPORT_SEMANTICS_NODEID: ('2025.1',),
     TRANSPORT_MIXED_NODEID: ('2025.1',),
     TRANSPORT_OLDER_NODEID: tuple(OLDER_FIXTURES),
@@ -541,6 +547,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')
     if PROFILER_CAPTURE_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
+    if READERS_2025_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
+        raise pytest.UsageError('Owned Profiler readers require only their matching 2025 Authoring node')
     if METER_2024_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1'):
         raise pytest.UsageError('Owned meter projection requires only its matching 2024 Authoring node')
     if set(selected).intersection((TRANSPORT_SEMANTICS_NODEID, TRANSPORT_MIXED_NODEID)) and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
@@ -561,7 +569,7 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         if selected == (TRANSPORT_OLDER_NODEID,):
             stage_owned_older_transport_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
     live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (READERS_2025_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
