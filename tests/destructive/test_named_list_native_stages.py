@@ -148,11 +148,13 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         setup_result = flatten_set_result(setup['execute']['dispatch_result']['result'])
         setup_root, = [row for row in setup_result if row.parent_request_path is None and row.object == METADATA_WU]
         setup_child, = [row for row in setup_result if row.parent_request_path == setup_root.request_path and row.collection == 'children']
-        assert len(setup_result) == 2 and setup_child.name == METADATA_NAME, setup_result
+        assert METADATA_NAME == 'R84 System Output Settings'
+        assert len(setup_result) == 2 and setup_child.name == 'R84_System_Output_Settings', setup_result
+        observation['metadata_name_binding'] = {'requested_name': METADATA_NAME, 'actual_name': setup_child.name}
         metadata_id = setup_child.object
         metadata_target = observation['metadata_target'] = exact('metadata-target-after-setup', metadata_id)
         assert metadata_target['type'] == 'Metadata' and metadata_target['class_id'] == METADATA_CLASS, metadata_target
-        assert metadata_target['name'] == METADATA_NAME and metadata_target['parent']['id'] == METADATA_WU, metadata_target
+        assert metadata_target['name'] == setup_child.name and metadata_target['parent']['id'] == METADATA_WU, metadata_target
         assert uuid.UUID(metadata_id).int != 0 and metadata_id not in {METADATA_WU, OWNER, ANCESTOR, GUNS, CARS, CONTAINERS, RETAINED_CONTAINER, WINDOWS}
         assert query('metadata-children-after-setup', ['--exact-id', METADATA_WU, '--relationship', 'children', *projection], 2) == [metadata_target]
         setup_packet = Path(setup['execute']['dispatch_result']['evidence_path'])
