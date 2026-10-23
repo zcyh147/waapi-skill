@@ -5,6 +5,63 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R108 cursor moves and runtime evidence publication
+
+On frozen candidate `013776270f6d9c1b65bf53940442f4ac593e5714`, one owned Mac
+Authoring 2025.1.7.9143 cursor-only workflow passed in **65.18s**, with final
+lifecycle PASS. Its 63 public calls include the two initial ownership/config
+receipts. Each move executed once and its returned time matched an independent
+user-cursor readback:
+
+| Move | Returned and observed time (ms) |
+| --- | ---: |
+| first | 10133 |
+| next | 10144 |
+| last | 13600 |
+| previous | 13589 |
+
+The stopped capture-latest cursor was 13600ms. These facts prove the selected
+four modes, matching readbacks and ordered endpoint relationships; they do not
+prove exact adjacent-frame indices, acoustic output or capture-content
+completeness. No audition, media setup, property writes, setter, meter, log or
+other reader case was repeated. The owner used its Automation Mode path.
+The original project hash/mtime was unchanged, cleanup completed, no owned
+process remained and port 8080 was released. Main independently checked all
+617 source-context hashes and 99 archived files without mismatches. Evidence:
+`.waapi-skill-state/full-coverage/r108-cursor-moves-native-2025-r1/root-review.json`.
+
+The collector's initial code-test fixture concealed a short-audio playback
+race and admitted a failed setup verification. Both were caught before native
+execution. The revised collector removes audition entirely, rejects failed
+setup, and counts initial and failed receipts against its limits. Six affected
+cases passed in 50.32s, preserving unavailable, mismatch, insufficient-frame
+and cleanup-failure reports through the actual final writer. Unchanged owner
+admission and prior collector controls retain their separate earlier results.
+
+The runtime evidence adapter is independently reviewed and merged as
+`49489e73dfc65de3134d31d9f85f51ecf18f5212`. Its standalone portable fixture
+`tests/fixtures/branch-evidence/product/runtime-read-r108/index.json` proves
+one exact 2025 getRTPCs value leaf through the existing final audit evaluator,
+using an actual Gateway program receipt and the preserved R105 native PASS.
+All 34 same-route sibling obligations remain unresolved in that proof; the
+global policy/index/ledger has not been updated by this slice. The archive
+contains 170 required original objects, preserving their byte hashes, rather
+than copying the original sandbox. Original absolute paths are inert locators.
+
+The shared evidence reader now permits multiple actual outcomes from one node
+while requiring the exact archived category roster and statuses. Five forged
+roster/status cases first reproduced the defect, then passed as rejection
+checks. Six targeted roster/layout controls and two affected program/final-
+consumer cases passed after that repair; the earlier 23-check run remains
+separate evidence, not an additional full gate. Original native archives,
+failed verdicts and global coverage claims were not rewritten.
+
+[Runtime verification decisions](../docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md)
+record the source-backed distinction between acknowledged controls, captured
+data and independently observed state. LoadedMedia nonempty, unbound runtime
+branches and other remaining #186 requirements are still open. No Fresh,
+Windows, full Program/Non-live or whole-ticket completion is claimed here.
+
 ## 2026-10-24 R105–R107 targeted Profiler follow-up and lifecycle repair
 
 R105 candidate `503688449ba9f9db964a5fb7116ac6be2fb07198` ran only the
