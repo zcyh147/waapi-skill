@@ -1701,6 +1701,8 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--field-meaning")
     core_call.add_argument("--platform-name")
     core_call.add_argument("--log-channel")
+    from wwise_waapi.profiler_meter_objects import add_meter_object_arguments
+    add_meter_object_arguments(core_call)
     core_call.add_argument("--profiler-position")
     core_call.add_argument("--profiler-cursor")
     core_call.add_argument(
@@ -5246,6 +5248,16 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
+    from wwise_waapi.profiler_meter_objects import METERS_URI, meter_arguments_supplied, compile_meter_object_options
+    meter_supplied = meter_arguments_supplied(args)
+    if meter_supplied and args.api != METERS_URI:
+        raise GatewayInputError('Meter object options apply only to profiler.getMeters')
+    args.meter_object_options = None
+    if args.api == METERS_URI:
+        try:
+            args.meter_object_options = compile_meter_object_options(args, versions[0],compile_condition=lambda condition:_query_sequence_condition(versions[0],condition))
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     status_read_uri = "ak.wwise.core.sourceControl.getStatus"
     if args.api == status_read_uri:
         from wwise_waapi.source_control_status_read import status_file_plan
@@ -5309,7 +5321,7 @@ def preflight_core_business_input(
             from wwise_waapi.runtime_inspection_observations import RuntimeInspectionObservationStore, resolve_pipeline, validate_pipeline_handle
             from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
             if args.runtime_observation is not None or args.runtime_page is not None:
-                if args.runtime_observation is None or args.runtime_page is None or any(value is not None for value in
+                if args.runtime_observation is None or args.runtime_page is None or meter_supplied or any(value is not None for value in
                         (args.log_channel, args.max_results, args.profiler_position, args.profiler_cursor, args.result_view,
                          args.bus_instance_handle, args.voice_instance_handle, args.transport_handle)):
                     raise GatewayInputError("Copy only the exact runtime observation and page continuation")
@@ -12568,6 +12580,25 @@ def dispatch_runtime_inspection_business_read(
         if args.api.endswith(("getVoices", "getBusses", "getAudioObjects")) and args.runtime_inspection_business_request.get("result_view") in {"summary", "identity", "diagnostics"}:
             identity_fields = ["busGUID", "gameObjectID"] if args.api.endswith("getAudioObjects") else ["objectGUID", "gameObjectID"]
             request["options"] = {"return": list(dict.fromkeys([*request["options"]["return"], *identity_fields]))}
+    meter_options = getattr(args, 'meter_object_options', None)
+    if meter_options is not None:
+        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+        def read_meter(options):
+            observed = dispatch(dispatcher, args.api, connection=connection, version=detected_version,
+                args=request['args'], options=options, allow_destructive=True,
+                result_limit_bytes=MAX_GATEWAY_RESULT_JSON_BYTES)
+            if not observed.get('ok'):
+                raise GatewayResultShapeError('Meter preparation read failed', details={'call':observed}, error_code='METER_OBJECT_READ_FAILED')
+            validate_semantic_result(args.api, observed['result'], version=detected_version)
+            return observed['result']
+        try:
+            clarification = meter_options.prepare(read_meter=read_meter,time=request['args']['time'],
+                read_metadata=transaction_read_call(dispatcher,connection=connection,version=detected_version))
+        except RelatedQueryError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
+        if clarification is not None:
+            return {'ok':True,'status':'needs_clarification',**dict(common),'api_attempted':args.api,'agent_result':clarification}
+        request['options'] = meter_options.options()
     if not isinstance(request, Mapping):  # pragma: no cover - preflight invariant
         raise GatewayInputError("Runtime-inspection request was not materialized")
     request_validation = validate_semantic_payload(
@@ -12665,11 +12696,17 @@ def dispatch_runtime_inspection_business_read(
         if result.get("ok")
         else None
     )
+    source_result = result.get('result')
+    if result.get('ok') and meter_options is not None:
+        try:
+            source_result = meter_options.project(source_result)
+        except RelatedQueryError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.code) from exc
     try:
         normalized = (
             normalize_runtime_inspection_result(
                 args.api,
-                result.get("result"),
+                source_result,
                 business_request=args.runtime_inspection_business_request,
                 max_results=args.runtime_inspection_limit,
             )
@@ -12692,7 +12729,7 @@ def dispatch_runtime_inspection_business_read(
         # rows. The native dispatcher byte ceiling remains authoritative.
         field = next(field for field in ("return", "meters", "items") if field in normalized)
         native_rows = result["result"][field]
-        complete_result = normalize_runtime_inspection_result(args.api, result["result"],
+        complete_result = normalize_runtime_inspection_result(args.api, source_result,
             business_request=args.runtime_inspection_business_request, max_results=max(1, len(native_rows)))
         pipeline_bindings = {}
         native_field = "busPipelineID" if args.api.endswith("getAudioObjects") else "pipelineID"

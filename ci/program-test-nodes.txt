@@ -90,6 +90,7 @@ tests/unit/test_peak_branch_evidence.py
 tests/unit/test_remaining_core_business_adapter.py
 tests/unit/test_remaining_core_business_gateway.py
 tests/unit/test_runtime_business_gateway.py
+tests/unit/test_profiler_meter_objects_gateway.py
 tests/unit/test_runtime_transport_handles.py
 tests/unit/test_runtime_playing_handles.py
 tests/unit/test_runtime_game_object_handles.py

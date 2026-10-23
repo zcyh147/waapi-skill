@@ -389,7 +389,7 @@ def test_related_schema_exposes_same_source_proven_closed_modes_paths_and_limits
     assert 'parent.parent.type' in section and 'OutputBus.Volume' in section and 'UserAuxSend0.Attenuation' in section
     assert 'reference' in source['semantics']['resolved_reference'] and '@@' in source['semantics']['resolved_reference']
     assert contract['field_value_source_evidence']['page_sha256'] == source['page_sha256']
-    assert 'list compositions' in contract['followup']
+    assert 'non-object record lists' in contract['followup']
     assert task.calls == []
 
 
