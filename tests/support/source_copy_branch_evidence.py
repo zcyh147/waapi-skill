@@ -76,12 +76,14 @@ def relevant_sources():
     names = set(review['current_sources'])
     names.update(review['launcher_and_dependency_config_source_maps'][review['current_source_basis']])
     names.update(review['pinned_project_input_source_maps'][review['current_source_basis']])
+    from tests.support.source_copy_native_evidence import successor_dependency_review
+    names.update(successor_dependency_review()['current_sources'])
     return source_seals(names)
 
 
 def capture_sources(inventory_sources=()):
     # Current pytest fake producers/importer are separate from native 6d/411 bytes.
-    names = [REVIEW_PATH, 'tests/support/source_copy_native_evidence.py',
+    names = [REVIEW_PATH, 'tests/fixtures/source-copy/branch-successor-review-r92.json', 'tests/support/source_copy_native_evidence.py',
         'tests/support/source_copy_branch_evidence.py', 'tests/support/platform_filesystem.py',
         'tests/support/gateway_config.py', 'tests/unit/test_source_copy_capture.py',
         'tests/unit/test_source_copy_branch_evidence.py', 'tests/unit/test_source_copy_modern_collector.py',

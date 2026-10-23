@@ -370,6 +370,7 @@ def portable_binding_inputs(index_path, requirements):
             descriptor = {**descriptor, "record_index":record_index}
         return read_sealed_artifact(descriptor, base)
     bindings, names = {}, set()
+    source_capture_origins = {}
     for entry in index['entries']:
         if (set(entry) != {'id', 'bindings', 'origin'} or not isinstance(entry['id'], str)
                 or not entry['id'] or entry['id'] in names):
@@ -408,6 +409,8 @@ def portable_binding_inputs(index_path, requirements):
                        for key, value in policy['branches'].items())):
             raise ValueError('portable requirement differs from reviewed exact branch policy')
         bindings.update(projected['bindings'])
+        for identity in projected['bindings']:
+            source_capture_origins[identity] = originals['capture']
     attachments = index.get('metadata_attachments', [])
     if not isinstance(attachments, list):
         raise ValueError('closed metadata attachment list required')
@@ -534,7 +537,8 @@ def portable_binding_inputs(index_path, requirements):
         source_business_facts = portable_source_attachments(index['source_attachments'], bindings, read, base)
     if 'source_native_attachments' in index:
         from tests.support.source_copy_native_evidence import portable_source_native_attachments
-        portable_source_native_attachments(index['source_native_attachments'], bindings, read, base)
+        portable_source_native_attachments(index['source_native_attachments'], bindings, read, base,
+            capture_origins=source_capture_origins)
     condition_mechanism_reuse = []
     if 'condition_mechanism_attachments' in index:
         from tests.support.condition_mechanism_reuse import attach_condition_mechanisms
