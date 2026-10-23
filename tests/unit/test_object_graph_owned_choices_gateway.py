@@ -145,8 +145,8 @@ def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, 
         element_name, element_class = "EffectSlot", 5505040
     accessor = {"Metadata": "@Metadata", "RTPC": "@RTPC", "Effects": "@Effects"}[list_name]
     task.types = [{"classId": 65552, "name": "Sound", "type": "WObject"},
-                  {"classId": element_class, "name": element_name, "type": "WObject"}]
-    task.objects[SECOND]["classId"] = 1638416
+                  {"classId": element_class, "name": element_name, "type": "Inner" if element_class == 5570560 else "WObject"}]
+    task.objects[SECOND].update(classId=1638416, parent=None)
     task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
         "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "parent": {"id": SECOND},
         "notes": "Keep sound", accessor: [{"id": CHILD}]}
@@ -226,32 +226,40 @@ def test_documented_metadata_list_handle_constructs_member_and_verifies_actual_c
     def call(uri, args=None, options=None):
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            expected_nodes = [{"type": "MetadataSlot", "name": "New metadata", "@Metadata": CONSTRUCTOR_METADATA}]
-            if fault == "reversed-effect-order":
-                expected_nodes.append({"type": "MetadataSlot", "name": "Second metadata", "@Metadata": CONSTRUCTOR_METADATA})
-            assert args["objects"] == [{"object": FIRST, "listMode": "replaceAll", "@Metadata": expected_nodes}]
-            task.objects[CHILD] = {"id": CHILD, "name": "New metadata", "type": "MetadataSlot", "classId": 5570560,
-                "path": task.objects[FIRST]["path"] + r"\New metadata", "owner": {"id": FIRST}, "parent": None, "notes": "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
-            task.objects[FIRST]["@Metadata"] = [{"id": CHILD}]
+            write_count = len([uri for uri, _, _ in task.calls if uri.endswith("object.set")])
+            label = "Second metadata" if fault == "reversed-effect-order" and write_count == 2 else "New metadata"
+            expected_nodes = [{"type": "MetadataSlot", "name": label, "@Metadata": CONSTRUCTOR_METADATA}]
+            assert args["objects"] == [{"object": FIRST, "listMode": "append" if write_count == 2 else "replaceAll", "@Metadata": expected_nodes}]
+            created_id = ROOT if label == "Second metadata" else CHILD
+            task.objects[created_id] = {"id": created_id, "name": "", "type": "PluginInnerObject", "classId": 5570560,
+                "path": task.objects[FIRST]["path"] + "\\opaque-" + str(write_count), "owner": {"id": FIRST}, "parent": None,
+                "notes": "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
+            if write_count == 1:
+                task.objects[FIRST]["@Metadata"] = []
+            task.objects[FIRST]["@Metadata"].append({"id": created_id})
             if fault == "native-generic-type":
-                task.objects[CHILD]["type"] = "PluginInnerObject"
-                del task.objects[CHILD]["parent"]
+                del task.objects[created_id]["parent"]
             elif fault == "wrong-effect-class":
-                task.objects[CHILD]["classId"] = 1441808
+                task.objects[created_id]["classId"] = 1441808
             elif fault == "wrong-effect-owner":
-                task.objects[CHILD]["owner"] = {"id": SECOND}
+                task.objects[created_id]["owner"] = {"id": SECOND}
             elif fault == "missing-effect-membership":
                 task.objects[FIRST]["@Metadata"] = []
-            results = [{"id": CHILD, "name": "New metadata"}]
-            if fault == "reversed-effect-order":
-                task.objects[ROOT] = {**task.objects[CHILD], "id": ROOT, "name": "Second metadata",
-                    "path": task.objects[FIRST]["path"] + r"\Second metadata"}
-                task.objects[FIRST]["@Metadata"] = [{"id": ROOT}, {"id": CHILD}]
-                results.append({"id": ROOT, "name": "Second metadata"})
-            return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": results}]}
+            elif fault == "reversed-effect-order" and write_count == 2:
+                task.objects[FIRST]["@Metadata"].reverse()
+            return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": [{"id": created_id, "name": ""}]}]}
+
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
+    if fault == "reversed-effect-order":
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        code, rejected = task.run("execute", tx)
+        assert code == 2 and rejected.get("executed") is not True, rejected
+        code, replay = task.run("execute", tx)
+        assert code == 2 and len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 2, replay
+        return
     code, verified = task.finish(tx, shown)
     assert code == (0 if fault in (None, "native-generic-type") else 2), verified
     assert (verified.get("verified") is True) == (fault in (None, "native-generic-type")), verified
@@ -408,10 +416,10 @@ def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_tr
                 "path": task.objects[SECOND]["path"] + "\\" + actual_owner_name, "parent": {"id": SECOND},
                 "notes": "Keep old owner" if conflict == "merge" else "",
                 "@Metadata": ([{"id": old_slot}] if keep_old else []) + [{"id": fresh_slot}]}
-            task.objects[fresh_slot] = {"id": fresh_slot, "name": "New metadata", "type": "PluginInnerObject", "classId": 5570560,
+            task.objects[fresh_slot] = {"id": fresh_slot, "name": "New metadata" if slot_collision else "", "type": "PluginInnerObject", "classId": 5570560,
                 "path": task.objects[actual_owner]["path"] + r"\New metadata", "owner": {"id": actual_owner}, "notes": "Keep old metadata" if slot_collision else "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
             return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": actual_owner, "name": actual_owner_name,
-                "@Metadata": [{"id": fresh_slot, "name": "New metadata"}]}]}]}
+                "@Metadata": [{"id": fresh_slot, "name": "New metadata" if slot_collision else ""}]}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
@@ -1207,12 +1215,12 @@ def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path
                     task.objects[ROOT]["path"] += " Unexpected"
             assert args["objects"] == [expected]
             del task.objects[CHILD]
-            task.objects[fresh_id] = {"id": fresh_id, "name": "Metadata", "type": "PluginInnerObject", "classId": 5570560,
+            task.objects[fresh_id] = {"id": fresh_id, "name": "", "type": "PluginInnerObject", "classId": 5570560,
                 "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "notes": "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
             task.objects[FIRST]["@Metadata"] = [{"id": ROOT}, {"id": fresh_id}]
             if fault in {"name", "notes", "path"}:
                 task.objects[ROOT][fault] += " Unexpected"
-            return {"objects": [{"id": FIRST, "name": task.objects[FIRST]["name"], "@Metadata": [{"id": fresh_id, "name": "Metadata"}]}]}
+            return {"objects": [{"id": FIRST, "name": task.objects[FIRST]["name"], "@Metadata": [{"id": fresh_id, "name": ""}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
@@ -1517,11 +1525,11 @@ def test_planned_metadata_slot_scalar_reference_stays_distinct_from_sound_metada
             task.objects[ROOT] = {"id": ROOT, "name": "New sound", "type": "Sound", "classId": 65552,
                 "path": task.objects[SECOND]["path"] + r"\New sound", "parent": {"id": SECOND}, "notes": "", "@Metadata": [{"id": "{77777777-7777-7777-7777-777777777777}"}]}
             slot = "{77777777-7777-7777-7777-777777777777}"
-            task.objects[slot] = {"id": slot, "name": "Room slot", "type": "PluginInnerObject", "classId": 5570560,
-                "path": task.objects[ROOT]["path"] + r"\Room slot", "owner": {"id": ROOT}, "notes": "",
+            task.objects[slot] = {"id": slot, "name": "", "type": "PluginInnerObject", "classId": 5570560,
+                "path": task.objects[ROOT]["path"] + r"\opaque-slot", "owner": {"id": ROOT}, "notes": "",
                 "@Metadata": {"id": SECOND if fault == "reference-effect" else metadata_id}}
             return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "New sound",
-                "@Metadata": [{"id": slot, "name": "Room slot"}]}]}]}
+                "@Metadata": [{"id": slot, "name": ""}]}]}]}
         return original(uri, args, options)
     task.call = call
     kinds = {}

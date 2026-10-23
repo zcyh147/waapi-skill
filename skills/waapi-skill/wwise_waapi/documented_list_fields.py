@@ -12,6 +12,13 @@ from .canonical import canonical_sha256
 CATALOG_ROOT = Path(__file__).resolve().parents[1] / "resources" / "metadata"
 VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 MAX_CATALOG_BYTES = 2 * 1024 * 1024
+# These exact 2025 classes inherit the same MetadataReferences InnerType.
+METADATA_INNER_OWNERS = {
+    3997712: "AuxBus", 1900560: "BlendContainer", 1376272: "Bus",
+    2228240: "MusicPlaylistContainer", 1769488: "MusicSegment", 2293776: "MusicSwitchContainer",
+    1835024: "MusicTrack", 524304: "PropertyContainer", 589840: "RandomSequenceContainer",
+    65552: "Sound", 655376: "SwitchContainer",
+}
 
 
 def discovery_contract():
@@ -206,6 +213,42 @@ def resolve_planned_list_evidence(session, value, *, owner_handle):
     return evidence
 
 
+
+def owned_inner_identity(binding, member_class):
+    """One observed Inner representation, bound to its exact List source.
+
+    The R87 native MetadataSlot result is unnamed PluginInnerObject. Other
+    Inner classes/versions retain their own unresolved representation rules.
+    """
+    owner_class = binding.get("scope", {}).get("class_id")
+    if (type(owner_class) is not int or owner_class not in METADATA_INNER_OWNERS
+            or (binding.get("version"), binding.get("declaration", {}).get("name"), member_class)
+                != ("2025.1", "Metadata", 5570560)):
+        return None
+    expected = resolve_class_list_evidence("2025.1", owner_class, "Metadata")
+    if expected["declaration"]["element_classes"] != [{"name": "MetadataSlot", "class_id": 5570560}]:
+        raise ValueError("Inner identity requires the sole exact MetadataSlot element class")
+    if any(binding.get(key) != expected[key] for key in ("kind", "version", "catalog_sha256", "source_member", "source_sha256", "declaration")):
+        raise ValueError("Inner identity requires its matching exact owner/List/element source")
+    return {"kind": "source-certified-owned-inner/v1", "version": "2025.1", "owner_class_id": owner_class,
+        "collection": "Metadata", "element_class_id": 5570560, "class_name": "MetadataSlot",
+        "catalog_sha256": expected["catalog_sha256"], "source_member": expected["source_member"],
+        "source_sha256": expected["source_sha256"], "native_type": "PluginInnerObject", "native_name": "",
+        "declaration_name_role": "label"}
+
+
+def inner_result_candidate(spec, object_id, name):
+    """Closed Inner representation relation shared by both result consumers."""
+    profile = spec.get("inner_identity")
+    if profile is None:
+        return None
+    from .operation_registry import _same_identity
+    retained = spec.get("preexisting_id")
+    if retained is not None:
+        return _same_identity(object_id, retained) and name == spec["pre_state"]["name"]
+    return name == profile["native_name"]
+
+
 def validate_planned_list_source(binding, *, read):
     evidence = {key: value for key, value in binding.items() if key not in {"planned_owner", "reference_targets"}}
     if evidence.get("scope", {}).get("scope_kind") != "class":
@@ -221,6 +264,12 @@ def validate_planned_list_source(binding, *, read):
         and not isinstance(item.get("classId"), bool) and item.get("name") == row["name"]] if isinstance(types, list) else []
     if len(matches) != 1:
         raise ValueError("The planned List owner class no longer matches exact live getTypes")
+    for element in evidence["declaration"]["element_classes"]:
+        profile = owned_inner_identity(evidence, element["class_id"])
+        if profile is not None:
+            members = [item for item in types if isinstance(item, Mapping) and item.get("classId") == profile["element_class_id"]]
+            if len(members) != 1 or members[0].get("name") != profile["class_name"] or members[0].get("type") != "Inner":
+                raise ValueError("The selected Inner element lost its exact live class/category")
     return evidence
 
 

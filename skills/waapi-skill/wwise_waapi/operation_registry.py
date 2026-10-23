@@ -7172,6 +7172,11 @@ def _prepare_object_set(
     }
     if global_platform is not None:
         dispatch_args["platform"] = global_platform
+    from .owned_result_stages import certify_inner_occurrences
+    try:
+        stage_new_graphs = certify_inner_occurrences(node_specs, request.version) or stage_new_graphs
+    except ValueError as exc:
+        raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
     from .planned_references import apply_result_name_choices
     apply_result_name_choices(node_specs, result_context)
     deferred_reference_stage = any('target_request_path' in field for node in node_specs for field in node.get('references', []))
@@ -10308,6 +10313,11 @@ def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_i
     if not (_object_class_matches(actual_class_id, expected_class)
             and isinstance(actual, str) and bool(actual)):
         return False
+    inner = spec.get("inner_identity")
+    if inner is not None:
+        return (inner.get("kind") == "source-certified-owned-inner/v1"
+            and _object_class_matches(actual_class_id, inner.get("element_class_id"))
+            and actual == inner.get("native_type"))
     if class_proof is not None:
         return True
     return _ordinary_object_type_matches(actual, spec)
@@ -18617,6 +18627,10 @@ def _bind_object_set_result_nodes(
     seen_result_ids: dict[str, str] = {}
 
     def name_matches(node: ObjectResultNode, spec: Mapping[str, Any], *, owner_id=None) -> bool:
+        from .documented_list_fields import inner_result_candidate
+        inner_match = inner_result_candidate(spec, node.object, node.name)
+        if inner_match is not None:
+            return inner_match
         if spec.get("anonymous_list_member"):
             return node.name == "" and _same_identity(node.object, anonymous_ids.get(str(spec["request_path"])))
         if spec.get("rtpc_binding"):
@@ -20930,7 +20944,17 @@ def verify_prepared_operation(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if owned_stage_identities is not None and spec.get("existing_target") is not True:
+            if spec.get("inner_identity") is not None:
+                from .documented_list_fields import inner_result_candidate
+                name_ok = (result_node is not None and row.get("name") == returned_name
+                    and inner_result_candidate(spec, object_id, returned_name) is True)
+                owner_spec = spec_by_path.get(spec.get("parent_request_path"), {})
+                old_ids = [member['id'] for snapshot in owner_spec.get('list_snapshots', [])
+                    if snapshot['list'] == spec.get('collection') for member in snapshot['rows']]
+                check(f"{request_path} fresh Inner GUID is outside the sealed List pre-state",
+                    spec.get('preexisting_id') is not None or not any(_same_identity(object_id, old) for old in old_ids),
+                    {"actual": object_id, "retained_ids": old_ids})
+            elif owned_stage_identities is not None and spec.get("existing_target") is not True:
                 # Native conflict naming is certified by the owned GUID/name
                 # association, never a guessed prefix or suffix convention.
                 name_ok = row.get("name") == owned_stage_identities[request_path]["name"] == returned_name
@@ -21083,7 +21107,7 @@ def verify_prepared_operation(
                     "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
                 if identity_ok and history_fields and len(specs) == 1:
                     created_history_metadata.append((spec, object_id))
-            if (history_graph or owned_stage_identities is not None) and not spec.get("preexisting_id") and not spec.get("existing_target"):
+            if (history_graph or owned_stage_identities is not None or spec.get("inner_identity")) and not spec.get("preexisting_id") and not spec.get("existing_target"):
                 identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
                 identity_ok = (result_node is not None and _same_identity(row.get("id"), object_id)
                     and type(row.get("classId")) is int and row["classId"] == spec.get("class_id")
@@ -21093,7 +21117,9 @@ def verify_prepared_operation(
                 assertions.append({"name": ("created owned List member is independently verified" if spec.get("collection") not in {None, "children"} else "created hierarchy node is independently verified"),
                     "kind": ("verified_created_list_member_identity" if spec.get("collection") not in {None, "children"} else "verified_created_node_identity"), "passed": bool(identity_ok),
                     "evidence": {"request_path": request_path, "object": identity,
-                        "requested_name": spec.get("original_requested_name", spec["requested_name"]),
+                        **({"declaration_label": spec["requested_name"], "name_role": "declaration_label",
+                            "native_name": row.get("name")} if spec.get("inner_identity") else
+                            {"requested_name": spec.get("original_requested_name", spec["requested_name"])}),
                         **({"result_handle": pre_state["planned_reference_context"]["facts"][request_path]["result_handle"]}
                            if request_path in pre_state.get("planned_reference_context", {}).get("facts", {}) else {}),
                         "class_id": row.get("classId"),

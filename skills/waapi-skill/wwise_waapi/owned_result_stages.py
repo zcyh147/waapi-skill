@@ -44,9 +44,31 @@ def native_node(args, path, specs=()):
     return node
 
 
+def certify_inner_occurrences(specs, version):
+    """Select the existing owned-stage consumer for exact certified Inner Lists."""
+    from .documented_list_fields import METADATA_INNER_OWNERS, resolve_class_list_evidence, owned_inner_identity
+    owners = {node['request_path']: node for node in specs}
+    counts = {}
+    for member in specs:
+        owner = owners.get(member.get('parent_request_path'))
+        if (member.get('existing_target') or version != '2025.1' or member.get('collection') != 'Metadata'
+                or member.get('class_id') != 5570560 or owner is None
+                or owner.get('class_id') not in METADATA_INNER_OWNERS):
+            continue
+        source = resolve_class_list_evidence(version, owner['class_id'], 'Metadata')
+        inner = owned_inner_identity(source, member['class_id'])
+        if member.get('class_metadata') != {'classId': 5570560, 'name': 'MetadataSlot', 'type': 'Inner'}:
+            raise ValueError('Owned Inner occurrence requires its exact live class/category')
+        member['inner_identity'] = inner
+        key = (member['parent_request_path'], member['collection'])
+        if member.get('preexisting_id') is None:
+            counts[key] = counts.get(key, 0) + 1
+    return any(count > 1 for count in counts.values())
+
+
 def list_profiles(specs, guards, version):
     """Seal named owned append Lists using the existing producer's source proof."""
-    from .documented_list_fields import resolve_class_list_evidence
+    from .documented_list_fields import resolve_class_list_evidence, owned_inner_identity
     profiles = []
     for owner in specs:
         for snapshot in owner.get('list_snapshots', []):
@@ -77,6 +99,12 @@ def list_profiles(specs, guards, version):
             names = [member['name'].casefold() for member in before]
             allowed = {row['class_id'] for row in source['declaration']['element_classes']}
             for member in members:
+                inner = owned_inner_identity(source, member['class_id'])
+                if inner is not None:
+                    metadata = member.get('class_metadata', {})
+                    if metadata != {'classId': inner['element_class_id'], 'name': inner['class_name'], 'type': 'Inner'}:
+                        raise ValueError('Owned Inner occurrence requires its exact live class/category')
+                    member['inner_identity'] = inner
                 if (not member.get('requested_name') or member.get('existing_target') or member.get('preexisting_id')
                         or member.get('documented_list_element_class') != member.get('class_id')
                         or member['class_id'] not in allowed or member.get('on_name_conflict') not in {'fail', 'rename'}
@@ -235,7 +263,8 @@ def creation_chunks(specs):
             descendants = children.get(node['request_path'], [])
             for collection in dict.fromkeys(child.get('collection') for child in descendants):
                 group = [child for child in descendants if child.get('collection') == collection]
-                if len({child['requested_name'].casefold() for child in group}) != len(group):
+                if (len({child['requested_name'].casefold() for child in group}) != len(group)
+                        or len(group) > 1 and any(child.get('inner_identity') for child in group)):
                     deferred.extend(group)
                 else:
                     for child in group:
@@ -283,7 +312,9 @@ def prospective_paths(specs, *, root_parent=None):
             raise ValueError('Owned creation overlap scope lacks connected declared parents')
         for path in ready:
             node = pending.pop(path)
-            paths[path] = paths[node['parent_request_path']] + '\\' + node['requested_name']
+            parent_path = paths[node['parent_request_path']]
+            paths[path] = (None if node.get('inner_identity') or parent_path is None
+                else parent_path + '\\' + node['requested_name'])
     return paths
 
 
@@ -312,8 +343,11 @@ def bind(prepared, result, *, read):
             # A sole child below an existing exact GUID is the owned creation
             # occurrence. Its native suffix is never an identity expression.
             group = [candidate for candidate in children if candidate.get('collection') == child.collection]
-            matches = group if spec.get('existing_target') and len(group) == 1 else [candidate for candidate in group
-                if candidate['requested_name'] == child.name]
+            from .documented_list_fields import inner_result_candidate
+            matches = [candidate for candidate in group
+                if inner_result_candidate(candidate, child.object, child.name) is True
+                or not candidate.get('inner_identity') and (spec.get('existing_target') and len(group) == 1
+                    or candidate['requested_name'] == child.name)]
             if len(matches) != 1:
                 raise ValueError('Native result cannot uniquely associate this child declaration')
             bind_occurrence(child, matches[0])
@@ -350,6 +384,13 @@ def bind(prepared, result, *, read):
             raise ValueError('Actual returned GUID must resolve exactly once')
         row = rows[0]
         if not spec.get('existing_target'):
+            inner = spec.get('inner_identity')
+            if inner is not None:
+                from .documented_list_fields import owned_inner_identity
+                sources = [profile['source'] for profile in plan.get('lists', []) if path in profile['members']]
+                if (len(sources) != 1 or inner != owned_inner_identity(sources[0], spec['class_id'])
+                        or row.get('type') != inner['native_type'] or row.get('name') != inner['native_name']):
+                    raise ValueError('Inner occurrence class/collection/name/type profile is not independently proved')
             if (str(object_id).upper() in all_before or not returned or row.get('name') != returned.name
                     or type(row.get('classId')) is not int or row['classId'] != spec['class_id']
                     or not _object_type_matches(row.get('type'), spec, actual_class_id=row['classId'])):

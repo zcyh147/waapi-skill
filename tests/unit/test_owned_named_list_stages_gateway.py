@@ -17,9 +17,9 @@ OLD_SLOT = '{88888888-8888-8888-8888-888888888888}'
 SECOND_SLOT = '{99999999-9999-9999-9999-999999999999}'
 
 
-def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, constructor_reference=True, constructor_target='valid'):
+def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', retained_kind=('Sound', 65552)):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
-    task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for name, cid in (
+    task.types = [{'classId': cid, 'name': name, 'type': 'Inner' if name == 'MetadataSlot' else 'WObject'} for name, cid in (
         ('WorkUnit', 1638416), ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560))]
     task.objects = {
         PROJECT_GROUP: {'id': PROJECT_GROUP, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
@@ -32,10 +32,14 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
     task.types.append({'classId': 58982409, 'name': 'Wwise System Output Settings', 'type': 'Metadata'})
     task.objects[METADATA] = {'id': METADATA, 'name': 'System settings', 'type': 'Metadata', 'classId': 58982409,
         'path': r'\Metadata\Default Work Unit\System settings', 'parent': None, 'notes': 'Keep Metadata'}
+    if retained_kind[0] not in {row['name'] for row in task.types}:
+        task.types.append({'classId': retained_kind[1], 'name': retained_kind[0], 'type': 'WObject'})
     if retained:
-        task.objects[FIRST] = {'id': FIRST, 'name': 'Sender', 'type': 'Sound', 'classId': 65552,
+        task.objects[FIRST] = {'id': FIRST, 'name': 'Sender', 'type': retained_kind[0], 'classId': retained_kind[1],
             'path': task.objects[SECOND]['path'] + r'\Sender', 'parent': {'id': SECOND},
             'notes': 'Keep sound', '@Metadata': [{'id': OLD_SLOT}]}
+        if retained_kind[0] in {'Bus', 'AuxBus'}:
+            task.objects[FIRST].update(path=task.objects[PROJECT_GROUP]['path'] + r'\Sender', parent={'id': PROJECT_GROUP})
         task.objects[OLD_SLOT] = {'id': OLD_SLOT, 'name': 'Old slot', 'type': 'PluginInnerObject', 'classId': 5570560,
             'path': r'\opaque-old-slot', 'owner': {'id': FIRST}, 'parent': None, 'notes': 'Keep old slot'}
         if empty_replace_two:
@@ -57,10 +61,14 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                 oid, actual, cid = {'Routing': (BUS, 'Routing19', 1376272),
                     'Sender': (SOUND, 'Sender', 65552), 'Room slot': (SLOT, 'Room slot', 5570560),
                     'Second slot': (SECOND_SLOT, 'Second slot', 5570560)}[node['name']]
+                if owned:
+                    actual = ''
                 task.objects[oid] = {'id': oid, 'name': actual, 'type': 'PluginInnerObject' if owned else node['type'],
                     'classId': cid, 'notes': '', 'path': (r'\opaque-slot-path' if owned else task.objects[parent]['path'] + '\\' + actual),
                     **({'owner': {'id': parent}, 'parent': None} if owned else {'parent': {'id': parent}})}
-                result = {'id': oid, 'name': actual}
+                result = {'id': oid, 'name': actual, **({'type': 'PluginInnerObject'} if owned else {})}
+                if node['type'] == 'Sound':
+                    task.objects[oid]['@Metadata'] = []
                 for key, nodes in node.items():
                     if key == 'children' or key == '@Metadata' and isinstance(nodes, list):
                         members = [create(child, oid, key == '@Metadata') for child in nodes]
@@ -93,6 +101,8 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
             if SLOT in task.objects and len(task.writes) < 3:
                 if fault == 'wrong-class':
                     task.objects[SLOT]['classId'] = 65552
+                elif fault == 'wrong-runtime-type':
+                    task.objects[SLOT]['type'] = 'Sound'
                 elif fault == 'wrong-owner':
                     task.objects[SLOT]['owner'] = {'id': SECOND}
                 elif fault == 'wrong-metadata-target':
@@ -162,8 +172,8 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         task.constructor_rejected = slot
         return task
     assert code == 0, slot
-    if empty_replace_two:
-        code, slot2 = task.step('draft-declare-new', '--declaration-id', 'slot2', '--parent-handle', retained_handle,
+    if empty_replace_two or multiple_new:
+        code, slot2 = task.step('draft-declare-new', '--declaration-id', 'slot2', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'],
             '--name', 'Second slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
         assert code == 0, slot2
     return task
@@ -177,7 +187,7 @@ def test_empty_replace_list_two_staged_members_survive_and_verify(tmp_path):
     assert code == 0 and verified['verified'] is True, verified
     assert task.objects[FIRST]['@Metadata'] == [{'id': SLOT}, {'id': SECOND_SLOT}]
     assert all(task.objects[oid]['owner'] == {'id': FIRST} for oid in (SLOT, SECOND_SLOT))
-    assert task.objects[SLOT]['name'] == 'Room slot' and task.objects[SECOND_SLOT]['name'] == 'Second slot'
+    assert task.objects[SLOT]['name'] == task.objects[SECOND_SLOT]['name'] == ''
     assert all(task.objects[oid] == row for oid, row in before.items() if oid != FIRST)
     assert task.objects[FIRST]['notes'] == before[FIRST]['notes']
     assert task.objects[FIRST]['@OutputBus'] == {'id': BUS}
@@ -245,7 +255,7 @@ def test_retained_list_prefix_drift_stops_before_later_creation(tmp_path):
     assert code == 2 and len(task.writes) == 1, replay
 
 
-@pytest.mark.parametrize('fault', ['wrong-class', 'wrong-owner', 'wrong-metadata-target', 'extra-member', 'reversed-prefix', 'changed-prefix'])
+@pytest.mark.parametrize('fault', ['wrong-class', 'wrong-runtime-type', 'wrong-owner', 'wrong-metadata-target', 'extra-member', 'reversed-prefix', 'changed-prefix'])
 def test_bad_named_list_proof_stops_dependent_reference_and_cannot_retry(tmp_path, fault):
     task = named_list_task(tmp_path, retained=True, fault=fault)
     tx, shown = task.preview()
@@ -264,6 +274,7 @@ def test_named_list_without_reference_keeps_existing_single_native_source(tmp_pa
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified['verified'] is True, verified
     assert len(task.writes) == 1 and '@OutputBus' not in task.objects[SOUND]
+    assert 'result_reference_execution' not in shown['artifact']['prepared_operation']['semantic_preview']['envelope']['metadata']
     assert task.objects[SOUND]['@Metadata'] == [{'id': SLOT}]
     assert task.objects[SLOT]['owner'] == {'id': SOUND} and task.objects[SLOT]['classId'] == 5570560
 
@@ -374,3 +385,35 @@ def test_metadata_constructor_metadata_drift_stops_every_write(tmp_path):
     code, rejected = task.run('execute', tx)
     assert code == 2 and rejected.get('executed') is not True, rejected
     assert task.writes == []
+
+
+def test_new_owner_indistinguishable_inner_members_get_unique_bounded_stages(tmp_path):
+    task = named_list_task(tmp_path, multiple_new=True)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[SOUND]['@Metadata'] == [{'id': SLOT}, {'id': SECOND_SLOT}]
+    assert task.objects[SLOT]['name'] == task.objects[SECOND_SLOT]['name'] == ''
+    roster = verified['agent_result']['business_result']['created_objects']
+    slots = {row['declaration_label']: row for row in roster if row.get('name_role') == 'declaration_label'}
+    assert slots['Room slot']['object']['id'] == SLOT and slots['Second slot']['object']['id'] == SECOND_SLOT
+    assert all(row['owner_id'] == SOUND and row['native_name'] == '' for row in slots.values())
+    assert len(task.writes) == 5  # Bus, Sound, each indistinguishable member, then reference.
+    assert [row['objects'][0].get('@Metadata') for row in task.writes[2:4]] == [
+        [{'type': 'MetadataSlot', 'name': 'Room slot', '@Metadata': METADATA}],
+        [{'type': 'MetadataSlot', 'name': 'Second slot', '@Metadata': METADATA}]]
+    assert task.writes[-1] == {'objects': [{'object': SOUND, '@OutputBus': task.objects[BUS]['path']}]}
+
+
+@pytest.mark.parametrize('owner_kind', [('AuxBus', 3997712), ('PropertyContainer', 524304)])
+def test_metadata_inner_representation_uses_shared_exact_owner_sources(tmp_path, owner_kind):
+    task = named_list_task(tmp_path, retained=True, retained_kind=owner_kind)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[FIRST]['@Metadata'] == [{'id': OLD_SLOT}, {'id': SLOT}]
+    assert task.objects[SLOT]['name'] == '' and task.objects[SLOT]['classId'] == 5570560
+    assert task.objects[SLOT]['owner'] == {'id': FIRST}
+    assert task.objects[SLOT]['@Metadata'] == {'id': METADATA}
+    assert task.objects[OLD_SLOT]['notes'] == 'Keep old slot'
+    assert len(task.writes) == 3 and task.objects[FIRST]['@OutputBus'] == {'id': BUS}

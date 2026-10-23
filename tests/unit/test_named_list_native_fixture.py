@@ -32,6 +32,7 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         'sound': '{22222222-2222-2222-2222-222222222222}', 'slot': '{33333333-3333-3333-3333-333333333333}',
         'metadata': '{44444444-4444-4444-4444-444444444444}'}
     observed_bus_name = 'Observed native Bus'
+    native_slot = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'named-list-inner-2025-result.json').read_text())['slot']
 
     class ListTask(OwnedGraphTask):
         def call(self, uri, args=None, options=None):
@@ -63,9 +64,9 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                 def create(node, parent, *, owned=False):
                     role = {collector.REQUESTED['bus']: 'bus', collector.REQUESTED['sound']: 'sound', collector.REQUESTED['slot']: 'slot', collector.METADATA_NAME: 'metadata'}[node['name']]
                     oid = new[role]
-                    name = ('R84_System_Output_Settings' if role == 'metadata' else
+                    name = (native_slot['name'] if owned else 'R84_System_Output_Settings' if role == 'metadata' else
                         observed_bus_name if role == 'bus' else node['name'])
-                    self.objects[oid] = {'id': oid, 'name': name, 'type': 'PluginInnerObject' if owned else node['type'],
+                    self.objects[oid] = {'id': oid, 'name': name, 'type': native_slot['type'] if owned else node['type'],
                         'classId': collector.METADATA_CLASS if role == 'metadata' else collector.CLASSES[role], 'notes': '',
                         'path': r'\opaque observed MetadataSlot' if owned else self.objects[parent]['path'] + '\\' + name,
                         **({'owner': {'id': collector.CONTAINERS if fault == 'wrong-slot-owner' else parent}}
@@ -74,7 +75,8 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                         self.objects[oid]['@OverrideOutput'] = self.metadata['OverrideOutput']['default']
                     self.objects[oid].update({key: deepcopy(value) for key, value in node.items()
                         if key.startswith('@') and key != '@Metadata'})
-                    returned = {'id': oid, 'name': name}
+                    returned = ({key: deepcopy(self.objects[oid][key]) for key in ('id', 'name', 'type', 'notes', 'path', 'owner')}
+                        if owned else {'id': oid, 'name': name})
                     if owned:
                         assert node.get('@Metadata') == new['metadata'], 'MetadataSlot requires its verified Metadata ShareSet'
                         self.objects[oid]['@Metadata'] = {'id': node['@Metadata']}
@@ -108,7 +110,7 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['Metadata']}, 'notNull']}}
     assert task.metadata['OverrideOutput']['default'] is False
     assert task.metadata['OutputBus']['type'] == ''
-    task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for name, cid in (
+    task.types = [{'classId': cid, 'name': name, 'type': 'Inner' if name == 'MetadataSlot' else 'WObject'} for name, cid in (
         ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560), ('WorkUnit', 1638416), ('PropertyContainer', 524304))]
     task.types.append({'classId': collector.METADATA_CLASS, 'name': 'Wwise System Output Settings', 'type': 'Metadata'})
     task.objects = {
@@ -164,9 +166,12 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         memberships = [row['result']['return'][0]['@Metadata']
             for row in observation['stage_proof']['creation_bindings'][1]['readbacks']
             if row['args'] == {'from': {'id': [new['sound']]}} and row['options'] == {'return': ['id', '@Metadata']}]
-        assert memberships and all(rows == [{'id': new['slot'], 'name': collector.REQUESTED['slot']}]
+        assert memberships and all(rows == [{'id': new['slot'], 'name': ''}]
             for rows in memberships)
-        assert observation['independent_created']['slot']['name'] == collector.REQUESTED['slot']
+        assert observation['independent_created']['slot']['name'] == ''
+        notices = [row['payload']['preview_summary']['owned_inner_naming'] for row in observation['calls']
+            if 'owned_inner_naming' in row.get('payload', {}).get('preview_summary', {})]
+        assert notices and notices[-1]['declaration_name_role'] == 'label' and notices[-1]['native_name'] == ''
         assert observation['independent_created']['slot']['class_id'] == 5570560
         assert observation['independent_created']['slot']['owner']['id'] == new['sound']
         assert observation['output_bus_field']['restrictions']['allowed_target_types'] == ['Audio Bus']
