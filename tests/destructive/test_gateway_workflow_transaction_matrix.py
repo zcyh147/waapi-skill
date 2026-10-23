@@ -1981,6 +1981,17 @@ def test_remaining_core_business_effect_families_on_2025(
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_profiler_remaining_minus_two_input_native_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    if workflow_sandbox_runtime.version != '2025.1':
+        pytest.skip('Signed cursor setter is reflected only on2025.1')
+    from tests.destructive.support.profiler_input_shapes import collect_signed_cursor_inputs
+    collect_signed_cursor_inputs(workflow_sandbox_runtime, remaining_minus_two=True)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_profiler_signed_cursor_input_native_observations(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
