@@ -154,12 +154,23 @@ def _committed_car_capture_objects(version):
     return rows
 
 
-def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1', readers=False, capture_reads=False):
+# Exact retained Authoring2024 native rows; source receipt SHA256 05dc4a6c6c28c2f1635bd3e741f208ad2630a379f6a2b57da5bdbe9d4bbf43a0.
+NATIVE_CPU_2024 = json.loads(r'''{"return":[{"elementName":"CAkAudioMgr::Perform","id":0,"instances":2,"millisecondsExclusive":0.014000000432133675,"millisecondsInclusive":0.2167000025510788,"percentExclusive":0.13124999403953552,"percentInclusive":2.031562328338623,"type":""},{"elementName":"AK Acquire GlobalLock","id":0,"instances":1,"millisecondsExclusive":0.00039999998989515007,"millisecondsInclusive":0.00039999998989515007,"percentExclusive":0.0037499996833503246,"percentInclusive":0.0037499996833503246,"type":""},{"elementName":"CAkAudioMgr::BeginPerformIteration","id":0,"instances":2,"millisecondsExclusive":0.0006000000284984708,"millisecondsInclusive":0.0006000000284984708,"percentExclusive":0.005624999757856131,"percentInclusive":0.005624999757856131,"type":""},{"elementName":"AK::JobMgr::WorkUntilDone","id":0,"instances":2,"millisecondsExclusive":0.010499999858438969,"millisecondsInclusive":0.20229999721050262,"percentExclusive":0.09843749552965164,"percentInclusive":1.8965623378753662,"type":""},{"elementName":"CAkAudioMgr::PerformPrologue","id":0,"instances":1,"millisecondsExclusive":0.0017000000225380063,"millisecondsInclusive":0.0027000000700354576,"percentExclusive":0.015937499701976776,"percentInclusive":0.025312498211860657,"type":""},{"elementName":"CAkAudioMgr::ProcessPlayCmds","id":0,"instances":2,"millisecondsExclusive":0.0020000000949949026,"millisecondsInclusive":0.0032999999821186066,"percentExclusive":0.01874999888241291,"percentInclusive":0.030937498435378075,"type":""},{"elementName":"Global Extension","id":0,"instances":1,"millisecondsExclusive":0.000699999975040555,"millisecondsInclusive":0.0010000000474974513,"percentExclusive":0.006562499329447746,"percentInclusive":0.009374999441206455,"type":""},{"elementName":"CAkAudioMgr::BeginPerform","id":0,"instances":1,"millisecondsExclusive":0.004000000189989805,"millisecondsInclusive":0.004000000189989805,"percentExclusive":0.03749999776482582,"percentInclusive":0.03749999776482582,"type":""},{"elementName":"AK::SoundEngine::RenderAudio","id":0,"instances":1,"millisecondsExclusive":0.0003000000142492354,"millisecondsInclusive":0.0003000000142492354,"percentExclusive":0.0028124998789280653,"percentInclusive":0.0028124998789280653,"type":""},{"elementName":"CAkAudioMgr::ProcessMsgQueue","id":0,"instances":4,"millisecondsExclusive":0.0010999999940395355,"millisecondsInclusive":0.00139999995008111,"percentExclusive":0.010312499478459358,"percentInclusive":0.013124998658895493,"type":""},{"elementName":"CAkMusicRenderer::ProcessNextFrame","id":0,"instances":1,"millisecondsExclusive":0.0005000000237487257,"millisecondsInclusive":0.0005000000237487257,"percentExclusive":0.004687499720603228,"percentInclusive":0.004687499720603228,"type":""},{"elementName":"CAkLEngine::SoftwarePerformEpilogue","id":0,"instances":1,"millisecondsExclusive":0.00559999980032444,"millisecondsInclusive":0.008100000210106373,"percentExclusive":0.05249999463558197,"percentInclusive":0.07593749463558197,"type":""},{"elementName":"CAkAudioMgr::EndRender","id":0,"instances":1,"millisecondsExclusive":0.00039999998989515007,"millisecondsInclusive":0.00039999998989515007,"percentExclusive":0.0037499996833503246,"percentInclusive":0.0037499996833503246,"type":""},{"elementName":"CAkLEngine::PostRunVpls","id":0,"instances":1,"millisecondsExclusive":0.004100000020116568,"millisecondsInclusive":0.004100000020116568,"percentExclusive":0.03843749687075615,"percentInclusive":0.03843749687075615,"type":""},{"elementName":"CAkAudioMgr::ProcessAllCommands","id":0,"instances":1,"millisecondsExclusive":0.003800000064074993,"millisecondsInclusive":0.013199999928474426,"percentExclusive":0.035624995827674866,"percentInclusive":0.1237499937415123,"type":""},{"elementName":"CAkLEngineCmds::ProcessPendingCommands","id":0,"instances":1,"millisecondsExclusive":0.0003000000142492354,"millisecondsInclusive":0.0003000000142492354,"percentExclusive":0.0028124998789280653,"percentInclusive":0.0028124998789280653,"type":""},{"elementName":"CAkAudioMgr::EndPerformIteration","id":0,"instances":2,"millisecondsExclusive":0.02630000002682209,"millisecondsInclusive":0.02630000002682209,"percentExclusive":0.24656248092651367,"percentInclusive":0.24656248092651367,"type":""},{"elementName":"CAkAudioMgr::EndPerform","id":0,"instances":1,"millisecondsExclusive":0.0003000000142492354,"millisecondsInclusive":0.0003000000142492354,"percentExclusive":0.0028124998789280653,"percentInclusive":0.0028124998789280653,"type":""},{"elementName":"CAkAudioMgr::PerformEpilogue","id":0,"instances":1,"millisecondsExclusive":0.0007999999797903001,"millisecondsInclusive":0.08980000019073486,"percentExclusive":0.007499999366700649,"percentInclusive":0.8418749570846558,"type":""},{"elementName":"AkMonitor::DispatchNotification","id":0,"instances":2,"millisecondsExclusive":0.13590000569820404,"millisecondsInclusive":0.13590000569820404,"percentExclusive":1.2740623950958252,"percentInclusive":1.2740623950958252,"type":""},{"elementName":"CAkLEngine::ReleaseBuffersAndFeedback","id":0,"instances":1,"millisecondsExclusive":0.000699999975040555,"millisecondsInclusive":0.000699999975040555,"percentExclusive":0.006562499329447746,"percentInclusive":0.006562499329447746,"type":""},{"elementName":"CAkLEngine::AnalyzeMixingGraph","id":196608,"instances":1,"millisecondsExclusive":0.006300000008195639,"millisecondsInclusive":0.006300000008195639,"percentExclusive":0.059062495827674866,"percentInclusive":0.059062495827674866,"type":""},{"elementName":"CAkLEngine::PreprocessSources","id":262144,"instances":1,"millisecondsExclusive":0.0012000000569969416,"millisecondsInclusive":0.0012000000569969416,"percentExclusive":0.011249999515712261,"percentInclusive":0.011249999515712261,"type":""},{"elementName":"CAkLEngine::VoiceTask","id":327680,"instances":1,"millisecondsExclusive":0.0032999999821186066,"millisecondsInclusive":0.005100000184029341,"percentExclusive":0.030937498435378075,"percentInclusive":0.04781249538064003,"type":""},{"elementName":"CAkLEngine::VoiceTaskParallelAsync","id":393216,"instances":1,"millisecondsExclusive":0.0006000000284984708,"millisecondsInclusive":0.0006000000284984708,"percentExclusive":0.005624999757856131,"percentInclusive":0.005624999757856131,"type":""},{"elementName":"AkPerf::PostPipelineStats","id":458752,"instances":1,"millisecondsExclusive":0.0024999999441206455,"millisecondsInclusive":0.0024999999441206455,"percentExclusive":0.02343749813735485,"percentInclusive":0.02343749813735485,"type":""},{"elementName":"Original WAV","id":458753,"instances":1,"millisecondsExclusive":0.0017999999690800905,"millisecondsInclusive":0.0017999999690800905,"percentExclusive":0.016874998807907104,"percentInclusive":0.016874998807907104,"type":"Codec"},{"elementName":"AK::CommunicationCentral::Process","id":524288,"instances":1,"millisecondsExclusive":0.08900000154972076,"millisecondsInclusive":0.08900000154972076,"percentExclusive":0.8343749642372131,"percentInclusive":0.8343749642372131,"type":""},{"elementName":"AK SwVoice","id":655360,"instances":1,"millisecondsExclusive":0.00019999999494757503,"millisecondsInclusive":0.0052999998442828655,"percentExclusive":0.0018749998416751623,"percentInclusive":0.049687497317790985,"type":""},{"elementName":"AK BusTask","id":786432,"instances":1,"millisecondsExclusive":0.01269999984651804,"millisecondsInclusive":0.03189999982714653,"percentExclusive":0.11906249076128006,"percentInclusive":0.29906249046325684,"type":""},{"elementName":"CAkLEngine::DispatchBusGraphAsync","id":2949120,"instances":1,"millisecondsExclusive":0.0010000000474974513,"millisecondsInclusive":0.0010000000474974513,"percentExclusive":0.009374999441206455,"percentInclusive":0.009374999441206455,"type":""},{"elementName":"Peak Limiter","id":7208963,"instances":1,"millisecondsExclusive":0.019200000911951065,"millisecondsInclusive":0.019200000911951065,"percentExclusive":0.17999999225139618,"percentInclusive":0.17999999225139618,"type":"Effect"},{"elementName":"Interactive Music","id":52494344,"instances":1,"millisecondsExclusive":0.0003000000142492354,"millisecondsInclusive":0.0007999999797903001,"percentExclusive":0.0028124998789280653,"percentInclusive":0.007499999366700649,"type":"Global Extension"},{"elementName":"MIDI Device Manager","id":52559880,"instances":1,"millisecondsExclusive":0.0005000000237487257,"millisecondsInclusive":0.0005000000237487257,"percentExclusive":0.004687499720603228,"percentInclusive":0.004687499720603228,"type":"Global Extension"}]}''')
+
+# Exact retained Authoring2025 native rows; source receipt SHA256 2866fe3e2238f485a4acdb86532734086847a8e01556903444046f1a63634ba1.
+NATIVE_CPU_2025 = json.loads(r'''{"return":[{"elementName":"CAkAudioMgr::Perform","id":0,"instances":2,"millisecondsExclusive":0.013700000010430813,"millisecondsInclusive":0.24310000240802765,"percentExclusive":0.12843748927116394,"percentInclusive":2.279062271118164,"type":""},{"elementName":"AK Acquire GlobalLock","id":0,"instances":1,"millisecondsExclusive":0.000699999975040555,"millisecondsInclusive":0.000699999975040555,"percentExclusive":0.006562499329447746,"percentInclusive":0.006562499329447746,"type":""},{"elementName":"CAkAudioMgr::BeginPerformIteration","id":0,"instances":2,"millisecondsExclusive":0.0005000000237487257,"millisecondsInclusive":0.0005000000237487257,"percentExclusive":0.004687499720603228,"percentInclusive":0.004687499720603228,"type":""},{"elementName":"AK::JobMgr::WorkUntilDone","id":0,"instances":2,"millisecondsExclusive":0.013899999670684338,"millisecondsInclusive":0.22869999706745148,"percentExclusive":0.1303124874830246,"percentInclusive":2.1440622806549072,"type":""},{"elementName":"CAkAudioMgr::PerformPrologue","id":0,"instances":1,"millisecondsExclusive":0.0015999999595806003,"millisecondsInclusive":0.0024999999441206455,"percentExclusive":0.014999998733401299,"percentInclusive":0.02343749813735485,"type":""},{"elementName":"CAkAudioMgr::ProcessPlayCmds","id":0,"instances":2,"millisecondsExclusive":0.002199999988079071,"millisecondsInclusive":0.0026000000070780516,"percentExclusive":0.020624998956918716,"percentInclusive":0.02437499724328518,"type":""},{"elementName":"Global Extension","id":0,"instances":1,"millisecondsExclusive":0.0006000000284984708,"millisecondsInclusive":0.0008999999845400453,"percentExclusive":0.005624999757856131,"percentInclusive":0.008437499403953552,"type":""},{"elementName":"CAkAudioMgr::BeginPerform","id":0,"instances":1,"millisecondsExclusive":0.00419999985024333,"millisecondsInclusive":0.00419999985024333,"percentExclusive":0.03937499597668648,"percentInclusive":0.03937499597668648,"type":""},{"elementName":"AK::SoundEngine::RenderAudio","id":0,"instances":1,"millisecondsExclusive":0.0003000000142492354,"millisecondsInclusive":0.0003000000142492354,"percentExclusive":0.0028124998789280653,"percentInclusive":0.0028124998789280653,"type":""},{"elementName":"CAkAudioMgr::ProcessMsgQueue","id":0,"instances":4,"millisecondsExclusive":0.0017999999690800905,"millisecondsInclusive":0.002199999988079071,"percentExclusive":0.016874998807907104,"percentInclusive":0.020624998956918716,"type":""},{"elementName":"CAkAudioMgr::ProcessAllCommands","id":0,"instances":1,"millisecondsExclusive":0.00430000014603138,"millisecondsInclusive":0.016599999740719795,"percentExclusive":0.040312495082616806,"percentInclusive":0.15562498569488525,"type":""},{"elementName":"CAkLEngineCmds::ProcessPendingCommands","id":0,"instances":1,"millisecondsExclusive":9.999999747378752e-05,"millisecondsInclusive":9.999999747378752e-05,"percentExclusive":0.0009374999208375812,"percentInclusive":0.0009374999208375812,"type":""},{"elementName":"CAkLEngine::SoftwarePerformEpilogue","id":0,"instances":1,"millisecondsExclusive":0.006399999838322401,"millisecondsInclusive":0.00989999994635582,"percentExclusive":0.059999994933605194,"percentInclusive":0.09281249344348907,"type":""},{"elementName":"CAkAudioMgr::EndRender","id":0,"instances":1,"millisecondsExclusive":0.0005000000237487257,"millisecondsInclusive":0.0005000000237487257,"percentExclusive":0.004687499720603228,"percentInclusive":0.004687499720603228,"type":""},{"elementName":"CAkMusicRenderer::ProcessNextFrame","id":0,"instances":1,"millisecondsExclusive":0.0003000000142492354,"millisecondsInclusive":0.0003000000142492354,"percentExclusive":0.0028124998789280653,"percentInclusive":0.0028124998789280653,"type":""},{"elementName":"CAkLEngine::PostRunVpls","id":0,"instances":1,"millisecondsExclusive":0.004100000020116568,"millisecondsInclusive":0.004100000020116568,"percentExclusive":0.03843749687075615,"percentInclusive":0.03843749687075615,"type":""},{"elementName":"CAkAudioMgr::EndPerformIteration","id":0,"instances":2,"millisecondsExclusive":0.03579999879002571,"millisecondsInclusive":0.03579999879002571,"percentExclusive":0.33562496304512024,"percentInclusive":0.33562496304512024,"type":""},{"elementName":"CAkAudioMgr::EndPerform","id":0,"instances":1,"millisecondsExclusive":9.999999747378752e-05,"millisecondsInclusive":9.999999747378752e-05,"percentExclusive":0.0009374999208375812,"percentInclusive":0.0009374999208375812,"type":""},{"elementName":"CAkAudioMgr::PerformEpilogue","id":0,"instances":1,"millisecondsExclusive":0.0010000000474974513,"millisecondsInclusive":0.09790000319480896,"percentExclusive":0.009374999441206455,"percentInclusive":0.9178124070167542,"type":""},{"elementName":"AkMonitor::DispatchNotification","id":0,"instances":3,"millisecondsExclusive":0.15129999816417694,"millisecondsInclusive":0.15129999816417694,"percentExclusive":1.4184373617172241,"percentInclusive":1.4184373617172241,"type":""},{"elementName":"CAkLEngine::ReleaseBuffersAndFeedback","id":0,"instances":1,"millisecondsExclusive":0.000699999975040555,"millisecondsInclusive":0.000699999975040555,"percentExclusive":0.006562499329447746,"percentInclusive":0.006562499329447746,"type":""},{"elementName":"CAkLEngine::AnalyzeMixingGraph","id":196608,"instances":1,"millisecondsExclusive":0.008700000122189522,"millisecondsInclusive":0.008700000122189522,"percentExclusive":0.08156249672174454,"percentInclusive":0.08156249672174454,"type":""},{"elementName":"CAkLEngine::PreprocessSources","id":262144,"instances":1,"millisecondsExclusive":0.001500000013038516,"millisecondsInclusive":0.001500000013038516,"percentExclusive":0.014062498696148396,"percentInclusive":0.014062498696148396,"type":""},{"elementName":"CAkLEngine::VoiceTask","id":327680,"instances":1,"millisecondsExclusive":0.0032999999821186066,"millisecondsInclusive":0.005200000014156103,"percentExclusive":0.030937498435378075,"percentInclusive":0.04874999448657036,"type":""},{"elementName":"CAkLEngine::VoiceTaskParallelAsync","id":393216,"instances":1,"millisecondsExclusive":0.000699999975040555,"millisecondsInclusive":0.000699999975040555,"percentExclusive":0.006562499329447746,"percentInclusive":0.006562499329447746,"type":""},{"elementName":"AkPerf::PostPipelineStats","id":458752,"instances":1,"millisecondsExclusive":0.0035000001080334187,"millisecondsInclusive":0.0035000001080334187,"percentExclusive":0.03281249850988388,"percentInclusive":0.03281249850988388,"type":""},{"elementName":"Original WAV","id":458753,"instances":1,"millisecondsExclusive":0.0019000000320374966,"millisecondsInclusive":0.0019000000320374966,"percentExclusive":0.017812497913837433,"percentInclusive":0.017812497913837433,"type":"Codec"},{"elementName":"AK::CommunicationCentral::Process","id":524288,"instances":1,"millisecondsExclusive":0.09690000116825104,"millisecondsInclusive":0.09690000116825104,"percentExclusive":0.9084374308586121,"percentInclusive":0.9084374308586121,"type":""},{"elementName":"AK SwVoice","id":655360,"instances":1,"millisecondsExclusive":0.00039999998989515007,"millisecondsInclusive":0.00559999980032444,"percentExclusive":0.0037499996833503246,"percentInclusive":0.05249999463558197,"type":""},{"elementName":"AK BusTask","id":786432,"instances":1,"millisecondsExclusive":0.013000000268220901,"millisecondsInclusive":0.03200000151991844,"percentExclusive":0.12187498807907104,"percentInclusive":0.29999998211860657,"type":""},{"elementName":"CAkLEngine::DispatchBusGraphAsync","id":3145728,"instances":1,"millisecondsExclusive":0.0010000000474974513,"millisecondsInclusive":0.0010000000474974513,"percentExclusive":0.009374999441206455,"percentInclusive":0.009374999441206455,"type":""},{"elementName":"Peak Limiter","id":7208963,"instances":1,"millisecondsExclusive":0.01899999938905239,"millisecondsInclusive":0.01899999938905239,"percentExclusive":0.17812497913837433,"percentInclusive":0.17812497913837433,"type":"Effect"},{"elementName":"MIDI Device Manager","id":52559880,"instances":1,"millisecondsExclusive":0.00039999998989515007,"millisecondsInclusive":0.00039999998989515007,"percentExclusive":0.0037499996833503246,"percentInclusive":0.0037499996833503246,"type":"Global Extension"}]}''')
+
+
+def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1', readers=False,
+        capture_reads=False, cpu_native_version=None, native_rtpc=False, mixing_bus=None, missing_reads=False):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
         NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
     )
     runtime = owner.runtime
+    capture_reads = capture_reads or missing_reads
+    game_object = 18446744073709551614 if native_rtpc else 1
+    capture_time = {'2024.1': 45621, '2025.1': 46869}.get(cpu_native_version, 1500)
     nodeid, sound_id, bus_id = NODEID, SOUND_ID, BUS_ID
     if readers:
         from tests.destructive.support.profiler_capture import READERS_2025_NODEID
@@ -167,6 +178,9 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
     if capture_reads:
         from tests.destructive.support.profiler_capture import CAPTURE_READS_NODEID
         nodeid = CAPTURE_READS_NODEID
+        if missing_reads:
+            from tests.destructive.support.profiler_capture import CAPTURE_MISSING_NODEID
+            nodeid = CAPTURE_MISSING_NODEID
     media_relative = 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav'
     build = '2025.1.7.9143'
     if capture_reads:
@@ -222,7 +236,6 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             self.logs = {'general': [], 'sourceControl': [{'message': 'preserve unselected channel',
                 'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]}
             self.rows = car_rows if capture_reads else _committed_2024_capture_objects() if version == '2024.1' else _committed_capture_objects(version)
-            self.rpm_value = None
             self.rows['{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'] = {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}',
                 'name': 'SampleProject', 'type': 'Project', 'path': '\\', 'filePath': str(runtime.sandbox.sandbox_project)}
             if capture_reads and version == '2021.1':
@@ -290,7 +303,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 self.rows[args['object']]['@' + args['property']] = args['value']
                 return {}
             if uri.endswith('transport.getList'):
-                return {'list': [{'transport': 74, 'object': sound_id, 'gameObject': 1}] if self.transport else []}
+                return {'list': [{'transport': 74, 'object': sound_id, 'gameObject': game_object}] if self.transport else []}
             if uri.endswith('transport.create'):
                 self.transport = True
                 return {'transport': 74}
@@ -303,19 +316,16 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             if uri.endswith('transport.getState'):
                 return {'state': 'playing' if self.playing else 'stopped'}
             if uri.endswith('profiler.getCursorTime'):
-                return {'return': 1500 if args['cursor'] == 'capture' else self.user_time}
+                return {'return': capture_time if args['cursor'] == 'capture' else self.user_time}
             if uri.endswith('profiler.getRTPCs'):
+                if native_rtpc:
+                    return {'return': [{'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'name': 'RPM',
+                        'gameObjectId': 18446744073709551614, 'value': 1000.0},
+                        {'id': '{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}', 'name': 'Engine_Load',
+                            'gameObjectId': 18446744073709551614, 'value': 1.0}]}
                 return {'return': [] if failure == 'empty-extra' else [
                     {'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'name': 'RPM',
-                        'gameObjectId': 18446744073709551615, 'value': self.rpm_value}]}
-            if uri == 'ak.soundengine.setRTPCValue':
-                self.rpm_value = args['value']
-                return {}
-            if uri == 'ak.soundengine.resetRTPCValue':
-                if failure == 'reset-rpm':
-                    raise RuntimeError('fake global RPM reset uncertainty')
-                self.rpm_value = None
-                return {}
+                        'gameObjectId': game_object, 'value': 1000.0}]}
             if uri.endswith('profiler.getVoiceContributions'):
                 if failure in ('empty-extra', 'missing-contribution'):
                     return {}
@@ -330,14 +340,18 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                     obj['DSF'] = result['DSF'] = 0.0
                 return {'return': result}
             if uri.endswith('profiler.getCpuUsage'):
+                if cpu_native_version is not None:
+                    return deepcopy(NATIVE_CPU_2024 if cpu_native_version == '2024.1' else NATIVE_CPU_2025)
                 rows = [] if failure == 'empty-extra' else [{'id': 1, 'elementName': 'PCM',
                     'type': 'Codec', 'instances': 1, 'percentInclusive': 0.0, 'percentExclusive': 0.0,
                     'millisecondsInclusive': 0.0, 'millisecondsExclusive': 0.0}]
+                if failure == 'cpu-page-bound':
+                    rows = [{**rows[0], 'id': i, 'elementName': 'x' * 3000} for i in range(64)]
                 return {'return': rows * (65 if failure == 'partial-extra' else 1)}
             if uri.endswith('profiler.getPerformanceMonitor'):
                 return {'return': [] if failure == 'empty-extra' else [{'id': 'totalCPU', 'name': 'Total CPU', 'value': 0.0}]}
             if uri.endswith(('profiler.getLoadedMedia', 'profiler.getStreamedMedia')):
-                if failure in ('nonempty-media', 'reset-rpm', 'scalar-contribution', 'missing-contribution'):
+                if failure in ('nonempty-media', 'disable-readers', 'scalar-contribution', 'missing-contribution'):
                     if uri.endswith('getLoadedMedia'):
                         return {'return': [{'mediaId': 17, 'fileName': 'some-media.wem', 'format': 'PCM',
                             'size': 1024, 'soundBank': 'Some Bank'}]}
@@ -349,7 +363,7 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             if uri.endswith(('profiler.getVoices', 'profiler.getBusses', 'profiler.getAudioObjects')):
                 if failure == 'reader-error' and uri.endswith('getVoices'):
                     raise RuntimeError('fake voice read unavailable')
-                common = {'gameObjectID': 1, 'gameObjectName': 'Transport/Soundcaster'}
+                common = {'gameObjectID': game_object, 'gameObjectName': 'Transport/Soundcaster'}
                 if uri.endswith('getVoices'):
                     row = {**common, 'pipelineID': 42, 'objectGUID': sound_id, 'objectName': self.rows[sound_id]['name'],
                         'playingID': 7, 'soundID': 8, 'playTargetID': 8, 'playTargetGUID': sound_id,
@@ -362,20 +376,34 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                         'voiceCount': 1, 'depth': 1, 'effectCount': 0}
                     if version in ('2021.1', '2022.1'):
                         row['mixerID'] = row.pop('effectCount')
+                    if mixing_bus:
+                        # R104 actually observed Main's mixing pipeline while
+                        # query-object correctly returned logical OutputBus Cars.
+                        row.update(pipelineID=2, objectGUID='{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}',
+                            objectName='Main Audio Bus' if version == '2025.1' else 'Master Audio Bus', depth=0)
+                        if mixing_bus == 'wrong-game-object':
+                            row['gameObjectID'] = 2
+                        elif mixing_bus == 'malformed':
+                            row['gameObjectID'] = 'not-a-native-uint64'
                 else:
                     row = {**common, 'audioObjectID': 44, 'audioObjectName': '', 'busPipelineID': 43,
                         'busGUID': bus_id, 'busID': 123, 'busName': self.rows[bus_id]['name'], 'instigatorPipelineID': 42,
                         'effectClassID': 0, 'effectIndex': 0, 'effectPluginName': '', 'spatializationMode': 0,
                         'x': 0, 'y': 0, 'z': 0, 'spread': 0, 'focus': 0, 'channelConfig': 4,
                         'metadata': [], 'rmsMeter': [-12.5], 'peakMeter': [-10.5]}
+                    if mixing_bus:
+                        row.update(busPipelineID=2, busGUID='{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}',
+                            busName='Main Audio Bus' if version == '2025.1' else 'Master Audio Bus')
                 if failure == 'unattributed-readers':
                     row.update(gameObjectID=2, gameObjectName='Unrelated capture participant')
                     row['busGUID' if uri.endswith('getAudioObjects') else 'objectGUID'] = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
                 rows = [] if failure == 'empty-readers' else [row]
+                if mixing_bus == 'mixed' and uri.endswith('getBusses'):
+                    rows.append({**row, 'pipelineID': 3})
                 return {'return': [{key: value for key, value in item.items() if key in options['return']} for item in rows]}
             if uri.endswith('profiler.getGameObjects'):
                 return {'return': [] if failure == 'empty-readers' else [
-                    {'id': 2 if failure == 'unattributed-readers' else 1,
+                    {'id': 2 if failure == 'unattributed-readers' else game_object,
                         'name': 'Transport/Soundcaster',
                         'registrationTime' if version == '2022.1' else 'registerTime': 0,
                         'unregistrationTime' if version == '2022.1' else 'unregisterTime': -1}]}
@@ -427,8 +455,11 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
         set_gateway_config(env, wwise_version=version, project_modification_policy='ask_before_changes')
         env['WWISE_EVIDENCE_DIR'] = runtime.runner_environment['WWISE_EVIDENCE_DIR']
         def call(argv):
+            native_calls_before = len(client.calls)
             code, payload = gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'setup-state'), *argv],
                 env=env, client_factory=lambda _: client)
+            if '--runtime-page' in argv:
+                assert len(client.calls) == native_calls_before, 'Cached continuation dispatched an external native call'
             receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
             assert code == 0, json.dumps(payload, ensure_ascii=False)
             return payload
@@ -459,6 +490,159 @@ def _finish(batch, tmp_path, monkeypatch, *, passed):
     item._waapi_phase_reports['teardown'] = 'passed'
     final = batch.finalize([item], terminal=True, exitstatus=0 if passed else 1)
     return final, json.loads(target.read_text().splitlines()[-1])
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_missing_only_capture_collects_new_facts_without_repeating_passed_reads_or_effects(
+        owned_authoring, tmp_path, monkeypatch, version):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        version=version, missing_reads=True, native_rtpc=True, mixing_bus='unique')
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS'
+    assert {row['category'] for row in record['categories']} == ({'profiler-contributions-bus-observation'}
+        if version == '2021.1' else {'profiler-rtpcs-observation', 'profiler-contributions-bus-observation'})
+    assert all(row['status'] == 'PASS' and row['parent_workflow_complete'] is False for row in record['categories'])
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert report['reader_call_count'] == (3 if version == '2021.1' else 4) and report['public_call_count'] <= 192
+    assert report['reused_capture_evidence']['capture_time_ms'] == {
+        '2021.1': 34752, '2022.1': 39861, '2023.1': 45888, '2024.1': 45621, '2025.1': 46869}[version]
+    assert report['reused_capture_evidence']['candidate'] == 'a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8'
+    assert report['capture_position']['position_ms'] == 1500
+    assert report['remaining_same_parent_obligations']['profiler-loaded-media-observation'] == ['2023.1', '2024.1', '2025.1']
+    assert not any(uri.endswith(('getCpuUsage', 'getLoadedMedia', 'getStreamedMedia', 'getPerformanceMonitor',
+        'getGameObjects', 'getAudioObjects', 'getMeters', 'registerMeter', 'setCursorTime', 'saveCapture',
+        'log.addItem', 'log.clear', 'transport.prepare', 'object.setProperty')) for uri, _, _ in client.calls)
+    contributions = [args for uri, args, _ in client.calls if uri.endswith('getVoiceContributions')]
+    assert len(contributions) == 1 and contributions[0]['bussesPipelineID'] == [2]
+    data = [args['dataTypes'] for uri, args, _ in client.calls if uri.endswith('enableProfilerData')]
+    types = ('voices', 'voiceInspector') if version == '2021.1' else ('voices', 'voiceInspector', 'gameSyncs')
+    assert data == [[{'dataType': item, 'enable': True} for item in types],
+        [{'dataType': item, 'enable': False} for item in types]]
+    targeted = [uri for uri, _, _ in client.calls if uri.endswith(('getVoices', 'getBusses', 'getRTPCs', 'getVoiceContributions'))]
+    assert len(targeted) == (5 if version == '2021.1' else 6)
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+
+
+def test_retained_main_bus_read_and_filter_facts_are_meaningful_owned_observations(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        version='2021.1', capture_reads=True, native_rtpc=True, mixing_bus='unique')
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS'
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    for name in ('profiler-busses-observation', 'profiler-bus-instance-filter'):
+        evidence = report['outcomes'][name]['evidence']
+        assert evidence['owned_identity_observed'] is True
+        assert evidence['agent_result']['return'][0]['objectGUID'] == '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}'
+        assert next(row for row in record['categories'] if row['category'] == name)['status'] == 'PASS'
+    assert report['runtime_mixing_bus']['logical_output_equals_runtime_bus'] is False
+    assert report['fixture_before'] == report['fixture_after']
+
+
+def test_retained_cpu_page_ceiling_keeps_partial_data_without_another_native_read(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        capture_reads=True, failure='cpu-page-bound')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL'
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    cpu = report['outcomes']['profiler-cpu-observation']
+    assert cpu['outcome'] == 'BLOCKED' and cpu['evidence']['complete'] is False
+    assert len(cpu['evidence']['agent_result_pages']) == 8
+    assert len(cpu['evidence']['rows_native_order']) == 8
+    assert sum(uri.endswith('getCpuUsage') for uri, _, _ in client.calls) == 1
+    assert report['retained_page_call_count'] == 7 and report['public_call_count'] <= 192
+    assert next(row for row in record['categories'] if row['category'] == 'profiler-cpu-observation')['business_outcome'] == 'BLOCKED'
+
+
+@pytest.mark.parametrize('mixing_bus', ['unique', 'mixed', 'wrong-game-object', 'malformed'])
+def test_observed_mixing_bus_and_logical_output_remain_distinct_through_final_writer(
+        owned_authoring, tmp_path, monkeypatch, mixing_bus):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        capture_reads=True, failure='nonempty-media', native_rtpc=True, mixing_bus=mixing_bus)
+    if mixing_bus == 'unique':
+        collect(batch, call)
+    else:
+        with pytest.raises(AssertionError):
+            collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=mixing_bus == 'unique')
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    category = next(row for row in record['categories'] if row['category'] == 'profiler-contributions-bus-observation')
+    if mixing_bus == 'unique':
+        assert final['outcome'] == category['status'] == 'PASS'
+        association = report['runtime_mixing_bus']
+        assert association['logical_output_bus_id'] == '{33329D23-BCDD-4D1A-9734-2403A3428FAE}'
+        assert association['selected_observed_instance']['objectGUID'] == '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}'
+        assert association['selected_observed_instance']['pipelineID'] == 2
+        assert association['logical_output_equals_runtime_bus'] is False
+        assert any(args.get('bussesPipelineID') == [2] for uri, args, _ in client.calls if uri.endswith('getVoiceContributions'))
+    else:
+        assert final['outcome'] == 'FAIL' and category['business_outcome'] == 'BLOCKED'
+        assert not any(args.get('bussesPipelineID') for uri, args, _ in client.calls if uri.endswith('getVoiceContributions'))
+        assert report['outcomes']['profiler-contributions-dry-observation']['outcome'] == 'PASS'
+    assert report['fixture_before'] == report['fixture_after'] and report['cleanup']['complete']
+    assert not any(args.get('property') == 'BusChannelConfig' for uri, args, _ in client.calls if uri.endswith('setProperty'))
+
+
+def test_owned_rtpc_read_preserves_actual_native_value_without_global_setter_effect(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        version='2021.1', capture_reads=True, native_rtpc=True)
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS'
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    evidence = report['outcomes']['profiler-rtpcs-observation']['evidence']
+    assert evidence['rpm_read_row_indexes'] == [0]
+    assert evidence['agent_result']['return'][0] == {'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}',
+        'name': 'RPM', 'gameObjectId': 18446744073709551614, 'value': 1000.0}
+    assert evidence['setter_effect_verified'] is False
+    assert not any(uri.startswith('ak.soundengine.') for uri, _, _ in client.calls)
+    assert next(row for row in record['categories'] if row['category'] == 'profiler-rtpcs-observation')['status'] == 'PASS'
+
+
+@pytest.mark.parametrize('cpu_native_version,row_count', [('2024.1', 34), ('2025.1', 33)])
+def test_retained_native_cpu_rows_reach_final_writer_without_a_second_native_read(
+        owned_authoring, tmp_path, monkeypatch, cpu_native_version, row_count):
+    import hashlib
+    original = tmp_path / 'retained-original-cpu-receipt.json'
+    original.write_text(json.dumps(NATIVE_CPU_2024 if cpu_native_version == '2024.1' else NATIVE_CPU_2025))
+    before = hashlib.sha256(original.read_bytes()).hexdigest()
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        version=cpu_native_version, capture_reads=True, failure='nonempty-media', cpu_native_version=cpu_native_version)
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS' and record['version'] == cpu_native_version
+    archived = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archived['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    cpu = report['outcomes']['profiler-cpu-observation']
+    assert cpu['outcome'] == 'PASS' and cpu['evidence']['complete'] is True
+    pages = cpu['evidence']['agent_result_pages']
+    assert len(pages) == 3 and sum(len(page['return']) for page in pages) == row_count
+    assert len({page['snapshot_sha256'] for page in pages}) == 1
+    capture_time, snapshot = {'2024.1': ('45621', '307fa2b3b5fac363b5146d671cc6679dbabe5d00f1800631daf7179d75fd15b6'),
+        '2025.1': ('46869', '155343dcd3b55706c21969f876d80162b7466493c7e70e919516f0c37f55a1b7')}[cpu_native_version]
+    assert pages[0]['snapshot_sha256'] == snapshot
+    assert all(page['total_count'] == row_count and page['profiler_position'] == capture_time for page in pages)
+    assert cpu['evidence']['rows_native_order'] == json.loads(original.read_text())['return']
+    assert pages[0]['complete'] is False and pages[-1]['complete'] is True
+    continuations = [receipt for receipt in archived['receipts']
+        if receipt['argv'][:2] == ['core-call', 'ak.wwise.core.profiler.getCpuUsage']
+        and '--runtime-page' in receipt['argv']]
+    assert len(continuations) == 2
+    assert all(receipt['payload']['native_read_dispatched'] is False for receipt in continuations)
+    assert sum(uri.endswith('getCpuUsage') for uri, _, _ in client.calls) == 1
+    assert next(row for row in record['categories'] if row['category'] == 'profiler-cpu-observation')['status'] == 'PASS'
+    assert hashlib.sha256(original.read_bytes()).hexdigest() == before
 
 
 def test_capture_read_extension_keeps_new_data_and_empty_media_in_final_archive(owned_authoring, tmp_path, monkeypatch):
@@ -529,16 +713,12 @@ def test_capture_level_media_rows_pass_without_inventing_sound_or_control_attrib
     archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
     report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
     assert report['public_call_count'] <= 192 and report['reader_call_count'] == 9
-    assert report['rpm_stimulus']['prior_global_override_restored'] is False
-    assert report['outcomes']['profiler-rtpcs-observation']['evidence']['rpm_stimulus_row_indexes'] == [0]
+    assert report['outcomes']['profiler-rtpcs-observation']['evidence'].get('setter_effect_verified', False) is False
+    assert report['outcomes']['profiler-rtpcs-observation']['evidence']['rpm_read_row_indexes'] == [0]
     assert [(args['property'], args['value']) for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [
         ('IsStreamingEnabled', True), ('IsStreamingEnabled', False)]
-    assert [(uri, args) for uri, args, _ in client.calls if uri.startswith('ak.soundengine.')] == [
-        ('ak.soundengine.setRTPCValue', {'rtpc': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}',
-            'gameObject': 18446744073709551615, 'value': 4000.0}),
-        ('ak.soundengine.resetRTPCValue', {'rtpc': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}',
-            'gameObject': 18446744073709551615})]
-    assert client.rpm_value is None and not client.transport and not batch.runtime.owned_root.exists()
+    assert not any(uri.startswith('ak.soundengine.') for uri, _, _ in client.calls)
+    assert not client.transport and not batch.runtime.owned_root.exists()
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2023.1', '2024.1'])
@@ -576,7 +756,7 @@ def test_older_capture_read_batch_keeps_version_fields_and_independent_file_log_
         assert sum(uri.endswith('profiler.saveCapture') for uri, _, _ in client.calls) == 1
         assert sum(uri.endswith('log.addItem') for uri, _, _ in client.calls) == 1
         assert sum(uri.endswith('log.clear') for uri, _, _ in client.calls) == 1
-    assert client.rpm_value is None and not client.transport and not batch.runtime.owned_root.exists()
+    assert not client.transport and not batch.runtime.owned_root.exists()
 
 
 @pytest.mark.parametrize('reported', [True, False])
@@ -607,14 +787,14 @@ def test_reported_scalar_contribution_and_unreported_payload_remain_distinct_in_
         category = next(row for row in record['categories'] if row['category'] == name)
         assert category['business_outcome'] == ('PASS' if reported else 'BLOCKED')
         assert category['status'] == ('PASS' if reported else 'blocked')
-    assert report['reader_call_count'] == 9 and report['public_call_count'] == 140
+    assert report['reader_call_count'] == 9 and report['public_call_count'] <= 192
     assert next(row for row in record['categories'] if row['category'] == 'profiler-rtpcs-observation')[
-        'attribution_scope'] == 'controlled-global-rtpc'
+        'attribution_scope'] == 'owned-rtpc-read'
     assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
     assert sum(uri.endswith('getVoiceContributions') for uri, _, _ in client.calls) == 2
 
 
-@pytest.mark.parametrize('failure', ['empty-extra', 'partial-extra', 'reset-rpm'])
+@pytest.mark.parametrize('failure', ['empty-extra', 'partial-extra', 'disable-readers'])
 def test_capture_read_missing_partial_and_cleanup_results_reach_final_writer(
         owned_authoring, tmp_path, monkeypatch, failure):
     batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
@@ -628,7 +808,7 @@ def test_capture_read_missing_partial_and_cleanup_results_reach_final_writer(
     report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
     assert report['reader_call_count'] == 9 and report['public_call_count'] <= 192
     assert all(row['status'] == 'blocked' and 'batch_finalization' not in row for row in record['categories'])
-    assert report['rpm_stimulus']['prior_global_override_restored'] is False
+    assert report['outcomes']['profiler-rtpcs-observation']['evidence'].get('setter_effect_verified', False) is False
     assert not client.transport and report['fixture_before'] == report['fixture_after']
     if failure == 'empty-extra':
         assert all(row['outcome'] == 'BLOCKED' and row['evidence']['observation_status'] == 'PASS'
@@ -643,14 +823,40 @@ def test_capture_read_missing_partial_and_cleanup_results_reach_final_writer(
         assert report['outcomes']['profiler-rtpcs-observation']['outcome'] == 'PASS'
     else:
         assert all(row['outcome'] == 'PASS' for row in report['outcomes'].values())
-        assert [row['action'] for row in report['cleanup']['errors']] == ['reset-global-rpm']
-        assert sum(uri == 'ak.soundengine.resetRTPCValue' for uri, _, _ in client.calls) == 1
+        assert [row['action'] for row in report['cleanup']['errors']] == ['disable-capture-read-data']
+        assert sum(uri.endswith('enableProfilerData') and not args['dataTypes'][0]['enable']
+            for uri, args, _ in client.calls) == 1
         failed = [row for row in archive['receipts'] if row['argv'][0] == 'execute'
-            and row['payload'].get('dispatch_result', {}).get('api') == 'ak.soundengine.resetRTPCValue']
+            and row['exit_code'] != 0
+            and row['payload'].get('dispatch_result', {}).get('api') == 'ak.wwise.core.profiler.enableProfilerData']
         assert len(failed) == 1 and failed[0]['payload']['state'] == 'indeterminate'
         assert failed[0]['payload']['automatic_retry'] is False
-    assert report['cleanup']['complete'] is (failure != 'reset-rpm')
+    assert report['cleanup']['complete'] is (failure != 'disable-readers')
     assert record['source']['hash_before'] == record['source']['hash_after']
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('extra', [False, True])
+def test_missing_capture_owner_requires_its_exact_single_node(tmp_path, monkeypatch, version, extra):
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.profiler_capture import CAPTURE_MISSING_NODEID
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    staged = []
+    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media',
+        lambda sandbox, io_root, *, version: staged.append(version))
+    monkeypatch.setenv('WWISE_VERSION', version)
+    config = _config(tmp_path)
+    config.args = [CAPTURE_MISSING_NODEID, *([NODE] if extra else [])]
+    items = [SimpleNamespace(nodeid=name) for name in config.args]
+    if extra:
+        with pytest.raises(pytest.UsageError, match='exact single node|not available'):
+            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert not events and not staged
+    else:
+        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert [row[0] for row in events] == ['construct', 'start', 'install']
+        assert staged == [version] and events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])

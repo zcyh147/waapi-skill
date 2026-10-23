@@ -23,6 +23,8 @@ READERS_2025_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_profiler_readers')
 CAPTURE_READS_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_profiler_capture_reads')
+CAPTURE_MISSING_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_runtime_owned_missing_profiler_reads')
 METER_2024_SOUND_ID = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'
 METER_2024_BUS_ID = '{06362E8D-5A32-497A-B063-3DA95963CE47}'
 METER_2024_PARENT_ID = '{ED2BCAC8-D7B6-4448-8900-439B557894F4}'
@@ -44,6 +46,7 @@ CAPTURE_READ_OUTCOMES = ('profiler-rtpcs-observation', 'profiler-contributions-d
     'profiler-contributions-bus-observation', 'profiler-cpu-observation', 'profiler-loaded-media-observation',
     'profiler-performance-observation', 'profiler-streamed-media-observation')
 CAPTURE_NODE_OUTCOMES[CAPTURE_READS_NODEID] = CAPTURE_READ_OUTCOMES
+CAPTURE_NODE_OUTCOMES[CAPTURE_MISSING_NODEID] = (CAPTURE_READ_OUTCOMES[0], CAPTURE_READ_OUTCOMES[2])
 CAPTURE_CAR_ID = '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'
 CAPTURE_CAR_SOURCE_ID = '{48770A4D-B8C3-41CF-AE3E-FB8651347736}'
 CAPTURE_CAR_PARENT_ID = '{97A58685-6231-4227-9BAB-451E089615A8}'
@@ -56,6 +59,8 @@ PREFIX = 'ak.wwise.core.'
 
 
 def capture_node_outcomes(nodeid, version):
+    if nodeid == CAPTURE_MISSING_NODEID:
+        return CAPTURE_NODE_OUTCOMES[nodeid][1:] if version == '2021.1' else CAPTURE_NODE_OUTCOMES[nodeid]
     if nodeid != CAPTURE_READS_NODEID:
         return CAPTURE_NODE_OUTCOMES[nodeid]
     basic = () if version == '2025.1' else tuple(name for name in READER_OUTCOMES
@@ -105,6 +110,14 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
     observations = {}
     outcomes = report.setdefault('seed_observations', {}) if seed_only else report['outcomes']
 
+    def mixing_candidates(rows):
+        owned_voices = [row for row in observations.get(READER_OUTCOMES[0], [])
+            if row.get('gameObjectID') == game_object]
+        if len(owned_voices) != 1 or owned_voices[0].get('objectGUID') != sound_id:
+            return []
+        return [i for i, row in enumerate(rows) if row.get('gameObjectID') == game_object
+            and row.get('voiceCount') == 1 and isinstance(row.get('bus_instance_handle'), str)]
+
     def observe(name, argv, *, row_field='return', selected=None, identity_fields=()):
         report['reader_call_count'] += 1
         assert report['reader_call_count'] <= report['limits']['reader_calls'], 'Profiler reader call bound exceeded'
@@ -131,6 +144,10 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
                 ('bus_row_indexes',) if name in (READER_OUTCOMES[1], READER_OUTCOMES[5]) else
                 ('transport_game_object_row_indexes',) if name == READER_OUTCOMES[3] else
                 ('bus_row_indexes', 'transport_game_object_row_indexes'))
+            if report.get('capture_read_batch') and name in (READER_OUTCOMES[1], READER_OUTCOMES[5]):
+                candidates = ties['mixing_bus_candidate_row_indexes'] = mixing_candidates(rows)
+                ties['unique_owned_mixing_bus_row_indexes'] = candidates if len(candidates) == 1 else []
+                relevant = ('unique_owned_mixing_bus_row_indexes',)
             evidence['owned_identity_observed'] = any(ties[key] for key in relevant)
             if not evidence['complete']:
                 outcomes[name]['reason'] = 'Retained first page incomplete; no additional native read or paging scheduled'
@@ -172,10 +189,19 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
     # and use an actually issued instance; never assert fixture attribution.
     def select(name, handle, expected_guid):
         rows = [row for row in observations.get(name, []) if isinstance(row.get(handle), str)]
+        if report.get('capture_read_batch') and name == READER_OUTCOMES[1]:
+            candidates = mixing_candidates(rows)
+            return rows[candidates[0]] if len(candidates) == 1 else None
         return next((row for row in rows if row.get('objectGUID') == expected_guid), rows[0] if rows else None)
 
     voice = select(READER_OUTCOMES[0], 'voice_instance_handle', sound_id)
     bus = select(READER_OUTCOMES[1], 'bus_instance_handle', bus_id)
+    if report.get('capture_read_batch'):
+        report['runtime_mixing_bus'] = {'logical_output_bus_id': bus_id,
+            'selected_observed_instance': bus,
+            'logical_output_equals_runtime_bus': bus.get('objectGUID') == bus_id if bus else None,
+            'association_boundary': 'Unique observed mixing pipeline on owned transport with isolated Car voice; no inferred logical-bus GUID equivalence or arbitrary path-order proof'}
+        persist()
     if seed_only:
         return voice, bus
     for name, suffix, row, flag, keys in (
@@ -200,9 +226,45 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
     return voice, bus
 
 
+def _retained_cpu_rows(call, report, evidence, first, *, fixed_time):
+    """Deliver one retained native snapshot; continuations never read Wwise."""
+    pages = evidence['agent_result_pages'] = [first]
+    rows = list(first['return'])
+    total = first.get('total_count')
+    snapshot = first.get('snapshot_sha256')
+    handle = None
+    while (not pages[-1].get('complete') and type(total) is int and total <= report['limits']['reader_rows']
+            and 'row_fragment' not in pages[-1] and len(pages) < report['limits']['retained_cpu_pages']):
+        prior = pages[-1]
+        continuation = prior.get('next_command', {}).get('gateway_argv')
+        assert (isinstance(continuation, list) and len(continuation) == 6
+            and continuation[:3] == ['core-call', PREFIX + 'profiler.getCpuUsage', '--runtime-observation']
+            and continuation[4] == '--runtime-page'
+            and all(isinstance(value, str) for value in continuation)), 'Malformed retained CPU continuation'
+        handle = handle or continuation[3]
+        assert continuation[3] == handle, 'Retained CPU observation changed'
+        payload = call(continuation)  # Copy the exact Gateway-owned continuation.
+        assert payload.get('native_read_dispatched') is False and payload.get('retained_observation') is True
+        page = payload['agent_result']
+        pages.append(page)
+        report['retained_page_call_count'] = report.get('retained_page_call_count', 0) + 1
+        assert (page.get('snapshot_sha256') == snapshot and page.get('total_count') == total
+            and page.get('profiler_position') == fixed_time), 'Retained CPU snapshot context changed'
+        assert (page['page']['offset_from_end'] == prior['page']['next_offset_from_end']
+            and page['page']['next_offset_from_end'] > page['page']['offset_from_end']
+            and page['page']['next_offset_from_end'] - page['page']['offset_from_end'] == len(page['return'])
+            and page.get('returned_count') == len(page['return'])
+            and 'row_fragment' not in page), 'Retained CPU page gap, overlap or unsupported fragment'
+        rows = [*page['return'], *rows]  # Newest ranges are delivered first.
+        assert len(rows) <= 64 and all(isinstance(row, dict) for row in rows)
+    complete = pages[-1].get('complete') is True and len(rows) == total
+    evidence['rows_native_order'] = rows
+    return rows, complete
+
+
 def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_id):
     voice, bus = _collect_readers(call, report, persist, fixed_time=fixed_time,
-        sound_id=sound_id, bus_id=bus_id, seed_only=report['version'] == '2025.1')
+        sound_id=sound_id, bus_id=bus_id, seed_only=report['version'] == '2025.1' or report.get('missing_only', False))
     game_object = report['transport_association']['gameObject']
 
     def observe(name, argv, *, scope='owned-game-object', contribution=False):
@@ -215,6 +277,9 @@ def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_i
             result = call(argv)['agent_result']
             evidence['agent_result'] = result
             rows = result.get('objects') if contribution else result['return']
+            cpu_complete = None
+            if name == CAPTURE_READ_OUTCOMES[3]:
+                rows, cpu_complete = _retained_cpu_rows(call, report, evidence, result, fixed_time=fixed_time)
             if rows is None and contribution and result.get('contribution_reported') is False:
                 rows = []
             assert isinstance(rows, list) and len(rows) <= (8192 if contribution else 64), 'Capture read row bound exceeded'
@@ -223,16 +288,19 @@ def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_i
             if contribution:
                 evidence['tree_nonempty'] = bool(rows)
             evidence['complete'] = result.get('complete', not result.get('truncated', False)) is True
+            if cpu_complete is not None:
+                evidence['complete'] = cpu_complete
             evidence['owned_game_object_row_indexes'] = [i for i, row in enumerate(rows)
                 if row.get('gameObjectId') == game_object]
             evidence['owned_identity_observed'] = evidence['nonempty'] and (contribution or bool(evidence['owned_game_object_row_indexes']))
             if name == CAPTURE_READ_OUTCOMES[0]:
-                evidence['rpm_stimulus_row_indexes'] = [i for i, row in enumerate(rows)
+                evidence['rpm_read_row_indexes'] = [i for i, row in enumerate(rows)
                     if row.get('id') == CAPTURE_RPM_ID and row.get('name') == 'RPM'
-                    and row.get('value') == report['rpm_stimulus']['value']
-                    and row.get('gameObjectId') == (1 << 64) - 1]
-                evidence['owned_identity_observed'] = bool(evidence['rpm_stimulus_row_indexes'])
-                evidence['association_boundary'] = 'Global RPM value and independently observed Car voice/committed curve; no per-row Sound identity'
+                    and type(row.get('value')) in (int, float) and math.isfinite(row['value'])
+                    and row.get('gameObjectId') in (game_object, (1 << 64) - 1)]
+                evidence['owned_identity_observed'] = bool(evidence['rpm_read_row_indexes'])
+                evidence['setter_effect_verified'] = False
+                evidence['association_boundary'] = 'Actual owned/global RPM read with observed Car voice/committed curve; no setter effect or per-row Sound identity'
             if name == CAPTURE_READ_OUTCOMES[4]:
                 evidence['source_media_id_row_indexes'] = [i for i, row in enumerate(rows)
                     if row.get('mediaId') == CAPTURE_CAR_MEDIA_ID]
@@ -243,7 +311,7 @@ def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_i
             if name in (CAPTURE_READ_OUTCOMES[4], CAPTURE_READ_OUTCOMES[6]):
                 evidence['preparation_or_streaming_control_effect_verified'] = False
             if not evidence['complete']:
-                observation['reason'] = 'Incomplete retained first page; no paging or additional native read'
+                observation['reason'] = 'Incomplete retained data or delivery bound reached; no additional native read'
             else:
                 evidence['observation_status'] = 'PASS'
                 if not evidence['nonempty']:
@@ -262,11 +330,14 @@ def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_i
         observe(name, ['core-call', PREFIX + 'profiler.' + suffix, '--profiler-position', fixed_time,
             '--max-results', '64'], scope=scope)
 
-    row_read(CAPTURE_READ_OUTCOMES[0], 'getRTPCs', 'controlled-global-rtpc')
+    if CAPTURE_READ_OUTCOMES[0] in report['outcomes']:
+        row_read(CAPTURE_READ_OUTCOMES[0], 'getRTPCs', 'owned-rtpc-read')
     for name, use_bus in ((CAPTURE_READ_OUTCOMES[1], False), (CAPTURE_READ_OUTCOMES[2], True)):
+        if name not in report['outcomes']:
+            continue
         valid = (voice is not None and voice.get('objectGUID') == sound_id
             and voice.get('gameObjectID') == game_object and (not use_bus or bus is not None
-                and bus.get('objectGUID') == bus_id and bus.get('gameObjectID') == game_object))
+                and bus.get('gameObjectID') == game_object))
         if not valid:
             report['outcomes'][name] = {'outcome': 'BLOCKED', 'reason': 'No attributable issued voice/Bus capture handle',
                 'evidence': {'position_ms': int(fixed_time), 'observation_status': 'BLOCKED', 'owned_identity_observed': False}}
@@ -284,7 +355,8 @@ def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_i
             (CAPTURE_READ_OUTCOMES[5], 'getPerformanceMonitor', 'capture'),
             (CAPTURE_READ_OUTCOMES[6], 'getStreamedMedia', 'capture'),
         ):
-            row_read(name, suffix, scope)
+            if name in report['outcomes']:
+                row_read(name, suffix, scope)
 
 
 def stage_owned_2024_meter_media(sandbox, io_root):
@@ -318,11 +390,12 @@ def stage_owned_2024_meter_media(sandbox, io_root):
 
 def collect_owned_capture(batch, public_call):
     version = batch.runtime.version
-    capture_reads = batch.selected_nodeids == (CAPTURE_READS_NODEID,)
+    missing_only = batch.selected_nodeids == (CAPTURE_MISSING_NODEID,)
+    capture_reads = missing_only or batch.selected_nodeids == (CAPTURE_READS_NODEID,)
     assert version in (('2021.1', '2022.1', '2023.1', '2024.1', '2025.1') if capture_reads
         else ('2024.1', '2025.1')), 'Capture version is not admitted for this node'
     readers = capture_reads or batch.selected_nodeids == (READERS_2025_NODEID,)
-    nodeid = CAPTURE_READS_NODEID if capture_reads else READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
+    nodeid = CAPTURE_MISSING_NODEID if missing_only else CAPTURE_READS_NODEID if capture_reads else READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
     assert batch.selected_nodeids == (nodeid,), 'Capture requires its exact matching node'
     sound_id, bus_id, parent_id = (METER_2024_SOUND_ID, METER_2024_BUS_ID, METER_2024_PARENT_ID) if version == '2024.1' else (SOUND_ID, BUS_ID, PARENT_ID)
     parent_output, parent_key = ('volume-db', 'volume_db') if version == '2024.1' else ('work-unit-is-default', 'work_unit_is_default')
@@ -349,8 +422,20 @@ def collect_owned_capture(batch, public_call):
         report['scope'] = 'One owned 2025.1 capture; no 2021.1–2024.1 reader evidence or acoustic proof'
     if capture_reads:
         report['capture_read_batch'] = True
+        report['limits']['retained_cpu_pages'] = 8
         report['limits']['reader_calls'] = {'2021.1': 9, '2022.1': 10, '2023.1': 14, '2024.1': 14, '2025.1': 9}[version]
         report['scope'] = 'Only missing read observations at one capture time; no acoustic or missing-version credit'
+    if missing_only:
+        report['missing_only'] = True
+        report['limits']['reader_calls'] = 3 if version == '2021.1' else 4
+        report['scope'] = 'Only selected missing reads at this new capture; historical native facts are separate and #186 remains incomplete'
+        report['reused_capture_evidence'] = {'candidate': 'a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8',
+            'root': 'r104-capture-reads-native-' + version[:4] + '-r1',
+            'capture_time_ms': {'2021.1': 34752, '2022.1': 39861, '2023.1': 45888,
+                '2024.1': 45621, '2025.1': 46869}[version],
+            'original_verdict': 'FAIL', 'boundary': 'Separate retained facts; not measurements at this new capture time'}
+        report['remaining_same_parent_obligations'] = {
+            'profiler-loaded-media-observation': ['2023.1', '2024.1', '2025.1']}
 
     def persist():
         raw = (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode()
@@ -407,8 +492,7 @@ def collect_owned_capture(batch, public_call):
                     arguments = ['--business-value', choices[0]['input']]
                 step('draft-declare-field-change', ['--object-handle', handle, '--field-handle', field_handle, *arguments])
             else:
-                step('draft-declare-soundengine-plan' if operation.startswith('ak.soundengine.')
-                    else 'draft-declare-runtime-control-plan', ['--' + role.replace('_', '-') + '-handle', handle, *arguments])
+                step('draft-declare-runtime-control-plan', ['--' + role.replace('_', '-') + '-handle', handle, *arguments])
         else:
             step('draft-declare-runtime-control-plan', arguments)
         step('draft-check')
@@ -443,10 +527,6 @@ def collect_owned_capture(batch, public_call):
             identity=sound_id, field_meaning='IsStreamingEnabled'), before_execute=before_execute)
         assert result['verification']['business_state_verified'] is True, result
         return result
-
-    def rpm(suffix, fields=(), *, before_execute=None):
-        return execute(draft('ak.soundengine.' + suffix, ['--global-scope', *fields],
-            role='game_parameter', identity=CAPTURE_RPM_ID), before_execute=before_execute)
 
     def set_bus_configuration(value, *, label=None, before_execute=None):
         result = execute(draft('object.setProperty', [], identity=bus_id,
@@ -536,17 +616,10 @@ def collect_owned_capture(batch, public_call):
         if capture_reads:
             source = exact(CAPTURE_CAR_SOURCE_ID)
             assert source['type'] == 'AudioFileSource'
-            rpm_before = exact(CAPTURE_RPM_ID, '--include-field', 'Min', '--include-field', 'Max')
-            assert rpm_before['name'] == 'RPM' and rpm_before['type'] == 'GameParameter'
-            minimum, maximum = (rpm_before['properties'][key] for key in ('Min', 'Max'))
-            assert all(type(value) in (int, float) and math.isfinite(value) for value in (minimum, maximum)) and minimum < maximum
-            report['fixture_before'].update(source=source, rpm=rpm_before)
-            report['rpm_stimulus'] = {'value': (minimum + maximum) / 2,
-                'scope': 'global', 'fresh_owned_host': True, 'prior_global_override_restored': False,
-                'restoration_boundary': 'Reset companion only; unknown earlier global override cannot be recovered'}
+            report['fixture_before'].update(source=source)
             streaming = props.get('IsStreamingEnabled')
             assert type(streaming) is bool
-            if not streaming:
+            if not streaming and not missing_only:
                 report['setup'].append({'enable_streaming': set_stream(True,
                     before_execute=lambda: own('restore-streaming', lambda: set_stream(False)))})
         if version == '2024.1' and not capture_reads:
@@ -566,11 +639,12 @@ def collect_owned_capture(batch, public_call):
                 before_execute=lambda: own('restore-loop-enabled', lambda: set_loop(False)))})
         if version in ('2023.1', '2024.1', '2025.1'):
             report['setup'].append({'originals': effect('transport.useOriginals', ['--audition-media', 'originals'])})
-        if capture_reads and version != '2021.1':
+        if capture_reads and not missing_only and version != '2021.1':
             report['setup'].append({'prepare': effect('transport.prepare', role='target', identity=sound_id)})
         if capture_reads:
-            data_sets = ('voices', 'voice-inspector', *(() if version == '2025.1' else ('audio-objects',)),
-                *(('cpu', 'loaded-media', 'streaming') if version in ('2023.1', '2024.1', '2025.1') else ()))
+            data_sets = ('voices', 'voice-inspector', *(() if version == '2021.1' else ('game-syncs',)),
+                *(() if version == '2025.1' or missing_only else ('audio-objects',)),
+                *(('cpu', 'loaded-media', 'streaming') if not missing_only and version in ('2023.1', '2024.1', '2025.1') else ()))
             def data_changes(outcome):
                 return [value for data in data_sets for value in ('--capture-data', data, outcome)]
             report['setup'].append({'enable_capture_reads': effect('profiler.enableProfilerData', data_changes('enable'),
@@ -604,9 +678,6 @@ def collect_owned_capture(batch, public_call):
             rows = call(membership)['agent_result']['list']
             association, = [row for row in rows if row['object'] == sound_id]
             report['transport_association'] = association
-        if capture_reads:
-            report['setup'].append({'set_global_rpm': rpm('setRTPCValue', ['--value', str(report['rpm_stimulus']['value'])],
-                before_execute=lambda: own('reset-global-rpm', lambda: rpm('resetRTPCValue')))})
         time.sleep(0.25)
         position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
         assert position['available'] is True and position['position_ms'] >= 0, position
@@ -650,7 +721,7 @@ def collect_owned_capture(batch, public_call):
         # executes at most once; cleanup never repeats an attempted stop.
         report['setup'].append({'stop_capture': clean_one('stop-capture')})
         optional_effects = False
-        if capture_reads and version in ('2023.1', '2024.1'):
+        if capture_reads and not missing_only and version in ('2023.1', '2024.1'):
             budget = report['optional_effect_budget'] = {'calls_before': report['public_call_count'],
                 'effect_calls': 29, 'cleanup_reserve_calls': 52}
             optional_effects = budget['admitted'] = budget['calls_before'] + 29 + 52 <= report['limits']['public_calls']
@@ -734,9 +805,8 @@ def collect_owned_capture(batch, public_call):
                 after = {'sound': exact(sound_id, *looping),
                     'bus': exact(bus_id, *bus_fields),
                     'parent': exact(parent_id, *parent_fields)}
-                if capture_reads and 'source' in report['fixture_before'] and 'rpm' in report['fixture_before']:
-                    after.update(source=exact(CAPTURE_CAR_SOURCE_ID),
-                        rpm=exact(CAPTURE_RPM_ID, '--include-field', 'Min', '--include-field', 'Max'))
+                if capture_reads and 'source' in report['fixture_before']:
+                    after.update(source=exact(CAPTURE_CAR_SOURCE_ID))
                 report['fixture_after'] = after
                 assert after == report['fixture_before'], 'Owned Sound/bus/parent values changed after cleanup'
         except Exception as exc:
