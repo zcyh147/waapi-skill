@@ -11195,6 +11195,47 @@ def test_structure_changed_notes_filtered_diagnostic(workflow_sandbox_runtime: _
         name='WAAPI_NOTES_FILTERED_' + uuid.uuid4().hex[:12], filtered=True)
 
 
+def _compact_blend_failure_receipt(receipt, *, state_dir, full_body):
+    """Bounded failure index, never a second copy of omitted phase payloads."""
+    from wwise_waapi.transactions import validate_transaction_id
+
+    compact = {key: receipt[key] for key in ("candidate", "version", "build", "source_member", "source_sha256",
+        "native_assignment_effect_verified", "failure", "finalization_error") if key in receipt}
+    compact.update(full_phase_payloads_retained=False,
+        omission_reason="Full payload omitted from bounded failure retention; use persisted transaction/native evidence.",
+        full_receipt={"bytes": len(full_body), "sha256": hashlib.sha256(full_body).hexdigest(), "serialization": "UTF-8 JSON indent=2"})
+    original = receipt["transactions"]
+    phases = {key: original[key] for key in ("transaction_id", "phase") if key in original}
+    for name in ("draft-check", "preview", "transaction-show", "confirm", "execute", "verify"):
+        payload = original.get(name)
+        if not isinstance(payload, Mapping):
+            continue
+        phases[name] = {key: payload[key] for key in ("transaction_id", "artifact_hash", "ok", "status", "state",
+            "executed", "verified", "automatic_retry", "error_code") if key in payload}
+        verification = payload.get("verification")
+        if isinstance(verification, Mapping):
+            phases[name]["verification"] = {key: verification[key] for key in ("status", "ok", "business_state_verified",
+                "verification_strength", "assertion_count", "passed_assertion_count") if key in verification}
+        raw = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        phases[name]["omitted_payload"] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        if name + "_exit_code" in original:
+            phases[name + "_exit_code"] = original[name + "_exit_code"]
+    compact["transactions"] = phases
+    compact["native_evidence"] = receipt.get("native_evidence", [])[:64]
+    compact["persisted_transaction_evidence"] = []
+    if "transaction_id" in phases:
+        tx = validate_transaction_id(phases["transaction_id"])
+        for name in ("preview.json", "state.json", "events.jsonl"):
+            path = state_dir / "transactions" / tx / name
+            try:
+                raw = read_bounded_exclusive_regular_file(path, max_bytes=8 * 1024 * 1024).raw
+                compact["persisted_transaction_evidence"].append({"path": str(path), "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
+            except Exception as exc:
+                compact["persisted_transaction_evidence"].append({"path": str(path), "unavailable": {"type": type(exc).__name__, "message": str(exc)[:2048]}})
+    assert len(json.dumps(compact, ensure_ascii=False, indent=2).encode("utf-8")) <= 8 * 1024 * 1024, "Compact Blend failure index byte bound"
+    return compact
+
+
 @pytest.mark.live
 @pytest.mark.destructive
 def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
@@ -11282,9 +11323,19 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
             try:
                 partial = output.with_name("blend-negative-insertion.partial.json")
                 body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+                retained = receipt
+                if len(body) > 8 * 1024 * 1024:
+                    retained = _compact_blend_failure_receipt(receipt, state_dir=runtime.state_dir, full_body=body)
+                    body = json.dumps(retained, ensure_ascii=False, indent=2).encode("utf-8")
+                assert len(body) <= 8 * 1024 * 1024, "Partial Blend receipt byte bound"
                 partial.write_bytes(body)
                 category.update(observation_path=str(partial), observation_sha256=hashlib.sha256(body).hexdigest())
             except BaseException as retention_error:
-                category.update(partial_receipt=receipt, retention_error={"type": type(retention_error).__name__, "message": str(retention_error)[:2048]})
+                body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+                retained = _compact_blend_failure_receipt(receipt, state_dir=runtime.state_dir, full_body=body)
+                fallback = {**category, "partial_receipt": retained,
+                    "retention_error": {"type": type(retention_error).__name__, "message": str(retention_error)[:2048]}}
+                assert len(json.dumps(fallback, ensure_ascii=False, indent=2).encode("utf-8")) <= 8 * 1024 * 1024, "Blend category failure byte bound"
+                category.update(fallback)
             if original_error is None:
                 raise

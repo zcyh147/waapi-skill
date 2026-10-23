@@ -139,3 +139,50 @@ def test_blend_collector_preserves_original_verification_failure_when_finalizati
     assert receipt["transactions"]["verify_exit_code"] == 2
     assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
     assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("all_writes_fail", [False, True])
+def test_blend_collector_oversized_final_receipt_keeps_bounded_partial_or_category(tmp_path, workflow, monkeypatch, all_writes_fail):
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch)
+    raw = runtime.raw_gateway
+    def oversized_retained_diagnostic(argv):
+        code, reply = raw(argv)
+        if argv[0] == "execute":
+            # Inject finalization pressure after the real public reply. Native
+            # dispatch/state/effect/verify remain the actual fake Gateway chain.
+            reply["collector_fixture_diagnostic"] = "x" * (9 * 1024 * 1024)
+        return code, reply
+    runtime.raw_gateway = oversized_retained_diagnostic
+    if all_writes_fail:
+        write = Path.write_bytes
+        def fail_receipt(path, body):
+            if path.name.startswith("blend-negative-insertion"):
+                raise OSError("injected all receipt writes failed")
+            return write(path, body)
+        monkeypatch.setattr(Path, "write_bytes", fail_receipt)
+    with pytest.raises(AssertionError, match="Blend receipt byte bound"):
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    category, = runtime.category_results
+    if all_writes_fail:
+        receipt = category["partial_receipt"]
+    else:
+        body = Path(category["observation_path"]).read_bytes()
+        assert len(body) <= 8 * 1024 * 1024
+        receipt = json.loads(body)
+    assert len(json.dumps(category).encode()) <= 8 * 1024 * 1024
+    assert category["status"] == "FAIL" and receipt["native_assignment_effect_verified"] is False
+    assert receipt["full_phase_payloads_retained"] is False
+    assert receipt["full_receipt"]["bytes"] > 8 * 1024 * 1024
+    assert receipt["finalization_error"]["message"].startswith("Blend receipt byte bound")
+    phases = receipt["transactions"]
+    tx = phases["transaction_id"]
+    assert phases["preview"]["transaction_id"] == phases["execute"]["transaction_id"] == phases["verify"]["transaction_id"] == tx
+    assert phases["execute"]["executed"] is True and phases["verify"]["verified"] is True
+    assert phases["execute_exit_code"] == phases["verify_exit_code"] == 0
+    assert "collector_fixture_diagnostic" not in phases["execute"]
+    persisted = receipt["persisted_transaction_evidence"]
+    assert {Path(row["path"]).name for row in persisted} == {"preview.json", "state.json", "events.jsonl"}
+    import hashlib
+    assert all(hashlib.sha256(Path(row["path"]).read_bytes()).hexdigest() == row["sha256"] for row in persisted)
+    assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
