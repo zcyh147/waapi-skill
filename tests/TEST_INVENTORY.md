@@ -40,6 +40,26 @@ test before another native selection. No retry or native-absence claim follows.
 
 No Fresh, broad gate, Windows acceptance or whole-ticket completion is claimed.
 
+The omitted-projection repair `6330b8b9`, reviewed as `5031a90b` and integrated
+at `42bc090c`, reuses the existing source-bound empty-list proof. Only an exact
+modern Marker owner/profile and a fresh independent `select @Markers take 1`
+returning exactly an empty result can normalize the omitted projection. The
+full public fake collector reproduced the failure and then passed in 2.23s;
+14 new/affected controls passed in 12.76s. Independent review found no issue.
+
+The new native attempt on frozen `42bc090c` **retained an overall FAIL in
+6.80s**, but passed creation and independent Marker observation: transaction
+`tx1-ywrvbet3n5hr8dmgdkxf` verified; actual Marker GUID/class/owner and
+Time0/Label `R90_MARKER` matched, with Source Mode2 and unchanged media. The
+later read-only retained binding rejected the actual opaque display path
+`[Marker]`. This is a separate identity-normalization defect; creation evidence
+is reusable and the original whole-case verdict is not regraded. The run has
+26 public calls, 101 hash-checked dispatcher packets, 20 handshakes and one
+verified transaction. Source full-tree hash/mtime/tree metadata were unchanged,
+processes cleaned and the failed sandbox quarantined. Record:
+`r90-manual-marker-42bc090c-2025-r1/root-review.json`. No replay or additional
+write is selected solely to fix this observed display-path consumer.
+
 ## 2026-10-23 R89 imported Marker observation
 
 Reviewed fixture `4d5d9e46` uses one closed audio import in the existing private
