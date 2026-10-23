@@ -58,6 +58,26 @@ hash, project mtime and tree metadata were unchanged, processes cleaned, and
 the failed sandbox quarantined. Exact record:
 `r89-named-list-46db6f4b-2025-r1/root-review.json`.
 
+Reviewed correction `fc6e4342` interprets only the source-certified MetadataSlot
+constructor's singleton local reference. Both constructor observation and final
+verification use the same strict adapter and observed local accessor; ordinary
+reference parsing is unchanged. The full public fake collector passed one check
+in 3.41s, and 11 affected controls passed in 10.28s. Original causal and
+intermediate verification failures remain retained.
+
+Frozen integration `a491fb59` then **passed the original native node in 10.45s**
+on the same 2025 build, in a new lifecycle. Both transactions verified; 58 public
+calls, 23 independent observations and 199 hash-checked packets establish the
+actual MetadataSlot identity/class/owner, ordered membership, required local
+Metadata reference, subsequent OutputBus reference and retained object scope.
+All four SET calls were acknowledged. Source full-tree hash, project mtime and
+tree metadata remained unchanged; processes cleaned and the passing sandbox
+was deleted by the lifecycle. Record:
+`r89-named-list-a491fb59-2025-r1/root-review.json`. This accepts this selected
+mixed creation/reference flow, not every Inner class, owner, conflict policy,
+history composition or version. The earlier indeterminate transactions were
+not touched or regraded.
+
 No Fresh, full Program/Non-live gate or whole-ticket completion is claimed.
 
 ## 2026-10-23 R88 legacy ControlInput typed query
