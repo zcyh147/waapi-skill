@@ -35,8 +35,25 @@ captured; no transaction occurred. Source integrity and process cleanup passed;
 the failed sandbox remains quarantined. The original FAIL is retained at
 `r84-eq-gain-a5439459-2025-r1/root-review.json`. This is a test-oracle mismatch,
 not evidence of an EQ implementation failure or a passing EQ business outcome.
-Repair and complete simulated public-flow validation precede any new-root
-native attempt. Neither slice adds Fresh or full-gate evidence.
+The test-only repair `477b0049` added a complete public Gateway/fake-transport
+collector flow, which also caught a nine-field request exceeding the existing
+eight-field ceiling. The corrected 8+1 queries compare identity envelopes;
+`66a2a1f1` preserves each original response before joining the separate context.
+The affected controls passed 25 in 2.14s, followed by four full-flow controls in
+2.12s after Main's exact-response preservation finding. These runs overlap.
+
+Frozen `66a2a1f1` then passed the selected existing-EQ native workflow on macOS
+Console2025.1.7.9143 in 7.04s. One verified transaction changed Voice_EQ GainBand1
+from 4 to 3; 19 independent reads and 114 hashed native packets establish the
+actual Effect class6881283, all three Gain dependency clauses and recursive
+controller metadata. NumBands3, OnOffBand1true, FilterTypeBand1=4, other observed
+target values, peer values, complete ordered folder membership and selected
+metadata remained unchanged. The platform came from actual project status.
+No setup/history transaction occurred; source integrity and cleanup passed.
+Evidence: `r84-eq-gain-66a2a1f1-2025-r2/root-review.json`. The original failed
+root remains unchanged. This is one actual existing-EQ composition witness,
+not every plugin, band, version or audio-state verification. Neither slice adds
+Fresh or full-gate evidence.
 
 ## 2026-10-23 R82 duplicate creation and namespaced query witness
 
