@@ -4074,11 +4074,12 @@ def test_compound_discovery_exposes_exact_versioned_ordinary_children_and_proof_
     assert ("object.set" in choices) is (version != "2021.1")
     assert "object.createPlugin" not in choices and "object.setRTPC" not in choices
     scope = declaration["child_observation_scope"]
-    assert "new_fail_mode_hierarchy" in scope["object.create"]
+    assert "ordinary_new_fail_or_owned_native_rename_hierarchy" in scope["object.create"]
     assert "actual_parent_execution_phase" in scope["history_receipt"]
     assert "remaining_same_parent" in scope["graph_list_merge_replace_restoration"]
     assert 'exact_intent_GUID_bound' in scope['created_graph_ancestor_rename']
-    assert 'new_object_collision_names_and_phase_reference_dependencies_remain_same_parent' in scope['created_graph_ancestor_rename']
+    assert 'owned_actual_GUID_names_and_deferred_reference_stages' in scope['created_graph_ancestor_rename']
+    assert 'typed_List_history_remains_implementation_obligation' in scope['graph_list_merge_replace_restoration']
     assert declaration["native_request_input"] == "forbidden"
 
 

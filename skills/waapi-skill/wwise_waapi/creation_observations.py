@@ -235,4 +235,4 @@ def verified_created_objects(verification):
     return [{**deepcopy(row["evidence"]),
         **({"compound_child_index": row["compound_child_index"]} if "compound_child_index" in row else {})}
         for row in verification.get("assertions", [])
-        if row.get("kind") == "verified_created_node_identity" and row.get("passed") is True]
+        if row.get("kind") in {"verified_created_node_identity", "verified_created_list_member_identity"} and row.get("passed") is True]
