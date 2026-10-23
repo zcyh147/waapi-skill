@@ -42,9 +42,23 @@ public source workflow passed in 1.21s; 2025 compound source/undo/redo passed in
 seven checks in 5.64s; final existing CREATE/SET callers passed seven in 15.70s.
 Counts overlap. Original failures and fixes are retained in
 `r83-create-reviewed-evidence`; Main's runtime and final-delta review found no
-material issue. No native CREATE duplicate result is claimed yet. A minimal
-2021 source witness is being prepared; broader policies, graph shapes and
-constructor/history alternatives remain assigned to #178/#192.
+material issue. The test-only successor `e51f4ff8` then passed on matching
+macOS Console2021.1.14.8108 in 10.38s: one verified transaction, zero setup or
+history transactions, nine independent reads, 27 public commands and 117 hashed
+native packets. Three CREATE calls used actual parent GUIDs, then one closed
+setReference connected the correct actual siblings. Full public occurrence
+roster, original owner/ancestor/leaves, matching 2021 field metadata and source
+integrity/cleanup passed. All four stage results match their original native
+packets. Root: `r83-duplicate-create-e51f4ff8-2021-r1/root-review.json`.
+
+The accepted component assessment
+`r83-duplicate-creation-component-acceptance.json` combines that CREATE witness,
+new 2025 SET duplicate/history evidence, retained matching 2025 ordinary CREATE
+history and current five-version program/CREATE history-adapter checks. It
+justifies shared-mechanism reuse without an additional 2025 CREATE history
+chain, while explicitly not claiming a directly observed 2025 staged-CREATE
+native run or every-version native matrix. Broader conflict policies, graph
+shapes and constructor/history alternatives remain assigned to #178/#192.
 
 Test-only candidate `1c5a07b7` passed one macOS Console2025.1.7.9143 namespaced
 query witness in 9.71s. The private project copy loaded the official
