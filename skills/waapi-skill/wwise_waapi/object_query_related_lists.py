@@ -71,7 +71,7 @@ class RelatedListPlan:
         self.return_scope = {}
         self.total_bytes = self.total_occurrences = 0
         self.unique_ids = set()
-        self.binder = binder or RelatedFieldBinder(self.measured_read, RelatedQueryError)
+        self.binder = binder or RelatedFieldBinder(self.measured_read, RelatedQueryError, version=version)
         from .object_query_field_conditions import ScalarConditionPlan
         self.scalar_conditions = ScalarConditionPlan(version=version, read=self.measured_read, binder=self.binder, validate_rows=self.validate_rows,
             charge_selection=self.charge_sequence_members)
@@ -624,6 +624,7 @@ class RelatedListPlan:
             'observed_scope_sha256':canonical_sha256(self.snapshot),
             'metadata_observations_sha256':canonical_sha256(self.binder.observations),
             'scopes':self.binder.selections,'read_associations':self.descriptors,
+            **({'reference_kind_proofs':list(self.binder.reference_kind_proofs.values())} if self.binder.reference_kind_proofs else {}),
             'limits':{'unique_member_ids':MULTI_IDENTITY_READ_MAX_IDS,'member_occurrences':MAX_RELATED_MEMBER_OCCURRENCES,
                 'cumulative_member_observations':MAX_RELATED_MEMBER_OBSERVATIONS,'source_ids_per_read':MAX_STRUCTURED_SOURCE_ITEMS,
                 **({'relationship_rows_per_read':MAX_QUERY_TAKE} if not self.composed else {}),

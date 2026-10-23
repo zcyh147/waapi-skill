@@ -299,7 +299,7 @@ class RootScalarConditionPlan:
         self.final_limit, self.platform, self.language = final_limit, platform, language
         self.total_bytes = 0
         self.descriptors = []
-        self.binder = RelatedFieldBinder(self.read,RelatedQueryError)
+        self.binder = RelatedFieldBinder(self.read,RelatedQueryError,version=version)
         self.scalar = ScalarConditionPlan(version=version,read=self.read,binder=self.binder,
             validate_rows=self.validate_rows,platform=platform,language=language)
         self.clauses, self.predicate_fields, self.bound_groups = [], [], []

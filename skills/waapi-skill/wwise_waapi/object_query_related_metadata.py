@@ -13,8 +13,9 @@ def namespaced_property_token(value):
 
 
 class RelatedFieldBinder:
-    def __init__(self, read, error):
-        self.read, self.error = read, error
+    def __init__(self, read, error, *, version=None):
+        self.read, self.error, self.version = read, error, version
+        self.reference_kind_proofs = {}
         self.metadata_cache, self.discoveries = {}, {}
         self.observations, self.selections = [], []
         self.metadata_bytes = 0
@@ -58,6 +59,15 @@ class RelatedFieldBinder:
         unknown_kind = selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}
         if 'classId' in scope and selection['complete'] and (not selection['candidate_names'] or unknown_kind):
             selection = lookup({'object': reference['id'].upper()})
+        if (selection['candidate'] is not None and selection['candidate'].get('kind') == 'unknown'
+                and 'object' in selection['scope'] and option in {'reference', 'local-reference',
+                    '--include-related-field', '--include-related-local-reference'}):
+            from .reference_kind_evidence import certify_query_candidate
+            candidate = certify_query_candidate(selection['candidate'], version=self.version,
+                object_id=reference['id'].upper(), class_id=class_id, read=self.cached_read)
+            selection = {**selection, 'candidate': candidate}
+            if candidate.get('kind_evidence'):
+                self.reference_kind_proofs[canonical_sha256(candidate['kind_evidence'])] = candidate['kind_evidence']
         # Unknown kind is insufficient authority, not a known wrong kind. If
         # exact-object facts remain insufficient, retain scoped clarification.
         if selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}:

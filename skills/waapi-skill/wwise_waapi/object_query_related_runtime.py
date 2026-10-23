@@ -74,7 +74,7 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
         fields[:] = wanted
 
     from .object_query_related_metadata import RelatedFieldBinder
-    binder = RelatedFieldBinder(read, RelatedQueryError)
+    binder = RelatedFieldBinder(read, RelatedQueryError, version=version)
     def bind(meaning, native, index, option):
         row = rows[index]
         reference = row if not native else row.get(native)
@@ -221,5 +221,6 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
     proof = {'observed_fields': observed_fields,
         'observed_rows': [{key: row[key] for key in observed_fields if key in row} for row in rows],
         'metadata_observations_sha256': canonical_sha256(binder.observations), 'scopes': binder.selections,
+        **({'reference_kind_proofs': list(binder.reference_kind_proofs.values())} if binder.reference_kind_proofs else {}),
         'metadata_authority': 'live-waapi', 'mutation_authority': False}
     return tuple(bindings), proof, None

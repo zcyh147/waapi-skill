@@ -75,5 +75,27 @@
       "source_claim": "Action.Target is documented as Reference; target restrictions and applicability remain native-metadata owned"
     }
   },
-  "sha256": "7b19877ed653c0ff765f73a213611a0fb17bc1dad95c8d1d61905491a0e5ae89"
+  "sha256": "f4e26df2216b774e3ffa07ee3598f0890d74673d9a47ae15dcde72bf8223efc1",
+  "query_read_fields": [
+    {
+      "version": "2021.1",
+      "build": "2021.1.14.8108",
+      "registered_name": "ParamControl",
+      "native_type": "RTPC",
+      "class_id": 1441808,
+      "field": "ControlInput",
+      "value_kind": "reference",
+      "sdk": {
+        "member": "/wwiseobject_paramcontrol.html",
+        "raw_member_sha256": "6c9d0b8b83998caec78590b2979b2cda2957c627f9c9560eb835e5bfd3b6e0e3",
+        "section": "<tr>\r\n<td><b>ControlInput</b></td><td>Control Input</td><td>Reference</td><td>&#160;</td><td>None</td><td>true</td><td>&#160;</td><td>&#160; </td></tr>\r\n",
+        "section_sha256": "1a68cb94b251860dd6fa1b881269380b50438817f30d486a773b3742f8d53f3d"
+      },
+      "wobjects": {
+        "sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+        "declaration": "<WwiseObject Name=\"ParamControl\" CompanyID=\"1\" PluginID=\"22\"> / Properties / Reference[@Name=\"ControlInput\"]"
+      },
+      "authority": "read field kind only; native restrictions and values unchanged; no mutation authority"
+    }
+  ]
 }

@@ -63,3 +63,84 @@ def certify(info, *, version, object_id, read):
         "sdk": lane["sdk"], "identity": {key: row[key] for key in ("id", "type", "classId", "ActionType")},
         "restrictions_authority": "native_getPropertyInfo", "native_metadata_sha256": canonical_sha256(info.raw)}
     return replace(info, reference_kind_evidence=proof)
+
+
+def certify_query_candidate(candidate, *, version, object_id, read, class_id=None):
+    """Certify the one legacy read field after exact-object metadata fallback.
+
+    This proof never enters mutation discovery and does not supply restrictions.
+    Its original bounded observations are revalidated before returning a read.
+    """
+    if (version != '2021.1' or candidate.get('name') != 'ControlInput'
+            or candidate.get('kind') != 'unknown' or not isinstance(object_id, str)
+            or not _GUID.fullmatch(object_id)):
+        return candidate
+    metadata = candidate['metadata']
+    if metadata.get('type') not in (None, '') or metadata.get('restriction'):
+        return candidate
+    source = json.loads(_SOURCE.read_text(encoding='utf-8'))
+    if (source.get('contract') != 'waapi-skill.reference-kind-source/v1'
+            or canonical_sha256({k: v for k, v in source.items() if k != 'sha256'}) != source.get('sha256')):
+        raise ValueError('Reference-kind source seal changed')
+    selected, = source['query_read_fields']
+    catalog_bytes = (_SOURCE.parent / version / 'object-types.json').read_bytes()
+    if hashlib.sha256(catalog_bytes).hexdigest() != source['versions'][version]['types_sha256']:
+        raise ValueError('Reference-kind class source changed')
+    catalog = json.loads(catalog_bytes)['types']
+    if (selected['version'], selected['native_type'], selected['class_id'], selected['field']) != ('2021.1', 'RTPC', 1441808, 'ControlInput'):
+        raise ValueError('Legacy read field source changed')
+    if len([row for row in catalog if row['name'] == selected['registered_name'] and row['classId'] == selected['class_id']]) != 1:
+        raise ValueError('Legacy read class contradicts its pinned catalog')
+    observations = []
+    def observe(uri, args, options):
+        result = read(uri, args, options)
+        observations.append({'api': uri, 'args': args, 'options': options, 'result_sha256': canonical_sha256(result)})
+        return result
+    from .builders.metadata import parse_property_and_reference_names_result, parse_get_property_info_result
+    names = parse_property_and_reference_names_result(observe(
+        'ak.wwise.core.object.getPropertyAndReferenceNames', {'object': object_id}, {}))
+    if [item.name for item in names].count('ControlInput') != 1:
+        return candidate
+    current = parse_get_property_info_result(observe('ak.wwise.core.object.getPropertyInfo',
+        {'object': object_id, 'property': 'ControlInput'}, {}), require_identity=False)
+    if canonical_sha256(current.raw) != canonical_sha256(metadata):
+        return candidate
+    result = observe('ak.wwise.core.object.get', {'from': {'id': [object_id]}}, {'return': ['id', 'type', 'classId']})
+    rows = result.get('return') if isinstance(result, dict) else None
+    if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict)
+            or not isinstance(rows[0].get('id'), str) or rows[0]['id'].upper() != object_id.upper()
+            or rows[0].get('type') != 'RTPC'
+            or type(rows[0].get('classId')) is not int or rows[0]['classId'] != 1441808
+            or class_id is not None and (type(class_id) is not int or class_id != rows[0]['classId'])):
+        return candidate
+    proof = {'kind': 'documented-query-reference-kind', 'version': version, 'object_id': object_id,
+        'field': 'ControlInput', 'source_sha256': source['sha256'], 'identity': rows[0],
+        'observations': observations, 'restrictions_authority': 'native_getPropertyInfo', 'mutation_authority': False}
+    return {**candidate, 'kind': 'reference', 'kind_evidence': proof}
+
+
+def revalidate_query_read_proofs(proofs, *, read):
+    """No cached kind proof can replace current inventory, metadata or identity."""
+    seen = set()
+    for proof in proofs:
+        for observation in proof['observations']:
+            key = canonical_sha256(observation)
+            if key in seen:
+                continue
+            seen.add(key)
+            actual = read(observation['api'], observation['args'], observation['options'])
+            if canonical_sha256(actual) != observation['result_sha256']:
+                raise ValueError('Legacy read field inventory, metadata or exact object identity changed; restart the original read')
+
+
+def query_read_kind_contract(version):
+    """Disclose the exact read exception; other unknown kinds stay unresolved."""
+    source = json.loads(_SOURCE.read_text(encoding='utf-8'))
+    if canonical_sha256({k: v for k, v in source.items() if k != 'sha256'}) != source.get('sha256'):
+        raise ValueError('Reference-kind source seal changed')
+    return {'fields': [{key: row[key] for key in ('class_id', 'registered_name', 'native_type', 'field')}
+            for row in source['query_read_fields'] if row['version'] == version],
+        'source_sha256': source['sha256'], 'root_scope': 'exact current object GUID',
+        'related_scope': 'actual canonical endpoint GUID and class; exact-object metadata after class fallback',
+        'revalidation': 'current field inventory, native metadata and exact identity before returning the read',
+        'target_restrictions_authority': 'native metadata only', 'mutation_authority': False}
