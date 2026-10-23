@@ -5,6 +5,55 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R101–R103 transport states and Profiler reader observations
+
+The missing transport-state observations were collected once per older build,
+with eight independently prepared selected/mixed-scope cases per version:
+
+| Build | Candidate | Raw node result | Final lifecycle result |
+| --- | --- | --- | --- |
+| 2021.1.14.8108 | `14d9b00c` | PASS, 276.38s | BLOCKED: post-teardown wildcard port bind exceeded 15 seconds. |
+| 2022.1.19.8584 | `4e5eb44b` | PASS, 294.84s | PASS, cleanup and port release complete. |
+| 2023.1.19.8928 | `4e5eb44b` | PASS, 291.24s | PASS, cleanup and port release complete. |
+| 2024.1.13.9056 | `4e5eb44b` | PASS, 301.66s | PASS, cleanup and port release complete. |
+
+All eight state relations agree with the retained separate 2025 selected and
+mixed-scope observations. Exact roots below `.waapi-skill-state/full-coverage/`
+are `r101-transport-older-native-2021-r3`,
+`r102-transport-older-native-2022-r2`,
+`r102-transport-older-native-2023-r1`, and
+`r103-transport-older-native-2024-r1`, each with `root-review.json`.
+The 2021 collector completed its observations and transport cleanup; its sealed
+tree and original-project hash/mtime matched. Later inspection proved no owned
+process/listener and successful loopback/wildcard port binding. Its original
+formal BLOCKED result remains unchanged; the eight observations are reused
+without replaying or reverifying its transactions.
+
+Reviewed implementation `0c3a7e46` uses these observations to resolve
+play-directly → playing, pause from stopped → stopped, and play/stop toggle
+from paused → playing. Its 70 affected public-flow checks and three affected
+collector/final-writer checks passed in separate focused runs. These prove the
+new deterministic mapping; the earlier native transactions were not rerun or
+retroactively marked verified. State proof does not establish acoustic output,
+restart timing, or prior global-setting restoration.
+
+On candidate `4e5eb44b`, Mac Authoring 2025.1.7.9143 then passed the new Profiler
+reader node in 102.53s, with final lifecycle PASS. At one capture position,
+40042ms, Voices, Busses and AudioObjects each returned one attributable row;
+GameObjects returned two rows, including the owned audition GameObject. Three
+same-position filters used actual issued voice/bus handles and returned the
+matching instances. The seven reader calls shared one capture; 123 public calls
+include all setup and cleanup. Fixture projections, original source, archive
+hashes, process cleanup and port release were checked. Evidence is
+`.waapi-skill-state/full-coverage/r103-profiler-readers-native-2025-r1/root-review.json`.
+This proves these seven 2025 observations, not older-reader behavior, every
+projection, acoustic output, or restoration of prior capture/audition settings.
+
+All runs used owned Authoring launches with `-AutomationMode`. This records
+successful startup under that invocation across the five installed builds,
+not a universal dialog-suppression guarantee. No Fresh or native Windows run,
+broad Program/Non-live gate, or whole-#186 acceptance is claimed here.
+
 ## 2026-10-24 R98 Console log and R99 Authoring startup observations
 
 Three separate Mac Console runs on candidate
