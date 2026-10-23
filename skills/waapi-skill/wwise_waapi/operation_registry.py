@@ -11521,13 +11521,15 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             warnings.append("Active-source selection uses existing source linkage and may affect other linked platforms; this operation does not unlink or establish platform isolation.")
         blend_plan = None
         if api == "ak.wwise.core.blendContainer.addAssignment":
-            from .blend_assignment import prepare as prepare_blend, notice, BlendAssignmentError
+            from .blend_assignment import prepare as prepare_blend, notice, materialize_index, BlendAssignmentError
             try:
                 blend_plan = prepare_blend(call_args, read=read, version=request.version)
             except BlendAssignmentError as exc:
                 raise OperationContractError("INVALID_BLEND_ASSIGNMENT_OBSERVATION", str(exc)) from exc
             metadata["blend_assignment"] = blend_plan
             call_metadata["blend_assignment"] = notice(blend_plan)
+            # Keep the raw request while sealing its documented native effect.
+            call_args = materialize_index(call_args, len(blend_plan["before"]["assignments"]))
             if blend_plan["verification_scope"]["unobserved"]:
                 warnings.append("Blend assignment execution remains effect-unverified for: " + ", ".join(blend_plan["verification_scope"]["unobserved"]))
         preview = SemanticPreview(
@@ -16909,7 +16911,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
         if api == "ak.wwise.core.blendContainer.addAssignment" and "blend_assignment" in prepared.get("pre_state", {}):
-            from .blend_assignment import observe as observe_blend, BlendAssignmentError
+            from .blend_assignment import observe as observe_blend, materialize_index, BlendAssignmentError
             plan = prepared.get("pre_state", {}).get("blend_assignment")
             if not isinstance(plan, Mapping):
                 raise OperationContractError("INVALID_PREVIEW", "Blend assignment lacks its immutable observation")
@@ -16919,6 +16921,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
                 raise OperationContractError("STALE_BLEND_ASSIGNMENT", str(exc)) from exc
             if any(current[key] != value for key, value in plan["before"].items() if key != "native_assignments"):
                 raise OperationContractError("STALE_BLEND_ASSIGNMENT", "Blend identities, owner membership or assignments changed after Preview")
+            call_args = materialize_index(call_args, len(current["assignments"]))
         if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
             from .remote_transition import remote_connection_snapshot
             before = prepared.get("pre_state", {}).get("remote_connection_before")
