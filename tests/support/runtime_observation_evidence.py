@@ -122,6 +122,22 @@ def validate_rtpc_program(record, binding, branch, root):
             or payload.get('is_command_line') != (host == 'wwise-console')
             or any(payload['schema_validation'][section]['version'] != version for section in ('request', 'result'))):
         raise ValueError('RTPC program needs exact current public read capture')
+    native_rows = record['native_call']['result']['return']
+    public_rows = record['gateway']['payload']['agent_result']['return']
+    # These complete RTPC reads copy the entire array without transformation.
+    # Canonical JSON also distinguishes int/float/bool values that Python ==
+    # would otherwise conflate when comparing nested containers.
+    if (payload['agent_result'].get('complete') is not True
+            or not isinstance(native_rows, list) or not isinstance(public_rows, list)
+            or audit.digest(native_rows) != audit.digest(public_rows)):
+        raise ValueError('Program must preserve complete native/public RTPC return arrays')
+    if branch['pointer'].startswith('/resultSchema/'):
+        pointer = binding.get('program_observation_pointer', binding['observation_pointer'])
+        parent = '/native_call/result/return'
+        if (pointer != parent and not pointer.startswith(parent + '/')
+                or binding['gateway_observation_pointer'] != pointer.replace(
+                    '/native_call/result', '/gateway/payload/agent_result', 1)):
+            raise ValueError('RTPC result needs the corresponding exact public field occurrence')
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
@@ -379,9 +395,10 @@ def validate_rtpc_source_review(descriptor, historical_sources, branch, root, ba
             or gateway['argv'] != argv or gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True
             or gateway['payload'].get('is_command_line') is not False
             or gateway['payload']['schema_validation']['result']['version'] != version
-            or gateway['payload']['agent_result']['return'] != rows
+            or audit.digest(gateway['payload']['agent_result']['return']) != audit.digest(rows)
             or gateway['payload']['agent_result']['complete'] is not True
-            or native != {'uri': RTPC_URI, 'args': {'time': position}, 'options': {}, 'result': {'return': rows}}):
+            or audit.digest(native) != audit.digest({'uri': RTPC_URI, 'args': {'time': position},
+                'options': {}, 'result': {'return': rows}})):
         raise ValueError('RTPC guard review needs current complete original-array public replay')
 
 

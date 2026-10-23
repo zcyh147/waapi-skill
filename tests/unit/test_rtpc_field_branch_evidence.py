@@ -418,3 +418,36 @@ def test_program_only_final_consumer_checks_exact_capture(tmp_path, inventory, d
     assert selected['state'] == 'implemented_unverified', json.dumps(selected)
     assert selected['evidence_results']['program']['outcome'] == 'missing'
     assert 'exact current public read capture' in selected['evidence_results']['program']['reason']
+
+
+def test_final_rtpc_consumer_rejects_resealed_public_native_field_mismatch(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_bundle, write_json
+    receipt, dispatch, context = public_rtpc_read(tmp_path, '2021.1')
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, dispatch, nodeid='same-public-native-field',
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+    index = write_field_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2021.1', host='wwise-authoring', mode='data')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    identity = next(key for key in document['bindings'] if key.endswith('/items/properties/id'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def evaluate():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row for row in result['obligations'] if row['id'] == identity)
+    assert evaluate()['evidence_results']['program'] == {'outcome': 'passed', 'reason': None}
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    replacement = '{11111111-1111-1111-1111-111111111111}'
+    program['gateway']['payload']['agent_result']['return'][1]['id'] = replacement
+    program['runtime_read_program']['gateway'] = deepcopy(program['gateway'])
+    public_pointer = binding['gateway_observation_pointer']
+    for check in program['branch_assertions'][identity]['checks']:
+        if check['pointer'] == public_pointer:
+            check['equals'] = replacement
+    assert program['native_call']['result']['return'][1]['id'] == RPM
+    binding['evidence']['program'].update(write_json(base / 'program.json', program))
+    changed = evaluate()
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert 'complete native/public RTPC return' in changed['evidence_results']['program']['reason']
