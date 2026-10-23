@@ -168,7 +168,12 @@ def candidate_identity(root, inventory, catalogs, *, digest):
     # original source context; missing/changed current files change identity.
     for name in ('tests/support/source_copy_branch_evidence.py', 'tests/support/exact_evidence_finalization.py',
                  'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
-                 'tests/unit/test_source_copy_capture.py'):
+                 'tests/unit/test_source_copy_capture.py',
+                 'tests/support/condition_mechanism_reuse.py', 'tests/support/condition_source_resolution.py',
+                 'tests/maintenance/reconcile_condition_sources.py',
+                 'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json',
+                 'tests/fixtures/metadata-conditions/lfo-eq-originals.json.gz',
+                 'tests/unit/test_condition_mechanism_reuse.py', 'tests/unit/test_condition_source_resolution.py'):
         path = root / name
         if path.is_file():
             sources[name] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1304,6 +1309,12 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
     from pathlib import Path
     root = source_root or Path(__file__).resolve().parents[2]
     try:
+        if category == 'native' and (binding or {}).get('condition_mechanism_attachment'):
+            from tests.support.condition_mechanism_reuse import condition_mechanism_result
+            return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {})
+        if category == 'live_metadata' and (binding or {}).get('condition_metadata_mechanism_attachment'):
+            from tests.support.condition_mechanism_reuse import condition_mechanism_result
+            return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {}, category=category)
         record = read_sealed_artifact(descriptor, base)
         if record.get('candidate_sha256') != candidate:
             validate_equivalence((binding or {}).get('equivalence', {}), descriptor, record, branch, candidate, binding or {}, base, root)
@@ -1542,6 +1553,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 return False
         return symbol in symbols[source]
 
+    condition_reuse_reviews, condition_reuse_runs = set(), set()
     for branch in native['obligations']:
         branch['requirements'] = []
         route = routes.get(branch['route'])
@@ -1613,9 +1625,21 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 native['candidate_sha256'], required, scope_kind, evidence_base or root, binding, root, reference_edges)
             branch['evidence_results'][required] = {'outcome': outcome, 'reason': reason}
         outcomes = {r['outcome'] for r in branch['evidence_results'].values()}
-        branch['state'] = 'verified' if outcomes == {'passed'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
+        if branch['evidence_results'].get('native', {}).get('outcome') == 'reviewed_mechanism_reuse':
+            from tests.support.condition_mechanism_reuse import load_review
+            review = load_review(root)
+            condition_reuse_reviews.add(review['review_id'])
+            condition_reuse_runs.add(review['witness']['run_id'])
+            branch['direct_recipient_native_effect'] = 'not_observed'
+        if branch['evidence_results'].get('live_metadata', {}).get('outcome') == 'reviewed_class_metadata_and_object_scope_mechanism':
+            branch['metadata_scope'] = 'object_type'
+            branch['direct_recipient_instance_metadata'] = 'not_observed'
+        branch['state'] = 'verified' if outcomes <= {'passed', 'reviewed_mechanism_reuse', 'reviewed_class_metadata_and_object_scope_mechanism'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
     complete_states = {'verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
+    if condition_reuse_reviews:
+        native['condition_mechanism_reuse'] = {'original_witness_run_ids': sorted(condition_reuse_runs),
+            'review_ids': sorted(condition_reuse_reviews), 'new_native_runs': 0}
     native['scope_kind'] = scope_kind
     native['scope_sha256'] = digest(scope) if scope is not None else None
     native['bindings_sha256'] = digest(bindings_document)
