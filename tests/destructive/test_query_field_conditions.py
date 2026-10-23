@@ -1,4 +1,5 @@
 """Read-only scalar WHERE acceptance against an independent child baseline."""
+import copy
 import hashlib
 import json
 import re
@@ -6,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.destructive.test_gateway_workflow_transaction_matrix import workflow_sandbox_runtime
+from tests.destructive.test_gateway_workflow_transaction_matrix import workflow_sandbox_runtime, waapi_gateway
 from tests.destructive.test_query_list_sequences import (
     CHILDREN, CONTAINER, BUILDS, DEFINITION_EVIDENCE, PINS, READ_APIS, REPO,
     _page_value, _projection, _spec, _wwu,
@@ -40,7 +41,7 @@ def _condition_sources():
 CONDITION_SOURCES = _condition_sources()
 
 
-def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflow_sandbox_runtime):
+def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflow_sandbox_runtime, monkeypatch):
     runtime = workflow_sandbox_runtime
     live = runtime.sandbox.metadata.get_info_version
     assert tuple(live[key] for key in ('year', 'major', 'minor', 'build')) == BUILDS[runtime.version]
@@ -56,18 +57,38 @@ def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflo
         'observation_path': str(output)}
     runtime.category_results.append(category)
     status, continuation_count = 'FAIL', 0
+    original_dispatch = waapi_gateway.WwiseDispatcher.dispatch
 
     def read(label, flags, *, maximum=16):
         nonlocal continuation_count
         assert len(observation['reads']) < 5
-        argv = ['query-object', '--exact-id', CONTAINER, '--max-results', str(maximum), '--detail', *flags]
+        argv = ['query-object', '--exact-id', CONTAINER, '--max-results', str(maximum), *flags]
         record = {'label': label, 'invocations': []}
         observation['reads'].append(record)
-        entries, offset, encoding, initial, packets = [], 0, None, None, {}
+        entries, offset, encoding, initial_calls, packets = [], 0, None, None, {}
         while True:
             before = set(evidence_root.glob('*.json'))
-            code, payload = runtime.raw_gateway(argv)
-            invocation = {'argv': argv, 'exit_code': code, 'payload': payload, 'native_packets': []}
+            calls = []
+            def capture(dispatcher, api, **kwargs):
+                # Passive observation of genuine public Gateway dispatch. Copy
+                # inputs before calling the original once; never modify its
+                # inputs, result or transport, and return the exact same object.
+                assert len(calls) < 128
+                call = {'api': api, **copy.deepcopy({key: kwargs.get(key) for key in ('version', 'args', 'options')})}
+                result = original_dispatch(dispatcher, api, **kwargs)
+                call.update(ok=result['ok'], evidence_path=result.get('evidence_path'),
+                    result_sha256=canonical_sha256(result.get('result')))
+                calls.append(call)
+                return result
+            with monkeypatch.context() as patch:
+                patch.setattr(waapi_gateway.WwiseDispatcher, 'dispatch', capture)
+                # Returned complete argv already owns state/configuration. The
+                # workflow convenience wrapper adds --timeout, so only initial
+                # business commands use it; continuations execute verbatim.
+                code, payload = (runtime.raw_gateway(argv) if initial_calls is None
+                    else waapi_gateway.execute_gateway(argv, env=runtime.env))
+            invocation = {'argv': argv, 'exit_code': code, 'payload': payload,
+                'dispatch_calls': calls, 'native_packets': []}
             record['invocations'].append(invocation)
             paths = sorted(set(evidence_root.glob('*.json')) - before)
             assert len(paths) <= 128
@@ -80,13 +101,19 @@ def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflo
                 packet = json.loads(body)
                 assert packet['api'] in READ_APIS, packet
                 packets[str(path)] = packet
+            assert {call['evidence_path'] for call in calls} == {str(path) for path in paths}
+            for call in calls:
+                packet = packets[call['evidence_path']]
+                assert call['api'] == packet['api'] and call['version'] == runtime.version
+                assert call['ok'] is packet['ok']
+                assert canonical_sha256(packet['result']) == call['result_sha256']
             assert code == 0 and payload.get('ok') is True, payload
             assert list(payload)[-1] == 'agent_result'
-            if initial is None: initial = payload
+            if initial_calls is None: initial_calls = calls
             value = payload['agent_result']
             if isinstance(value, list):
                 assert not entries and payload.get('projection_complete') is not False
-                return value, initial, packets
+                return value, initial_calls, packets
             # Exact established public query protocol, shared reconstruction
             # helper from the accepted sequence witness; no alternate decoder.
             assert isinstance(value, dict) and value['entries_encoding'] in {'json-document-fragments', 'json-pointer-entries'}, payload
@@ -100,53 +127,74 @@ def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflo
             argv = value['next_command']['gateway_argv']
             assert 'query-object' in argv and '--result-query' in argv and '--result-page' in argv
         restored = _page_value(entries, encoding)
-        return restored['objects'], {**initial, **{key: value for key, value in restored.items() if key != 'objects'}}, packets
+        return restored['objects'], initial_calls, packets
 
-    def trace(detail, packets, by_id, thresholds, *, root=False):
-        proof = detail['related_scope_binding']
-        authority = proof['root_field_conditions'] if root else proof
-        assert authority['mutation_authority'] is False
-        selected = [row for row in authority['scopes'] if (row.get('selected') or {}).get('name') == 'Pitch']
-        assert selected
-        for selection in selected:
-            assert selection['complete'] is True and selection['selected']['kind'] == 'property'
-            assert selection['scope'] in ([{'classId': known['class_id']} for known in by_id.values()]
-                + [{'object': identity} for identity in by_id])
-        records = detail['related_read_evidence']
-        assert records
+    def trace(calls, packets, by_id, thresholds, *, root=False):
+        """Associate actual dispatcher requests with immutable native packets."""
+        assert calls
         first_paths = {row['path'] for row in observation['reads'][-1]['invocations'][0]['native_packets']}
-        descriptors = {canonical_sha256(row) for row in authority['read_associations']}
-        seen_thresholds, metadata_witness = set(), False
-        for row in records:
-            assert canonical_sha256({key: row[key] for key in ('api', 'args', 'options', 'result_sha256')}) in descriptors
-            path = row['call']['evidence_path']
-            assert path in first_paths, 'Origin evidence must refer to the original invocation'
-            packet = packets[path]
-            assert packet['ok'] is True and packet['api'] == row['api']
-            assert canonical_sha256(packet['result']) == row['result_sha256']
-            if row['api'].endswith('getPropertyInfo') and row['args']['property'] == 'Pitch':
+        assert {row['evidence_path'] for row in calls} == first_paths
+        seen_thresholds, metadata_scopes, full_sources, final = set(), [], [], []
+        for index, call in enumerate(calls):
+            assert call['api'] in READ_APIS and call['ok'] is True
+            assert call['version'] == runtime.version
+            packet = packets[call['evidence_path']]
+            assert packet['ok'] is True and packet['api'] == call['api']
+            assert canonical_sha256(packet['result']) == call['result_sha256']
+            if call['api'].endswith('getPropertyInfo') and call['args']['property'] == 'Pitch':
                 assert packet['result']['name'] == 'Pitch' and packet['result']['type'] == 'int32'
-                metadata_witness = True
-            waql = row['args'].get('waql', '')
+                scope = {key: call['args'][key] for key in ('classId', 'object') if key in call['args']}
+                assert scope in ([{'classId': known['class_id']} for known in by_id.values()]
+                    + [{'object': identity} for identity in by_id])
+                metadata_scopes.append(scope)
+            waql = (call['args'] or {}).get('waql', '')
+            source = re.fullmatch(r'from object "' + re.escape(CONTAINER) + r'" select children take ([1-9][0-9]*)', waql)
+            if root and source:
+                rows = packet['result']['return']
+                # A complete source witness must terminate below its real
+                # requested native cap, not merely contain a plausible prefix.
+                assert len(rows) == 5 < int(source.group(1))
+                assert [row['id'] for row in rows] == list(by_id)
+                assert set(row['id'] for row in rows) == CHILDREN
+                for row in rows:
+                    assert all(canonical_json_bytes(row[key]) == canonical_json_bytes(by_id[row['id']][business])
+                        for key, business in (('id', 'id'), ('name', 'name'), ('type', 'type'), ('path', 'path'), ('classId', 'class_id')))
+                full_sources.append(index)
             match = re.search(r'where @Pitch <= (-?\d+)(?: |$)', waql)
             if not match: continue
             threshold = int(match.group(1)); seen_thresholds.add(threshold)
-            expected = {identity for identity, known in by_id.items() if known['pitch_cents'] <= threshold}
+            expected = [identity for identity, known in by_id.items() if known['pitch_cents'] <= threshold]
             requested = set(re.findall(r'"(\{[0-9A-Fa-f-]{36}\})"', waql.split(' where ')[0]))
-            if ' select children' not in waql: expected &= requested
+            if ' select children' not in waql: expected = [identity for identity in expected if identity in requested]
             rows = packet['result']['return']
-            # Related selected-ID reads have no final root cap. Root final
-            # projection is checked separately against the independent order.
-            if ' take 1' not in waql:
-                assert {value['id'] for value in rows} == expected
-            for value in rows:
-                assert value['id'] in expected
-                assert canonical_json_bytes(value['@Pitch']) == canonical_json_bytes(by_id[value['id']]['pitch_cents'])
-        # Root final WHERE is the independently dispatched detail.call, outside
-        # preparation's read_associations; verify it below rather than inventing
-        # a helper-read association for that final packet.
-        assert metadata_witness and seen_thresholds == (set() if root else set(thresholds))
-        return authority
+            if root:
+                assert waql == f'from object "{CONTAINER}" select children where @Pitch <= {threshold} take 1'
+                assert [row['id'] for row in rows] == expected[:1]
+                final.append(index)
+            else:
+                assert {row['id'] for row in rows} == set(expected)
+            for row in rows:
+                assert row['id'] in expected
+                assert canonical_json_bytes(row['@Pitch']) == canonical_json_bytes(by_id[row['id']]['pitch_cents'])
+        assert metadata_scopes and seen_thresholds == set(thresholds)
+        if root:
+            assert len(final) == 1 and any(index < final[0] for index in full_sources)
+            assert any(index > final[0] for index in full_sources), 'Complete post-query source revalidation must remain observable'
+            # Every independent member must have an unfiltered exact value
+            # observation before the final WHERE, with actual typed class/value.
+            values_before = {}
+            for call in calls[:final[0]]:
+                waql = (call['args'] or {}).get('waql', '')
+                if not waql.startswith('from object ') or ' where ' in waql or ' select ' in waql:
+                    continue
+                if not {'classId', '@Pitch'} <= set((call['options'] or {}).get('return', [])):
+                    continue
+                for row in packets[call['evidence_path']]['result']['return']:
+                    assert row['id'] in by_id
+                    assert canonical_json_bytes(row['classId']) == canonical_json_bytes(by_id[row['id']]['class_id'])
+                    assert canonical_json_bytes(row['@Pitch']) == canonical_json_bytes(by_id[row['id']]['pitch_cents'])
+                    values_before[row['id']] = row
+            assert set(values_before) == CHILDREN
 
     def condition(threshold):
         return {'field_condition': {'mode': 'ordinary', 'meaning': 'Voice Pitch',
@@ -157,9 +205,10 @@ def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflo
             reducer={'operation': 'count'} if count else None)
 
     try:
-        baseline, detail, packets = read('independent-children', ['--relationship', 'children',
+        baseline, calls, packets = read('independent-children', ['--relationship', 'children',
             '--include', 'volume-db', '--include', 'pitch-cents', '--include', 'class-id'])
-        native = packets[detail['call']['evidence_path']]['result']['return']
+        assert len(calls) == 1 and calls[0]['args']['waql'] == f'from object "{CONTAINER}" select children take 16'
+        native = packets[calls[0]['evidence_path']]['result']['return']
         order = [row['id'] for row in native]
         assert len(order) == 5 and set(order) == CHILDREN
         assert [row['id'] for row in baseline] == order
@@ -175,7 +224,7 @@ def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflo
         observation['independent_order'] = order
         observation['independent_values'] = by_id
 
-        rows, detail, packets = read('related-matching-values-and-counts', [
+        rows, calls, packets = read('related-matching-values-and-counts', [
             '--include-related', 'children', 'matching-field', 'ordinary', 'Voice Pitch', 'at-most', '0', 'volume-db',
             '--include-related-field', 'children', 'matching-field', 'ordinary', 'Voice Pitch', 'at-most', '0', 'Pitch',
             '--include-related', 'children', 'matching-field', 'ordinary', 'Voice Pitch', 'at-most', '0', 'count',
@@ -192,30 +241,22 @@ def test_scalar_conditions_keep_native_order_values_scope_and_root_limit(workflo
         for threshold in (0, -1):
             count = _projection(root, spec(threshold, count=True))['value']
             assert type(count) is int and count == len(expected[threshold])
-        trace(detail, packets, by_id, (0, -1))
+        trace(calls, packets, by_id, (0, -1))
 
-        rows, detail, packets = read('related-empty-keeps-root', ['--include-related', 'children',
+        rows, calls, packets = read('related-empty-keeps-root', ['--include-related', 'children',
             'matching-field', 'ordinary', 'Voice Pitch', 'at-most', '-1', 'volume-db'])
         root, = rows
         assert root['id'] == CONTAINER and root['name'] == 'FS_Concrete'
         assert _projection(root, spec(-1))['items'] == []
-        trace(detail, packets, by_id, (-1,))
+        trace(calls, packets, by_id, (-1,))
 
         for threshold in (0, -1):
-            rows, detail, packets = read(f'root-filter-before-limit-{threshold}', ['--relationship', 'children',
+            rows, calls, packets = read(f'root-filter-before-limit-{threshold}', ['--relationship', 'children',
                 '--where-field', 'ordinary', 'Pitch', 'at-most', str(threshold), '--include', 'pitch-cents'], maximum=1)
             assert [row['id'] for row in rows] == expected[threshold][:1]
             for row in rows:
                 assert canonical_json_bytes(row['pitch_cents']) == canonical_json_bytes(by_id[row['id']]['pitch_cents'])
-            proof = trace(detail, packets, by_id, (threshold,), root=True)
-            assert proof['source_complete'] is True and proof['source_rows'] == 5
-            assert proof['final_root_limit_applied_after_predicates'] is True
-            waql = detail['semantic_preview']['envelope']['args']['waql']
-            assert waql == f'from object "{CONTAINER}" select children where @Pitch <= {threshold} take 1'
-            final_rows = packets[detail['call']['evidence_path']]['result']['return']
-            assert [row['id'] for row in final_rows] == expected[threshold][:1]
-            for row in final_rows:
-                assert canonical_json_bytes(row['@Pitch']) == canonical_json_bytes(by_id[row['id']]['pitch_cents'])
+            trace(calls, packets, by_id, (threshold,), root=True)
         assert len(observation['reads']) == 5
         observation['business_effect_verified'] = True
         status = 'PASS'
