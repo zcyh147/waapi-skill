@@ -5,6 +5,21 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R98 remaining signed cursor observation
+
+Exact candidate `8a582235fbbb1718da17450da9f05cd551d98d02` ran only the
+previously unattempted `-2` setter input on Mac Console 2025.1.7.9143, after
+bounded capture preparation. Wwise returned `ak.wwise.unexpected_error` with
+“The user time is out of range.” The Gateway retained `indeterminate`; no
+verification, restoration or retry followed that uncertain execution. The raw
+node result remains FAIL (10.81s), with source hash/mtime/tree unchanged,
+process cleanup complete, port released and sandbox quarantined. Evidence is
+`.waapi-skill-state/full-coverage/r98-cursor-minus-two-native-2025-r1/root-review.json`.
+The earlier `-1` transaction was not repeated. Both planned negative examples
+now have exact native error observations; neither establishes a universal
+negative-input rule or successful cursor change. No earlier green test,
+full gate or Fresh run was repeated for this observation.
+
 ## 2026-10-23 R97 Console input observations
 
 On exact candidate `0c7713f82267fb636a87e91049d7d9fcd855b4d0`, five
