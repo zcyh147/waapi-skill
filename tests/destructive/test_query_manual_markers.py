@@ -250,4 +250,3 @@ def test_manual_marker_keeps_exact_source_and_typed_member_scope(workflow_sandbo
         with output.open('xb') as stream: stream.write(body)
         category.update(status=status, observation_sha256=sha(body), business_effect_verified=observation['business_effect_verified'])
         assert config_stable and bounded
-
