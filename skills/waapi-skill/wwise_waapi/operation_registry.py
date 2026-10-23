@@ -20605,6 +20605,14 @@ def verify_prepared_operation(
         )
         if len(plugin_rows) != 1:
             return _verification(operation, assertions, readbacks)
+        actual_plugin_id = plugin_rows[0].get("id")
+        exact_plugin_id = (isinstance(actual_plugin_id, str)
+            and _PLUGIN_GUID.fullmatch(actual_plugin_id) is not None
+            and _same_identity(actual_plugin_id, plugin_id))
+        check("created plug-in exact readback retains its resolved GUID", exact_plugin_id,
+              {"expected_id": plugin_id, "actual_id": actual_plugin_id})
+        if not exact_plugin_id:
+            return _verification(operation, assertions, readbacks)
         bound_name = result_binding.get("observed_name", result_binding["created"].get("name"))
         if descriptor.placement == "shareset":
             check("created ShareSet name agrees across native result and independent reads",

@@ -498,3 +498,20 @@ def test_metadata_relation_never_guesses_other_identifier_rewrites(tmp_path, req
     code, result = finish_native_name(transaction_id, env, client)
     assert code == 2, result
     assert result['state'] == 'verification_failed'
+
+
+def test_normalized_metadata_exact_readback_cannot_substitute_guid(tmp_path):
+    class WrongExactGuidClient(NativeMetadataNameClient):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if (uri == 'ak.wwise.core.object.get' and self.created
+                    and (args or {}).get('from') == {'id': [PLUGIN]}
+                    and not (args or {}).get('transform')):
+                for row in result.get('return', []):
+                    row['id'] = '{99999999-9999-9999-9999-999999999999}'
+            return result
+    client = WrongExactGuidClient()
+    transaction_id, _, env = native_name_preview(tmp_path, client)
+    code, result = finish_native_name(transaction_id, env, client)
+    assert code == 2, result
+    assert result['state'] == 'verification_failed'
