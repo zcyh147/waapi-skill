@@ -35,6 +35,9 @@ Complete only the exact branch scope and evidence owned by this ticket. A native
 Use [runtime verification decisions](../RUNTIME_VERIFICATION.md) to distinguish
 standalone acknowledgement from independently observed effect. Bind the
 already-proven runtime reads through the existing evidence reader before
-scheduling additional native work. The next bounded implementation slices are
-the runtime observation attachment and the 2025 four-mode cursor collector;
+scheduling additional native work. R108 implemented the runtime observation
+attachment and completed the 2025 four-mode cursor observation. The next slices
+expand exact runtime branch bindings using retained evidence and repair the
+confirmed referenced-result validation gaps in the public read paths. Bind
+each fact to its actual host/version and keep missing native observations open;
 no broad reader rerun or Fresh campaign is authorized by this note.

@@ -37,8 +37,11 @@ No universal prior-state restoration or waveform requirement is added here.
   An unchanged retry is not the next step without a distinct source-backed
   diagnosis. Authoring getter-based add/clear facts remain separate.
 - The 2025 `moveCursor` returned time has a suitable independent user-cursor
-  getter. Four move alternatives still need their selected native facts;
-  existing setter, meter and other reader observations do not need repetition.
+  getter. R108 observed all four alternatives on Mac Authoring 2025.1.7.9143:
+  first, next, last and previous each matched that getter. The retained PASS
+  root is `r108-cursor-moves-native-2025-r1`; see the test inventory for its
+  candidate, times and cleanup evidence. Bind these facts to their exact audit
+  branches; no repeated cursor, setter, meter or other reader run is needed.
 - Nonempty LoadedMedia remains an independent read obligation on 2023–2025.
   R106's complete empty Event-preparation result does not establish native
   absence, SDK equivalence or that this read is unsupported.
