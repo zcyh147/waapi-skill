@@ -7169,6 +7169,7 @@ def _prepare_object_set(
     from .planned_references import apply_result_name_choices
     apply_result_name_choices(node_specs, result_context)
     deferred_reference_stage = any('target_request_path' in field for node in node_specs for field in node.get('references', []))
+    from .owned_result_stages import creation_stage_count
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.set",
         args=dispatch_args,
@@ -7180,7 +7181,7 @@ def _prepare_object_set(
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
                 "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
-                "stage_count": 1 + bool(deferred_reference_stage)}}
+                "stage_count": creation_stage_count(node_specs) + bool(deferred_reference_stage)}}
                 if (result_context and result_context['renames']) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
@@ -7264,6 +7265,28 @@ def _prepare_object_set(
         except ValueError as exc:
             raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
         if stage_plan is not None:
+            from .owned_result_stages import native_node
+            captured = {row['id'].upper() for rename in (result_context or {}).get('renames', [])
+                for snapshot in rename['collision_state'] for row in snapshot['rows']}
+            collision_state = []
+            for parent_spec in (node for node in node_specs if node.get('existing_target')):
+                native_parent = native_node(stage_plan['creation_args'], parent_spec['request_path'])
+                if native_parent.get('onNameConflict', conflict) != 'rename':
+                    continue
+                names = {node['requested_name'].casefold() for node in node_specs
+                    if node.get('parent_request_path') == parent_spec['request_path']}
+                for collision in parent_spec.get('preexisting_children', []):
+                    if collision['name'].casefold() not in names or collision['id'].upper() in captured:
+                        continue
+                    snapshot = _capture_planned_rename_collision(collision, read=read)
+                    collision_state.append(snapshot)
+                    captured.update(row['id'].upper() for row in snapshot['rows'])
+                    for row in snapshot['rows']:
+                        graph_guard['field_snapshots'].append({'object_id': row['id'], 'fields': snapshot['fields'], 'platform': None, 'rows': [row]})
+                        graph_guard['children_snapshots'].append({'object_id': row['id'], 'fields': ['id'],
+                            'rows': [{'id': child['id']} for child in snapshot['rows'] if _same_identity(_parent_value(child.get('parent')), row['id'])]})
+            if collision_state:
+                stage_plan['collision_state'] = collision_state
             state["owned_result_stages"] = stage_plan
             from .owned_result_stages import preservation_rows
             try:
