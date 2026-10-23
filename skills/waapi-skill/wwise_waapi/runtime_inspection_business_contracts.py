@@ -615,6 +615,20 @@ def runtime_inspection_business_contract_data(
     }
     execution_shape = row.get("execution_shape", "bounded_read")
     bounded_read = execution_shape == "bounded_read"
+    capture_verification = {}
+    if operation == PROFILER_SAVE_CAPTURE_URI:
+        from .operation_soundbank import MAX_TREE_FILES, MAX_TREE_ENTRIES, MAX_TREE_TOTAL_BYTES, MAX_TREE_FILE_BYTES, MAX_TREE_DEPTH
+        capture_verification = {"verification": {
+            "requires_created_or_content_changed_nonempty_file": True,
+            "capture_format_validity_verified": False,
+            "capture_content_completeness_verified": False,
+            "preservation": "bounded output-directory regular-file contents; no outside-directory observation",
+            "path_protection": "exact authorized destination, non-link regular file, unchanged Preview and directory identities",
+            "resource_bound_owner": "Gateway artifact observation policy, not native capture limits",
+            "resource_bounds": {"max_files": MAX_TREE_FILES, "max_entries": MAX_TREE_ENTRIES,
+                "max_total_bytes": MAX_TREE_TOTAL_BYTES, "max_file_bytes": MAX_TREE_FILE_BYTES,
+                "max_depth": MAX_TREE_DEPTH},
+        }}
     value_choices = {}
     field_meanings = {
         "log_channel": BASE_LOG_CHANNEL_MEANINGS if version in {"2021.1", "2022.1"} else LATER_LOG_CHANNEL_MEANINGS,
@@ -720,6 +734,7 @@ def runtime_inspection_business_contract_data(
             ),
             "required_fields": list(row["required_fields"]),
             "optional_fields": list(optional_fields),
+            **capture_verification,
             "field_types": {
                 name: value
                 for name, value in row["field_types"].items()

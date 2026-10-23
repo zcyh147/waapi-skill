@@ -80,6 +80,7 @@ from .host_paths import (
     parse_relative_host_path,
 )
 from .io_policy import IOPolicyError, validate_isolated_io
+from .profiler_capture_artifact import SAVE_CAPTURE_URI, prepare_capture_artifact, validate_capture_artifact, verify_capture_artifact
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .condition_limits import MAX_CONDITION_CONTROLLERS, MAX_CONDITION_PATH_FIELDS
 from .metadata_restrictions import (
@@ -11570,6 +11571,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
         )
         if blend_plan is not None:
             verification = {"kind": "blend-assignment", "uri": api, "version": request.version, **blend_plan}
+        if api == SAVE_CAPTURE_URI:
+            try:
+                verification = prepare_capture_artifact(call_args, arguments["io_root"], execution_contract["io_audit"], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+            warnings.append("Capture save verifies only a nonempty created or content-changed destination and bounded output-directory file preservation. Native capture format and capture-data completeness remain unverified.")
         if api == "ak.wwise.core.sound.setActiveSource":
             source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
             if source_guard is not None:
@@ -16923,6 +16930,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == SAVE_CAPTURE_URI:
+            try:
+                validate_capture_artifact(prepared.get("verification_plan", {}), call_args,
+                    arguments["io_root"], execution_contract["io_audit"], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == "ak.wwise.core.blendContainer.addAssignment" and "blend_assignment" in prepared.get("pre_state", {}):
             from .blend_assignment import observe as observe_blend, materialize_index, BlendAssignmentError
             plan = prepared.get("pre_state", {}).get("blend_assignment")
@@ -19579,6 +19592,21 @@ def verify_prepared_operation(
                 else "complete_reflected_schema"
             )
         )
+    elif kind == "profiler-capture-artifact":
+        check_result_schema(plan["uri"], plan["version"])
+        business_state_verified = False
+        verification_strength = "profiler_capture_artifact"
+        try:
+            observed = verify_capture_artifact(plan)
+        except SoundBankContractError as exc:
+            check("Exact authorized capture artifact can be observed safely", False, exc.as_dict())
+        else:
+            readbacks.append(observed)
+            check("Exact authorized capture artifact was created or changed and is nonempty",
+                observed["changed"] and observed["nonempty"], observed)
+            check("Unrelated regular-file contents in the bounded output directory are preserved",
+                observed["unrelated_files_preserved"], observed)
+            business_state_verified = all(item.get("passed") is True for item in assertions)
     elif kind == 'tone-wav-artifact':
         check_result_schema(TONE_URI, plan['version'])
         business_state_verified = False
@@ -24565,6 +24593,13 @@ def verify_prepared_operation(
             message = 'The Console command failed verification; inspect the retained checks and do not retry execution.'
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "profiler-capture-artifact":
+        message = ("The exact authorized capture destination was created or content-changed and is nonempty; bounded unrelated output-file contents are preserved. "
+            if outcome.business_state_verified else
+            "The exact authorized capture artifact or unrelated output-file preservation could not be verified. Do not replay the executed save. ")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            message + "Native capture format validity and capture-data completeness remain unverified.",
+            outcome.verification_strength, outcome.business_state_verified, plan["verification_scope"])
     if kind == 'tone-wav-artifact':
         message = ('The requested Tone WAV artifact failed independent verification.'
             if outcome.status == 'verification_failed' else

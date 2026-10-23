@@ -99,6 +99,21 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert event_validation.section == "event"
         return
 
+    if entry.uri == "ak.wwise.core.profiler.saveCapture":
+        # This exact row now needs an actual output effect. Opaque fixture bytes
+        # exercise the public artifact seam, not native .prof format acceptance.
+        from tests.unit.test_profiler_capture_artifact_gateway import CaptureTask
+        task = CaptureTask(tmp_path, entry.version)
+        task.preview()
+        task.confirm()
+        task.run("execute", task.tx)
+        verified = task.run("verify", task.tx)
+        assert verified["verification"]["business_state_verified"] is True
+        assert verified["verification"]["verification_strength"] == "profiler_capture_artifact"
+        assert verified["verification"]["verification_scope"]["capture_content_completeness_verified"] is False
+        assert sum(uri == entry.uri for uri, _, _ in task.calls) == 1
+        return
+
     if entry.uri == "ak.wwise.core.blendContainer.addAssignment":
         # Complete live owner/index facts are mandatory; synthesized schema
         # arguments and an empty observation cannot prepare this public route.
