@@ -7,6 +7,16 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-23 R94 selected transport observations
 
+Reviewed input repair `8a7160d4`, integrated at `e05bae10`, adds an explicit
+empty capture-data declaration, preserves repeated rows and their order across
+all five definitions, and admits signed numeric cursor targets in 2025. The
+incremental public-flow tests cover construction, discovery, rejection of
+conflicting or malformed declarations, returned-time verification and
+execute-once failures. Later result-disclosure changes received only affected
+checks; these receipts are not a combined gate. Enablement remains explicitly
+schema-only, with no invented empty-list, repetition or negative-time meaning.
+Real acceptance of those boundary inputs is still unproven.
+
 Reviewed collector `645ee1d2`, integrated at `224c8d79`, exercises the public
 Gateway through the actual archive and final category writer. Review caught a
 missing original-audio audition prerequisite before native execution. Its causal

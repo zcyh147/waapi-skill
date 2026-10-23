@@ -497,12 +497,11 @@ def materialize_runtime_control_business_request(
         if (
             isinstance(target, bool)
             or not isinstance(target, int)
-            or target < 0
         ):
             raise business_repair(
                 "BUSINESS_VALUE_INVALID",
                 field="cursor_target_ms",
-                action="provide non-negative integer milliseconds",
+                action="provide signed integer milliseconds without assigning a special cursor meaning",
             )
         args = {"time": target}
     elif operation == PROFILER_ENABLE_DATA_URI:
@@ -510,14 +509,12 @@ def materialize_runtime_control_business_request(
         capture_data = plan.get("capture_data_changes")
         if (
             not isinstance(capture_data, list)
-            or not capture_data
             or any(
                 not isinstance(value, list)
                 or len(value) != 2
                 or not all(isinstance(item, str) for item in value)
                 for value in capture_data
             )
-            or len({value[0] for value in capture_data}) != len(capture_data)
             or any(
                 value[0] not in PROFILER_CAPTURE_DATA_CHOICES[version]
                 or value[1] not in {"enable", "disable"}
@@ -529,7 +526,7 @@ def materialize_runtime_control_business_request(
                 field="capture_data_changes",
                 choices=list(PROFILER_CAPTURE_DATA_CHOICES[version]),
                 outcomes=["enable", "disable"],
-                action="choose distinct available data sets and each desired enablement outcome",
+                action="provide available data sets and each enable or disable directive, or an explicit empty list",
             )
         args = {
             "dataTypes": [
