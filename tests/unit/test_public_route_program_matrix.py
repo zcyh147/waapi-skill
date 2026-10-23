@@ -544,7 +544,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
                 **({"notificationPort": args.get("notificationPort", 0)} if entry.version == "2021.1" else {})}]}
         if uri == "ak.wwise.core.transport.getList":
             if entry.uri == "ak.wwise.core.transport.create":
-                return {"list": [{"transport": 0}]}
+                # Model the created association as well as its native ID;
+                # public mismatch controls exercise incorrect associations.
+                return {"list": [{"transport": 0, "object": args["object"],
+                    **({"gameObject": args["gameObject"]} if "gameObject" in args else {})}]}
             if entry.uri == "ak.wwise.core.transport.destroy":
                 return {"list": []}
         if uri == "ak.wwise.core.transport.getState":

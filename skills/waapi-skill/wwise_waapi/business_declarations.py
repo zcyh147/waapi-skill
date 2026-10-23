@@ -595,7 +595,7 @@ class BusinessHandleRegistry:
                 "type": object_type,
                 "path": path,
                 "classId": class_id,
-            }, owned_identity=owned_identity,
+            }, owned_identity=owned_identity, version=self.context.wwise_version,
         )
         if owned_identity is not None:
             from .documented_list_fields import validate_owned_empty_identity
@@ -1633,7 +1633,7 @@ def revalidate_live_objects(
         for row in rows:
             owned = next((bound.owned_identity for bound in bounds
                 if bound.object_id == str(row.get('id', '')).upper()), None)
-            identity = normalize_live_object_identity(row, owned_identity=owned)
+            identity = normalize_live_object_identity(row, owned_identity=owned, version=registry.context.wwise_version)
             canonical_id = identity.object_id
             if (
                 canonical_id not in expected_ids
@@ -2021,7 +2021,7 @@ def _bound_object_from_dict(
                 "type": payload.get("object_type"),
                 "path": payload.get("path"),
                 "classId": payload.get("class_id"),
-            }, owned_identity=payload.get('owned_identity'),
+            }, owned_identity=payload.get('owned_identity'), version=context.wwise_version,
         )
     except ValueError as exc:
         raise ValueError("bound object identity is invalid") from exc
@@ -2517,7 +2517,7 @@ def _bounded_object_name(value: Any, *, object_type: str) -> str:
     )
 
 
-def normalize_live_object_identity(row: Any, *, owned_identity=None) -> LiveObjectIdentity:
+def normalize_live_object_identity(row: Any, *, owned_identity=None, version: str | None = None) -> LiveObjectIdentity:
     """Normalize the exact Wwise object identity shape once for every caller.
 
     Wwise Authoring objects use canonical GUIDs. Ordinary objects have absolute
@@ -2566,6 +2566,15 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None) -> LiveObje
     )
     reviewed_relative_display_path = (
         path in object_identity_semantics(object_type).relative_display_paths
+        # R68 exact-GUID observations on pinned 2024/25: BlendTrack path is
+        # its intrinsic name. This is comparison text, never a hierarchy path.
+        or (version in {"2024.1", "2025.1"} and object_type == "BlendTrack"
+            and path == name and bool(name)
+            and not any(ord(character) < 32 or character in {"\\", "/"} for character in path))
+        or (certified_owned and descriptor['version'] == '2025.1'
+            and descriptor['native_type'] == 'Marker' and descriptor['class_id'] == 5373968
+            and descriptor['owner_class_id'] == 16 and descriptor['collection'] == 'Markers'
+            and path == '[Marker]')
     )
     if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path:
         raise ValueError(

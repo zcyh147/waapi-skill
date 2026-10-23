@@ -12300,7 +12300,7 @@ def dispatch_core_business_read(
     by_id: dict[str, Mapping[str, Any]] = {}
     for row_index, row in enumerate(rows):
         try:
-            identity = normalize_live_object_identity(row)
+            identity = normalize_live_object_identity(row, version=detected_version)
         except ValueError as exc:
             raise GatewayResultShapeError(
                 "Core business identity row is malformed.",
@@ -13293,7 +13293,7 @@ def dispatch_business_core_plan(
             value = _parse_business_value("boolean", raw, field=name)
         elif value_type in {"finite_number_lte_zero", "finite_number_gte_zero"}:
             value = _parse_business_value("number", raw, field=name)
-        elif value_type == "nonnegative_integer":
+        elif value_type in {"nonnegative_integer", "integer_clamped_to_assignment_count"}:
             value = _parse_business_value("integer", raw, field=name)
         elif value_type in {
             "attenuation_curve_kind",
@@ -19918,7 +19918,7 @@ def dispatch_business_object_binding(
     try:
         from wwise_waapi.documented_list_fields import capture_owned_empty_identity
         owned_identity = capture_owned_empty_identity(detected_version, row, read=binding.read_call)
-        identity = normalize_live_object_identity(row, owned_identity=owned_identity)
+        identity = normalize_live_object_identity(row, owned_identity=owned_identity, version=detected_version)
     except ValueError as exc:
         raise GatewayResultShapeError(
             "Exact business object binding returned a malformed live identity.",
@@ -19933,6 +19933,8 @@ def dispatch_business_object_binding(
             "path": identity.path,
         }
     )
+    if identity.object_type == "BlendTrack" and not identity.path.startswith("\\") and closed_selector.kind != "id":
+        raise GatewayInputError("A BlendTrack relative display identity requires its exact canonical GUID selector")
     if (
         (
             closed_selector.expected_id is not None
@@ -32508,6 +32510,10 @@ def transaction_show_summary(
             "native_enabled_state": proof["native_enabled_state"], "ancestry_count": len(proof["rows"]),
             "proof_sha256": canonical_sha256(proof)} for proof in structural]
     source_linkage = prepared.get("semantic_preview", {}).get("envelope", {}).get("metadata", {}).get("source_linkage")
+    blend_assignment = prepared.get("pre_state", {}).get("blend_assignment")
+    if isinstance(blend_assignment, Mapping):
+        from wwise_waapi.blend_assignment import notice as blend_assignment_notice
+        derived_notice["blend_assignment"] = blend_assignment_notice(blend_assignment)
     if isinstance(source_linkage, Mapping):
         derived_notice["source_linkage"] = dict(source_linkage)
     if isinstance(request, Mapping) and isinstance(request.get("arguments"), Mapping):
@@ -33337,8 +33343,9 @@ def transaction_read_call(
             # dispatcher gate must be bypassed internally without broadening
             # the public direct-call surface.
             allow_destructive=True,
-            operation_timeout=10 if uri in LAYOUT_READ_URIS else None,
-            result_limit_bytes=MAX_LAYOUT_RESULT_BYTES if uri in LAYOUT_READ_URIS else MAX_GATEWAY_RESULT_JSON_BYTES,
+            operation_timeout=10 if uri in LAYOUT_READ_URIS or uri == "ak.wwise.core.blendContainer.getAssignments" else None,
+            result_limit_bytes=(MAX_LAYOUT_RESULT_BYTES if uri in LAYOUT_READ_URIS else
+                                256 * 1024 if uri == "ak.wwise.core.blendContainer.getAssignments" else MAX_GATEWAY_RESULT_JSON_BYTES),
         )
         if result.get("ok") is not True:
             raise OperationContractError(

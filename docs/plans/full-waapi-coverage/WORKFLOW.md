@@ -9,6 +9,20 @@ batch planning and reruns. Each active ticket's execution note identifies its
 next complete business flow, reusable checks and remaining native evidence.
 The five-version scope and existing blocking edges remain unchanged.
 
+Use the current checkpoint to name one ticket as the closeout focus and list
+its remaining acceptance steps with existing evidence pointers. Finish already
+reviewed work and required dependencies alongside it; assign new independent
+work only when it advances that ticket. Keep other obligations assigned to
+their original tickets. Report whole-ticket completion separately from merged
+components, without changing the original acceptance criteria.
+
+For a shared mechanism repair, inspect the complete operation's declared
+changes and its affected consumers before handoff. Review that mechanism and
+its caller evidence together. Later reviews concentrate on unresolved findings
+and changed behavior; reuse previously checked source and evidence instead of
+recopying or rereading unchanged archives. Publish one consolidated handoff per
+integration batch.
+
 Every agent dispatch must explicitly set `fork_turns="none"`. Send only the
 objective, constraints, acceptance criteria, relevant document/code pointers and
 essential decisions not yet recorded. Require descendants to use the same rule;
@@ -31,8 +45,8 @@ retry-prefix controls. Lower-level Broker passes alone do not prove that the
 task can produce and replay its final result.
 
 1. Freeze one bounded batch of explicitly selected immutable worker refs. Workers
-   run their relevant focused cases; a new preparation read also selects its
-   affected existing public-route matrix rows. Confirm negative tests reach the
+   run their relevant focused cases; changed preparation or verification also
+   selects its affected existing public-route matrix rows. Confirm negative tests reach the
    intended boundary from a valid baseline. Keep later successors separate and
    merge only the selected refs with one integration source owner.
 2. Identify which generated artifacts the batch actually changes. Reconcile
