@@ -23,9 +23,9 @@
   "controller": "LfoWaveform",
   "current_sources": {
     "skills/waapi-skill/scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
-    "skills/waapi-skill/scripts/gateway.py": "02a2043daa58e44029d373fc5bc2995ddd2260915dbf071042d9e21ba1b58bdf",
+    "skills/waapi-skill/scripts/gateway.py": "349291ffc29ee65dd70c61e084fca65e28d8c632a88077d9d9f58de633ad11ea",
     "skills/waapi-skill/wwise_waapi/business_declarations.py": "6fd0f8a08d952a0093d02a8400111aa82ea6718eb0458f7f84461299d6e4baab",
-    "skills/waapi-skill/wwise_waapi/operation_registry.py": "6ec0d235888261baf04d69f3715ed1598099056784dd411b115a5a3abb60367f",
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": "2d8c26f100194adc7081c27aa04d8207c654f420c6a77e1bb29206a2c5e53023",
     "skills/waapi-skill/wwise_waapi/metadata_restrictions.py": "a040f4aee638809b0dce2cc52664a2673e3cc7add5fcbb068f1b0a25825ab5c3",
     "skills/waapi-skill/wwise_waapi/builders/metadata.py": "ac58211914543aca3e3fdfdbe77095d2b8179f53091bb045fd5cf3452aea1cbf",
     "docs/branch-coverage-condition-sources.json": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
@@ -60,5 +60,51 @@
       "tests/unit/test_condition_closure_gateway.py::test_every_branch_of_recursive_metadata_closure_is_guarded"
     ],
     "reason": "Actual class-scoped LFO receipt and exact source/class/typed graph link to current public object-scoped acquisition, refresh and verifier reads; native EQ observes object-scoped metadata before/after. Controlled public drift tests establish guard behavior. No native LFO instance metadata or per-recipient effect is asserted."
+  },
+  "source_reconciliation": {
+    "original_review": {
+      "commit": "993641ae6295db90365bc0f9a2d0ffc6d54471a4",
+      "path": "tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json",
+      "sha256": "aa561c015719afc1c06ea142dca03d3d3bfe3893ca59825a744e593b078748b4"
+    },
+    "integrated_root_commit": "7a0d95b3d8dabefe4da92779750dfa3390637728",
+    "changed_sources": {
+      "skills/waapi-skill/scripts/gateway.py": {
+        "original_sha256": "02a2043daa58e44029d373fc5bc2995ddd2260915dbf071042d9e21ba1b58bdf",
+        "current_sha256": "349291ffc29ee65dd70c61e084fca65e28d8c632a88077d9d9f58de633ad11ea",
+        "changed_top_level_functions": [
+          "_compile_query_business_projection",
+          "_prepare_query_related_outputs",
+          "_project_query_business_rows",
+          "transaction_show_summary"
+        ]
+      },
+      "skills/waapi-skill/wwise_waapi/operation_registry.py": {
+        "original_sha256": "6ec0d235888261baf04d69f3715ed1598099056784dd411b115a5a3abb60367f",
+        "current_sha256": "2d8c26f100194adc7081c27aa04d8207c654f420c6a77e1bb29206a2c5e53023",
+        "changed_top_level_functions": [
+          "_extract_plugin_result_binding",
+          "_new_object_class_metadata_assertions",
+          "_prepare_object_create_plugin",
+          "_prepare_object_node_specs",
+          "_read_plugin_prestate",
+          "verify_prepared_operation"
+        ]
+      }
+    },
+    "unchanged_condition_helpers": [
+      "_prepare_association_parent_condition",
+      "_append_association_condition",
+      "_condition_metadata_assertions",
+      "_related_condition_assertions",
+      "_existing_override_applicability",
+      "_collect_existing_condition_closure",
+      "_apply_reference_activation_dependencies",
+      "_reference_target_condition_assertions"
+    ],
+    "verification_comparison": "verify_prepared_operation AST is identical after removing only the object-plugin-created branch bodies; every existing-object condition/property/reference verification branch is unchanged.",
+    "gateway_semantics": "The three query changes concern related/local list and curve_points projection. transaction_show_summary only adds a notice when a prepared plugin creation verification_plan has name_binding; the selected existing scalar edit has none. No field discovery, condition binding, mutation/verification routing or ordinary existing-field summary branch changed.",
+    "registry_semantics": "ShareSet creation name acceptance, returned GUID/name readback and plugin verifier changes are confined to plugin construction. constructor_inputs and root collection fixes apply to new-object List-node preparation/class metadata checks. Existing-object condition helpers and the non-plugin-created verifier are structurally unchanged.",
+    "retained_scope": "Exactly the six original 2025 LfoSmoothing members and original EQ witness; no new native runs or recipient instance/effect observation. Original993641ae source artifact and receipts remain immutable, not re-signed. Final causal null-URI control and scoped metadata positive will validate this new candidate only."
   }
 }

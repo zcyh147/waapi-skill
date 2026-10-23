@@ -14,7 +14,7 @@ from tests.maintenance.branch_coverage_audit import digest
 from tests.support.condition_scalar_batch import scalar_manifest, scalar_plan
 
 REVIEW_PATH = 'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json'
-REVIEW_SHA256 = 'aa561c015719afc1c06ea142dca03d3d3bfe3893ca59825a744e593b078748b4'
+REVIEW_SHA256 = '05e840728b7e9fbf8433bf3d4f97ba313ecaf4255c9082ca9b67b6088bb78e12'
 
 
 def load_review(root):
