@@ -20,7 +20,7 @@ def runtime_with_existing_source(tmp_path, workflow, monkeypatch, fault=None):
             auro_isolation_profile=workflow.WWISE_2025_SOUNDBANK_AURO_PROFILE))
     assert prepared.auro_soundbank_isolation is not None
     (owned / 'prelaunch-helper-report.json').write_text(json.dumps(prepared.as_dict(), indent=2))
-    transport = tmp_path / 'transport'; transport.mkdir(); task = marker_task(transport, fault=fault)
+    transport = tmp_path / 'transport'; transport.mkdir(); task = marker_task(transport, fault=fault, omit_empty_markers=True)
     task.project_file = sandbox / 'SampleProject.wproj'
     sound_path = '\\' + '\\'.join(witness.SOUND_SEGMENTS)
     task.objects[SECOND].update(name='Rifle_Close', path=sound_path)

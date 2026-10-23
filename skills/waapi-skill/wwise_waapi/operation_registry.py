@@ -10594,18 +10594,21 @@ def _prove_omitted_object_list_empty(
 ) -> dict[str, Any]:
     """Prove absence independently of a missing owner return projection.
 
-    Only fixed operation-owned lists or a certified owned Metadata profile enter
+    Only fixed operation-owned lists or certified owned Metadata/Marker profiles enter
     this compatibility path. WAQL list selection is distinct from the legacy transform.select relationship enum.
     One returned member is sufficient to disprove emptiness; never enumerate
     an unbounded list or treat a failed/malformed query as an empty result.
     """
-    from .documented_list_fields import owned_inner_identity
+    from .documented_list_fields import owned_inner_identity, is_manual_marker_list_source
     certified_metadata = (list_name == "Metadata" and isinstance(documented_list, Mapping)
         and documented_list.get("scope", {}).get("scope_kind") == "object"
         and documented_list["scope"].get("scope_value") == object_id
         and owned_inner_identity(documented_list, 5570560) is not None)
+    certified_marker = (list_name == "Markers" and isinstance(documented_list, Mapping)
+        and documented_list.get("scope", {}).get("scope_value") == object_id
+        and is_manual_marker_list_source(documented_list))
     if (
-        (list_name not in {"RTPC", "Effects"} and not certified_metadata)
+        (list_name not in {"RTPC", "Effects"} and not certified_metadata and not certified_marker)
         or not isinstance(object_id, str)
         or not _PLUGIN_GUID.fullmatch(object_id)
     ):
@@ -10686,7 +10689,8 @@ def _read_object_list_rows_with_evidence(
     owner_row = owner_rows[0]
     compatibility_normalization: dict[str, Any] | None = None
     if list_field not in owner_row:
-        if version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}:
+        if (version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"} and canonical_name in {"RTPC", "Effects"}
+                or version in {"2023.1", "2024.1", "2025.1"} and canonical_name == "Markers"):
             from .documented_list_fields import resolve_live_list_evidence, prove_source_owned_empty_list
             try:
                 source = resolve_live_list_evidence(version, object_id, canonical_name, read=read)
