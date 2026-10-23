@@ -61,6 +61,47 @@
     {
       "model_values": [
         {
+          "name": "object_handle",
+          "path": [
+            "declaration",
+            "object_handle"
+          ],
+          "required": true,
+          "schema_sha256": "590c152580b056da54374cecd3326f92a818b20a3a79ae0ee3ee5dbb4c74131a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "field_handle",
+          "path": [
+            "declaration",
+            "field_handle"
+          ],
+          "required": true,
+          "schema_sha256": "ecb34bfa8835a22584a95683a4630f7b60949be322880b3637ef08f125beddc7",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "business_value",
+          "path": [
+            "declaration",
+            "business_value"
+          ],
+          "required": true,
+          "schema_sha256": "305b9d1056806031250fe4219e2767d3fe35244262fc33f7942fc0b6b1fef1ae",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "0713107303682fbae6d2d07b4b0d2c26ba9dd0735c0f0953e10e22a70f696ecb"
+    },
+    {
+      "model_values": [
+        {
           "name": "command_id",
           "path": [
             "ui_plan",
@@ -304,175 +345,6 @@
         }
       ],
       "sha256": "2555cc7ef7feb82816c68e7f1674ea8d9fa926dd24e8a62d532deb0a2dc0bd89"
-    },
-    {
-      "model_values": [
-        {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "rtpc",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "0a06a489009e6e7de9050937c312ba2f0c30947f08d0abc027d7bdf8b379aa3c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "field_handle",
-          "path": [
-            "declaration",
-            "rtpc",
-            "field_handle"
-          ],
-          "required": true,
-          "schema_sha256": "a95c5cf4e4fefa900977c76fb5b74c635fa9a7a02212b670cdc04d0df4ef3eb3",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "control_input_handle",
-          "path": [
-            "declaration",
-            "rtpc",
-            "control_input_handle"
-          ],
-          "required": true,
-          "schema_sha256": "eb893ea48be42be5986bb8aee2ebf32e3b235e1bb5d1ad1b9b21d9c9a4433ce9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "curve_points",
-          "path": [
-            "declaration",
-            "rtpc",
-            "curve_points"
-          ],
-          "required": true,
-          "schema_sha256": "2c0642140043dd61aaad3c829ab181514967d3285677f817bacdec2d1f29b46c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "mode",
-          "path": [
-            "declaration",
-            "rtpc",
-            "mode"
-          ],
-          "required": false,
-          "schema_sha256": "5ec5fa48b74d1ab749fc3317d3c7f947c22239fccd03b14a2cd3be1a0d9a3c9a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "notes",
-          "path": [
-            "declaration",
-            "rtpc",
-            "notes"
-          ],
-          "required": false,
-          "schema_sha256": "f01aa3b7148d3f2eb2fb1b8e4216410c3c587b33379f61a623008b0436ae9aef",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "x",
-          "path": [
-            "declaration",
-            "rtpc",
-            "curve_points",
-            "*",
-            "x"
-          ],
-          "required": true,
-          "schema_sha256": "b7684e18bf1283637ba763dad92cd7e6fb2e9f0627cf6e0b6596cae35e379186",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "y",
-          "path": [
-            "declaration",
-            "rtpc",
-            "curve_points",
-            "*",
-            "y"
-          ],
-          "required": true,
-          "schema_sha256": "7dce7da3aeb712edde2e9e3bc44a60862062296a51067a6b2d3ebdbbf40d45b4",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "shape",
-          "path": [
-            "declaration",
-            "rtpc",
-            "curve_points",
-            "*",
-            "shape"
-          ],
-          "required": true,
-          "schema_sha256": "edda423ef2ec0e4bb981b12a563e22539ca702a97f1c8b96a9fdd608677ccba7",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "2573341182a08e82ad10fa01bc50f42c77985069fd0c579290494df81e522138"
-    },
-    {
-      "model_values": [
-        {
-          "name": "object_handle",
-          "path": [
-            "declaration",
-            "object_handle"
-          ],
-          "required": true,
-          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "live_bound_handle"
-        },
-        {
-          "name": "field_handle",
-          "path": [
-            "declaration",
-            "field_handle"
-          ],
-          "required": true,
-          "schema_sha256": "ecb34bfa8835a22584a95683a4630f7b60949be322880b3637ef08f125beddc7",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "business_value",
-          "path": [
-            "declaration",
-            "business_value"
-          ],
-          "required": true,
-          "schema_sha256": "305b9d1056806031250fe4219e2767d3fe35244262fc33f7942fc0b6b1fef1ae",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2"
     },
     {
       "model_values": [
@@ -831,6 +703,121 @@
         }
       ],
       "sha256": "6f0fbd3d5b5a3334bc7273b81c7cae14e8871f097516a33662844c28cd266365"
+    },
+    {
+      "model_values": [
+        {
+          "name": "object_handle",
+          "path": [
+            "declaration",
+            "rtpc",
+            "object_handle"
+          ],
+          "required": true,
+          "schema_sha256": "0a06a489009e6e7de9050937c312ba2f0c30947f08d0abc027d7bdf8b379aa3c",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "field_handle",
+          "path": [
+            "declaration",
+            "rtpc",
+            "field_handle"
+          ],
+          "required": true,
+          "schema_sha256": "a95c5cf4e4fefa900977c76fb5b74c635fa9a7a02212b670cdc04d0df4ef3eb3",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "curve_points",
+          "path": [
+            "declaration",
+            "rtpc",
+            "curve_points"
+          ],
+          "required": true,
+          "schema_sha256": "2c0642140043dd61aaad3c829ab181514967d3285677f817bacdec2d1f29b46c",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "mode",
+          "path": [
+            "declaration",
+            "rtpc",
+            "mode"
+          ],
+          "required": false,
+          "schema_sha256": "5ec5fa48b74d1ab749fc3317d3c7f947c22239fccd03b14a2cd3be1a0d9a3c9a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "notes",
+          "path": [
+            "declaration",
+            "rtpc",
+            "notes"
+          ],
+          "required": false,
+          "schema_sha256": "f01aa3b7148d3f2eb2fb1b8e4216410c3c587b33379f61a623008b0436ae9aef",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "x",
+          "path": [
+            "declaration",
+            "rtpc",
+            "curve_points",
+            "*",
+            "x"
+          ],
+          "required": true,
+          "schema_sha256": "b7684e18bf1283637ba763dad92cd7e6fb2e9f0627cf6e0b6596cae35e379186",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "y",
+          "path": [
+            "declaration",
+            "rtpc",
+            "curve_points",
+            "*",
+            "y"
+          ],
+          "required": true,
+          "schema_sha256": "7dce7da3aeb712edde2e9e3bc44a60862062296a51067a6b2d3ebdbbf40d45b4",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "shape",
+          "path": [
+            "declaration",
+            "rtpc",
+            "curve_points",
+            "*",
+            "shape"
+          ],
+          "required": true,
+          "schema_sha256": "edda423ef2ec0e4bb981b12a563e22539ca702a97f1c8b96a9fdd608677ccba7",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "85ff88e38fc8cf83bdb90034a3d4b039774fef80004d894c2f8ca346d7835b60"
     },
     {
       "model_values": [
@@ -25826,6 +25813,401 @@
         }
       ],
       "sha256": "2031c16eee5ea4f0c1743a9ae9fce133939fbed368edbc2db68443bc9d922ff1"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "fixed.query-object",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "result-query",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "result-query"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "result-page",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "result-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "type-selection",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "type-selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "short-id",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "short-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "short-id-kind",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "short-id-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "search-text",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "search-text"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "query-id",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "query-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "query-path-segment",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "query-path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "advanced-waql",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "advanced-waql"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "bounded_domain_expression"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "max-results",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "max-results"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "platform"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "language",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "language"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-related",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-related"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-related-field",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-related-field"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-related-override-source-value",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-related-override-source-value"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-related-local-reference",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-related-local-reference"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-field",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-field"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-override-source-value",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-override-source-value"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "include-local-reference",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "include-local-reference"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "where-field",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "where-field"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "predicate",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "predicate"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "match-original-file-path",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "match-original-file-path"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "relationship",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "relationship"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "view",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.query-object",
+          "name": "detail",
+          "path": [
+            "fixed_command",
+            "query-object",
+            "detail"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "203a2a46a2b6c217f501c779b6245eb3f375233d113f426368d744ccc11f3291"
     },
     {
       "model_values": [
@@ -172106,310 +172488,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.query-object",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "result-query",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "result-query"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "result-page",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "result-page"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "type-selection",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "type-selection"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "short-id",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "short-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "short-id-kind",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "short-id-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "search-text",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "search-text"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "query-id",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "query-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "query-path-segment",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "query-path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "advanced-waql",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "advanced-waql"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "bounded_domain_expression"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "max-results",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "max-results"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "platform"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "language",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "language"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "include",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "include"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "include-field",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "include-field"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "predicate",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "predicate"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "match-original-file-path",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "match-original-file-path"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "relationship",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "relationship"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "view",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "view"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.query-object",
-          "name": "detail",
-          "path": [
-            "fixed_command",
-            "query-object",
-            "detail"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "f754b360d613578866ffdbe52a1cea95aeabc1ba39c961af55cc3bc4cd1fbc24"
-    },
-    {
-      "model_values": [
-        {
           "channel": "fixed.metadata attenuation",
           "name": "type-selection",
           "path": [
@@ -174460,7 +174538,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 897
   },
-  "inventory_sha256": "5c85913c43f00ef4076753cc7dc18cb28beb21379264b28fb0ab643bc24cfc27",
+  "inventory_sha256": "11cbcdb68f93960040f38de7496e125a3cffe1595798216ea5521567a9009453",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -175875,7 +175953,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "dbfeda29066c37573b73f77727ca22f0ec4ed3c43da8b7242da28b9d5cb4c4ef",
-      "field_contract_sha256": "f754b360d613578866ffdbe52a1cea95aeabc1ba39c961af55cc3bc4cd1fbc24",
+      "field_contract_sha256": "203a2a46a2b6c217f501c779b6245eb3f375233d113f426368d744ccc11f3291",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -180247,7 +180325,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "df0ea6e406d877a1e0fc0a35920b7b90f2cdd09142fff716af7e53ae69c55f52",
-      "field_contract_sha256": "f754b360d613578866ffdbe52a1cea95aeabc1ba39c961af55cc3bc4cd1fbc24",
+      "field_contract_sha256": "203a2a46a2b6c217f501c779b6245eb3f375233d113f426368d744ccc11f3291",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -185482,7 +185560,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "6a013055c2d2dfa80ea881ae9171fa2580a82d0a3b7186996a2dde43a722b812",
-      "field_contract_sha256": "f754b360d613578866ffdbe52a1cea95aeabc1ba39c961af55cc3bc4cd1fbc24",
+      "field_contract_sha256": "203a2a46a2b6c217f501c779b6245eb3f375233d113f426368d744ccc11f3291",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -191747,7 +191825,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "ed74be1d343f1b84c45c6066996954ad95bc8fdfaaea3d71f647a8c9cfc54211",
-      "field_contract_sha256": "f754b360d613578866ffdbe52a1cea95aeabc1ba39c961af55cc3bc4cd1fbc24",
+      "field_contract_sha256": "203a2a46a2b6c217f501c779b6245eb3f375233d113f426368d744ccc11f3291",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -199079,7 +199157,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "a6efce1e678b5b721a29b545d95ba3e3edb034283642600ceab67b3d9f5e64e7",
-      "field_contract_sha256": "f754b360d613578866ffdbe52a1cea95aeabc1ba39c961af55cc3bc4cd1fbc24",
+      "field_contract_sha256": "203a2a46a2b6c217f501c779b6245eb3f375233d113f426368d744ccc11f3291",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -206116,7 +206194,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "c1ad8c514070d7c9eff895379785ae454e65199ea099409316b12acee512d13c",
+      "contract_sha256": "725b546a2e1f8837b4ed508ef3a779dc8a5621f67403e3191172e9c90f8301eb",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206143,7 +206221,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "60a43fe599e175b91db242559fe99690766fe619c54b5d4be095eae763b24e82",
+      "contract_sha256": "acda5a657e7d2a9601a4a08eb809bf0fa9f111ecc5f6c4f0331b87839cf441d2",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206170,7 +206248,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "1dc673501c84c1cc3c6259217357eabc76ca7b7bcdc792e416f5c5c398f2c833",
+      "contract_sha256": "96e3fa049fbe8a7c4ec4f8ae9808a8326422c2c9f125f66545d905471107c37e",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206197,7 +206275,7 @@
       "argument_contract_sha256": "d432e6a6bdb97aa18b8945d0782133b6673710e2b5bdac880fd3893c1f411fff",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "549cc1f4fc3f84127d924c2cdd67d747811d437228dcda38ec094cc2912f2dd7",
+      "contract_sha256": "0d3b0707262c02479169f42aff235d1f3f74bb71b4ee870ae037ebfbfc198c2e",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206572,10 +206650,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
+      "argument_contract_sha256": "0713107303682fbae6d2d07b4b0d2c26ba9dd0735c0f0953e10e22a70f696ecb",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "607ead7cc76275201a2a018b0e526e1932215419799854ccf4df31f411ee7c5a",
+      "contract_sha256": "02e44307bba7d010ac85dd67e8b81ea6e9f51e30aafc02977b3bbb22f1c50572",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206599,10 +206677,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
+      "argument_contract_sha256": "0713107303682fbae6d2d07b4b0d2c26ba9dd0735c0f0953e10e22a70f696ecb",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "8bda6d9c47967d862aaa75e9fc07e43751c6bfb560e065103583fd88960a7e45",
+      "contract_sha256": "3e10ac2de421da82d46ce59ddde86c62f4b01be3c7f3ac49f268d8beb9c69b13",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206626,10 +206704,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
+      "argument_contract_sha256": "0713107303682fbae6d2d07b4b0d2c26ba9dd0735c0f0953e10e22a70f696ecb",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "0f0d1b353891f9bd88b223934f9f89f6c73238c611e467c3c955d6487d0c4d47",
+      "contract_sha256": "1f17c9c62ef71c58cdde0ab357d1c7ae9b43572c6b01b04975fd88f7b4d5cd46",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206653,10 +206731,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
+      "argument_contract_sha256": "0713107303682fbae6d2d07b4b0d2c26ba9dd0735c0f0953e10e22a70f696ecb",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "4a681f60d968aeb0e8809b870c6d179afbab1979d9217b52e0d6f128a8005129",
+      "contract_sha256": "87699902fb5a98a2d9e81f29ff8d5e559d209c685d81f9a3e9292f8bbf80c3ec",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206680,10 +206758,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
+      "argument_contract_sha256": "0713107303682fbae6d2d07b4b0d2c26ba9dd0735c0f0953e10e22a70f696ecb",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "267c926e08ec9c12ec7af339594fbc75d12eebcbac51256821f128dce0a3c3d2",
+      "contract_sha256": "802f66973387da328a4f97a8299341db22a4344324778f6fd402dc9150e1a58e",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206707,10 +206785,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "2573341182a08e82ad10fa01bc50f42c77985069fd0c579290494df81e522138",
+      "argument_contract_sha256": "85ff88e38fc8cf83bdb90034a3d4b039774fef80004d894c2f8ca346d7835b60",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "a2f94bede03e9be9dd236031288e73544dfe8fa9fde353475906f3d262216cd6",
+      "contract_sha256": "b2687a2ebfab337689d012b13874445855cab58992a1451953016c649debce23",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206734,10 +206812,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "2573341182a08e82ad10fa01bc50f42c77985069fd0c579290494df81e522138",
+      "argument_contract_sha256": "85ff88e38fc8cf83bdb90034a3d4b039774fef80004d894c2f8ca346d7835b60",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "5e0fe14ed8b1e53b79a564cac3419004ed08414c2f938b467e71b61430e0f3ad",
+      "contract_sha256": "09ef49cc26561180b0692a363c2e33a1f60cbffabbeb7b41a4f9a65bf985dda8",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206761,10 +206839,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "2573341182a08e82ad10fa01bc50f42c77985069fd0c579290494df81e522138",
+      "argument_contract_sha256": "85ff88e38fc8cf83bdb90034a3d4b039774fef80004d894c2f8ca346d7835b60",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "657bdbc37c66bd3a15ea41ddad7b00c22ee36be3748e3a6873b8ee4bb4512aaf",
+      "contract_sha256": "b753ab4c5c6203c0a9e3515c14027efe21d5b515339d78bdfe70ef3fa3c447ce",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206788,10 +206866,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "2573341182a08e82ad10fa01bc50f42c77985069fd0c579290494df81e522138",
+      "argument_contract_sha256": "85ff88e38fc8cf83bdb90034a3d4b039774fef80004d894c2f8ca346d7835b60",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "fdfebae82a42bb0d2ded8dc59ebdb5526afe25934c4dda868215c45ddea162b8",
+      "contract_sha256": "b0bfb384fd7840ef33d7c90620817dc8239aeb3db3b8a869b213cd1502f7a7a7",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206818,7 +206896,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "d15b8c2685acd0da803526c3258f120e2f0a436a53d5603be25c96b6cb3183a7",
+      "contract_sha256": "9ebd70f68b10b872371754b6db887e67d00d01b2aee6314dc0001f194da3b2a6",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206845,7 +206923,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "878ff67027719596fed76ffd78c5f75b00522284b658c5ff82936a092ac84359",
+      "contract_sha256": "17958c2e7fa622db1dec5087fb8271c33a6e3cf714a2b0b7ebb1983527d93561",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206872,7 +206950,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "7220e9ac0b2ae05867489824e82f0d2d8ffba540adade0f90cc0710eef24dbbc",
+      "contract_sha256": "72c8148d6050c39199af184daf1abe08b79b98c3583e8ac3905f5bf4c66f2aee",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206899,7 +206977,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "cf9c5ada319f1337bf4c539bfbdd0bd4afbba1f4212b8ba0ca3a6f7630fbb84a",
+      "contract_sha256": "4d2f7a00e90e78b2d2e8534fa102d3dfaa557cbac9b4b0695f9a32b9b3ea0019",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206926,7 +207004,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "fb8fc2cef3ede7bcd1e9418554510213099857ef3233b702c51e148a334305af",
+      "contract_sha256": "d9b05c5da9fdd0488ab73fd2f93dc41b93fdb6745962dc34db7f268e310930fb",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208384,7 +208462,7 @@
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
       "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of closed child outcomes. Its parent-owned start_child continuation creates each child with an internal parent handoff; a checked child cannot produce an independent Preview and returns only its opaque child argument plus the next-child or parent-finish choices. The Gateway snapshots each exact checked child request and schema, rejects overlapping final outcomes, derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable parent Preview. The generic typed children remain prohibited; public Undo child schemas, call handles, native request fragments, dependency edges, and Composer ordering grammar remain unavailable, and no shallow fallback exists.",
       "classification": "named-compound-undo",
-      "contract_sha256": "02418aac7726d12df4a7cc23a6509f26d3f69870ea35ce39821d731ddeb682bb",
+      "contract_sha256": "8a700687a8e8e0c116e3754c27e82b4f89af86052bfb9adddf5eea0b11a2d74c",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208411,7 +208489,7 @@
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
       "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of closed child outcomes. Its parent-owned start_child continuation creates each child with an internal parent handoff; a checked child cannot produce an independent Preview and returns only its opaque child argument plus the next-child or parent-finish choices. The Gateway snapshots each exact checked child request and schema, rejects overlapping final outcomes, derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable parent Preview. The generic typed children remain prohibited; public Undo child schemas, call handles, native request fragments, dependency edges, and Composer ordering grammar remain unavailable, and no shallow fallback exists.",
       "classification": "named-compound-undo",
-      "contract_sha256": "247fbe6f8c1fd4b9b6984798688da4f52fa9913d53ee3ee233069e75832614a4",
+      "contract_sha256": "35771741003e0d6aa17338dfed43ee84000caef1b2578e560a99db850373a1f9",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208438,7 +208516,7 @@
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
       "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of closed child outcomes. Its parent-owned start_child continuation creates each child with an internal parent handoff; a checked child cannot produce an independent Preview and returns only its opaque child argument plus the next-child or parent-finish choices. The Gateway snapshots each exact checked child request and schema, rejects overlapping final outcomes, derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable parent Preview. The generic typed children remain prohibited; public Undo child schemas, call handles, native request fragments, dependency edges, and Composer ordering grammar remain unavailable, and no shallow fallback exists.",
       "classification": "named-compound-undo",
-      "contract_sha256": "96c63fa0e14375436a889aa70f0b893ea1ea1eccca36c90b896f7740153d0b10",
+      "contract_sha256": "3a16676c0e3454bb850e76706239457d57aaaf27b0fcd91b07233bc013e6b7c1",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208465,7 +208543,7 @@
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
       "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of closed child outcomes. Its parent-owned start_child continuation creates each child with an internal parent handoff; a checked child cannot produce an independent Preview and returns only its opaque child argument plus the next-child or parent-finish choices. The Gateway snapshots each exact checked child request and schema, rejects overlapping final outcomes, derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable parent Preview. The generic typed children remain prohibited; public Undo child schemas, call handles, native request fragments, dependency edges, and Composer ordering grammar remain unavailable, and no shallow fallback exists.",
       "classification": "named-compound-undo",
-      "contract_sha256": "d42e301f39017249f5529e94f1e00abae5d5531431bc8ebc838a5ab46839a97e",
+      "contract_sha256": "361451024e843eb2a471c4cf27693829994dd8d1bbff1668c9768520029b1ba9",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208492,7 +208570,7 @@
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
       "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of closed child outcomes. Its parent-owned start_child continuation creates each child with an internal parent handoff; a checked child cannot produce an independent Preview and returns only its opaque child argument plus the next-child or parent-finish choices. The Gateway snapshots each exact checked child request and schema, rejects overlapping final outcomes, derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable parent Preview. The generic typed children remain prohibited; public Undo child schemas, call handles, native request fragments, dependency edges, and Composer ordering grammar remain unavailable, and no shallow fallback exists.",
       "classification": "named-compound-undo",
-      "contract_sha256": "47e553a100744695bcbc939b17db5952116ea3f16ad7827da47405517c5e26e1",
+      "contract_sha256": "fbdca78baec1d5d02b42fac95fdf05ac51fc78cff8d7f0f47c3505fe7c8f2425",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208526,9 +208604,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "26fc00e581429d36a11c09c9f66d51e21f24ae5e0968d7acc5a8e37dad998cb7",
-    "operation_contract_sha256": "3c8e8b29b141e084653af5dc682ae5b6e990b0d4a7ea49e6e84697a65f9c9be1",
-    "public_continuation_sha256": "d70ab5cd8cb16538326e7939250429dd86ea03dc7993f3f110fa25438f05e5c0",
+    "gateway_parser_sha256": "6dc4cb03ba12b6a935006231270bc431187ba9367575efc15718fe645d0af3bb",
+    "operation_contract_sha256": "b2d76899195fbd342375b80651c80b8d5229af2330cd0ee8d991645d242b5b59",
+    "public_continuation_sha256": "7e63798666897561b08432f6016228adb55199bd4a47f15d48314ea1bcaf5584",
     "typed_request_surface_sha256": "829f71b2cca1e2779e14f7c681cc3802b94945f9a9a9e111c070c82478151150"
   },
   "summary": {
