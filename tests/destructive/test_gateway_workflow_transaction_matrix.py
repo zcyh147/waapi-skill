@@ -11196,12 +11196,14 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
     getter = "ak.wwise.core.blendContainer.getAssignments"
     category = {"category": "blend-assignment", "status": "FAIL", "version": runtime.version}
     runtime.category_results.append(category)
-    receipt = {"candidate": runtime.candidate, "version": runtime.version, "source_member": str(source),
+    receipt = {"candidate": runtime.candidate, "version": runtime.version, "build": runtime.sandbox.metadata.get_info_version, "source_member": str(source),
                "source_sha256": source_hash, "native_assignment_effect_verified": False, "transactions": {}}
     output = runtime.state_dir / "blend-negative-insertion.json"
     native_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
     previous_native = set(native_root.glob("*.json"))
     try:
+        expected_build = (2024, 1, 13, 9056) if runtime.version == "2024.1" else (2025, 1, 7, 9143)
+        assert tuple(receipt["build"][key] for key in ("year", "major", "minor", "build")) == expected_build, "Fixture prerequisite: exact native build"
         before_payload = runtime.gateway(["core-call", getter, "--object-id", track], live=True)
         receipt["before"] = before_payload
         before = before_payload["agent_result"]["return"]
