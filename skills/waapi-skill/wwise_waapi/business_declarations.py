@@ -233,6 +233,7 @@ class BoundObjectHandle:
     role: str | None
     binding_digest: str
     class_id: int | None = None
+    owned_identity: Mapping[str, Any] | None = None
 
 
 def require_bound_name_mutability(bound: BoundObjectHandle) -> None:
@@ -243,7 +244,7 @@ def require_bound_name_mutability(bound: BoundObjectHandle) -> None:
     not assert that Wwise itself prohibits renaming this class.
     """
     if (bound.context.wwise_version == "2025.1" and bound.object_type == "PluginInnerObject"
-            and bound.class_id == 5636096):
+            and bound.class_id in {5636096, 5570560}):
         raise business_repair("OBJECT_NAME_MUTABILITY_UNPROVEN", field="new_name",
             object_handle=bound.handle, object_type=bound.object_type, class_id=bound.class_id,
             pending_issue="https://github.com/zcyh147/waapi-skill/issues/180",
@@ -585,6 +586,7 @@ class BusinessHandleRegistry:
         semantic_kind: str | None = None,
         role: str | None = None,
         class_id: int | None = None,
+        owned_identity: Mapping[str, Any] | None = None,
     ) -> BoundObjectHandle:
         identity = normalize_live_object_identity(
             {
@@ -593,11 +595,16 @@ class BusinessHandleRegistry:
                 "type": object_type,
                 "path": path,
                 "classId": class_id,
-            }
+            }, owned_identity=owned_identity,
         )
-        if class_id is not None and (self.context.wwise_version != "2025.1" or object_type != "PluginInnerObject"
-                or type(class_id) is not int or class_id != 5636096):
-            raise ValueError("Only the pinned 2025 PlaylistSlot identity carries a class binding")
+        if owned_identity is not None:
+            from .documented_list_fields import validate_owned_empty_identity
+            validate_owned_empty_identity(owned_identity)
+            if owned_identity['descriptor']['version'] != self.context.wwise_version:
+                raise ValueError('Owned identity version differs from the bound context')
+        if class_id is not None and owned_identity is None and (self.context.wwise_version != "2025.1"
+                or object_type != "PluginInnerObject" or type(class_id) is not int or class_id != 5636096):
+            raise ValueError("Only a certified owned identity carries this class binding")
         normalized_type = identity.object_type
         normalized_name = identity.name
         normalized_path = identity.path
@@ -632,6 +639,7 @@ class BusinessHandleRegistry:
             "semantic_kind": semantic_kind,
             **({} if normalized_role is None else {"role": normalized_role}),
             **({} if class_id is None else {"class_id": class_id}),
+            **({} if owned_identity is None else {"owned_identity": dict(owned_identity)}),
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("boh1", digest)
@@ -646,6 +654,7 @@ class BusinessHandleRegistry:
             role=normalized_role,
             binding_digest=digest,
             class_id=class_id,
+            owned_identity=owned_identity,
         )
         self._objects[handle] = bound
         return bound
@@ -665,6 +674,7 @@ class BusinessHandleRegistry:
                     "semantic_kind": row.semantic_kind,
                     **({} if row.role is None else {"role": row.role}),
                     **({} if row.class_id is None else {"class_id": row.class_id}),
+                    **({} if row.owned_identity is None else {"owned_identity": dict(row.owned_identity)}),
                     "binding_digest": row.binding_digest,
                 }
                 for row in sorted(self._objects.values(), key=lambda item: item.handle)
@@ -1621,7 +1631,9 @@ def revalidate_live_objects(
         expected_ids = set(unique_ids)
         rows_by_id: dict[str, Mapping[str, Any]] = {}
         for row in rows:
-            identity = normalize_live_object_identity(row)
+            owned = next((bound.owned_identity for bound in bounds
+                if bound.object_id == str(row.get('id', '')).upper()), None)
+            identity = normalize_live_object_identity(row, owned_identity=owned)
             canonical_id = identity.object_id
             if (
                 canonical_id not in expected_ids
@@ -1700,6 +1712,12 @@ def revalidate_live_objects(
             "type": bound.object_type,
             "path": bound.path,
         }
+        if bound.owned_identity is not None:
+            from .documented_list_fields import capture_owned_empty_identity
+            actual_owned = capture_owned_empty_identity(registry.context.wwise_version, row, read=read_call)
+            if actual_owned != bound.owned_identity:
+                raise _error('OBJECT_HANDLE_STALE', field='object_handle', rejected_handle=bound.handle,
+                    action='resolve the exact owned object again before Preview')
         if bound.class_id is not None:
             live["classId"] = row.get("classId")
             expected["classId"] = bound.class_id
@@ -1985,7 +2003,7 @@ def _bound_object_from_dict(
     }
     if (
         not isinstance(payload, Mapping)
-        or set(payload) - {"role", "class_id"} != expected
+        or set(payload) - {"role", "class_id", "owned_identity"} != expected
     ):
         raise ValueError("bound object handle fields are invalid")
     handle = payload.get("handle")
@@ -2003,7 +2021,7 @@ def _bound_object_from_dict(
                 "type": payload.get("object_type"),
                 "path": payload.get("path"),
                 "classId": payload.get("class_id"),
-            }
+            }, owned_identity=payload.get('owned_identity'),
         )
     except ValueError as exc:
         raise ValueError("bound object identity is invalid") from exc
@@ -2031,9 +2049,15 @@ def _bound_object_from_dict(
         )
     path = identity.path
     class_id = payload.get("class_id")
-    if "class_id" in payload and (context.wwise_version != "2025.1" or object_type != "PluginInnerObject"
-            or type(class_id) is not int or class_id != 5636096):
-        raise ValueError("Invalid pinned PlaylistSlot class binding")
+    owned_identity = payload.get('owned_identity')
+    if owned_identity is not None:
+        from .documented_list_fields import validate_owned_empty_identity
+        validate_owned_empty_identity(owned_identity)
+        if owned_identity['descriptor']['version'] != context.wwise_version:
+            raise ValueError('Owned identity version differs from the restored context')
+    if "class_id" in payload and owned_identity is None and (context.wwise_version != "2025.1"
+            or object_type != "PluginInnerObject" or type(class_id) is not int or class_id != 5636096):
+        raise ValueError("Invalid certified owned class binding")
     material = {
         "contract": BOUND_OBJECT_HANDLE_CONTRACT,
         "context": context.as_binding_dict(),
@@ -2044,6 +2068,7 @@ def _bound_object_from_dict(
         "semantic_kind": semantic_kind,
         **({} if role is None else {"role": role}),
         **({} if class_id is None else {"class_id": class_id}),
+        **({} if owned_identity is None else {"owned_identity": dict(owned_identity)}),
     }
     expected_digest = canonical_sha256(material)
     if (
@@ -2063,6 +2088,7 @@ def _bound_object_from_dict(
         role=role,
         binding_digest=digest,
         class_id=class_id,
+        owned_identity=owned_identity,
     )
 
 
@@ -2491,7 +2517,7 @@ def _bounded_object_name(value: Any, *, object_type: str) -> str:
     )
 
 
-def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
+def normalize_live_object_identity(row: Any, *, owned_identity=None) -> LiveObjectIdentity:
     """Normalize the exact Wwise object identity shape once for every caller.
 
     Wwise Authoring objects use canonical GUIDs. Ordinary objects have absolute
@@ -2513,7 +2539,17 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
     )
     playlist_slot = (object_type == "PluginInnerObject" and type(row.get("classId")) is int
                      and row["classId"] == 5636096)
-    name = "" if playlist_slot and row.get("name") == "" else _bounded_object_name(row.get("name"), object_type=object_type)
+    certified_owned = False
+    if owned_identity is not None:
+        from .documented_list_fields import validate_owned_empty_identity
+        validate_owned_empty_identity(owned_identity)
+        descriptor = owned_identity['descriptor']
+        certified_owned = (object_id.upper() == owned_identity['object_id']
+            and object_type == descriptor['native_type'] and type(row.get('classId')) is int
+            and row['classId'] == descriptor['class_id'])
+        if not certified_owned:
+            raise ValueError('Owned identity does not name this exact GUID/class')
+    name = "" if (playlist_slot or certified_owned) and row.get("name") == "" else _bounded_object_name(row.get("name"), object_type=object_type)
     path = _bounded_required_text(
         row.get("path"),
         field="path",

@@ -708,7 +708,9 @@ def _validate_target(
             ) from exc
         if isinstance(target, AnonymousListTarget):
             kind = handles.resolve_type(target.kind)
-            if (target.name != "" or kind.name != "EffectSlot" or handles.context.wwise_version not in {"2023.1", "2024.1", "2025.1"}):
+            from .documented_list_fields import is_manual_marker_class
+            if (target.name != "" or handles.context.wwise_version not in {"2023.1", "2024.1", "2025.1"}
+                    or not (kind.name == "EffectSlot" or is_manual_marker_class(handles.context.wwise_version, kind.name, kind.class_id))):
                 raise business_repair("ANONYMOUS_LIST_PLACEMENT_INVALID", field="kind", action="select a source-proven anonymous List member Type Handle")
         return target
     if isinstance(target, OwnedRtpcTarget):

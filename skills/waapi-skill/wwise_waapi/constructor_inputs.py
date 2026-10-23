@@ -69,8 +69,15 @@ def complete(spec):
 def local_reference_field(spec, name):
     """Select the observed local getter for this sealed constructor input only."""
     proof = authority(spec)
-    return ('@' + name if proof is not None and spec.get('constructor_inputs') == proof
-        and name in proof['required_references'] else name)
+    constructor = proof is not None and spec.get('constructor_inputs') == proof and name in proof['required_references']
+    owned = spec.get('owned_identity')
+    retained = False
+    if owned is not None:
+        from .documented_list_fields import validate_owned_empty_identity
+        validate_owned_empty_identity(owned)
+        descriptor = owned['descriptor']
+        retained = (descriptor['version'], descriptor['class_id'], descriptor['collection'], name) == (VERSION, CLASS_ID, 'Metadata', FIELD)
+    return '@' + name if constructor or retained else name
 
 
 def local_reference_value(spec, name, value):

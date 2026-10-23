@@ -214,6 +214,44 @@ def resolve_planned_list_evidence(session, value, *, owner_handle):
 
 
 
+def manual_marker_profile(version):
+    """One SDK-certified anonymous WObject profile, separate from Inner naming."""
+    if version not in {"2023.1", "2024.1", "2025.1"}:
+        return None
+    path = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "manual-marker-construction-source.json"
+    source = json.loads(path.read_text(encoding="utf-8"))
+    catalog = load_catalog(version)
+    if (source["contract"] != "waapi-skill.manual-marker-construction-source/v1" or source["version"] != version
+            or source["source"]["build"] != catalog["source"]["build"]
+            or source["source"]["archive_sha256"] != catalog["source"]["archive_sha256"]
+            or (source["owner_class_id"], source["collection"], source["element_class_id"], source["element_type"], source["native_name"])
+                != (16, "Markers", 5373968, "Marker", "")
+            or source["sdk_example"] != {"marker_input_mode": 2, "list_mode": "append",
+                "marker": {"type": "Marker", "name": "", "@Time": 1, "@Label": "Waapi Generated"}}):
+        raise ValueError("Manual Marker constructor differs from its matching SDK authority")
+    binding = resolve_class_list_evidence(version, 16, "Markers")
+    if binding["declaration"]["element_classes"] != [{"name": "Marker", "class_id": 5373968}]:
+        raise ValueError("Manual Marker requires the exact AudioFileSource List declaration")
+    return {**source, "source_sha256": canonical_sha256(source), "list_source": binding}
+
+
+def is_manual_marker_class(version, name, class_id):
+    return version in {"2023.1", "2024.1", "2025.1"} and (name, class_id) == ("Marker", 5373968)
+
+
+def certify_anonymous_marker(spec, binding):
+    """Bind the actual owner scope, never a base-name or Inner substitution."""
+    if not spec.get("manual_marker"):
+        return
+    profile = manual_marker_profile(binding["version"])
+    if (profile is None or binding["scope"]["class_id"] != 16
+            or binding["declaration"] != profile["list_source"]["declaration"]
+            or binding["scope"]["scope_kind"] == "object" and binding["scope"].get("owner", {}).get("type") != "AudioFileSource"
+            or spec["class_metadata"].get("type") != "WObject"):
+        raise ValueError("Anonymous Marker requires exact AudioFileSource16/Markers/Marker5373968 WObject placement")
+    spec["manual_marker"] = profile
+
+
 def owned_inner_identity(binding, member_class):
     """One observed Inner representation, bound to its exact List source.
 
@@ -494,3 +532,103 @@ def planned_reference_guard_assertions(guards, *, read):
         assertions.append({"name": "planned reference List source, target classes and unchanged external state remain bound",
             "passed": bool(passed), "evidence": evidence})
     return assertions
+
+
+def owned_empty_identity_candidate(version, row):
+    """Finite observed identity profiles; generic empty names remain invalid."""
+    return (row.get('name') == '' and type(row.get('classId')) is int
+        and ((version == '2025.1' and (row.get('type'), row['classId']) == ('PluginInnerObject', 5570560))
+            or is_manual_marker_class(version, row.get('type'), row['classId'])))
+
+
+def owned_empty_identity_descriptor(version, native_type, class_id, owner_class_id):
+    if type(class_id) is not int or type(owner_class_id) is not int:
+        return None
+    if is_manual_marker_class(version, native_type, class_id) and owner_class_id == 16:
+        profile = manual_marker_profile(version)
+        return {'version': version, 'native_type': native_type, 'class_id': class_id,
+            'owner_class_id': owner_class_id, 'owner_type': 'AudioFileSource', 'collection': 'Markers',
+            'source': profile['list_source'], 'profile': profile}
+    if ((version, native_type, class_id) != ('2025.1', 'PluginInnerObject', 5570560) or owner_class_id not in METADATA_INNER_OWNERS):
+        return None
+    source = resolve_class_list_evidence(version, owner_class_id, 'Metadata')
+    return {'version': version, 'native_type': native_type, 'class_id': class_id,
+        'owner_class_id': owner_class_id, 'owner_type': METADATA_INNER_OWNERS[owner_class_id], 'collection': 'Metadata', 'source': source,
+        'profile': owned_inner_identity(source, class_id)}
+
+
+def validate_owned_empty_identity(proof):
+    if (not isinstance(proof, Mapping) or set(proof) != {'contract', 'descriptor', 'object_id', 'owner', 'members'}
+            or proof['contract'] != 'waapi-skill.owned-empty-identity/v1'):
+        raise ValueError('Owned identity proof is malformed')
+    descriptor = proof['descriptor']
+    if not isinstance(descriptor, Mapping):
+        raise ValueError('Owned identity descriptor is malformed')
+    expected = owned_empty_identity_descriptor(descriptor.get('version'), descriptor.get('native_type'),
+        descriptor.get('class_id'), descriptor.get('owner_class_id'))
+    owner = proof['owner']
+    members = proof['members']
+    from .operation_registry import _ordinary_object_type_matches
+    guid = r'\{[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}\}'
+    if (expected is None or descriptor != expected or not isinstance(owner, Mapping)
+            or set(owner) != {'id', 'name', 'type', 'path', 'classId'}
+            or not isinstance(owner['id'], str) or re.fullmatch(guid, owner['id']) is None
+            or owner['id'] == '{00000000-0000-0000-0000-000000000000}'
+            or type(owner['classId']) is not int or owner['classId'] != descriptor['owner_class_id']
+            or not _ordinary_object_type_matches(owner['type'],
+                {'canonical_type': descriptor['owner_type'], 'requested_type': descriptor['owner_type']})
+            or not isinstance(members, list) or not 1 <= len(members) <= 128
+            or not isinstance(proof['object_id'], str) or re.fullmatch(guid, proof['object_id']) is None
+            or proof['object_id'] == '{00000000-0000-0000-0000-000000000000}'
+            or any(not isinstance(item, Mapping) or set(item) - {'notes', 'path'} != {'id', 'classId', 'type', 'owner_id', 'name'}
+                or (item.get('id') == proof['object_id'] and 'path' in item)
+                or type(item['classId']) is not int or item['classId'] != descriptor['class_id']
+                or item['type'] != descriptor['native_type'] or item['owner_id'] != owner['id']
+                or not isinstance(item['name'], str) or ('notes' in item and not isinstance(item['notes'], str))
+                or ('path' in item and not isinstance(item['path'], str))
+                or not isinstance(item['id'], str) or re.fullmatch(guid, item['id']) is None
+                or item['id'] == '{00000000-0000-0000-0000-000000000000}' for item in members)
+            or len({item['id'] for item in members}) != len(members)
+            or sum(item['id'] == proof['object_id'] for item in members) != 1):
+        raise ValueError('Owned identity requires its exact source, owner and complete typed member roster')
+    from .business_declarations import normalize_live_object_identity
+    normalize_live_object_identity(owner)
+    return proof
+
+
+def capture_owned_empty_identity(version, row, *, read):
+    """Certify one exact selected GUID through its actual owning source/List."""
+    if not owned_empty_identity_candidate(version, row):
+        return None
+    identity = row.get('id')
+    result = read('ak.wwise.core.object.get', {'from': {'id': [identity]}},
+        {'return': ['id', 'name', 'type', 'path', 'classId', 'owner']})
+    rows = result.get('return') if isinstance(result, Mapping) else None
+    if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping)
+            or any(rows[0].get(key) != row.get(key) for key in ('id', 'name', 'type', 'path', 'classId'))):
+        raise ValueError('Owned identity changed during exact GUID binding')
+    selected = rows[0]
+    owner_id = selected.get('owner', {}).get('id') if isinstance(selected.get('owner'), Mapping) else None
+    if not isinstance(owner_id, str) or re.fullmatch(r'\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}', owner_id) is None:
+        raise ValueError('Owned identity requires one canonical actual owner GUID')
+    catalog, owner_class, scope = scope_evidence(version, scope_kind='object', scope_value=owner_id.upper(), read=read)
+    descriptor = owned_empty_identity_descriptor(version, selected['type'], selected['classId'], scope['class_id'])
+    if descriptor is None:
+        raise ValueError('Owned identity has no matching owner/class/List source profile')
+    fields = [field for field in owner_class['lists'] if field['name'] == descriptor['collection']] if owner_class else []
+    if len(fields) != 1:
+        raise ValueError('Owned identity source List is not unique')
+    evidence = field_evidence(catalog, owner_class, scope, fields[0])
+    validate_planned_list_source(descriptor['source'], read=read)
+    observation = observe_list_binding(evidence, read=read)
+    members = observation['members']
+    matches = [member for member in members if member['id'].upper() == identity.upper()]
+    if len(matches) != 1 or any(matches[0].get(key) != selected.get(key) for key in ('id', 'name', 'type', 'path', 'classId', 'owner')):
+        raise ValueError('Selected owned GUID does not match its complete typed List observation')
+    proof = {'contract': 'waapi-skill.owned-empty-identity/v1', 'descriptor': descriptor,
+        'object_id': identity.upper(), 'owner': {**evidence['scope']['owner'], 'classId': evidence['scope']['class_id']},
+        'members': [{'id': member['id'].upper(), 'type': member['type'], 'classId': member['classId'],
+            'owner_id': owner_id.upper(), 'name': member['name'],
+            **({'notes': member['notes']} if 'notes' in member else {}),
+            **({'path': member['path']} if member['id'].upper() != identity.upper() and 'path' in member else {})} for member in members]}
+    return validate_owned_empty_identity(proof)

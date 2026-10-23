@@ -19877,8 +19877,11 @@ def dispatch_business_object_binding(
             error_code="BUSINESS_OBJECT_NOT_UNIQUE",
         )
     row = dict(rows[0])
+    owned_identity = None
     try:
-        identity = normalize_live_object_identity(row)
+        from wwise_waapi.documented_list_fields import capture_owned_empty_identity
+        owned_identity = capture_owned_empty_identity(detected_version, row, read=binding.read_call)
+        identity = normalize_live_object_identity(row, owned_identity=owned_identity)
     except ValueError as exc:
         raise GatewayResultShapeError(
             "Exact business object binding returned a malformed live identity.",
@@ -20040,7 +20043,8 @@ def dispatch_business_object_binding(
             path=str(row["path"]),
             semantic_kind=semantic_kind,
             role=args.role,
-            class_id=row.get("classId") if row["type"] == "PluginInnerObject" and row["name"] == "" else None,
+            class_id=row.get("classId") if owned_identity is not None or row["type"] == "PluginInnerObject" and row["name"] == "" else None,
+            owned_identity=owned_identity,
         )
         captured.append(bound)
         return current.with_handle_registry(handles)
@@ -29753,7 +29757,7 @@ def _business_next_action_binding(
                     "anonymous_list_member": {
                         **operation_draft_prefix_copy_binding(declare_new_prefix),
                         "append": ["--declaration-id", "<task-local-id>", "--parent-handle", "<bound-or-planned-owner-handle>",
-                            "--kind", "<selected-EffectSlot-Type-Handle>", "--field", "object_list", "<selected-Effects-List-Field-Handle>",
+                            "--kind", "<selected-profile-Type-Handle>", "--field", "object_list", "<selected-owner-List-Field-Handle>",
                             "[--field-value <selected-class-Field-Handle> <business-value>]..."],
                         "native_name": "Gateway_owned_empty_string",
                         "semantics": business_contract["declaration"]["anonymous_list_member"],

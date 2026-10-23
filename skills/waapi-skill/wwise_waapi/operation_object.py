@@ -1377,8 +1377,8 @@ class _NormalizationState:
         if plugin is not None and (plugin.kind not in {"effect", "source"} or object_type != plugin.object_type or plugin.name != mapping.get("name")):
             raise ObjectOperationContractError("INVALID_GRAPH_PLUGIN", "Typed graph plugins retain their selected kind and name")
         anonymous = mapping.get("anonymous", False)
-        if type(anonymous) is not bool or (anonymous and (collection != "Effects" or object_type != "EffectSlot" or mapping.get("name") != "")):
-            raise ObjectOperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Blank names require a certified EffectSlot in Effects")
+        if type(anonymous) is not bool or (anonymous and ((collection, object_type) not in {("Effects", "EffectSlot"), ("Markers", "Marker")} or mapping.get("name") != "")):
+            raise ObjectOperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Blank names require a certified anonymous List member placement")
         name = "" if anonymous else _bounded_token(
             mapping.get("name"),
             path=f"{request_path}.name",

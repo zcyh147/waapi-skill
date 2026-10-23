@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .documented_list_fields import discovery_contract as documented_list_discovery_contract
+from .documented_list_fields import discovery_contract as documented_list_discovery_contract, manual_marker_profile
 from .effect_render_conditions import CLEAR_SUFFIX_OBSERVATIONS
 
 from typing import Any
@@ -301,14 +301,17 @@ def object_graph_business_contract_data(
                     "other_profiles": "require_their_own_source_and_representation_proof"},
                 "anonymous_list_member": {
                     "subcommand": "draft-declare-new", "omit": ["name"],
-                    "requires": ["EffectSlot_Type_Handle", "source_proven_Effects_List_Field_Handle"],
+                    "requires": ["selected_profile_Type_Handle", "source_proven_owner_List_Field_Handle"],
                     "versions": ["2023.1", "2024.1", "2025.1"],
+                    "profiles": {"effect_slot": {"class": "EffectSlot", "collection": "Effects"},
+                        "manual_marker": manual_marker_profile(version)},
                     "native_name": "Gateway_owned_empty_string",
                     "on_name_conflict": {"supported": ["fail"],
                         "pending_source_native_proof": ["rename", "merge", "replace"],
                         "pending_behavior": "reject_before_dispatch_without_selecting_old_blank_name_members_or_changing_policy"},
                     "result_binding": "independent_ordered_owner_membership_then_exact_GUID_class_owner_and_values",
                     "render_conditions": {
+                        "applies_to": "EffectSlot",
                         "explicit_false_before_later_true": "reject_before_preview_or_write",
                         "omitted_predecessors": "derive_visible_true_from_actual_state_or_fresh_class_default",
                         "verification": "complete_stored_slot_state_not_rendered_audio",
