@@ -1,5 +1,6 @@
 """Named documented List members retain typed ownership through native-name stages."""
 from copy import deepcopy
+import json
 
 import pytest
 
@@ -9,13 +10,14 @@ BUS = '{55555555-5555-5555-5555-555555555555}'
 SOUND = '{66666666-6666-6666-6666-666666666666}'
 SLOT = '{77777777-7777-7777-7777-777777777777}'
 SET = 'ak.wwise.core.object.set'
+METADATA = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
 
 
 OLD_SLOT = '{88888888-8888-8888-8888-888888888888}'
 SECOND_SLOT = '{99999999-9999-9999-9999-999999999999}'
 
 
-def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False):
+def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, constructor_reference=True, constructor_target='valid'):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for name, cid in (
         ('WorkUnit', 1638416), ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560))]
@@ -27,6 +29,9 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
             'path': r'\Actor-Mixer Hierarchy\Default Work Unit', 'parent': None, 'notes': 'Keep sounds'},
     }
+    task.types.append({'classId': 58982409, 'name': 'Wwise System Output Settings', 'type': 'Metadata'})
+    task.objects[METADATA] = {'id': METADATA, 'name': 'System settings', 'type': 'Metadata', 'classId': 58982409,
+        'path': r'\Metadata\Default Work Unit\System settings', 'parent': None, 'notes': 'Keep Metadata'}
     if retained:
         task.objects[FIRST] = {'id': FIRST, 'name': 'Sender', 'type': 'Sound', 'classId': 65552,
             'path': task.objects[SECOND]['path'] + r'\Sender', 'parent': {'id': SECOND},
@@ -37,7 +42,9 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
             task.objects[FIRST]['@Metadata'] = []
             del task.objects[OLD_SLOT]
     task.metadata = {'OutputBus': {'name': 'OutputBus', 'type': 'Reference',
-        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Bus']}]}}}
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Bus']}, 'notNull']}}}
+    task.metadata['Metadata'] = {'name': 'Metadata', 'type': 'Reference',
+        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Metadata']}, 'notNull']}}
     original = task.call
     task.writes = []
     task.partial_list_drift_injected = False
@@ -55,11 +62,14 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                     **({'owner': {'id': parent}, 'parent': None} if owned else {'parent': {'id': parent}})}
                 result = {'id': oid, 'name': actual}
                 for key, nodes in node.items():
-                    if key == 'children' or key == '@Metadata':
+                    if key == 'children' or key == '@Metadata' and isinstance(nodes, list):
                         members = [create(child, oid, key == '@Metadata') for child in nodes]
                         result[key] = members
                         if key == '@Metadata':
                             task.objects[oid][key] = [{'id': member['id']} for member in members]
+                if owned:
+                    assert node.get('@Metadata') == METADATA, 'MetadataSlot constructor needs its Metadata target'
+                    task.objects[oid]['@Metadata'] = {'id': node['@Metadata']}
                 return result
             for node in args['objects']:
                 parent = node['object']
@@ -85,6 +95,8 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                     task.objects[SLOT]['classId'] = 65552
                 elif fault == 'wrong-owner':
                     task.objects[SLOT]['owner'] = {'id': SECOND}
+                elif fault == 'wrong-metadata-target':
+                    task.objects[SLOT]['@Metadata'] = {'id': ROOT}
                 elif fault == 'extra-member':
                     task.objects[FIRST if retained else SOUND]['@Metadata'].append({'id': ROOT})
                 elif fault == 'reversed-prefix':
@@ -138,11 +150,21 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
     else:
         code, sound = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', parents[1], '--name', 'Sender', '--kind', kinds['Sound'], *reference_fields)
     assert code == 0, sound
-    code, slot = task.step('draft-declare-new', '--declaration-id', 'slot', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'], '--name', 'Room slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field)
+    metadata_fields = []
+    if constructor_reference:
+        metadata_handle = 'null' if constructor_target == 'null' else task.bind(ROOT if constructor_target == 'wrong-type' else METADATA)
+        code, metadata = task.step('draft-discover-fields', '--type-handle', kinds['MetadataSlot'], '--meaning', 'Metadata')
+        assert code == 0, metadata
+        metadata_fields = ['--field-value', metadata['meaning_results'][0]['candidates'][0]['handle'], metadata_handle]
+    code, slot = task.step('draft-declare-new', '--declaration-id', 'slot', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'], '--name', 'Room slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
+    if constructor_target == 'wrong-type':
+        assert code == 2 and slot['error_code'] == 'REFERENCE_TARGET_TYPE_MISMATCH', slot
+        task.constructor_rejected = slot
+        return task
     assert code == 0, slot
     if empty_replace_two:
         code, slot2 = task.step('draft-declare-new', '--declaration-id', 'slot2', '--parent-handle', retained_handle,
-            '--name', 'Second slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field)
+            '--name', 'Second slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
         assert code == 0, slot2
     return task
 
@@ -162,8 +184,8 @@ def test_empty_replace_list_two_staged_members_survive_and_verify(tmp_path):
     assert len(task.writes) == 4
     assert task.writes[0]['listMode'] == task.writes[1]['listMode'] == 'replaceAll'
     assert task.writes[2]['objects'][0]['listMode'] == 'append'
-    assert task.writes[1]['objects'][0]['@Metadata'] == [{'type': 'MetadataSlot', 'name': 'Room slot'}]
-    assert task.writes[2]['objects'][0]['@Metadata'] == [{'type': 'MetadataSlot', 'name': 'Second slot'}]
+    assert task.writes[1]['objects'][0]['@Metadata'] == [{'type': 'MetadataSlot', 'name': 'Room slot', '@Metadata': METADATA}]
+    assert task.writes[2]['objects'][0]['@Metadata'] == [{'type': 'MetadataSlot', 'name': 'Second slot', '@Metadata': METADATA}]
     assert task.writes[-1] == {'objects': [{'object': FIRST, '@OutputBus': task.objects[BUS]['path']}]}
     roster = verified['agent_result']['business_result']['created_objects']
     assert {row['object']['id'] for row in roster} == {BUS, SLOT, SECOND_SLOT}
@@ -184,6 +206,19 @@ def test_native_named_set_proves_named_list_owner_and_all_public_occurrences(tmp
     assert {row['object']['id'] for row in roster} == {BUS, SOUND, SLOT}
     slot = next(row for row in roster if row['object']['id'] == SLOT)
     assert slot['owner_id'] == SOUND and slot['list_name'] == 'Metadata' and 'parent_id' not in slot
+    code, full = task.run('transaction-show', tx)
+    assert code == 0, full
+    internal = [node['constructor_inputs'] for node in full['artifact']['prepared_operation']['pre_state']['object_set_nodes']
+        if 'constructor_inputs' in node]
+    assert internal and all('constructor_packet_sha256' in proof and 'constructor_evidence' in proof for proof in internal)
+    public = [assertion['evidence']['constructor_inputs'] for event in full['events']
+        for phase in ('role_validation', 'verification')
+        for assertion in event['details'].get(phase, {}).get('assertions', [])
+        if 'constructor_inputs' in assertion.get('evidence', {})]
+    assert len(public) >= 2, full['events']
+    expected = {'version': '2025.1', 'class_name': 'MetadataSlot', 'class_id': 5570560,
+        'collection': 'Metadata', 'required_references': ['Metadata']}
+    assert all(proof == expected for proof in public), public
 
 
 def test_staged_named_list_append_retains_ordered_prefix_and_member_state(tmp_path):
@@ -210,7 +245,7 @@ def test_retained_list_prefix_drift_stops_before_later_creation(tmp_path):
     assert code == 2 and len(task.writes) == 1, replay
 
 
-@pytest.mark.parametrize('fault', ['wrong-class', 'wrong-owner', 'extra-member', 'reversed-prefix', 'changed-prefix'])
+@pytest.mark.parametrize('fault', ['wrong-class', 'wrong-owner', 'wrong-metadata-target', 'extra-member', 'reversed-prefix', 'changed-prefix'])
 def test_bad_named_list_proof_stops_dependent_reference_and_cannot_retry(tmp_path, fault):
     task = named_list_task(tmp_path, retained=True, fault=fault)
     tx, shown = task.preview()
@@ -244,7 +279,8 @@ def test_retained_list_drift_after_preview_blocks_every_write(tmp_path):
     assert task.writes == []
 
 
-def test_named_list_verification_requires_retained_ordered_membership_read(tmp_path):
+@pytest.mark.parametrize('missing', ['membership', 'constructor-reference'])
+def test_named_list_verification_requires_retained_ordered_membership_read(tmp_path, missing):
     import json
     from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
     task = named_list_task(tmp_path)
@@ -260,7 +296,7 @@ def test_named_list_verification_requires_retained_ordered_membership_read(tmp_p
     assert execution['result'] == proof['stages'][0]['dispatch_result']['result']
     assert len(proof['stages']) == 3 and len(proof['creation_bindings']) == 2
     reads = proof['creation_bindings'][1]['readbacks']
-    membership = next(row for row in reads if row['args'] == {'from': {'id': [SOUND]}}
+    membership = next(row for row in reads if row['args'] == {'from': {'id': [SOUND if missing == 'membership' else SLOT]}}
         and row['options'] == {'return': ['id', '@Metadata']})
     reads.remove(membership)
     previous = ''
@@ -306,3 +342,35 @@ def test_nonempty_replace_list_still_stops_before_any_source_write(tmp_path):
     code, rejected = task.step('draft-check')
     assert code == 2 and rejected['error_code'] == 'PLANNED_REFERENCE_STAGING_UNAVAILABLE', rejected
     assert task.writes == [] and task.objects[FIRST]['@Metadata'] == [{'id': OLD_SLOT}]
+
+
+def test_new_metadata_slot_requires_constructor_reference_before_preview(tmp_path):
+    task = named_list_task(tmp_path, constructor_reference=False)
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked.get('error_code') == 'REQUIRED_CONSTRUCTOR_REFERENCE_MISSING', checked
+    assert checked['details']['reference'] == 'Metadata'
+    assert checked['details']['field_discovery']['meaning'] == 'Metadata'
+    encoded = json.dumps(checked)
+    assert 'r84-named-list-2a3037eb-2025-r2' not in encoded, checked['details']['required_inputs']
+    assert 'constructor_packet_sha256' not in encoded
+    assert checked['details']['required_inputs'] == {'version': '2025.1', 'class_name': 'MetadataSlot',
+        'class_id': 5570560, 'collection': 'Metadata', 'required_references': ['Metadata']}
+    assert task.writes == []
+
+
+@pytest.mark.parametrize('target,error', [('null', 'INVALID_REFERENCE_TARGET'), ('wrong-type', 'REFERENCE_TARGET_TYPE_MISMATCH')])
+def test_metadata_constructor_rejects_null_or_wrong_type_before_preview(tmp_path, target, error):
+    task = named_list_task(tmp_path, constructor_target=target)
+    code, checked = (2, task.constructor_rejected) if target == 'wrong-type' else task.step('draft-check')
+    assert code == 2 and checked.get('error_code') == error, checked
+    assert task.writes == []
+
+
+def test_metadata_constructor_metadata_drift_stops_every_write(tmp_path):
+    task = named_list_task(tmp_path)
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    task.metadata['Metadata']['restriction']['restrictions'] = [{'type': ['Metadata']}]
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert task.writes == []
