@@ -486,3 +486,105 @@ def test_absent_predicate_value_is_unknown_not_a_silent_nonmatch(tmp_path,versio
             record,=row['related']['projections']
             assert 'value' not in record
             assert record['unavailable_predicates'][0]['condition']['meaning']=='Voice Pitch'
+
+
+@pytest.mark.parametrize('version',VERSIONS)
+def test_review_advanced_matching_roots_keep_explicit_final_cap(tmp_path,version):
+    task=FieldTask(tmp_path,version)
+    task.rows=[task.members[OTHER],task.members[SOUND]]
+    code,result=task.run('query-object','--advanced-waql','from type Sound','--max-results','1',
+        '--where-field','ordinary','Voice Pitch','at-most','0','--detail')
+    assert code==0,result
+    assert [row['id'] for row in result['agent_result']]==[OTHER]
+    assert result['semantic_preview']['envelope']['args']['waql'].endswith(' take 1')
+
+
+@pytest.mark.parametrize('version',VERSIONS)
+@pytest.mark.parametrize('lane',['root','matching-field','any-match-field','all-match-field'])
+def test_review_partial_display_discovery_cannot_certify_scalar_condition(tmp_path,version,lane):
+    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN
+    task=FieldTask(tmp_path,version)
+    last=MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN
+    task.metadata[SOUND_CLASS]={f'P{index:03}':{'name':f'P{index:03}','type':'int32',
+        'display':{'name':'Tone Offset' if index in {0,last} else f'Unrelated {index}'}}
+        for index in range(last+1)}
+    for member in task.members.values():member['@P000']=0
+    if lane=='root':
+        task.rows=[task.members[SOUND],task.members[OTHER]]
+        args=['--where-field','ordinary','Tone Offset','is','0']
+    else:
+        args=['--include-related','children','volume-db',
+            '--include-related','children',lane,'ordinary','Tone Offset','is','0']
+        if lane=='matching-field':args+=['count']
+    code,result=task.run('query-object','--kind','all-sounds','--max-results','2',*args)
+    if lane=='root':
+        assert code==2 and result['error_code']=='QUERY_FIELD_CONDITION_UNAVAILABLE',result
+    else:
+        assert code==0,result
+        for root in result['agent_result']:
+            assert len(root['related']['children']['items'])==2
+            projection,=root['related']['projections']
+            assert 'value' not in projection and 'items' not in projection
+            assert projection['unavailable_predicates'][0]['unresolved_scope']['complete'] is False
+    assert not any('where @P000' in (args or {}).get('waql','') for uri,args,_ in task.calls)
+
+
+@pytest.mark.parametrize('version',VERSIONS)
+@pytest.mark.parametrize('continuation',[False,True])
+def test_review_removed_source_member_still_existing_has_owned_drift_error(tmp_path,version,continuation):
+    task=FieldTask(tmp_path,version)
+    task.rows=[task.members[SOUND],task.members[OTHER]]
+    argv=['query-object','--kind','all-sounds','--max-results','2',
+        '--where-field','ordinary','Voice Pitch','at-most','0','--include','notes','--detail']
+    if continuation:
+        for row in task.members.values():row['notes']='音声'*16000
+        code,first=task.run(*argv)
+        assert code==0 and first['status']=='partial',first
+        argv=first['agent_result']['next_command']['gateway_argv']
+    original=task.call
+    def leave_source(uri,args=None,options=None):
+        result=original(uri,args,options)
+        if uri.endswith('object.get') and (args or {}).get('waql','').startswith('from type Sound where @Pitch'):
+            task.rows=[task.members[SOUND]]
+        return result
+    task.call=leave_source
+    code,result=task.run(*argv)
+    assert OTHER in task.objects  # The object survives; only source membership changed.
+    expected='QUERY_RESULT_CONTINUATION_CHANGED' if continuation else 'RELATED_QUERY_SCOPE_CHANGED'
+    assert code==2 and result['error_code']==expected,result
+
+
+@pytest.mark.parametrize('version',VERSIONS)
+@pytest.mark.parametrize('fault',['absent','null','changed','boolean','float'])
+def test_review_selected_predicate_packet_must_agree_with_observed_value(tmp_path,version,fault):
+    task=FieldTask(tmp_path,version)
+    original=task.call
+    def changed_selection(uri,args=None,options=None):
+        result=original(uri,args,options)
+        if uri.endswith('object.get') and 'where @Pitch' in (args or {}).get('waql',''):
+            for row in result['return']:
+                if fault=='absent':row.pop('@Pitch')
+                else:row['@Pitch']={'null':None,'changed':0,'boolean':False,'float':-560.0}[fault]
+        return result
+    task.call=changed_selection
+    code,result=task.run('query-object','--kind','all-sounds','--max-results','2',
+        '--include-related','children','matching-field','ordinary','Voice Pitch','at-most','-500','count')
+    assert code==2 and result['error_code']=='RELATED_QUERY_SCOPE_CHANGED',result
+
+
+@pytest.mark.parametrize('version',VERSIONS)
+def test_review_selected_value_disagreement_on_related_page_is_continuation_drift(tmp_path,version):
+    task=FieldTask(tmp_path,version)
+    for row in task.members.values():row['notes']='音声'*16000
+    code,first=task.run('query-object','--kind','all-sounds','--max-results','2',
+        '--include-related','children','matching-field','ordinary','Voice Pitch','at-most','0','first','notes','--detail')
+    assert code==0 and first['status']=='partial',first
+    original=task.call
+    def changed_selection(uri,args=None,options=None):
+        result=original(uri,args,options)
+        if uri.endswith('object.get') and 'where @Pitch' in (args or {}).get('waql',''):
+            result['return'][0]['@Pitch']=None
+        return result
+    task.call=changed_selection
+    code,result=task.run(*first['agent_result']['next_command']['gateway_argv'])
+    assert code==2 and result['error_code']=='QUERY_RESULT_CONTINUATION_CHANGED',result

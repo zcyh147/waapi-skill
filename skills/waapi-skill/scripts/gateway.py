@@ -25158,7 +25158,8 @@ def _prepare_root_field_conditions(args, body, *, connection, detected_version, 
         return result
     plan = RootScalarConditionPlan(version=detected_version,body=body,conditions=args.query_field_conditions,
         read=observed_read,maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES,
-        final_limit=_query_result_maximum(args) or MAX_QUERY_TAKE,platform=args.query_platform,language=args.query_language)
+        final_limit=(args.max_results if args.advanced_waql is not None else _query_result_maximum(args)) or MAX_QUERY_TAKE,
+        platform=args.query_platform,language=args.query_language)
     try:
         plan.prepare()
     except RelatedQueryError as exc:

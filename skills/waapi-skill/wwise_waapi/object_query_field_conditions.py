@@ -102,7 +102,7 @@ class ScalarConditionPlan:
         for index,row in enumerate(rows):
             selection = self.binder.bind(condition['meaning'],row,row.get('classId'),'',index,option)
             candidate = selection['candidate']
-            if candidate is None:
+            if candidate is None or not selection['complete']:
                 raise RelatedQueryError('The field condition cannot be decided in every actual metadata scope; refine the meaning or source',
                     code='QUERY_FIELD_CONDITION_UNAVAILABLE', details={'condition':condition,'requested_option':option,'unresolved_scope':selection})
             if candidate.get('kind') != 'property':
@@ -133,7 +133,7 @@ class ScalarConditionPlan:
                 identity = row['id'].upper()
                 if identity not in chunk or identity in batch:
                     raise RelatedQueryError('Field-value scope returned extra/duplicate identities',code='QUERY_FIELD_CONDITION_BATCH')
-                if any(canonical_json_bytes(row.get(key))!=canonical_json_bytes(expected[identity].get(key)) for key in (*IDENTITY,'classId')):
+                if identity not in expected or any(canonical_json_bytes(row.get(key))!=canonical_json_bytes(expected[identity].get(key)) for key in (*IDENTITY,'classId')):
                     raise RelatedQueryError('Field-value identity or actual class changed during binding')
                 value,kind = row.get(field),group['value_type']
                 valid = (type(value) is bool if kind=='boolean' else type(value) is int if kind=='integer'
@@ -160,7 +160,7 @@ class ScalarConditionPlan:
         groups = self.bind(actual,condition)
         selected = set()
         for group in groups:
-            self.observe_values(group,actual)
+            observed = self.observe_values(group,actual)
             for start in range(0,len(group['ids']),MAX_STRUCTURED_SOURCE_ITEMS):
                 chunk = group['ids'][start:start+MAX_STRUCTURED_SOURCE_ITEMS]
                 preview = build_object_get_query(object_ids=chunk,where=group['predicate'],
@@ -175,6 +175,10 @@ class ScalarConditionPlan:
                 if any(any(canonical_json_bytes(row.get(key))!=canonical_json_bytes(bound[row['id'].upper()].get(key))
                            for key in (*IDENTITY,'classId')) for row in values):
                     raise RelatedQueryError('Selected field-condition identity or actual class changed during the native read')
+                field = group['predicate'].field
+                if any(field not in row or canonical_json_bytes(row[field]) != canonical_json_bytes(observed[row['id'].upper()][field])
+                       for row in values):
+                    raise RelatedQueryError('Selected predicate value differs from its checked source observation')
                 if self.charge_selection is not None:
                     self.charge_selection(values)
                 selected.update(ids)
@@ -266,13 +270,13 @@ class RootScalarConditionPlan:
             if reference is None or any(canonical_json_bytes(row.get(key))!=canonical_json_bytes(reference.get(key)) for key in (*IDENTITY,'classId')):
                 raise RelatedQueryError('The final field-condition result left its observed source/metadata scope')
         after = self.scan()
+        if canonical_json_bytes(after)!=canonical_json_bytes(self.source_rows):
+            raise RelatedQueryError('Root predicate source membership or actual class changed during the read')
         for group in self.bound_groups:
             values = self.scalar.observe_values(group,after)
             for row in rows:
                 if row['id'].upper() in values and canonical_json_bytes(row.get(group['predicate'].field))!=canonical_json_bytes(values[row['id'].upper()][group['predicate'].field]):
                     raise RelatedQueryError('The final predicate value differs from its actual source observation')
-        if canonical_json_bytes(after)!=canonical_json_bytes(self.source_rows):
-            raise RelatedQueryError('Root predicate source membership or actual class changed during the read')
 
     def proof(self):
         return {'conditions':self.conditions,'source_complete':True,'source_rows':len(self.source_rows),
