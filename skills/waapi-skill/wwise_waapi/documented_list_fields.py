@@ -303,20 +303,22 @@ def planned_list_guard_assertions(guards, *, read, after_write=False):
 def prove_source_owned_empty_list(evidence, owner_row, *, read, platform=None):
     """Normalize only a source-proven fixed owned List with an independent empty read.
 
-    A missing projection alone is never membership evidence. RTPC and modern
-    Effects have the existing operation-owned empty-list observation kernel;
-    other documented Lists need their own representation authority first.
+    A missing projection alone is never membership evidence. The fixed owned
+    Lists and certified 2025 MetadataSlot profile require an independently
+    empty bounded relationship read; other Lists need their own authority.
     """
     scope = evidence.get("scope", {})
     name = evidence.get("declaration", {}).get("name")
     owner = scope.get("scope_value")
     if (evidence.get("kind") != "documented-list" or scope.get("scope_kind") != "object"
-            or name not in {"RTPC", "Effects"} or not isinstance(owner_row, Mapping)
+            or (name not in {"RTPC", "Effects"} and owned_inner_identity(evidence, 5570560) is None)
+            or not isinstance(owner_row, Mapping)
             or set(owner_row) != {"id"} or owner_row.get("id", "").upper() != owner
             or not isinstance(evidence.get("source_sha256"), str)):
         raise ValueError("Missing List projection requires its exact documented owner/source and supported empty-list representation")
     from .operation_registry import _prove_omitted_object_list_empty
-    empty = _prove_omitted_object_list_empty(owner, name, read=read, platform=platform)
+    empty = _prove_omitted_object_list_empty(owner, name, read=read, platform=platform,
+        **({"documented_list": evidence} if name == "Metadata" else {}))
     return {"kind": "missing-empty-object-list", "version": evidence["version"],
         "field": "@" + name, "observed_row_keys": ["id"], "normalized_value": [],
         "list_source": dict(evidence), "emptiness_readback": empty}

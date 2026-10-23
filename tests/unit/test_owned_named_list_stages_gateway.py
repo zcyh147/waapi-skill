@@ -17,7 +17,7 @@ OLD_SLOT = '{88888888-8888-8888-8888-888888888888}'
 SECOND_SLOT = '{99999999-9999-9999-9999-999999999999}'
 
 
-def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', retained_kind=('Sound', 65552)):
+def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False, multiple_new=False, constructor_reference=True, constructor_target='valid', replace_existing_two=False, owner_collision=False, old_source_child=False, name_conflict='rename', retained_kind=('Sound', 65552)):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
     task.types = [{'classId': cid, 'name': name, 'type': 'Inner' if name == 'MetadataSlot' else 'WObject'} for name, cid in (
         ('WorkUnit', 1638416), ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560))]
@@ -32,16 +32,19 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
     task.types.append({'classId': 58982409, 'name': 'Wwise System Output Settings', 'type': 'Metadata'})
     task.objects[METADATA] = {'id': METADATA, 'name': 'System settings', 'type': 'Metadata', 'classId': 58982409,
         'path': r'\Metadata\Default Work Unit\System settings', 'parent': None, 'notes': 'Keep Metadata'}
+    if owner_collision:
+        task.objects[ROOT]['name'] = 'Existing bus'
+        task.objects[ROOT]['path'] = task.objects[PROJECT_GROUP]['path'] + r'\Existing bus'
     if retained_kind[0] not in {row['name'] for row in task.types}:
         task.types.append({'classId': retained_kind[1], 'name': retained_kind[0], 'type': 'WObject'})
-    if retained:
+    if retained or owner_collision:
         task.objects[FIRST] = {'id': FIRST, 'name': 'Sender', 'type': retained_kind[0], 'classId': retained_kind[1],
             'path': task.objects[SECOND]['path'] + r'\Sender', 'parent': {'id': SECOND},
             'notes': 'Keep sound', '@Metadata': [{'id': OLD_SLOT}]}
         if retained_kind[0] in {'Bus', 'AuxBus'}:
             task.objects[FIRST].update(path=task.objects[PROJECT_GROUP]['path'] + r'\Sender', parent={'id': PROJECT_GROUP})
         task.objects[OLD_SLOT] = {'id': OLD_SLOT, 'name': 'Old slot', 'type': 'PluginInnerObject', 'classId': 5570560,
-            'path': r'\opaque-old-slot', 'owner': {'id': FIRST}, 'parent': None, 'notes': 'Keep old slot'}
+            'path': r'\opaque-old-slot', 'owner': {'id': FIRST}, 'parent': None, 'notes': 'Keep old slot', '@Metadata': {'id': METADATA}}
         if empty_replace_two:
             task.objects[FIRST]['@Metadata'] = []
             del task.objects[OLD_SLOT]
@@ -49,10 +52,21 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['Bus']}, 'notNull']}}}
     task.metadata['Metadata'] = {'name': 'Metadata', 'type': 'Reference',
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['Metadata']}, 'notNull']}}
+    if old_source_child:
+        task.types.append({'classId': 16, 'name': 'AudioFileSource', 'type': 'WObject'})
+        child = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+        task.objects[child] = {'id': child, 'name': 'Existing take', 'type': 'AudioFileSource', 'classId': 16,
+            'path': task.objects[FIRST]['path'] + r'\Existing take', 'parent': {'id': FIRST}, 'notes': 'Keep existing source'}
+    old_slot_before = deepcopy(task.objects.get(OLD_SLOT))
     original = task.call
     task.writes = []
     task.partial_list_drift_injected = False
     def call(uri, args=None, options=None):
+        if uri == 'ak.wwise.core.object.get' and args and 'waql' in args:
+            for owner in (FIRST, SOUND):
+                if args['waql'] == f'from object "{owner}" select @Metadata take 1':
+                    task.calls.append((uri, deepcopy(args), deepcopy(options)))
+                    return {'return': deepcopy(task.objects[owner].get('@Metadata', [])[:1])}
         if uri == SET:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             task.writes.append(deepcopy(args))
@@ -61,14 +75,22 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                 oid, actual, cid = {'Routing': (BUS, 'Routing19', 1376272),
                     'Sender': (SOUND, 'Sender', 65552), 'Room slot': (SLOT, 'Room slot', 5570560),
                     'Second slot': (SECOND_SLOT, 'Second slot', 5570560)}[node['name']]
+                previous = None
+                if node['name'] == 'Routing' and owner_collision:
+                    actual = 'Routing'
+                if node['name'] == 'Sender' and owner_collision:
+                    if name_conflict == 'merge':
+                        oid, previous = FIRST, deepcopy(task.objects[FIRST])
+                    elif name_conflict == 'replace':
+                        del task.objects[FIRST], task.objects[OLD_SLOT]
                 if owned:
                     actual = ''
                 task.objects[oid] = {'id': oid, 'name': actual, 'type': 'PluginInnerObject' if owned else node['type'],
-                    'classId': cid, 'notes': '', 'path': (r'\opaque-slot-path' if owned else task.objects[parent]['path'] + '\\' + actual),
+                    'classId': cid, 'notes': previous['notes'] if previous else '', 'path': (r'\opaque-slot-path' if owned else task.objects[parent]['path'] + '\\' + actual),
                     **({'owner': {'id': parent}, 'parent': None} if owned else {'parent': {'id': parent}})}
                 result = {'id': oid, 'name': actual, **({'type': 'PluginInnerObject'} if owned else {})}
                 if node['type'] == 'Sound':
-                    task.objects[oid]['@Metadata'] = []
+                    task.objects[oid]['@Metadata'] = previous.get('@Metadata', []) if previous else []
                 for key, nodes in node.items():
                     if key == 'children' or key == '@Metadata' and isinstance(nodes, list):
                         members = [create(child, oid, key == '@Metadata') for child in nodes]
@@ -96,11 +118,15 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                         target = next(item for item in task.objects.values() if item['path'] == value)
                         task.objects[parent][key] = {'id': target['id']}
                 results.append(row)
+            if fault in {'changed-merge-root', 'changed-merge-prefix'} and len(task.writes) == 1:
+                task.objects[FIRST if fault == 'changed-merge-root' else OLD_SLOT]['notes'] = 'External drift before owner stage'
             if fault == 'changed-prefix-before-slot' and len(task.writes) == 1:
                 task.objects[OLD_SLOT]['notes'] = 'Changed before later creation'
             if SLOT in task.objects and len(task.writes) < 3:
                 if fault == 'wrong-class':
                     task.objects[SLOT]['classId'] = 65552
+                elif fault == 'left-replaced-member':
+                    task.objects[OLD_SLOT] = deepcopy(old_slot_before)
                 elif fault == 'wrong-runtime-type':
                     task.objects[SLOT]['type'] = 'Sound'
                 elif fault == 'wrong-owner':
@@ -115,6 +141,12 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
                     task.objects[OLD_SLOT]['notes'] = 'Unrequested change'
             return {'objects': results}
         result = original(uri, args, options)
+        if (fault in {'omitted-empty-metadata', 'omitted-nonempty-metadata'} and uri == 'ak.wwise.core.object.get'
+                and options == {'return': ['id', '@Metadata']}):
+            for row in result.get('return', []):
+                value = row.get('@Metadata')
+                if isinstance(value, list) and (not value if fault == 'omitted-empty-metadata' else bool(value)):
+                    del row['@Metadata']
         if (fault in {'removed-first-member', 'changed-first-member'} and not task.partial_list_drift_injected
                 and len(task.writes) == 2 and SLOT in task.objects
                 and uri == 'ak.wwise.core.object.get'
@@ -130,10 +162,10 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         return result
     task.call = call
     parents = [task.bind(oid) for oid in (PROJECT_GROUP, SECOND)]
-    code, configured = task.step('draft-business-configure', '--name-conflict', 'rename')
+    code, configured = task.step('draft-business-configure', '--name-conflict', name_conflict)
     assert code == 0, configured
-    if empty_replace_two:
-        code, configured = task.step('draft-business-configure', '--name-conflict', 'rename', '--list-behavior', 'replace-all')
+    if empty_replace_two or replace_existing_two:
+        code, configured = task.step('draft-business-configure', '--name-conflict', name_conflict, '--list-behavior', 'replace-all')
         assert code == 0, configured
     kinds = {}
     for name in ('Bus', 'Sound', 'MetadataSlot'):
@@ -172,7 +204,7 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, emp
         task.constructor_rejected = slot
         return task
     assert code == 0, slot
-    if empty_replace_two or multiple_new:
+    if empty_replace_two or multiple_new or replace_existing_two:
         code, slot2 = task.step('draft-declare-new', '--declaration-id', 'slot2', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'],
             '--name', 'Second slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field, *metadata_fields)
         assert code == 0, slot2
@@ -346,13 +378,19 @@ def test_empty_replace_continuation_rechecks_first_member_before_later_write(tmp
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 2
 
 
-def test_nonempty_replace_list_still_stops_before_any_source_write(tmp_path):
+def test_nonempty_inner_replace_list_keeps_single_member_source_and_preservation(tmp_path):
     task = named_list_task(tmp_path, retained=True)
+    before = deepcopy(task.objects)
     code, configured = task.step('draft-business-configure', '--name-conflict', 'rename', '--list-behavior', 'replace-all')
     assert code == 0, configured
-    code, rejected = task.step('draft-check')
-    assert code == 2 and rejected['error_code'] == 'PLANNED_REFERENCE_STAGING_UNAVAILABLE', rejected
-    assert task.writes == [] and task.objects[FIRST]['@Metadata'] == [{'id': OLD_SLOT}]
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert len(task.writes) == 3 and OLD_SLOT not in task.objects
+    assert task.objects[FIRST]['@Metadata'] == [{'id': SLOT}]
+    assert task.objects[SLOT]['@Metadata'] == {'id': METADATA}
+    assert all(task.objects[oid] == row for oid, row in before.items() if oid not in {FIRST, OLD_SLOT})
+    assert task.objects[FIRST]['notes'] == before[FIRST]['notes']
 
 
 def test_new_metadata_slot_requires_constructor_reference_before_preview(tmp_path):
@@ -417,3 +455,137 @@ def test_metadata_inner_representation_uses_shared_exact_owner_sources(tmp_path,
     assert task.objects[SLOT]['@Metadata'] == {'id': METADATA}
     assert task.objects[OLD_SLOT]['notes'] == 'Keep old slot'
     assert len(task.writes) == 3 and task.objects[FIRST]['@OutputBus'] == {'id': BUS}
+
+
+def test_nonempty_inner_replace_all_keeps_both_created_fragments_and_reference(tmp_path):
+    task = named_list_task(tmp_path, retained=True, replace_existing_two=True)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[FIRST]['@Metadata'] == [{'id': SLOT}, {'id': SECOND_SLOT}]
+    assert OLD_SLOT not in task.objects
+    assert task.objects[FIRST]['@OutputBus'] == {'id': BUS}
+    assert len(task.writes) == 4
+    first, second = task.writes[1:3]
+    assert first['objects'][0]['object'] == FIRST and second['objects'][0]['object'] == FIRST
+    assert first['objects'][0].get('listMode', first['listMode']) == 'replaceAll'
+    assert second['objects'][0]['listMode'] == 'append'
+
+
+@pytest.mark.parametrize('policy', ['merge', 'replace', 'merge-replace-list'])
+def test_two_inner_members_construct_owner_once_then_use_its_actual_guid(tmp_path, policy):
+    task = named_list_task(tmp_path, multiple_new=True, owner_collision=True,
+        name_conflict='merge' if policy == 'merge-replace-list' else policy, replace_existing_two=policy == 'merge-replace-list')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    owner = FIRST if policy.startswith('merge') else SOUND
+    expected = ([{'id': OLD_SLOT}] if policy == 'merge' else []) + [{'id': SLOT}, {'id': SECOND_SLOT}]
+    assert task.objects[owner]['@Metadata'] == expected
+    assert task.objects[owner]['@OutputBus'] == {'id': BUS}
+    assert len(task.writes) == 5
+    assert task.writes[1]['objects'] == [{'object': SECOND, 'children': [{'name': 'Sender', 'type': 'Sound'}]}]
+    for write in task.writes[2:4]:
+        assert write['objects'][0]['object'] == owner
+        assert 'children' not in write['objects'][0] and 'name' not in write['objects'][0]
+    if policy == 'merge':
+        assert task.objects[OLD_SLOT]['notes'] == 'Keep old slot'
+    elif policy == 'replace':
+        assert FIRST not in task.objects and OLD_SLOT not in task.objects
+    else:
+        assert OLD_SLOT not in task.objects
+        assert task.writes[2]['objects'][0].get('listMode', task.writes[2]['listMode']) == 'replaceAll'
+        assert task.writes[3]['objects'][0]['listMode'] == 'append'
+
+
+@pytest.mark.parametrize('fault,policy', [('changed-merge-root', 'merge'), ('changed-merge-root', 'replace'), ('changed-merge-prefix', 'merge')])
+def test_inner_owner_first_fragment_rechecks_original_retained_scope(tmp_path, fault, policy):
+    task = named_list_task(tmp_path, multiple_new=True, owner_collision=True, name_conflict=policy, fault=fault)
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert len(task.writes) == 1 and SLOT not in task.objects
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, replay
+
+
+@pytest.mark.parametrize('fault', ['removed-first-member', 'changed-first-member'])
+def test_nonempty_inner_replace_all_rechecks_partial_roster_before_next_append(tmp_path, fault):
+    task = named_list_task(tmp_path, retained=True, replace_existing_two=True, fault=fault)
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert task.partial_list_drift_injected and len(task.writes) == 2
+    assert SECOND_SLOT not in task.objects and '@OutputBus' not in task.objects[FIRST]
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 2, replay
+
+
+def test_nonempty_inner_replace_all_proves_old_member_absent_before_later_append(tmp_path):
+    task = named_list_task(tmp_path, retained=True, replace_existing_two=True, fault='left-replaced-member')
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    assert len(task.writes) == 2 and SECOND_SLOT not in task.objects
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 2, replay
+
+
+@pytest.mark.parametrize('corrupt_child', [False, True])
+def test_inner_merge_owner_preserves_preexisting_hierarchy_before_member_writes(tmp_path, corrupt_child):
+    task = named_list_task(tmp_path, multiple_new=True, owner_collision=True, old_source_child=True, name_conflict='merge')
+    child = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    before = {'id': child, 'name': 'Existing take', 'type': 'AudioFileSource', 'classId': 16,
+        'path': task.objects[FIRST]['path'] + r'\Existing take', 'parent': {'id': FIRST}, 'notes': 'Keep existing source'}
+    task.objects[child] = deepcopy(before)
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if corrupt_child and uri == SET and len(task.writes) == 2:
+            task.objects[child]['notes'] = 'Unrequested source change'
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    if corrupt_child:
+        code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+        assert code == 0, confirmed
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and rejected.get('executed') is not True, rejected
+        assert len(task.writes) == 2 and SLOT not in task.objects
+        code, replay = task.run('execute', tx)
+        assert code == 2 and len(task.writes) == 2, replay
+    else:
+        code, verified = task.finish(tx, shown)
+        assert code == 0 and verified['verified'] is True, verified
+        assert task.objects[child] == before and len(task.writes) == 5
+
+
+def test_new_inner_owner_missing_empty_projection_requires_independent_bounded_list_read(tmp_path):
+    task = named_list_task(tmp_path, multiple_new=True, fault='omitted-empty-metadata')
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    query = {'waql': f'from object "{SOUND}" select @Metadata take 1'}
+    assert any(uri == 'ak.wwise.core.object.get' and args == query and options == {'return': ['id']}
+        for uri, args, options in task.calls)
+    assert len(task.writes) == 5 and task.objects[SOUND]['@Metadata'] == [{'id': SLOT}, {'id': SECOND_SLOT}]
+
+
+def test_nonempty_inner_list_cannot_be_normalized_from_omitted_projection(tmp_path):
+    task = named_list_task(tmp_path, multiple_new=True, fault='omitted-nonempty-metadata')
+    tx, shown = task.preview()
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and rejected.get('executed') is not True, rejected
+    query = {'waql': f'from object "{SOUND}" select @Metadata take 1'}
+    assert any(uri == 'ak.wwise.core.object.get' and args == query for uri, args, _ in task.calls)
+    assert len(task.writes) == 3 and SECOND_SLOT not in task.objects and '@OutputBus' not in task.objects[SOUND]
+    code, replay = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 3, replay

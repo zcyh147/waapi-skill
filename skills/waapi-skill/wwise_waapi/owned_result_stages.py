@@ -67,7 +67,7 @@ def certify_inner_occurrences(specs, version):
 
 
 def list_profiles(specs, guards, version):
-    """Seal named owned append Lists using the existing producer's source proof."""
+    """Seal named owned Lists using the existing producer's source proof."""
     from .documented_list_fields import resolve_class_list_evidence, owned_inner_identity
     profiles = []
     for owner in specs:
@@ -107,17 +107,53 @@ def list_profiles(specs, guards, version):
                     member['inner_identity'] = inner
                 if (not member.get('requested_name') or member.get('existing_target') or member.get('preexisting_id')
                         or member.get('documented_list_element_class') != member.get('class_id')
-                        or member['class_id'] not in allowed or member.get('on_name_conflict') not in {'fail', 'rename'}
+                        or member['class_id'] not in allowed
+                        or member.get('on_name_conflict') not in ({'fail', 'rename', 'merge', 'replace'} if inner else {'fail', 'rename'})
                         or member['requested_name'].casefold() in names):
                     raise ValueError('Staged named owned List requires distinct fresh source-certified members')
                 names.append(member['requested_name'].casefold())
-            if owner.get('list_mode', 'append') != 'append' and before:
+            if (owner.get('list_mode', 'append') != 'append' and before
+                    and not all(member.get('inner_identity') for member in members)):
                 raise ValueError('Staged List replacement/removal needs its separate outcome contract')
             if [row['id'].upper() for row in before] != [row['id'].upper() for row in snapshot['rows']]:
                 raise ValueError('Staged List prefix differs from its complete producer snapshot')
             profiles.append({'owner': owner['request_path'], 'name': name, 'source': source,
-                'before': deepcopy(before), 'members': [node['request_path'] for node in members]})
+                'before': deepcopy(before), 'mode': owner.get('list_mode', 'append'),
+                'members': [node['request_path'] for node in members]})
     return profiles
+
+
+def replacement_scopes(specs, snapshots, path_snapshots):
+    """Associate existing authorized replacement snapshots with one root stage."""
+    from .operation_registry import _same_identity, _parent_value
+    by_path = {node['request_path']: node for node in specs}
+    scopes = []
+    for snapshot in snapshots:
+        sources = [(view, row) for view in path_snapshots for row in view['rows']
+            if _same_identity(row.get('id'), snapshot['root_id'])]
+        if len(sources) != 1:
+            raise ValueError('Replacement stage requires one exact original collision image')
+        view, before = sources[0]
+        matches = [node for node in specs if node.get('on_name_conflict') == 'replace'
+            and node.get('collection') in {None, 'children'} and node['requested_name'] == before['name']
+            and _same_identity(_parent_value(before.get('parent')),
+                by_path.get(node.get('parent_request_path'), {}).get('target_id'))]
+        if len(matches) != 1:
+            raise ValueError('Replacement snapshot is not one declared root under its sealed parent GUID')
+        scopes.append({'root': matches[0]['request_path'], 'root_id': snapshot['root_id'],
+            'before': deepcopy(before), 'fields': list(view['fields']), 'platform': view.get('platform'), 'rows': deepcopy(snapshot['rows'])})
+    if sum(len(scope['rows']) for scope in scopes) > DEFAULT_MAX_NODES:
+        raise ValueError('Replacement stage forest exceeds its existing complete roster bound')
+    return scopes
+
+
+def active_replaced_ids(plan, identities):
+    return {row['id'].upper() for scope in plan.get('replacements', []) if scope['root'] in identities
+        for row in scope['rows']}
+
+
+def preservation_reads(records):
+    return [item for row in records for item in ([row, row['membership']] if 'membership' in row else [row])]
 
 
 def fields_for(spec):
@@ -133,14 +169,18 @@ def observe_lists(prepared, identities, *, read):
         owner = identities.get(profile['owner'])
         if owner is None:
             retained = next((node for node in prepared['verification_plan']['nodes']
-                if node['request_path'] == profile['owner'] and node.get('existing_target')), None)
+                if node['request_path'] == profile['owner'] and (node.get('existing_target') or node.get('preexisting_id'))), None)
             owner = retained['pre_state'] if retained is not None else None
         if owner is None:
             continue
         actual = observe_planned_list(profile['source'], owner['id'], read=read)
-        prefix = profile['before']
         created = [identities[path] for path in profile['members'] if path in identities]
+        prefix = [] if profile.get('mode') == 'replaceAll' and created else profile['before']
         members = actual['members']
+        if profile.get('mode') == 'replaceAll' and created and profile['before']:
+            removed = read(GET, {'from': {'id': [row['id'] for row in profile['before']]}}, {'return': ['id']})
+            if not isinstance(removed, Mapping) or removed.get('return') != []:
+                raise ValueError('Replaced Inner member GUIDs remain present; later creation stopped')
         if ([row['id'].upper() for row in members] != [row['id'].upper() for row in [*prefix, *created]]
                 or members[:len(prefix)] != prefix
                 or any(any(row.get(key) != expected.get(key) or (key in row) != (key in expected)
@@ -162,7 +202,8 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
         raise ValueError('Named owned List staging currently requires the pinned SET constructor')
     if (not specs or len(specs) > DEFAULT_MAX_NODES or any(
             (node.get('collection') not in {None, 'children'} and node['request_path'] not in list_paths)
-            or node.get('preexisting_id') is not None
+            or (node.get('preexisting_id') is not None
+                and not (node['request_path'] in owner_paths and node.get('on_name_conflict') == 'merge'))
             or ((node.get('list_request_paths') or node.get('list_snapshots')) and node['request_path'] not in owner_paths)
             or node.get('import_requested')
             or node.get('requested_language') or node.get('graph_plugin_native') or node.get('rtpc_binding')
@@ -219,7 +260,7 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
                     parent_args['platform'] = native_parent['platform']
             list_key = (parent['request_path'], root.get('collection'))
             if root['request_path'] in list_paths:
-                # The first call preserves the declared empty replacement.
+                # The first call applies the declared replacement.
                 # Later fragments append to its proven owned partial roster;
                 # repeating replaceAll would delete earlier created members.
                 if list_key in started_lists and parent_args.get('listMode', creation.get('listMode', 'append')) == 'replaceAll':
@@ -344,7 +385,9 @@ def bind(prepared, result, *, read):
             # occurrence. Its native suffix is never an identity expression.
             group = [candidate for candidate in children if candidate.get('collection') == child.collection]
             from .documented_list_fields import inner_result_candidate
-            matches = [candidate for candidate in group
+            sealed = [candidate for candidate in group if candidate.get('preexisting_id')
+                and _same_identity(candidate['preexisting_id'], child.object)]
+            matches = sealed or [candidate for candidate in group
                 if inner_result_candidate(candidate, child.object, child.name) is True
                 or not candidate.get('inner_identity') and (spec.get('existing_target') and len(group) == 1
                     or candidate['requested_name'] == child.name)]
@@ -373,6 +416,7 @@ def bind(prepared, result, *, read):
     all_before = {str(row['id']).upper() for node in specs for row in node.get('preexisting_children', [])}
     all_before.update(str(row['id']).upper() for profile in plan.get('lists', []) for row in profile['before'])
     all_before.update(str(node['target_id']).upper() for node in specs if node.get('existing_target'))
+    all_before.update(row['id'].upper() for scope in plan.get('replacements', []) for row in scope['rows'])
     if plan['uri'] == CREATE:
         all_before.update(str(row['id']).upper() for row in plan['parent_children'])
         all_before.add(plan['parent_id'].upper())
@@ -391,7 +435,10 @@ def bind(prepared, result, *, read):
                 if (len(sources) != 1 or inner != owned_inner_identity(sources[0], spec['class_id'])
                         or row.get('type') != inner['native_type'] or row.get('name') != inner['native_name']):
                     raise ValueError('Inner occurrence class/collection/name/type profile is not independently proved')
-            if (str(object_id).upper() in all_before or not returned or row.get('name') != returned.name
+            retained_merge = spec.get('preexisting_id')
+            if (retained_merge is not None and not _same_identity(object_id, retained_merge)):
+                raise ValueError('Merged occurrence did not retain its sealed GUID')
+            if ((not retained_merge and str(object_id).upper() in all_before) or not returned or row.get('name') != returned.name
                     or type(row.get('classId')) is not int or row['classId'] != spec['class_id']
                     or not _object_type_matches(row.get('type'), spec, actual_class_id=row['classId'])):
                 raise ValueError('Returned created GUID/name/class differs from its live occurrence')
@@ -465,18 +512,29 @@ def split_stage_prepared(prepared, stage, identities):
     if stage.get('owned_parent'):
         actual = identities[stage['parent']]
         parent.update(existing_target=True, target_id=actual['id'], pre_state=actual,
-            original_name=actual['name'], requested_name=actual['name'], preexisting_children=[])
+            original_name=actual['name'], requested_name=actual['name'],
+            preexisting_children=parent.get('preexisting_children', []) if (parent.get('preexisting_id') or '').upper() == actual['id'].upper() else [])
     children = [row for path, row in identities.items() if path != stage['parent']
         and str(row.get('parent', {}).get('id') if isinstance(row.get('parent'), Mapping) else row.get('parent')).upper() == parent['target_id'].upper()]
-    parent['preexisting_children'] = [*parent.get('preexisting_children', []), *children]
+    replacements = prepared['pre_state']['owned_result_stages'].get('replacements', [])
+    removed = {row['id'].upper() for scope in replacements if scope['root'] == stage['root'] for row in scope['rows']}
+    parent['preexisting_children'] = [child for child in [*parent.get('preexisting_children', []), *children]
+        if child['id'].upper() not in removed]
     scoped = [parent, *(node for node in nodes if node['request_path'] in stage['node_paths'])]
     stage_plan = {**prepared['pre_state']['owned_result_stages'], 'deferred': []}
     scoped_paths = {node['request_path'] for node in scoped}
     if stage_plan.get('lists'):
-        stage_plan['lists'] = [{**profile,
-            'before': [*profile['before'], *(identities[path] for path in profile['members'] if path in identities)],
-            'members': [path for path in profile['members'] if path in stage['node_paths']]}
-            for profile in stage_plan['lists'] if profile['owner'] in scoped_paths]
+        profiles = []
+        for profile in stage_plan['lists']:
+            if profile['owner'] not in scoped_paths:
+                continue
+            prior = [identities[path] for path in profile['members'] if path in identities]
+            continued_replacement = profile.get('mode') == 'replaceAll' and bool(prior)
+            profiles.append({**profile,
+                'before': ([] if continued_replacement else profile['before']) + prior,
+                'mode': 'append' if continued_replacement else profile.get('mode', 'append'),
+                'members': [path for path in profile['members'] if path in stage['node_paths']]})
+        stage_plan['lists'] = profiles
     return {**prepared, 'verification_plan': {**prepared['verification_plan'], 'nodes': scoped},
         'pre_state': {**prepared['pre_state'], 'owned_result_stages': stage_plan}}
 
@@ -494,9 +552,10 @@ def observe_owned_roster(prepared, identities, *, read):
         actual = read(GET, {'from': {'id': [expected['id']]}}, {'return': fields_for(node)})
         if not isinstance(actual, Mapping) or actual.get('return') != [expected]:
             raise ValueError('An earlier owned created identity changed between creation stages')
-        children = {identities[child['request_path']]['id'].upper() for child in nodes
+        children = {row['id'].upper() for row in node.get('preexisting_children', [])}
+        children.update(identities[child['request_path']]['id'].upper() for child in nodes
             if child.get('parent_request_path') == path and child['request_path'] in identities
-            and child.get('collection') in {None, 'children'}}
+            and child.get('collection') in {None, 'children'})
         payload = read(GET, {'from': {'id': [expected['id']]}, 'transform': [{'select': ['children']}]}, {'return': ['id']})
         rows = payload.get('return') if isinstance(payload, Mapping) else None
         if (not isinstance(rows, list) or any(not isinstance(row, Mapping) or not isinstance(row.get('id'), str) for row in rows)
@@ -666,14 +725,14 @@ def validate_split(prepared, execution, *, context):
             raise ValueError('Creation stage is not its exact sealed ordinary root')
         if plan.get('pre_creation_roster_check'):
             before_preserved = binding.get('before_preservation', [])
-            before_reads = [*binding.get('before_readbacks', []), *(item for row in before_preserved for item in (row, row['membership']))]
+            before_reads = [*binding.get('before_readbacks', []), *preservation_reads(before_preserved)]
             rebuilt_before = {'before_readbacks': [], 'before_preservation': []}
             replay(before_reads, lambda read: observe_before_creation(prepared, identities,
                 read=read, context=context, binding=rebuilt_before))
             if rebuilt_before != {key: binding.get(key, []) for key in rebuilt_before}:
                 raise ValueError('Before-creation proof differs from its sealed partial roster')
         preserved = binding.get('preservation', [])
-        reads = [*binding.get('readbacks', []), *(item for row in preserved for item in (row, row['membership']))]
+        reads = [*binding.get('readbacks', []), *preservation_reads(preserved)]
         identities, observations, rebuilt = replay(reads, lambda read: bind_split_stage(prepared, stage,
             actual.get('dispatch_result', {}).get('result'), identities, read=read, context=context))
         if observations != binding.get('readbacks') or rebuilt != preserved:
@@ -719,7 +778,7 @@ def validate(prepared, execution, *, context=None):
     preservation = iter(proof.get('preservation', []))
     preserved_reads = []
     for record in preservation:
-        preserved_reads.extend([record, record['membership']])
+        preserved_reads.extend(preservation_reads([record]))
     preserved_reads = iter(preserved_reads)
     def retained_preservation(uri, args, options):
         row = next(preserved_reads)
@@ -768,7 +827,7 @@ def preservation_rows(prepared):
             before = {**spec['pre_state'], 'classId': spec['class_id']}
             rows[before['id'].upper()] = (before, sorted(str(row['id']).upper() for row in spec.get('preexisting_children', [])))
     snapshots = [snapshot for rename in (prepared['pre_state'].get('planned_reference_context') or {}).get('renames', [])
-        for snapshot in rename['collision_state']] + stage_plan.get('collision_state', [])
+        for snapshot in rename['collision_state']] + stage_plan.get('collision_state', []) + stage_plan.get('merge_state', [])
     for snapshot in snapshots:
         for before in snapshot['rows']:
             children = [row['id'].upper() for row in snapshot['rows']
@@ -784,8 +843,14 @@ def observe_preservation(prepared, identities, *, read, context=None):
     from .object_graph_paths import project_compound_snapshot
     from .operation_registry import _same_identity
     records = []
+    plan = prepared['pre_state']['owned_result_stages']
+    removed = active_replaced_ids(plan, identities)
     for before, children in preservation_rows(prepared):
         expected = project_compound_snapshot(before, context)
+        for node in prepared['verification_plan']['nodes']:
+            if (node.get('preexisting_id') and node['request_path'] in identities
+                    and _same_identity(node['preexisting_id'], before['id']) and node.get('notes_supplied')):
+                expected['notes'] = node['requested_notes']
         args, options = {'from': {'id': [before['id']]}}, {'return': FIELDS}
         payload = read(GET, args, options)
         rows = payload.get('return') if isinstance(payload, Mapping) else None
@@ -801,8 +866,27 @@ def observe_preservation(prepared, identities, *, read, context=None):
         membership = read(GET, child_args, {'return': ['id']})
         found = membership.get('return') if isinstance(membership, Mapping) else None
         ids = [str(row.get('id')).upper() for row in found] if isinstance(found, list) else []
-        passed = passed and isinstance(found, list) and len(ids) == len(set(ids)) and set(ids) == set(children) | set(created)
+        passed = passed and isinstance(found, list) and len(ids) == len(set(ids)) and set(ids) == (set(children) - removed) | set(created)
         records.append({'role': 'owned-result-preservation', 'object_id': before['id'], 'passed': bool(passed),
             'uri': GET, 'args': args, 'options': options, 'result': payload,
             'membership': {'uri': GET, 'args': child_args, 'options': {'return': ['id']}, 'result': membership}})
+    for scope in plan.get('replacements', []):
+        active = scope['root'] in identities
+        args = {'from': {'id': [row['id'] for row in scope['rows']] if active else [scope['root_id']]}}
+        options = {'return': ['id', 'path'] if active else scope['fields']}
+        if not active and scope.get('platform') is not None:
+            options['platform'] = scope['platform']
+        payload = read(GET, args, options)
+        passed = isinstance(payload, Mapping) and payload.get('return') == ([] if active else [scope['before']])
+        record = {'role': 'owned-result-replacement', 'object_id': scope['root_id'], 'passed': bool(passed),
+            'uri': GET, 'args': args, 'options': options, 'result': payload}
+        if not active:
+            child_args = {'from': {'id': [scope['root_id']]}, 'transform': [{'select': ['descendants']}]}
+            membership = read(GET, child_args, {'return': ['id', 'path']})
+            found = membership.get('return') if isinstance(membership, Mapping) else None
+            expected = [row for row in scope['rows'] if row['id'].upper() != scope['root_id'].upper()]
+            passed = passed and isinstance(found, list) and sorted(found, key=lambda row: str(row.get('id'))) == sorted(expected, key=lambda row: row['id'])
+            record.update(passed=bool(passed), membership={'uri': GET, 'args': child_args,
+                'options': {'return': ['id', 'path']}, 'result': membership})
+        records.append(record)
     return records

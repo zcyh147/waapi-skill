@@ -7308,6 +7308,30 @@ def _prepare_object_set(
                             'rows': [{'id': child['id']} for child in snapshot['rows'] if _same_identity(_parent_value(child.get('parent')), row['id'])]})
             if collision_state:
                 stage_plan['collision_state'] = collision_state
+            merged_owners = [node for node in node_specs if node.get('preexisting_id')
+                and node['request_path'] in {profile['owner'] for profile in stage_plan.get('lists', [])}]
+            if merged_owners:
+                stage_plan['merge_state'] = []
+                for owner in merged_owners:
+                    snapshot = _capture_planned_rename_collision(owner['pre_state'], read=read)
+                    rows_by_id = {row['id']: row for row in snapshot['rows']}
+                    old = rows_by_id.get(owner['preexisting_id'], {})
+                    if (old.get('classId') != owner['class_id'] or any(old.get(key) != value
+                            for key, value in owner['pre_state'].items() if key in snapshot['fields'])
+                            or any(any(rows_by_id.get(child['id'], {}).get(key) != value
+                                for key, value in child.items() if key in snapshot['fields'])
+                                for child in owner.get('preexisting_children', []))):
+                        raise OperationContractError('INVALID_READBACK', 'Merged owner preservation changed during preparation')
+                    stage_plan['merge_state'].append(snapshot)
+                    for row in snapshot['rows']:
+                        graph_guard['field_snapshots'].append({'object_id': row['id'], 'fields': snapshot['fields'],
+                            'platform': None, 'rows': [row]})
+            if stage_plan.get('lists') and replace_subtree_snapshots:
+                from .owned_result_stages import replacement_scopes
+                try:
+                    stage_plan['replacements'] = replacement_scopes(node_specs, replace_subtree_snapshots, path_snapshots)
+                except ValueError as exc:
+                    raise OperationContractError('PLANNED_REFERENCE_STAGING_UNAVAILABLE', str(exc)) from exc
             state["owned_result_stages"] = stage_plan
             from .owned_result_stages import preservation_rows
             try:
@@ -10544,16 +10568,22 @@ def _prove_omitted_object_list_empty(
     *,
     read: ReadCall,
     platform: str | None = None,
+    documented_list: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prove absence independently of a missing owner return projection.
 
-    Only fixed operation-owned lists enter this compatibility path. WAQL list
-    selection is distinct from the legacy transform.select relationship enum.
+    Only fixed operation-owned lists or a certified owned Metadata profile enter
+    this compatibility path. WAQL list selection is distinct from the legacy transform.select relationship enum.
     One returned member is sufficient to disprove emptiness; never enumerate
     an unbounded list or treat a failed/malformed query as an empty result.
     """
+    from .documented_list_fields import owned_inner_identity
+    certified_metadata = (list_name == "Metadata" and isinstance(documented_list, Mapping)
+        and documented_list.get("scope", {}).get("scope_kind") == "object"
+        and documented_list["scope"].get("scope_value") == object_id
+        and owned_inner_identity(documented_list, 5570560) is not None)
     if (
-        list_name not in {"RTPC", "Effects"}
+        (list_name not in {"RTPC", "Effects"} and not certified_metadata)
         or not isinstance(object_id, str)
         or not _PLUGIN_GUID.fullmatch(object_id)
     ):
