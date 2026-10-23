@@ -1,6 +1,6 @@
 {
   "contract": "waapi-skill.recorded-time-modulator-range-facts/v1",
-  "evidence_scope": "Native class-scoped dependent-field metadata plus installed controller-definition inputs only; instance identity/controller native metadata/applicability/effects remain unobserved.",
+  "evidence_scope": "Native class-scoped dependent-field metadata for2021/25 plus explicitly identified matching installed models for other lanes; instance applicability and existing-edit effects remain unobserved. Actual2022 owned-Time identity is separately retained in R59.",
   "versions": {
     "2021.1": {
       "build": "2021.1.14.8108",
@@ -123,6 +123,201 @@
         "enabled-state behavior",
         "mutation/readback effect"
       ]
+    },
+    "2022.1": {
+      "build": "2022.1.19.8584",
+      "field_metadata": {
+        "name": "EnvelopeStopPlayback",
+        "type": "bool",
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Enable",
+            "property": "TimeModLoops",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "range",
+                  "min": 1,
+                  "max": 100
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "metadata_scope": {
+        "kind": "object_type",
+        "requested": "ModulatorTime",
+        "resolved": {
+          "classId": 5111824,
+          "name": "ModulatorTime",
+          "type": "WObject"
+        }
+      },
+      "controller_metadata_model": {
+        "name": "TimeModLoops",
+        "type": "int32",
+        "restriction": {
+          "type": "range",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "controller_model_source": {
+        "installed_definition_sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+        "element": "<Property Name=\"TimeModLoops\" Type=\"int32\" SupportModifier=\"true\" DisplayName=\"Loops\">\n       <UserInterface InfiniteValue=\"0\" />\n       <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>0</Min>\n              <Max>100</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n     </Property>\n     "
+      },
+      "instance_identity_model": {
+        "type": "ModulatorTime",
+        "basis": "Installed class label only, not a native instance type observation"
+      },
+      "missing_native_facts": [
+        "instance identity/class applicability",
+        "object-scoped controller metadata",
+        "enabled-state behavior",
+        "mutation/readback effect"
+      ],
+      "evidence_scope": "Installed-definition model only, not native field metadata or instance/effect evidence.",
+      "field_model_source": {
+        "file": "WObjects/WObjects.xml",
+        "installed_definition_sha256": "018ddcb9e0b50c4cdc2f0849d0cc8a95d5568c169f0c888ca6f07c3f0e3266b6",
+        "element": "PluginModule/WwiseObject[ModulatorTime]/Properties/Property[EnvelopeStopPlayback]",
+        "line": 5245,
+        "context": "Self from omitted PropertyDependency Context; matches native2021/25 field model"
+      }
+    },
+    "2023.1": {
+      "build": "2023.1.19.8928",
+      "field_metadata": {
+        "name": "EnvelopeStopPlayback",
+        "type": "bool",
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Enable",
+            "property": "TimeModLoops",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "range",
+                  "min": 1,
+                  "max": 100
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "metadata_scope": {
+        "kind": "object_type",
+        "requested": "ModulatorTime",
+        "resolved": {
+          "classId": 5111824,
+          "name": "ModulatorTime",
+          "type": "WObject"
+        }
+      },
+      "controller_metadata_model": {
+        "name": "TimeModLoops",
+        "type": "int32",
+        "restriction": {
+          "type": "range",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "controller_model_source": {
+        "installed_definition_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+        "element": "<Property Name=\"TimeModLoops\" Type=\"int32\" SupportModifier=\"true\" DisplayName=\"Loops\">\n       <UserInterface InfiniteValue=\"0\" />\n       <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>0</Min>\n              <Max>100</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n     </Property>\n     "
+      },
+      "instance_identity_model": {
+        "type": "ModulatorTime",
+        "basis": "Installed class label only, not a native instance type observation"
+      },
+      "missing_native_facts": [
+        "instance identity/class applicability",
+        "object-scoped controller metadata",
+        "enabled-state behavior",
+        "mutation/readback effect"
+      ],
+      "evidence_scope": "Installed-definition model only, not native field metadata or instance/effect evidence.",
+      "field_model_source": {
+        "file": "WObjects/WObjects.xml",
+        "installed_definition_sha256": "bae4d5fdd821fef226f1939d34ba1810e08bf79578fb8edc4ae3bdc3c66bd468",
+        "element": "PluginModule/WwiseObject[ModulatorTime]/Properties/Property[EnvelopeStopPlayback]",
+        "line": 5112,
+        "context": "Self from omitted PropertyDependency Context; matches native2021/25 field model"
+      }
+    },
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "field_metadata": {
+        "name": "EnvelopeStopPlayback",
+        "type": "bool",
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Enable",
+            "property": "TimeModLoops",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "range",
+                  "min": 1,
+                  "max": 100
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "metadata_scope": {
+        "kind": "object_type",
+        "requested": "ModulatorTime",
+        "resolved": {
+          "classId": 5111824,
+          "name": "ModulatorTime",
+          "type": "WObject"
+        }
+      },
+      "controller_metadata_model": {
+        "name": "TimeModLoops",
+        "type": "int32",
+        "restriction": {
+          "type": "range",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "controller_model_source": {
+        "installed_definition_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+        "element": "<Property Name=\"TimeModLoops\" Type=\"int32\" SupportModifier=\"true\" DisplayName=\"Loops\">\n       <UserInterface InfiniteValue=\"0\" />\n       <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>0</Min>\n              <Max>100</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n     </Property>\n     "
+      },
+      "instance_identity_model": {
+        "type": "ModulatorTime",
+        "basis": "Installed class label only, not a native instance type observation"
+      },
+      "missing_native_facts": [
+        "instance identity/class applicability",
+        "object-scoped controller metadata",
+        "enabled-state behavior",
+        "mutation/readback effect"
+      ],
+      "evidence_scope": "Installed-definition model only, not native field metadata or instance/effect evidence.",
+      "field_model_source": {
+        "file": "WObjects/WObjects.xml",
+        "installed_definition_sha256": "28c19c59fe681a9cb81e11cec8f80caea006274ea670dc1388966239d4ee8e7f",
+        "element": "PluginModule/WwiseObject[ModulatorTime]/Properties/Property[EnvelopeStopPlayback]",
+        "line": 5109,
+        "context": "Self from omitted PropertyDependency Context; matches native2021/25 field model"
+      }
     }
   }
 }

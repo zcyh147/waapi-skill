@@ -8,6 +8,7 @@ import pytest
 from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST, condition_product_capture
 
 FACTS = json.loads((Path(__file__).parents[1] / "fixtures/metadata-conditions/time-modulator-range.json").read_text())
+VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 
 
 def start(task):
@@ -20,7 +21,8 @@ def time_task(tmp_path, version, loops=50, operation="object.setProperty"):
     task = ScalarPropertyTask(tmp_path, version, operation)
     facts = FACTS["versions"][version]
     task.metadata = {"EnvelopeStopPlayback": deepcopy(facts["field_metadata"]), "TimeModLoops": deepcopy(facts["controller_metadata_model"])}
-    task.objects[FIRST].update(type=facts["instance_identity_model"]["type"], name="OwnedTime",
+    task.set_object_type(FIRST, "ModulatorTime", facts["metadata_scope"]["resolved"]["classId"])
+    task.objects[FIRST].update(name="OwnedTime",
         path=r"\Modulators\Default Work Unit\OwnedTime", TimeModLoops=loops, EnvelopeStopPlayback=True)
     return task
 
@@ -103,6 +105,47 @@ def test_explicit_range_repair_and_dependent_change_share_one_atomic_preview_whe
     assert task.objects == {**before, FIRST: {**before[FIRST], "TimeModLoops": 25, "EnvelopeStopPlayback": False}}
     writes = [args for uri, args, _ in task.calls if uri.endswith("object.set")]
     assert len(writes) == 1 and writes[0]["objects"] == [{"object": FIRST, "@EnvelopeStopPlayback": False, "@TimeModLoops": 25}]
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_exact_time_class_public_edit_preserves_loop_count_and_peer(tmp_path, version):
+    from tests.unit.test_new_object_conditions_gateway import ClassTask
+    from tests.unit.test_gameparameter_class_fields_gateway import CREATED
+    task = ClassTask(tmp_path, version)
+    facts = FACTS["versions"][version]
+    task.metadata = {"EnvelopeStopPlayback": {**deepcopy(facts["field_metadata"]), "default": True},
+        "TimeModLoops": {**deepcopy(facts["controller_metadata_model"]), "default": 1}}
+    task.objects[FIRST].update(classId=1638416, path=r"\Modulators\Default Work Unit")
+    for row in task.types:
+        if row["name"] == "WorkUnit":
+            row["classId"] = 1638416
+    before = deepcopy(task.objects)
+    task.declare(TimeModLoops=50)
+    _, _, _, setup_tx = finish(task)
+    assert task.objects[CREATED]["type"] == "ModulatorTime" and task.objects[CREATED]["classId"] == 5111824
+    assert task.objects[CREATED]["TimeModLoops"] == 50 and task.objects[CREATED]["EnvelopeStopPlayback"] is True
+    created = deepcopy(task.objects[CREATED])
+    task.operation = "object.setProperty"
+    start(task)
+    target = task.bind(CREATED)
+    field = task.discover(target, "EnvelopeStopPlayback")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+        "--field-handle", field, "--business-value", "false")
+    assert code == 0, declared
+    preview, _, verified, tx = finish(task)
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    assert prepared["resolved_roles"]["object"]["row"]["type"] == "ModulatorTime"
+    assert prepared["pre_state"]["field_before"]["activation_requirements"] == {"TimeModLoops": 50}
+    assert not preview["preview_summary"].get("derived_changes"), preview
+    assert task.objects == {**before, CREATED: {**created, "EnvelopeStopPlayback": False}}
+    assert verified["verified"] is True and setup_tx != tx
+    writes = [(uri, args) for uri, args, _ in task.calls if uri.endswith(("object.create", "setProperty"))]
+    assert len(writes) == 2 and writes[0][0].endswith("object.create")
+    assert writes[0][1]["type"] == "ModulatorTime" and writes[0][1]["@TimeModLoops"] == 50
+    assert "@EnvelopeStopPlayback" not in writes[0][1]
+    assert writes[1][1] == {"object": CREATED, "property": "EnvelopeStopPlayback", "value": False}
 
 
 @pytest.mark.parametrize("version,condition_product_capture", [(v, f"time-modulator-range-{v}") for v in ("2021.1", "2025.1")],
