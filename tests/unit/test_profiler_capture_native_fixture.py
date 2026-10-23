@@ -162,7 +162,8 @@ NATIVE_CPU_2025 = json.loads(r'''{"return":[{"elementName":"CAkAudioMgr::Perform
 
 
 def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1', readers=False,
-        capture_reads=False, cpu_native_version=None, native_rtpc=False, mixing_bus=None, missing_reads=False):
+        capture_reads=False, cpu_native_version=None, native_rtpc=False, mixing_bus=None, missing_reads=False,
+        partial_seed=None):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
         NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
@@ -400,6 +401,16 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 rows = [] if failure == 'empty-readers' else [row]
                 if mixing_bus == 'mixed' and uri.endswith('getBusses'):
                     rows.append({**row, 'pipelineID': 3})
+                if partial_seed is not None and partial_seed == ('voices' if uri.endswith('getVoices') else 'busses' if uri.endswith('getBusses') else None):
+                    rows = [{**row, 'pipelineID': 99}, *[
+                        {**row, 'gameObjectID': 2, 'pipelineID': 100 + i,
+                            'objectGUID': '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'} for i in range(31)], row]
+                    # The public newest-range page hides the earlier owned
+                    # candidate. Native validation still returns the exact
+                    # selected instance, so its legal handle cannot prove uniqueness.
+                    native_filter = args.get('voicePipelineID', args.get('busPipelineID'))
+                    if native_filter is not None:
+                        rows = [item for item in rows if item['pipelineID'] == native_filter]
                 return {'return': [{key: value for key, value in item.items() if key in options['return']} for item in rows]}
             if uri.endswith('profiler.getGameObjects'):
                 return {'return': [] if failure == 'empty-readers' else [
@@ -523,6 +534,37 @@ def test_missing_only_capture_collects_new_facts_without_repeating_passed_reads_
     targeted = [uri for uri, _, _ in client.calls if uri.endswith(('getVoices', 'getBusses', 'getRTPCs', 'getVoiceContributions'))]
     assert len(targeted) == (5 if version == '2021.1' else 6)
     assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+
+
+@pytest.mark.parametrize('missing_only,partial_seed', [(True, 'voices'), (True, 'busses'),
+    (False, 'voices'), (False, 'busses')])
+def test_partial_capture_seed_never_certifies_unique_owned_contribution_in_final_writer(
+        owned_authoring, tmp_path, monkeypatch, missing_only, partial_seed):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        version='2025.1' if missing_only else '2021.1', capture_reads=True, missing_reads=missing_only,
+        native_rtpc=True, mixing_bus='unique', partial_seed=partial_seed)
+    collector_passed = True
+    try:
+        collect(batch, call)
+    except AssertionError:
+        collector_passed = False
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=collector_passed)
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(archive['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert final['outcome'] == 'FAIL'
+    name = 'profiler-voices-observation' if partial_seed == 'voices' else 'profiler-busses-observation'
+    observation = (report['seed_observations'] if missing_only else report['outcomes'])[name]
+    assert observation['outcome'] == 'BLOCKED' and observation['evidence']['complete'] is False
+    raw = observation['evidence']['agent_result']
+    assert raw['complete'] is False and raw['total_count'] == 33 and 0 < raw['returned_count'] < 33
+    assert report['runtime_mixing_bus']['selected_observed_instance'] is None
+    category = next(row for row in record['categories'] if row['category'] == 'profiler-contributions-bus-observation')
+    assert category['business_outcome'] == 'BLOCKED' and category['status'] == 'blocked'
+    assert not any(args.get('bussesPipelineID') for uri, args, _ in client.calls if uri.endswith('getVoiceContributions'))
+    assert sum(uri.endswith('getVoices') for uri, _, _ in client.calls) == 1
+    assert sum(uri.endswith('getBusses') for uri, _, _ in client.calls) == 1
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+    assert record['source']['hash_before'] == record['source']['hash_after']
 
 
 def test_retained_main_bus_read_and_filter_facts_are_meaningful_owned_observations(

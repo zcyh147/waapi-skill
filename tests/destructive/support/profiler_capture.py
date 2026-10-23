@@ -110,7 +110,15 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
     observations = {}
     outcomes = report.setdefault('seed_observations', {}) if seed_only else report['outcomes']
 
+    def seed_complete(name):
+        observation = outcomes.get(name, {})
+        evidence = observation.get('evidence', {})
+        return (observation.get('outcome') == 'PASS' and evidence.get('complete') is True
+            and evidence.get('observation_status') == 'PASS')
+
     def mixing_candidates(rows):
+        if not seed_complete(READER_OUTCOMES[0]):
+            return []
         owned_voices = [row for row in observations.get(READER_OUTCOMES[0], [])
             if row.get('gameObjectID') == game_object]
         if len(owned_voices) != 1 or owned_voices[0].get('objectGUID') != sound_id:
@@ -189,6 +197,8 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
     # and use an actually issued instance; never assert fixture attribution.
     def select(name, handle, expected_guid):
         rows = [row for row in observations.get(name, []) if isinstance(row.get(handle), str)]
+        if report.get('capture_read_batch') and not all(seed_complete(seed) for seed in READER_OUTCOMES[:2]):
+            return None
         if report.get('capture_read_batch') and name == READER_OUTCOMES[1]:
             candidates = mixing_candidates(rows)
             return rows[candidates[0]] if len(candidates) == 1 else None
@@ -210,7 +220,9 @@ def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id, see
         (READER_OUTCOMES[6], 'getAudioObjects', bus, 'bus_instance_handle', ('gameObjectID',)),
     ):
         if row is None:
-            outcomes[name] = {'outcome': 'BLOCKED', 'reason': 'Unfiltered read issued no usable instance handle',
+            outcomes[name] = {'outcome': 'BLOCKED', 'reason': (
+                'No complete attributable Voices/Busses seeds for safe instance selection'
+                if report.get('capture_read_batch') else 'Unfiltered read issued no usable instance handle'),
                 'evidence': {'position_ms': int(fixed_time), 'observation_status': 'BLOCKED',
                     'owned_identity_observed': False}}
             persist()
@@ -339,7 +351,7 @@ def _collect_capture_reads(call, report, persist, *, fixed_time, sound_id, bus_i
             and voice.get('gameObjectID') == game_object and (not use_bus or bus is not None
                 and bus.get('gameObjectID') == game_object))
         if not valid:
-            report['outcomes'][name] = {'outcome': 'BLOCKED', 'reason': 'No attributable issued voice/Bus capture handle',
+            report['outcomes'][name] = {'outcome': 'BLOCKED', 'reason': 'No safe owned voice/Bus selection from complete seed observations',
                 'evidence': {'position_ms': int(fixed_time), 'observation_status': 'BLOCKED', 'owned_identity_observed': False}}
             persist()
             continue
