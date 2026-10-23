@@ -1980,6 +1980,66 @@ def test_remaining_core_business_effect_families_on_2025(
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_console_log_addition_observer(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Observe one owned addition, never clear or infer Console channel contents."""
+    runtime = workflow_sandbox_runtime
+    builds = {'2023.1': (2023, 1, 19, 8928), '2024.1': (2024, 1, 13, 9056),
+        '2025.1': (2025, 1, 7, 9143)}
+    if runtime.version not in builds:
+        pytest.skip('Console log.addItem is reflected only on the three modern lanes')
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    output = runtime.state_dir / 'console-log-addition-observer.json'
+    message = 'WAAPI owned Console addition ' + uuid.uuid4().hex
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version,
+        'expected': {'channel': 'general', 'message': message, 'severity': 'Message'},
+        'transaction': {}}
+    category = {'category': 'console-log-addition-observer', 'status': 'FAIL',
+        'verifier_strength': 'same_execute_process_bounded_addition_event_then_durable_verification',
+        'receipt_path': str(output), 'transaction_ids': []}
+    runtime.category_results.append(category)
+    try:
+        status = runtime.gateway(['status'], live=True)
+        receipt['host'] = status['wwise']
+        assert status['wwise']['isCommandLine'] is True, status
+        build = status['wwise']['version']
+        assert tuple(build[key] for key in ('year', 'major', 'minor', 'build')) == builds[runtime.version], status
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        draft = _start_business_draft(runtime, 'ak.wwise.core.log.addItem')
+        _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
+            ['--message', message, '--log-channel', 'general', '--severity', 'message'], live=True)
+        result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'])
+        transaction_id = result['preview']['transaction_id']
+        category['transaction_ids'] = [transaction_id]
+        shown = runtime.gateway(['transaction-show', transaction_id], live=False)
+        execution, = [event['details']['dispatch_result'] for event in shown['events']
+            if event['event_type'] == 'execution_completed']
+        assert execution == result['execute']['dispatch_result'], shown
+        assert execution['ok'] is True and execution['result'] == {}, execution
+        observation = execution['log_item_observation']
+        receipt['durable_observation'] = observation
+        assert observation['subscribed'] is True and observation['outcome'] == 'matched', observation
+        assert observation['cleanup']['status'] == 'unsubscribed', observation
+        assert 1 <= observation['events_observed'] <= 64, observation
+        event = observation['event']
+        assert event['channel'] == 'general' and event['item']['message'] == message and event['item']['severity'] == 'Message', event
+        scope = result['verify']['verification']['verification_scope']['log_observation']
+        assert scope['outcome'] == 'matching_item_event' and scope['effect_observed'] is True, scope
+        assert scope['execution_observation'] == observation, scope
+        assert scope['exclusive_causation_verified'] is False and scope['continuing_channel_state_verified'] is False, scope
+        category['status'] = 'PASS'
+    finally:
+        # Preserve partial execute/verify replies before a failed assertion reaches
+        # the existing lifecycle finalizer; no new Wwise process or replay.
+        transaction_id = receipt['transaction'].get('transaction_id')
+        if transaction_id:
+            category['transaction_ids'] = [transaction_id]
+        output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_runtime_inspection_business_profiler_and_transport_lifecycle(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
