@@ -5,6 +5,27 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R94 selected transport observations
+
+Reviewed collector `645ee1d2`, integrated at `224c8d79`, exercises the public
+Gateway through the actual archive and final category writer. Review caught a
+missing original-audio audition prerequisite before native execution. Its causal
+regression failed twice; only the affected success and setup-failure flows were
+rerun after repair, passing in 24.45s. Earlier unaffected ownership and failure
+controls were retained, not repeated as another full selection.
+
+One matching Mac Authoring 2025.1.7.9143 run on `224c8d79` completed in
+104.83s with 124 public calls. It observed three selected-transport transitions:
+stopped plus playDirectly became playing; stopped plus pause remained stopped;
+paused plus playStop became playing. The last result differs from the fake's
+example outcome, which the diagnostic deliberately did not treat as an oracle.
+Source hash/mtime, restored loop settings, owned process cleanup and port release
+passed. The original diagnostic report and transactions remain explicitly
+unverified for business effects; these facts support a later bounded semantic
+assessment without repeating the mutations. This is not all-active, older-version,
+acoustic, restart-position or prior global audition-mode restoration evidence.
+No Fresh or full Program/Non-live gate was run, and #186 remains open.
+
 ## 2026-10-23 R91 runtime verification and focused repair
 
 The published `ca6af9ac` preflight passed 826 checks in 94.49s (GitHub run
