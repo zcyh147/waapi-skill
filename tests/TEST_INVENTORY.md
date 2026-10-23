@@ -46,6 +46,17 @@ Handoffs, selected logs and review are hash-archived in
 behaviors. Multi-root collisions, duplicate requested sibling names, richer
 graph forms and native-name create history remain #178/#192 work.
 
+The first prepared scalar-query native node ran on macOS Console2025.1.7.9143
+at `f6f1f28e` and failed in9.51s. The independent baseline and initial related
+query succeeded, but the test wrapper prepended `--timeout30` to the Gateway's
+complete pagination continuation; the Gateway rejected that altered command.
+The detailed diagnostic document also contained4128 entries, making full paging
+inappropriate for this small acceptance flow. This is no native acceptance PASS.
+Its original root `r77-query-fields-f6f1f28e-2025-r1` retains85 hash-checked native
+packets, three public invocations, zero transactions, unchanged source hashes/
+mtime/tree, clean process teardown and a quarantined sandbox. The2021 attempt
+was deferred pending a test-only correction; the failed root is not reused.
+
 No Fresh, Windows native, full Program or full Non-live gate ran for this
 increment. The PR remains draft and all affected functional tickets stay open.
 
