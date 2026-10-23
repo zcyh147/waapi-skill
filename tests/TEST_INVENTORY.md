@@ -5,6 +5,28 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R89 imported Marker observation
+
+Reviewed fixture `4d5d9e46` uses one closed audio import in the existing private
+workflow lifecycle, followed by actual Source/mode/media and bounded Marker
+reads. Eleven focused checks passed in 5.08s; the three extracted RIFF helpers
+retain their original function bytes and four concrete fixture digests.
+
+Frozen integration `b25fe515` **failed the positive Marker observation in
+7.29s** on Mac Console2025.1.7.9143. The import transaction
+`tx1-6b2j1qsjehd5gc2xhgyp` verified, copied media matched the input WAV, and the
+actual Source reported MarkerInputMode0. The local `@Markers` query returned
+an empty list; no exact Marker Time/Label read followed. This does not prove
+native absence or the behavior of a different accessor. The retained result
+requires source reconciliation of stored object Lists versus imported-file
+marker projections before another native selection.
+
+Thirteen public calls produced 28 hash-checked dispatcher packets and nine
+version handshakes, with zero continuations and one setup transaction. Source
+full-tree hash, project mtime and tree metadata were unchanged; processes
+cleaned and the failed sandbox was quarantined. No retry, Fresh or all-version
+native claim follows. Record: `r89-marker-b25fe515-2025-r1/root-review.json`.
+
 ## 2026-10-23 R89 condition mapping and Inner policy increment
 
 Reviewed condition core `f8469066` maps 7,297 installed condition IDs across
