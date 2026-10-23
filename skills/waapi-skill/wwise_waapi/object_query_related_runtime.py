@@ -80,7 +80,8 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
         if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
             return None
         class_id = row.get(f'{native}.classId' if native else 'classId')
-        return binder.bind(meaning, reference, class_id, native, index, option)
+        return binder.bind(meaning, reference, class_id, native, index, option,
+            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value'})
 
     # Read all statically known prefixes together, including actual endpoint class.
     initial = list(IDENTITY)

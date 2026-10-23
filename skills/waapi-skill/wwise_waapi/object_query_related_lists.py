@@ -453,7 +453,8 @@ class RelatedListPlan:
         if reference is None: return None
         if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
             raise RelatedQueryError('A singleton path requires one canonical reference, null or absence', code='RELATED_QUERY_RESULT_SHAPE')
-        return self.binder.bind(meaning, reference, row.get(f'{prefix}.classId' if prefix else 'classId'), prefix, {'frame':frame.number,'occurrence':list(loc)}, option)
+        return self.binder.bind(meaning, reference, row.get(f'{prefix}.classId' if prefix else 'classId'), prefix, {'frame':frame.number,'occurrence':list(loc)}, option,
+            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value'})
 
     def unresolved(self, candidates, matched, option, meaning, pending):
         for frame, loc, prefix, path, selected in candidates:

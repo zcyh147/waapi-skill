@@ -8,7 +8,7 @@ from .metadata_discovery import discover_metadata, MAX_METADATA_DISCOVERY_RESULT
 
 
 def namespaced_property_token(value):
-    """Condition-only lexical shape; fresh property metadata supplies authority."""
+    """Scalar property lexical shape; fresh property metadata supplies authority."""
     return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_]+:[A-Za-z0-9_]+', value) is not None
 
 
@@ -64,8 +64,8 @@ class RelatedFieldBinder:
             selection = {**selection, 'insufficient_kind': selection['candidate'].get('kind'), 'candidate': None}
         candidate = selection['candidate']
         # Apply the current use's policy after exact-object kind fallback, on
-        # every bind. Cached discovery cannot grant a condition's authority to
-        # a later reference hop or custom output using the same field meaning.
+        # every bind. Cached property discovery cannot grant its token permission
+        # to a later reference hop or reference output using the same meaning.
         if candidate and not (re.fullmatch(r'[A-Za-z0-9_]+', candidate.get('name', ''))
                 or namespaced_property and candidate.get('kind') == 'property'
                 and namespaced_property_token(candidate.get('name'))):
