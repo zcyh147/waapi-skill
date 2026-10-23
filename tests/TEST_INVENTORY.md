@@ -5,6 +5,60 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R109–R110 runtime result validation and evidence reuse
+
+Integrated candidate `0a6400d199e638b3b00e13679af4be147198e696` combines the
+reviewed RTPC evidence mechanism (`a3596f60`) and runtime result guards
+(`5343f159`). The earlier RTPC scalar guard (`a5e3b1a6`) checks every returned
+row before pagination, preserving actual MIDI labels and older optional fields.
+The new guards resolve the pinned result definitions for Voices, Busses,
+AudioObjects, performance counters, meters, logs and voice-contribution trees
+before publishing results or retaining handles. Each family uses its supported
+versions; no latest-version schema is substituted for older definitions.
+
+Focused public-Gateway RED/GREEN checks cover malformed off-page rows, nested
+references, recursive contribution values and preservation of valid labels,
+optional fields and ID domains. Two narrow result-only compatibility rules
+preserve the documented pre-2024 contribution driver reason/GUID union and
+existing selected nullable meter values. Other meter fields retain their
+reflected checks. The retained successful arrays in
+`tests/fixtures/runtime/referenced-runtime-native-results.json` were replayed
+through the corresponding public routes: 18 row/counter cases passed, then five
+contribution cases passed after correcting their test CLI route. All 23 source
+dispatch hashes and exact copied values were independently checked. These are
+offline compatibility checks, not new native executions or whole-run acceptance
+for the original R104 roots.
+
+Review also found that valid negative Game Object IDs on 2024/2025 received
+handles but were rejected by contribution identity revalidation. The narrow
+versioned lower-bound repair preserves uint64-only behavior through 2023 and
+all bool/type/upper-bound checks. The two affected public-flow nodes first
+reported four failures and 18 passes, then **22 passes in 6.89s**. They exercise
+actual Gateway-issued voice and bus handles plus invalid live rereads. No
+negative-ID native execution is claimed. Earlier guard selections retain their
+separate tool-transcript-reported results; they were not repeated merely to
+create log files or summed into a broad-gate count.
+
+The RTPC publisher maps 182 exact construction/data/reference branches across
+the five versions and two host contracts. Its no-native final-consumer test
+proved 60 deterministic construction branches and left all 122 data branches
+missing native evidence. Only the preserved finalized 2022/2025 Authoring runs
+are eligible for subsequent native attachment. Two review findings were fixed:
+program evidence must preserve the complete native/public array and exact field
+occurrence, and removing optional markers cannot bypass the captured-program
+contract. Their separate causal follow-ups passed two and three selected tests,
+including the affected stage and historical attachment path. These are test
+produced inputs; final receipts, a sealed 182-branch package and global ledger
+publication remain pending.
+
+One evaluator invocation now reuses immutable historical Git source hashes:
+two native branches require 413 Git reads total, and a second invocation reads
+all 413 afresh. Exact source selections remain distinct. Current source checks,
+per-branch assertions and original archive/lifecycle checks are not cached.
+No Wwise/Fresh launch, full Program/Non-live gate or whole-#186 acceptance was
+performed for this batch. Original failed evidence and historical sealed
+program records remain unchanged.
+
 ## 2026-10-24 R108 cursor moves and runtime evidence publication
 
 On frozen candidate `013776270f6d9c1b65bf53940442f4ac593e5714`, one owned Mac
