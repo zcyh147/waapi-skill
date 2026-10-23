@@ -235,3 +235,31 @@ def test_runtime_batch_rejects_duplicate_categories_or_changed_node_set(damage):
         read = lambda name: raw if name == seal_path else original_read(name)
     with pytest.raises(ValueError, match='batch context or final proof differs'):
         completion.validate_authoring_batch_finalization(run, FIXTURE, read_bytes=read)
+
+
+@pytest.mark.parametrize('damage', ['invented', 'renamed', 'status', 'business-status', 'missing'])
+def test_original_runtime_batch_rejects_category_roster_or_status_changes(tmp_path, damage):
+    from tests.support.runtime_observation_evidence import archive_reader, sha, write_json
+    run = json.loads((FIXTURE / 'original-category.json').read_bytes())
+    read = archive_reader({'artifact': 'original-closure.json.gz',
+        'sha256': sha((FIXTURE / 'original-closure.json.gz').read_bytes())}, FIXTURE)
+    completion.validate_authoring_batch_finalization(run, FIXTURE, read_bytes=read)
+    if damage == 'invented':
+        extra = deepcopy(run['categories'][0])
+        extra['category'] = 'invented-profiler-effect'
+        run['categories'].append(extra)
+    elif damage == 'renamed':
+        run['categories'][0]['category'] = 'renamed-profiler-effect'
+    elif damage == 'status':
+        run['categories'][0]['status'] = 'blocked'
+    elif damage == 'business-status':
+        run['categories'][0]['business_outcome'] = 'FAIL'
+    else:
+        run['categories'].pop()
+    # Preserve every original archive/hash/source/lifecycle fact; reseal the
+    # changed outer row so the reader must check the archived outcome roster.
+    descriptor = {**write_json(tmp_path / 'category.json', run),
+        'nodeid': run['invocation']['selected_test_nodeids'][0]}
+    context = completion.read_category_run(descriptor, tmp_path)
+    with pytest.raises(ValueError, match='archived category roster or status differs'):
+        completion.validate_authoring_batch_finalization(context['record'], FIXTURE, read_bytes=read)

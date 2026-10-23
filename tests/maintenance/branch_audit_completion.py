@@ -314,7 +314,8 @@ def validate_authoring_batch_finalization(run, base, *, read_bytes=None):
             if (original['nodeid'] != nodeid or original['candidate'] != run['candidate']
                     or original['source_context'] != seal['source_context']):
                 raise ValueError('node original context differs')
-            for artifact in original['artifacts'].values():
+            profiler_report = None
+            for artifact_name, artifact in original['artifacts'].items():
                 root = PurePosixPath(artifact['path']) if read_bytes else Path(artifact['path'])
                 for entry in artifact['files']:
                     path = root / entry['path']
@@ -325,6 +326,29 @@ def validate_authoring_batch_finalization(run, base, *, read_bytes=None):
                     content = read_bytes(str(path)) if read_bytes else path.read_bytes()
                     if len(content) != entry['bytes'] or hashlib.sha256(content).hexdigest() != entry['sha256']:
                         raise ValueError('node archived evidence differs')
+                    if artifact_name == 'native-evidence' and entry['path'] == 'profiler-capture.json':
+                        profiler_report = json.loads(content)
+            claimed = {row['category']: row for row in categories if row['nodeid'] == nodeid}
+            if profiler_report is None:
+                # Historical layout nodes predate the outcome report. Their
+                # closed producer shape is one layout category per passed node.
+                if set(claimed) != {'authoring-layout'} or claimed['authoring-layout']['status'] != 'PASS':
+                    raise ValueError('archived category roster or status differs')
+            else:
+                # The archived report owns its historical outcome roster. Never
+                # import today's collector roster to reinterpret that evidence.
+                outcomes = profiler_report.get('outcomes')
+                if (profiler_report.get('contract') != 'waapi-skill.owned-profiler-capture/v1'
+                        or profiler_report.get('candidate') != run['candidate']
+                        or profiler_report.get('version') != run['version']
+                        or not isinstance(outcomes, dict) or not outcomes or set(claimed) != set(outcomes)):
+                    raise ValueError('archived category roster or status differs')
+                for name, observed in outcomes.items():
+                    business = observed.get('outcome')
+                    expected_status = {'PASS': 'PASS', 'FAIL': 'FAIL', 'BLOCKED': 'blocked'}.get(business)
+                    if (expected_status is None or claimed[name]['status'] != expected_status
+                            or claimed[name].get('business_outcome') != business):
+                        raise ValueError('archived category roster or status differs')
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ValueError(f'Authoring batch finalization is incomplete: {exc}') from exc
 
