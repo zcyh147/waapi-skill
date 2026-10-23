@@ -11699,6 +11699,9 @@ def resolve_profiler_voice_path(
                 error_code="INVALID_STABLE_READ_RESULT",
             )
         required = set(PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS)
+        # voiceReturn/busReturn use uint64 through 2023, then the pinned
+        # common id64bits union (int64 or uint64) in 2024/2025.
+        minimum_game_object_id = -(1 << 63) if detected_version in {"2024.1", "2025.1"} else 0
         normalized: list[dict[str, Any]] = []
         for index, row in enumerate(rows):
             if not isinstance(row, Mapping) or not required <= set(row):
@@ -11716,7 +11719,7 @@ def resolve_profiler_voice_path(
                 or not 0 <= pipeline_id <= 0xFFFFFFFF
                 or isinstance(game_object_id, bool)
                 or not isinstance(game_object_id, int)
-                or not 0 <= game_object_id <= (1 << 64) - 1
+                or not minimum_game_object_id <= game_object_id <= (1 << 64) - 1
                 or not _canonical_guid(object_guid)
             ):
                 raise GatewayResultShapeError(

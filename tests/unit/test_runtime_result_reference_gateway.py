@@ -184,3 +184,67 @@ def test_retained_native_runtime_results_remain_compatible_at_public_gateway(tmp
     else:
         code, payload = run("core-call", operation, "--profiler-position", "123", "--max-results", "1000")
     assert code == 0, payload
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("game_object_id", [-1, -(1 << 63)])
+def test_signed_game_object_voice_and_bus_handles_continue_to_contributions(tmp_path, version, game_object_id):
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        if uri in {PREFIX + "getVoices", PREFIX + "getBusses"}:
+            return {"return": [{"pipelineID": 42 if uri.endswith("getVoices") else 43,
+                "gameObjectID": game_object_id, "objectGUID": GUID, "objectName": LABEL,
+                "gameObjectName": LABEL}]}
+        if uri == PREFIX + "getVoiceContributions":
+            return {"return": {"volume": -3.0, "LPF": 2.0, "HPF": 1.0, "objects": [],
+                **({"DSF": 0.0} if version == "2025.1" else {})}}
+        return original(uri, args, options)
+    client.call = call
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env,
+            client_factory=lambda _url: client)
+    handles = []
+    for operation, field in [("getVoices", "voice_instance_handle"), ("getBusses", "bus_instance_handle")]:
+        code, payload = run("core-call", PREFIX + operation, "--profiler-position", "123")
+        assert code == 0, payload
+        handles.append(payload["agent_result"]["return"][0][field])
+    code, payload = run("profiler-voice-contributions", "--capture-ms", "123",
+        "--voice-instance-handle", handles[0], "--bus-instance-handle", handles[1])
+    assert code == 0, payload
+    assert payload["agent_result"]["volume"] == -3.0
+    assert calls[-1] == PREFIX + "getVoiceContributions"
+
+
+@pytest.mark.parametrize("version,invalid", [
+    *((version, value) for version in VERSIONS for value in (False, -(1 << 63) - 1, 1 << 64)),
+    *((version, -1) for version in VERSIONS[:3]),
+])
+def test_contribution_handle_revalidation_rejects_invalid_versioned_game_object_ids(tmp_path, version, invalid):
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    game_object_id = 1
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        if uri == PREFIX + "getVoices":
+            return {"return": [{"pipelineID": 42, "gameObjectID": game_object_id, "objectGUID": GUID,
+                                 "objectName": LABEL, "gameObjectName": LABEL}]}
+        return original(uri, args, options)
+    client.call = call
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env,
+            client_factory=lambda _url: client)
+    code, observed = run("core-call", PREFIX + "getVoices", "--profiler-position", "123")
+    assert code == 0, observed
+    handle = observed["agent_result"]["return"][0]["voice_instance_handle"]
+    game_object_id = invalid
+    code, payload = run("profiler-voice-contributions", "--capture-ms", "123", "--voice-instance-handle", handle)
+    assert code == 2, payload
+    assert payload["error_code"] == "INVALID_STABLE_READ_RESULT"
+    assert "agent_result" not in payload
+    assert PREFIX + "getVoiceContributions" not in calls
