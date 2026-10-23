@@ -2,6 +2,7 @@
 import copy
 import json
 import re
+from pathlib import Path
 
 import pytest
 
@@ -125,11 +126,96 @@ def test_local_members_require_declared_class_and_actual_owner_in_every_sequence
 @pytest.mark.parametrize('version',['2022.1','2025.1'])
 def test_unknown_plugin_class_cannot_borrow_abstract_source_list_or_return_empty(tmp_path,version):
     task=LocalListTask(tmp_path,version)
-    task.row.update(classId=9699330,type='SourcePlugin')
+    task.row.update(classId=9699331,type='SourcePlugin',name='Wwise Synth One')
     task.row['@RTPC']=[]
     code,result=task.run('query-object','--exact-id',SOUND,'--include-related','local-rtpcs','any')
     assert code==2 and result['error_code']=='RELATED_QUERY_LOCAL_LIST_SOURCE',result
     assert not any('@RTPC' in (args or {}).get('waql','') or any('@RTPC' in field for field in (options or {}).get('return',[])) for _,args,options in task.calls)
+
+
+@pytest.mark.parametrize('version',['2022.1','2023.1','2024.1','2025.1'])
+@pytest.mark.parametrize('selection',[[],['first'],['combine','local-rtpcs','and','local-rtpcs','end','take','3']])
+def test_exact_source_plugin_class_projects_its_source_certified_rtpcs(tmp_path,version,selection):
+    task=LocalListTask(tmp_path,version)
+    task.row.update(classId=9699330,type='SourcePlugin',name='Wwise Synth One')
+    path=selection if selection and selection[0]=='combine' else ['local-rtpcs',*selection]
+    code,result=task.run('query-object','--exact-id',SOUND,
+        '--include-related',*path,'reference','Curve','curve-points','--detail')
+    assert code==0,result
+    root,=result['agent_result']
+    if not selection:
+        items=root['related']['local-rtpcs']['items']
+        assert [row['object']['id'] for row in items]==[RTPC1,RTPC2]
+        assert items[0]['related']['references']['Curve']['curve_points']==POINTS
+    elif selection==['first']:
+        projection,=root['related']['projections']
+        selected,=projection['items']
+        assert selected['object']['id']==RTPC1 and selected['related']['references']['Curve']['curve_points']==POINTS
+    else:
+        projection,=root['related']['projections']
+        assert [row['object']['id'] for row in projection['items']]==[RTPC1,RTPC2,RTPC1]
+
+
+@pytest.mark.parametrize('version',['2022.1','2023.1','2024.1','2025.1'])
+@pytest.mark.parametrize('actual_type',['Source','Sound'])
+def test_source_plugin_bridge_requires_actual_object_type_not_gettypes_category(tmp_path,version,actual_type):
+    task=LocalListTask(tmp_path,version)
+    task.row.update(classId=9699330,type=actual_type,name='Wwise Synth One')
+    code,result=task.run('query-object','--exact-id',SOUND,'--include-related','local-rtpcs','count')
+    assert code==2 and result['error_code']=='RELATED_QUERY_LOCAL_LIST_SOURCE',result
+
+
+@pytest.mark.parametrize('version',['2022.1','2025.1'])
+def test_exact_source_plugin_bridge_also_loads_actual_type_at_singleton_owner(tmp_path,version):
+    task=LocalListTask(tmp_path,version)
+    source=copy.deepcopy(task.row)
+    source.update(id=OTHER,classId=9699330,type='SourcePlugin',name='Wwise Synth One')
+    task.objects[OTHER]=source
+    task.row.update(parent={'id':OTHER,'name':'Wwise Synth One'},**{'parent.classId':9699330,
+        'parent.type':'SourcePlugin','parent.@RTPC':source['@RTPC']})
+    for member in task.members.values():member['owner']={'id':OTHER,'name':'Wwise Synth One'}
+    code,result=task.run('query-object','--exact-id',SOUND,'--include-related-field','parent','local-rtpcs','first','PropertyName')
+    assert code==0,result
+    projection,=result['agent_result'][0]['related']['parent']['related']['projections']
+    assert [row['object']['id'] for row in projection['items']]==[RTPC1]
+
+
+@pytest.mark.parametrize('version',['2022.1','2023.1','2024.1','2025.1'])
+def test_offline_bridge_discloses_exact_scope_and_retains_distinct_primary_type_evidence(tmp_path,version):
+    task=LocalListTask(tmp_path,version)
+    code,schema=task.run('query-schema')
+    assert code==0
+    assert schema['related_outputs']['local_object_lists']['explicit_class_bridges']==[{
+        'actual_class_id':9699330,'actual_object_type':'SourcePlugin','source_class_id':1048592,'native_list':'@RTPC'}]
+    root=Path(__file__).resolve().parents[2]/'skills/waapi-skill'
+    source=json.loads((root/'references/semantic'/version/'query-local-list-bridge.json').read_text())
+    assert source['version']==version
+    assert source['official_plugin_identity']['sha256']=='372181c5a3452fa6822da5e96e5d3fd2652337bb3fd65d8a81bbe4e24463d996'
+    assert source['class_id_calculation']['calculation']=='2 + (0 << 4) + (148 << (4 + 12)) = 9699330'
+    assert source['retained_type_registration']['row']=={'classId':9699330,'name':'Wwise Synth One','type':'Source'}
+    owner=source['retained_object_observation']['object']; member=source['retained_member_observation']['object']
+    assert owner['class_id']==9699330 and owner['type']=='SourcePlugin'
+    assert member['class_id']==1441808 and member['type']=='RTPC' and member['owner']['id']==owner['id']
+    assert source['abstract_declaration']['declaration']['name']=='RTPC'
+
+
+@pytest.mark.parametrize('version',['2022.1','2025.1'])
+@pytest.mark.parametrize('fault',['member-class','member-owner'])
+def test_source_plugin_bridge_keeps_actual_member_class_and_owner_controls(tmp_path,version,fault):
+    task=LocalListTask(tmp_path,version)
+    task.row.update(classId=9699330,type='SourcePlugin')
+    if fault=='member-class':task.members[RTPC1]['classId']=65552
+    else:task.members[RTPC1]['owner']={'id':OTHER}
+    code,result=task.run('query-object','--exact-id',SOUND,'--include-related-field','local-rtpcs','PropertyName')
+    assert code==2 and result['error_code']=='RELATED_QUERY_LOCAL_LIST_MEMBER',result
+
+
+@pytest.mark.parametrize('version',['2023.1','2025.1'])
+def test_source_plugin_rtpc_bridge_does_not_admit_unproven_effect_list(tmp_path,version):
+    task=effect_task(tmp_path,version)
+    task.row.update(classId=9699330,type='SourcePlugin')
+    code,result=task.run('query-object','--exact-id',SOUND,'--include-related','local-effect-slots','count')
+    assert code==2 and result['error_code']=='RELATED_QUERY_LOCAL_LIST_SOURCE',result
 
 
 @pytest.mark.parametrize('version',['2022.1','2023.1','2024.1','2025.1'])

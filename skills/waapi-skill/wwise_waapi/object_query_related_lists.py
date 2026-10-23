@@ -158,7 +158,7 @@ class RelatedListPlan:
             return self.combination_rows(owner,sequence)
         if descriptor(relation):
             actual = self.object_row(owner)
-            source_evidence = certify_local_list(self.version, relation, actual.get('classId'), RelatedQueryError)
+            source_evidence = certify_local_list(self.version, relation, actual.get('classId'), RelatedQueryError, owner_type=actual.get('type'))
             self.local_list_sources[(owner.upper(), relation)] = source_evidence
             source = build_object_get_query(object_id=owner, return_fields=IDENTITY, version=self.version)
             source_waql = source.envelope.args['waql'] + ' select ' + relation
@@ -371,7 +371,8 @@ class RelatedListPlan:
                         owner = row.get(prefix) if prefix else row
                         if owner is not None:
                             source_evidence = certify_local_list(self.version, local_native,
-                                row.get(prefix + '.classId' if prefix else 'classId'), RelatedQueryError)
+                                row.get(prefix + '.classId' if prefix else 'classId'), RelatedQueryError,
+                                owner_type=row.get(prefix + '.type') if prefix else owner.get('type'))
                             self.local_list_sources[(owner['id'].upper(), local_native)] = source_evidence
                     if not self.composed or edge.sequence:
                         prefix, _, relation = edge.native.rpartition('.')
@@ -511,11 +512,15 @@ class RelatedListPlan:
                     for frame, loc, prefix, path in states:
                         native = '.'.join(value for value in (prefix, RELATED_QUERY_LIST_RELATIONS.get(relation,'__combine__')) if value)
                         if descriptor(RELATED_QUERY_LIST_RELATIONS.get(relation)):
+                            if prefix and prefix + '.type' not in frame.fields:
+                                frame.fields.append(prefix + '.type'); frame.scope.append(prefix + '.type')
+                                self.observe()
                             row = frame.rows[loc]
                             owner = row.get(prefix) if prefix else row
                             if owner is not None:
                                 source_evidence = certify_local_list(self.version, RELATED_QUERY_LIST_RELATIONS[relation],
-                                    row.get(prefix + '.classId' if prefix else 'classId'), RelatedQueryError)
+                                    row.get(prefix + '.classId' if prefix else 'classId'), RelatedQueryError,
+                                    owner_type=row.get(prefix + '.type') if prefix else owner.get('type'))
                                 self.local_list_sources[(owner['id'].upper(), RELATED_QUERY_LIST_RELATIONS[relation])] = source_evidence
                         business = (*path, ('relation', relation))
                         edge_id = native if sequence is None else native + ':' + canonical_sha256(sequence)

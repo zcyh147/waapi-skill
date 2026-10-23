@@ -1,5 +1,8 @@
 """Two fixed local object-list contexts; exact class/source admission, no raw tokens."""
+import hashlib
+import json
 import math
+from pathlib import Path
 
 from .documented_list_fields import load_catalog
 from .schema_inventory import load_definition_graph
@@ -14,18 +17,47 @@ def descriptor(native):
     return next((value for value in LOCAL_LISTS.values() if value['native'] == native), None)
 
 
-def certify_local_list(version, native, class_id, error):
+def plugin_bridge(version):
+    if version not in {'2022.1', '2023.1', '2024.1', '2025.1'}: return None
+    path = Path(__file__).resolve().parents[1] / 'references/semantic' / version / 'query-local-list-bridge.json'
+    raw = path.read_bytes()
+    source = json.loads(raw)
+    if (source['version'], source['wwise_build']) != (version, load_definition_graph(version).wwise_build):
+        raise ValueError('Local List bridge source does not match selected definitions')
+    return source, hashlib.sha256(raw).hexdigest()
+
+
+def certify_local_list(version, native, class_id, error, *, owner_type=None):
     selected = descriptor(native)
     if selected is None: return None
     catalog = load_catalog(version)
     owner = next((row for row in catalog['classes'] if type(class_id) is int and row['class_id'] == class_id), None)
     field = next((row for row in owner['lists'] if row['name'] == selected['field']), None) if owner else None
+    bridge = None
+    # One reviewed XML/class/actual-object bridge. getTypes.type is 'Source',
+    # not the actual object type 'SourcePlugin'; neither is a general base rule.
+    if field is None and type(class_id) is int and class_id == 9699330 and native == '@RTPC' and owner_type == 'SourcePlugin':
+        pinned = plugin_bridge(version)
+        if pinned is not None:
+            source, digest = pinned
+            candidate = next(row for row in catalog['classes'] if row['class_id'] == source['source_class_id'])
+            if (source['owner_class_id'] != class_id or source['actual_object_type'] != owner_type or source['native_list'] != native
+                    or source['source_class_id'] != 1048592
+                    or source['abstract_declaration']['catalog_sha256'] != catalog['catalog_sha256']
+                    or source['abstract_declaration']['sha256'] != candidate['source_sha256']
+                    or source['abstract_declaration']['declaration'] not in candidate['lists']):
+                raise ValueError('Local List bridge differs from its matching class source')
+            owner = candidate
+            field = source['abstract_declaration']['declaration']
+            bridge = {'actual_class_id': class_id, 'actual_object_type': owner_type,
+                'source_class_id': source['source_class_id'], 'authority_sha256': digest}
     if version < selected['first'] or field is None or not field['element_classes'] or field['unresolved_element_types']:
         raise error('The exact owner class has no complete matching source for this local List; empty membership is not established',
             code='RELATED_QUERY_LOCAL_LIST_SOURCE', details={'native': native, 'class_id': class_id, 'version': version,
                 'native_absence_proven': False})
     return {'version': version, 'catalog_sha256': catalog['catalog_sha256'], 'class_id': class_id,
-        'source_member': owner['source_member'], 'source_sha256': owner['source_sha256'], 'declaration': field}
+        'source_member': owner['source_member'], 'source_sha256': owner['source_sha256'], 'declaration': field,
+        **({'explicit_class_bridge': bridge} if bridge else {})}
 
 
 def validate_local_member(row, owner_id, source, error):
@@ -44,8 +76,10 @@ def local_list_contract(version):
         'source': {'version': version, 'catalog_sha256': catalog['catalog_sha256'], **catalog['source']},
         'identity': 'canonical native GUID plus declared element class/exact owner; empty names valid, order and duplicate occurrences retained separately',
         'unresolved': 'missing class/source is not empty membership or native absence',
+        'explicit_class_bridges': ([{'actual_class_id': 9699330, 'actual_object_type': 'SourcePlugin',
+            'source_class_id': 1048592, 'native_list': '@RTPC'}] if plugin_bridge(version) else []),
         'remaining': ['2021 RTPC inspection semantics', '2021/2022 fixed Effect0-3 inspection uses existing scalar/reference paths',
-            'modern Marker transport identity and older Inner Marker representation', 'precise source-proven plugin-to-base bridges']}
+            'modern Marker transport identity and older Inner Marker representation', 'other precise source-proven plugin-to-base bridges']}
 
 
 def validate_curve_points(version, value, error):
