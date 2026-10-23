@@ -28,6 +28,10 @@ EFFECT='{4D11F2B7-6057-4887-A725-F00E1629699E}'
 PINS={'2022.1':('41784c1030c678d9a7f19a105dfb48e46fb8b76b044e9a3bdb8f2da885f61c3a',),
     '2025.1':('b8fc20794cc3d6b7ac17f5bd67fd57d297098830c52e985d44318f459da9c0df',
         '0d06c10e0e632bdb723d00922d38e1796561c781b11c8d71f5b7eeedb10130b6')}
+# Existing workflow normalize_project_copy's exact 2025 Auro profile removes an
+# unrelated bus reference and serializes that WWU. The selected MIDI is intact.
+PREPARED_PINS={**PINS,'2025.1':(PINS['2025.1'][0],
+    'dbd6e902dd8f062900f3c7e6ed38c55998d1af194e7d77d5d56c3e11f455992a')}
 IDENTITY=('id','name','type','path')
 MAX_DISPATCHES=384
 MAX_PACKET_BYTES=32*1024*1024
@@ -41,15 +45,17 @@ def source_paths(version):
 
 def source_frame(runtime):
     """Independent full WWU source/owned-copy evidence; no edits or inferred defaults."""
-    frames=[];trees=[]
-    for relative,pin in zip(source_paths(runtime.version),PINS[runtime.version]):
+    frames=[];trees=[];prepared_trees=[]
+    for relative,pin,prepared_pin in zip(source_paths(runtime.version),PINS[runtime.version],PREPARED_PINS[runtime.version]):
         source=runtime.sandbox.source_root/relative;owned=runtime.sandbox.sandbox_path/relative
         assert source.resolve()!=owned.resolve() and not source.is_symlink() and not owned.is_symlink()
         body=read_file(source,4*1024*1024);assert sha(body)==pin
-        assert read_file(owned,4*1024*1024)==body
-        frames.append({'relative_path':relative.as_posix(),'sha256':pin,'source_mtime_ns':source.stat().st_mtime_ns,
+        prepared=read_file(owned,4*1024*1024);assert sha(prepared)==prepared_pin,'Prepared WWU bytes drifted'
+        frames.append({'relative_path':relative.as_posix(),'sha256':pin,'prepared_sha256':prepared_pin,
+            'source_bytes':len(body),'prepared_bytes':len(prepared),'source_mtime_ns':source.stat().st_mtime_ns,
             'owned_mtime_ns':owned.stat().st_mtime_ns})
         trees.append(ET.fromstring(body))
+        prepared_trees.append(ET.fromstring(prepared))
     owners={};members={};curves={}
     selected=[(SOUND,'Sound','Synth',65552,SOUND_RTPCS),(SOURCE,'SourcePlugin','Wwise Synth One',9699330,(SOURCE_RTPC,))]
     for identity,kind,name,class_id,expected in selected:
@@ -79,7 +85,23 @@ def source_frame(runtime):
         ref,=slot.findall('./ReferenceList/Reference/ObjectRef');assert ref.get('ID')==EFFECT
         owners[AUXBUS]={'name':bus.get('Name'),'type':'AuxBus','class_id':3997712,'native':'@Effects','members':[SLOT]}
         members[SLOT]={'type':'EffectSlot','class_id':5505040,'owner':AUXBUS,'effect':EFFECT}
-    return {'wwus':frames,'owners':owners,'members':members,'curves':curves}
+    def business_xml(node):
+        # Wwise's scalar/reference data and child order are preserved; only XML
+        # formatting whitespace disappears. Non-whitespace text/tails stay exact.
+        return {'tag':node.tag,'attributes':dict(node.attrib),
+            'text':node.text if node.text and node.text.strip() else None,
+            'tail':node.tail if node.tail and node.tail.strip() else None,
+            'children':[business_xml(child) for child in node]}
+    selected={**{identity:row['type'] for identity,row in owners.items()},
+        **{identity:row['type'] for identity,row in members.items()},**{identity:'Curve' for identity in curves}}
+    subtrees={}
+    for identity,kind in selected.items():
+        original,=[node for tree in trees for node in tree.iter(kind) if node.get('ID')==identity]
+        prepared,=[node for tree in prepared_trees for node in tree.iter(kind) if node.get('ID')==identity]
+        expected=business_xml(original);actual=business_xml(prepared)
+        assert canonical_json_bytes(actual)==canonical_json_bytes(expected),('Selected business subtree changed',identity)
+        subtrees[identity]={'kind':kind,'source_sha256':canonical_sha256(expected),'prepared_sha256':canonical_sha256(actual)}
+    return {'wwus':frames,'owners':owners,'members':members,'curves':curves,'business_subtrees':subtrees}
 
 
 def test_local_rtpc_and_effect_slot_outputs_keep_actual_owners(workflow_sandbox_runtime,monkeypatch):
