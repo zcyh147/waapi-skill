@@ -4212,7 +4212,7 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
     operation = 'object.set' if native_rename or set_graph else 'object.create'
@@ -4229,6 +4229,10 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         collision_id = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
         task.objects[collision_id] = {'id': collision_id, 'name': 'Routing', 'type': 'Bus', 'classId': 1376272,
             'path': task.objects[SECOND]['path'] + r'\Routing', 'parent': {'id': SECOND}, 'notes': 'Keep collision'}
+        if multiple_roots:
+            task.objects['{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}'] = {'id': '{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}',
+                'name': 'Backup', 'type': 'Bus', 'classId': 1376272, 'path': task.objects[SECOND]['path'] + r'\Backup',
+                'parent': {'id': SECOND}, 'notes': 'Keep second collision'}
     if external:
         from tests.unit.test_object_graph_owned_choices_gateway import ROOT
         task.objects[ROOT] = {'id': ROOT, 'name': 'External', 'type': 'AuxBus', 'classId': 3997712,
@@ -4240,6 +4244,7 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
             task.objects[ROOT].update(path=r'\Master-Mixer Hierarchy\External buses\External', parent={'id': PROJECT_GROUP})
 
     ids = {'Routing': '{66666666-6666-6666-6666-666666666666}',
+        'Backup': '{99999999-9999-9999-9999-999999999999}',
         'Destination': '{77777777-7777-7777-7777-777777777777}', 'Sender': '{88888888-8888-8888-8888-888888888888}'}
     platform = '{44444444-4444-4444-4444-444444444444}'
     original = task.call
@@ -4250,10 +4255,13 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             if any('children' in item for item in args['objects']):
                 assert args['onNameConflict'] == ('rename' if native_rename else 'fail')
-                assert args['objects'][0]['children'][0]['name'] == 'Routing'
+                assert args['objects'][0]['children'][0]['name'] in ({'Routing', 'Backup'} if multiple_roots else {'Routing'})
+                if multiple_roots:
+                    assert len(args['objects']) == 1 and len(args['objects'][0]['children']) == 1
+                    assert set(args['objects'][0]) == {'object', 'children'}
                 def create(node, parent):
                     identity = ids[node['name']]
-                    name = 'Routing19' if native_rename and collision and node['name'] == 'Routing' else node['name']
+                    name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and node['name'] in {'Routing', 'Backup'} else node['name']
                     task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
                         'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
                         'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
@@ -4261,7 +4269,7 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
                     children = [create(child, identity) for child in node.get('children', [])]
                     return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
                 children = [create(child, SECOND) for child in args['objects'][0]['children']]
-                assert '@UserAuxSend0' not in task.objects[ids['Sender']]
+                assert '@UserAuxSend0' not in task.objects.get(ids['Sender'], {})
                 return {'objects': [{'id': SECOND, 'name': task.objects[SECOND]['name'], 'children': children}]}
             for item in args['objects']:
                 assert set(item) == {'object', '@UserAuxSend0'}, item
@@ -4309,6 +4317,10 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     external_fields = ['--field-value', field, task.bind(ROOT)] if external else []
     code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', target_name, *external_fields)
     assert code == 0, target
+    if multiple_roots:
+        code, second = task.step('draft-declare-new', '--declaration-id', 'backup', '--parent-handle', parent, '--kind', kinds['Bus'], '--name', 'Backup')
+        assert code == 0, second
+        root = second['draft']['declared_object']['result_handle']
     code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Sender',
         *(['--field-value', field, target['draft']['declared_object']['result_handle']] if planned_reference else []))
     assert code == 0, sender
@@ -5258,3 +5270,62 @@ def test_compound_set_fieldless_graph_history_uses_truthful_no_platform_view(tmp
         compound=True, creation_first=False, external=False, set_graph=True, collision=False,
         planned_reference=False, platform_certified=False)
     assert len(after) - len(before) == 3
+
+
+@pytest.mark.parametrize('version,creation_first', [('2022.1', False), ('2023.1', True), ('2024.1', False), ('2025.1', True)])
+def test_compound_two_collision_roots_bind_each_actual_result_before_cross_tree_reference_and_history(tmp_path, version, creation_first):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, version,
+        compound=True, creation_first=creation_first, external=True, native_rename=True, multiple_roots=True)
+    assert after['{66666666-6666-6666-6666-666666666666}']['name'] == 'Routing19'
+    assert after['{99999999-9999-9999-9999-999999999999}']['name'] == 'Backup37'
+    assert after['{88888888-8888-8888-8888-888888888888}']['@UserAuxSend0'] == {'id': '{77777777-7777-7777-7777-777777777777}'}
+    assert after['{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}']['notes'] == 'Keep second collision'
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == 3
+    code, shown = task.run('transaction-show', source)
+    assert code == 0, shown
+    child = next(call['prepared_operation'] for call in shown['artifact']['prepared_operation']['pre_state']['execution_plan']['calls']
+        if 'owned_result_stages' in call['prepared_operation']['pre_state'])
+    assert child['semantic_preview']['envelope']['metadata']['result_reference_execution']['stage_count'] == 3
+    execution = next(event['details']['dispatch_result'] for event in shown['events'] if event['event_type'] == 'execution_completed')
+    actual = next(phase['dispatch_result'] for phase in execution['result']['phases'] if 'owned_result_execution' in phase['dispatch_result'])
+    stages = actual['owned_result_execution']['stages']
+    assert actual['result'] == stages[0]['dispatch_result']['result']
+    assert [stage['dispatch_result']['result']['objects'][0]['children'][0]['id'] for stage in stages[:2]] == [
+        '{66666666-6666-6666-6666-666666666666}', '{99999999-9999-9999-9999-999999999999}']
+
+
+@pytest.mark.parametrize('fault', ['earlier-target-drift', 'reused-guid', 'prewrite-parent-drift', 'second-collision-drift', 'prewrite-second-collision-drift'])
+def test_two_owned_creation_stages_stop_bad_association_before_reference_and_never_retry(tmp_path, fault):
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, creation_first=False, external=True, native_rename=True, multiple_roots=True, prepared_only=True)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    original = task.call
+    creations = []
+    def damaged(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.set') and any('children' in item for item in args['objects']):
+            creations.append(args)
+            if len(creations) == 1 and fault == 'second-collision-drift':
+                task.objects['{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}']['notes'] = 'Unexpected collision edit'
+            if len(creations) == 2:
+                if fault == 'earlier-target-drift':
+                    task.objects['{77777777-7777-7777-7777-777777777777}']['path'] += 'Changed'
+                elif fault == 'reused-guid':
+                    result['objects'][0]['children'][0]['id'] = '{66666666-6666-6666-6666-666666666666}'
+        return result
+    task.call = damaged
+    if fault == 'prewrite-parent-drift':
+        from tests.unit.test_object_graph_owned_choices_gateway import SECOND
+        task.objects[SECOND]['notes'] = 'Changed after Preview'
+    if fault == 'prewrite-second-collision-drift':
+        task.objects['{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}']['notes'] = 'Changed after Preview'
+    code, failed = task.run('execute', source)
+    assert code == 2, failed
+    writes = [row for row in task.calls if row[0] == 'ak.wwise.core.object.set']
+    assert len(writes) == (0 if fault.startswith('prewrite-') else 1 if fault == 'second-collision-drift' else 2), failed
+    assert all(any('children' in item for item in args['objects']) for _, args, _ in writes)
+    if not fault.startswith('prewrite-'):
+        assert failed['state'] == 'indeterminate' and failed['automatic_retry'] is False, failed
+    count = len(task.calls)
+    assert task.run('execute', source)[0] == 2
+    assert not any(uri == 'ak.wwise.core.object.set' for uri, _, _ in task.calls[count:])

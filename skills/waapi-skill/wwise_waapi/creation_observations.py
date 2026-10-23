@@ -168,9 +168,9 @@ def ordinary_set_creation_graphs(plan, state):
         paths = {node['request_path'] for node in group}
         if any(node is not root and node.get('parent_request_path') not in paths for node in group):
             raise ValueError('Set creation graph is not connected to its retained parent')
-        if any('target_request_path' in field and field['target_request_path'] not in paths
+        if any('target_request_path' in field and field['target_request_path'] not in new
                 for node in group for field in ordinary_creation_fields(node)):
-            raise ValueError('Cross-tree creation references require their complete shared history observation')
+            raise ValueError('Creation references require their complete shared new-node observation roster')
         groups.append({'root': path, 'parent_id': parent['target_id'], 'nodes': group})
         visited.update(paths)
     if visited != set(new) or len(visited) + sum(len(ordinary_creation_fields(node)) for node in new.values()) > 128:
