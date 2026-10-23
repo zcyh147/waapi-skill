@@ -742,9 +742,23 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             if result_validation.unresolved_refs
             else "complete_reflected_schema"
         )
-        assert verification.message == (
-            "The returned WAAPI payload matches the packaged reflected result schema."
-        )
+        if entry.uri == "ak.wwise.core.profiler.enableProfilerData":
+            # Acknowledging capture directives cannot prove their final settings
+            # or restoration, even when the native result schema passes.
+            scope = verification.verification_scope
+            assert scope is not None
+            assert scope["strategy"] == "native_result_schema_only"
+            assert scope["enabled_settings_verified"] is False
+            assert scope["empty_effect_verified"] is False
+            assert scope["repeated_data_set_resolution_verified"] is False
+            assert scope["prior_settings_restoration_verified"] is False
+            assert verification.readbacks == ()
+            assert "acknowledged the submitted capture-data directives" in verification.message
+            assert "Do not replay the executed control." in verification.message
+        else:
+            assert verification.message == (
+                "The returned WAAPI payload matches the packaged reflected result schema."
+            )
 
 
 def test_program_matrix_is_the_exact_808_row_contract() -> None:
