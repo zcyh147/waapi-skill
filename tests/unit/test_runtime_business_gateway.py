@@ -1769,7 +1769,8 @@ def test_log_controls_disclose_bounded_observation_and_concurrency_limits(tmp_pa
     assert verification["maximum_channel_items"] == 1000
     assert verification["maximum_channel_bytes"] == 65536
     assert verification["row_identity"] == "none; messageId and time are not treated as unique or ordered"
-    assert verification["console_effect"] == "unverified by this getter; Topic delivery is not established here"
+    assert verification["console_add_observer"]["topic"] == "ak.wwise.core.log.itemAdded"
+    assert "addition-only" in verification["console_clear_boundary"]
 
 
 class _LogControlClient(_RuntimeControlDraftClient):
@@ -1857,7 +1858,6 @@ def test_log_add_preexisting_or_competing_content_does_not_prove_a_new_matching_
 
 
 @pytest.mark.parametrize("operation,declaration", [
-    ("ak.wwise.core.log.addItem", ("--message", "Console probe")),
     ("ak.wwise.core.log.clear", ("--log-channel", "general")),
 ])
 @pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))

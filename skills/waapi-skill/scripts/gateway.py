@@ -375,6 +375,7 @@ from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ign
     media_build_input_from_namespace,
 )
 from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    LOG_ADD_ITEM_URI,
     PROFILER_GET_CURSOR_TIME_URI,
     TRANSPORT_CREATE_URI,
     TRANSPORT_DESTROY_URI,
@@ -22880,6 +22881,17 @@ def _dispatch_transaction_command_with_execution_lease(
             if prepared.get("pre_state", {}).get("owned_result_stages"):
                 result = dispatch_owned_result_stages(dispatcher, connection=connection, version=detected_version,
                     prepared=prepared, operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+            elif (call_uri == LOG_ADD_ITEM_URI
+                    and prepared.get('verification_plan', {}).get('console') is True):
+                from wwise_waapi.runtime_log_observer import observe_console_log_add
+                result = observe_console_log_add(client=dispatcher.client,
+                    plan=prepared['verification_plan'], remaining=connection.deadline.remaining,
+                    dispatch_once=lambda: dispatch(dispatcher, call_uri,
+                        connection=connection, version=detected_version,
+                        args=runtime_call_args, options=runtime_call_options,
+                        allow_destructive=True,
+                        operation_timeout=float(capability.execution_contract['timeout_seconds']),
+                        result_limit_bytes=int(capability.execution_contract['result_limit_bytes'])))
             else:
                 result = dispatch(
                     dispatcher,
