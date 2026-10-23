@@ -5,6 +5,28 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R110 standalone RTPC branch publication
+
+Package `793c9f8a0222bde34156a47518488a4d43fe3467`, integrated at
+`133cb1aa7b808c206b5c00a705c02af84cccf184`, adds the standalone
+`tests/fixtures/branch-evidence/product/runtime-rtpc-fields-r110/index.json`.
+On stable bridge candidate `0c499d82`, 22 actual setup/call/teardown receipts
+passed once in **3.61s**. The first final package evaluation passed in **17.748s**:
+182 program branches passed; 84 met their requirements (60 deterministic
+construction and 24 matched native-data branches), 98 still lacked native
+evidence, and all 220 unselected RTPC alternatives remained unresolved.
+
+Native evidence is limited to the original finalized 2022/2025 Authoring runs.
+The exact reviewed three-file source delta requires unchanged complete original
+arrays through the current Gateway; all other 410 packaged paths remain
+byte-identical. Independent review checked source and receipt maps, unique
+phase-complete nodes, 166 referenced artifact seals, original archives and
+selected outcomes. No successful test or final consumer was repeated for review.
+
+The global index still contains no runtime entries; this package has not changed
+the global policy or completion ledger. The earlier R108 package remains
+historical. No new native/Fresh run, full gate or whole-ticket acceptance follows.
+
 ## 2026-10-24 R109–R110 runtime result validation and evidence reuse
 
 Integrated candidate `0a6400d199e638b3b00e13679af4be147198e696` combines the
@@ -47,9 +69,9 @@ are eligible for subsequent native attachment. Two review findings were fixed:
 program evidence must preserve the complete native/public array and exact field
 occurrence, and removing optional markers cannot bypass the captured-program
 contract. Their separate causal follow-ups passed two and three selected tests,
-including the affected stage and historical attachment path. These are test
-produced inputs; final receipts, a sealed 182-branch package and global ledger
-publication remain pending.
+including the affected stage and historical attachment path. Those were test
+produced inputs; the subsequent standalone publication above supplies final
+receipts and the sealed package. Global ledger publication remains pending.
 
 One evaluator invocation now reuses immutable historical Git source hashes:
 two native branches require 413 Git reads total, and a second invocation reads
