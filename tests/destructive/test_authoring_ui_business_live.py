@@ -75,6 +75,13 @@ def test_runtime_owned_2025_meter_cursor_capture(owned_authoring_layout_node):
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_runtime_owned_2025_loaded_media_event_probe(owned_authoring_layout_node):
+    from tests.destructive.support.loaded_media_probe import collect_loaded_event_probe
+    collect_loaded_event_probe(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_runtime_owned_2025_profiler_readers(owned_authoring_layout_node):
     from tests.destructive.support.profiler_capture import collect_owned_capture
     collect_owned_capture(*owned_authoring_layout_node)
