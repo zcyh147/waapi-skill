@@ -69,6 +69,7 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     lifecycle = HeadlessLifecycle(console_path=facts.console, project_path=facts.project, port=8080,
         host_kind='wwise-authoring', authoring_build=facts.build, authoring_owned_root=facts.owned,
         launch_env={'HOME': str(facts.home), 'WINEPREFIX': str(facts.prefix),
+                    'AK_AUTOMATION_MODE': '1',
                     'CX_ENV': 'WINEPREFIX=/unowned/bottle HOME=/unowned/home', 'WINE_WAIT_CHILD_PIPE': '15',
                     'AK_AUTHORING_ARGS_OVERRIDE': 'unowned.wproj'},
         launch_cwd_path=facts.project.parent, process_factory=process_factory,
@@ -110,11 +111,13 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     assert options['cwd'] == str(facts.project.parent)
     assert options['env']['HOME'] == str(facts.home)
     assert options['env']['WINEPREFIX'] == str(facts.prefix)
+    assert options['env']['AK_AUTOMATION_MODE'] == '1'
     assert not {'CX_ENV', 'WINE_WAIT_CHILD_PIPE', 'AK_AUTHORING_ARGS_OVERRIDE'} & set(options['env'])
     assert lifecycle.process is process
     assert lifecycle.ready_result['isCommandLine'] is False
     assert lifecycle.launch_project_attestation == {'method': 'owned_winepath_roundtrip',
         'project': str(facts.project), 'native_project': native_project, 'roundtrip_project': str(facts.project),
+        'requested_startup_environment': {'AK_AUTOMATION_MODE': '1'},
         'build': build, 'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(facts.prefix),
             'managed_reference': str(facts.cx / 'support/Wwise2019x64'),
             'configuration': str(facts.cx / 'support/Wwise2019x64/cxbottle.conf'),
