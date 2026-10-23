@@ -183,7 +183,7 @@ def _require_object_scope_mechanism(program, review):
     mutation = program['native_call']
     if not isinstance(calls, list) or sum(c['uri'].endswith('setProperty') for c in calls) != 1:
         raise ValueError('Current public object-scoped read/refresh trace is missing')
-    index = next(i for i, c in enumerate(calls) if c == mutation)
+    index = calls.index(mutation)
     identity = mutation['args']['object']
     for name in (review['selected_field'], review['controller']):
         def matches(call):
