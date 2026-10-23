@@ -474,7 +474,8 @@ def _staged_set_creation_observations(prepared, execution, verification, path_co
     actual = validate_stages(prepared, execution, context=phase_context)
     ids = {path: row['id'].upper() for path, row in actual.items()}
     view = state.get('field_read_platform', {})
-    if view.get('status') != 'certified' or not _GUID.fullmatch(str(view.get('platform_id'))):
+    platform = view.get('platform_id') if view.get('status') == 'certified' else None
+    if any(ordinary_creation_fields(node) for group in groups for node in group['nodes']) and (platform is None or not _GUID.fullmatch(str(platform))):
         raise ValueError('Staged creation receipt needs its certified original source field view')
     witnesses = [row for row in verification['assertions'] if row.get('kind') == 'verified_created_node_identity']
     all_nodes = [node for group in groups for node in group['nodes']]
@@ -493,7 +494,7 @@ def _staged_set_creation_observations(prepared, execution, verification, path_co
                     or _identity(matches[0]['object']) != {**_identity(actual[path]), 'path': expected_path}):
                 raise ValueError('Staged created node differs from the native result GUID/class/parent/path binding')
             identity = _identity(matches[0]['object'])
-            group_observations.extend(_created_node_observations(node, identity, parent_id, view['platform_id'],
+            group_observations.extend(_created_node_observations(node, identity, parent_id, platform,
                 ordinary_creation_fields(node), prepared, verification, ids, ids[group['root']], compound_path_context=path_context))
             if actual[path]['path'] != identity['path']:
                 next(row for row in reversed(group_observations) if row.get('kind') == 'creation_presence')['absence_paths'] = [actual[path]['path'], identity['path']]
