@@ -16,6 +16,12 @@ affected public Gateway, Registry, transaction, lifetime and cleanup selection
 passed **115 checks** (838 deselected); independent review found no issue.
 No additional native read, native run or Fresh attempt was needed for this
 comparison repair. This is five-version program proof, not whole #186 acceptance.
+The subsequent pure-code CI preflight on `786bf349` retained 821 passes and
+five transport-create failures because its older route-matrix fake returned
+only the transport ID. Updating that fake to return the created association
+made the five failed version rows pass in 0.65s (804 deselected). Production
+behavior and the independent wrong-association controls were unchanged; this
+targeted repair is not a replacement full preflight or release gate.
 
 Reviewed GET disclosure `6eb66b29`, integrated at `a3dd01be`, exposes the exact
 reflected attenuation curve choices for all five versions: 7/19/19/19/24.
