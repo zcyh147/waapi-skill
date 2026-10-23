@@ -1750,8 +1750,173 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
         "options": {},
     }
     assert artifact["prepared_operation"]["verification_plan"]["kind"] == (
-        "result-schema"
+        "profiler-user-cursor"
     )
+
+
+class _ProfilerCursorControlClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path) -> None:
+        super().__init__(tmp_path)
+        self.calls: list[tuple[str, object, object]] = []
+        self.control_result: object = {"return": 1230}
+        self.cursor_result: object = {"return": 1230}
+
+    def call(self, uri: str, args: object = None, options: object = None) -> object:
+        self.calls.append((uri, args, options))
+        if uri in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI}:
+            return self.control_result
+        if uri == GET_CURSOR_TIME_URI:
+            if isinstance(self.cursor_result, Exception):
+                raise self.cursor_result
+            return self.cursor_result
+        return super().call(uri, args, options)
+
+
+def test_profiler_cursor_setter_verifies_returned_snapped_time_through_public_transaction(tmp_path: Path) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "1234"))
+    assert not any(uri in {PROFILER_SET_CURSOR_TIME_URI, GET_CURSOR_TIME_URI} for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    assert verified["verification"]["business_state_verified"] is True
+    assert verified["verification"]["verification_strength"] == "independent_profiler_user_cursor_observation"
+    shown = invoke(["transaction-show", previewed["transaction_id"]])
+    evidence = next(event["details"]["verification"] for event in reversed(shown["events"])
+        if event["event_type"] == "verification_recorded")
+    assert {"uri": GET_CURSOR_TIME_URI, "args": {"cursor": "user"}, "options": {},
+        "result": {"return": 1230}} in evidence["readbacks"]
+    assert "Capture data completeness" in evidence["message"]
+    assert (PROFILER_SET_CURSOR_TIME_URI, {"time": 1234}, {}) in client.calls
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+    assert (GET_CURSOR_TIME_URI, {"cursor": "user"}, {}) in client.calls
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("move,native,time_ms", [
+    ("first-frame", "first", 0), ("last-frame", "last", 4560),
+    ("next-frame", "next", 0), ("previous-frame", "previous", 0),
+])
+def test_profiler_cursor_moves_verify_observed_time_without_requiring_motion(
+    tmp_path: Path, move: str, native: str, time_ms: int,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.control_result = client.cursor_result = {"return": time_ms}
+    previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "cursor-state",
+        PROFILER_MOVE_CURSOR_URI, ("--cursor-move", move))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    assert (PROFILER_MOVE_CURSOR_URI, {"position": native}, {}) in client.calls
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+    assert verified["verification"]["verification_scope"]["cursor_observation"] == {
+        "kind": "profiler-user-cursor-observation", "returned_time_ms": time_ms,
+        "observed_time_ms": time_ms, "capture_data_verified": False, "outcome": "matched"}
+
+
+@pytest.mark.parametrize("operation,declaration", [
+    (PROFILER_MOVE_CURSOR_URI, ("--cursor-move", "next-frame")),
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "1234")),
+])
+@pytest.mark.parametrize("returned,observed,outcome", [
+    (1230, 1234, "changed"), (1230, 1220, "changed"),
+    (1230, -1, "unavailable"), (-1, -1, "unavailable"), (-1, 1230, "unavailable"),
+])
+def test_profiler_cursor_changed_or_unavailable_observation_never_verifies_effect(
+    tmp_path: Path, operation: str, declaration: tuple[str, ...], returned: int, observed: int, outcome: str,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.control_result, client.cursor_result = {"return": returned}, {"return": observed}
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir, operation, declaration)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == (2 if outcome == "changed" else 0), verified
+    assert verified["verified"] is False
+    assert verified["state"] == ("verification_failed" if outcome == "changed" else "result_schema_checked")
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["cursor_observation"]["outcome"] == outcome
+    assert verified["automatic_retry"] is False
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("stage", ("control", "readback"))
+@pytest.mark.parametrize("native_result", [
+    {}, {"time": 1230}, {"return": True}, {"return": 1230.5}, {"return": None},
+    {"return": -2}, {"return": 1230, "time": 1230},
+], ids=("missing", "wrong-field", "boolean", "fraction", "null", "invalid-negative", "extra-field"))
+def test_profiler_cursor_malformed_result_cannot_verify_a_valid_looking_other_result(
+    tmp_path: Path, stage: str, native_result: dict[str, object],
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    if stage == "control":
+        client.control_result = native_result
+    else:
+        client.cursor_result = native_result
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "1234"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["cursor_observation"]["outcome"] == (
+        "malformed" if stage == "readback" else "malformed_control_result")
+    assert verified["automatic_retry"] is False
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == (1 if stage == "readback" else 0)
+    assert len(json.dumps(verified, ensure_ascii=False).encode("utf-8")) < gateway.MAX_GATEWAY_RESULT_JSON_BYTES
+
+
+@pytest.mark.parametrize("native_result,error_code", [
+    ([], "INVALID_READBACK"), (RuntimeError("cursor observation unavailable"), "READBACK_FAILED"),
+])
+def test_profiler_cursor_read_error_retains_executed_unverified_transaction(
+    tmp_path: Path, native_result: object, error_code: str,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.cursor_result = native_result
+    state_dir = tmp_path / "cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        PROFILER_MOVE_CURSOR_URI, ("--cursor-move", "last-frame"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["status"] == "verification_deferred"
+    assert verified["state"] == "executed_unverified"
+    assert verified["error_code"] == error_code
+    assert verified["automatic_retry"] is False
+    assert verified["manual_verification_retry_allowed"] is True
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == PROFILER_MOVE_CURSOR_URI for uri, _, _ in client.calls) == 1
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1"))
+@pytest.mark.parametrize("operation", (PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI))
+@pytest.mark.parametrize("command", ("request-schema", "draft-start"))
+def test_profiler_cursor_controls_do_not_offer_a_route_on_earlier_definitions(
+    tmp_path: Path, version: str, operation: str, command: str,
+) -> None:
+    code, result = gateway.execute_gateway([command, operation], env=_env(tmp_path, version=version),
+        client_factory=lambda url: pytest.fail(f"unavailable cursor route connected to {url}"))
+    assert code == 2, result
+    assert result["error_code"] == "TypedRequestError", result
+    assert operation in result["message"] and version in result["message"], result
 
 
 def _seal_runtime_control_preview(
