@@ -8,6 +8,7 @@ import uuid
 import pytest
 
 from wwise_waapi.metadata_restrictions import reference_type_token
+from wwise_waapi.operation_object import flatten_set_result
 
 from tests.destructive.test_gateway_workflow_transaction_matrix import (
     _bind_business_object, _complete_business_draft, _discover_business_type,
@@ -144,9 +145,11 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         observation['transactions'].append(setup)
         setup.update(_complete_business_draft(gateway, setup_draft))
         assert setup['execute']['automatic_retry'] is False and setup['verify']['verified'] is True, setup
-        setup_binding, = [row for row in setup['verify']['verification']['assertions']
-            if row['name'] == 'created plug-in requested state and placement match the immutable plan' and row['passed'] is True]
-        metadata_id = setup_binding['evidence']['id']
+        setup_result = flatten_set_result(setup['execute']['dispatch_result']['result'])
+        setup_root, = [row for row in setup_result if row.parent_request_path is None and row.object == METADATA_WU]
+        setup_child, = [row for row in setup_result if row.parent_request_path == setup_root.request_path and row.collection == 'children']
+        assert len(setup_result) == 2 and setup_child.name == METADATA_NAME, setup_result
+        metadata_id = setup_child.object
         metadata_target = observation['metadata_target'] = exact('metadata-target-after-setup', metadata_id)
         assert metadata_target['type'] == 'Metadata' and metadata_target['class_id'] == METADATA_CLASS, metadata_target
         assert metadata_target['name'] == METADATA_NAME and metadata_target['parent']['id'] == METADATA_WU, metadata_target
