@@ -206,7 +206,7 @@ def test_windows_owned_driver_has_an_explicit_unfinished_boundary_before_dispatc
 
 @pytest.mark.parametrize('version,nodeid', [
     *[(version, nodeid) for version in ('2021.1', '2022.1', '2023.1')
-        for nodeid in authoring_batch.OWNED_AUTHORING_NODEIDS],
+        for nodeid in authoring_batch.OWNED_AUTHORING_NODEIDS if nodeid != authoring_batch.TRANSPORT_OLDER_NODEID],
     ('2024.1', authoring_batch.PROFILER_CAPTURE_NODEID),
     ('2024.1', authoring_batch.TRANSPORT_SEMANTICS_NODEID),
     ('2024.1', authoring_batch.TRANSPORT_MIXED_NODEID),

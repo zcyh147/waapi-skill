@@ -94,6 +94,13 @@ def test_runtime_owned_2025_mixed_transport_semantics(owned_authoring_layout_nod
     collect_mixed_transport_semantics(*owned_authoring_layout_node)
 
 
+@pytest.mark.live
+@pytest.mark.destructive
+def test_runtime_owned_older_transport_semantics(owned_authoring_layout_node):
+    from tests.destructive.support.transport_semantics import collect_older_transport_semantics
+    collect_older_transport_semantics(*owned_authoring_layout_node)
+
+
 def _layout_effect(call, suffix, *, layout_handle, fields=()):
     schema = call(['request-schema', 'ak.wwise.ui.layout.' + suffix])
     started = call(schema['continuation']['gateway_argv'])
