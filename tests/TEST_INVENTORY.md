@@ -5,6 +5,39 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R97 Console input observations
+
+On exact candidate `0c7713f82267fb636a87e91049d7d9fcd855b4d0`, five
+sequential Mac WwiseConsole runs accepted all three capture-data submissions:
+an explicit empty list, two identical Voices-enable rows, and Voices-enable
+followed by Voices-disable. The exact builds were 2021.1.14.8108,
+2022.1.19.8584, 2023.1.19.8928, 2024.1.13.9056 and 2025.1.7.9143.
+Each exact enablement node passed; durations were respectively 11.28s, 11.50s,
+7.37s, 11.53s and 5.59s. These 15 separately previewed submissions prove
+native acceptance of the tested shapes, not hidden settings, repetition
+precedence or prior-setting restoration. Transactions remain
+`result_schema_checked`, with false business-effect claims.
+
+The 2023.1 Console log node failed: one add returned `{}`, but its acknowledged
+subscription delivered zero events within the fixed observation window.
+Unsubscribe succeeded; later verification truthfully remained schema-only.
+This is neither verified log addition nor proof that Console cannot publish
+the Topic. On 2025.1, bounded capture preparation succeeded, but setter `-1`
+returned native `ak.wwise.unexpected_error`, “The user time is out of range.”
+The Gateway retained `indeterminate`; `-2` was not attempted. Neither failed
+transaction was replayed or reverified, and no universal negative-time rule
+is inferred from that one input.
+
+Actual reports, exact final category rows and independent report-hash,
+source-hash/mtime/tree, process-cleanup and port-release checks are indexed by
+`.waapi-skill-state/full-coverage/r97-native-summary.json` and its per-run
+`root-review.json` files. Failed sandboxes remain quarantined. An earlier
+2021 command failed before Wwise launch because the basetemp parent was absent;
+only the invocation was corrected in a new root. Subsequent separate roots
+ran only previously unattempted enablement nodes after the log/cursor failures.
+No passing enablement case was repeated. This is targeted Console evidence,
+not Windows, Fresh, a broad regression gate or whole-#186 completion.
+
 ## 2026-10-23 R94 selected transport observations
 
 The separate five-case mixed-transport collector `440a3674`, integrated at
@@ -28,7 +61,8 @@ conflicting or malformed declarations, returned-time verification and
 execute-once failures. Later result-disclosure changes received only affected
 checks; these receipts are not a combined gate. Enablement remains explicitly
 schema-only, with no invented empty-list, repetition or negative-time meaning.
-Real acceptance of those boundary inputs is still unproven.
+That increment added no real input-acceptance evidence; the later R97
+observations are recorded above.
 
 Reviewed collector `645ee1d2`, integrated at `224c8d79`, exercises the public
 Gateway through the actual archive and final category writer. Review caught a
