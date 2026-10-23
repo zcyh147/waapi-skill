@@ -461,7 +461,8 @@ def test_capture_owner_requires_exact_single_2025_selection(tmp_path, monkeypatc
     config.args = [NODEID, *([NODE] if extra else [])]
     items = [SimpleNamespace(nodeid=name) for name in config.args]
     if version != '2025.1' or extra:
-        with pytest.raises(pytest.UsageError, match='only its matching 2025'):
+        message = 'Selected owned Authoring node is not available on the requested version' if version != '2025.1' else 'only its matching 2025'
+        with pytest.raises(pytest.UsageError, match=message):
             authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
         assert not events
     else:
