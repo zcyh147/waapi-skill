@@ -159,7 +159,11 @@ def test_existing_master_bus_audio_device_preserves_context(workflow_sandbox_run
         member, = [row for row in before["siblings"] if row["id"] == BUS]
         assert {key: member[key] for key in ("id", "name", "type", "path")} == {
             key: bus[key] for key in ("id", "name", "type", "path")}, (member, bus)
-        assert {row["id"] for row in before["siblings"]} == {BUS, PEER}, before["siblings"]
+        # The 2025 source also owns integration-fixture busses. Require our
+        # selected bus and peer without discarding any other observed sibling.
+        sibling_ids = [str(uuid.UUID(row["id"])) for row in before["siblings"]]
+        assert len(set(sibling_ids)) == len(sibling_ids), before["siblings"]
+        assert {str(uuid.UUID(BUS)), str(uuid.UUID(PEER))} <= set(sibling_ids), before["siblings"]
 
         selection, metadata = selected_metadata()
         observation["metadata_before"] = metadata
