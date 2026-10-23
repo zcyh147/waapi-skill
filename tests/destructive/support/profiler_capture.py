@@ -19,7 +19,8 @@ NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_meter_cursor_capture')
 SOUND_ID = '{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}'
 BUS_ID = '{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}'
-PARENT_ID = '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}'
+# Structural parent in the committed Busses WWU; Main Audio Bus is a sibling.
+PARENT_ID = '{A74EEB4A-0805-4AFA-969C-53DCB862B550}'
 OUTCOMES = ('profiler-meter-object-observation', 'profiler-cursor-snap-readback',
     'profiler-saved-capture-artifact', 'runtime-owned-log-add', 'runtime-owned-log-clear')
 PREFIX = 'ak.wwise.core.'
@@ -158,9 +159,10 @@ def collect_owned_capture(batch, public_call):
         assert type(props.get('IsLoopingEnabled')) is bool and props.get('IsLoopingInfinite') is True, (
             'Owned fixture requires live boolean loop values and already-infinite mode', original)
         before_bus = exact(BUS_ID, '--include', 'volume-db', '--include', 'parent')
-        before_parent = exact(PARENT_ID, '--include', 'volume-db')
+        before_parent = exact(PARENT_ID, '--include', 'work-unit-is-default')
         assert before_bus['name'] == 'WAAPI_V2_Weapons' and before_bus['type'] == 'Bus', before_bus
         assert before_bus['parent']['id'] == PARENT_ID, before_bus
+        assert before_parent['type'] == 'WorkUnit' and type(before_parent.get('work_unit_is_default')) is bool, before_parent
         report['fixture_before'] = {'sound': original, 'bus': before_bus, 'parent': before_parent}
         # The matching WObjects.xml defines Loop Enable as bool, default false;
         # Infinite defaults true and requires Enable. Fresh Draft discovery owns
@@ -192,7 +194,7 @@ def collect_owned_capture(batch, public_call):
         def meters():
             payload = call(['core-call', PREFIX + 'profiler.getMeters', '--profiler-position', fixed_time,
                 '--max-results', '64', '--meter-object-include', 'volume-db',
-                '--meter-object-include-related', 'parent', 'volume-db'])
+                '--meter-object-include-related', 'parent', 'work-unit-is-default'])
             pages = [payload['agent_result']]
             while not pages[-1]['complete']:
                 assert len(pages) < report['limits']['meter_pages'], 'Meter page bound exceeded'
@@ -206,7 +208,7 @@ def collect_owned_capture(batch, public_call):
                 assert obj['volume_db'] == before_bus['volume_db'], obj
                 parent = obj['related']['parent']
                 assert parent['object']['id'] == PARENT_ID and parent['object']['name'] == before_parent['name'], parent
-                assert parent['volume_db'] == before_parent['volume_db'], parent
+                assert type(parent.get('work_unit_is_default')) is bool and parent['work_unit_is_default'] == before_parent['work_unit_is_default'], parent
                 assert isinstance(row['source'], str) and row['source'], row
                 assert isinstance(row['configurationName'], str) and row['configurationName']
                 assert isinstance(row['configurationType'], str) and row['configurationType']
@@ -292,7 +294,7 @@ def collect_owned_capture(batch, public_call):
             if 'fixture_before' in report:
                 after = {'sound': exact(SOUND_ID, *looping),
                     'bus': exact(BUS_ID, '--include', 'volume-db', '--include', 'parent'),
-                    'parent': exact(PARENT_ID, '--include', 'volume-db')}
+                    'parent': exact(PARENT_ID, '--include', 'work-unit-is-default')}
                 report['fixture_after'] = after
                 assert after == report['fixture_before'], 'Owned Sound/bus/parent values changed after cleanup'
         except Exception as exc:

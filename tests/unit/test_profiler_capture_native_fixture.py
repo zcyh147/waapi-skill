@@ -6,6 +6,7 @@ from copy import deepcopy
 import json
 from pathlib import Path
 from types import SimpleNamespace
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -14,10 +15,48 @@ from tests.unit.test_runtime_business_gateway import _RuntimeControlDraftClient,
 from tests.support.gateway_config import set_gateway_config
 
 
+def _committed_capture_objects():
+    """Fixture relationships come from WWU structure, not collector constants."""
+    fixture = Path(__file__).resolve().parents[1] / '_org/2025.1'
+    rows = {}
+    for section in ('Containers', 'Busses'):
+        root = ET.parse(fixture / section / 'Default Work Unit.wwu').getroot()
+        parents = {child: parent for parent in root.iter() for child in parent}
+        for name in ('RFL_Tail', 'WAAPI_V2_Weapons', 'Default Work Unit', 'Main Audio Bus'):
+            matches = [node for node in root.iter() if node.tag in ('Sound', 'Bus', 'WorkUnit') and node.get('Name') == name]
+            if not matches:
+                continue
+            node, = matches
+            ancestors, current = [], node
+            while current is not root:
+                if current.get('Name'):
+                    ancestors.append(current)
+                current = parents[current]
+            row = {'id': node.get('ID'), 'name': name, 'type': node.tag,
+                'path': '\\' + '\\'.join([section, *[item.get('Name') for item in reversed(ancestors)]])}
+            if section == 'Busses' and node.tag == 'Bus':
+                parent = ancestors[1]
+                row['parent'] = {'id': parent.get('ID'), 'name': parent.get('Name')}
+                row['@Volume'] = 0.0
+            if section == 'Busses' and node.tag == 'WorkUnit':
+                row['workunitIsDefault'] = True
+            rows[row['id']] = row
+    sound = next(row for row in rows.values() if row['name'] == 'RFL_Tail')
+    sound_node, = [node for node in ET.parse(fixture / 'Containers/Default Work Unit.wwu').iter()
+        if node.get('ID') == sound['id']]
+    bus = next(row for row in rows.values() if row['name'] == 'WAAPI_V2_Weapons')
+    assert sound_node.find("ReferenceList/Reference[@Name='OutputBus']/ObjectRef").get('ID') == bus['id']
+    source = sound_node.find('ChildrenList/AudioFileSource')
+    assert source.findtext('AudioFile') == r'WAAPI Skill Integration V2\audit_tail.wav'
+    assert sound_node.find('ActiveSourceList/ActiveSource').get('ID') == source.get('ID')
+    bus['parent.workunitIsDefault'] = rows[bus['parent']['id']]['workunitIsDefault']
+    return rows
+
+
 def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
-        NODEID, SOUND_ID, BUS_ID, PARENT_ID, collect_owned_capture,
+        NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
     )
     runtime = owner.runtime
     runtime.lifecycle.ready_result['version']['displayName'] = 'v2025.1.7.9143'
@@ -35,19 +74,12 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
             self.registered = False
             self.logs = {'general': [], 'sourceControl': [{'message': 'preserve unselected channel',
                 'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]}
-            self.rows = {
-                SOUND_ID: {'id': SOUND_ID, 'name': 'RFL_Tail', 'type': 'Sound',
-                    'path': r'\Containers\Default Work Unit\WAAPI Skill Integration V2\WeaponsAudit\Rifle\RFL_Tail',
-                    'classId': 65552, '@IsLoopingEnabled': False, '@IsLoopingInfinite': True},
-                BUS_ID: {'id': BUS_ID, 'name': 'WAAPI_V2_Weapons', 'type': 'Bus',
-                    'path': r'\Busses\Default Work Unit\Main Audio Bus\WAAPI_V2_Weapons',
-                    'classId': 1376272, '@Volume': 0.0,
-                    'parent': {'id': PARENT_ID, 'name': 'Main Audio Bus', 'type': 'Bus',
-                        'path': r'\Busses\Default Work Unit\Main Audio Bus'},
-                    'parent.@Volume': 0.0},
-                PARENT_ID: {'id': PARENT_ID, 'name': 'Main Audio Bus', 'type': 'Bus',
-                    'path': r'\Busses\Default Work Unit\Main Audio Bus', 'classId': 1376272, '@Volume': 0.0},
-            }
+            self.rows = _committed_capture_objects()
+            self.rows[SOUND_ID].update({'classId': 65552, '@IsLoopingEnabled': False, '@IsLoopingInfinite': True})
+            self.rows[BUS_ID]['classId'] = 1376272
+            if failure == 'wrong-parent':
+                sibling = next(row for row in self.rows.values() if row['name'] == 'Main Audio Bus')
+                self.rows[BUS_ID]['parent'] = {key: sibling[key] for key in ('id', 'name')}
 
         def call(self, uri, args=None, options=None):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -186,6 +218,12 @@ def test_owned_capture_public_flow_reaches_archived_final_categories(owned_autho
     report = json.loads((report_root / 'profiler-capture.json').read_text())
     assert report['cleanup']['complete'] is True
     assert report['outcomes']['profiler-meter-object-observation']['evidence']['meters'][0]['channels'] == [{'name': 'C', 'value': -12.5}]
+    meter_object = report['outcomes']['profiler-meter-object-observation']['evidence']['meters'][0]['object']
+    assert meter_object['path'] == r'\Busses\Default Work Unit\WAAPI_V2_Weapons'
+    assert meter_object['volume_db'] == 0.0
+    assert meter_object['related']['parent']['object'] == {
+        'id': '{A74EEB4A-0805-4AFA-969C-53DCB862B550}', 'name': 'Default Work Unit'}
+    assert meter_object['related']['parent']['work_unit_is_default'] is True
     assert report['outcomes']['profiler-cursor-snap-readback']['evidence']['snapped_time_ms'] == 1490
     assert report['outcomes']['profiler-saved-capture-artifact']['evidence']['capture_format_validity_verified'] is False
     assert (report_root / 'saved-capture/OwnedCapture.prof').read_bytes().startswith(b'opaque fake')
@@ -197,6 +235,26 @@ def test_owned_capture_public_flow_reaches_archived_final_categories(owned_autho
     assert controls == ['ak.wwise.core.transport.destroy', 'ak.wwise.core.log.addItem', 'ak.wwise.core.log.clear']
     assert client.logs == {'general': [], 'sourceControl': [{'message': 'preserve unselected channel',
         'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]}
+
+
+def test_mismatched_structural_parent_stops_before_writes_and_final_acceptance(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, failure='wrong-parent')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
+    assert all(row['business_outcome'] == 'BLOCKED' and row['status'] == 'blocked'
+        and 'batch_finalization' not in row for row in record['categories'])
+    artifact = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    report = json.loads((Path(artifact['artifacts']['native-evidence']['path']) / 'profiler-capture.json').read_text())
+    assert report['setup'] == [] and report['public_call_count'] == 3
+    assert 'Main Audio Bus' in report['errors'][0]['message']
+    assert report['cleanup']['complete'] is True and report['cleanup']['receipts'] == []
+    assert not client.transport and not client.registered
+    assert {uri for uri, _, _ in client.calls} <= {
+        'ak.wwise.core.getInfo', 'ak.wwise.core.getProjectInfo', 'ak.wwise.core.object.get',
+        'ak.wwise.core.object.getPropertyAndReferenceNames', 'ak.wwise.core.object.getPropertyInfo'}
+    assert record['source']['hash_before'] == record['source']['hash_after']
 
 
 def test_empty_meter_retains_cursor_file_and_cleanup_as_separate_observations(owned_authoring, tmp_path, monkeypatch):

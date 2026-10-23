@@ -7,6 +7,33 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-23 R91 runtime verification and focused repair
 
+The owned 2025 profiler collector was integrated at `9ed95f41` after its
+public fake-host flow reached the actual archived final category writer.
+The affected success case passed in 25.61s. An explicit cleanup-failure
+reporting defect then passed its causal regression and the affected existing
+cleanup control: two passes in 43.11s. These checks preserve partial business
+observations while withholding acceptance after cleanup failure.
+
+Its first native attempt failed during startup, before the test body. Reviewed
+startup repair `8c589ee7`, integrated at `c7144d22`, restores the existing child
+Automation Mode request for this exact node; three affected controls passed in
+0.57s. The next native attempt reached matching 2025.1.7.9143 Authoring but
+failed in 37.21s before any mutation: the collector incorrectly assumed the
+selected Bus's structural parent was another Bus rather than its Work Unit.
+All five business outcomes remain blocked. The source hash and mtime were
+unchanged, lifecycle cleanup reported no errors, and the failed roots remain
+quarantined. Startup success grants no profiler, cursor, file or log effect
+credit. Fixture repair `a06f4d18`, integrated at `3368fd48`, derives simulated
+hierarchy facts from the committed Work Units and checks the actual WorkUnit
+parent. Its complete success flow and wrong-parent rejection passed in 26.39s.
+The fresh owned native run on `3368fd48` then passed in 122.47s: meter object
+and related output, snapped cursor readback, exact saved capture artifact,
+owned log addition and log clearing each have separate passing observations.
+Finalization confirms unchanged source hash/mtime, no residual processes and
+released port 8080. This is Mac Authoring 2025.1.7.9143 evidence; it does not
+prove other versions, capture-content completeness or whole-ticket completion.
+No broad gate or Fresh run was performed by this follow-up.
+
 Reviewed capture-artifact candidate `0aeaee85`, integrated at `9cf8eac7`,
 binds the exact authorized destination before execution and independently checks
 the resulting bounded regular-file artifact. It explicitly does not certify
