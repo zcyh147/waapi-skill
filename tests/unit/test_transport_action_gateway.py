@@ -23,6 +23,7 @@ class TransportActionClient(_RuntimeControlDraftClient):
         self.states = {}
         self.read_error = None
         self.state_result = None
+        self.list_error = None
 
     def call(self, uri, args=None, options=None):
         self.calls.append((uri, args, options))
@@ -37,6 +38,8 @@ class TransportActionClient(_RuntimeControlDraftClient):
                 raise self.read_error
             return self.state_result if self.state_result is not None else {"state": self.states.get(args["transport"], self.state)}
         if uri == "ak.wwise.core.transport.getList":
+            if self.list_error is not None:
+                raise self.list_error
             return {"list": self.rows}
         return super().call(uri, args, options)
 
@@ -61,6 +64,82 @@ def test_one_transport_stop_observes_stopped_state_through_public_transaction(tm
     assert any(row["uri"] == STATE and row["args"] == {"transport": 74}
         and row["result"] == {"state": "stopped"} for row in verified["verification"]["readbacks"])
     assert sum(uri == STATE for uri, _, _ in client.calls[before_verify:]) == 1
+    assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("native_id", (0, 74))
+def test_known_retire_recreate_cannot_verify_the_old_action_even_with_identical_native_row(tmp_path: Path, native_id: int) -> None:
+    class LifecycleClient(TransportActionClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.transport.destroy":
+                self.calls.append((uri, args, options))
+                self.rows = []
+                return {}
+            if uri == "ak.wwise.core.transport.create":
+                self.rows = [{"transport": native_id, "object": self.target_id, "gameObject": 1}]
+            return super().call(uri, args, options)
+
+    client = LifecycleClient(tmp_path)
+    state_dir = tmp_path / "state"
+    old_handle = create_handle(tmp_path, client, state_dir)
+    preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
+        ("--audition-action", "stop", "--transport-scope", "one-transport", "--transport-handle", old_handle))
+    executed = invoke(["execute", preview["transaction_id"]])
+    destroyed, invoke_destroy = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.destroy",
+        ("--transport-handle", old_handle))
+    destroy_executed = invoke_destroy(["execute", destroyed["transaction_id"]])
+    assert invoke_destroy(destroy_executed["next_command"]["gateway_argv"])["verified"] is True
+    new_handle = create_handle(tmp_path, client, state_dir)
+    assert new_handle != old_handle
+    before_verify = len(client.calls)
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and rejected["verified"] is False, rejected
+    assert rejected["verification"]["verification_strength"] == "gateway_transport_lifetime_invalidated"
+    assert not any(uri == STATE for uri, _, _ in client.calls[before_verify:])
+    assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("scope", ("one-transport", "all-active"))
+def test_transport_list_read_failure_defers_only_verification_and_allows_manual_observation_retry(tmp_path: Path, scope: str) -> None:
+    client = TransportActionClient(tmp_path)
+    state_dir = tmp_path / "state"
+    declaration = ("--audition-action", "stop", "--transport-scope", scope)
+    if scope == "one-transport":
+        handle = create_handle(tmp_path, client, state_dir)
+        declaration += ("--transport-handle", handle)
+    preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION, declaration)
+    executed = invoke(["execute", preview["transaction_id"]])
+    client.list_error = RuntimeError("transport list observation unavailable")
+    code, deferred = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and deferred["status"] == "verification_deferred", deferred
+    assert deferred["state"] == "executed_unverified"
+    assert deferred["error_code"] == "READBACK_FAILED"
+    assert deferred["automatic_retry"] is False
+    assert deferred["manual_verification_retry_allowed"] is True
+    client.list_error = None
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, rejected
+    assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
+
+
+def test_observed_malformed_transport_list_fails_verification_instead_of_deferring(tmp_path: Path) -> None:
+    client = TransportActionClient(tmp_path)
+    state_dir = tmp_path / "state"
+    preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
+        ("--audition-action", "stop", "--transport-scope", "all-active"))
+    executed = invoke(["execute", preview["transaction_id"]])
+    client.rows = [{}]
+    code, failed = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and failed["state"] == "verification_failed", failed
+    assert failed["verified"] is False
+    assert failed["verification"]["business_state_verified"] is False
+    assert failed["verification"]["verification_scope"]["observation"]["membership_matches"] is False
     assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
 
 

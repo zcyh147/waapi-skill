@@ -20279,6 +20279,8 @@ def verify_prepared_operation(
             return verified_readback(uri, args, version=version)
         try:
             current = transport_action_snapshot(args, version=version, read=action_read)
+        except OperationContractError:
+            raise
         except (ValueError, SemanticValidationError) as exc:
             check("Transport target associations remain observable", False, {"error": str(exc)})
             current = {"scope": before.get("scope"), "targets": []}
