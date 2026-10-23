@@ -43,6 +43,7 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
     assert tuple(build.get(key) for key in ("year", "major", "minor", "build")) == (2025, 1, 7, 9143)
     output = runtime.state_dir / "multiple-root-owned-history.json"
     assert not output.exists(), "Never overwrite an earlier native observation"
+    output.parent.mkdir(parents=True, exist_ok=True)
     evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
     prior_packets = set(evidence_root.glob("*.json"))
     endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
