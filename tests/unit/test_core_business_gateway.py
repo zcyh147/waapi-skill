@@ -1154,3 +1154,360 @@ def test_attenuation_role_contract_is_unavailable_outside_pinned_versions(versio
     assert code == 2, rejected
     assert rejected["ok"] is False
     assert "draft" not in rejected
+
+
+class _BlendAssignmentTask:
+    """Existing public Draft lifecycle with a stateful external WAAPI boundary."""
+    uri = "ak.wwise.core.blendContainer.addAssignment"
+    getter = "ak.wwise.core.blendContainer.getAssignments"
+    track = "{33333333-3333-3333-3333-333333333333}"
+    owner = "{44444444-4444-4444-4444-444444444444}"
+    first = "{55555555-5555-5555-5555-555555555555}"
+    second = "{66666666-6666-6666-6666-666666666666}"
+
+    def __init__(self, tmp_path, version):
+        from copy import deepcopy
+        self.clone = deepcopy
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        self.env = _env(tmp_path)
+        set_gateway_config(self.env, wwise_version=version)
+        self.info = _info()
+        self.info["version"]["year"] = int(version[:4])
+        self.project = _project(tmp_path)
+        base = r"\Containers\Default Work Unit\Weather"
+        self.objects = {
+            self.track: {"id": self.track, "name": "Weather", "type": "BlendTrack", "path": "Weather"},
+            TARGET_ID: {"id": TARGET_ID, "name": "Rain", "type": "Sound", "path": base + r"\Rain", "parent": {"id": self.owner}},
+            self.owner: {"id": self.owner, "name": "Weather", "type": "BlendContainer", "path": base,
+                         "blendTracks": [{"id": self.track, "name": "Weather"}]},
+        }
+        self.assignments = [{"child": child, "index": index, "edges": self.edges(index * 10)}
+                            for index, child in enumerate((self.first, self.second))]
+        self.calls = []
+        self.prefix = ["--state-dir", str(tmp_path / "state")]
+        started = self.run("draft-start", self.uri)
+        self.draft = started["draft"]
+        self.binding = [self.draft["draft_id"], "--task-authority", started["task_authority"]]
+        track = self.step("draft-bind-object", "--role", "blend_track", "--object-id", self.track)["bound_object"]["handle"]
+        child = self.step("draft-bind-object", "--role", "child", "--object-id", TARGET_ID)["bound_object"]["handle"]
+        self.handles = ["--role", "blend_track_handle", track, "--role", "child_handle", child]
+
+    @staticmethod
+    def edges(position):
+        return [{"edgePosition": position, "fadeMode": "None", "fadeShape": "Linear"},
+                {"edgePosition": position + 5, "fadeMode": "None", "fadeShape": "Linear"}]
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, self.clone(args), self.clone(options)))
+        if uri == "ak.wwise.core.getInfo":
+            return self.clone(self.info)
+        if uri == "ak.wwise.core.getProjectInfo":
+            return self.clone(self.project)
+        if uri == "ak.wwise.core.object.get":
+            return {"return": [self.clone(self.objects[identity]) for identity in args["from"]["id"] if identity in self.objects]}
+        if uri == self.getter:
+            return {"return": self.clone(self.assignments)}
+        if uri == self.uri:
+            retained = next((item for item in self.assignments if item["child"] == args["child"]), None)
+            if retained is not None:
+                # An admitted outcome for the deliberately unpredicted duplicate lane.
+                return self.clone(retained)
+            row = {"child": args["child"], "edges": self.clone(args.get("edges", self.edges(0)))}
+            position = max(0, min(args.get("index", len(self.assignments)), len(self.assignments)))
+            self.assignments.insert(position, row)
+            for index, item in enumerate(self.assignments):
+                item["index"] = index
+            return self.clone(row)
+        raise AssertionError((uri, args, options))
+
+    def disconnect(self):
+        pass
+
+    def raw(self, *argv):
+        return gateway.execute_gateway([*self.prefix, *argv], env=self.env, client_factory=lambda _: self)
+
+    def run(self, *argv):
+        code, result = self.raw(*argv)
+        assert code == 0, result
+        return result
+
+    def step(self, command, *argv):
+        result = self.run(command, *self.binding, "--expected-revision", str(self.draft["revision"]), *argv)
+        self.draft = result.get("draft", self.draft)
+        return result
+
+    def preview(self, index=None, *, edges=False):
+        self.step("draft-declare-core-plan", *self.handles,
+            *([] if index is None else ["--value", "insertion_index", str(index)]),
+            *(["--blend-edge", "0", "none", "none", "linear", "--blend-edge", "5", "none", "none", "linear"] if edges else []))
+        self.step("draft-check")
+        preview = self.step("preview-from-draft")
+        self.tx = preview["transaction_id"]
+        self.shown = self.run("transaction-show", self.tx)
+        self.artifact = self.shown["artifact"]["prepared_operation"]
+        return preview
+
+    def execute(self):
+        self.run("confirm", self.tx, "--confirmation-token", self.shown["confirmation"]["token"])
+        return self.raw("execute", self.tx)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_assignment_negative_index_preview_and_independent_order(tmp_path, version):
+    task = _BlendAssignmentTask(tmp_path, version)
+    preview = task.preview(-9)
+    assert preview["preview_summary"]["blend_assignment"]["expected_position"] == 0
+    assert task.artifact["verification_plan"]["expected_order"] == [TARGET_ID, task.first, task.second]
+    assert task.execute()[0] == 0
+    result = task.run("verify", task.tx)
+    assert result["verification"]["business_state_verified"] is True
+    assert [row["child"] for row in task.assignments] == [TARGET_ID, task.first, task.second]
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+def test_blend_assignment_null_observation_blocks_preview(tmp_path):
+    task = _BlendAssignmentTask(tmp_path, "2024.1")
+    task.assignments[0]["child"] = "{00000000-0000-0000-0000-000000000000}"
+    task.step("draft-declare-core-plan", *task.handles, "--value", "insertion_index", "-9")
+    code, result = task.raw("draft-check", *task.binding, "--expected-revision", str(task.draft["revision"]))
+    assert code != 0
+    assert "INVALID_BLEND_ASSIGNMENT_OBSERVATION" in json.dumps(result)
+    assert not any(uri == task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("damage", ["assignment-null", "owner-null", "owner-malformed-guid"])
+@pytest.mark.parametrize("phase", ["preview", "prewrite", "postwrite"])
+def test_blend_assignment_invalid_member_observations_fail_closed(tmp_path, damage, phase):
+    task = _BlendAssignmentTask(tmp_path, "2024.1")
+    if phase != "preview":
+        task.preview(-9)
+    if phase == "postwrite":
+        assert task.execute()[0] == 0
+    null = "{00000000-0000-0000-0000-000000000000}"
+    if damage == "assignment-null":
+        task.assignments[-1]["child"] = null
+    else:
+        identity = null if damage == "owner-null" else "{1234567-81234-1234-1234-123456789ABC}"
+        task.objects[task.owner]["blendTracks"].append({"id": identity})
+    if phase == "preview":
+        task.step("draft-declare-core-plan", *task.handles, "--value", "insertion_index", "-9")
+        code, result = task.raw("draft-check", *task.binding, "--expected-revision", str(task.draft["revision"]))
+        assert code == 2 and "INVALID_BLEND_ASSIGNMENT_OBSERVATION" in json.dumps(result), result
+    elif phase == "prewrite":
+        code, result = task.execute()
+        assert code == 2 and "STALE_BLEND_ASSIGNMENT" in json.dumps(result), result
+    else:
+        code, result = task.raw("verify", task.tx)
+        assert code == 2 and result["verified"] is False, result
+        assert result["verification"]["business_state_verified"] is False
+        assert task.raw("execute", task.tx)[0] == 2
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == (1 if phase == "postwrite" else 0)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_assignment_valid_mixedcase_member_observations_remain_accepted(tmp_path, version):
+    task = _BlendAssignmentTask(tmp_path, version)
+    task.assignments[0]["child"] = "{aBcDeFaB-1234-5678-9AbC-aBcDeF123456}"
+    task.objects[task.owner]["blendTracks"].append({"id": "{BcDeFaBc-2345-6789-aBcD-bCdEfA234567}"})
+    task.preview(-9)
+    assert task.artifact["verification_plan"]["expected_order"] == [
+        TARGET_ID, "{ABCDEFAB-1234-5678-9ABC-ABCDEF123456}", task.second]
+    assert task.execute()[0] == 0
+    result = task.run("verify", task.tx)
+    assert result["verification"]["business_state_verified"] is True
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize(("index", "expected"), [(None, 2), (0, 0), (1, 1), (99, 2)])
+def test_blend_assignment_documented_positions_and_retained_edges(tmp_path, version, index, expected):
+    task = _BlendAssignmentTask(tmp_path, version)
+    original = task.clone(task.assignments)
+    preview = task.preview(index)
+    assert preview["preview_summary"]["blend_assignment"]["expected_position"] == expected
+    assert task.execute()[0] == 0
+    verified = task.run("verify", task.tx)["verification"]
+    assert verified["business_state_verified"] is True
+    assert task.assignments[expected]["child"] == TARGET_ID
+    retained = {row["child"]: row["edges"] for row in task.assignments if row["child"] != TARGET_ID}
+    assert retained == {row["child"]: row["edges"] for row in original}
+    assert verified["verification_scope"]["default_edge_geometry_promised"] is False
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_assignment_empty_and_explicit_indices_own_order(tmp_path, version):
+    task = _BlendAssignmentTask(tmp_path, version)
+    # Native array transport order is not inferred assignment order.
+    task.assignments.reverse()
+    task.preview(1)
+    assert task.artifact["verification_plan"]["expected_order"] == [task.first, TARGET_ID, task.second]
+    task.assignments.reverse()  # Same explicit indices, different transport array order.
+    assert task.execute()[0] == 0
+    assert task.run("verify", task.tx)["verification"]["business_state_verified"] is True
+    other = _BlendAssignmentTask(tmp_path / "empty", version)
+    other.assignments = []
+    assert other.preview(-1)["preview_summary"]["blend_assignment"]["expected_position"] == 0
+    assert other.execute()[0] == 0
+    assert other.run("verify", other.tx)["verification"]["business_state_verified"] is True
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("kind", ["edge", "reassignment", "missing-observed-edges"])
+def test_blend_assignment_existing_admitted_lanes_keep_truthful_weak_result(tmp_path, version, kind):
+    task = _BlendAssignmentTask(tmp_path, version)
+    if kind == "reassignment":
+        task.assignments[0]["child"] = TARGET_ID
+    if kind == "missing-observed-edges":
+        task.assignments[0].pop("edges")
+    preview = task.preview(1, edges=kind == "edge")
+    assert preview["preview_summary"]["blend_assignment"]["verification_scope"]["unobserved"]
+    assert task.execute()[0] == 0
+    result = task.run("verify", task.tx)
+    assert result["verification"]["business_state_verified"] is False
+    assert result["verification"]["status"] == "result_schema_checked"
+    assert result["verification"]["verification_strength"] == "blend_assignment_partial_observation"
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("damage", ["order", "edge", "parent", "owner-track", "track-name", "missing-index", "extra"])
+def test_blend_assignment_prewrite_snapshot_drift_never_dispatches(tmp_path, version, damage):
+    task = _BlendAssignmentTask(tmp_path, version)
+    task.preview(-3)
+    if damage == "order":
+        task.assignments[0]["index"], task.assignments[1]["index"] = 1, 0
+    elif damage == "edge":
+        task.assignments[0]["edges"][0]["edgePosition"] = -0.5
+    elif damage == "parent":
+        task.objects[TARGET_ID]["parent"] = {"id": PROJECT_ID}
+    elif damage == "owner-track":
+        task.objects[task.owner]["blendTracks"] = []
+    elif damage == "track-name":
+        task.objects[task.track]["name"] = "Changed"
+    elif damage == "missing-index":
+        task.assignments[0].pop("index")
+    else:
+        task.assignments.append({"child": SOURCE_ID, "index": 2})
+    code, result = task.execute()
+    assert code == 2, result
+    assert all(uri != task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("damage", ["order", "edge", "parent", "missing-index", "extra", "missing-target"])
+def test_blend_assignment_independent_post_read_catches_partial_effects(tmp_path, version, damage):
+    task = _BlendAssignmentTask(tmp_path, version)
+    task.preview(-4)
+    assert task.execute()[0] == 0
+    if damage == "order":
+        task.assignments[0]["index"], task.assignments[1]["index"] = 1, 0
+    elif damage == "edge":
+        task.assignments[1]["edges"][0]["edgePosition"] = 99
+    elif damage == "parent":
+        task.objects[TARGET_ID]["parent"] = {"id": PROJECT_ID}
+    elif damage == "missing-index":
+        task.assignments[1].pop("index")
+    elif damage == "missing-target":
+        task.assignments.pop(0)
+        for i, row in enumerate(task.assignments):
+            row["index"] = i
+    else:
+        task.assignments.append({"child": SOURCE_ID, "index": 3})
+    code, result = task.raw("verify", task.tx)
+    assert code == 2 and result["verified"] is False, result
+    assert result["verification"]["business_state_verified"] is False
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+    replay_code, replay = task.raw("execute", task.tx)
+    assert replay_code == 2, replay
+    assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("damage", ["index", "duplicate-index", "duplicate-child", "wrong-owner", "wrong-track-type"])
+def test_blend_assignment_missing_material_facts_are_not_guessed(tmp_path, version, damage):
+    task = _BlendAssignmentTask(tmp_path, version)
+    if damage == "index":
+        task.assignments[0].pop("index")
+    elif damage == "duplicate-index":
+        task.assignments[1]["index"] = 0
+    elif damage == "duplicate-child":
+        task.assignments[1]["child"] = task.first
+    elif damage == "wrong-owner":
+        task.objects[task.owner]["type"] = "ActorMixer"
+    else:
+        task.objects[task.track]["type"] = "Sound"
+    task.step("draft-declare-core-plan", *task.handles, "--value", "insertion_index", "-2")
+    code, result = task.raw("draft-check", *task.binding, "--expected-revision", str(task.draft["revision"]))
+    if code == 0:
+        task.draft = result["draft"]
+        code, result = task.raw("preview-from-draft", *task.binding, "--expected-revision", str(task.draft["revision"]))
+        assert result["error_code"] == "INVALID_BLEND_ASSIGNMENT_OBSERVATION", result
+    if damage == "wrong-track-type":
+        assert result["error_code"] in {"OBJECT_READBACK_INVALID"}, result
+    else:
+        assert result["error_code"] == "INVALID_BLEND_ASSIGNMENT_OBSERVATION", result
+    assert code == 2, result
+    assert all(uri != task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_assignment_configuration_drift_is_still_prewrite_blocked(tmp_path, version):
+    task = _BlendAssignmentTask(tmp_path, version)
+    task.preview(-2)
+    set_gateway_config(task.env, waapi_port=31338)
+    code, result = task.raw("confirm", task.tx, "--confirmation-token", task.shown["confirmation"]["token"])
+    assert code == 2, result
+    assert all(uri != task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("damage", ["wrong-type", "different-path", "noncanonical-id", "type-name-selector"])
+def test_blend_assignment_relative_track_identity_is_guid_comparison_only(tmp_path, version, damage):
+    task = _BlendAssignmentTask(tmp_path, version)
+    started = task.run("draft-start", task.uri)
+    binding = [started["draft"]["draft_id"], "--task-authority", started["task_authority"], "--expected-revision", "1", "--role", "blend_track"]
+    if damage == "wrong-type":
+        task.objects[task.track]["type"] = "Sound"
+    elif damage == "different-path":
+        task.objects[task.track]["path"] = "Another"
+    elif damage == "noncanonical-id":
+        task.objects[task.track]["id"] = task.track.strip("{}")
+    else:
+        # Exact type/name resolution still must not promote display text to a selector.
+        original_call = task.call
+        def selector_call(uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get" and "waql" in args:
+                return {"return": [task.clone(task.objects[task.track])]}
+            return original_call(uri, args, options)
+        task.call = selector_call
+    selector = (["--exact-type-name", "BlendTrack", "Weather"]
+                if damage == "type-name-selector" else ["--object-id", task.track])
+    code, result = task.raw("draft-bind-object", *binding, *selector)
+    assert code == 2, result
+    assert all(uri != task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("index", ["true", "1.5", "NaN"])
+def test_blend_assignment_index_requires_an_integer(tmp_path, version, index):
+    task = _BlendAssignmentTask(tmp_path, version)
+    code, result = task.raw("draft-declare-core-plan", *task.binding,
+        "--expected-revision", str(task.draft["revision"]), *task.handles,
+        "--value", "insertion_index", index)
+    assert code == 2, result
+    assert all(uri != task.uri for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+def test_blend_assignment_schema_discloses_clamping_and_edge_effect_boundary(tmp_path, version):
+    env = _env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    code, result = gateway.execute_gateway(["request-schema", _BlendAssignmentTask.uri], env=env,
+        client_factory=lambda _: pytest.fail("schema discovery must be offline"))
+    assert code == 0, result
+    declaration = result["business_adapter"]["declaration"]
+    assert declaration["field_types"]["insertion_index"] == "integer_clamped_to_assignment_count"
+    assert declaration["field_semantics"]["insertion_index"]["input"] == "integer_including_negative"
+    assert declaration["field_semantics"]["insertion_index"]["omitted_effect"] == "append"
+    assert declaration["field_semantics"]["edges"]["effect_scope"] == "crossfade_GameParameter_only"
+    assert "unproved" in declaration["field_semantics"]["edges"]["verification_boundary"]

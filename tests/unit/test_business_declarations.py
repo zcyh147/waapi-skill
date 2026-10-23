@@ -1363,3 +1363,9 @@ def test_exact_live_token_binding_distinguishes_optional_type_absence_from_malfo
     assert error.value.error_code == expected_code
     assert calls[-1][1] == {"object": OBJECT_ID, "property": "Volume"}
     assert registry.as_dict()["fields"] == []
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", None])
+def test_blend_track_relative_identity_requires_the_observed_version_profile(version):
+    with pytest.raises(ValueError):
+        normalize_live_object_identity({"id": OBJECT_ID, "name": "On-Load", "type": "BlendTrack", "path": "On-Load"}, version=version)

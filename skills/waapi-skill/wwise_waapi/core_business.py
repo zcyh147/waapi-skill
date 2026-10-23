@@ -692,12 +692,11 @@ def materialize_core_business_request(
         }
         if "insertion_index" in plan:
             index = plan["insertion_index"]
-            if type(index) is not int or index < 0:
+            if type(index) is not int:
                 raise business_repair(
                     "BUSINESS_RANGE_INVALID",
                     field="insertion_index",
-                    minimum=0,
-                    action="provide a nonnegative integer",
+                    action="provide an integer; the Gateway discloses Wwise's clamped insertion position",
                 )
             args["index"] = index
         if "edges" in plan:

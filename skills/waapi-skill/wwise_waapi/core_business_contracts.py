@@ -225,8 +225,15 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "field_types": {
             "blend_track_handle": "bound_object_handle",
             "child_handle": "bound_object_handle",
-            "insertion_index": "nonnegative_integer",
+            "insertion_index": "integer_clamped_to_assignment_count",
             "edges": "blend_assignment_edges",
+        },
+        "field_semantics": {
+            "insertion_index": {"input": "integer_including_negative", "omitted_effect": "append",
+                                "effective_position": "clamp_to_zero_through_current_assignment_count",
+                                "preview_authority": "fresh_complete_indexed_assignments"},
+            "edges": {"effect_scope": "crossfade_GameParameter_only",
+                      "verification_boundary": "applicability_and_effect_unproved; bounded_read_observation_only"},
         },
         "execution_shape": "draft_mutation",
     },

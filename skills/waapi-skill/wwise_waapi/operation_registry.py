@@ -300,6 +300,7 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_
         GET_PROPERTY_INFO_URI,
         SOUNDBANK_GET_INCLUSIONS_URI,
         SWITCHCONTAINER_GET_ASSIGNMENTS_URI,
+        "ak.wwise.core.blendContainer.getAssignments",
         REMOTE_GET_CONNECTION_STATUS_URI,
         REMOTE_GET_AVAILABLE_CONSOLES_URI,
         TRANSPORT_GET_LIST_URI,
@@ -11492,6 +11493,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             from .project_setting_business_contracts import active_source_linkage_disclosure
             call_metadata["source_linkage"] = active_source_linkage_disclosure()
             warnings.append("Active-source selection uses existing source linkage and may affect other linked platforms; this operation does not unlink or establish platform isolation.")
+        blend_plan = None
+        if api == "ak.wwise.core.blendContainer.addAssignment":
+            from .blend_assignment import prepare as prepare_blend, notice, BlendAssignmentError
+            try:
+                blend_plan = prepare_blend(call_args, read=read, version=request.version)
+            except BlendAssignmentError as exc:
+                raise OperationContractError("INVALID_BLEND_ASSIGNMENT_OBSERVATION", str(exc)) from exc
+            metadata["blend_assignment"] = blend_plan
+            call_metadata["blend_assignment"] = notice(blend_plan)
+            if blend_plan["verification_scope"]["unobserved"]:
+                warnings.append("Blend assignment execution remains effect-unverified for: " + ", ".join(blend_plan["verification_scope"]["unobserved"]))
         preview = SemanticPreview(
             envelope=SemanticEnvelope(
                 uri=api,
@@ -11515,6 +11527,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 else None
             ),
         )
+        if blend_plan is not None:
+            verification = {"kind": "blend-assignment", "uri": api, "version": request.version, **blend_plan}
         if api == "ak.wwise.core.sound.setActiveSource":
             source_guard, source_rows = _observe_active_source_plugin_binding(call_args["sound"], call_args["source"], read=read)
             if source_guard is not None:
@@ -16868,6 +16882,17 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == "ak.wwise.core.blendContainer.addAssignment" and "blend_assignment" in prepared.get("pre_state", {}):
+            from .blend_assignment import observe as observe_blend, BlendAssignmentError
+            plan = prepared.get("pre_state", {}).get("blend_assignment")
+            if not isinstance(plan, Mapping):
+                raise OperationContractError("INVALID_PREVIEW", "Blend assignment lacks its immutable observation")
+            try:
+                current = observe_blend(call_args["object"], call_args["child"], read=read_call, version=version)
+            except BlendAssignmentError as exc:
+                raise OperationContractError("STALE_BLEND_ASSIGNMENT", str(exc)) from exc
+            if any(current[key] != value for key, value in plan["before"].items() if key != "native_assignments"):
+                raise OperationContractError("STALE_BLEND_ASSIGNMENT", "Blend identities, owner membership or assignments changed after Preview")
         if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
             from .remote_transition import remote_connection_snapshot
             before = prepared.get("pre_state", {}).get("remote_connection_before")
@@ -19615,6 +19640,23 @@ def verify_prepared_operation(
                 {"expected_value_id": plan["expected_value_id"], "actual_value_id": actual_id,
                     "scope": plan["getter_args"]})
         verification_strength = "independent_soundengine_state_observation"
+    elif kind == "blend-assignment":
+        from .blend_assignment import observe as observe_blend, compare as compare_blend, BlendAssignmentError
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        def blend_read(uri, args, options):
+            result = read_call(uri, args, options)
+            readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+            return result
+        try:
+            after = observe_blend(plan["before"]["track"]["id"], plan["before"]["child"]["id"], read=blend_read, version=plan["version"])
+        except BlendAssignmentError as exc:
+            check("Complete indexed Blend assignment readback is available", False, {"error": str(exc)})
+        else:
+            for item in compare_blend(plan, after):
+                check(item["name"], item["passed"], item.get("evidence", {}))
+        business_state_verified = not plan["verification_scope"]["unobserved"]
+        success_status = "verified" if business_state_verified else "result_schema_checked"
+        verification_strength = "blend_assignment_order_and_observed_preservation" if business_state_verified else "blend_assignment_partial_observation"
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False
@@ -24417,9 +24459,13 @@ def verify_prepared_operation(
         success_status=success_status,
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
-        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True else None,
+        verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind == "blend-assignment" else None,
     )
 
+    if kind == "blend-assignment" and not outcome.business_state_verified:
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
+            "Blend assignment result and bounded observations were checked; complete effect remains unverified for the disclosed scope. Do not replay automatically.",
+            outcome.verification_strength, False, plan["verification_scope"])
     if kind == 'authoring-layout-reset-observation':
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
             ('Native result schema checked and bounded post-reset state observed. Layout defaults, selection effects and unrelated-state preservation remain unverified under #188; do not replay automatically.'
