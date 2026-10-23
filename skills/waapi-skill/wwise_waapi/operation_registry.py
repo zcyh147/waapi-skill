@@ -31,6 +31,11 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
+from .runtime_inspection_business_contracts import (
+    PROFILER_GET_CURSOR_TIME_URI,
+    PROFILER_MOVE_CURSOR_URI,
+    PROFILER_SET_CURSOR_TIME_URI,
+)
 from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
 from .source_copy_observations import capture_source_copy, source_copy_scope, verify_source_copy
 from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
@@ -305,6 +310,7 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_
         REMOTE_GET_AVAILABLE_CONSOLES_URI,
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
+        PROFILER_GET_CURSOR_TIME_URI,
         "ak.soundengine.getState",
         "ak.soundengine.getSwitch",
         UI_COMMAND_GET_COMMANDS_URI,
@@ -4657,6 +4663,13 @@ def _public_call_verification_plan(
             "base_result_strategy": strategy,
             "expected_connected": api == REMOTE_CONNECT_URI,
             **({"expected_target": remote_target(version, args)} if api == REMOTE_CONNECT_URI else {}),
+        }
+    if api in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI} and version == "2025.1":
+        return {
+            "kind": "profiler-user-cursor",
+            **common,
+            "strategy": "operation_specific_readback",
+            "base_result_strategy": strategy,
         }
     if api == TRANSPORT_CREATE_URI:
         object_id = args.get("object")
@@ -20097,6 +20110,39 @@ def verify_prepared_operation(
                 business_state_verified = False
                 success_status = "result_schema_checked"
                 verification_strength = "partial_remote_target_observation"
+    elif kind == "profiler-user-cursor":
+        uri, version = plan.get("uri"), plan.get("version")
+        if uri not in {PROFILER_MOVE_CURSOR_URI, PROFILER_SET_CURSOR_TIME_URI} or version != "2025.1":
+            raise OperationContractError("INVALID_PREVIEW", "Profiler cursor verification lacks its matching URI/version.")
+        business_state_verified = False
+        verification_strength = "independent_profiler_user_cursor_observation"
+        check_result_schema(uri, version)
+        returned_time = _execution_payload(execution_result).get("return")
+        valid_time = type(returned_time) is int and returned_time >= -1
+        check("Profiler control returned an available time or the unavailable sentinel", valid_time,
+            {"returned_time_ms": returned_time})
+        if valid_time and all(item["passed"] for item in assertions):
+            # One independent observation only. Native snapping, endpoints and
+            # concurrent cursor changes do not imply the requested time survives.
+            observed = verified_readback(PROFILER_GET_CURSOR_TIME_URI, {"cursor": "user"}, version=version)
+            observed_time = observed.get("return")
+            valid_observed_time = type(observed_time) is int and observed_time >= -1
+            check("Profiler user-cursor read returned an available time or the unavailable sentinel", valid_observed_time,
+                {"observed_time_ms": observed_time})
+            observation = {"kind": "profiler-user-cursor-observation", "returned_time_ms": returned_time,
+                "observed_time_ms": observed_time, "capture_data_verified": False,
+                "outcome": "malformed"}
+            if valid_observed_time and all(item["passed"] for item in assertions):
+                if returned_time == -1 or observed_time == -1:
+                    success_status = "result_schema_checked"
+                    observation["outcome"] = "unavailable"
+                else:
+                    matches = returned_time == observed_time
+                    observation["outcome"] = "matched" if matches else "changed"
+                    check("Independent user-cursor time matches the control's returned snapped time", matches,
+                        {"returned_time_ms": returned_time, "observed_time_ms": observed_time})
+                    business_state_verified = matches and all(item["passed"] for item in assertions)
+            readbacks.append(observation)
     elif kind == "transport-created":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -24532,6 +24578,20 @@ def verify_prepared_operation(
             "The saved project was observed; explicit-empty collection effects remain unresolved. Do not replay the executed call.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "profiler-user-cursor":
+        message = ("The user cursor matched the control's returned snapped time at one independent observation. "
+            "Capture data completeness and a continuing cursor position are unverified."
+            if outcome.business_state_verified else
+            "The cursor was unavailable; its effect remains unverified. Do not replay the executed control."
+            if outcome.status == "result_schema_checked" else
+            "The control result or later user-cursor observation did not verify the cursor effect. "
+            "A changed observation does not prove the control never took effect. Do not replay the executed control.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            {"comparison": "one_user_cursor_read_against_returned_snapped_time",
+                "continuing_cursor_position_verified": False,
+                "cursor_observation": next((dict(row) for row in outcome.readbacks
+                    if row.get("kind") == "profiler-user-cursor-observation"), {"outcome": "malformed_control_result"})})
     if kind == "remote-connection-state" and not outcome.business_state_verified:
         message = ("The requested remote target did not match independent observations; do not replay the executed transition."
             if outcome.status == "verification_failed" else
