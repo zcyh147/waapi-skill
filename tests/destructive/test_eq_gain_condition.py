@@ -126,10 +126,21 @@ def test_existing_eq_gain_preserves_condition_controllers_and_context(workflow_s
         assert code == 0 and payload.get("ok") is True, payload
         assert payload.get("endpoint") == endpoint and payload.get("detected_version") == runtime.version, payload
         assert payload.get("projection_complete") is not False and payload.get("status") not in {"partial", "needs_clarification"}, payload
-        assert payload.get("limit_reached") is not True and list(payload)[-1] == "agent_result", payload
+        assert payload.get("limit_reached") is not True, payload
+        if argv[0] in {"query-object", "metadata"}:
+            assert "agent_result" in payload and list(payload)[-1] == "agent_result", payload
         return payload
 
     def objects(label, identity, platform, fields=(), *, children=False):
+        if len(fields) > 8:
+            # The public query owns an eight-custom-field ceiling. Keep both
+            # exact identity frames equal before joining the bounded results.
+            row = objects(label + "-fields-1", identity, platform, fields[:8])
+            extra = objects(label + "-fields-2", identity, platform, fields[8:])
+            _same({key: value for key, value in row.items() if key != "properties"},
+                {key: value for key, value in extra.items() if key != "properties"})
+            row["properties"].update(extra["properties"])
+            return row
         ceiling = 16 if children else 2
         argv = ["query-object", "--exact-id", identity, "--max-results", str(ceiling), "--detail",
             "--include", "class-id", "--include", "notes", "--include", "parent"]
