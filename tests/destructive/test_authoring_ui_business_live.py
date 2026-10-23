@@ -1352,9 +1352,12 @@ def test_runtime_business_profiler_and_transport_lifecycle_on_authoring(
             env=env,
             state_dir=state_dir,
         )
-        assert stopped_verified["state"] == (
-            TransactionState.RESULT_SCHEMA_CHECKED.value
-        )
+        assert stopped_verified["state"] == TransactionState.VERIFIED.value
+        stop_observation = stopped_verified["verification"]["verification_scope"]["observation"]
+        assert stop_observation["membership_matches"] is True
+        assert len(stop_observation["targets"]) == 1
+        assert stop_observation["targets"][0]["observed_state"] == "stopped"
+        assert stop_observation["targets"][0]["outcome"] == "matched"
 
         destroyed = _preview_runtime_plan(
             "ak.wwise.core.transport.destroy",

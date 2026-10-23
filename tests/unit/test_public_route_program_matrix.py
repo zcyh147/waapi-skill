@@ -491,6 +491,12 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         expected_version=entry.version,
     )
     def preparation_readback(uri, call_args, call_options):
+        if entry.uri == "ak.wwise.core.transport.executeAction":
+            if uri == "ak.wwise.core.transport.getList":
+                return {"list": [{"transport": args.get("transport", 0),
+                    "object": "{11111111-1111-1111-1111-111111111111}", "gameObject": 1}]}
+            if uri == "ak.wwise.core.transport.getState":
+                return {"state": "stopped"}
         if entry.uri == "ak.wwise.core.sound.setActiveSource" and uri == "ak.wwise.core.object.get":
             objects = {
                 "{11111111-1111-1111-1111-111111111111}": {
@@ -514,6 +520,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         read_call=preparation_readback,
     )
     def readback(uri: str, call_args: Mapping[str, Any], call_options: Mapping[str, Any]) -> Mapping[str, Any]:
+        if entry.uri == "ak.wwise.core.transport.executeAction":
+            if uri == "ak.wwise.core.transport.getState":
+                return {"state": "playing"}
+            return preparation_readback(uri, call_args, call_options)
         if uri == "ak.wwise.core.object.get":
             if entry.uri == "ak.wwise.core.sound.setActiveSource":
                 assert call_args == {"from": {"id": [args["sound"]]}}
@@ -574,7 +584,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         execution_result=result,
         read_call=(
             readback
-            if entry.uri in BUSINESS_STATE_VERIFIED_APIS
+            if entry.uri in BUSINESS_STATE_VERIFIED_APIS or entry.uri == "ak.wwise.core.transport.executeAction"
             else lambda uri, call_args, call_options: {}
         ),
     )
@@ -663,6 +673,11 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
                 assert len(effects) == 1, verification.readbacks
                 effect = effects[0]
             assert effect["unresolved"] == [expected_boundary]
+    elif entry.uri == "ak.wwise.core.transport.executeAction":
+        assert verification.status == "verified"
+        assert verification.business_state_verified is True
+        assert verification.verification_strength == "bounded_transport_state_observation"
+        assert verification.verification_scope["observation"]["targets"][0]["observed_state"] == "playing"
     elif entry.uri in BUSINESS_STATE_VERIFIED_APIS:
         assert verification.status == "verified"
         assert verification.business_state_verified is True

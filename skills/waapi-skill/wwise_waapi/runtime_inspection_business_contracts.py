@@ -743,6 +743,19 @@ def runtime_inspection_business_contract_data(
                 if name in exposed_fields
             } | (meter_contract['fields'] if meter_contract else {}),
             **({'meter_object_projection':meter_contract} if meter_contract else {}),
+            **({"field_semantics": {"audition_action": {
+                "play": "play the selected scope; a later stopped state cannot disprove transient playback",
+                "stop": "stop the selected scope; a stopped read is an observed postcondition, not proof of causality",
+                "pause": "toggle pause/resume; stopped behavior remains unresolved",
+                "toggle-play-stop": "toggle play/stop; paused behavior remains unresolved",
+                "play-directly": "accepted native action; exact effect semantics remain unresolved",
+            }}, "verification": {
+                "state_observer": "ak.wwise.core.transport.getState",
+                "target_observer": "ak.wwise.core.transport.getList",
+                "maximum_targets": 64,
+                "scope": "Preview associations and toggle prestate are revalidated before execution; all-active binds the bounded target list",
+                "boundary": "One later state observation per target; no continuous playback, causal or atomic snapshot guarantee. Missing transient play or unresolved semantics remain unverified.",
+            }} if operation == TRANSPORT_EXECUTE_ACTION_URI else {}),
             **({"field_semantics": {
                 "notification_port": {
                     "native_effect": "paired_notification_port" if version == "2021.1" else "unused",
