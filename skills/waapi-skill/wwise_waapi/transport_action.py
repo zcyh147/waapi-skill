@@ -1,8 +1,10 @@
 """Bounded, operation-local transport action observations.
 
 The matching 2021.1–2025.1 SDK examples specify play, stop, pause/resume
-and play/stop toggles. They do not specify playDirectly or the stopped-pause
-and paused-playStop edges. A later stopped read cannot disprove transient play.
+and play/stop toggles. Retained native state observations additionally establish
+playDirectly -> playing, stopped pause -> stopped and paused playStop -> playing.
+These are state postconditions, not acoustic or restart-position guarantees.
+A later stopped read cannot disprove transient play.
 """
 from __future__ import annotations
 
@@ -57,12 +59,10 @@ def snapshot(args: Mapping, *, version: str, read) -> dict:
 def expected_state(action: str, before: Mapping) -> tuple[str | None, str | None]:
     if action == "stop":
         return "stopped", None
-    if action == "play":
+    if action in {"play", "playDirectly"}:
         return "playing", None
     if action == "pause":
-        return ({"playing": "paused", "paused": "playing"}.get(before.get("state")),
-            "pause_from_stopped_semantics_unresolved" if before.get("state") == "stopped" else None)
+        return {"playing": "paused", "paused": "playing", "stopped": "stopped"}.get(before.get("state")), None
     if action == "playStop":
-        return ({"playing": "stopped", "stopped": "playing"}.get(before.get("state")),
-            "play_stop_from_paused_semantics_unresolved" if before.get("state") == "paused" else None)
-    return None, "play_directly_semantics_unresolved"
+        return {"playing": "stopped", "stopped": "playing", "paused": "playing"}.get(before.get("state")), None
+    return None, "unsupported_transport_action"

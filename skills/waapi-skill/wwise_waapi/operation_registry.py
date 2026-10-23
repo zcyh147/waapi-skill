@@ -24789,7 +24789,7 @@ def verify_prepared_operation(
     if kind == "transport-action-state":
         message = ("Requested transport states matched one bounded observation. Continuing playback, causality and an atomic all-transport snapshot are unverified."
             if outcome.business_state_verified else
-            "The later transport observation did not establish every requested state. Transient playback may have ended before observation; unresolved action semantics remain explicit. Do not replay the executed action.")
+            "The later transport observation did not establish every requested state. Transient playback may have ended before observation. State does not establish acoustic output or restart position. Do not replay the executed action.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
             {"comparison": "one_state_read_per_preview_target", "continuous_state_verified": False,

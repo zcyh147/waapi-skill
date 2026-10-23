@@ -21,6 +21,7 @@ class TransportActionClient(_RuntimeControlDraftClient):
         self.after = "stopped"
         self.rows = [{"transport": 74, "object": self.target_id, "gameObject": 1}]
         self.states = {}
+        self.after_states = None
         self.read_error = None
         self.state_result = None
         self.list_error = None
@@ -31,7 +32,8 @@ class TransportActionClient(_RuntimeControlDraftClient):
             return {"transport": self.rows[0]["transport"]}
         if uri == ACTION:
             self.state = self.after
-            self.states = {native_id: self.after for native_id in self.states}
+            self.states = {native_id: self.after if self.after_states is None else self.after_states[native_id]
+                for native_id in self.states}
             return {}
         if uri == STATE:
             if self.read_error is not None:
@@ -168,8 +170,12 @@ def test_transport_schema_explains_pause_toggle_and_observation_boundary(tmp_pat
         client_factory=lambda _: pytest.fail("schema must be offline"))
     assert code == 0, result
     declaration = result["business_adapter"]["declaration"]
-    assert declaration["field_semantics"]["audition_action"]["pause"] == "toggle pause/resume; stopped behavior remains unresolved"
+    actions = declaration["field_semantics"]["audition_action"]
+    assert actions["pause"] == "toggle pause/resume; a stopped target remains stopped"
+    assert actions["toggle-play-stop"] == "toggle play/stop; a paused target becomes playing"
+    assert actions["play-directly"] == "observe playing in the selected scope; restart position and acoustic output are unverified"
     assert declaration["verification"]["maximum_targets"] == 64
+    assert "global audition-mode restoration" in declaration["verification"]["boundary"]
 
 
 VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -183,11 +189,16 @@ VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     ("pause", "playing", "paused", True, "matched"),
     ("pause", "paused", "playing", True, "matched"),
     ("pause", "paused", "stopped", False, "transient_play_unobserved"),
-    ("pause", "stopped", "stopped", False, "semantics_unresolved"),
+    ("pause", "stopped", "stopped", True, "matched"),
+    ("pause", "stopped", "playing", False, "different_state"),
     ("toggle-play-stop", "playing", "stopped", True, "matched"),
     ("toggle-play-stop", "stopped", "playing", True, "matched"),
-    ("toggle-play-stop", "paused", "stopped", False, "semantics_unresolved"),
-    ("play-directly", "stopped", "playing", False, "semantics_unresolved"),
+    ("toggle-play-stop", "paused", "playing", True, "matched"),
+    ("toggle-play-stop", "paused", "stopped", False, "transient_play_unobserved"),
+    ("play-directly", "stopped", "playing", True, "matched"),
+    ("play-directly", "stopped", "paused", False, "transient_play_unobserved"),
+    ("play-directly", "playing", "playing", True, "matched"),
+    ("play-directly", "paused", "playing", True, "matched"),
 ))
 def test_actions_observe_only_source_supported_postconditions(
     tmp_path: Path, version: str, action: str, before: str, after: str, expected: bool, outcome: str,
@@ -200,7 +211,9 @@ def test_actions_observe_only_source_supported_postconditions(
         ("--audition-action", action, "--transport-scope", "one-transport", "--transport-handle", handle))
     executed = invoke(["execute", preview["transaction_id"]])
     before_verify = len(client.calls)
-    verified = invoke(executed["next_command"]["gateway_argv"])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == (2 if outcome == "different_state" else 0), verified
     assert verified["verified"] is expected
     assert verified["verification"]["business_state_verified"] is expected
     assert verified["verification"]["verification_scope"]["observation"]["targets"][0]["outcome"] == outcome
@@ -213,14 +226,14 @@ def test_actions_observe_only_source_supported_postconditions(
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-@pytest.mark.parametrize("intervention", ("none", "before-membership", "after-membership", "before-state"))
+@pytest.mark.parametrize("intervention", ("none", "before-membership", "after-membership", "before-state", "after-state"))
 def test_all_scope_binds_membership_and_toggle_prestate(tmp_path: Path, version: str, intervention: str) -> None:
     client = TransportActionClient(tmp_path, version=version)
     client.rows.append({"transport": 0, "object": client.target_id, "gameObject": 2})
     client.states = {0: "stopped", 74: "playing"}
-    # pause has a specified playing→paused edge; the stopped target remains
-    # unresolved, preventing a partial matched row from granting whole-scope credit.
+    # Retained mixed-state observations: stopped stays stopped; playing pauses.
     client.after = "paused"
+    client.after_states = {0: "stopped", 74: "paused"}
     state_dir = tmp_path / "state"
     preview, invoke = _public_runtime_preview(tmp_path, client, state_dir, ACTION,
         ("--audition-action", "pause", "--transport-scope", "all-active"))
@@ -237,16 +250,21 @@ def test_all_scope_binds_membership_and_toggle_prestate(tmp_path: Path, version:
     assert code == 0, executed
     if intervention == "after-membership":
         client.rows.pop()
+    elif intervention == "after-state":
+        client.states[0] = "paused"
     code, verified = gateway.execute_gateway(["--state-dir", str(state_dir), *executed["next_command"]["gateway_argv"]],
         env=_env(tmp_path, version=version), client_factory=lambda _: client)
-    assert verified["verified"] is False
-    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verified"] is (intervention == "none")
+    assert verified["verification"]["business_state_verified"] is (intervention == "none")
     observation = verified["verification"]["verification_scope"]["observation"]
     if intervention == "after-membership":
         assert code == 2 and observation["membership_matches"] is False
+    elif intervention == "after-state":
+        assert code == 2, verified
+        assert [row["outcome"] for row in observation["targets"]] == ["different_state", "matched"]
     else:
         assert code == 0, verified
-        assert [row["outcome"] for row in observation["targets"]] == ["semantics_unresolved", "matched"]
+        assert [row["outcome"] for row in observation["targets"]] == ["matched", "matched"]
     assert sum(uri == ACTION for uri, _, _ in client.calls) == 1
 
 

@@ -83,7 +83,7 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None):
                 elif action in ('play', 'playDirectly'): self.state = 'playing' if self.originals else 'stopped'
                 elif action == 'pause':
                     self.state = ('stopped' if failure == 'missing-paused' else 'paused') if self.state == 'playing' else 'playing' if self.state == 'paused' else 'stopped'
-                elif action == 'playStop': self.state = 'stopped' if self.state in ('playing','paused') else 'playing'
+                elif action == 'playStop': self.state = 'stopped' if self.state == 'playing' else 'playing'
                 return {}
             return super().call(uri, args, options)
 
@@ -117,8 +117,9 @@ def test_selected_observations_archive_without_business_or_coverage_pass(owned_a
     saved = json.loads((Path(archived['artifacts']['native-evidence']['path']) / 'transport-semantics.json').read_text())
     assert saved == report
     assert [(c['case_id'], c['before']['state'], c['after']['observed_state']) for c in saved['cases']] == [
-        ('D-one','stopped','playing'), ('P-one','stopped','stopped'), ('T-one','paused','stopped')]
+        ('D-one','stopped','playing'), ('P-one','stopped','stopped'), ('T-one','paused','playing')]
     assert all(c['observation_status'] == 'OBSERVED' and c['business_effect_verified'] is False for c in saved['cases'])
+    assert all(c['gateway_business_state_verified'] is True for c in saved['cases'])
     assert saved['cleanup']['complete'] is True and saved['public_call_count'] <= 210
     assert saved['cleanup']['audition_media_prior_state_restored'] is False
     originals, = [args for uri, args, _ in client.calls if uri.endswith('transport.useOriginals')]

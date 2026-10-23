@@ -801,15 +801,15 @@ def runtime_inspection_business_contract_data(
             **({"field_semantics": {"audition_action": {
                 "play": "play the selected scope; a later stopped state cannot disprove transient playback",
                 "stop": "stop the selected scope; a stopped read is an observed postcondition, not proof of causality",
-                "pause": "toggle pause/resume; stopped behavior remains unresolved",
-                "toggle-play-stop": "toggle play/stop; paused behavior remains unresolved",
-                "play-directly": "accepted native action; exact effect semantics remain unresolved",
+                "pause": "toggle pause/resume; a stopped target remains stopped",
+                "toggle-play-stop": "toggle play/stop; a paused target becomes playing",
+                "play-directly": "observe playing in the selected scope; restart position and acoustic output are unverified",
             }}, "verification": {
                 "state_observer": "ak.wwise.core.transport.getState",
                 "target_observer": "ak.wwise.core.transport.getList",
                 "maximum_targets": 64,
                 "scope": "Preview associations and toggle prestate are revalidated before execution; all-active binds the bounded target list",
-                "boundary": "One later state observation per target; no continuous playback, causal or atomic snapshot guarantee. Missing transient play or unresolved semantics remain unverified.",
+                "boundary": "One later state observation per target; no continuous playback, causal or atomic snapshot guarantee. Missing transient play remains unverified; state does not establish acoustic output, restart position or prior global audition-mode restoration.",
             }} if operation == TRANSPORT_EXECUTE_ACTION_URI else {}),
             **({"verification": {
                 "observer": LOG_GET_URI,
