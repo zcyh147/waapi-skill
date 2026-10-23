@@ -1,4 +1,4 @@
-"""Owned 2024 meter capture and 2025 meter/cursor/file/log observations.
+"""Owned 2024 meters and bounded 2025 capture/read observations.
 
 This collector uses only the public Gateway. The existing Authoring batch owns
 launch, source integrity, process cleanup, archival and final acceptance.
@@ -19,6 +19,8 @@ NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_meter_cursor_capture')
 METER_2024_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2024_meter_projection')
+READERS_2025_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_runtime_owned_2025_profiler_readers')
 METER_2024_SOUND_ID = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'
 METER_2024_BUS_ID = '{06362E8D-5A32-497A-B063-3DA95963CE47}'
 METER_2024_PARENT_ID = '{ED2BCAC8-D7B6-4448-8900-439B557894F4}'
@@ -31,8 +33,106 @@ BUS_ID = '{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}'
 PARENT_ID = '{A74EEB4A-0805-4AFA-969C-53DCB862B550}'
 OUTCOMES = ('profiler-meter-object-observation', 'profiler-cursor-snap-readback',
     'profiler-saved-capture-artifact', 'runtime-owned-log-add', 'runtime-owned-log-clear')
-CAPTURE_NODE_OUTCOMES = {NODEID: OUTCOMES, METER_2024_NODEID: OUTCOMES[:1]}
+READER_OUTCOMES = ('profiler-voices-observation', 'profiler-busses-observation',
+    'profiler-audio-objects-observation', 'profiler-game-objects-observation',
+    'profiler-voice-instance-filter', 'profiler-bus-instance-filter', 'profiler-audio-objects-bus-filter')
+CAPTURE_NODE_OUTCOMES = {NODEID: OUTCOMES, METER_2024_NODEID: OUTCOMES[:1],
+    READERS_2025_NODEID: READER_OUTCOMES}
 PREFIX = 'ak.wwise.core.'
+
+
+def _collect_readers(call, report, persist, *, fixed_time, sound_id, bus_id):
+    """One fixed frame, no live paging, replay or invented pipeline selectors."""
+    report['reader_call_count'] = 0
+    game_object = report['transport_association']['gameObject']
+    observations = {}
+
+    def observe(name, argv, *, row_field='return', selected=None, identity_fields=()):
+        report['reader_call_count'] += 1
+        assert report['reader_call_count'] <= 7, 'Profiler reader call bound exceeded'
+        evidence = {'position_ms': int(fixed_time), 'observation_status': 'BLOCKED',
+            'owned_identity_observed': False}
+        report['outcomes'][name] = {'outcome': 'BLOCKED', 'evidence': evidence}
+        try:
+            payload = call(argv)
+            result = payload['agent_result']
+            evidence['agent_result'] = result  # Keep the exact Gateway projection.
+            rows = result[row_field]
+            assert isinstance(rows, list) and len(rows) <= 64, 'Profiler reader row bound exceeded'
+            assert all(isinstance(row, dict) for row in rows), 'Malformed Profiler reader rows'
+            ties = evidence['identity_ties'] = {
+                'sound_row_indexes': [i for i, row in enumerate(rows) if row.get('objectGUID') == sound_id],
+                'bus_row_indexes': [i for i, row in enumerate(rows)
+                    if row.get('objectGUID') == bus_id or row.get('busGUID') == bus_id],
+                'transport_game_object_row_indexes': [i for i, row in enumerate(rows)
+                    if row.get('id' if row_field == 'game_objects' else 'gameObjectID') == game_object],
+            }
+            evidence['nonempty'] = bool(rows)
+            evidence['complete'] = result.get('complete', not result.get('truncated', False)) is True
+            relevant = ('sound_row_indexes',) if name in (READER_OUTCOMES[0], READER_OUTCOMES[4]) else (
+                ('bus_row_indexes',) if name in (READER_OUTCOMES[1], READER_OUTCOMES[5]) else
+                ('transport_game_object_row_indexes',) if name == READER_OUTCOMES[3] else
+                ('bus_row_indexes', 'transport_game_object_row_indexes'))
+            evidence['owned_identity_observed'] = any(ties[key] for key in relevant)
+            if not evidence['complete']:
+                report['outcomes'][name]['reason'] = 'Retained first page incomplete; no additional native read or paging scheduled'
+            elif not rows:
+                report['outcomes'][name]['reason'] = 'No rows observed at the one fixed capture time'
+            elif selected is not None and any(
+                    any(row.get(key) != selected.get(key) for key in identity_fields) for row in rows):
+                report['outcomes'][name]['outcome'] = 'FAIL'
+                report['outcomes'][name]['reason'] = 'Filtered rows differ from the selected observed instance identity'
+                evidence['observation_status'] = 'FAIL'
+            else:
+                evidence['observation_status'] = 'PASS'
+                if evidence['owned_identity_observed']:
+                    report['outcomes'][name]['outcome'] = 'PASS'
+                else:
+                    report['outcomes'][name]['reason'] = 'Nonempty rows observed, but no required owned Sound/Bus/GameObject association established'
+            observations[name] = rows
+        except Exception as exc:
+            evidence['observation_status'] = 'FAIL'
+            report['outcomes'][name].update(outcome='FAIL', error={
+                'type': type(exc).__name__, 'message': str(exc)[:4096]})
+        finally:
+            persist()
+
+    def reader(suffix, *selection):
+        return ['core-call', PREFIX + 'profiler.' + suffix, '--profiler-position', fixed_time,
+            '--result-view', 'diagnostics', '--max-results', '64', *selection]
+
+    observe(READER_OUTCOMES[0], reader('getVoices'))
+    observe(READER_OUTCOMES[1], reader('getBusses'))
+    observe(READER_OUTCOMES[2], reader('getAudioObjects'))
+    observe(READER_OUTCOMES[3], ['profiler-game-objects', '--capture-ms', fixed_time], row_field='game_objects')
+
+    # Prefer owned identities. If only unrelated rows exist, retain that truth
+    # and use an actually issued instance; never assert fixture attribution.
+    def select(name, handle, expected_guid):
+        rows = [row for row in observations.get(name, []) if isinstance(row.get(handle), str)]
+        return next((row for row in rows if row.get('objectGUID') == expected_guid), rows[0] if rows else None)
+
+    voice = select(READER_OUTCOMES[0], 'voice_instance_handle', sound_id)
+    bus = select(READER_OUTCOMES[1], 'bus_instance_handle', bus_id)
+    for name, suffix, row, flag, keys in (
+        (READER_OUTCOMES[4], 'getVoices', voice, 'voice_instance_handle', ('pipelineID', 'objectGUID', 'gameObjectID')),
+        (READER_OUTCOMES[5], 'getBusses', bus, 'bus_instance_handle', ('pipelineID', 'objectGUID', 'gameObjectID')),
+        (READER_OUTCOMES[6], 'getAudioObjects', bus, 'bus_instance_handle', ('gameObjectID',)),
+    ):
+        if row is None:
+            report['outcomes'][name] = {'outcome': 'BLOCKED', 'reason': 'Unfiltered read issued no usable instance handle',
+                'evidence': {'position_ms': int(fixed_time), 'observation_status': 'BLOCKED',
+                    'owned_identity_observed': False}}
+            persist()
+            continue
+        selected = row if suffix != 'getAudioObjects' else {
+            'busPipelineID': row['pipelineID'], 'busGUID': row['objectGUID'], 'gameObjectID': row['gameObjectID']}
+        if suffix == 'getAudioObjects':
+            keys = ('busPipelineID', 'busGUID', 'gameObjectID')
+        observe(name, reader(suffix, '--' + flag.replace('_', '-'), row[flag]),
+            selected=selected, identity_fields=keys)
+        report['outcomes'][name]['evidence']['selected_observed_instance'] = row
+        persist()
 
 
 def stage_owned_2024_meter_media(sandbox, io_root):
@@ -67,7 +167,8 @@ def stage_owned_2024_meter_media(sandbox, io_root):
 def collect_owned_capture(batch, public_call):
     version = batch.runtime.version
     assert version in ('2024.1', '2025.1'), 'Capture cases are pinned to 2024.1/2025.1'
-    nodeid = METER_2024_NODEID if version == '2024.1' else NODEID
+    readers = batch.selected_nodeids == (READERS_2025_NODEID,)
+    nodeid = READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
     assert batch.selected_nodeids == (nodeid,), 'Capture requires its exact matching node'
     sound_id, bus_id, parent_id = (METER_2024_SOUND_ID, METER_2024_BUS_ID, METER_2024_PARENT_ID) if version == '2024.1' else (SOUND_ID, BUS_ID, PARENT_ID)
     parent_output, parent_key = ('volume-db', 'volume_db') if version == '2024.1' else ('work-unit-is-default', 'work_unit_is_default')
@@ -83,6 +184,9 @@ def collect_owned_capture(batch, public_call):
             'capture_settings_scope': 'Explicit enable/disable pair only; no prior global settings getter'},
         'limits': {'public_calls': 192, 'total_reply_bytes': 8 * 1024 * 1024,
             'reply_bytes': 1024 * 1024, 'meter_pages': 8}, 'public_call_count': 0, 'total_reply_bytes': 0}
+    if readers:
+        report['limits'].update(reader_calls=7, reader_rows=64)
+        report['scope'] = 'One owned 2025.1 capture; no 2021.1–2024.1 reader evidence or acoustic proof'
 
     def persist():
         raw = (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode()
@@ -218,7 +322,7 @@ def collect_owned_capture(batch, public_call):
             assert proof['sha256'] == staging['source']['sha256'] == staging['staged']['sha256'] == METER_2024_MEDIA_SHA256
             report['fixture_media']['staging'] = staging
         looping = ['--include-field', 'IsLoopingEnabled', '--include-field', 'IsLoopingInfinite']
-        if version == '2024.1':
+        if version == '2024.1' or readers:
             looping += ['--include', 'output-bus']
         original = exact(sound_id, *looping)
         assert original['name'] == ('MnGn_Barrel_Loop' if version == '2024.1' else 'RFL_Tail') and original['type'] == 'Sound', original
@@ -227,6 +331,8 @@ def collect_owned_capture(batch, public_call):
             'Owned fixture requires live boolean loop values and already-infinite mode', original)
         if version == '2024.1':
             assert props['IsLoopingEnabled'] is True and original.get('output_bus', {}).get('id') == bus_id, original
+        if readers:
+            assert original.get('output_bus', {}).get('id') == bus_id, original
         bus_fields = ['--include', 'volume-db', '--include', 'parent']
         if version == '2024.1':
             bus_fields += ['--include-field', 'BusChannelConfig']
@@ -253,10 +359,16 @@ def collect_owned_capture(batch, public_call):
             report['setup'].append({'loop_enabled': set_loop(True,
                 before_execute=lambda: own('restore-loop-enabled', lambda: set_loop(False)))})
         report['setup'].append({'originals': effect('transport.useOriginals', ['--audition-media', 'originals'])})
-        report['setup'].append({'enable_meters': effect('profiler.enableProfilerData', ['--capture-data', 'meters', 'enable'],
-            before_execute=lambda: own('disable-meters-data', lambda: effect('profiler.enableProfilerData', ['--capture-data', 'meters', 'disable'])))})
-        report['setup'].append({'register_meter': effect('profiler.registerMeter', role='meter_object', identity=bus_id,
-            before_execute=lambda: own('unregister-meter', lambda: effect('profiler.unregisterMeter', role='meter_object', identity=bus_id)))})
+        if readers:
+            for data in ('voices', 'audio-objects'):
+                report['setup'].append({'enable_' + data: effect('profiler.enableProfilerData', ['--capture-data', data, 'enable'],
+                    before_execute=lambda data=data: own('disable-' + data + '-data',
+                        lambda: effect('profiler.enableProfilerData', ['--capture-data', data, 'disable'])))})
+        else:
+            report['setup'].append({'enable_meters': effect('profiler.enableProfilerData', ['--capture-data', 'meters', 'enable'],
+                before_execute=lambda: own('disable-meters-data', lambda: effect('profiler.enableProfilerData', ['--capture-data', 'meters', 'disable'])))})
+            report['setup'].append({'register_meter': effect('profiler.registerMeter', role='meter_object', identity=bus_id,
+                before_execute=lambda: own('unregister-meter', lambda: effect('profiler.unregisterMeter', role='meter_object', identity=bus_id)))})
         report['setup'].append({'start_capture': zero('profiler.startCapture',
             before_execute=lambda: own('stop-capture', lambda: zero('profiler.stopCapture')))})
         created = effect('transport.create', role='target', identity=sound_id)
@@ -267,6 +379,14 @@ def collect_owned_capture(batch, public_call):
         report['setup'].append({'create_transport': created})
         report['setup'].append({'play': effect('transport.executeAction', ['--audition-action', 'play',
             '--transport-scope', 'one-transport', '--transport-handle', handle])})
+        if readers:
+            state = call(['core-call', PREFIX + 'transport.getState', '--transport-handle', handle])['agent_result']
+            assert state['state'] == 'playing', state
+            report['transport_playing_observation'] = state
+            membership = call(['request-schema', PREFIX + 'transport.getList'])['continuation']['gateway_argv']
+            rows = call(membership)['agent_result']['list']
+            association, = [row for row in rows if row['object'] == sound_id]
+            report['transport_association'] = association
         time.sleep(0.25)
         position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
         assert position['available'] is True and position['position_ms'] >= 0, position
@@ -300,12 +420,15 @@ def collect_owned_capture(batch, public_call):
             return {'position_ms': position['position_ms'], 'meters': observed, 'page_count': len(pages),
                 'capture_frame_not_current_authoring_values': ['source', 'configurationName', 'configurationMask', 'configurationType', 'channels'],
                 'nested_authoring_values': ['identity', 'volume_db', 'related.parent'], 'nonzero_audio_level_claimed': False}
-        outcome(OUTCOMES[0], meters)
+        if readers:
+            _collect_readers(call, report, persist, fixed_time=fixed_time, sound_id=sound_id, bus_id=bus_id)
+        else:
+            outcome(OUTCOMES[0], meters)
         # Freeze capture before independent cursor/file assertions. Each control
         # executes at most once; cleanup never repeats an attempted stop.
         report['setup'].append({'stop_capture': clean_one('stop-capture')})
 
-        if version == '2025.1':
+        if version == '2025.1' and not readers:
             def cursor():
                 verified = effect('profiler.setCursorTime', ['--cursor-target-ms', fixed_time])
                 scope = verified['verification']['verification_scope']['cursor_observation']
@@ -334,7 +457,7 @@ def collect_owned_capture(batch, public_call):
         report['cleanup']['transport_stopped_observation'] = state
         clean_one('destroy-transport')
 
-        if version == '2025.1':
+        if version == '2025.1' and not readers:
             # General log belongs to this isolated host. Other-channel contents are
             # observed separately; no continuous/exclusive log-state promise is made.
             def log(channel):
