@@ -173,7 +173,11 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/maintenance/reconcile_condition_sources.py',
                  'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json',
                  'tests/fixtures/metadata-conditions/lfo-eq-originals.json.gz',
-                 'tests/unit/test_condition_mechanism_reuse.py', 'tests/unit/test_condition_source_resolution.py'):
+                 'tests/unit/test_condition_mechanism_reuse.py', 'tests/unit/test_condition_source_resolution.py',
+                 'tests/support/condition_completion_mapping.py', 'tests/maintenance/map_condition_completion.py',
+                 'tests/unit/test_condition_completion_mapping.py', 'tests/unit/test_condition_completion_reader.py',
+                 'tests/fixtures/metadata-conditions/condition-completion-review.json',
+                 'tests/fixtures/metadata-conditions/condition-completion-proof-inputs.json.gz'):
         path = root / name
         if path.is_file():
             sources[name] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1309,6 +1313,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
     from pathlib import Path
     root = source_root or Path(__file__).resolve().parents[2]
     try:
+        if (binding or {}).get('condition_source_mapping_attachment'):
+            from tests.support.condition_completion_mapping import mapping_evidence_result
+            return mapping_evidence_result(descriptor, branch, category, scope_kind, base, binding, root)
         if category == 'native' and (binding or {}).get('condition_mechanism_attachment'):
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {})
@@ -1554,6 +1561,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
         return symbol in symbols[source]
 
     condition_reuse_reviews, condition_reuse_runs = set(), set()
+    definition_contexts, definition_proofs = {}, {}
     for branch in native['obligations']:
         branch['requirements'] = []
         route = routes.get(branch['route'])
@@ -1577,6 +1585,20 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
         if binding is None:
             branch['state'] = 'unresolved'
             branch['reasons'] = ['exact input/construction/validation/verifier mapping missing; parent/family source attribution is not proof']
+            continue
+        if binding.get('condition_source_mapping_attachment'):
+            from tests.support.condition_completion_mapping import (validate_mapping_attachment,
+                evaluate_definition_binding, witness_references)
+            descriptor = binding['condition_source_mapping_attachment']
+            key = digest(descriptor)
+            if key not in definition_contexts:
+                definition_contexts[key] = validate_mapping_attachment(descriptor, evidence_base or root, root)
+            context = definition_contexts[key]
+            evaluate_definition_binding(branch, binding, policies.get(branch['id'], {}), scope_kind,
+                evidence_base or root, root, context)
+            if branch['state'] == 'source_definition_verified':
+                for proof in witness_references(context['members'][branch['id']], context):
+                    definition_proofs[proof['original_proof_id']] = proof
             continue
         if binding.get('disposition') == 'native_absence':
             if route is not None or not binding.get('alternatives_considered'):
@@ -1635,11 +1657,18 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             branch['metadata_scope'] = 'object_type'
             branch['direct_recipient_instance_metadata'] = 'not_observed'
         branch['state'] = 'verified' if outcomes <= {'passed', 'reviewed_mechanism_reuse', 'reviewed_class_metadata_and_object_scope_mechanism'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
-    complete_states = {'verified', 'proven_native_absence', 'approved_exclusion'}
+    complete_states = {'verified', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:
         native['condition_mechanism_reuse'] = {'original_witness_run_ids': sorted(condition_reuse_runs),
             'review_ids': sorted(condition_reuse_reviews), 'new_native_runs': 0}
+    if definition_contexts:
+        from tests.support.condition_completion_mapping import _review
+        _review(root)  # Source immutability also holds at the end of this batch.
+        native['condition_source_definition_reuse'] = {
+            'original_native_witness_proofs': [definition_proofs[k] for k in sorted(definition_proofs)],
+            'original_run_count': 'not_summed_from_member_bindings; original identities retained inside exact proofs',
+            'new_native_runs': 0, 'direct_recipient_instance_metadata': 'not_observed'}
     native['scope_kind'] = scope_kind
     native['scope_sha256'] = digest(scope) if scope is not None else None
     native['bindings_sha256'] = digest(bindings_document)
