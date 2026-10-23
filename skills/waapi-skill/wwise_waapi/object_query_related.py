@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -100,27 +101,109 @@ def _meaning(value: str) -> str:
 def parse_related_request(version: str, values: list[str], option: str) -> dict[str, Any]:
     if len(values) < 2:
         raise ValueError(f"{option} requires a related path and one terminal")
+    if len(values) > MAX_ADVANCED_RETURN_EXPRESSIONS * 4:
+        raise ValueError('related paths and sequence arguments exceed their bounded declaration size')
+    reducer = None
+    if option == '--include-related' and len(values) >= 4 and values[-3] in {'any-match','all-match'}:
+        reducer = {'operation':values[-3], 'condition':{'condition':values[-2],'value':values[-1]}}
+        values = [*values[:-3], '__sequence_value__']
+    elif option == '--include-related' and values[-1] in {'count','any'}:
+        reducer, values = {'operation':values[-1]}, [*values[:-1], '__sequence_value__']
     tokens, terminal = values[:-1], values[-1]
     hops, index = [], 0
     while index < len(tokens):
         name = tokens[index]
-        if name in RELATED_QUERY_RELATIONS or name in RELATED_QUERY_LIST_RELATIONS:
-            hops.append(("list" if name in RELATED_QUERY_LIST_RELATIONS else "relation", name))
-            index += 1
+        if name == 'combine' or name in RELATED_QUERY_RELATIONS or name in RELATED_QUERY_LIST_RELATIONS:
+            spec = None
+            if name == 'combine':
+                arms, arm, depth = [], [], 0
+                index += 1
+                while index < len(tokens):
+                    token = tokens[index]; index += 1
+                    if token == 'end' and depth == 0:
+                        arms.append(arm); break
+                    if token == 'and' and depth == 0:
+                        arms.append(arm); arm = []; continue
+                    if token == 'combine': depth += 1
+                    if token == 'end': depth -= 1
+                    arm.append(token)
+                else:
+                    raise ValueError('combine requires closed arms separated by and, followed by end')
+                if len(arms) < 2 or any(not arm for arm in arms):
+                    raise ValueError('combine requires at least two nonempty closed path arms')
+                for arm in arms:
+                    if arm != ['self']:
+                        parse_related_request(version,[*arm,'volume-db'],'--include-related')
+                spec = {'source':'combine','arms':arms,'stages':[]}
+                hops.append(('sequence',json.dumps(spec,separators=(',',':'))))
+            else:
+                hops.append(("list" if name in RELATED_QUERY_LIST_RELATIONS else "relation", name))
+                index += 1
+            if spec is not None or name in RELATED_QUERY_LIST_RELATIONS:
+                stages = []
+                while index < len(tokens) and tokens[index] in {"first", "last", "at", "skip", "take", "matching"}:
+                    selection = tokens[index]; index += 1
+                    stage = {"selection": selection}
+                    if selection == 'matching':
+                        if index+1 >= len(tokens):
+                            raise ValueError('matching requires one disclosed business condition and value')
+                        stage.update({'condition':tokens[index], 'value':tokens[index+1]}); index += 2
+                    if selection in {'at','skip','take'}:
+                        if index >= len(tokens) or len(tokens[index]) > MAX_ADVANCED_RETURN_EXPRESSION_BYTES or re.fullmatch(r'0|[1-9][0-9]*',tokens[index]) is None:
+                            raise ValueError("related selection counts must be nonnegative decimal integers")
+                        stage["count"] = int(tokens[index]); index += 1
+                    stages.append(stage)
+                if stages:
+                    hops[-1] = ("sequence", json.dumps({**(spec or {'source':name}), 'stages': stages}, separators=(",", ":")))
         elif name in {"reference", "local-reference"} and index + 1 < len(tokens):
             hops.append((name, _meaning(tokens[index + 1])))
             index += 2
         else:
             raise ValueError(f"{option} requires disclosed relation or reference/local-reference MEANING hops")
-    if len(hops) > MAX_ADVANCED_RETURN_EXPRESSIONS:
+    if reducer:
+        if not hops or hops[-1][0] not in {'list','sequence'}:
+            raise ValueError('related reducers require an object sequence')
+        kind, name = hops[-1]
+        spec = json.loads(name) if kind == 'sequence' else {'source':name,'stages':[]}
+        spec['reducer'] = reducer
+        hops[-1] = ('sequence',json.dumps(spec,separators=(',',':')))
+    nodes = len(hops)
+    for kind,name in hops:
+        if kind != 'sequence': continue
+        spec = json.loads(name)
+        nodes += len(spec['stages'])
+        for arm in spec.get('arms',[]):
+            nodes += 1 if arm == ['self'] else parse_related_request(version,[*arm,'volume-db'],'--include-related')['nodes']
+    if nodes > MAX_ADVANCED_RETURN_EXPRESSIONS:
         raise ValueError(f"closed related paths accept at most {MAX_ADVANCED_RETURN_EXPRESSIONS} hops")
-    if option == "--include-related":
+    if option == "--include-related" and not reducer:
         detail = related_output_detail(version, terminal)
         if not detail["available"]:
             raise ValueError(f"{option} {' '.join(values)}: {detail['reason']}")
-    else:
+    elif option != '--include-related':
         _meaning(terminal)
-    return {"hops": tuple(hops), "terminal": terminal, "option": option}
+    return {"hops": tuple(hops), "terminal": terminal, "option": option, "nodes":nodes, "reducer":reducer}
+
+
+def related_sequence_specs(version, request):
+    """Walk the same bounded record for preflight and runtime disclosure."""
+    for kind,name in request['hops']:
+        if kind != 'sequence': continue
+        spec = json.loads(name)
+        yield spec
+        for arm in spec.get('arms',[]):
+            if arm != ['self']:
+                yield from related_sequence_specs(version,parse_related_request(version,[*arm,'volume-db'],'--include-related'))
+
+
+def related_sequence_source(version):
+    from .canonical import canonical_sha256
+    source_path = Path(__file__).resolve().parents[1]/'references'/'semantic'/version/'query-list-output-sources.json'
+    source = json.loads(source_path.read_text(encoding='utf-8'))
+    if source['version'] != version or source['wwise_build'] != load_definition_graph(version).wwise_build:
+        raise ValueError('Related sequence source does not match the selected definitions')
+    return {**{key:source[key] for key in ('version','wwise_build','archive','archive_sha256','page','page_sha256')},
+            'sections_sha256':canonical_sha256(source['sequence_sources'])}
 
 
 def compile_related_output(version: str, relation: str, name: str) -> RelatedQueryOutput:
@@ -176,6 +259,22 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
     return {"option": "--include-related <closed-hop>... <business-output> (repeat)",
             "relations": dict(RELATED_QUERY_RELATIONS),
             "list_members": {"relations": dict(RELATED_QUERY_LIST_RELATIONS), "strategy": list_source["strategy"],
+                "sequences": {"versions":list(SUPPORTED_WWISE_VERSION_KEYS),
+                    "selection_tokens":['matching','first','last','at','skip','take'],
+                    "reducer_tokens":['count','any','any-match','all-match'],
+                    "condition_vocabulary":"same exact query-schema /predicates and /predicates/kind-is/choices; no native accessor, operator or parallel alias input",
+                    "combination":"combine <closed relative path> and <closed relative path> ... end; self names the current context; arm and selected-arm occurrence origins retained, explicitly scoped after any pushed matching",
+                    "examples":[['children','matching','kind-is','sound','first','volume-db'],['children','count'],['children','all-match','kind-is','sound'],['combine','self','and','ancestors','end','volume-db']],
+                    "arguments":"canonical nonnegative decimal integers; skip 0 is omitted; zero selection is Gateway-empty, never an unproved native take 0",
+                    "result_location":"related.projections",
+                    "result_shape":"ordered records with canonical spec and derivation; selected members in items (first/last/at zero-or-one), reducers in value; equal specs merge requested terminal modes; untransformed paths unchanged",
+                    "derivation":"Gateway business sequence/count/any/all/concat, backed by actual bounded native query-selection/member reads; no native function-return equality or atomic snapshot. Count is an integer; any/all false on empty. Unknown data is never false/zero",
+                    "execution":"owned chainable SELECT/where/positive skip/take before bounded GUID member projection; last may require a complete bounded sequence; matching keeps native predicate semantics; native member composition remains separately versioned",
+                    "bounds":"existing path/selection node and declaration/output/member/read/deadline/page bounds; overflow is explicit, never a counted hidden prefix",
+                    "source":{**{key:list_source[key] for key in ('version','wwise_build','archive','archive_sha256','page','page_sha256')},
+                        "sections_sha256":canonical_sha256(list_source['sequence_sources'])},
+                    "native_domains":"2023+ function examples are query predicates/selection; concat and one filtered return chain have explicit return examples. 2021/22 missing function sections do not establish native absence",
+                    "followup":"non-object record-list descriptors, randomizer and other typed functions remain unavailable through this contract; this is not native absence"},
                 "membership": "2021/2022: each actual canonical owner/relation is read with documented query SELECT, an initial window without skip, positive-offset bounded skip/final-take windows and overflow detection; no bare list return accessor is assumed",
                 "result": "related.<list>.items contains ordered independent member records with object identities and the same fixed/custom terminal modes; nested paths retain their grouping",
                 "source": {**{key: list_source[key] for key in ("version", "wwise_build", "page", "page_sha256")}, "sections_sha256": canonical_sha256(list_source["sections"])},
@@ -207,4 +306,4 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "metadata_scope": "actual endpoint classId or canonical GUID only; complete no-match scopes can report unavailable_field_requests when another actual scope binds; empty roots or absent contexts establish no metadata authority",
             "applicability": "ordinary, broad and bounded advanced reads retain root membership, ordered identities and prefix scope facts through preparation/final read/paging; no mutation authority",
             "native_limits": {"return_expressions_including_helpers": MAX_ADVANCED_RETURN_EXPRESSIONS, "each_expression_utf8_bytes": MAX_ADVANCED_RETURN_EXPRESSION_BYTES},
-            "followup": "list compositions with selectors/reducers, other functions, additional legacy spellings, states and other unproved fixed-output combinations remain unavailable through this related-output interface; this does not establish native absence"}
+            "followup": "non-object record lists, other typed functions, additional legacy spellings, states and other unproved fixed-output combinations remain unavailable through this related-output interface; this does not establish native absence"}

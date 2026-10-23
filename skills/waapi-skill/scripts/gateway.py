@@ -5598,6 +5598,22 @@ def preflight_typed_zero_input(
     )
 
 
+def _query_sequence_condition(version, condition):
+    """Reuse the ordinary business vocabulary and literal/type compiler."""
+    name, value = condition['condition'], condition['value']
+    if name == QUERY_BUSINESS_KIND_PREDICATE:
+        if value not in QUERY_BUSINESS_KINDS:
+            raise GatewayInputError('related matching kind-is requires a disclosed business kind')
+        predicates = _query_kind_predicates(value, version=version)
+    else:
+        if name not in QUERY_BUSINESS_PREDICATES:
+            raise GatewayInputError('related matching requires a disclosed business condition')
+        field, operator, value_type = QUERY_BUSINESS_PREDICATES[name]
+        predicates = [(field,operator,value_type,value)]
+    from wwise_waapi.builders.query import _where_clause
+    return _where_clause(typed_query_predicates(argparse.Namespace(where=predicates)))
+
+
 def _query_kind_predicates(
     name: str,
     *,
@@ -5900,12 +5916,19 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         requests = [parse_related_request(version, list(values), "--include-related") for values in related]
         requests.extend(parse_related_request(version, list(values), option)
             for option, occurrences in related_custom for values in occurrences)
-        signatures = [(request["option"], tuple((kind, " ".join(value.split()).casefold()) for kind, value in request["hops"]),
+        from wwise_waapi.object_query_related import related_sequence_specs
+        for request in requests:
+            for spec in related_sequence_specs(version,request):
+                for stage in spec['stages']:
+                    if stage['selection'] == 'matching': _query_sequence_condition(version,stage)
+                if 'condition' in spec.get('reducer',{}):
+                    _query_sequence_condition(version,spec['reducer']['condition'])
+        signatures = [(request["option"], tuple((kind, value if kind == 'sequence' else " ".join(value.split()).casefold()) for kind, value in request["hops"]),
                        " ".join(request["terminal"].split()).casefold()) for request in requests]
         if len(set(signatures)) != len(signatures):
             raise ValueError("query-object related declarations must be unique")
         args.query_related_requests = tuple(requests)
-        args.query_related_has_lists = any(kind == "list" for request in requests for kind, _ in request["hops"])
+        args.query_related_has_lists = any(kind in {"list", "sequence"} for request in requests for kind, _ in request["hops"])
         args.query_related_preparation_required = any(request["option"] != "--include-related" or
             any(kind != "relation" for kind, _ in request["hops"]) for request in requests)
         if not args.query_related_has_lists:
@@ -25069,6 +25092,7 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
                 return result
             plan = RelatedListPlan(version=detected_version, requests=args.query_related_requests,
                 bindings=args.query_output_bindings, build_preview=build_preview, read=read,
+                compile_condition=lambda condition: _query_sequence_condition(detected_version, condition),
                 maximum_rows=_query_result_maximum(args) or MAX_QUERY_TAKE,
                 maximum_read_bytes=MAX_GATEWAY_RESULT_JSON_BYTES)
             clarification = plan.prepare()
