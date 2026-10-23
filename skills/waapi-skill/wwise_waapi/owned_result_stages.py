@@ -1,4 +1,4 @@
-"""Bound native creation results before dependent ordinary scalar references.
+"""Bind native creation results before dependent scalar references.
 
 The original declaration and Preview stay immutable. Each native result and
 materialized request is retained; a dependent write never gets identity from
@@ -20,24 +20,121 @@ SET_REFERENCE = 'ak.wwise.core.object.setReference'
 FIELDS = ['id', 'name', 'type', 'path', 'parent', 'classId', 'notes']
 
 
-def native_node(args, path):
+def native_node(args, path, specs=()):
+    """Resolve normalized List paths only through sealed typed occurrences."""
     import re
-    node = args
-    for key, index in re.findall(r'\.(objects|children)\[(\d+)\]', path):
-        node = node[key][int(index)]
+    node, prefix = args, '$'
+    tokens = list(re.finditer(r'\.(objects|children|lists)\[(\d+)\]', path))
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        key, position = token.group(1), int(token.group(2))
+        prefix += token.group(0)
+        if key == 'lists':
+            matches = {spec['collection'] for spec in specs if re.fullmatch(re.escape(prefix) + r'\.objects\[\d+\]', spec['request_path'])
+                and spec.get('documented_list_element_class') == spec.get('class_id')}
+            if len(matches) != 1 or index + 1 >= len(tokens) or tokens[index + 1].group(1) != 'objects':
+                raise ValueError('Native List path lacks one source-certified occurrence collection')
+            index += 1
+            prefix += tokens[index].group(0)
+            node = node['@' + matches.pop()][int(tokens[index].group(2))]
+        else:
+            node = node[key][position]
+        index += 1
     return node
 
 
-def prepare(uri, args, options, specs, context, version, *, force=False, root_parent=None, parent_children=()):
+def list_profiles(specs, guards, version):
+    """Seal named owned append Lists using the existing producer's source proof."""
+    from .documented_list_fields import resolve_class_list_evidence
+    profiles = []
+    for owner in specs:
+        for snapshot in owner.get('list_snapshots', []):
+            name = snapshot['list']
+            members = [node for node in specs if node.get('parent_request_path') == owner['request_path']
+                and node.get('collection') == name]
+            matches = []
+            for guard in guards:
+                binding = guard.get('binding', guard.get('evidence', {}))
+                if (binding.get('declaration', {}).get('name') == name
+                        and binding.get('scope', {}).get('class_id') == owner['class_id']
+                        and (binding.get('planned_owner', {}).get('request_path') == owner['request_path']
+                            or binding.get('scope', {}).get('scope_kind') == 'object'
+                            and binding['scope'].get('scope_value') == owner.get('target_id'))):
+                    matches.append(guard)
+            if len(matches) != 1 or not members:
+                raise ValueError('Staged List needs its exact producer-owned class/source and member roster')
+            guard = matches[0]
+            binding = guard.get('binding', guard.get('evidence'))
+            source = resolve_class_list_evidence(version, owner['class_id'], name)
+            if (any(binding.get(key) != source[key] for key in ('kind', 'version', 'catalog_sha256',
+                    'source_member', 'source_sha256', 'declaration'))
+                    or binding.get('reference_targets') is not None or source['declaration']['unresolved_element_types']):
+                raise ValueError('Staged owned List source is not one complete matching named profile')
+            before = (guard.get('before') or {}).get('members', []) if 'binding' in guard else guard['members']
+            if len(before) + len(members) > DEFAULT_MAX_NODES:
+                raise ValueError('Staged List prefix and new occurrences exceed the complete membership bound')
+            names = [member['name'].casefold() for member in before]
+            allowed = {row['class_id'] for row in source['declaration']['element_classes']}
+            for member in members:
+                if (not member.get('requested_name') or member.get('existing_target') or member.get('preexisting_id')
+                        or member.get('documented_list_element_class') != member.get('class_id')
+                        or member['class_id'] not in allowed or member.get('on_name_conflict') not in {'fail', 'rename'}
+                        or member['requested_name'].casefold() in names):
+                    raise ValueError('Staged named owned List requires distinct fresh source-certified members')
+                names.append(member['requested_name'].casefold())
+            if owner.get('list_mode', 'append') != 'append' and before:
+                raise ValueError('Staged List replacement/removal needs its separate outcome contract')
+            if [row['id'].upper() for row in before] != [row['id'].upper() for row in snapshot['rows']]:
+                raise ValueError('Staged List prefix differs from its complete producer snapshot')
+            profiles.append({'owner': owner['request_path'], 'name': name, 'source': source,
+                'before': deepcopy(before), 'members': [node['request_path'] for node in members]})
+    return profiles
+
+
+def fields_for(spec):
+    return [*FIELDS, 'owner'] if spec.get('collection') not in {None, 'children'} else FIELDS
+
+
+def observe_lists(prepared, identities, *, read):
+    """Prove exact ordered partial membership, typed ownership and retained prefix."""
+    from .documented_list_fields import observe_planned_list
+    for profile in prepared['pre_state']['owned_result_stages'].get('lists', []):
+        owner = identities.get(profile['owner'])
+        if owner is None:
+            retained = next((node for node in prepared['verification_plan']['nodes']
+                if node['request_path'] == profile['owner'] and node.get('existing_target')), None)
+            owner = retained['pre_state'] if retained is not None else None
+        if owner is None:
+            continue
+        actual = observe_planned_list(profile['source'], owner['id'], read=read)
+        prefix = profile['before']
+        created = [identities[path] for path in profile['members'] if path in identities]
+        members = actual['members']
+        if ([row['id'].upper() for row in members] != [row['id'].upper() for row in [*prefix, *created]]
+                or members[:len(prefix)] != prefix
+                or any(any(row.get(key) != expected.get(key) or (key in row) != (key in expected)
+                    for key in expected) for row, expected in zip(members[len(prefix):], created, strict=True))):
+            raise ValueError('Owned List changed its exact ordered prefix, members, class or ownership')
+
+
+def prepare(uri, args, options, specs, context, version, *, force=False, root_parent=None, parent_children=(), list_guards=()):
     if not force and (not context or not (context.get('renames') or context.get('duplicate_sibling_groups'))):
         return None
     if force and not any(not node.get('existing_target') for node in specs):
         return None
     if uri not in {SET, CREATE} or uri == SET and version == '2021.1':
         raise ValueError('Owned ordinary creation requires its pinned native constructor')
+    profiles = list_profiles(specs, list_guards, version)
+    list_paths = {path for profile in profiles for path in profile['members']}
+    owner_paths = {profile['owner'] for profile in profiles}
+    if profiles and uri != SET:
+        raise ValueError('Named owned List staging currently requires the pinned SET constructor')
     if (not specs or len(specs) > DEFAULT_MAX_NODES or any(
-            node.get('collection') not in {None, 'children'} or node.get('preexisting_id') is not None
-            or node.get('list_request_paths') or node.get('list_snapshots') or node.get('import_requested')
+            (node.get('collection') not in {None, 'children'} and node['request_path'] not in list_paths)
+            or node.get('preexisting_id') is not None
+            or ((node.get('list_request_paths') or node.get('list_snapshots')) and node['request_path'] not in owner_paths)
+            or node.get('import_requested')
             or node.get('requested_language') or node.get('graph_plugin_native') or node.get('rtpc_binding')
             or any('array' in field or 'curve' in field for field in node.get('references', []))
             for node in specs)):
@@ -58,14 +155,17 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
             raise ValueError('Every staged new occurrence needs its declared parent association')
     creation = deepcopy(args)
     for field in deferred:
-        del native_node(creation, field['source'])['@' + field['field']]
+        del native_node(creation, field['source'], specs)['@' + field['field']]
     def prune(node, path):
         children = [child for child in specs if child.get('parent_request_path') == path]
-        if any(child['request_path'] not in paths for child in children):
-            node.pop('children', None)
-        else:
-            for child, raw in zip(children, node.get('children', []), strict=True):
-                prune(raw, child['request_path'])
+        for collection in dict.fromkeys(child.get('collection') or 'children' for child in children):
+            group = [child for child in children if (child.get('collection') or 'children') == collection]
+            key = collection if collection == 'children' else '@' + collection
+            if any(child['request_path'] not in paths for child in group):
+                node.pop(key, None)
+            else:
+                for child, raw in zip(group, node.get(key, []), strict=True):
+                    prune(raw, child['request_path'])
     stages = []
     if uri == SET and creation_stage_count(specs) > 1:
         for root, paths in creation_chunks(specs):
@@ -73,22 +173,22 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
             retained = parent
             while not retained.get('existing_target'):
                 retained = by_path[retained['parent_request_path']]
-            inherited = native_node(creation, retained['request_path'])
+            inherited = native_node(creation, retained['request_path'], specs)
             parent_args = {key: deepcopy(inherited[key]) for key in ('platform', 'onNameConflict', 'listMode') if key in inherited}
             if parent.get('existing_target'):
                 parent_args['object'] = parent['target_id']
             else:
-                native_parent = native_node(creation, parent['request_path'])
+                native_parent = native_node(creation, parent['request_path'], specs)
                 if 'platform' in native_parent:
                     parent_args['platform'] = native_parent['platform']
-            chunk = deepcopy(native_node(creation, root['request_path']))
+            chunk = deepcopy(native_node(creation, root['request_path'], specs))
             prune(chunk, root['request_path'])
             stages.append({'root': root['request_path'], 'parent': parent['request_path'], 'node_paths': paths,
                 **({'owned_parent': True} if not parent.get('existing_target') else {}),
-                'args': {**deepcopy(creation), 'objects': [{**parent_args, 'children': [chunk]}]}})
+                'args': {**deepcopy(creation), 'objects': [{**parent_args, ('children' if root.get('collection') in {None, 'children'} else '@' + root['collection']): [chunk]}]}})
     if uri == CREATE and creation_stage_count(specs) > 1:
         for root, paths in creation_chunks(specs):
-            chunk = deepcopy(native_node(creation, root['request_path']))
+            chunk = deepcopy(native_node(creation, root['request_path'], specs))
             prune(chunk, root['request_path'])
             parent_path = root.get('parent_request_path')
             controls = {key: deepcopy(creation[key]) for key in ('onNameConflict', 'autoAddToSourceControl', 'platform') if key in creation}
@@ -99,13 +199,14 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
                 'args': {**chunk, **controls}})
     return {'kind': KIND, 'version': version, 'uri': uri, 'creation_args': creation,
             'options': deepcopy(options), 'deferred': deferred,
+            **({'lists': profiles} if profiles else {}),
             **({'creation_stages': stages, 'pre_creation_roster_check': True} if stages else {}),
             'prospective_paths': prospective_paths(specs, root_parent=root_parent),
             **({'parent_before': dict(root_parent), 'parent_children': list(parent_children), 'parent_id': args['parent']} if uri == CREATE else {})}
 
 
 def creation_chunks(specs):
-    """Cut ambiguous sibling frontiers; retain ordinary unambiguous subtrees."""
+    """Cut ambiguous sibling frontiers within each typed collection."""
     children = {}
     for node in specs:
         children.setdefault(node.get('parent_request_path'), []).append(node)
@@ -115,12 +216,14 @@ def creation_chunks(specs):
         deferred = []
         def collect(node):
             paths.append(node['request_path'])
-            group = children.get(node['request_path'], [])
-            if len({child['requested_name'].casefold() for child in group}) != len(group):
-                deferred.extend(group)
-            else:
-                for child in group:
-                    collect(child)
+            descendants = children.get(node['request_path'], [])
+            for collection in dict.fromkeys(child.get('collection') for child in descendants):
+                group = [child for child in descendants if child.get('collection') == collection]
+                if len({child['requested_name'].casefold() for child in group}) != len(group):
+                    deferred.extend(group)
+                else:
+                    for child in group:
+                        collect(child)
         collect(root)
         roots.append((root, paths))
         for child in deferred:
@@ -174,7 +277,7 @@ def bind(prepared, result, *, read):
     specs = prepared['verification_plan']['nodes']
     plan = prepared['pre_state']['owned_result_stages']
     by_path = {node['request_path']: node for node in specs}
-    returned = flatten_create_result(result) if plan['uri'] == CREATE else flatten_set_result(result)
+    returned = flatten_create_result(result) if plan['uri'] == CREATE else flatten_set_result(result, allowed_lists=[row['name'] for row in plan.get('lists', [])])
     returned_children, bound, seen = {}, {}, set()
     for node in returned:
         if node.parent_request_path is not None:
@@ -192,7 +295,8 @@ def bind(prepared, result, *, read):
         for child in actual:
             # A sole child below an existing exact GUID is the owned creation
             # occurrence. Its native suffix is never an identity expression.
-            matches = children if spec.get('existing_target') else [candidate for candidate in children
+            group = [candidate for candidate in children if candidate.get('collection') == child.collection]
+            matches = group if spec.get('existing_target') and len(group) == 1 else [candidate for candidate in group
                 if candidate['requested_name'] == child.name]
             if len(matches) != 1:
                 raise ValueError('Native result cannot uniquely associate this child declaration')
@@ -210,13 +314,14 @@ def bind(prepared, result, *, read):
         payload = read(uri, args, options)
         records.append({'uri': uri, 'args': args, 'options': options, 'result': payload})
         return payload
-    def observe(args):
-        payload = retained(GET, args, {'return': FIELDS})
+    def observe(args, fields=FIELDS):
+        payload = retained(GET, args, {'return': fields})
         rows = payload.get('return') if isinstance(payload, Mapping) else None
         if not isinstance(rows, list) or any(not isinstance(row, Mapping) for row in rows):
             raise ValueError('Owned result observation requires a complete bounded row set')
         return rows
     all_before = {str(row['id']).upper() for node in specs for row in node.get('preexisting_children', [])}
+    all_before.update(str(row['id']).upper() for profile in plan.get('lists', []) for row in profile['before'])
     all_before.update(str(node['target_id']).upper() for node in specs if node.get('existing_target'))
     if plan['uri'] == CREATE:
         all_before.update(str(row['id']).upper() for row in plan['parent_children'])
@@ -224,7 +329,7 @@ def bind(prepared, result, *, read):
     for path, spec in by_path.items():
         returned = bound.get(path)
         object_id = spec.get('target_id') if spec.get('existing_target') else returned.object if returned else None
-        rows = observe({'from': {'id': [object_id]}})
+        rows = observe({'from': {'id': [object_id]}}, fields_for(spec))
         if len(rows) != 1 or not _same_identity(rows[0].get('id'), object_id):
             raise ValueError('Actual returned GUID must resolve exactly once')
         row = rows[0]
@@ -247,16 +352,19 @@ def bind(prepared, result, *, read):
                 if len(parents) != 1 or not _same_identity(parents[0].get('id'), parent_id):
                     raise ValueError('Created root parent lacks its actual GUID observation')
                 parent = parents[0]
-            edge = row.get('parent')
+            owned = spec.get('collection') not in {None, 'children'}
+            edge = row.get('owner' if owned else 'parent')
             if (not _same_identity(edge.get('id') if isinstance(edge, Mapping) else edge, parent['id'])
-                    or row.get('path') != parent['path'] + '\\' + row['name']):
+                    or not owned and row.get('path') != parent['path'] + '\\' + row['name']):
                 raise ValueError('Actual created occurrence parent/path does not match declared topology')
-        children = [identities[child['request_path']]['id'].upper() for child in specs if child.get('parent_request_path') == path]
+        children = [identities[child['request_path']]['id'].upper() for child in specs if child.get('parent_request_path') == path
+            and child.get('collection') in {None, 'children'}]
         expected = {str(child['id']).upper() for child in spec.get('preexisting_children', [])} | set(children)
         rows = observe({'from': {'id': [row['id']]}, 'transform': [{'select': ['children']}]})
         actual = [str(child.get('id')).upper() for child in rows]
         if len(actual) != len(set(actual)) or set(actual) != expected:
             raise ValueError('Actual parent membership differs from complete sealed and returned GUID roster')
+    observe_lists(prepared, identities, read=retained)
     observe_reference_metadata(prepared, identities, read=retained)
     return identities, records
 
@@ -271,7 +379,7 @@ def observe_reference_metadata(prepared, identities, *, read):
         # dependent reference must still consume their exact actual identity.
         paths = list(dict.fromkeys(path for field in plan['deferred'] for path in (field['source'], field['target'])))
         for path in paths:
-            payload = read(GET, {'from': {'id': [identities[path]['id']]}}, {'return': FIELDS})
+            payload = read(GET, {'from': {'id': [identities[path]['id']]}}, {'return': fields_for(by_path[path])})
             if not isinstance(payload, Mapping) or payload.get('return') != [identities[path]]:
                 raise ValueError('Owned reference source/target drifted after its actual creation stage')
     for field in plan['deferred']:
@@ -305,8 +413,15 @@ def split_stage_prepared(prepared, stage, identities):
         and str(row.get('parent', {}).get('id') if isinstance(row.get('parent'), Mapping) else row.get('parent')).upper() == parent['target_id'].upper()]
     parent['preexisting_children'] = [*parent.get('preexisting_children', []), *children]
     scoped = [parent, *(node for node in nodes if node['request_path'] in stage['node_paths'])]
+    stage_plan = {**prepared['pre_state']['owned_result_stages'], 'deferred': []}
+    scoped_paths = {node['request_path'] for node in scoped}
+    if stage_plan.get('lists'):
+        stage_plan['lists'] = [{**profile,
+            'before': [*profile['before'], *(identities[path] for path in profile['members'] if path in identities)],
+            'members': [path for path in profile['members'] if path in stage['node_paths']]}
+            for profile in stage_plan['lists'] if profile['owner'] in scoped_paths]
     return {**prepared, 'verification_plan': {**prepared['verification_plan'], 'nodes': scoped},
-        'pre_state': {**prepared['pre_state'], 'owned_result_stages': {**prepared['pre_state']['owned_result_stages'], 'deferred': []}}}
+        'pre_state': {**prepared['pre_state'], 'owned_result_stages': stage_plan}}
 
 
 def observe_owned_roster(prepared, identities, *, read):
@@ -319,16 +434,19 @@ def observe_owned_roster(prepared, identities, *, read):
         if node.get('existing_target') or path not in identities:
             continue
         expected = identities[path]
-        actual = read(GET, {'from': {'id': [expected['id']]}}, {'return': FIELDS})
+        actual = read(GET, {'from': {'id': [expected['id']]}}, {'return': fields_for(node)})
         if not isinstance(actual, Mapping) or actual.get('return') != [expected]:
             raise ValueError('An earlier owned created identity changed between creation stages')
         children = {identities[child['request_path']]['id'].upper() for child in nodes
-            if child.get('parent_request_path') == path and child['request_path'] in identities}
+            if child.get('parent_request_path') == path and child['request_path'] in identities
+            and child.get('collection') in {None, 'children'}}
         payload = read(GET, {'from': {'id': [expected['id']]}, 'transform': [{'select': ['children']}]}, {'return': ['id']})
         rows = payload.get('return') if isinstance(payload, Mapping) else None
         if (not isinstance(rows, list) or any(not isinstance(row, Mapping) or not isinstance(row.get('id'), str) for row in rows)
                 or len(rows) != len(children) or {row['id'].upper() for row in rows} != children):
             raise ValueError('An earlier owned created subtree changed its complete child membership')
+
+    observe_lists(prepared, identities, read=read)
 
 
 def bind_split_stage(prepared, stage, result, identities, *, read, context, binding=None):
@@ -375,7 +493,8 @@ def reference_args(plan, identities):
         if row is None:
             row = {'object': source['id'], **({'platform': field['platform']} if field['platform'] is not None else {})}
             rows.append(row)
-        row['@' + field['field']] = target['path']
+        owned_list_paths = {path for profile in plan.get('lists', []) for path in profile['members']}
+        row['@' + field['field']] = target['id'] if field['target'] in owned_list_paths else target['path']
     return {'objects': rows}
 
 

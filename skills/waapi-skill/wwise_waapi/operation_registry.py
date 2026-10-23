@@ -7259,11 +7259,21 @@ def _prepare_object_set(
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
+    if documented_bindings:
+        if any(binding.get("version") != request.version for binding in documented_bindings):
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "List source evidence must belong to this exact Wwise version")
+        from .documented_list_fields import observe_list_binding
+        try:
+            state["documented_list_guards"] = [observe_list_binding(evidence, read=read)
+                for evidence in documented_bindings]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
     if result_context or stage_new_graphs:
         from .owned_result_stages import prepare as prepare_owned_stages
         try:
             stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
-                node_specs, result_context, request.version, force=stage_new_graphs)
+                node_specs, result_context, request.version, force=stage_new_graphs,
+                list_guards=[*planned_guards, *state.get('documented_list_guards', []), *early_merge_guards])
         except ValueError as exc:
             raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
         if stage_plan is not None:
@@ -7308,15 +7318,6 @@ def _prepare_object_set(
         raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Every planned List source must belong to one reachable owner occurrence")
     if planned_guards:
         state["documented_planned_list_guards"] = planned_guards
-    if documented_bindings:
-        if any(binding.get("version") != request.version for binding in documented_bindings):
-            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "List source evidence must belong to this exact Wwise version")
-        from .documented_list_fields import observe_list_binding
-        try:
-            state["documented_list_guards"] = [observe_list_binding(evidence, read=read)
-                for evidence in documented_bindings]
-        except (ValueError, KeyError, TypeError) as exc:
-            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
     from .documented_list_fields import capture_slot_reference_targets
     reference_targets = capture_slot_reference_targets(node_specs, roles)
     if reference_targets:
@@ -21020,21 +21021,23 @@ def verify_prepared_operation(
                     "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
                 if identity_ok and history_fields and len(specs) == 1:
                     created_history_metadata.append((spec, object_id))
-            if history_graph and not spec.get("preexisting_id") and not spec.get("existing_target"):
+            if (history_graph or owned_stage_identities is not None) and not spec.get("preexisting_id") and not spec.get("existing_target"):
                 identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
                 identity_ok = (result_node is not None and _same_identity(row.get("id"), object_id)
                     and type(row.get("classId")) is int and row["classId"] == spec.get("class_id")
                     and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")) and name_ok
-                    and _same_identity(_reference_identity(row.get("parent")), expected_parent_id)
+                    and _same_identity(_reference_identity(row.get('owner' if spec.get('collection') not in {None, 'children'} else 'parent')), expected_parent_id)
                     and isinstance(row.get("notes"), str))
-                assertions.append({"name": "created hierarchy node is independently verified",
-                    "kind": "verified_created_node_identity", "passed": bool(identity_ok),
+                assertions.append({"name": ("created owned List member is independently verified" if spec.get("collection") not in {None, "children"} else "created hierarchy node is independently verified"),
+                    "kind": ("verified_created_list_member_identity" if spec.get("collection") not in {None, "children"} else "verified_created_node_identity"), "passed": bool(identity_ok),
                     "evidence": {"request_path": request_path, "object": identity,
                         "requested_name": spec.get("original_requested_name", spec["requested_name"]),
                         **({"result_handle": pre_state["planned_reference_context"]["facts"][request_path]["result_handle"]}
                            if request_path in pre_state.get("planned_reference_context", {}).get("facts", {}) else {}),
-                        "class_id": row.get("classId"), "parent_id": expected_parent_id}})
-                if identity_ok and history_fields:
+                        "class_id": row.get("classId"),
+                        **({"owner_id": expected_parent_id, "list_name": spec["collection"]} if spec.get("collection") not in {None, "children"}
+                           else {"parent_id": expected_parent_id})}})
+                if identity_ok and history_fields and history_graph:
                     created_history_metadata.append((spec, object_id))
             if spec.get("notes_supplied") is True:
                 check(
