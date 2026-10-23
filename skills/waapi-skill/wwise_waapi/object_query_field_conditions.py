@@ -424,7 +424,7 @@ def field_condition_contract(version, *, maximum_conditions):
             'token_pattern':'[A-Za-z0-9_]+:[A-Za-z0-9_]+','source':namespaced_source,
             'custom_output_token_grammar_changed':False,'reference_token_grammar_changed':False,
             'predicate_value_readback_required':True,
-            'native_boundary':'retained2025 component proves WHERE spelling/membership only; existing typed predicate-value RETURN/readback checks remain mandatory and fail closed; no custom RETURN, override difference or other-version native claim'},
+            'native_boundary':'live typed predicate-value RETURN/readbacks remain mandatory before and after selection; absent or incompatible values stop the query'},
         'authority':'complete actual source/member class or GUID live metadata; unknown is not false or zero',
         'root_limit_order':'native field predicates before final root take',
         'root_unknown':'bounded refinement/failure; never return unfiltered roots as matches',
