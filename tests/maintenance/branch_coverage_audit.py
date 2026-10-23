@@ -350,7 +350,7 @@ def portable_binding_inputs(index_path, requirements):
     from tests.maintenance.branch_audit_completion import read_sealed_artifact
     raw = index_path.read_bytes()
     index = json.loads(raw)
-    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments', 'condition_mechanism_attachments', 'condition_definition_attachments'}
+    if (not {'contract', 'base', 'entries'} <= set(index) or set(index) - {'contract', 'base', 'entries', 'metadata_attachments', 'source_attachments', 'source_native_attachments', 'runtime_observation_attachments', 'condition_mechanism_attachments', 'condition_definition_attachments'}
             or index['contract'] != 'waapi-skill.branch-evidence-index/v1'
             or not isinstance(index['base'], str) or Path(index['base']).is_absolute()
             or not isinstance(index['entries'], list) or (not index['entries'] and not index.get('condition_definition_attachments'))):
@@ -540,6 +540,10 @@ def portable_binding_inputs(index_path, requirements):
         portable_source_native_attachments(index['source_native_attachments'], bindings, read, base,
             capture_origins=source_capture_origins)
     condition_mechanism_reuse = []
+    if 'runtime_observation_attachments' in index:
+        from tests.support.runtime_observation_evidence import attach_runtime_observations
+        attach_runtime_observations(index['runtime_observation_attachments'], bindings, read, base,
+            requirements, source_capture_origins)
     if 'condition_mechanism_attachments' in index:
         from tests.support.condition_mechanism_reuse import attach_condition_mechanisms
         condition_mechanism_reuse = attach_condition_mechanisms(index['condition_mechanism_attachments'], bindings, read, base, ROOT)
@@ -555,8 +559,9 @@ def portable_binding_inputs(index_path, requirements):
         'selected_documents_sha256': digest({'entries':index['entries'],'metadata_attachments':attachments,
             'source_attachments':index.get('source_attachments', []),
             'source_native_attachments':index.get('source_native_attachments', []),
+            **({'runtime_observation_attachments':index['runtime_observation_attachments']} if 'runtime_observation_attachments' in index else {}),
             **({'condition_mechanism_attachments':index['condition_mechanism_attachments']} if 'condition_mechanism_attachments' in index else {}),
-            **({'condition_definition_attachments':index['condition_definition_attachments']} if 'condition_definition_attachments' in index else {})}) if index.get('source_attachments') or index.get('source_native_attachments') or index.get('condition_mechanism_attachments') or index.get('condition_definition_attachments') else
+            **({'condition_definition_attachments':index['condition_definition_attachments']} if 'condition_definition_attachments' in index else {})}) if index.get('source_attachments') or index.get('source_native_attachments') or index.get('runtime_observation_attachments') or index.get('condition_mechanism_attachments') or index.get('condition_definition_attachments') else
             digest({'entries':index['entries'],'metadata_attachments':attachments}) if attachments else digest(index['entries'])}
 
 

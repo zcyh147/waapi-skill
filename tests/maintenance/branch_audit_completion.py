@@ -169,6 +169,8 @@ def candidate_identity(root, inventory, catalogs, *, digest):
     for name in ('tests/support/source_copy_branch_evidence.py', 'tests/support/exact_evidence_finalization.py',
                  'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
                  'tests/unit/test_source_copy_capture.py',
+                 'tests/support/runtime_observation_evidence.py',
+                 'tests/unit/test_runtime_observation_branch_evidence.py',
                  'tests/support/condition_mechanism_reuse.py', 'tests/support/condition_source_resolution.py',
                  'tests/maintenance/reconcile_condition_sources.py',
                  'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json',
@@ -260,25 +262,35 @@ def read_category_run(descriptor, base):
     return dict(context, candidate=run['candidate'], record=run)
 
 
-def validate_authoring_batch_finalization(run, base):
+def validate_authoring_batch_finalization(run, base, *, read_bytes=None):
     """New shared Authoring rows need the whole completed batch publication."""
     import hashlib
     import json
-    from pathlib import Path
+    from pathlib import Path, PurePosixPath
+    def load(descriptor):
+        if read_bytes is None:
+            return read_sealed_artifact(descriptor, base)
+        raw = read_bytes(descriptor['artifact'])
+        if hashlib.sha256(raw).hexdigest() != descriptor['sha256']:
+            raise ValueError('original finalization artifact digest differs')
+        return json.loads(raw)
     try:
         categories = run['categories']
         descriptors = [row['batch_finalization'] for row in categories]
         if not descriptors or any(row != descriptors[0] for row in descriptors):
             raise ValueError('node finalization links differ')
-        seal = read_sealed_artifact(descriptors[0], base)
+        seal = load(descriptors[0])
         invocation = run['invocation']
         lifecycle = seal['lifecycle']
         if (seal['contract'] != 'waapi-skill.authoring-batch-finalization/v1' or seal['outcome'] != 'PASS'
                 or any(seal[key] != run[key] for key in ('candidate', 'version', 'host', 'transactions'))
                 or any(seal[key] != invocation[key] for key in ('selected_test_nodeids', 'node_outcomes', 'started_at_unix_ns'))
                 or any(row['outcome'] != 'PASS' for row in seal['node_outcomes'])
+                or len(set(seal['selected_test_nodeids'])) != len(seal['selected_test_nodeids'])
+                or len(seal['node_outcomes']) != len(seal['selected_test_nodeids'])
+                or {row['nodeid'] for row in seal['node_outcomes']} != set(seal['selected_test_nodeids'])
                 or {row['nodeid'] for row in categories} != set(seal['selected_test_nodeids'])
-                or len(categories) != len(seal['selected_test_nodeids'])
+                or len({(row['nodeid'], row['category']) for row in categories}) != len(categories)
                 or lifecycle['final_status'] != 'PASS' or lifecycle['sandbox_retained'] is not False or lifecycle['errors']
                 or lifecycle['source_hash_after']['digest'] != run['source']['hash_after']
                 or lifecycle['source_mtime_after_ns'] != run['source']['mtime_after_ns']
@@ -295,7 +307,7 @@ def validate_authoring_batch_finalization(run, base):
             observation = category['observation_artifact']
             if observation != seal['observations'][nodeid]:
                 raise ValueError('node observation links differ')
-            raw = Path(observation['path']).read_bytes()
+            raw = (read_bytes(observation['path']) if read_bytes else Path(observation['path']).read_bytes())
             if len(raw) != observation['bytes'] or hashlib.sha256(raw).hexdigest() != observation['sha256']:
                 raise ValueError('node original observation seal differs')
             original = json.loads(raw)
@@ -303,12 +315,14 @@ def validate_authoring_batch_finalization(run, base):
                     or original['source_context'] != seal['source_context']):
                 raise ValueError('node original context differs')
             for artifact in original['artifacts'].values():
-                root = Path(artifact['path'])
+                root = PurePosixPath(artifact['path']) if read_bytes else Path(artifact['path'])
                 for entry in artifact['files']:
-                    path = (root / entry['path']).resolve()
-                    if not path.is_relative_to(root.resolve()):
+                    path = root / entry['path']
+                    if read_bytes is None:
+                        path = path.resolve()
+                    if '..' in path.parts or not path.is_relative_to(root if read_bytes else root.resolve()):
                         raise ValueError('node artifact escaped its archive')
-                    content = path.read_bytes()
+                    content = read_bytes(str(path)) if read_bytes else path.read_bytes()
                     if len(content) != entry['bytes'] or hashlib.sha256(content).hexdigest() != entry['sha256']:
                         raise ValueError('node archived evidence differs')
     except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -1323,6 +1337,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {}, category=category)
         record = read_sealed_artifact(descriptor, base)
+        if (binding or {}).get('runtime_observation_attachment'):
+            from tests.support.runtime_observation_evidence import validate_runtime_evidence
+            validate_runtime_evidence(record, binding, branch, category, base, root)
         if record.get('candidate_sha256') != candidate:
             validate_equivalence((binding or {}).get('equivalence', {}), descriptor, record, branch, candidate, binding or {}, base, root)
         if record.get('scope_kind', 'product') != scope_kind:
@@ -1386,7 +1403,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         boundary = branch.get('approved_boundary')
         if boundary is None and category != 'native_absence':
             if native_section is not None and category == 'program':
-                prefix = exact_observation_pointer(branch, binding, dispatch_pointer, native_section, reference_edges or {})
+                program_binding = ({**binding, 'observation_pointer': binding['program_observation_pointer']}
+                    if binding.get('runtime_observation_attachment') else binding)
+                prefix = exact_observation_pointer(branch, program_binding, dispatch_pointer, native_section, reference_edges or {})
             relevant = [c for c in checks if c['pointer'] == prefix]
             if not relevant or not any(proves_alternative(c, branch) for c in relevant):
                 raise ValueError('same exact observation must prove the declared native branch semantics')
