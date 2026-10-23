@@ -118,6 +118,29 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
         assert set(rows) == {identity.upper()}, rows
         return rows[identity.upper()]
 
+    def absent(label, identity):
+        # This pinned host rejects an exact WAQL source for a missing GUID.
+        # Inspect its structured failure without changing ordinary query errors.
+        assert identity in ids.values() and len(observation["reads"]) < 20
+        call_index = len(observation["calls"])
+        observation["reads"].append({"label": label, "call_index": call_index})
+        code, payload = gateway.raw_gateway(["query-object", "--exact-id", identity, "--max-results", "2", "--detail",
+            "--include", "class-id", "--include", "parent", "--include", "notes"])
+        assert code == 2 and payload["ok"] is False and payload["status"] == "error", payload
+        assert payload["endpoint"] == endpoint and payload["detected_version"] == runtime.version, payload
+        query = f'from object "{identity}" take 2'
+        preview = payload["semantic_preview"]
+        assert preview["version"] == runtime.version and preview["envelope"]["uri"] == GET, payload
+        assert preview["envelope"]["args"] == {"waql": query}, payload
+        assert preview["envelope"]["options"] == {"return": ["id", "name", "type", "path", "classId", "parent", "notes"]}, payload
+        assert payload["query_bound"] == {"mode": "take", "value": 2}, payload
+        call = payload["call"]
+        assert call["api"] == GET and call["version"] == runtime.version and call["ok"] is False, payload
+        assert call["error_code"] == "WaapiRequestFailed" and call["waapi_error_uri"] == "ak.wwise.query.invalid_query", payload
+        assert call["waapi_error_details"] == {"details": {"procedureUri": GET}, "message": query + " - Object not found"}, payload
+        assert payload["count"] is None and payload["objects"] is None and payload["agent_result"] is None, payload
+        return {"id": identity, "call_index": call_index, "query": query, "native_error_uri": call["waapi_error_uri"]}
+
     def preserved(label):
         return {"ancestor": exact(label + "-ancestor", ANCESTOR), "owner": exact(label + "-owner", OWNER),
             "descendants": objects(label + "-descendants", OWNER, descendants=True)}
@@ -306,8 +329,9 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
             if direction == "undo":
                 state = observation["undo_state"] = preserved("undo")
                 assert state == before, state
+                observation["undo_absence"] = {}
                 for name, identity in ids.items():
-                    assert objects("undo-absent-" + name, identity) == {}, identity
+                    observation["undo_absence"][name] = absent("undo-absent-" + name, identity)
             else:
                 observation["redo_state"] = after_state("redo")
                 assert observation["redo_state"] == after
