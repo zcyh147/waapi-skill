@@ -4658,11 +4658,27 @@ def _public_call_verification_plan(
             **({"expected_target": remote_target(version, args)} if api == REMOTE_CONNECT_URI else {}),
         }
     if api == TRANSPORT_CREATE_URI:
+        object_id = args.get("object")
+        if not isinstance(object_id, str) or _PLUGIN_GUID.fullmatch(object_id) is None:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "Transport creation verification requires the selected object GUID.",
+            )
+        game_object_id = args.get("gameObject")
+        if "gameObject" in args and (
+            type(game_object_id) is not int or not 0 <= game_object_id <= 0xFFFFFFFFFFFFFFFF
+        ):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "Transport creation verification requires an explicit uint64 Game Object ID.",
+            )
         return {
             "kind": "transport-created",
             **common,
             "strategy": "operation_specific_readback",
             "base_result_strategy": strategy,
+            "expected_object_id": object_id,
+            **({"expected_game_object_id": game_object_id} if "gameObject" in args else {}),
         }
     if api == TRANSPORT_DESTROY_URI:
         transport_id = args.get("transport")
@@ -20016,10 +20032,21 @@ def verify_prepared_operation(
     elif kind == "transport-created":
         uri = plan.get("uri")
         version = plan.get("version")
-        if uri != TRANSPORT_CREATE_URI or not isinstance(version, str):
+        expected_object = plan.get("expected_object_id")
+        expected_game_object = plan.get("expected_game_object_id")
+        if (
+            uri != TRANSPORT_CREATE_URI
+            or not isinstance(version, str)
+            or not isinstance(expected_object, str)
+            or _PLUGIN_GUID.fullmatch(expected_object) is None
+            or ("expected_game_object_id" in plan and (
+                type(expected_game_object) is not int
+                or not 0 <= expected_game_object <= 0xFFFFFFFFFFFFFFFF
+            ))
+        ):
             raise OperationContractError(
                 "INVALID_PREVIEW",
-                "Transport creation verification lacks a valid uri/version.",
+                "Transport creation verification lacks its URI, version, selected object GUID, or explicit Game Object ID.",
             )
         check_result_schema(uri, version)
         transport_id = _execution_payload(execution_result).get("transport")
@@ -20043,6 +20070,23 @@ def verify_prepared_operation(
                 list_shape_ok and len(matches) == 1,
                 {"transport": transport_id, "matches": matches},
             )
+            if list_shape_ok and len(matches) == 1:
+                actual_object = matches[0].get("object")
+                check(
+                    "created transport controls the selected object GUID",
+                    isinstance(actual_object, str)
+                    and _PLUGIN_GUID.fullmatch(actual_object) is not None
+                    and _same_identity(actual_object, expected_object),
+                    {"expected": expected_object, "actual": actual_object},
+                )
+                if "expected_game_object_id" in plan:
+                    actual_game_object = matches[0].get("gameObject")
+                    check(
+                        "created transport uses the explicit Game Object ID",
+                        type(actual_game_object) is int
+                        and actual_game_object == expected_game_object,
+                        {"expected": expected_game_object, "actual": actual_game_object},
+                    )
             transport_state = verified_readback(
                 TRANSPORT_GET_STATE_URI,
                 {"transport": transport_id},

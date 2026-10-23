@@ -6289,6 +6289,7 @@ def test_public_transport_create_requires_returned_id_list_membership_and_state_
         "version": "2025.1",
         "strategy": "operation_specific_readback",
         "base_result_strategy": "result_schema",
+        "expected_object_id": GUID,
     }
     reader = ScriptedReader(
         {
@@ -6314,6 +6315,7 @@ def test_public_transport_create_requires_returned_id_list_membership_and_state_
     assert assertion_names >= {
         "transport.create returned a uint32 transport ID",
         "created transport ID appears exactly once in transport.getList",
+        "created transport controls the selected object GUID",
         "created transport ID resolves through transport.getState",
     }
 
