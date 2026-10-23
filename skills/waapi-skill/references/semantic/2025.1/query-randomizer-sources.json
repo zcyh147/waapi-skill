@@ -1,0 +1,41 @@
+{
+  "version": "2025.1",
+  "wwise_build": "2025.1.7.9143",
+  "definitions_sha256": "39a04186fa2686278fe2df42479350e77f4670923f0e999d421dd76482ec8f96",
+  "archive": "SDK/Help/WwiseSDK-Windows.chm",
+  "archive_sha256": "c54b729388040e9df540a2f58d0d0eda966ac5da6410d3cd715ae256d898166d",
+  "return_page": "waapi_query.html",
+  "return_page_sha256": "c50dd24ce42b502a0368fa4be8a6e081cc4435fa8ce9b5a8f1d447e01c45a3f6",
+  "return_example": {
+    "html": "<p>Some objects have properties with certain capabilities, such as randomization. To retrieve values related to these capabilities, special objects bound to the properties can be queried through function-like accessors. For example, the randomizer feature is described by a Modifier object linked to certain properties of an object. This object can be queried as 'randomizer(\"PropertyName\")', where PropertyName is the name of a property such as 'Volume'. When the accessor provides a valid reference, the object returned can be queried further as described previously. For example, the 'Max' property of the Volume randomizer can be obtained like so: 'randomizer(\"Volume\").@Max'.</p>\r\n",
+    "sha256": "4c32cbbc20011e766b1e557fc7bcd06f88d7732005a217e854184b93c9929a91"
+  },
+  "modifier_page": "wwiseobject_modifier.html",
+  "modifier_page_sha256": "f17b90c091f79153ab4229e966804f8e4f7fc7341f56aef3d41b248079b15cf4",
+  "modifier_fields": {
+    "Enabled": {
+      "html_lines": [
+        47,
+        48
+      ],
+      "html": "<tr>\r\n<td><b>Enabled</b></td><td>Enabled</td><td>bool</td><td>false</td><td>None</td><td>true</td><td>None</td><td>false </td></tr>",
+      "sha256": "6f51c80803d7efd78efa5fa99d425bcc1767b27cb8815b8bab3cb96faf775b92"
+    },
+    "Max": {
+      "html_lines": [
+        49,
+        50
+      ],
+      "html": "<tr>\r\n<td><b>Max</b></td><td>Max Offset</td><td>Real64</td><td>0</td><td>None</td><td>true</td><td>None</td><td>false </td></tr>",
+      "sha256": "cc236012f0cd095fac588340761bbd35c62f31ec5c6aa2e5e735dd45e202b638"
+    },
+    "Min": {
+      "html_lines": [
+        51,
+        52
+      ],
+      "html": "<tr>\r\n<td><b>Min</b></td><td>Min Offset</td><td>Real64</td><td>0</td><td>None</td><td>true</td><td>None</td><td>false </td></tr>",
+      "sha256": "bb08cf9b533fec9fb08e2f87898eed3e7cb8e3fda823d6cade810aa22e13ea4c"
+    }
+  }
+}

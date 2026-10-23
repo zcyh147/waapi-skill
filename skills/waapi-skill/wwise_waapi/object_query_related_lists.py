@@ -20,6 +20,7 @@ from .object_query_related import (RELATED_QUERY_RELATIONS, RELATED_QUERY_LIST_R
     RELATED_FIELD_MODES, RelatedQueryOutput, related_native_fields, parse_related_request, related_sequence_source)
 from .object_query_related_runtime import RelatedQueryError, canonical_guid, IDENTITY, OBJECT_GET
 from .object_query_related_metadata import RelatedFieldBinder
+from .object_query_randomizer import randomizer_terminal, validate_randomizer_value
 
 # Gateway-owned aggregate limits, independent of native source/projection caps.
 MAX_RELATED_MEMBER_OCCURRENCES = MULTI_IDENTITY_READ_MAX_IDS
@@ -454,7 +455,7 @@ class RelatedListPlan:
         if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
             raise RelatedQueryError('A singleton path requires one canonical reference, null or absence', code='RELATED_QUERY_RESULT_SHAPE')
         return self.binder.bind(meaning, reference, row.get(f'{prefix}.classId' if prefix else 'classId'), prefix, {'frame':frame.number,'occurrence':list(loc)}, option,
-            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value'})
+            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value', 'randomizer'})
 
     def unresolved(self, candidates, matched, option, meaning, pending):
         for frame, loc, prefix, path, selected in candidates:
@@ -469,7 +470,9 @@ class RelatedListPlan:
         for request in self.requests:
             states = [(self.root, loc, '', ()) for loc in self.root.rows]
             terminal_states = []
-            for kind, name in request['hops']:
+            randomizer = request['hops'][-1][1] if request['hops'][-1][0] == 'randomizer' else None
+            owner_hops = request['hops'][:-1] if randomizer is not None else request['hops']
+            for kind, name in owner_hops:
                 next_states, unresolved = [], []
                 if kind in {'list','sequence'}:
                     sequence = json.loads(name) if kind == 'sequence' else None
@@ -522,13 +525,22 @@ class RelatedListPlan:
                         valid.append((frame,loc,prefix,path))
                     next_states = valid
                 states = next_states
-            if request['option'] == '--include-related' and request['hops'][-1][0] not in {'list','sequence'}:
+            if randomizer is None and request['option'] == '--include-related' and request['hops'][-1][0] not in {'list','sequence'}:
                 states = terminal_states
             if request['option'] == '--include-related' and request.get('reducer') is not None:
                 continue
             unresolved, matched = [], []
             for frame, loc, prefix, path in states:
-                if request['option'] == '--include-related':
+                if randomizer is not None:
+                    selected = self.field(frame, loc, prefix, randomizer, 'randomizer')
+                    if selected is None: continue
+                    candidate = selected['candidate']
+                    if candidate is None:
+                        unresolved.append((frame, loc, prefix, path, selected)); continue
+                    terminal, output = randomizer_terminal(candidate, request['terminal'], RelatedQueryError)
+                    path = (*path, ('randomizers', candidate['name']))
+                    group = None
+                elif request['option'] == '--include-related':
                     terminal, output = available_query_outputs(self.version)[request['terminal']]
                     group = None
                 else:
@@ -550,9 +562,10 @@ class RelatedListPlan:
                     raise RelatedQueryError('Related declarations resolved duplicate result fields', code='RELATED_QUERY_DUPLICATE_FIELD')
                 self.aliases.add(alias)
                 if native not in frame.fields: frame.fields.append(native)
-                frame.outputs.append((loc,path,'terminal',native,group,output))
+                frame.outputs.append((loc,path,'randomizer' if randomizer is not None else 'terminal',native,group,output))
                 matched.append(loc)
-            self.unresolved(unresolved,matched,request['option'],request['terminal'],pending)
+            self.unresolved(unresolved,matched,'randomizer' if randomizer is not None else request['option'],
+                randomizer if randomizer is not None else request['terminal'],pending)
         if pending:
             return {'metadata_authority':'live-waapi','unresolved':pending,'repair':'Refine each unresolved meaning within its actual scope, retaining its option and path; no other class token is substituted'}
         self.observe()  # Observe full values and revalidate every prepared scope.
@@ -607,6 +620,7 @@ class RelatedListPlan:
                         name = f'{group}.{output}' if group else output
                         if name not in missing: missing.append(name)
                     else:
+                        if kind == 'randomizer': validate_randomizer_value(output, row[native], RelatedQueryError)
                         (target.setdefault(group,{}) if group else target)[output] = copy.deepcopy(row[native])
                 for edge in frame.lists.values():
                     if edge.sequence:

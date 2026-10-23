@@ -25316,6 +25316,14 @@ def _project_query_business_rows(
                     if name not in missing:
                         missing.append(name)
                 else:
+                    if 'randomizer_value' in output:
+                        from wwise_waapi.object_query_randomizer import validate_randomizer_value
+                        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+                        try:
+                            validate_randomizer_value(output['randomizer_value'], row[native], RelatedQueryError)
+                        except RelatedQueryError as exc:
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
                     target = context.setdefault(group, {}) if group else context
                     target[field] = row[native]
                 if kind == "related_identity":
