@@ -209,6 +209,7 @@ def test_windows_owned_driver_has_an_explicit_unfinished_boundary_before_dispatc
         for nodeid in authoring_batch.OWNED_AUTHORING_NODEIDS],
     ('2024.1', authoring_batch.PROFILER_CAPTURE_NODEID),
     ('2024.1', authoring_batch.TRANSPORT_SEMANTICS_NODEID),
+    ('2024.1', authoring_batch.TRANSPORT_MIXED_NODEID),
     ('2025.1', authoring_batch.METER_2024_NODEID),
     *[('2025.1', nodeid) for nodeid in authoring_batch.DIAGNOSTIC_NODEIDS],
 ])
