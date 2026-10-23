@@ -19,8 +19,8 @@ from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 
 
 pytestmark = [pytest.mark.live, pytest.mark.destructive,
-    pytest.mark.skipif(os.environ.get('WWISE_VERSION') != '2025.1',
-        reason='Initial reference-condition witness is selected for2025.1; older native delta requires separate review')]
+    pytest.mark.skipif(os.environ.get('WWISE_VERSION') not in {'2021.1', '2025.1'},
+        reason='Reference-condition witnesses are selected for2021.1/2025.1; no intermediate-version matrix')]
 ZERO = '{00000000-0000-0000-0000-000000000000}'
 AMBISONICS = {
     '2021.1': '9ce075f255131130504058fe6012f7546ccb51216dd58e85c5982eb2682e2fd2',
@@ -86,7 +86,9 @@ def _same(left, right):
 def test_reference_local_and_override_conditions_use_native_scopes_and_unset_facts(workflow_sandbox_runtime, monkeypatch):
     runtime = workflow_sandbox_runtime
     live = runtime.sandbox.metadata.get_info_version
-    assert runtime.version == '2025.1'
+    assert runtime.version in {'2021.1', '2025.1'}
+    oldest = runtime.version == '2021.1'
+    maximum_groups = 7 if oldest else 8
     assert tuple(live[key] for key in ('year', 'major', 'minor', 'build')) == BUILDS[runtime.version]
     for relative, digest in ((_wwu(runtime.version), PINS[runtime.version][1]),
             (_wwu(runtime.version).with_name('Ambisonics.wwu'), AMBISONICS[runtime.version])):
@@ -96,7 +98,9 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
     assert not output.exists()
     evidence_root = Path(runtime.env['WWISE_EVIDENCE_DIR'])
     observation = {'candidate': runtime.candidate, 'version': runtime.version, 'read_only': True,
-        'definitions': DEFINITION_EVIDENCE, 'sources': SOURCES, 'cleared_reference_provenance': CLEARED_REFERENCE_EVIDENCE,
+        'definitions': DEFINITION_EVIDENCE, 'sources': SOURCES,
+        'acceptance_scope': '2021 four core groups plus three observational unset-expression groups' if oldest else '2025 eight-group reference/local/override proof',
+        'unset_association_authority': 'new matching2021 native WHERE observation; no transferred zero-GUID/null premise' if oldest else CLEARED_REFERENCE_EVIDENCE,
         'reads': [], 'core_verified': False, 'unset_verified': False, 'business_effect_verified': False}
     category = {'category': 'query-reference-local-override-conditions', 'status': 'FAIL',
         'verifier_strength': 'actual_native_where_unfiltered_values_complete_source_and_fresh_actual_metadata',
@@ -107,7 +111,7 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
 
     def read(label, identity, flags):
         nonlocal continuation_count
-        assert len(observation['reads']) < 8
+        assert len(observation['reads']) < maximum_groups
         argv = ['query-object', '--exact-id', identity, '--max-results', '1', *flags]
         record = {'label': label, 'invocations': []}
         observation['reads'].append(record)
@@ -179,7 +183,7 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
         assert len(indices) == 1, (expected, calls)
         return indices[0]
 
-    def metadata(calls, packets, field, identity, class_id, *, reference):
+    def metadata(calls, packets, field, identity, class_id, *, reference, required=True):
         matches = []
         for call in calls:
             if not call['api'].endswith('getPropertyInfo') or call['args']['property'] != field: continue
@@ -189,10 +193,10 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
             assert scope in ({'classId': class_id}, {'object': identity}), scope
             kind = (str(result.get('type', '')).casefold() in {'reference', 'objectreference'}
                 or str(result.get('restriction', {}).get('type', '')).casefold() == 'reference')
-            assert kind is reference
+            if required: assert kind is reference
             if not reference: assert result['type'] in {'int16', 'int32'}
-            matches.append({'scope': scope, 'packet': call['evidence_path'], 'metadata': result})
-        assert matches, (field, calls)
+            matches.append({'scope': scope, 'packet': call['evidence_path'], 'metadata': result, 'kind_compatible': kind is reference})
+        if required: assert matches, (field, calls)
         return matches
 
     def trace(rows, calls, packets, identity, clauses, expected_values):
@@ -233,7 +237,9 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
                 for key in ('id', 'name', 'type', 'path', 'classId'): _same(raw[key], known[key])
             for raw in selected: _same(_observed(raw, field), expected_values[field])
             token = field.lstrip('@')
-            scopes[field] = metadata(calls, packets, token, identity, known['classId'], reference=token != '3DSpatialization')
+            scopes[field] = metadata(calls, packets, token, identity, known['classId'],
+                reference=token != '3DSpatialization', required=not (oldest and token == 'UserAuxSend0'))
+            if oldest and token == 'UserAuxSend0': assert any(item['kind_compatible'] for item in scopes[field])
         observation['reads'][-1]['proof'] = {'final_packet': calls[final]['evidence_path'],
             'selected_ids': [row['id'] for row in selected], 'complete_source': known, 'metadata': scopes,
             'unfiltered_values': expected_values, 'source_before_and_after': True}
@@ -252,14 +258,23 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
         _same(sound['local_references']['OutputBus'], raw['@OutputBus'])
         assert raw['OutputBus']['id'] == RESOLVED_BUS and raw['@OutputBus']['id'] == LOCAL_BUS
         _same(_observed(sound.get('local_references', {}), 'UserAuxSend0'), _observed(raw, '@UserAuxSend0'))
-        for field in ('OutputBus', 'UserAuxSend0'):
-            metadata(calls, packets, field, SOUND, raw['classId'], reference=True)
+        metadata(calls, packets, 'OutputBus', SOUND, raw['classId'], reference=True)
+        unset_metadata = metadata(calls, packets, 'UserAuxSend0', SOUND, raw['classId'], reference=True, required=not oldest)
         unset = _observed(raw, '@UserAuxSend0')
-        eligible = unset['present'] and (unset['value'] is None
-            or isinstance(unset['value'], dict) and unset['value'].get('id') == ZERO)
-        observation['unset_candidate'] = {'raw': unset, 'eligible': eligible,
-            'basis': 'present native null or matching-host documented cleared zero-GUID shape plus fresh reference metadata and source nonassignment',
-            'metadata': metadata(calls, packets, 'UserAuxSend0', SOUND, raw['classId'], reference=True)}
+        if oldest:
+            # A present canonical reference shape is interpretable, but zero
+            # does not acquire2025's null meaning. The documented native WHERE
+            # observations below establish the old association themselves.
+            eligible = (any(item['kind_compatible'] for item in unset_metadata) and unset['present']
+                and (unset['value'] is None or isinstance(unset['value'], dict)
+                    and isinstance(unset['value'].get('id'), str)
+                    and re.fullmatch(r'\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}', unset['value']['id']) is not None))
+            basis = 'source nonassignment plus fresh actual-scope reference metadata and present interpretable raw value; no preexisting2021 null/zero equivalence'
+        else:
+            eligible = unset['present'] and (unset['value'] is None
+                or isinstance(unset['value'], dict) and unset['value'].get('id') == ZERO)
+            basis = 'present native null or matching-host documented cleared zero-GUID shape plus fresh reference metadata and source nonassignment'
+        observation['unset_candidate'] = {'raw': unset, 'eligible': eligible, 'basis': basis, 'metadata': unset_metadata}
         observation['independent_sound'] = sound
         reference_values = {'@@OutputBus': {'present': True, 'value': raw['OutputBus']},
             '@OutputBus': _observed(raw, '@OutputBus')}
@@ -283,21 +298,30 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
         trace(rows, calls, packets, SOUND, ['where !(@@OutputBus != null)'], {'@@OutputBus': reference_values['@@OutputBus']})
 
         if eligible:
+            unset_outcomes = {}
             for label, comparison, constant, clause, expected_ids in (
                 ('known-unset-null', 'is', 'null', 'where !(@UserAuxSend0 != null)', [SOUND]),
                 ('known-unset-setness', 'is-not', 'null', 'where @UserAuxSend0 != null', []),
                 ('known-unset-identity-inequality', 'is-not', RESOLVED_BUS, f'where @UserAuxSend0.id != "{RESOLVED_BUS}"', None)):
                 flags = ['--where-field', 'local-reference', 'UserAuxSend0', comparison, constant]
                 if label == 'known-unset-null': flags += ['--include-local-reference', 'UserAuxSend0']
-                rows, calls, packets = read(label, SOUND, flags)
-                if expected_ids is not None: assert [row['id'] for row in rows] == expected_ids
+                observed_label = label.replace('known-unset', 'observe-unassigned-reference') if oldest else label
+                rows, calls, packets = read(observed_label, SOUND, flags)
+                if expected_ids is not None and not oldest: assert [row['id'] for row in rows] == expected_ids
                 trace(rows, calls, packets, SOUND, [clause], {'@UserAuxSend0': unset})
-                if label == 'known-unset-null': _same(_observed(rows[0].get('local_references', {}), 'UserAuxSend0'), unset)
+                if label == 'known-unset-null':
+                    for row in rows: _same(_observed(row.get('local_references', {}), 'UserAuxSend0'), unset)
+                unset_outcomes[observed_label] = [row['id'] for row in rows]
                 if expected_ids is None:
                     observation['unset_identity_inequality_native_outcome'] = [row['id'] for row in rows]
             observation['unset_verified'] = True
+            observation['unset_native_expression_observations'] = {'raw_value': unset, 'selected_ids': unset_outcomes,
+                'classification': 'new2021 shape/null/setness/identity-inequality association observed from documented native WHERE' if oldest else '2025 independently eligible unset fixture verified',
+                'preexisting_matching_null_proof': not oldest, 'python_complement_used': False}
         else:
-            observation['unset_incomplete_reason'] = 'Fresh reference RETURN did not establish a present null or documented cleared zero-GUID shape; omission is not null. Groups3-5 were not executed.'
+            observation['unset_incomplete_reason'] = (
+                '2021 candidate lacks fresh actual-scope reference metadata or a present interpretable native reference value; no null/zero equivalence is inferred. Three observational groups were not executed.' if oldest else
+                'Fresh reference RETURN did not establish a present null or documented cleared zero-GUID shape; omission is not null. Groups3-5 were not executed.')
 
         scalar_values = {'@3DSpatialization': {'present': True, 'value': 0}, '@@3DSpatialization': {'present': True, 'value': 2}}
         rows, calls, packets = read('local-and-override-scalar-positive', OVERRIDE_SOUND,
@@ -316,13 +340,14 @@ def test_reference_local_and_override_conditions_use_native_scopes_and_unset_fac
         _same(scalar['parent'], selected['parent'])
         _same(scalar['properties']['3DSpatialization'], selected['@3DSpatialization'])
         _same(scalar['override_source_values']['3DSpatialization'], selected['@@3DSpatialization'])
-        rows, calls, packets = read('wrong-override-scalar-negative', OVERRIDE_SOUND,
-            ['--where-field', 'override-source-value', '3DSpatialization', 'is', '0'])
-        assert rows == []
-        trace(rows, calls, packets, OVERRIDE_SOUND, ['where @@3DSpatialization = 0'],
-            {'@@3DSpatialization': scalar_values['@@3DSpatialization']})
+        if not oldest:
+            rows, calls, packets = read('wrong-override-scalar-negative', OVERRIDE_SOUND,
+                ['--where-field', 'override-source-value', '3DSpatialization', 'is', '0'])
+            assert rows == []
+            trace(rows, calls, packets, OVERRIDE_SOUND, ['where @@3DSpatialization = 0'],
+                {'@@3DSpatialization': scalar_values['@@3DSpatialization']})
         observation['core_verified'] = True
-        assert len(observation['reads']) == (8 if eligible else 5)
+        assert len(observation['reads']) == ((7 if eligible else 4) if oldest else (8 if eligible else 5))
         if not observation['unset_verified']:
             observation['outcome'] = 'incomplete_unset_fixture'
             pytest.fail(observation['unset_incomplete_reason'])
