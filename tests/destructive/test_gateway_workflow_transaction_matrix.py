@@ -127,8 +127,11 @@ class _WorkflowSandboxRuntime:
         assert self.lifecycle.port is not None
         return self.lifecycle.port
 
-    def gateway(self, command: Sequence[str], *, live: bool) -> dict[str, Any]:
+    def gateway(self, command: Sequence[str], *, live: bool, receipt_sink: dict[str, Any] | None = None) -> dict[str, Any]:
         exit_code, payload = self.raw_gateway(command)
+        if receipt_sink is not None:
+            receipt_sink[command[0]] = payload
+            receipt_sink[command[0] + "_exit_code"] = exit_code
         assert exit_code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
         assert payload["ok"] is True, payload
         if live:
@@ -314,8 +317,21 @@ def _complete_business_draft(
     draft: _BusinessDraft,
     *,
     inspect_preview=None,
+    phase_receipt: dict[str, Any] | None = None,
 ) -> dict[str, Mapping[str, Any]]:
-    _update_business_draft(runtime, draft, "draft-check", live=True)
+    # Opt-in bounded, fixed phase receipt. Preserve replies before gateway
+    # assertions raise; unrelated callers retain their existing completion path.
+    def phase(command, *, live):
+        if phase_receipt is None:
+            return runtime.gateway(command, live=live)
+        phase_receipt["phase"] = command[0]
+        return _WorkflowSandboxRuntime.gateway(runtime, command, live=live, receipt_sink=phase_receipt)
+    if phase_receipt is not None:
+        phase_receipt["phase"] = "draft-check"
+    checked = _update_business_draft(runtime, draft, "draft-check", live=True)
+    if phase_receipt is not None:
+        phase_receipt["draft-check"] = checked
+        phase_receipt["phase"] = "preview-from-draft"
     preview = _update_business_draft(
         runtime,
         draft,
@@ -323,21 +339,23 @@ def _complete_business_draft(
         live=True,
     )
     transaction_id = _required_string(preview, "transaction_id")
+    if phase_receipt is not None:
+        phase_receipt.update(preview=preview, transaction_id=transaction_id, phase="inspect-preview")
     if inspect_preview is not None:
         inspect_preview(preview)
-    shown = runtime.gateway(
+    shown = phase(
         ["transaction-show", transaction_id, "--summary-only"],
         live=False,
     )
     confirmation = shown.get("confirmation")
     assert isinstance(confirmation, Mapping), shown
     token = _required_string(confirmation, "token")
-    runtime.gateway(
+    phase(
         ["confirm", transaction_id, "--confirmation-token", token],
         live=False,
     )
-    executed = runtime.gateway(["execute", transaction_id], live=True)
-    verified = runtime.gateway(["verify", transaction_id], live=True)
+    executed = phase(["execute", transaction_id], live=True)
+    verified = phase(["verify", transaction_id], live=True)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
     assert verified["state"] == TransactionState.VERIFIED.value, verified
     assert verified["verification"]["business_state_verified"] is True, verified
@@ -11201,6 +11219,8 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
     output = runtime.state_dir / "blend-negative-insertion.json"
     native_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
     previous_native = set(native_root.glob("*.json"))
+    effect_observed = False
+    original_error = None
     try:
         expected_build = (2024, 1, 13, 9056) if runtime.version == "2024.1" else (2025, 1, 7, 9143)
         assert tuple(receipt["build"][key] for key in ("year", "major", "minor", "build")) == expected_build, "Fixture prerequisite: exact native build"
@@ -11222,7 +11242,7 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
             notice = preview["preview_summary"]["blend_assignment"]
             assert notice["expected_position"] == 0 and notice["observed_assignment_count"] == 6, preview
             assert notice["verification_scope"]["unobserved"] == [], preview
-        receipt["transactions"] = _complete_business_draft(runtime, draft, inspect_preview=inspect)
+        _complete_business_draft(runtime, draft, inspect_preview=inspect, phase_receipt=receipt["transactions"])
         after_payload = runtime.gateway(["core-call", getter, "--object-id", track], live=True)
         receipt["after"] = after_payload
         after = after_payload["agent_result"]["return"]
@@ -11233,18 +11253,38 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
         assert all(all(after_by_id[row["child"]].get(key) == value for key, value in row.items() if key != "index") for row in before), after
         verification = receipt["transactions"]["verify"]["verification"]
         assert verification["verification_strength"] == "blend_assignment_order_and_observed_preservation", verification
-        assert all(item["passed"] for item in verification["assertions"]), verification
-        receipt["native_assignment_effect_verified"] = True
-        category["status"] = "PASS"
-    except Exception as exc:
+        assert verification["assertion_count"] > 0 and verification["passed_assertion_count"] == verification["assertion_count"], verification
+        effect_observed = True
+    except BaseException as exc:
+        original_error = exc
         receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
         raise
     finally:
-        paths = sorted(set(native_root.glob("*.json")) - previous_native)
-        assert len(paths) <= 64, "Blend dispatcher evidence file bound"
-        assert sum(path.stat().st_size for path in paths) <= 16 * 1024 * 1024, "Blend dispatcher evidence byte bound"
-        receipt["native_evidence"] = [{"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths]
-        body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
-        assert len(body) <= 8 * 1024 * 1024, "Blend receipt byte bound"
-        output.write_bytes(body)
-        category.update(observation_path=str(output), observation_sha256=hashlib.sha256(body).hexdigest())
+        try:
+            paths = sorted(set(native_root.glob("*.json")) - previous_native)
+            assert len(paths) <= 64, "Blend dispatcher evidence file bound"
+            assert sum(path.stat().st_size for path in paths) <= 16 * 1024 * 1024, "Blend dispatcher evidence byte bound"
+            receipt["native_evidence"] = [{"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths]
+            sealed = deepcopy(receipt)
+            sealed["native_assignment_effect_verified"] = effect_observed
+            body = json.dumps(sealed, ensure_ascii=False, indent=2).encode("utf-8")
+            assert len(body) <= 8 * 1024 * 1024, "Blend receipt byte bound"
+            pending = output.with_name(output.name + ".pending")
+            pending.write_bytes(body)
+            assert pending.read_bytes() == body, "Blend receipt write readback differs"
+            pending.replace(output)
+            category.update(status="PASS" if effect_observed else "FAIL", native_assignment_effect_verified=effect_observed,
+                observation_path=str(output), observation_sha256=hashlib.sha256(body).hexdigest())
+        except BaseException as exc:
+            receipt["finalization_error"] = {"type": type(exc).__name__, "message": str(exc)[:2048]}
+            category.update(status="FAIL", native_assignment_effect_verified=False, finalization_error=receipt["finalization_error"])
+            # Keep failed/partial phase evidence separate from the sealed PASS path.
+            try:
+                partial = output.with_name("blend-negative-insertion.partial.json")
+                body = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+                partial.write_bytes(body)
+                category.update(observation_path=str(partial), observation_sha256=hashlib.sha256(body).hexdigest())
+            except BaseException as retention_error:
+                category.update(partial_receipt=receipt, retention_error={"type": type(retention_error).__name__, "message": str(retention_error)[:2048]})
+            if original_error is None:
+                raise
