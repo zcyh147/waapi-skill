@@ -1,12 +1,12 @@
 {
   "contract": "waapi-skill.branch-evidence-equivalence/v1",
   "from_candidate": "503688449ba9f9db964a5fb7116ac6be2fb07198",
-  "to_candidate": "5d4a7a415c0e4c990f5999be9e84c83bf0613df1cb40f9b7e34fe868e2fa255c",
+  "to_candidate": "07102c1ff2dfcbc6ad1582b4fff685dc0bb8532dd99453e8fed2ae2d91036188",
   "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value",
   "native_shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
   "native_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs",
   "evidence_sha256": "4b2d031e3ff0c6d47395c48b25d3fe6eae954bd39de2ddbea603d8bf993e5d3e",
-  "binding_semantics_sha256": "dc008fa8f7240a24e5ca47477def0cce15f0ff417103565a3b1c5ea4aa3b3612",
+  "binding_semantics_sha256": "d8687036583977cc0fc91c13ca8cc1bac071f73263fce292918986a6d9b55b24",
   "reviewed_reason": "All original packaged runtime/resource sources byte-identical; test/docs-only successors do not change observed read semantics. Original finalized PASS retained.",
   "sources": {
     "skills/waapi-skill/SKILL.md": "fc7c4d88e42bb1663e407047fd29a0f3e7173c0bf4259da624ab36588757cc33",

@@ -95,7 +95,7 @@
   "capture_original_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/evidence/authoring-node-observations/d6e9da42fb2f751cbc535eeb-native-evidence/profiler-capture.json",
   "program_capture": {
     "artifact": "program-capture.json",
-    "sha256": "e296cbea3e45b8a2f7e5782cf0d71669689f50dc7eed60a167d0c55979445d13"
+    "sha256": "fe662c689f453a0116a3e63526b16825b305faa07bf6e63468331639e837ed91"
   },
   "relevant_sources": {
     "skills/waapi-skill/SKILL.md": "fc7c4d88e42bb1663e407047fd29a0f3e7173c0bf4259da624ab36588757cc33",

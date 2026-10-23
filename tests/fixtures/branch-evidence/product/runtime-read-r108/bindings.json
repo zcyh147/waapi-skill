@@ -450,7 +450,7 @@
       "evidence": {
         "program": {
           "artifact": "program.json",
-          "sha256": "c31c6438f70c44b80196b74994bfd8611569c4c3fae39acfbee6beede1aec85e",
+          "sha256": "6ecc1f8b28d3e87d80e8f3506105dd19d0594cd50c4977cff1d23d2e2d83f81a",
           "nodeid": "tests/unit/test_runtime_observation_branch_evidence.py::test_public_runtime_read_emits_only_after_actual_pytest_teardown"
         }
       }

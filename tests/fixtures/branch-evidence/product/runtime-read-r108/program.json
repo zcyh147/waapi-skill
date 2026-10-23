@@ -1,5 +1,5 @@
 {
-  "candidate_sha256": "5d4a7a415c0e4c990f5999be9e84c83bf0613df1cb40f9b7e34fe868e2fa255c",
+  "candidate_sha256": "07102c1ff2dfcbc6ad1582b4fff685dc0bb8532dd99453e8fed2ae2d91036188",
   "scope_kind": "product",
   "relevant_sources": {
     "skills/waapi-skill/SKILL.md": "fc7c4d88e42bb1663e407047fd29a0f3e7173c0bf4259da624ab36588757cc33",
@@ -455,7 +455,7 @@
         "error_code": null,
         "message": "ok",
         "evidence_path": null,
-        "timeout": 9.863250666996464
+        "timeout": 9.861663124989718
       },
       "project_call": {
         "api": "ak.wwise.core.getProjectInfo",
@@ -468,7 +468,7 @@
         "error_code": null,
         "message": "ok",
         "evidence_path": null,
-        "timeout": 9.999768500041682
+        "timeout": 9.999782041006256
       },
       "schema_validation": {
         "request": {
@@ -576,7 +576,7 @@
         "observation": "retained_profiler_capture_snapshot",
         "instantaneous_native_resource_authority": false,
         "snapshot_sha256": "190c892f5826632bad9c5492704942850347a4eb63afd65c65e0fd66df77a52f",
-        "expires_at": 1792795589,
+        "expires_at": 1792796048,
         "page": {
           "offset_from_end": 0,
           "next_offset_from_end": 5,
