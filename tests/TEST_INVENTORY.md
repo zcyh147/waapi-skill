@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R90 attenuation and retained object identity
+
+Reviewed GET disclosure `6eb66b29`, integrated at `a3dd01be`, exposes the exact
+reflected attenuation curve choices for all five versions: 7/19/19/19/24.
+The original seven meanings remain stable; GET DSF and SET HSF are not treated
+as aliases. The final focused metadata selection passed **294 checks in 7.60s**
+(288 deselected). Dispatch and bounds are unchanged; this is mapping/program
+evidence, not a new native curve-effect campaign.
+
+Reviewed combined `e8e1c0e5`, with formatting-only successor `ce4cf58b`, was
+integrated at `afc351f0`. A shared finite identity proof admits source-certified
+2023–25 Marker objects and 2025 MetadataSlot objects with empty intrinsic names,
+exact GUID/class/owner and complete ordered membership. The existing Playlist
+exception and unknown-class rejection remain intact. Public retained Marker
+binding/discovery/read/edit preparation and the manual constructor fixture
+passed **26 focused checks in 7.11s**; the directly affected retained Metadata
+positive passed separately in 1.17s. Retained Metadata drift, final-state and
+older-version controls passed **9 checks in 5.64s**. These selections overlap
+other component runs and are not an aggregate gate. A native retained Metadata
+reference-edit effect has not been established by this increment.
+
+The manual Marker native node on frozen `afc351f0` **failed** on Mac Console
+2025.1.7.9143 during the initial `draft-check`, before any Preview or write.
+Native owner projection `id,@Markers` returned only `id`; the snapshot consumer
+raised `INVALID_READBACK`. An earlier independent member query returned an empty
+set, but omission alone is not proof of an empty list. The original receipt and
+all 29 dispatcher packets were hash-checked: 15 public calls, 12 handshakes,
+zero continuations and zero transactions. Source full-tree hash, mtime and tree
+metadata were unchanged; processes cleaned and the failed sandbox was
+quarantined. Record: `r90-manual-marker-afc351f0-2025-r1/root-review.json`.
+The omission requires a source-backed consumer repair and causal public-flow
+test before another native selection. No retry or native-absence claim follows.
+
+No Fresh, broad gate, Windows acceptance or whole-ticket completion is claimed.
+
 ## 2026-10-23 R89 imported Marker observation
 
 Reviewed fixture `4d5d9e46` uses one closed audio import in the existing private
