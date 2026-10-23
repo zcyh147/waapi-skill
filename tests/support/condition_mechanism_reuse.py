@@ -182,8 +182,9 @@ def _require_object_scope_mechanism(program, review):
     calls = program.get('object_scope_call_trace', [])
     mutation = program['native_call']
     if (not isinstance(calls, list) or any(not isinstance(call, dict)
-            or not isinstance(call.get('uri'), str) or not isinstance(call.get('args'), dict) for call in calls)):
-        raise ValueError('Current public object-scoped trace calls must have a string URI and argument mapping')
+            or not isinstance(call.get('uri'), str)
+            or (call.get('args') is not None and not isinstance(call['args'], dict)) for call in calls)):
+        raise ValueError('Current public object-scoped trace calls require a string URI and mapping or null arguments')
     if sum(c['uri'].endswith('setProperty') for c in calls) != 1:
         raise ValueError('Current public object-scoped read/refresh trace is missing')
     index = calls.index(mutation)
