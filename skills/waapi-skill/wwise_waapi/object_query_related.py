@@ -7,14 +7,17 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .object_query_outputs import QUERY_BUSINESS_OUTPUTS, QUERY_FIELD_MODES, reference_value_source_contract, available_query_outputs
+from .object_query_outputs import QUERY_BUSINESS_OUTPUTS, QUERY_FIELD_MODES, reference_value_source_contract, available_query_outputs, query_output_detail
 from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS, MAX_ADVANCED_RETURN_EXPRESSION_BYTES, MAX_QUERY_TAKE
 from .schema_inventory import load_definition_graph
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
 from .object_query_randomizer import RANDOMIZER_OUTPUTS, randomizer_contract
+from .object_query_local_lists import LOCAL_LISTS, local_list_contract
 
 RELATED_QUERY_LIST_RELATIONS = {"children": "children", "descendants": "descendants", "ancestors": "ancestors", "references-to": "referencesTo"}
+
+RELATED_QUERY_LIST_RELATIONS.update({name: value["native"] for name, value in LOCAL_LISTS.items()})
 
 RELATED_QUERY_RELATIONS = {"parent": "parent", "owner": "owner", "work-unit": "workunit"}
 
@@ -27,7 +30,7 @@ largest-radius-attenuation music-playlist-root music-transition-root soundbank-f
 switch-container-child-context work-unit-is-default work-unit-is-dirty work-unit-type
 """.split())
 _ADDITIONAL_OUTPUTS = {
-    "2022.1": frozenset("included original-file-path converted-file-path active-source".split()),
+    "2022.1": frozenset("included original-file-path converted-file-path active-source curve-points".split()),
     "2023.1": frozenset("original-relative-file-path state-groups state-properties".split()),
     "2024.1": frozenset("""
 converted-anonymous-channel-count converted-bit-depth converted-channel-configuration
@@ -67,7 +70,12 @@ def related_output_detail(version: str, name: str) -> dict[str, Any]:
         reason = "related composition is not yet supported by the related-output contract; this does not establish native absence"
     else:
         reason = "matching SDK object/value descriptor and dot-chain rule"
-    return {"available": available, "reason": reason, "output_field": outputs.get(name, (None, None))[1]}
+    detail = {"available": available, "reason": reason, "output_field": outputs.get(name, (None, None))[1]}
+    if available and name == 'curve-points':
+        fixed = query_output_detail(version, name)
+        detail.update(reason='matching objectReturn.points/pointsDefinition and SDK object dot-chain rule',
+            result_shape=fixed['result_shape'], native_definition=fixed['native_definition'])
+    return detail
 
 
 @dataclass(frozen=True)
@@ -118,6 +126,8 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
     hops, index = [], 0
     while index < len(tokens):
         name = tokens[index]
+        if name in LOCAL_LISTS and version < LOCAL_LISTS[name]['first']:
+            raise ValueError('This local List context lacks the matching source contract in this version; native absence is not established')
         if name == 'combine' or name in RELATED_QUERY_RELATIONS or name in RELATED_QUERY_LIST_RELATIONS:
             spec = None
             if name == 'combine':
@@ -313,6 +323,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "custom_metadata_reads": "actual related class/object discovery for custom terminals and reference hops; fixed paths and fixed outputs require none",
             "custom_terminal_options": list(RELATED_FIELD_MODES),
             "randomizers": randomizer_contract(version),
+            "local_object_lists": local_list_contract(version),
             "custom_terminal_modes": {option: {kind: {"native_prefix": prefix, "output_group": {"property": "properties", "reference": "references", "override_source_value": "override_source_values", "local_reference": "local_references"}[binding_kind]}
                 for kind, (binding_kind, prefix) in mode.bindings.items()} for option, mode in RELATED_FIELD_MODES.items()},
             "field_value_source_evidence": reference_value_source_contract(version)["source"],

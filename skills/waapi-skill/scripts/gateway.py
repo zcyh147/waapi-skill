@@ -5947,6 +5947,7 @@ def _compile_query_business_projection(args: argparse.Namespace, *, version: str
         if len(set(signatures)) != len(signatures):
             raise ValueError("query-object related declarations must be unique")
         args.query_related_requests = tuple(requests)
+        args.query_related_version = version
         args.query_related_has_lists = any(kind in {"list", "sequence"} for request in requests for kind, _ in request["hops"])
         args.query_related_preparation_required = any(request["option"] != "--include-related" or
             any(kind != "relation" for kind, _ in request["hops"]) for request in requests)
@@ -25193,6 +25194,7 @@ def _prepare_query_related_outputs(args, *, build_preview, connection, detected_
     if not getattr(args, "query_related_preparation_required", False):
         return None
     from wwise_waapi.object_query_related_runtime import RelatedQueryError, prepare_related_outputs
+    args.query_related_version = detected_version
     try:
         if getattr(args, "query_related_has_lists", False):
             from wwise_waapi.object_query_related_lists import RelatedListPlan
@@ -25321,6 +25323,14 @@ def _project_query_business_rows(
                         from wwise_waapi.object_query_related_runtime import RelatedQueryError
                         try:
                             validate_randomizer_value(output['randomizer_value'], row[native], RelatedQueryError)
+                        except RelatedQueryError as exc:
+                            code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
+                            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc
+                    if group is None and field == 'curve_points':
+                        from wwise_waapi.object_query_local_lists import validate_curve_points
+                        from wwise_waapi.object_query_related_runtime import RelatedQueryError
+                        try:
+                            validate_curve_points(args.query_related_version, row[native], RelatedQueryError)
                         except RelatedQueryError as exc:
                             code = 'QUERY_RESULT_CONTINUATION_CHANGED' if args.result_page is not None else exc.code
                             raise GatewayResultShapeError(str(exc), details=exc.details, error_code=code) from exc

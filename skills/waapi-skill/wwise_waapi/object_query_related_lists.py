@@ -21,6 +21,7 @@ from .object_query_related import (RELATED_QUERY_RELATIONS, RELATED_QUERY_LIST_R
 from .object_query_related_runtime import RelatedQueryError, canonical_guid, IDENTITY, OBJECT_GET
 from .object_query_related_metadata import RelatedFieldBinder
 from .object_query_randomizer import randomizer_terminal, validate_randomizer_value
+from .object_query_local_lists import LOCAL_LISTS, descriptor, certify_local_list, validate_local_member, validate_curve_points
 
 # Gateway-owned aggregate limits, independent of native source/projection caps.
 MAX_RELATED_MEMBER_OCCURRENCES = MULTI_IDENTITY_READ_MAX_IDS
@@ -76,6 +77,7 @@ class RelatedListPlan:
             charge_selection=self.charge_sequence_members)
         self.aliases = set()
         self.sequence_origins = {}
+        self.local_list_sources = {}
         self.has_sequences = any(kind == 'sequence' for request in requests for kind,_ in request['hops'])
 
     def charge_sequence_members(self, rows):
@@ -154,8 +156,15 @@ class RelatedListPlan:
         """
         if sequence and sequence['source'] == 'combine':
             return self.combination_rows(owner,sequence)
-        source = build_object_get_query(object_id=owner, select=relation,
-            return_fields=IDENTITY, version=self.version)
+        if descriptor(relation):
+            actual = self.object_row(owner)
+            source_evidence = certify_local_list(self.version, relation, actual.get('classId'), RelatedQueryError, owner_type=actual.get('type'))
+            self.local_list_sources[(owner.upper(), relation)] = source_evidence
+            source = build_object_get_query(object_id=owner, return_fields=IDENTITY, version=self.version)
+            source_waql = source.envelope.args['waql'] + ' select ' + relation
+        else:
+            source = build_object_get_query(object_id=owner, select=relation, return_fields=IDENTITY, version=self.version)
+            source_waql = source.envelope.args['waql']
         rows = []
         limit, suffix, after = None, '', []
         stages = list((sequence or {}).get('stages', []))
@@ -186,15 +195,17 @@ class RelatedListPlan:
             if limit is not None: count = min(count, limit-len(rows))
             # COUNT is not documented to accept zero, and pinned2021 native
             # rejects skip 0. The initial sequence needs no skip transform.
-            waql = source.envelope.args["waql"] + suffix
+            waql = source_waql + suffix
             if rows:
                 waql += f" skip {len(rows)}"
             preview = build_advanced_object_get_query({"contract": ADVANCED_QUERY_CONTRACT,
                 "waql": waql,
-                "return": list(IDENTITY), "max_results": count}, version=self.version,
+                "return": [*IDENTITY, *(['classId', 'owner'] if descriptor(relation) else [])], "max_results": count}, version=self.version,
                 platform=self.return_scope.get('platform'), language=self.return_scope.get('language'))
             result = self.measured_read(OBJECT_GET, preview.envelope.args, preview.envelope.options)
             chunk = self.validate_rows(result, count)
+            if descriptor(relation):
+                for row in chunk: validate_local_member(row, owner, source_evidence, RelatedQueryError)
             self.charge_sequence_members(chunk)
             rows.extend(chunk)
             if len(rows) > MAX_RELATED_MEMBER_OCCURRENCES:
@@ -242,7 +253,7 @@ class RelatedListPlan:
         return rows[0]
 
     def arm_rows(self, owner, arm, limit=None, conditions=()):
-        if limit == 0: return []
+        if limit == 0 and not any(token in LOCAL_LISTS for token in arm): return []
         if arm == ['self']:
             rows = [self.object_row(owner)]
             for condition in conditions: rows = self.filter_rows(rows,condition)
@@ -317,6 +328,9 @@ class RelatedListPlan:
                 if limit is not None:
                     required = offset+limit if limit else 0
                     if limit == 0: break
+        if required == 0:
+            for arm in sequence['arms']:
+                if any(token in LOCAL_LISTS for token in arm): self.arm_rows(owner, arm, 0)
         for arm_index,arm in enumerate(sequence['arms']):
             if required is not None and len(rows) >= required: break
             values = self.arm_rows(owner,arm,None if required is None else required-len(rows),conditions)
@@ -351,6 +365,15 @@ class RelatedListPlan:
                 members = []
                 key = self.edge_key(frame, edge)
                 for loc, row in frame.rows.items():
+                    prefix, _, local_native = edge.native.rpartition('.')
+                    source_evidence = None
+                    if descriptor(local_native):
+                        owner = row.get(prefix) if prefix else row
+                        if owner is not None:
+                            source_evidence = certify_local_list(self.version, local_native,
+                                row.get(prefix + '.classId' if prefix else 'classId'), RelatedQueryError,
+                                owner_type=row.get(prefix + '.type') if prefix else owner.get('type'))
+                            self.local_list_sources[(owner['id'].upper(), local_native)] = source_evidence
                     if not self.composed or edge.sequence:
                         prefix, _, relation = edge.native.rpartition('.')
                         owner = row.get(prefix) if prefix else row
@@ -407,6 +430,13 @@ class RelatedListPlan:
                         edge.child.rows[loc] = {**copy.deepcopy(reference), **copy.deepcopy(record)}
                 else:
                     edge.child.rows.update(members)
+                prefix, _, local_native = edge.native.rpartition('.')
+                if descriptor(local_native):
+                    for child_loc, member in edge.child.rows.items():
+                        owner_row = frame.rows[child_loc[:-1]]
+                        owner = owner_row.get(prefix) if prefix else owner_row
+                        source_evidence = self.local_list_sources[(owner['id'].upper(), local_native)]
+                        validate_local_member(member, owner['id'], source_evidence, RelatedQueryError)
         self.total_occurrences += occurrences
         if self.total_occurrences > MAX_RELATED_MEMBER_OBSERVATIONS:
             raise RelatedQueryError('Related reads exceeded their cumulative member observation budget', code='RELATED_QUERY_MEMBER_LIMIT')
@@ -481,10 +511,23 @@ class RelatedListPlan:
                     edges = {}
                     for frame, loc, prefix, path in states:
                         native = '.'.join(value for value in (prefix, RELATED_QUERY_LIST_RELATIONS.get(relation,'__combine__')) if value)
+                        if descriptor(RELATED_QUERY_LIST_RELATIONS.get(relation)):
+                            if prefix and prefix + '.type' not in frame.fields:
+                                frame.fields.append(prefix + '.type'); frame.scope.append(prefix + '.type')
+                                self.observe()
+                            row = frame.rows[loc]
+                            owner = row.get(prefix) if prefix else row
+                            if owner is not None:
+                                source_evidence = certify_local_list(self.version, RELATED_QUERY_LIST_RELATIONS[relation],
+                                    row.get(prefix + '.classId' if prefix else 'classId'), RelatedQueryError,
+                                    owner_type=row.get(prefix + '.type') if prefix else owner.get('type'))
+                                self.local_list_sources[(owner['id'].upper(), RELATED_QUERY_LIST_RELATIONS[relation])] = source_evidence
                         business = (*path, ('relation', relation))
                         edge_id = native if sequence is None else native + ':' + canonical_sha256(sequence)
                         if edge_id not in frame.lists:
                             child = Frame(len(self.frames)); self.frames.append(child)
+                            if descriptor(RELATED_QUERY_LIST_RELATIONS.get(relation)):
+                                child.fields.append('owner'); child.scope.append('owner')
                             frame.lists[edge_id] = ListEdge(native, business, child, sequence=sequence)
                         edges[(frame.number, native)] = frame.lists[edge_id]
                     self.observe()
@@ -585,6 +628,7 @@ class RelatedListPlan:
                 'cumulative_member_observations':MAX_RELATED_MEMBER_OBSERVATIONS,'source_ids_per_read':MAX_STRUCTURED_SOURCE_ITEMS,
                 **({'relationship_rows_per_read':MAX_QUERY_TAKE} if not self.composed else {}),
                 'cumulative_read_bytes':MAX_ADVANCED_RETURN_EXPRESSIONS*self.maximum_read_bytes,'grouped_member_reconstruction_bytes':self.maximum_read_bytes},
+            'local_list_sources':[{'owner':key[0], 'native':key[1], **value} for key,value in self.local_list_sources.items()],
             'metadata_authority':'live-waapi','mutation_authority':False}
 
     def project(self, rows):
@@ -621,6 +665,8 @@ class RelatedListPlan:
                         if name not in missing: missing.append(name)
                     else:
                         if kind == 'randomizer': validate_randomizer_value(output, row[native], RelatedQueryError)
+                        if kind == 'terminal' and group is None and output == 'curve_points':
+                            validate_curve_points(self.version, row[native], RelatedQueryError)
                         (target.setdefault(group,{}) if group else target)[output] = copy.deepcopy(row[native])
                 for edge in frame.lists.values():
                     if edge.sequence:

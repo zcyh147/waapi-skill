@@ -1,0 +1,74 @@
+{
+  "version": "2022.1",
+  "wwise_build": "2022.1.19.8584",
+  "scope": "only exact class9699330, actual object type SourcePlugin, local RTPC; no general inheritance claim",
+  "owner_class_id": 9699330,
+  "actual_object_type": "SourcePlugin",
+  "native_list": "@RTPC",
+  "source_class_id": 1048592,
+  "official_plugin_identity": {
+    "member": "Authoring/x64/Release/bin/Plugins/AkSynthOne.xml",
+    "sha256": "372181c5a3452fa6822da5e96e5d3fd2652337bb3fd65d8a81bbe4e24463d996",
+    "xml": "<SourcePlugin Name=\"Wwise Synth One\" CompanyID=\"0\" PluginID=\"148\" DisplayName=\"Synth One\">"
+  },
+  "class_id_calculation": {
+    "member": "include/AK/SoundEngine/Common/AkCommonDefs.h",
+    "sha256": "0deb6c7987db82be241afbf8f673c4c0c521fa80e8a026488919c28e9869d100",
+    "macro": "( (in_pluginType) + ( (in_companyID) << 4 ) + ( (in_pluginID) << ( 4 + 12 ) ) )",
+    "source_type_member": "include/AK/SoundEngine/Common/AkTypes.h",
+    "source_type_sha256": "d9f485967361cbc00549cdea6035045bb0602241a1020ffd50b96086a7c59b12",
+    "source_type_definition": "AkPluginTypeSource = 2,\t///< Source plug-in: creates sound by synthesis method (no input, just output).",
+    "calculation": "2 + (0 << 4) + (148 << (4 + 12)) = 9699330"
+  },
+  "abstract_declaration": {
+    "member": "wwiseobject_sourceplugin.html",
+    "sha256": "64d625b31271d6458ea08b2337265707e316ac7e03a9a67c0b9aec43eacba5b6",
+    "declaration": {
+      "name": "RTPC",
+      "display_name": "RTPC",
+      "declared_kind": "List",
+      "element_classes": [
+        {
+          "name": "RTPC",
+          "class_id": 1441808
+        }
+      ],
+      "unresolved_element_types": []
+    },
+    "catalog_file_sha256": "df0da459f2be952f87084ca55224357e40c43bd27932cd2db91a2d46f6ae5313",
+    "catalog_sha256": "4765d0898c998405025396085bc347130731f9f7da9cc263db4c01e51e4e21d9"
+  },
+  "retained_type_registration": {
+    "catalog_sha256": "465787f842997f729944536fe7a346aa90e639a6c0a20f40d4f6539a2b0f2378",
+    "source_result_sha256": "5a52d81c70061b34073f342656f7bc9d9a04bfd7bc797764197a6763a034aaa6",
+    "row": {
+      "classId": 9699330,
+      "name": "Wwise Synth One",
+      "type": "Source"
+    }
+  },
+  "retained_object_observation": {
+    "receipt_sha256": "4175d925f328238ab94a445a0eea5fab7747753e58c184b18b920883bc81c0ca",
+    "reply_sha256": "aeec7211da5e586c113466a8f316a6caf2cdf91ef73154ec95a2e5d90a1ef91b",
+    "call_index": 2,
+    "object": {
+      "id": "{95DDA32B-B666-4269-A54C-5ABF4E201C99}",
+      "type": "SourcePlugin",
+      "class_id": 9699330
+    }
+  },
+  "retained_member_observation": {
+    "reply_sha256": "95bc3254321f8c700117c2730414b41f8991769e99209f2fde699de38e66f20b",
+    "call_index": 20,
+    "native_projection": "select @RTPC",
+    "object": {
+      "id": "{CE99046D-D354-422D-A7BB-F1305FF00B2F}",
+      "type": "RTPC",
+      "class_id": 1441808,
+      "owner": {
+        "id": "{95DDA32B-B666-4269-A54C-5ABF4E201C99}",
+        "name": "Wwise Synth One"
+      }
+    }
+  }
+}
