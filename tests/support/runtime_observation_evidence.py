@@ -322,7 +322,7 @@ def write_bundle(output, program_path, originals, *, inventory):
         'from_candidate': run['candidate'], 'to_candidate': candidate, 'branch_id': identity,
         'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
         'evidence_sha256': native_run['sha256'], 'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)),
-        'reviewed_reason': ('Exact reviewed getRTPCs result guard narrowing; full original array preserved through current public Gateway. Original finalized PASS retained.'
+        'reviewed_reason': (RTPC_REVIEWED_SOURCE_REASON
             if source_review else 'All original packaged runtime/resource sources byte-identical; original finalized PASS retained.'),
         'sources': original_sources, **({'runtime_read_review': source_review} if source_review else {})}
     equivalence_descriptor = write_json(output / 'native-equivalence.json', equivalence)
@@ -344,13 +344,33 @@ RTPC_GUARD_FILE = RTPC_SOURCE.split('#')[0]
 RTPC_GUARD_CHANGE = {
     'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c',
     'after': 'a34a6b5f4b54b6f9ab80e3f3a07c6ff7bb2d5dbf34a5757bcf4520f8301a5699'}
+RTPC_REVIEWED_SOURCE_CHANGES = {
+    RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
+    'skills/waapi-skill/scripts/gateway.py': {
+        'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
+        'after': 'fcaaa2341a14690741e6c3fa4a50a252ac229ab2403173051847b4c4b11a1f8e'},
+    'skills/waapi-skill/wwise_waapi/builders/schema.py': {
+        'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
+        'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
+RTPC_REVIEWED_SOURCE_SYMBOLS = {
+    RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
+        '_validate_rtpc_rows', 'normalize_runtime_inspection_result'],
+    'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
+        'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
+        'dispatch_runtime_inspection_business_read'],
+    'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
+        '_validate_resolved_sections', '_runtime_result_reference_schema']}
+RTPC_REVIEWED_SOURCE_REASON = (
+    'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
+    'RTPC conservative validator/request/normalizer behavior retained and complete original '
+    'arrays unchanged through current public Gateway; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
 
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
-    """Accept one reviewed guard narrowing for exact unchanged original reads."""
+    """Accept only the pinned reviewed three-file delta for original RTPC reads."""
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
@@ -380,8 +400,8 @@ def validate_rtpc_source_review(descriptor, historical_sources, branch, root, ba
             or review['historical_candidate'] != RTPC_ORIGINAL_CANDIDATE
             or len(historical_sources) != 413 or review['historical_sources'] != historical_sources
             or review['current_sources'] != current or review['changed_files'] != changes
-            or changes != {RTPC_GUARD_FILE: RTPC_GUARD_CHANGE}
-            or review['changed_symbols'] != ['_validate_rtpc_rows', 'normalize_runtime_inspection_result']
+            or changes != RTPC_REVIEWED_SOURCE_CHANGES
+            or review['changed_symbols'] != RTPC_REVIEWED_SOURCE_SYMBOLS
             or review['scope'] != scope or review['original_capture']['sha256'] != original_sha):
         raise ValueError('RTPC reviewed guard source/branch closure differs')
     for key in ('original_capture', 'program_replay'):
@@ -416,8 +436,8 @@ def _write_rtpc_source_review(output, prefix, historical_sources, captured, orig
     descriptor = write_json(output / (prefix + 'guard-source-review.json'), {
         'contract': 'waapi-skill.runtime-read-source-review/v1', 'historical_candidate': RTPC_ORIGINAL_CANDIDATE,
         'historical_sources': historical_sources, 'current_sources': current,
-        'changed_files': {RTPC_GUARD_FILE: RTPC_GUARD_CHANGE},
-        'changed_symbols': ['_validate_rtpc_rows', 'normalize_runtime_inspection_result'],
+        'changed_files': RTPC_REVIEWED_SOURCE_CHANGES,
+        'changed_symbols': RTPC_REVIEWED_SOURCE_SYMBOLS,
         'scope': {'version': version, 'host': host, 'build': expected_build, 'uri': uri,
             'original_capture_sha256': original_sha,
             'original_rows_pointer': '/outcomes/profiler-rtpcs-observation/evidence/agent_result/return',
@@ -602,7 +622,7 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
                 'from_candidate': context['candidate'], 'to_candidate': candidate, 'branch_id': identity,
                 'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
                 'evidence_sha256': native_run['sha256'], 'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)),
-                'reviewed_reason': ('Exact reviewed getRTPCs guard narrowing; complete original array unchanged through current public Gateway; independent field/reference witness only'
+                'reviewed_reason': (RTPC_REVIEWED_SOURCE_REASON + '; independent field/reference witness only'
                     if source_review else 'Original finalized PASS and complete packaged runtime sources unchanged; exact independent field/reference witness only'),
                 'sources': original_sources, **({'runtime_read_review': source_review} if source_review else {})}
             equivalence_descriptor = write_json(destination(f'native-equivalence-{index}.json'), equivalence)

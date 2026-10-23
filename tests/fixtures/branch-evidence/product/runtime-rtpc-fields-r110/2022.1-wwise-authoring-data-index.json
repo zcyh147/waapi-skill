@@ -1,0 +1,93 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "rtpc-2022.1-wwise-authoring-data",
+      "bindings": {
+        "artifact": "2022.1-wwise-authoring-data-bindings.json",
+        "sha256": "5947b3798208361d665856a2ce8a9d79678709b81bbdc04c938d3e7a1728e7c6"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2022.1-wwise-authoring-data-bindings.json",
+          "sha256": "5947b3798208361d665856a2ce8a9d79678709b81bbdc04c938d3e7a1728e7c6"
+        },
+        "program": {
+          "artifact": "2022.1-wwise-authoring-data-program.json",
+          "sha256": "f17b02fc3be9019d50abf3c980d49d2c1fd41e454e1b2f27bbca6a5c69f07f15"
+        },
+        "requirements": {
+          "artifact": "2022.1-wwise-authoring-data-requirements.json",
+          "sha256": "7371e44a30959812af64c1dc99d22d067b782d63c144be612834dba00a7c97ad"
+        },
+        "capture": {
+          "artifact": "2022.1-wwise-authoring-data-program-capture.json",
+          "sha256": "6f759732911d6181a5d067976910061fc5849356b5d539b339e81774d8b9bb94"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-0.json",
+      "sha256": "13ae0e3da917382e0b9a0414d97396f868fa7c94aee123d9b63e018d17a6adb8"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-1.json",
+      "sha256": "c1f538fff08d499d087f00ddb842b8f2b22e094d97a7e532b4be4ae5639677f1"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-2.json",
+      "sha256": "65f65566b1d70597dadde2592a3aa54cdf3de2ce163a19d066a6f001bc41ca5c"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-3.json",
+      "sha256": "7a080181af1bbadac54a8a6b8494d9df8a886a078780fef75ec66cceb26c0c16"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-4.json",
+      "sha256": "369fb4112908e32b05e352fc3c4c1f4833a7cf1b850d490fea97958769400c9d"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-5.json",
+      "sha256": "aabe7e82b0eca46d381bb3fc93120fee77b1a49f89b88472958e31ba01c08f3c"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-6.json",
+      "sha256": "44f05408ea8deb673366f00d03058d55d020cf18508d5f8b85e365716da97de2"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-7.json",
+      "sha256": "3a3698a3eb0d55c8c40d79c911d0214950bb9a5e29de7f0c487db627feab8001"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-8.json",
+      "sha256": "c3c9de3ccf36b08d3f23240af02279ccab527d1e67b432e86816e59b05874ce8"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-9.json",
+      "sha256": "e9b12fa10247c9630417c3301d7f422f6bd1d01180a0d8b0fd4cded3af04061d"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-10.json",
+      "sha256": "8dca3133efb5c46bf52efdccd6b3df36f1ad46f26ee6320b30b97287ec1bd873"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-11.json",
+      "sha256": "24fe5a8c6d77c1562225149fdf26668456741dd1959bba07dad479f343df9128"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-12.json",
+      "sha256": "935101f993d6e841a3ca7791a84cdfd2443adde4a085102758cc5569c598e367"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-13.json",
+      "sha256": "6f439f628c9460b5bdba69481aff87b4461669bc94ad6187b360f11b100b7499"
+    },
+    {
+      "artifact": "2022.1-wwise-authoring-data-attachment-14.json",
+      "sha256": "d9aa5b916278b9c8ee892025fc84447bd88db5ce146d204ebbdc3ac5a6c8bdd9"
+    }
+  ]
+}
