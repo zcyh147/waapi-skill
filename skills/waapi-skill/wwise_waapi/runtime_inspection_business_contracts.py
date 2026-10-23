@@ -607,6 +607,11 @@ def runtime_inspection_business_contract_data(
             row["optional_fields"],
         )
     )
+    meter_contract = None
+    if operation == PROFILER_GET_METERS_URI:
+        from .profiler_meter_objects import meter_object_contract
+        meter_contract = meter_object_contract(version)
+        optional_fields = (*optional_fields, *meter_contract['fields'])
     exposed_fields = set(row["required_fields"]) | set(optional_fields)
     roles = tuple(row.get("roles", ()))
     role_field = {
@@ -724,7 +729,7 @@ def runtime_inspection_business_contract_data(
                 name: value
                 for name, value in row["field_types"].items()
                 if name in exposed_fields
-            },
+            } | ({name:detail['type'] for name,detail in meter_contract['fields'].items()} if meter_contract else {}),
             "input_forms": {
                 name: {
                     **value,
@@ -736,7 +741,8 @@ def runtime_inspection_business_contract_data(
                 }
                 for name, value in row["input_forms"].items()
                 if name in exposed_fields
-            },
+            } | (meter_contract['fields'] if meter_contract else {}),
+            **({'meter_object_projection':meter_contract} if meter_contract else {}),
             **({"verification": {
                 "observer": LOG_GET_URI,
                 "maximum_channel_items": 1000,

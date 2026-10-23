@@ -57,9 +57,10 @@ class ListEdge:
 
 
 class RelatedListPlan:
-    def __init__(self, *, version, requests, bindings, build_preview, read, maximum_rows, maximum_read_bytes, compile_condition, binder=None):
+    def __init__(self, *, version, requests, bindings, build_preview, read, maximum_rows, maximum_read_bytes, compile_condition, binder=None, root_observer=None):
         self.version, self.requests, self.bindings = version, requests, tuple(binding for binding in bindings if not binding[0].startswith('related'))
         self.build_preview, self.read = build_preview, read
+        self.root_observer = root_observer
         self.compile_condition = compile_condition
         self.maximum_rows, self.maximum_read_bytes = maximum_rows, maximum_read_bytes
         self.composed = version not in {'2021.1', '2022.1'}
@@ -467,6 +468,11 @@ class RelatedListPlan:
         self.snapshot = copy.deepcopy(snapshot)
 
     def observe(self):
+        if self.root_observer is not None:
+            rows, scope = self.root_observer(self.render(self.root, root=True))
+            self.return_scope = dict(scope)
+            self.accept(self.validate_rows({'return': rows}, self.maximum_rows))
+            return
         preview = self.build_preview(self.render(self.root, root=True))
         self.return_scope = {key:value for key,value in preview.envelope.options.items() if key != 'return'}
         result = self.measured_read(OBJECT_GET, preview.envelope.args, preview.envelope.options)
