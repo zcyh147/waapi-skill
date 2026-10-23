@@ -204,14 +204,59 @@ def test_capture_existing_host_name_and_extension_contract_is_preserved(tmp_path
     assert observed["created"] is False and observed["changed"] is True
 
 
-def test_capture_missing_output_directory_retains_existing_public_contract(tmp_path):
+@pytest.mark.parametrize("nested", (False, True))
+def test_capture_missing_output_directory_retains_existing_public_contract(tmp_path, nested):
     task = CaptureTask(tmp_path)
     task.output.rmdir()
-    task.effect = lambda: (task.output.mkdir(), task.destination.write_bytes(b"opaque fixture"))
+    if nested:
+        task.output = tmp_path / "missing" / "captures"
+        task.destination = task.output / "Weather.prof"
+    task.effect = lambda: (task.output.mkdir(parents=True), task.destination.write_bytes(b"opaque fixture"))
     task.preview()
     task.confirm()
     task.run("execute", task.tx)
     assert task.run("verify", task.tx)["verification"]["business_state_verified"] is True
+
+
+def test_missing_capture_ancestor_cannot_redirect_exact_authorized_destination(tmp_path, monkeypatch):
+    task = CaptureTask(tmp_path)
+    task.output.rmdir()
+    task.output = tmp_path / "missing" / "captures"
+    task.destination = task.output / "Weather.prof"
+    redirected = tmp_path / "redirected"
+    (redirected / "captures").mkdir(parents=True)
+    task.preview()
+    task.confirm()
+
+    def redirected_save():
+        (tmp_path / "missing").symlink_to(redirected, target_is_directory=True)
+        task.destination.write_bytes(b"opaque fixture capture bytes")
+
+    task.effect = redirected_save
+    task.run("execute", task.tx)
+    content_reads = []
+    real_open, real_scandir = os.open, os.scandir
+
+    def track_open(path, *args, **kwargs):
+        if Path(path).resolve().is_relative_to(redirected):
+            content_reads.append(("file", str(path)))
+        return real_open(path, *args, **kwargs)
+
+    def track_scandir(path):
+        if Path(path).resolve().is_relative_to(redirected):
+            content_reads.append(("tree", str(path)))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "open", track_open)
+    monkeypatch.setattr(os, "scandir", track_scandir)
+    code, result = task.execute("verify", task.tx)
+    assert code == 2 and result["verification"]["business_state_verified"] is False, result
+    assert content_reads == [], "Unapproved redirected contents must not be read before binding fails"
+    assert result["state"] == "verification_failed" and result["automatic_retry"] is False
+    assert any(row.get("evidence", {}).get("error_code") == "FILE_CHANGED"
+        for row in task.evidence()["assertions"])
+    assert task.execute("execute", task.tx)[0] == 2
+    assert len([call for call in task.calls if call[0] == SAVE_CAPTURE]) == 1
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1"))

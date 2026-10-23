@@ -6,7 +6,6 @@ from typing import Any, Mapping
 
 from .builders.schema import SemanticSchemaValidator
 from .canonical import canonical_sha256
-from .filesystem_security import metadata_is_link_or_reparse
 from .operation_soundbank import (
     MAX_TREE_FILE_BYTES, SoundBankContractError, capture_artifact_tree,
     capture_file_proof, prove_artifact_path,
@@ -37,18 +36,22 @@ def _directory_identity(path: Path) -> dict[str, Any]:
         "resolved_device": actual.st_dev, "resolved_inode": actual.st_ino}
 
 
-def _snapshot(path: str, root: str, anchor: str) -> dict[str, Any]:
-    root_path = Path(root)
-    try:
-        if root_path.is_symlink() or (root_path.exists() and metadata_is_link_or_reparse(root_path.lstat())):
-            raise SoundBankContractError("SYMLINK_NOT_ALLOWED", "Capture output directory must not be a link or reparse point.")
-    except OSError as exc:
-        raise SoundBankContractError("FILE_CHANGED", "Capture output directory changed while it was inspected.",
-            details={"path": root, "reason": str(exc)}) from exc
-    tree = capture_artifact_tree(root, io_root=anchor)
+def _snapshot(path: str, root: str, anchor: str, *, expected_root: str,
+        expected_path: str) -> dict[str, Any]:
+    # Missing ancestors may materialize during save. Re-resolve the original
+    # spellings against the sealed authorization before enumerating or hashing;
+    # membership in a newly redirected tree cannot authorize that new tree.
+    root_proof = prove_artifact_path(root, io_root=anchor, field="capture output directory")
     proof = prove_artifact_path(path, io_root=anchor, field="capture output", expect_directory=False)
-    if Path(proof["resolved_path"]).parent != Path(tree["resolved_root"]):
+    if root_proof["resolved_path"] != expected_root or proof["resolved_path"] != expected_path:
+        raise SoundBankContractError("FILE_CHANGED", "Capture output resolution changed from its exact authorized destination.",
+            details={"expected_root": expected_root, "actual_root": root_proof["resolved_path"],
+                "expected_path": expected_path, "actual_path": proof["resolved_path"]})
+    if Path(expected_path).parent != Path(expected_root):
         raise SoundBankContractError("INVALID_PATH", "Capture destination must remain in its exact authorized directory.")
+    tree = capture_artifact_tree(root, io_root=anchor)
+    if tree["resolved_root"] != expected_root:
+        raise SoundBankContractError("FILE_CHANGED", "Capture output resolution changed during its artifact snapshot.")
     file = (capture_file_proof(path, field="capture output", io_root=anchor,
         max_bytes=MAX_TREE_FILE_BYTES) if proof["exists"] else None)
     # The separate descriptor-backed proof must describe the same file as the
@@ -74,9 +77,8 @@ def prepare_capture_artifact(args: Mapping[str, Any], root: str,
         if directory.exists() or directory.is_symlink():
             identities.append(_directory_identity(directory))
     anchor = identities[0]["resolved_path"]
-    before = _snapshot(path, root, anchor)
-    if before["path"]["resolved_path"] != paths[0]["resolved_path"] or before["tree"]["resolved_root"] != audit["io_root"]:
-        raise SoundBankContractError("INVALID_PATH", "Capture destination differs from its authorized I/O audit.")
+    before = _snapshot(path, root, anchor, expected_root=audit["io_root"],
+        expected_path=paths[0]["resolved_path"])
     return {"kind": "profiler-capture-artifact", "uri": SAVE_CAPTURE_URI, "version": version,
         "args": dict(args), "path": path, "io_root": root, "anchor": anchor,
         "directory_identities": identities, "before": before,
@@ -101,13 +103,17 @@ def validate_capture_artifact(plan, args, root, audit, version):
                 != [plan.get("before", {}).get("path", {}).get("resolved_path")]):
         raise SoundBankContractError("INVALID_PREVIEW", "Capture artifact proof does not match its versioned request and I/O authorization.")
     _validate_directories(plan)
-    if _snapshot(plan["path"], plan["io_root"], plan["anchor"]) != plan["before"]:
+    if _snapshot(plan["path"], plan["io_root"], plan["anchor"],
+            expected_root=plan["before"]["tree"]["resolved_root"],
+            expected_path=plan["before"]["path"]["resolved_path"]) != plan["before"]:
         raise SoundBankContractError("FILE_CHANGED", "Capture destination or output files changed after Preview; prepare again.")
 
 
 def verify_capture_artifact(plan: Mapping[str, Any]) -> dict[str, Any]:
     _validate_directories(plan)
-    after = _snapshot(plan["path"], plan["io_root"], plan["anchor"])
+    after = _snapshot(plan["path"], plan["io_root"], plan["anchor"],
+        expected_root=plan["before"]["tree"]["resolved_root"],
+        expected_path=plan["before"]["path"]["resolved_path"])
     _validate_directories(plan)
     before = plan["before"]
     relative = Path(after["path"]["resolved_path"]).name
