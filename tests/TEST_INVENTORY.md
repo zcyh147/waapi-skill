@@ -20,8 +20,30 @@ controls retained their initial failures: the suffix-like name repair passed in
 5.24s, and a corrected between-stage test hook passed in 4.03s. Final affected
 existing callers passed nine checks in 25.33s. Original logs and two independent
 reviews are retained in `r82-reviewed-evidence`; overlapping runs are not summed.
-Reviews found no material issue. These are program checks, not native duplicate
-creation evidence. CREATE duplicate staging across 2021–2025 and broader
+Reviews found no material issue. Those initial checks were program evidence.
+The reviewed test-only successor `993a8e1a` then passed the matching macOS
+Console2025.1.7.9143 SET duplicate workflow in 23.86s: three separately verified
+source/undo/redo transactions, 19 independent observations, 60 public commands
+and 232 hashed native packets. Wwise returned distinct Send and Send_01 objects
+under the newly created parent's actual GUID; reference and public occurrence
+roster matched independent reads. Undo restored the baseline and proved all
+three new GUIDs absent; redo restored the exact original created graph and
+reference. Source integrity and cleanup passed. Exact stage results and three
+missing-GUID errors were matched to their original native packets. Root:
+`r82-duplicate-set-993a8e1a-2025-r1/root-review.json`. This is selected 2025 SET
+composition evidence, not a CREATE or all-version duplicate native result.
+
+Reviewed CREATE successor `c9dadc2b` extends that owned-stage mechanism across
+2021–2025: later creates use the actual parent GUID and each deferred reference
+uses closed setReference. Shared history observations consume the complete
+actual roster; compound phases avoid the old requested-path rewrite. The 2021
+public source workflow passed in 1.21s; 2025 compound source/undo/redo passed in
+24.46s. Three middle-version source/count cases and four causal stops passed
+seven checks in 5.64s; final existing CREATE/SET callers passed seven in 15.70s.
+Counts overlap. Original failures and fixes are retained in
+`r83-create-reviewed-evidence`; Main's runtime and final-delta review found no
+material issue. No native CREATE duplicate result is claimed yet. A minimal
+2021 source witness is being prepared; broader policies, graph shapes and
 constructor/history alternatives remain assigned to #178/#192.
 
 Test-only candidate `1c5a07b7` passed one macOS Console2025.1.7.9143 namespaced
