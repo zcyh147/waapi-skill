@@ -12,6 +12,7 @@ from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS, MAX_ADVANCED_RETURN
 from .schema_inventory import load_definition_graph
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .metadata_discovery import MAX_METADATA_DISCOVERY_QUERY_CHARS
+from .object_query_randomizer import RANDOMIZER_OUTPUTS, randomizer_contract
 
 RELATED_QUERY_LIST_RELATIONS = {"children": "children", "descendants": "descendants", "ancestors": "ancestors", "references-to": "referencesTo"}
 
@@ -163,6 +164,9 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
                     stages.append(stage)
                 if stages:
                     hops[-1] = ("sequence", json.dumps({**(spec or {'source':name}), 'stages': stages}, separators=(",", ":")))
+        elif name == 'randomizer' and index + 2 == len(tokens):
+            hops.append(('randomizer', _meaning(tokens[index + 1])))
+            index += 2
         elif name in {"reference", "local-reference"} and index + 1 < len(tokens):
             hops.append((name, _meaning(tokens[index + 1])))
             index += 2
@@ -184,7 +188,10 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
             nodes += 1 if arm == ['self'] else parse_related_request(version,[*arm,'volume-db'],'--include-related')['nodes']
     if nodes > MAX_ADVANCED_RETURN_EXPRESSIONS:
         raise ValueError(f"closed related paths accept at most {MAX_ADVANCED_RETURN_EXPRESSIONS} hops")
-    if option == "--include-related" and not reducer:
+    if hops and hops[-1][0] == 'randomizer':
+        if option != '--include-related' or terminal not in RANDOMIZER_OUTPUTS:
+            raise ValueError('randomizer MEANING requires --include-related and enabled, min-offset or max-offset')
+    elif option == "--include-related" and not reducer:
         detail = related_output_detail(version, terminal)
         if not detail["available"]:
             raise ValueError(f"{option} {' '.join(values)}: {detail['reason']}")
@@ -282,7 +289,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
                     "source":{**{key:list_source[key] for key in ('version','wwise_build','archive','archive_sha256','page','page_sha256')},
                         "sections_sha256":canonical_sha256(list_source['sequence_sources'])},
                     "native_domains":"2023+ function examples are query predicates/selection; concat and one filtered return chain have explicit return examples. 2021/22 missing function sections do not establish native absence",
-                    "followup":"non-object record-list descriptors, randomizer and other typed functions remain unavailable through this contract; this is not native absence"},
+                    "followup":"additional version-specific object/record lists and other typed functions remain unavailable through this contract; this is not native absence"},
                 "membership": "2021/2022: each actual canonical owner/relation is read with documented query SELECT, an initial window without skip, positive-offset bounded skip/final-take windows and overflow detection; no bare list return accessor is assumed",
                 "result": "related.<list>.items contains ordered independent member records with object identities and the same fixed/custom terminal modes; nested paths retain their grouping",
                 "source": {**{key: list_source[key] for key in ("version", "wwise_build", "page", "page_sha256")}, "sections_sha256": canonical_sha256(list_source["sections"])},
@@ -305,6 +312,7 @@ def related_query_contract(version: str, *, maximum_outputs: int, maximum_custom
             "metadata_reads": False,
             "custom_metadata_reads": "actual related class/object discovery for custom terminals and reference hops; fixed paths and fixed outputs require none",
             "custom_terminal_options": list(RELATED_FIELD_MODES),
+            "randomizers": randomizer_contract(version),
             "custom_terminal_modes": {option: {kind: {"native_prefix": prefix, "output_group": {"property": "properties", "reference": "references", "override_source_value": "override_source_values", "local_reference": "local_references"}[binding_kind]}
                 for kind, (binding_kind, prefix) in mode.bindings.items()} for option, mode in RELATED_FIELD_MODES.items()},
             "field_value_source_evidence": reference_value_source_contract(version)["source"],

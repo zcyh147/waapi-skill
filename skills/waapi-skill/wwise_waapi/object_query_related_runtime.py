@@ -15,6 +15,7 @@ from .builders.query import MAX_ADVANCED_RETURN_EXPRESSIONS
 from .object_query_outputs import QUERY_FIELD_OUTPUT_GROUPS, available_query_outputs
 from .object_query_related import (RELATED_FIELD_MODES, RELATED_QUERY_RELATIONS,
     RelatedQueryOutput, related_native_fields)
+from .object_query_randomizer import randomizer_terminal
 
 OBJECT_GET = 'ak.wwise.core.object.get'
 IDENTITY = ('id', 'name', 'type', 'path')
@@ -81,7 +82,7 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
             return None
         class_id = row.get(f'{native}.classId' if native else 'classId')
         return binder.bind(meaning, reference, class_id, native, index, option,
-            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value'})
+            namespaced_property=option in {'--include-related-field', '--include-related-override-source-value', 'randomizer'})
 
     # Read all statically known prefixes together, including actual endpoint class.
     initial = list(IDENTITY)
@@ -104,7 +105,9 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
     pending, aliases = [], {}
     for request in requests:
         states = [(index, '', ()) for index in range(len(rows))]
-        for kind, name in request['hops']:
+        randomizer = request['hops'][-1][1] if request['hops'][-1][0] == 'randomizer' else None
+        owner_hops = request['hops'][:-1] if randomizer is not None else request['hops']
+        for kind, name in owner_hops:
             next_states, added = [], []
             if kind == 'relation':
                 for index, prefix, path in states:
@@ -148,6 +151,31 @@ def prepare_related_outputs(*, version, requests, bindings, build_preview, read,
                 if not isinstance(reference, Mapping) or not canonical_guid(reference.get('id')):
                     raise RelatedQueryError('A related hop must return one canonical object reference, null or absence; list composition requires a separate interface', code='RELATED_QUERY_RESULT_SHAPE')
                 states.append((index, native, path))
+        if randomizer is not None:
+            matched, unresolved = [], []
+            for index, native, path in states:
+                selected = bind(randomizer, native, index, 'randomizer')
+                if selected is None: continue
+                candidate = selected['candidate']
+                if candidate is None:
+                    unresolved.append((index, native, path, selected)); continue
+                terminal, output = randomizer_terminal(candidate, request['terminal'], RelatedQueryError)
+                identity = (index, native, terminal)
+                if identity in aliases:
+                    raise RelatedQueryError('Randomizer meanings resolved duplicate result fields', code='RELATED_QUERY_DUPLICATE_FIELD')
+                aliases[identity] = randomizer
+                binding = RelatedQueryOutput('', native, terminal, output,
+                    path=(*path, ('randomizers', candidate['name'])), row_indices=(index,)).binding()
+                binding[2]['randomizer_value'] = output
+                bindings.append(binding)
+                matched.append(index)
+            for index, native, path, selected in unresolved:
+                if matched and selected['complete'] and not selected['candidate_names']:
+                    bindings.append(('related_unavailable', '', {'path': path, 'row_indices': (index,),
+                        'meaning': randomizer, 'requested_option': 'randomizer', 'reason': 'no matching property in the complete actual metadata scope'}))
+                else:
+                    pending.append({'option': 'randomizer', 'meaning': randomizer, 'path': native, 'row_index': index, **selected})
+            continue
         if request['option'] == '--include-related':
             terminal, output = available_query_outputs(version)[request['terminal']]
             for index, native, path in next_states:
