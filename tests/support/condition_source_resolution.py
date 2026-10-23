@@ -94,8 +94,14 @@ def reconcile_sources(root):
             raise ValueError('condition source snapshot changed')
         roots[key] = ET.fromstring(source)
     ownership = json.loads((root / 'docs/branch-coverage-ownership.json').read_bytes())['routes']
-    catalogs = {version: json.loads((root / f'skills/waapi-skill/resources/metadata/{version}/object-types.json').read_bytes())['types']
-                for version in sorted({c['version'] for c in manifest['occurrences']})}
+    catalogs = {}
+    for version in sorted({c['version'] for c in manifest['occurrences']}):
+        catalog = json.loads((root / f'skills/waapi-skill/resources/metadata/{version}/object-types.json').read_bytes())
+        metadata = catalog['metadata']
+        source_builds = {c['build'] for c in manifest['occurrences'] if c['version'] == version}
+        if metadata['wwise_version_target'] != version or source_builds != {metadata['wwise_build']}:
+            raise ValueError('catalog scope differs from condition source lane')
+        catalogs[version] = catalog['types']
     plan = scalar_plan(manifest)
     program_groups = {member['id']: group['id'] for group in plan['groups'] for member in group['members']}
     from tests.support.condition_mechanism_reuse import load_review

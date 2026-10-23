@@ -1,11 +1,33 @@
 """Finite installed-source accounting retains scope without inventing live facts."""
 from pathlib import Path
+import json
+import shutil
 
 import pytest
 
 from tests.support.condition_source_resolution import reconcile_sources
 
 ROOT = Path(__file__).parents[2]
+
+
+@pytest.mark.parametrize('field,value', [('wwise_version_target', '2024.1'), ('wwise_build', '2025.1.0.0')])
+def test_catalog_scope_must_match_the_frozen_source_lane(tmp_path, field, value):
+    for relative in ('docs/branch-coverage-condition-sources.json', 'docs/branch-coverage-ownership.json',
+            'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz',
+            'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json'):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, destination)
+    for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
+        relative = f'skills/waapi-skill/resources/metadata/{version}/object-types.json'
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        catalog = json.loads((ROOT / relative).read_bytes())
+        if version == '2025.1':
+            catalog['metadata'][field] = value
+        destination.write_text(json.dumps(catalog))
+    with pytest.raises(ValueError, match='catalog scope differs from condition source lane'):
+        reconcile_sources(tmp_path)
 
 
 @pytest.fixture(scope="module")

@@ -58,7 +58,10 @@ def run_scalar_public_group(path, group, *, observed=None, capture_scope=False):
     if observed is None:
         observed = {"workflows": {}, "negative_controls": {}}
     for flow in group["workflows"]:
-        observed["workflows"][flow["id"]] = run_scalar_public_workflow(path / flow["id"], group, before_values=flow["before"], capture_scope=capture_scope)
+        options = {"before_values": flow["before"]}
+        if capture_scope:
+            options["capture_scope"] = True
+        observed["workflows"][flow["id"]] = run_scalar_public_workflow(path / flow["id"], group, **options)
     for control in group["negative_controls"]:
         child = path / control["id"]
         child.mkdir()

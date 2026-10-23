@@ -14,7 +14,7 @@ from tests.maintenance.branch_coverage_audit import digest
 from tests.support.condition_scalar_batch import scalar_manifest, scalar_plan
 
 REVIEW_PATH = 'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json'
-REVIEW_SHA256 = 'baf2f9a813e80de4c38397cf7170deba3b93e31c6f700f291171878160af9193'
+REVIEW_SHA256 = 'aa561c015719afc1c06ea142dca03d3d3bfe3893ca59825a744e593b078748b4'
 
 
 def load_review(root):
@@ -155,6 +155,7 @@ def condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, 
         raise ValueError('The explicit scoped metadata mechanism attachment is required')
     review, group = _validate(attachment, base, root)
     if (branch['id'] not in review['selected_members'] or branch['shape_sha256'] != review['selected_members'][branch['id']]
+            or branch.get('source_file_sha256') != review['source_file_sha256']
             or branch.get('owner_issue') != 177 or branch.get('parent_issue') != 174
             or branch['version'] != review['version'] or branch['build'] != review['build']
             or branch.get('route') is not None or branch.get('kind') != 'metadata_condition'

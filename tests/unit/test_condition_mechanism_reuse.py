@@ -150,7 +150,7 @@ def test_only_the_exact_owned_review_can_attach_without_native_promotion(tmp_pat
     assert bindings == before
 
 
-@pytest.mark.parametrize('damage', ['version', 'build', 'shape', 'owner', 'parent'])
+@pytest.mark.parametrize('damage', ['version', 'build', 'shape', 'source', 'owner', 'parent'])
 def test_native_reuse_does_not_flow_to_another_branch_context(tmp_path, inputs, program, damage):
     bindings, attachment, read = bundle(tmp_path, program)
     attach_condition_mechanisms([write(tmp_path / 'attachment.json', attachment)], bindings, read, tmp_path, ROOT)
@@ -159,6 +159,7 @@ def test_native_reuse_does_not_flow_to_another_branch_context(tmp_path, inputs, 
     if damage == 'version': branch['version'] = '2024.1'
     elif damage == 'build': branch['build'] = '2025.1.0.0'
     elif damage == 'shape': branch['shape_sha256'] = '0' * 64
+    elif damage == 'source': branch['source_file_sha256'] = '0' * 64
     elif damage == 'owner': branch['owner_issue'] = 181
     else: branch['parent_issue'] = 999
     binding = bindings[identity]

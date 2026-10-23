@@ -31,7 +31,7 @@
     "docs/branch-coverage-condition-sources.json": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
     "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz": "b113f5511fa87c21679b99ab46197a7731203b0012d3b8e0052e195fea2e6978",
     "skills/waapi-skill/resources/metadata/2025.1/object-types.json": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d",
-    "tests/unit/test_scalar_condition_product_gateway.py": "934270f31f82fd8672c8b133f7719632310d3d3473b0ab8182795a04109550b6",
+    "tests/unit/test_scalar_condition_product_gateway.py": "3cd42086e1f4e3424f7a133369089bdff6c291f3f3855c4526d9f00ad87b6951",
     "tests/unit/test_conditional_reference_gateway.py": "aa7ccd5207d289dcd07a6e665cfb39ccffed2f89095aafa79bbcac1085d7b89d",
     "tests/unit/test_condition_closure_gateway.py": "4d6bf43a21fef5e9aaf3b640fb0e6ad25d15ff63708f7ecb2c828dd18af115cf"
   },
