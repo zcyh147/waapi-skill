@@ -2259,3 +2259,107 @@ def test_meter_control_rejects_bound_non_meter_object_with_repair(tmp_path: Path
     assert code == 2
     assert "BOUND_OBJECT_ROLE_MISMATCH" in json.dumps(rejected, sort_keys=True)
     assert "AudioDevice" in json.dumps(rejected, sort_keys=True)
+
+
+class _TransportCreateAssociationClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str, observed_object: str, observed_game_object: int = 123) -> None:
+        super().__init__(tmp_path, version=version)
+        self.observed_object = observed_object
+        self.observed_game_object = observed_game_object
+        self.created = False
+        self.calls: list[tuple[str, object, object]] = []
+
+    def call(self, uri: str, args: object = None, options: object = None) -> object:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.transport.create":
+            self.created = True
+            return {"transport": 0}
+        if uri == "ak.wwise.core.transport.getList":
+            return {"list": [{"transport": 0, "object": self.observed_object, "gameObject": self.observed_game_object}]
+                if self.created else []}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_transport_create_wrong_object_cannot_publish_handle(tmp_path: Path, version: str) -> None:
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
+        observed_object=_RuntimeControlDraftClient.meter_id)
+    state_dir = tmp_path / "state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    assert not any(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls)
+    invoke(["execute", previewed["transaction_id"]])
+    before_verify = len(client.calls)
+    code, verified = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verified"] is False
+    assert "agent_result" not in verified
+    assert any(not assertion["passed"] and "object" in assertion["name"]
+        for assertion in verified["verification"]["assertions"])
+    assert sum(uri == "ak.wwise.core.transport.getList" for uri, _, _ in client.calls[before_verify:]) == 1
+    shown = invoke(["transaction-show", previewed["transaction_id"]])
+    assert shown["state"] == "verification_failed"
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_transport_create_wrong_explicit_game_object_cannot_publish_handle(tmp_path: Path, version: str) -> None:
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
+        observed_object=_RuntimeControlDraftClient.target_id)
+    state_dir = tmp_path / "state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        "ak.wwise.core.transport.create", ("--game-object-id", "0"))
+    invoke(["execute", previewed["transaction_id"]])
+    before_verify = len(client.calls)
+    code, verified = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, verified
+    assert verified["state"] == "verification_failed"
+    assert verified["verified"] is False
+    assert "agent_result" not in verified
+    assert any(not assertion["passed"] and "Game Object" in assertion["name"]
+        for assertion in verified["verification"]["assertions"])
+    assert sum(uri == "ak.wwise.core.transport.getList" for uri, _, _ in client.calls[before_verify:]) == 1
+    assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("game_object_id", (None, 0, 18446744073709551615), ids=("native-default", "explicit-zero", "explicit-uint64-max"))
+def test_transport_create_matching_association_publishes_usable_zero_id_handle(
+    tmp_path: Path, version: str, game_object_id: int | None,
+) -> None:
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
+        observed_object="{ABCDEFAB-ABCD-ABCD-ABCD-ABCDEFABCDEF}".lower(),
+        observed_game_object=123 if game_object_id is None else game_object_id)
+    client.target_id = "{ABCDEFAB-ABCD-ABCD-ABCD-ABCDEFABCDEF}"
+    state_dir = tmp_path / "state"
+    declaration = () if game_object_id is None else ("--game-object-id", str(game_object_id))
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state_dir,
+        "ak.wwise.core.transport.create", declaration)
+    assert not any(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    before_verify = len(client.calls)
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["state"] == "verified"
+    assert verified["verified"] is True
+    assert sum(uri == "ak.wwise.core.transport.getList" for uri, _, _ in client.calls[before_verify:]) == 1
+    handle = verified["agent_result"]["business_result"]["transport_handle"]
+    assert handle.startswith("trh1-")
+    state = invoke(["core-call", TRANSPORT_GET_STATE_URI, "--transport-handle", handle])
+    assert state["agent_result"] == {"transport_handle": handle, "state": "stopped"}
+    creates = [args for uri, args, _ in client.calls if uri == "ak.wwise.core.transport.create"]
+    assert creates == [{"object": client.target_id, **({"gameObject": game_object_id} if game_object_id is not None else {})}]
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
