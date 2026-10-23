@@ -32464,6 +32464,14 @@ def transaction_show_summary(
             notice['review_required'] = True
         derived_notice['optional_none_state_materialization'] = notice
 
+    plugin_verification_plan = prepared.get("verification_plan")
+    plugin_name_binding = (plugin_verification_plan.get("name_binding")
+        if isinstance(plugin_verification_plan, Mapping) else None)
+    if isinstance(plugin_name_binding, Mapping):
+        # Keep the requested spelling and permitted native adjustment visible
+        # even when the full verifier/dispatch is summarized for output bounds.
+        derived_notice["plugin_name_binding"] = dict(plugin_name_binding)
+
     # ``transaction-show --summary-only`` predates the bounded projections.
     # Preserve that committed public shape exactly for ordinary transactions;
     # consumers can keep reading exact dispatch, role, pre-state, and verifier

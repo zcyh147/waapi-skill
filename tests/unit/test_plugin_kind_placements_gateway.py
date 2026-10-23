@@ -53,7 +53,7 @@ class KindClient(ShareSetClient):
         return super().call(uri, args, options)
 
 
-def declare(tmp_path, version, client, *, kind=None, placement="shareset", mix=None):
+def declare(tmp_path, version, client, *, kind=None, placement="shareset", mix=None, name="Created"):
     env = configured_env(tmp_path, version=version)
     env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
     code, result = gateway.execute_gateway(["draft-start", "object.createPlugin"], env=env)
@@ -74,7 +74,7 @@ def declare(tmp_path, version, client, *, kind=None, placement="shareset", mix=N
         assert code == 0, fields
         extra = ["--field-value", fields["field_candidates"][0]["handle"], str(mix)]
     code, result = step("draft-declare-existing", "--declaration-id", "plugin", "--object-handle", target["bound_object"]["handle"],
-        "--field", "plugin_role", kind or client.kind, "--field", "plugin_name", "Created", "--field", "plugin_placement", placement,
+        "--field", "plugin_role", kind or client.kind, "--field", "plugin_name", name, "--field", "plugin_placement", placement,
         "--field", "plugin_type_handle", types["type_candidates"][0]["handle"], *extra)
     return code, result, step, env
 
@@ -348,3 +348,170 @@ def test_source_class_disappearing_after_preview_cannot_create_a_child(tmp_path,
     code, result = gateway.execute_gateway(["execute", transaction_id], env=env, client_factory=lambda _: client)
     assert code == 2, result
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in client.calls)
+
+
+class NativeMetadataNameClient(KindClient):
+    # Retained r3 SET result: name adjusted; optional type absent.
+    def __init__(self, version="2025.1", kind="metadata"):
+        super().__init__(version, "metadata" if kind == "effect" else kind)
+        if kind == "effect":
+            self.kind, self.class_id, self.plugin_label, self.native_type = "effect", 7733251, "Wwise RoomVerb", "Effect"
+            self.target["path"] = "\\Effects\\Default Work Unit"
+        self.version = version
+        self.result_name = "R84_System_Output_Settings"
+        self.readback_name = "R84_System_Output_Settings"
+
+    def call(self, uri, args=None, options=None):
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.object.set":
+            result["objects"][0]["children"] = [{"id": PLUGIN, "name": self.result_name}]
+        elif uri == "ak.wwise.core.object.get" and self.created:
+            for row in result.get("return", []):
+                if row.get("id") == PLUGIN:
+                    row["name"] = self.readback_name
+        return result
+
+
+def native_name_preview(tmp_path, client, *, name="R84 System Output Settings"):
+    code, result, step, env = declare(tmp_path, client.version, client, name=name)
+    assert code == 0, result
+    code, result = step("draft-check")
+    assert code == 0, result
+    code, preview = step("preview-from-draft")
+    assert code == 0, preview
+    transaction_id = preview["transaction_id"]
+    code, shown = gateway.execute_gateway(["transaction-show", transaction_id, "--summary-only"], env=env)
+    assert code == 0, shown
+    return transaction_id, shown, env
+
+
+def finish_native_name(transaction_id, env, client):
+    code, shown = gateway.execute_gateway(["transaction-show", transaction_id], env=env)
+    assert code == 0, shown
+    code, result = gateway.execute_gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], env=env)
+    assert code == 0, result
+    code, result = gateway.execute_gateway(["execute", transaction_id], env=env, client_factory=lambda _: client)
+    assert code == 0, result
+    code, result = gateway.execute_gateway(["verify", transaction_id], env=env, client_factory=lambda _: client)
+    assert sum(uri == "ak.wwise.core.object.set" for uri, _, _ in client.calls) == 1
+    return code, result
+
+
+def test_2025_metadata_shareset_accepts_observed_space_name_relation(tmp_path):
+    client = NativeMetadataNameClient()
+    transaction_id, shown, env = native_name_preview(tmp_path, client)
+    code, verified = finish_native_name(transaction_id, env, client)
+    assert code == 0, verified
+    summary = shown["preview_summary"]
+    code, full = gateway.execute_gateway(["transaction-show", transaction_id], env=env)
+    assert code == 0, full
+    requested = full["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]["children"][0]["name"]
+    assert requested == "R84 System Output Settings"
+    policy = summary["plugin_name_binding"]
+    assert policy["requested_name"] == requested
+    assert policy["space_substitution"] == "ASCII spaces may be returned as underscores; other characters are preserved."
+    evidence, = [row["evidence"] for row in verified["verification"]["assertions"] if "name_binding" in row.get("evidence", {})]
+    assert evidence["name"] == "R84_System_Output_Settings"
+    assert evidence["name_binding"]["actual_name"] == "R84_System_Output_Settings"
+    assert evidence["name_binding"]["requested_name"] == requested
+
+
+@pytest.mark.parametrize('fault', ['unrelated-name', 'suffix', 'readback-disagreement', 'wrong-class', 'wrong-parent', 'stale-guid'])
+def test_metadata_space_relation_preserves_identity_and_exact_observations(tmp_path, fault):
+    client = NativeMetadataNameClient()
+    if fault == 'unrelated-name':
+        client.result_name = client.readback_name = 'Other_Metadata'
+    elif fault == 'suffix':
+        client.result_name = client.readback_name = 'R84_System_Output_Settings_01'
+    elif fault == 'readback-disagreement':
+        client.readback_name = 'R84 System Output Settings'
+    elif fault == 'wrong-class':
+        client.plugin_overrides = {'classId': 11403271}
+    elif fault == 'wrong-parent':
+        client.plugin_overrides = {'parent': {'id': '{55555555-5555-5555-5555-555555555555}'}}
+    elif fault == 'stale-guid':
+        client.children = [{'id': PLUGIN, 'name': 'Existing_Metadata', 'type': 'Metadata', 'parent': {'id': PARENT}}]
+    transaction_id, _, env = native_name_preview(tmp_path, client)
+    code, result = finish_native_name(transaction_id, env, client)
+    assert code == 2, result
+    assert result['state'] == 'verification_failed'
+    code, retry = gateway.execute_gateway(['execute', transaction_id], env=env, client_factory=lambda _: client)
+    assert code == 2, retry
+    assert sum(uri == 'ak.wwise.core.object.set' for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('version,kind', [('2022.1', 'metadata'), ('2023.1', 'metadata'), ('2024.1', 'metadata'), ('2025.1', 'sink'), ('2025.1', 'effect')])
+def test_unproved_plugin_profiles_do_not_accept_metadata_space_substitution(tmp_path, version, kind):
+    client = NativeMetadataNameClient(version, kind)
+    transaction_id, shown, env = native_name_preview(tmp_path, client)
+    assert 'plugin_name_binding' not in shown['preview_summary']
+    code, result = finish_native_name(transaction_id, env, client)
+    assert code == 2, result
+    assert result['state'] == 'verification_failed'
+
+
+@pytest.mark.parametrize('when', ['before-preview', 'after-preview'])
+def test_metadata_canonical_name_collision_stops_before_creation(tmp_path, when):
+    client = NativeMetadataNameClient()
+    collision = {'id': '{55555555-5555-5555-5555-555555555555}', 'name': 'R84_System_Output_Settings',
+                 'type': 'Metadata', 'parent': {'id': PARENT}}
+    if when == 'before-preview':
+        client.children = [collision]
+        code, result, step, _ = declare(tmp_path, '2025.1', client, name='R84 System Output Settings')
+        if code == 0:
+            code, result = step('draft-check')
+    else:
+        transaction_id, _, env = native_name_preview(tmp_path, client)
+        code, shown = gateway.execute_gateway(['transaction-show', transaction_id], env=env)
+        assert code == 0, shown
+        code, result = gateway.execute_gateway(['confirm', transaction_id, '--confirmation-token', shown['confirmation']['token']], env=env)
+        assert code == 0, result
+        client.children = [collision]
+        code, result = gateway.execute_gateway(['execute', transaction_id], env=env, client_factory=lambda _: client)
+    assert code == 2, result
+    assert not any(uri == 'ak.wwise.core.object.set' for uri, _, _ in client.calls)
+
+
+def test_metadata_name_omission_is_bound_by_independent_roster_and_exact_readback(tmp_path):
+    class NameOmittedClient(NativeMetadataNameClient):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if uri == 'ak.wwise.core.object.set':
+                result['objects'][0]['children'][0].pop('name')
+            return result
+    client = NameOmittedClient()
+    transaction_id, _, env = native_name_preview(tmp_path, client)
+    code, result = finish_native_name(transaction_id, env, client)
+    assert code == 0, result
+    assert result['state'] == 'verified'
+
+
+@pytest.mark.parametrize('requested,actual', [
+    ('R84 Référence', 'R84_Reference'),
+    ('R84 Settings-Plugin', 'R84_Settings_Plugin'),
+    ('84 Settings', '_84_Settings'),
+])
+def test_metadata_relation_never_guesses_other_identifier_rewrites(tmp_path, requested, actual):
+    client = NativeMetadataNameClient()
+    client.result_name = client.readback_name = actual
+    transaction_id, _, env = native_name_preview(tmp_path, client, name=requested)
+    code, result = finish_native_name(transaction_id, env, client)
+    assert code == 2, result
+    assert result['state'] == 'verification_failed'
+
+
+def test_normalized_metadata_exact_readback_cannot_substitute_guid(tmp_path):
+    class WrongExactGuidClient(NativeMetadataNameClient):
+        def call(self, uri, args=None, options=None):
+            result = super().call(uri, args, options)
+            if (uri == 'ak.wwise.core.object.get' and self.created
+                    and (args or {}).get('from') == {'id': [PLUGIN]}
+                    and not (args or {}).get('transform')):
+                for row in result.get('return', []):
+                    row['id'] = '{99999999-9999-9999-9999-999999999999}'
+            return result
+    client = WrongExactGuidClient()
+    transaction_id, _, env = native_name_preview(tmp_path, client)
+    code, result = finish_native_name(transaction_id, env, client)
+    assert code == 2, result
+    assert result['state'] == 'verification_failed'

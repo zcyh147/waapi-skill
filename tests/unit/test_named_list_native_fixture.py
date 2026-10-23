@@ -63,7 +63,8 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                 def create(node, parent, *, owned=False):
                     role = {collector.REQUESTED['bus']: 'bus', collector.REQUESTED['sound']: 'sound', collector.REQUESTED['slot']: 'slot', collector.METADATA_NAME: 'metadata'}[node['name']]
                     oid = new[role]
-                    name = observed_bus_name if role == 'bus' else node['name']
+                    name = ('R84_System_Output_Settings' if role == 'metadata' else
+                        observed_bus_name if role == 'bus' else node['name'])
                     self.objects[oid] = {'id': oid, 'name': name, 'type': 'PluginInnerObject' if owned else node['type'],
                         'classId': collector.METADATA_CLASS if role == 'metadata' else collector.CLASSES[role], 'notes': '',
                         'path': r'\opaque observed MetadataSlot' if owned else self.objects[parent]['path'] + '\\' + name,
@@ -174,6 +175,8 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         assert observation['independent_created']['sound']['properties']['OverrideOutput'] is True
         assert writes[2][1]['objects'][0]['children'][0]['@OverrideOutput'] is True
         assert observation['independent_slot_reference']['references']['Metadata']['id'] == new['metadata']
+        assert writes[0][1]['objects'][0]['children'][0]['name'] == 'R84 System Output Settings'
+        assert observation['metadata_target']['name'] == 'R84_System_Output_Settings'
         assert observation['metadata_target']['class_id'] == 58982409
         assert observation['created']['bus']['name'] == observed_bus_name
         assert observation['independent_created']['slot']['type'] == 'PluginInnerObject'
