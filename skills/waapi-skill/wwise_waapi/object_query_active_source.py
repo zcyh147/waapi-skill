@@ -92,14 +92,17 @@ def _selected_source(sound, candidates, language):
 def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], platform: str,
                                language: str, return_fields: tuple[str, ...], live_info: Mapping[str, Any],
                                project_before: Mapping[str, Any] | None = None, broad: bool = False,
-                               maximum_rows: int = MAX_QUERY_TAKE):
+                               maximum_rows: int = MAX_QUERY_TAKE, selector_preview: Callable | None = None):
     """Return the unchanged requested Sound row plus an independently joined reference.
 
     No row order, import return value or serialized project file is an oracle.
     Repeat observations detect changes; they are not an atomic project lock.
     """
-    def rows(*, maximum=MAX_QUERY_TAKE, **kwargs):
-        preview = build_object_get_query(version="2021.1", **kwargs)
+    def rows(*, maximum=MAX_QUERY_TAKE, preview_factory=None, **kwargs):
+        # The Gateway can supply its already metadata-bound filtered selector.
+        # Children/catalog/project reads still use the proven ordinary builder.
+        preview = (preview_factory(kwargs['return_fields'],view) if preview_factory is not None
+                   else build_object_get_query(version="2021.1", **kwargs))
         result = read(preview.envelope.uri, preview.envelope.args, preview.envelope.options)
         values = result.get("return") if isinstance(result, Mapping) else None
         if not isinstance(values, list) or len(values) > maximum or any(not isinstance(row, Mapping) for row in values):
@@ -147,7 +150,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
     before_project = ({**_identity(project_before), "filePath": project_before["filePath"]}
                       if project_before is not None else project())
     fields = tuple(dict.fromkeys((*return_fields, *SOURCE_FACTS)))
-    before, preview = rows(**selector, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
+    before, preview = rows(**selector, preview_factory=selector_preview, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
     if not before and not broad:
         return [], preview, {"method": "unique_same_view_original_path", "sound_count": 0}, before_project
     owners = {}
@@ -202,7 +205,7 @@ def resolve_2021_active_source(*, read: Callable, selector: Mapping[str, Any], p
     if children() != before_children:
         _fail("ACTIVE_SOURCE_OBSERVATION_CHANGED", "Source membership or selection facts changed during observation.")
     after_selector = selector if broad else {"object_id": owner_ids[0]}
-    after, _ = rows(**after_selector, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
+    after, _ = rows(**after_selector, preview_factory=selector_preview, return_fields=fields, maximum=maximum_rows if broad else 1, **view)
     def owner_facts(values):
         return [_sound_facts(row) if row.get("type") == "Sound" else dict(row) for row in values]
     if owner_facts(after) != owner_facts(before) or project() != before_project:
