@@ -265,6 +265,7 @@ TRANSPORT_CREATE_URI = "ak.wwise.core.transport.create"
 TRANSPORT_DESTROY_URI = "ak.wwise.core.transport.destroy"
 TRANSPORT_GET_LIST_URI = "ak.wwise.core.transport.getList"
 TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
+TRANSPORT_EXECUTE_ACTION_URI = "ak.wwise.core.transport.executeAction"
 CLI_CONVERT_EXTERNAL_SOURCE_URI = "ak.wwise.cli.convertExternalSource"
 AUTHORING_AUDIO_CONVERT_URI = "ak.wwise.core.audio.convert"
 CLI_EXECUTE_LUA_URI = "ak.wwise.cli.executeLuaScript"
@@ -4674,6 +4675,11 @@ def _public_call_verification_plan(
             "strategy": "operation_specific_readback",
             "base_result_strategy": strategy,
         }
+    if api == TRANSPORT_EXECUTE_ACTION_URI:
+        return {"kind": "transport-action-state", **common,
+            "strategy": "operation_specific_readback", "base_result_strategy": strategy,
+            "action": args["action"],
+            **({"transport_id": args["transport"]} if "transport" in args else {})}
     if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} and version in {"2023.1", "2024.1", "2025.1"}:
         return {"kind": "log-channel-effect", **common, "strategy": "operation_specific_readback",
             "base_result_strategy": strategy, "channel": args.get("channel", "general"),
@@ -11575,6 +11581,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
                 else None
             ),
         )
+        if api == TRANSPORT_EXECUTE_ACTION_URI:
+            from .transport_action import snapshot as transport_action_snapshot
+            try:
+                metadata["transport_action_before"] = transport_action_snapshot(call_args, version=request.version, read=read)
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_TRANSPORT_OBSERVATION", str(exc)) from exc
+            verification["before"] = metadata["transport_action_before"]
         if api in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI}:
             from .runtime_log_effects import channel_snapshot
             host = read(GET_INFO_URI, {}, {})
@@ -16952,6 +16965,22 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall,
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == TRANSPORT_EXECUTE_ACTION_URI:
+            from .transport_action import snapshot as transport_action_snapshot
+            def action_guard_read(uri, args, options):
+                result = read_call(uri, args, options)
+                readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": result})
+                return result
+            before = prepared.get("pre_state", {}).get("transport_action_before")
+            try:
+                current = transport_action_snapshot(call_args, version=version, read=action_guard_read)
+            except (ValueError, SemanticValidationError) as exc:
+                current = {"error": str(exc)}
+            if not isinstance(before, Mapping) or dict(before) != current:
+                return {"contract": ROLE_VALIDATION_CONTRACT, "operation": operation, "ok": False,
+                    "status": "repreview_required", "assertions": [{"name": "Transport targets and toggle prestate remain unchanged",
+                        "passed": False, "evidence": {"expected": before, "actual": current,
+                            "transport_mutation_dispatched": False}}], "readbacks": readbacks}
         if api == SAVE_CAPTURE_URI:
             try:
                 validate_capture_artifact(prepared.get("verification_plan", {}), call_args,
@@ -20233,6 +20262,55 @@ def verify_prepared_operation(
                         {"returned_time_ms": returned_time, "observed_time_ms": observed_time})
                     business_state_verified = matches and all(item["passed"] for item in assertions)
             readbacks.append(observation)
+    elif kind == "transport-action-state":
+        from .transport_action import expected_state, snapshot as transport_action_snapshot
+        uri, version, action = plan.get("uri"), plan.get("version"), plan.get("action")
+        before = plan.get("before")
+        if (uri != TRANSPORT_EXECUTE_ACTION_URI or not isinstance(version, str)
+                or action not in {"play", "stop", "pause", "playStop", "playDirectly"}
+                or not isinstance(before, Mapping) or not isinstance(before.get("targets"), list)):
+            raise OperationContractError("INVALID_PREVIEW", "Transport action lacks its bound URI/version/action/targets.")
+        business_state_verified = False
+        success_status = "result_schema_checked"
+        verification_strength = "bounded_transport_state_observation"
+        check_result_schema(uri, version)
+        args = {"action": "stop", **({"transport": plan["transport_id"]} if "transport_id" in plan else {})}
+        def action_read(uri, args, options):
+            return verified_readback(uri, args, version=version)
+        try:
+            current = transport_action_snapshot(args, version=version, read=action_read)
+        except OperationContractError:
+            raise
+        except (ValueError, SemanticValidationError) as exc:
+            check("Transport target associations remain observable", False, {"error": str(exc)})
+            current = {"scope": before.get("scope"), "targets": []}
+        expected_rows = [{key: row[key] for key in ("transport", "object", "gameObject")} for row in before["targets"]]
+        same_targets = expected_rows == current["targets"] and before.get("scope") == current.get("scope")
+        check("Transport target associations match the bounded Preview scope", same_targets,
+            {"before": expected_rows, "observed": current["targets"]})
+        observation = {"kind": "transport-action-observation", "action": action,
+            "scope": before.get("scope"), "membership_matches": same_targets, "targets": []}
+        if same_targets:
+            for target in before["targets"]:
+                native_id = target["transport"]
+                observed = verified_readback(TRANSPORT_GET_STATE_URI, {"transport": native_id}, version=version)
+                state = observed.get("state")
+                expected, unresolved = expected_state(action, target)
+                valid_state = isinstance(state, str) and state in TRANSPORT_STATES
+                check("Selected transport has a valid observed state", valid_state, {"transport": native_id, "state": state})
+                outcome = ("malformed" if not valid_state else "semantics_unresolved" if unresolved else
+                    "matched" if state == expected else "transient_play_unobserved" if expected == "playing" else "different_state")
+                if outcome == "different_state":
+                    check("Selected transport matches the requested state at observation", False,
+                        {"transport": native_id, "expected": expected, "observed": state})
+                observation["targets"].append({"transport": native_id, "before_state": target.get("state"),
+                    "expected_state": expected, "observed_state": state, "outcome": outcome,
+                    **({"unresolved": unresolved} if unresolved else {})})
+        readbacks.append(observation)
+        business_state_verified = (bool(observation["targets"]) and same_targets
+            and all(row["outcome"] == "matched" for row in observation["targets"])
+            and all(item["passed"] for item in assertions))
+        success_status = "verified" if business_state_verified else "result_schema_checked"
     elif kind == "transport-created":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -24675,6 +24753,15 @@ def verify_prepared_operation(
             "The saved project was observed; explicit-empty collection effects remain unresolved. Do not replay the executed call.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "transport-action-state":
+        message = ("Requested transport states matched one bounded observation. Continuing playback, causality and an atomic all-transport snapshot are unverified."
+            if outcome.business_state_verified else
+            "The later transport observation did not establish every requested state. Transient playback may have ended before observation; unresolved action semantics remain explicit. Do not replay the executed action.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified,
+            {"comparison": "one_state_read_per_preview_target", "continuous_state_verified": False,
+                "atomic_scope_verified": False, "causality_verified": False,
+                "observation": next((dict(row) for row in outcome.readbacks if row.get("kind") == "transport-action-observation"), {})})
     if kind == "log-channel-effect":
         observation = next((dict(row) for row in outcome.readbacks if row.get("kind") == "log-channel-observation"), {"outcome": "malformed_control_result"})
         message = ("The requested log effect was observed in one bounded channel comparison. Concurrent identical writers, individual entry identity and continuing channel state are unverified."
