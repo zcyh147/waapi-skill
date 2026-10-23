@@ -2566,6 +2566,12 @@ def normalize_live_object_identity(row: Any, *, owned_identity=None, version: st
     )
     reviewed_relative_display_path = (
         path in object_identity_semantics(object_type).relative_display_paths
+        # Matching 2021.1 Console and Authoring observations return a Platform's
+        # exact name as its display path. Keep this version/type-bound; the
+        # canonical GUID remains its identity, never this text as a selector.
+        or (version == "2021.1" and object_type == "Platform" and path == name
+            and not any(ord(character) < 32 or ord(character) == 127
+                        or character in {"\\", "/"} for character in path))
         # R68 exact-GUID observations on pinned 2024/25: BlendTrack path is
         # its intrinsic name. This is comparison text, never a hierarchy path.
         or (version in {"2024.1", "2025.1"} and object_type == "BlendTrack"

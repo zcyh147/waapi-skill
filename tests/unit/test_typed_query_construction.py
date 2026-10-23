@@ -1404,7 +1404,7 @@ def test_short_id_query_rejects_unbound_or_duplicate_native_candidates(tmp_path:
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
 
 
-def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
+def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX", platform_rows=None):
     sound = "{11111111-1111-1111-1111-111111111111}"
     inactive = "{22222222-2222-2222-2222-222222222222}"
     active = "{33333333-3333-3333-3333-333333333333}"
@@ -1440,7 +1440,8 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
             if query.startswith("from type Project"):
                 rows = [{"id": project, "name": "Fixture", "type": "Project", "path": "\\", "filePath": str(project_file)}]
             elif query.startswith("from type Platform"):
-                rows = [{"id": platform, "name": "Mac", "type": "Platform", "path": r"\Platforms\Mac"}]
+                rows = (platform_rows if platform_rows is not None else
+                        [{"id": platform, "name": "Mac", "type": "Platform", "path": r"\Platforms\Mac"}])
             elif query.startswith("from type Language"):
                 rows = [{"id": language, "name": language_name, "type": "Language", "path": "\\Languages\\" + language_name}]
                 if language_name != "SFX":
@@ -1490,6 +1491,65 @@ def _legacy_active_source_client(tmp_path, *, fault=None, language_name="SFX"):
                     rows[0]["parent"] = project
             return {"return": [{key: row[key] for key in options["return"] if key in row} for row in rows]}
     return Client("2021.1"), {"sound": sound, "active": active, "platform": platform, "language": language}
+
+
+@pytest.mark.parametrize("platform_selector", ["Mac", "{9C6217D5-DD11-4795-87C1-6CE02853C541}"])
+def test_2021_active_source_accepts_recorded_platform_display_identity_through_public_query(tmp_path, platform_selector):
+    # Exact Platform page from R99's 2021.1.14.8108 Authoring failure. The same
+    # Mac identity/path was retained by the earlier 2021 Console diagnostic.
+    platform_rows = [
+        {"id": "{09E4BEE8-33E7-492C-8B46-23DCF321E848}", "name": "WwiseAuthoringPlayback",
+         "type": "Platform", "path": "WwiseAuthoringPlayback"},
+        {"id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}", "name": "Windows", "type": "Platform", "path": "Windows"},
+        {"id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}", "name": "Mac", "type": "Platform", "path": "Mac"},
+    ]
+    client, ids = _legacy_active_source_client(tmp_path, platform_rows=platform_rows)
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"],
+        "--platform", platform_selector, "--language", "SFX", "--include", "active-source", "--detail"],
+        env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"] == [{"id": ids["sound"], "name": "Rain", "type": "Sound", "path": r"\Sounds\Rain",
+        "active_source": {"id": ids["active"], "name": "Beta"}}]
+    assert list(result)[-1] == "agent_result"
+    proof = result["active_source_resolution"]
+    assert proof["platform"] == platform_rows[2]
+    assert proof["language"] == {"id": ids["language"], "name": "SFX", "type": "Language", "path": r"\Languages\SFX"}
+    assert proof["complete"] and proof["stable_observation"]
+    assert proof["sound_count"] == 1 and proof["source_count"] == 2
+    observations = [(args, options) for uri, args, options in client.calls
+        if uri.endswith("object.get") and ids["sound"] in args.get("waql", "")]
+    assert len(observations) == 4
+    assert all(options["platform"] == "{9C6217D5-DD11-4795-87C1-6CE02853C541}"
+               and options["language"] == ids["language"] for _, options in observations)
+    assert all("activeSource" not in options["return"] for _, options in observations)
+
+
+@pytest.mark.parametrize("change,expected", [
+    ({"path": "Windows"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": "Mac/Child", "path": "Mac/Child"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": "Mac\\Child", "path": "Mac\\Child"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": "Mac\x00", "path": "Mac\x00"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": "Mac\nChild", "path": "Mac\nChild"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": "Mac\x7fChild", "path": "Mac\x7fChild"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": " ", "path": " "}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"name": "x" * 513, "path": "x" * 513}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"path": None}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"id": "{00000000-0000-0000-0000-000000000000}"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"id": "not-a-guid"}, "ACTIVE_SOURCE_INVALID_OBSERVATION"),
+    ({"type": "Sound"}, "ACTIVE_SOURCE_SELECTION_UNRESOLVED"),
+])
+def test_2021_active_source_rejects_invalid_platform_identity_before_source_reads(tmp_path, change, expected):
+    selected_id = "{9C6217D5-DD11-4795-87C1-6CE02853C541}"
+    rows = [{"id": selected_id, "name": "Mac", "type": "Platform", "path": "Mac", **change}]
+    client, ids = _legacy_active_source_client(tmp_path, platform_rows=rows)
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", ids["sound"],
+        "--platform", selected_id, "--language", "SFX", "--include", "active-source"],
+        env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == expected, result
+    assert not result.get("agent_result") and not result.get("continuations")
+    assert result["details"]["native_absence_proven"] is False
+    assert client.child_reads == 0 and client.sound_reads == 0
+    assert all("activeSource" not in options.get("return", ()) for _, _, options in client.calls)
 
 
 @pytest.mark.parametrize("language_name", ["SFX", "English(US)"])
