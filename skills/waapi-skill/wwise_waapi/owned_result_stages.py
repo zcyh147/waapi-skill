@@ -168,6 +168,7 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
                     prune(raw, child['request_path'])
     stages = []
     if uri == SET and creation_stage_count(specs) > 1:
+        started_lists = set()
         for root, paths in creation_chunks(specs):
             parent = by_path[root['parent_request_path']]
             retained = parent
@@ -181,6 +182,14 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
                 native_parent = native_node(creation, parent['request_path'], specs)
                 if 'platform' in native_parent:
                     parent_args['platform'] = native_parent['platform']
+            list_key = (parent['request_path'], root.get('collection'))
+            if root['request_path'] in list_paths:
+                # The first call preserves the declared empty replacement.
+                # Later fragments append to its proven owned partial roster;
+                # repeating replaceAll would delete earlier created members.
+                if list_key in started_lists and parent_args.get('listMode', creation.get('listMode', 'append')) == 'replaceAll':
+                    parent_args['listMode'] = 'append'
+                started_lists.add(list_key)
             chunk = deepcopy(native_node(creation, root['request_path'], specs))
             prune(chunk, root['request_path'])
             stages.append({'root': root['request_path'], 'parent': parent['request_path'], 'node_paths': paths,

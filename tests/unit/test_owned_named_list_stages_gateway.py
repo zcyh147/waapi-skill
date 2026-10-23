@@ -12,9 +12,10 @@ SET = 'ak.wwise.core.object.set'
 
 
 OLD_SLOT = '{88888888-8888-8888-8888-888888888888}'
+SECOND_SLOT = '{99999999-9999-9999-9999-999999999999}'
 
 
-def named_list_task(tmp_path, *, retained=False, fault=None, reference=True):
+def named_list_task(tmp_path, *, retained=False, fault=None, reference=True, empty_replace_two=False):
     task = OwnedGraphTask(tmp_path, '2025.1', 'object.set')
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for name, cid in (
         ('WorkUnit', 1638416), ('Bus', 1376272), ('Sound', 65552), ('MetadataSlot', 5570560))]
@@ -32,10 +33,14 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True):
             'notes': 'Keep sound', '@Metadata': [{'id': OLD_SLOT}]}
         task.objects[OLD_SLOT] = {'id': OLD_SLOT, 'name': 'Old slot', 'type': 'PluginInnerObject', 'classId': 5570560,
             'path': r'\opaque-old-slot', 'owner': {'id': FIRST}, 'parent': None, 'notes': 'Keep old slot'}
+        if empty_replace_two:
+            task.objects[FIRST]['@Metadata'] = []
+            del task.objects[OLD_SLOT]
     task.metadata = {'OutputBus': {'name': 'OutputBus', 'type': 'Reference',
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['Bus']}]}}}
     original = task.call
     task.writes = []
+    task.partial_list_drift_injected = False
     def call(uri, args=None, options=None):
         if uri == SET:
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -43,7 +48,8 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True):
             results = []
             def create(node, parent, owned=False):
                 oid, actual, cid = {'Routing': (BUS, 'Routing19', 1376272),
-                    'Sender': (SOUND, 'Sender', 65552), 'Room slot': (SLOT, 'Room slot', 5570560)}[node['name']]
+                    'Sender': (SOUND, 'Sender', 65552), 'Room slot': (SLOT, 'Room slot', 5570560),
+                    'Second slot': (SECOND_SLOT, 'Second slot', 5570560)}[node['name']]
                 task.objects[oid] = {'id': oid, 'name': actual, 'type': 'PluginInnerObject' if owned else node['type'],
                     'classId': cid, 'notes': '', 'path': (r'\opaque-slot-path' if owned else task.objects[parent]['path'] + '\\' + actual),
                     **({'owner': {'id': parent}, 'parent': None} if owned else {'parent': {'id': parent}})}
@@ -63,6 +69,10 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True):
                         members = [create(child, parent, key == '@Metadata') for child in value]
                         row[key] = members
                         if key == '@Metadata':
+                            if node.get('listMode', args.get('listMode', 'append')) == 'replaceAll':
+                                for previous in task.objects[parent].get(key, []):
+                                    del task.objects[previous['id']]
+                                task.objects[parent][key] = []
                             task.objects[parent].setdefault(key, []).extend({'id': member['id']} for member in members)
                     elif key == '@OutputBus':
                         target = next(item for item in task.objects.values() if item['path'] == value)
@@ -82,11 +92,27 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True):
                 elif fault == 'changed-prefix':
                     task.objects[OLD_SLOT]['notes'] = 'Unrequested change'
             return {'objects': results}
-        return original(uri, args, options)
+        result = original(uri, args, options)
+        if (fault in {'removed-first-member', 'changed-first-member'} and not task.partial_list_drift_injected
+                and len(task.writes) == 2 and SLOT in task.objects
+                and uri == 'ak.wwise.core.object.get'
+                and args == {'from': {'id': [ROOT]}, 'transform': [{'select': ['children']}]}
+                and options == {'return': ['id']}):
+            # External drift after the first member's full binding/preservation
+            # reads, before the next creation's prewrite roster observation.
+            task.partial_list_drift_injected = True
+            if fault == 'removed-first-member':
+                task.objects[FIRST]['@Metadata'] = []
+            else:
+                task.objects[SLOT]['notes'] = 'Unrequested first-member change'
+        return result
     task.call = call
     parents = [task.bind(oid) for oid in (PROJECT_GROUP, SECOND)]
     code, configured = task.step('draft-business-configure', '--name-conflict', 'rename')
     assert code == 0, configured
+    if empty_replace_two:
+        code, configured = task.step('draft-business-configure', '--name-conflict', 'rename', '--list-behavior', 'replace-all')
+        assert code == 0, configured
     kinds = {}
     for name in ('Bus', 'Sound', 'MetadataSlot'):
         code, selected = task.step('draft-discover-types', '--role', 'object', '--meaning', name)
@@ -114,7 +140,33 @@ def named_list_task(tmp_path, *, retained=False, fault=None, reference=True):
     assert code == 0, sound
     code, slot = task.step('draft-declare-new', '--declaration-id', 'slot', '--parent-handle', retained_handle if retained else sound['draft']['declared_object']['result_handle'], '--name', 'Room slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field)
     assert code == 0, slot
+    if empty_replace_two:
+        code, slot2 = task.step('draft-declare-new', '--declaration-id', 'slot2', '--parent-handle', retained_handle,
+            '--name', 'Second slot', '--kind', kinds['MetadataSlot'], '--field', 'object_list', list_field)
+        assert code == 0, slot2
     return task
+
+
+def test_empty_replace_list_two_staged_members_survive_and_verify(tmp_path):
+    task = named_list_task(tmp_path, retained=True, empty_replace_two=True)
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True, verified
+    assert task.objects[FIRST]['@Metadata'] == [{'id': SLOT}, {'id': SECOND_SLOT}]
+    assert all(task.objects[oid]['owner'] == {'id': FIRST} for oid in (SLOT, SECOND_SLOT))
+    assert task.objects[SLOT]['name'] == 'Room slot' and task.objects[SECOND_SLOT]['name'] == 'Second slot'
+    assert all(task.objects[oid] == row for oid, row in before.items() if oid != FIRST)
+    assert task.objects[FIRST]['notes'] == before[FIRST]['notes']
+    assert task.objects[FIRST]['@OutputBus'] == {'id': BUS}
+    assert len(task.writes) == 4
+    assert task.writes[0]['listMode'] == task.writes[1]['listMode'] == 'replaceAll'
+    assert task.writes[2]['objects'][0]['listMode'] == 'append'
+    assert task.writes[1]['objects'][0]['@Metadata'] == [{'type': 'MetadataSlot', 'name': 'Room slot'}]
+    assert task.writes[2]['objects'][0]['@Metadata'] == [{'type': 'MetadataSlot', 'name': 'Second slot'}]
+    assert task.writes[-1] == {'objects': [{'object': FIRST, '@OutputBus': task.objects[BUS]['path']}]}
+    roster = verified['agent_result']['business_result']['created_objects']
+    assert {row['object']['id'] for row in roster} == {BUS, SLOT, SECOND_SLOT}
 
 
 def test_native_named_set_proves_named_list_owner_and_all_public_occurrences(tmp_path):
@@ -226,3 +278,31 @@ def test_named_list_verification_requires_retained_ordered_membership_read(tmp_p
     assert code == 2 and failed.get('verified') is not True, failed
     assert 'Owned creation stage lost its exact read association' in json.dumps(failed), failed
     assert task.run('execute', tx)[0] == 2 and len(task.writes) == 3
+
+
+@pytest.mark.parametrize('fault', ['removed-first-member', 'changed-first-member'])
+def test_empty_replace_continuation_rechecks_first_member_before_later_write(tmp_path, fault):
+    task = named_list_task(tmp_path, retained=True, empty_replace_two=True, fault=fault)
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, failed = task.run('execute', tx)
+    assert code == 2 and failed.get('executed') is not True, failed
+    assert task.partial_list_drift_injected is True
+    proof = failed['dispatch_result']['owned_result_execution']
+    assert len(proof['stages']) == 2 and len(proof['creation_bindings']) == 3
+    assert proof['creation_bindings'][2]['before_readbacks']
+    assert any(row['options'] == {'return': ['id', '@Metadata']}
+        and row['result']['return'] == [{'id': FIRST, '@Metadata': [{'id': SLOT}]}]
+        for row in proof['creation_bindings'][1]['readbacks'])
+    assert len(task.writes) == 2 and SECOND_SLOT not in task.objects
+    assert '@OutputBus' not in task.objects[FIRST]
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 2
+
+
+def test_nonempty_replace_list_still_stops_before_any_source_write(tmp_path):
+    task = named_list_task(tmp_path, retained=True)
+    code, configured = task.step('draft-business-configure', '--name-conflict', 'rename', '--list-behavior', 'replace-all')
+    assert code == 0, configured
+    code, rejected = task.step('draft-check')
+    assert code == 2 and rejected['error_code'] == 'PLANNED_REFERENCE_STAGING_UNAVAILABLE', rejected
+    assert task.writes == [] and task.objects[FIRST]['@Metadata'] == [{'id': OLD_SLOT}]
