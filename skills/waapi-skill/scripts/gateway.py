@@ -33061,16 +33061,25 @@ def transaction_post_execution_project_guard_policy(
             "Prepared request does not match the immutable transaction request"
         )
     dispatch_payload = require_mapping(prepared.get("dispatch"), "prepared dispatch")
+    pre_state = require_mapping(prepared.get("pre_state"), "prepared pre-state")
+    expected_args = dict(require_mapping(arguments.get("args", {}), "waapi.call args"))
+    if api == "ak.wwise.core.blendContainer.addAssignment" and "blend_assignment" in pre_state:
+        from wwise_waapi.blend_assignment import materialize_index
+        plan = require_mapping(pre_state["blend_assignment"], "sealed Blend assignment plan")
+        before = require_mapping(plan.get("before"), "sealed Blend assignment before state")
+        assignments = before.get("assignments")
+        if not isinstance(assignments, list):
+            raise GatewayInputError("Blend index materialization requires its sealed assignment snapshot")
+        expected_args = materialize_index(expected_args, len(assignments))
     expected_dispatch = {
         "uri": api,
-        "args": dict(require_mapping(arguments.get("args", {}), "waapi.call args")),
+        "args": expected_args,
         "options": dict(require_mapping(arguments.get("options", {}), "waapi.call options")),
     }
     if dispatch_payload != expected_dispatch:
         raise GatewayInputError(
             "Prepared dispatch does not match the immutable transaction request"
         )
-    pre_state = require_mapping(prepared.get("pre_state"), "prepared pre-state")
     sealed_contract = require_mapping(
         pre_state.get("execution_contract"),
         "prepared execution contract",

@@ -186,3 +186,30 @@ def test_blend_collector_oversized_final_receipt_keeps_bounded_partial_or_catego
     assert all(hashlib.sha256(Path(row["path"]).read_bytes()).hexdigest() == row["sha256"] for row in persisted)
     assert [cmd[0] for cmd in commands].count("execute") == [cmd[0] for cmd in commands].count("verify") == 1
     assert sum(uri == task.uri for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("fault", [None, "verify"])
+def test_blend_collector_category_survives_actual_existing_category_writer(tmp_path, workflow, monkeypatch, fault):
+    from tests.destructive.support.category_evidence import append_category_evidence, exact_transaction_outcomes
+    runtime, task, commands = blend_runtime(tmp_path, workflow, monkeypatch, fault=fault)
+    if fault:
+        with pytest.raises(AssertionError): workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    else:
+        workflow.test_blend_assignment_negative_index_order_preservation(runtime)
+    target = tmp_path / "actual-category-writer.jsonl"
+    monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    node = "tests/destructive/test_gateway_workflow_transaction_matrix.py::test_blend_assignment_negative_index_order_preservation"
+    outcome = "FAIL" if fault else "PASS"
+    append_category_evidence(repo_root=tmp_path, candidate="a" * 40, version=runtime.version,
+        host=task.info, categories=runtime.category_results, source={"program_only": True},
+        residual_state={"sandbox": "retained" if fault else "deleted", "quarantine_path": None},
+        invocation={"selected_test_nodeids": [node], "started_at_unix_ns": 1, "finished_at_unix_ns": 2,
+            "outcome": outcome, "node_outcomes": [{"nodeid": node, "outcome": outcome}], "phase": "final"},
+        transactions=exact_transaction_outcomes(runtime.state_dir))
+    record = json.loads(target.read_text())
+    category, = record["categories"]
+    tx, = record["transactions"]
+    assert record["invocation"]["outcome"] == category["status"] == outcome
+    assert category["verifier_strength"] == "blend_assignment_order_and_observed_preservation"
+    assert tx["state"] == ("verification_failed" if fault else "verified")
+    assert [cmd[0] for cmd in commands].count("execute") == 1

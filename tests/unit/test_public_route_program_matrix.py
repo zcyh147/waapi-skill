@@ -99,6 +99,20 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert event_validation.section == "event"
         return
 
+    if entry.uri == "ak.wwise.core.blendContainer.addAssignment":
+        # Complete live owner/index facts are mandatory; synthesized schema
+        # arguments and an empty observation cannot prepare this public route.
+        from tests.unit.test_core_business_gateway import _BlendAssignmentTask
+        task = _BlendAssignmentTask(tmp_path, entry.version)
+        task.preview(-9)
+        assert task.artifact["dispatch"]["args"]["index"] == 0
+        assert task.artifact["verification_plan"]["requested_index"] == -9
+        assert task.execute()[0] == 0
+        verified = task.run("verify", task.tx)
+        assert verified["verification"]["business_state_verified"] is True
+        assert sum(uri == entry.uri for uri, _, _ in task.calls) == 1
+        return
+
     if entry.uri == "ak.wwise.core.sourceControl.setProvider":
         # The closed route requires a private-profile proof. Synthesized native
         # arguments cannot replace that public binding or bypass confidentiality.
