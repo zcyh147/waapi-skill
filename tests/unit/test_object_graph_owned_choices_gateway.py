@@ -124,6 +124,16 @@ def test_documented_arguments_assigns_existing_references_with_order_and_preserv
         for uri, args, _ in task.calls)
 
 
+CONSTRUCTOR_METADATA = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+
+
+def _metadata_constructor_fields(task, kind):
+    target = task.bind(CONSTRUCTOR_METADATA)
+    code, selected = task.step("draft-discover-fields", "--type-handle", kind, "--meaning", "Metadata")
+    assert code == 0, selected
+    return ["--field-value", selected["meaning_results"][0]["candidates"][0]["handle"], target]
+
+
 def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, select=True, list_name="Metadata", clear=True, operation="object.set"):
     task = OwnedGraphTask(tmp_path, version, operation)
     task.require_class_projection = True
@@ -142,6 +152,13 @@ def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, 
         "notes": "Keep sound", accessor: [{"id": CHILD}]}
     task.objects[CHILD] = {"id": CHILD, "name": list_name, "type": "RTPC" if list_name == "RTPC" else "PluginInnerObject", "classId": element_class,
         "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "parent": None, "notes": "Old slot"}
+    if version == "2025.1" and list_name == "Metadata":
+        task.types.append({"classId": 58982409, "name": "Wwise System Output Settings", "type": "Metadata"})
+        task.objects[CONSTRUCTOR_METADATA] = {"id": CONSTRUCTOR_METADATA, "name": "System settings", "type": "Metadata",
+            "classId": 58982409, "path": r"\Metadata\Default Work Unit\System settings", "parent": None, "notes": "Keep target"}
+        task.objects[CHILD]["@Metadata"] = {"id": CONSTRUCTOR_METADATA}
+        task.metadata["Metadata"] = {"name": "Metadata", "type": "Reference",
+            "restriction": {"type": "reference", "restrictions": [{"type": ["Metadata"]}, "notNull"]}}
     owner = task.bind(FIRST)
     task.list_owner_handle = owner
     field = list_name
@@ -190,9 +207,10 @@ def test_documented_metadata_list_handle_constructs_member_and_verifies_actual_c
     code, selected = task.step("draft-discover-fields", "--object-handle", task.list_owner_handle,
         "--field-source", "documented-lists", "--selection", choice["selection"])
     field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    required = [] if fault == "wrong-requested-class" else _metadata_constructor_fields(task, kind)
     code, created = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", task.list_owner_handle,
         "--name", "New metadata", "--kind", kind, "--field", "object_list", field,
-        "--field", "list_behavior", "replace-all")
+        "--field", "list_behavior", "replace-all", *required)
     assert code == 0, created
     if fault == "wrong-requested-class":
         code, rejected = task.step("draft-check")
@@ -202,18 +220,18 @@ def test_documented_metadata_list_handle_constructs_member_and_verifies_actual_c
     if fault == "reversed-effect-order":
         code, created = task.step("draft-declare-new", "--declaration-id", "second-slot", "--parent-handle", task.list_owner_handle,
             "--name", "Second metadata", "--kind", kind, "--field", "object_list", field,
-            "--field", "list_behavior", "replace-all")
+            "--field", "list_behavior", "replace-all", *required)
         assert code == 0, created
     original = task.call
     def call(uri, args=None, options=None):
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            expected_nodes = [{"type": "MetadataSlot", "name": "New metadata"}]
+            expected_nodes = [{"type": "MetadataSlot", "name": "New metadata", "@Metadata": CONSTRUCTOR_METADATA}]
             if fault == "reversed-effect-order":
-                expected_nodes.append({"type": "MetadataSlot", "name": "Second metadata"})
+                expected_nodes.append({"type": "MetadataSlot", "name": "Second metadata", "@Metadata": CONSTRUCTOR_METADATA})
             assert args["objects"] == [{"object": FIRST, "listMode": "replaceAll", "@Metadata": expected_nodes}]
             task.objects[CHILD] = {"id": CHILD, "name": "New metadata", "type": "MetadataSlot", "classId": 5570560,
-                "path": task.objects[FIRST]["path"] + r"\New metadata", "owner": {"id": FIRST}, "parent": None, "notes": ""}
+                "path": task.objects[FIRST]["path"] + r"\New metadata", "owner": {"id": FIRST}, "parent": None, "notes": "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
             task.objects[FIRST]["@Metadata"] = [{"id": CHILD}]
             if fault == "native-generic-type":
                 task.objects[CHILD]["type"] = "PluginInnerObject"
@@ -277,9 +295,10 @@ def test_documented_list_handle_places_created_root_and_verifies_native_class_ow
     code, types = task.step("draft-discover-types", "--role", "object", "--meaning", "Sound" if fault == "wrong-requested-class" else "MetadataSlot")
     assert code == 0, types
     owner = task.bind(SECOND) if fault == "wrong-handle-owner" else task.list_owner_handle
+    required = [] if fault in {"wrong-requested-class", "wrong-handle-owner"} else _metadata_constructor_fields(task, types["type_candidates"][0]["handle"])
     code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", owner,
         "--name", "New metadata", "--kind", types["type_candidates"][0]["handle"],
-        "--field", "object_list", task.list_field_handle)
+        "--field", "object_list", task.list_field_handle, *required)
     if fault == "wrong-handle-owner":
         assert code == 2 and declared["error_code"] == "DOCUMENTED_LIST_SELECTION_REQUIRED", declared
         assert "choices" in json.dumps(declared)
@@ -296,12 +315,12 @@ def test_documented_list_handle_places_created_root_and_verifies_native_class_ow
         if uri == "ak.wwise.core.object.create":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args == {"parent": FIRST, "type": "MetadataSlot", "name": "New metadata", "list": "Metadata",
-                "onNameConflict": conflict, "autoAddToSourceControl": False}
+                "onNameConflict": conflict, "autoAddToSourceControl": False, "@Metadata": CONSTRUCTOR_METADATA}
             if conflict == "merge":
                 return {"id": CHILD, "name": "New metadata"}
             result_name = "New metadata_01" if conflict == "rename" else "New metadata"
             task.objects[ROOT] = {"id": ROOT, "name": result_name, "type": "PluginInnerObject", "classId": 5570560,
-                "path": task.objects[FIRST]["path"] + "\\" + result_name, "owner": {"id": FIRST}, "notes": ""}
+                "path": task.objects[FIRST]["path"] + "\\" + result_name, "owner": {"id": FIRST}, "notes": "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
             task.objects[FIRST]["@Metadata"] = [{"id": CHILD}, {"id": ROOT}]
             if fault == "wrong-class":
                 task.objects[ROOT]["classId"] = 1441808
@@ -334,7 +353,7 @@ def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_tr
             "@Metadata": [{"id": old_slot}]}
         slot_name = "New metadata" if slot_collision else "Old metadata"
         task.objects[old_slot] = {"id": old_slot, "name": slot_name, "type": "PluginInnerObject", "classId": 5570560,
-            "path": task.objects[ROOT]["path"] + "\\" + slot_name, "owner": {"id": ROOT}, "notes": "Keep old metadata"}
+            "path": task.objects[ROOT]["path"] + "\\" + slot_name, "owner": {"id": ROOT}, "notes": "Keep old metadata", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
     preserved = deepcopy(task.objects)
     initial = ["--list-behavior", list_mode] if list_mode == "replace-all" else []
     code, configured = task.step("draft-business-configure", "--name-conflict", conflict, *initial)
@@ -362,8 +381,9 @@ def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_tr
         code, incomplete = task.step("draft-check")
         assert code == 2, incomplete
         assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+    required = _metadata_constructor_fields(task, slot_type)
     code, slot = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", owner_result,
-        "--name", "New metadata", "--kind", slot_type, "--field", "object_list", list_field)
+        "--name", "New metadata", "--kind", slot_type, "--field", "object_list", list_field, *required)
     assert code == 0, slot
     if list_mode != "replace-all":
         code, configured = task.step("draft-business-configure", "--name-conflict", conflict, "--list-behavior", list_mode)
@@ -376,7 +396,7 @@ def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_tr
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args["objects"] == [{"object": SECOND, "children": [{"type": "Sound", "name": "New sound",
-                "@Metadata": [{"type": "MetadataSlot", "name": "New metadata"}]}]}]
+                "@Metadata": [{"type": "MetadataSlot", "name": "New metadata", "@Metadata": CONSTRUCTOR_METADATA}]}]}]
             assert args["listMode"] == ("replaceAll" if list_mode == "replace-all" else "append")
             assert args["onNameConflict"] == conflict
             if conflict == "replace":
@@ -389,7 +409,7 @@ def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_tr
                 "notes": "Keep old owner" if conflict == "merge" else "",
                 "@Metadata": ([{"id": old_slot}] if keep_old else []) + [{"id": fresh_slot}]}
             task.objects[fresh_slot] = {"id": fresh_slot, "name": "New metadata", "type": "PluginInnerObject", "classId": 5570560,
-                "path": task.objects[actual_owner]["path"] + r"\New metadata", "owner": {"id": actual_owner}, "notes": "Keep old metadata" if slot_collision else ""}
+                "path": task.objects[actual_owner]["path"] + r"\New metadata", "owner": {"id": actual_owner}, "notes": "Keep old metadata" if slot_collision else "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
             return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": actual_owner, "name": actual_owner_name,
                 "@Metadata": [{"id": fresh_slot, "name": "New metadata"}]}]}]}
         return original(uri, args, options)
@@ -1168,16 +1188,17 @@ def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path
         code, renamed = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", task.list_owner_handle,
             "--field", "new_name", "Storm")
         assert code == 0, renamed
+    required = _metadata_constructor_fields(task, types["type_candidates"][0]["handle"])
     code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", task.list_owner_handle,
         "--name", "Metadata", "--kind", types["type_candidates"][0]["handle"],
-        "--field", "object_list", task.list_field_handle)
+        "--field", "object_list", task.list_field_handle, *required)
     assert code == 0, declared
     original = task.call
     fresh_id = "{77777777-7777-7777-7777-777777777777}"
     def call(uri, args=None, options=None):
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            expected = {"object": FIRST, "@Metadata": [{"type": "MetadataSlot", "name": "Metadata"}]}
+            expected = {"object": FIRST, "@Metadata": [{"type": "MetadataSlot", "name": "Metadata", "@Metadata": CONSTRUCTOR_METADATA}]}
             if fault in {"rename-owner-good-path", "rename-owner-bad-path"}:
                 expected["name"] = "Storm"
                 task.objects[FIRST].update(name="Storm", path=r"\Actor-Mixer Hierarchy\Default Work Unit\Storm")
@@ -1187,7 +1208,7 @@ def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path
             assert args["objects"] == [expected]
             del task.objects[CHILD]
             task.objects[fresh_id] = {"id": fresh_id, "name": "Metadata", "type": "PluginInnerObject", "classId": 5570560,
-                "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "notes": ""}
+                "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "notes": "", "@Metadata": {"id": CONSTRUCTOR_METADATA}}
             task.objects[FIRST]["@Metadata"] = [{"id": ROOT}, {"id": fresh_id}]
             if fault in {"name", "notes", "path"}:
                 task.objects[ROOT][fault] += " Unexpected"
@@ -1984,3 +2005,16 @@ def test_existing_guid_rename_cannot_verify_a_native_creation_suffix(tmp_path):
     tx, shown = task.preview()
     code, failed = task.finish(tx, shown)
     assert code == 2 and failed['verified'] is False, failed
+
+
+def test_create_metadata_slot_discloses_missing_constructor_input_before_preview(tmp_path):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False, operation='object.create')
+    code, types = task.step('draft-discover-types', '--role', 'object', '--meaning', 'MetadataSlot')
+    assert code == 0, types
+    code, declared = task.step('draft-declare-new', '--declaration-id', 'slot', '--parent-handle', task.list_owner_handle,
+        '--name', 'New metadata', '--kind', types['type_candidates'][0]['handle'], '--field', 'object_list', task.list_field_handle)
+    assert code == 0, declared
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'REQUIRED_CONSTRUCTOR_REFERENCE_MISSING', checked
+    assert checked['details']['field_discovery']['meaning'] == 'Metadata'
+    assert not any(uri.endswith(('object.create', 'object.set')) for uri, _, _ in task.calls)
