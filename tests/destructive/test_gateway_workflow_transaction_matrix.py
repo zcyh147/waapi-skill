@@ -120,6 +120,7 @@ class _WorkflowSandboxRuntime:
     candidate: str
     category_results: list[dict[str, Any]]
     source_copy_prelaunch: dict[str, Any] | None = None
+    namespaced_query_prelaunch: dict[str, Any] | None = None
 
     @property
     def port(self) -> int:
@@ -1024,12 +1025,16 @@ def workflow_sandbox_runtime(
         )
 
     from tests.destructive.support.source_copy_fixture import PROFILE as REPEATED_PROFILE
+    from tests.destructive.support.namespaced_query_fixture import PROFILE as NAMESPACED_QUERY_PROFILE
     selection = getattr(request, 'param', ())
     source_profile = selection if isinstance(selection, str) else None
-    assert source_profile in {None, REPEATED_PROFILE}, 'Unknown closed workflow fixture profile'
-    if source_profile and version != '2021.1':
+    assert source_profile in {None, REPEATED_PROFILE, NAMESPACED_QUERY_PROFILE}, 'Unknown closed workflow fixture profile'
+    if source_profile == REPEATED_PROFILE and version != '2021.1':
         pytest.skip('Native-donor repeated Source fixture is pinned to2021.1.14.8108')
+    if source_profile == NAMESPACED_QUERY_PROFILE and version != '2025.1':
+        pytest.skip('Namespaced query fixture is initially selected for2025.1.7.9143')
     source_copy_prelaunch = None
+    namespaced_query_prelaunch = None
     lock = LiveSandboxLock(_safe_lock_root(env))
     sandbox: SandboxProject | None = None
     lifecycle: HeadlessLifecycle | None = None
@@ -1099,11 +1104,16 @@ def workflow_sandbox_runtime(
                 )
             else:
                 assert prelaunch.auro_soundbank_isolation is not None
-        if source_profile:
+        if source_profile == REPEATED_PROFILE:
             from tests.destructive.support.source_copy_fixture import prepare_repeated_source_fixture
             source_fixture_io = case_sandbox_root / 'source-copy-prelaunch-io'
             source_fixture_io.mkdir(exist_ok=False)
             source_copy_prelaunch = prepare_repeated_source_fixture(sandbox, owned_root=case_sandbox_root, io_root=source_fixture_io)
+        if source_profile == NAMESPACED_QUERY_PROFILE:
+            from tests.destructive.support.namespaced_query_fixture import prepare_namespaced_query_fixture
+            custom_fixture_io = case_sandbox_root / 'namespaced-query-prelaunch-io'
+            custom_fixture_io.mkdir(exist_ok=False)
+            namespaced_query_prelaunch = prepare_namespaced_query_fixture(sandbox, owned_root=case_sandbox_root, io_root=custom_fixture_io)
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
         assert sandbox.metadata.selected_port == lifecycle.port
@@ -1143,6 +1153,7 @@ def workflow_sandbox_runtime(
             candidate=candidate,
             category_results=category_results,
             source_copy_prelaunch=source_copy_prelaunch,
+            namespaced_query_prelaunch=namespaced_query_prelaunch,
         )
         yield runtime
     finally:
