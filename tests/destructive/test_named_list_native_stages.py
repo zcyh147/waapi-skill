@@ -214,7 +214,15 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         assert reference['args'] == {'objects': [{'object': ids['sound'], 'platform': WINDOWS, '@OutputBus': created['bus']['path']}]}, reference
         assert proof['creation_bindings'][1]['before_readbacks'] and all(row['passed'] for row in proof['creation_bindings'][1]['before_preservation']), proof
         membership_reads = [row for row in proof['creation_bindings'][1]['readbacks'] if row['options'] == {'return': ['id', '@Metadata']}]
-        assert membership_reads and all(row['result']['return'][0]['@Metadata'] == [{'id': ids['slot']}] for row in membership_reads), proof
+        assert membership_reads, proof
+        for row in membership_reads:
+            owner, = row['result']['return']
+            assert owner['id'].upper() == ids['sound'].upper(), row
+            members = owner['@Metadata']
+            assert isinstance(members, list) and len(members) == 1, row
+            member_ids = [member['id'] for member in members]
+            assert all(isinstance(identity, str) and uuid.UUID(identity).int != 0 for identity in member_ids), row
+            assert [identity.upper() for identity in member_ids] == [ids['slot'].upper()], row
         after = observation['after'] = scope('after')
         assert all(after[key] == before[key] for key in ('owner', 'ancestor', 'containers')), after
         for role, identity in (('buses', GUNS), ('buses', CARS), ('children', RETAINED_CONTAINER)):

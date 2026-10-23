@@ -71,7 +71,7 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                     returned = {'id': oid, 'name': name}
                     if '@Metadata' in node:
                         slots = [create(slot, oid, owned=True) for slot in node['@Metadata']]
-                        self.objects[oid]['@Metadata'] = [{'id': row['id']} for row in slots]
+                        self.objects[oid]['@Metadata'] = [{'id': row['id'], 'name': row['name']} for row in slots]
                         returned['@Metadata'] = slots
                     return returned
                 for node in args['objects']:
@@ -144,6 +144,14 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         assert [argv[0] for argv in commands].count('draft-start') == 1
         assert len(writes) == 3 and len(observation['native_evidence']) > 0
         assert len(observation['stage_packet_paths']) == 3
+        memberships = [row['result']['return'][0]['@Metadata']
+            for row in observation['stage_proof']['creation_bindings'][1]['readbacks']
+            if row['options'] == {'return': ['id', '@Metadata']}]
+        assert memberships and all(rows == [{'id': new['slot'], 'name': collector.REQUESTED['slot']}]
+            for rows in memberships)
+        assert observation['independent_created']['slot']['name'] == collector.REQUESTED['slot']
+        assert observation['independent_created']['slot']['class_id'] == 5570560
+        assert observation['independent_created']['slot']['owner']['id'] == new['sound']
         assert observation['created']['bus']['name'] == observed_bus_name
         assert observation['independent_created']['slot']['type'] == 'PluginInnerObject'
         assert 'parent' not in observation['independent_created']['slot']
