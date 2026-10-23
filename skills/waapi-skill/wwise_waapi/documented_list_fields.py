@@ -536,13 +536,20 @@ def planned_reference_guard_assertions(guards, *, read):
 
 def owned_empty_identity_candidate(version, row):
     """Finite observed identity profiles; generic empty names remain invalid."""
-    return (version == '2025.1' and row.get('type') == 'PluginInnerObject'
-        and type(row.get('classId')) is int and row['classId'] == 5570560 and row.get('name') == '')
+    return (row.get('name') == '' and type(row.get('classId')) is int
+        and ((version == '2025.1' and (row.get('type'), row['classId']) == ('PluginInnerObject', 5570560))
+            or is_manual_marker_class(version, row.get('type'), row['classId'])))
 
 
 def owned_empty_identity_descriptor(version, native_type, class_id, owner_class_id):
-    if (type(class_id) is not int or type(owner_class_id) is not int
-            or (version, native_type, class_id) != ('2025.1', 'PluginInnerObject', 5570560) or owner_class_id not in METADATA_INNER_OWNERS):
+    if type(class_id) is not int or type(owner_class_id) is not int:
+        return None
+    if is_manual_marker_class(version, native_type, class_id) and owner_class_id == 16:
+        profile = manual_marker_profile(version)
+        return {'version': version, 'native_type': native_type, 'class_id': class_id,
+            'owner_class_id': owner_class_id, 'owner_type': 'AudioFileSource', 'collection': 'Markers',
+            'source': profile['list_source'], 'profile': profile}
+    if ((version, native_type, class_id) != ('2025.1', 'PluginInnerObject', 5570560) or owner_class_id not in METADATA_INNER_OWNERS):
         return None
     source = resolve_class_list_evidence(version, owner_class_id, 'Metadata')
     return {'version': version, 'native_type': native_type, 'class_id': class_id,

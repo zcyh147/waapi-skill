@@ -67,6 +67,9 @@ def test_manual_marker_collector_runs_one_explicit_transaction_on_existing_media
     assert receipt['setup_coverage_credit'] is False and receipt['transaction_count'] == 1
     assert receipt['baseline_before'] == receipt['baseline_after']
     assert receipt['marker']['properties'] == {'Time': 0.0, 'Label': 'R90_MARKER'}
+    assert receipt['retained_edit_preparation']['ok'] is True and receipt['retained_edit_executed'] is False
+    assert [cmd[0] for cmd in commands].count('draft-bind-object') == 2
+    assert [cmd[0] for cmd in commands].count('preview-from-draft') == 1
     assert len(task.writes) == 1 and [cmd[0] for cmd in commands].count('verify') == 1
     assert not any('audio.import' in uri or 'generateTone' in uri for uri, _, _ in task.calls)
     assert receipt['budget']['native_calls'] == len(task.calls)

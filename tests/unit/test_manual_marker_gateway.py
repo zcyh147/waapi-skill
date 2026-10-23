@@ -216,3 +216,64 @@ def test_manual_marker_owner_class_cannot_substitute_another_actual_object_type(
     code, result = declare_marker(task); assert code == 0, result
     code, result = task.step('draft-check')
     assert code == 2 and task.writes == [], result
+
+
+def retained_marker_task(path, version='2025.1'):
+    task = marker_task(path, version)
+    task.objects[MARKER] = {'id': MARKER, 'name': '', 'type': 'Marker', 'classId': 5373968,
+        'path': r'\opaque-retained-marker', 'owner': {'id': FIRST}, 'notes': '', '@Time': 0.0, '@Label': 'Retained'}
+    task.objects[FIRST].update({'@MarkerInputMode': 2, '@Markers': [{'id': MARKER}]})
+    return task
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_retained_marker_binds_discovers_reads_and_prepares_exact_guid_edit_without_execution(tmp_path, version):
+    task = retained_marker_task(tmp_path, version)
+    before = deepcopy(task.objects)
+    handle = task.bind(MARKER)
+    time = select_field(task, owner=handle, token='Time')
+    label = select_field(task, owner=handle, token='Label')
+    assert time != label
+    code, result = task.run('query-object', '--exact-id', MARKER, '--max-results', '1', '--include-field', 'Time', '--include-field', 'Label')
+    assert code == 0 and result['agent_result'][0]['properties'] == {'Time': 0.0, 'Label': 'Retained'}, result
+    code, result = task.step('draft-declare-existing', '--declaration-id', 'edit', '--object-handle', handle,
+        '--field-value', label, 'R90_PREPARED_ONLY')
+    assert code == 0, result
+    tx, shown = task.preview()
+    assert shown['artifact']['prepared_operation']['dispatch']['args']['objects'] == [{'object': MARKER, '@Label': 'R90_PREPARED_ONLY'}]
+    assert task.objects == before and task.writes == []
+    code, result = task.run('execute', tx)
+    assert code == 2 and task.writes == [], result
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('fault', ['missing-membership', 'wrong-owner', 'wrong-class', 'wrong-type', 'wrong-owner-class', 'wrong-owner-type'])
+def test_retained_marker_empty_name_requires_exact_live_owning_source_and_membership(tmp_path, version, fault):
+    task = retained_marker_task(tmp_path, version)
+    if fault == 'missing-membership': task.objects[FIRST]['@Markers'] = []
+    elif fault == 'wrong-owner': task.objects[MARKER]['owner'] = {'id': SECOND}
+    elif fault == 'wrong-class': task.objects[MARKER]['classId'] = 16
+    elif fault == 'wrong-type': task.objects[MARKER]['type'] = 'PluginInnerObject'
+    elif fault == 'wrong-owner-class': task.objects[FIRST]['classId'] = 65552
+    else: task.objects[FIRST]['type'] = 'Sound'
+    before = deepcopy(task.objects)
+    code, result = task.step('draft-bind-object', '--object-id', MARKER)
+    assert code == 2 and task.writes == [] and task.objects == before, result
+
+
+@pytest.mark.parametrize('fault', ['owner', 'class', 'name', 'prefix'])
+def test_retained_marker_binding_revalidates_actual_guid_and_complete_fresh_prefix_before_edit(tmp_path, fault):
+    task = retained_marker_task(tmp_path)
+    handle = task.bind(MARKER)
+    label = select_field(task, owner=handle, token='Label')
+    code, result = task.step('draft-declare-existing', '--declaration-id', 'edit', '--object-handle', handle,
+        '--field-value', label, 'R90_PREPARED_ONLY'); assert code == 0, result
+    if fault == 'owner': task.objects[MARKER]['owner'] = {'id': SECOND}
+    elif fault == 'class': task.objects[MARKER]['classId'] = 16
+    elif fault == 'name': task.objects[MARKER]['name'] = 'Changed after binding'
+    else:
+        task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'Marker', 'classId': 5373968,
+            'path': r'\another-retained-marker', 'owner': {'id': FIRST}, 'notes': '', '@Time': 0.02, '@Label': 'Another'}
+        task.objects[FIRST]['@Markers'].append({'id': CHILD})
+    code, result = task.step('draft-check')
+    assert code == 2 and task.writes == [], result

@@ -44,7 +44,7 @@ def test_manual_marker_keeps_exact_source_and_typed_member_scope(workflow_sandbo
     observation = {'candidate': runtime.candidate, 'version': runtime.version, 'calls': [],
         'definitions': definition_evidence(runtime.version), 'transaction_count': 0, 'setup_coverage_credit': False,
         'positive_marker_proof': False, 'business_effect_verified': False,
-        'scope': 'one explicit manual WObject construction and canonical typed read; imported/effective and older Inner Marker remain separate',
+        'scope': 'one explicit manual WObject construction, canonical typed read and retained-GUID edit preparation without execution; imported/effective and older Inner Marker remain separate',
         'limits': {'public_calls': MAX_CALLS, 'dispatcher_packets': MAX_DISPATCHES, 'native_packet_bytes': MAX_PACKET_BYTES,
             'membership_rows': 2, 'exact_rows': 1, 'transactions': 1, 'new_imports': 0, 'new_wavs': 0}}
     category = {'category': 'query-manual-marker', 'status': 'FAIL', 'observation_path': str(output),
@@ -211,6 +211,18 @@ def test_manual_marker_keeps_exact_source_and_typed_member_scope(workflow_sandbo
         assert type(native['@Time']) in (int, float) and math.isfinite(native['@Time']) and native['@Time'] == 0
         assert native['@Label'] == 'R90_MARKER'
         observation['marker'] = row
+        edit = _start_business_draft(business, 'object.set')
+        retained = _bind_business_object(business, edit, object_id=marker_id)
+        found = _update_business_draft(business, edit, 'draft-discover-fields',
+            ['--object-handle', retained, '--meaning', 'Label'], live=True)
+        selected_label, = [candidate for meaning in found['meaning_results'] for candidate in meaning['candidates']]
+        _update_business_draft(business, edit, 'draft-declare-existing',
+            ['--declaration-id', 'retained-marker', '--object-handle', retained,
+                '--field-value', selected_label['handle'], 'R90_PREPARED_ONLY'], live=False)
+        observation['retained_edit_preparation'] = _update_business_draft(business, edit, 'draft-check', live=True)
+        observation['retained_edit_executed'] = False
+        unchanged, _, _ = exact(marker_id, '--include-field', 'Time', '--include-field', 'Label')
+        assert unchanged == row, 'Read-only retained Marker preparation changed actual identity or values'
         observation['baseline_after'] = after = baseline(sound_id, source_id, 2)
         assert after == before and membership(source_id)[0] == rows, 'Exact Source/member/media baseline changed during the read group'
         observation['source_after'] = tree_frame(source_root, source_project)
