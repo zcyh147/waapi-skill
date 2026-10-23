@@ -431,3 +431,42 @@ def test_meter_frame_comparison_uses_canonical_guid_identity_not_native_letter_c
     code,result = run("core-call",METERS,"--profiler-position","123","--meter-object-include-field","Bus Volume")
     assert code == 0, result
     assert all(row["object"]["properties"] == {"Volume":-6.0} for row in result["agent_result"]["meters"])
+
+
+@pytest.mark.parametrize("change_read", [3, 5], ids=["related-preparation", "final-projection"])
+@pytest.mark.parametrize("change", ["case", "identity"])
+def test_related_meter_root_identity_comparison_preserves_native_text_and_real_drift(tmp_path, change_read, change):
+    client, run = task(tmp_path)
+    root_id = "{ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB}"
+    name = "Keep MixedCase {aBcDeFaB-cDeF-aBcD-eFaB-cDeFaBcDeFaB}"
+    notes = "Parent configuration {aBcDeFaB-cDeF-aBcD-eFaB-cDeFaBcDeFaB}"
+    parent = {"id":"{33333333-3333-3333-3333-333333333333}","name":"Parent Mix"}
+    for row in client.rows:
+        row["object"].update({"id":root_id,"name":name,"parent":parent,
+            "parent.classId":BUS_CLASS,"parent.notes":notes})
+    original = client.call
+    count = 0
+    def call(uri, args=None, options=None):
+        nonlocal count
+        if uri == METERS:
+            count += 1
+            if count == change_read:
+                for row in client.rows:
+                    row["object"]["id"] = (root_id.lower() if change == "case" else
+                        "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}")
+        return original(uri,args,options)
+    client.call = call
+    code, result = run("core-call",METERS,"--profiler-position","123",
+        "--meter-object-include-related","parent","notes")
+    assert count >= change_read
+    if change == "identity":
+        assert code == 2 and result["error_code"] == "METER_OBJECT_SCOPE_CHANGED", result
+        assert result.get("agent_result") is None
+    else:
+        assert code == 0, result
+        for row in result["agent_result"]["meters"]:
+            assert row["object"]["id"] == root_id.lower()
+            assert row["object"]["name"] == name
+            assert row["object"]["related"]["parent"] == {"object":parent,"notes":notes}
+        assert all(row["object"]["name"] == name and row["object"]["parent.notes"] == notes
+            for row in client.rows)

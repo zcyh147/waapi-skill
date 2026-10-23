@@ -139,14 +139,23 @@ def compile_meter_object_options(args, version, *, compile_condition=None):
         related=related,compile_condition=compile_condition)
 
 
-def meter_scope(rows):
-    facts = []
+def meter_root_comparison_view(rows):
+    """Copy actual roots for internal planning; normalize only their GUIDs."""
+    objects = []
     for row in rows:
         obj = row.get('object')
         if not isinstance(obj, dict) or not canonical_guid(obj.get('id')) or not all(key in obj for key in IDENTITY):
             raise RelatedQueryError('Meter metadata requires complete actual object identities', code='METER_OBJECT_IDENTITY_INCOMPLETE')
+        comparison = deepcopy(obj)
+        comparison['id'] = comparison['id'].upper()
+        objects.append(comparison)
+    return objects
+
+
+def meter_scope(rows):
+    facts = []
+    for row,obj in zip(rows,meter_root_comparison_view(rows),strict=True):
         identity = {key:deepcopy(obj[key]) for key in (*IDENTITY,'classId') if key in obj}
-        identity['id'] = identity['id'].upper()
         facts.append({key:deepcopy(value) for key,value in row.items() if key != 'object'} | {'object':identity})
     return facts
 
@@ -277,7 +286,7 @@ class MeterObjectOptions:
                 observed = read_meter({**self.scope,'return':list(fields)})
                 rows = observed['meters']
                 self.validate_scope(rows)
-                return [row['object'] for row in rows],self.scope
+                return meter_root_comparison_view(rows),self.scope
             self.related_plan = RelatedListPlan(version=self.version,requests=self.related,
                 bindings=[*self.bindings,*(binding for row in self.row_bindings for binding in row)],
                 build_preview=None,read=read_metadata,maximum_rows=MAX_METADATA_ROWS,
@@ -296,7 +305,7 @@ class MeterObjectOptions:
         rows = result['meters']
         self.record_meter_read(result,self.options())
         self.validate_scope(rows)
-        related = self.related_plan.project([row['object'] for row in rows]) if self.related_plan is not None else None
+        related = self.related_plan.project(meter_root_comparison_view(rows)) if self.related_plan is not None else None
         projected = []
         for index,row in enumerate(rows):
             obj = row['object']
