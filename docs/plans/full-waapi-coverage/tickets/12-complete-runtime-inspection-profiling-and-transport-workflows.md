@@ -29,3 +29,12 @@ Users can inspect and control the permitted profiling/transport sessions and rec
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Execution note — 2026-10-24
+
+Use [runtime verification decisions](../RUNTIME_VERIFICATION.md) to distinguish
+standalone acknowledgement from independently observed effect. Bind the
+already-proven runtime reads through the existing evidence reader before
+scheduling additional native work. The next bounded implementation slices are
+the runtime observation attachment and the 2025 four-mode cursor collector;
+no broad reader rerun or Fresh campaign is authorized by this note.
