@@ -107,13 +107,13 @@ class _InputObservation:
         case.update(declaration=list(fields), preview=reply)
         return self.execute_preview(reply, case)
 
-    def zero(self, suffix, case, *, before_execute=None):
+    def zero(self, suffix, case):
         schema = self.call(['request-schema', PREFIX + suffix])
         preview = self.call(schema['continuation']['gateway_argv'])
         case['preview'] = preview
-        return self.execute_preview(preview, case, before_execute=before_execute)
+        return self.execute_preview(preview, case)
 
-    def execute_preview(self, preview, case, *, before_execute=None):
+    def execute_preview(self, preview, case):
         tx = preview['transaction_id']
         case['transaction_id'] = tx
         self.category['transaction_ids'].append(tx)
@@ -122,8 +122,6 @@ class _InputObservation:
         self.call(['confirm', tx, '--confirmation-token', shown['confirmation']['token']])
         # Until a successful structured native acknowledgment is retained, a
         # failed execution is uncertain. Native errors never imply safe replay.
-        if before_execute:
-            before_execute()
         case['native_outcome'] = 'indeterminate'
         self.persist()
         code, executed = self.raw(['execute', tx])
@@ -170,10 +168,7 @@ def collect_signed_cursor_inputs(runtime):
     report = observed.report
     report['cleanup'].update(complete=False, capture_stop_acknowledged=False,
         capture_state_independently_observed=False)
-    capture_may_have_started, stop_attempted, prior, primary_error = False, False, None, None
-    def arm_capture_cleanup():
-        nonlocal capture_may_have_started
-        capture_may_have_started = True
+    capture_start_succeeded, stop_attempted, prior, primary_error = False, False, None, None
     def stop_capture():
         nonlocal stop_attempted
         stop_attempted = True  # No retry even when stop outcome is uncertain.
@@ -185,7 +180,8 @@ def collect_signed_cursor_inputs(runtime):
         observed.attest()
         start = {'name': 'start-capture'}
         report['setup'].append(start)
-        observed.zero('startCapture', start, before_execute=arm_capture_cleanup)
+        observed.zero('startCapture', start)
+        capture_start_succeeded = True
         deadline = time.monotonic() + 2.0
         report['capture_read_attempts'] = 0
         for _ in range(2):
@@ -219,8 +215,11 @@ def collect_signed_cursor_inputs(runtime):
     finally:
         cleanup_error = None
         try:
-            if capture_may_have_started and not stop_attempted:
+            if capture_start_succeeded and not stop_attempted:
                 stop_capture()
+            elif report['setup'] and report['setup'][0].get('native_outcome') == 'indeterminate':
+                report['cleanup']['capture_stop_boundary'] = (
+                    'withheld after uncertain start; owned host shutdown required')
             uncertain = any(case['native_outcome'] == 'indeterminate' for case in report['cases'])
             accepted = any(case['native_outcome'] == 'accepted' for case in report['cases'])
             if accepted and not uncertain and prior is not None and prior['available'] is True:

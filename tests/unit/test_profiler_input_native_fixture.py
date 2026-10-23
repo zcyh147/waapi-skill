@@ -48,6 +48,8 @@ def _runtime(tmp_path, monkeypatch, version='2025.1', fault=None):
                     self.user_time = -2
                 return {'return': self.user_time}
             if uri in (PREFIX + 'startCapture', PREFIX + 'stopCapture'):
+                if uri.endswith('startCapture') and fault == 'start-error':
+                    raise RuntimeError('fake native start lost; outcome unknown')
                 if uri.endswith('stopCapture') and fault == 'stop-error':
                     raise RuntimeError('fake native stop lost; no retry')
                 return {'return': 1500}
@@ -275,4 +277,27 @@ def test_shared_console_log_success_and_enable_failure_keep_independent_final_ou
     assert [case['native_outcome'] for case in enable_report['cases']] == ['accepted', 'indeterminate', 'not_attempted']
     assert len({row['transaction_id'] for row in final['transactions']}) == 3
     assert sum(uri == ADD for uri, _, _ in log.calls) == 1
+    assert Path(final['residual_state']['quarantine_path']).is_dir()
+
+
+def test_unknown_capture_start_retains_final_failure_without_followup_writes(tmp_path, monkeypatch):
+    context = _runtime(tmp_path, monkeypatch, fault='start-error')
+    workflow, runtime, client, _, _ = context
+    node = 'test_profiler_signed_cursor_input_native_observations'
+    with pytest.raises(AssertionError) as failure:
+        getattr(workflow, node)(runtime)
+    final, = _finish(context, tmp_path, monkeypatch, [(node, failure.value)])
+    category, = final['categories']
+    report = json.loads(Path(category['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'FAIL' and category['status'] == 'FAIL'
+    assert [uri for uri, _, _ in client.calls if uri in (
+        PREFIX + 'startCapture', PREFIX + 'stopCapture', PREFIX + 'setCursorTime')] == [PREFIX + 'startCapture']
+    assert report['setup'][0]['native_outcome'] == 'indeterminate'
+    assert report['setup'][0]['execute']['state'] == 'indeterminate'
+    assert report['setup'][0]['execute']['automatic_retry'] is False
+    assert 'verify' not in report['setup'][0]
+    assert [case['native_outcome'] for case in report['cases']] == ['not_attempted', 'not_attempted']
+    assert report['cleanup']['complete'] is False and report['cleanup']['capture_stop_acknowledged'] is False
+    assert 'stop_capture' not in report['cleanup'] and 'cursor_restoration' not in report['cleanup']
+    assert len(final['transactions']) == 1 and final['transactions'][0]['state'] == 'indeterminate'
     assert Path(final['residual_state']['quarantine_path']).is_dir()
