@@ -25,6 +25,10 @@ CAPTURE_READS_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_profiler_capture_reads')
 CAPTURE_MISSING_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_missing_profiler_reads')
+CURSOR_MOVES_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_runtime_owned_2025_profiler_cursor_moves')
+CURSOR_MOVE_OUTCOMES = tuple('profiler-cursor-' + move + '-frame'
+    for move in ('first', 'next', 'last', 'previous'))
 METER_2024_SOUND_ID = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'
 METER_2024_BUS_ID = '{06362E8D-5A32-497A-B063-3DA95963CE47}'
 METER_2024_PARENT_ID = '{ED2BCAC8-D7B6-4448-8900-439B557894F4}'
@@ -47,6 +51,7 @@ CAPTURE_READ_OUTCOMES = ('profiler-rtpcs-observation', 'profiler-contributions-d
     'profiler-performance-observation', 'profiler-streamed-media-observation')
 CAPTURE_NODE_OUTCOMES[CAPTURE_READS_NODEID] = CAPTURE_READ_OUTCOMES
 CAPTURE_NODE_OUTCOMES[CAPTURE_MISSING_NODEID] = (CAPTURE_READ_OUTCOMES[0], CAPTURE_READ_OUTCOMES[2])
+CAPTURE_NODE_OUTCOMES[CURSOR_MOVES_NODEID] = CURSOR_MOVE_OUTCOMES
 CAPTURE_CAR_ID = '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'
 CAPTURE_CAR_SOURCE_ID = '{48770A4D-B8C3-41CF-AE3E-FB8651347736}'
 CAPTURE_CAR_PARENT_ID = '{97A58685-6231-4227-9BAB-451E089615A8}'
@@ -400,14 +405,90 @@ def stage_owned_2024_meter_media(sandbox, io_root):
         'authored_xml_changed': False, 'scope': 'One existing missing original copied only into owned sandbox'}) + '\n')
 
 
+def _collect_cursor_moves(call, report, persist, *, effect, zero, own, clean_one):
+    """One stopped buffer; each source-defined move executes exactly once."""
+    report['setup'].append({'originals': effect('transport.useOriginals', ['--audition-media', 'originals'])})
+    report['setup'].append({'enable_voices': effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'enable'],
+        before_execute=lambda: own('disable-voices-data',
+            lambda: effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'disable'])))})
+    report['setup'].append({'start_capture': zero('profiler.startCapture',
+        before_execute=lambda: own('stop-capture', lambda: zero('profiler.stopCapture')))})
+    created = effect('transport.create', role='target', identity=SOUND_ID)
+    handle = created['agent_result']['business_result']['transport_handle']
+    own('destroy-transport', lambda: effect('transport.destroy', ['--transport-handle', handle]))
+    own('stop-transport', lambda: effect('transport.executeAction', ['--audition-action', 'stop',
+        '--transport-scope', 'one-transport', '--transport-handle', handle]))
+    report['setup'].append({'create_transport': created})
+    report['setup'].append({'play': effect('transport.executeAction', ['--audition-action', 'play',
+        '--transport-scope', 'one-transport', '--transport-handle', handle])})
+    # Same fixed capture interval as the existing fixture, never a retry/poll loop.
+    time.sleep(0.25)
+    report['setup'].append({'stop_capture': clean_one('stop-capture')})
+    position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
+    report['capture_position'] = position
+    for name, move in zip(CURSOR_MOVE_OUTCOMES, ('first', 'next', 'last', 'previous')):
+        observation = report['outcomes'][name] = {'outcome': 'BLOCKED', 'evidence': {
+            'cursor_move': move + '-frame', 'capture_data_completeness_verified': False}}
+        evidence = observation['evidence']
+        try:
+            verified = effect('profiler.moveCursor', ['--cursor-move', move + '-frame'])
+            evidence['transaction'] = verified
+            scope = verified['verification']['verification_scope']['cursor_observation']
+            evidence.update(returned_time_ms=scope['returned_time_ms'], observed_time_ms=scope['observed_time_ms'])
+            if scope['outcome'] == 'unavailable':
+                observation['reason'] = 'Returned or independent user-cursor time unavailable; no retry'
+            else:
+                assert verified['verification']['business_state_verified'] is True and scope['outcome'] == 'matched', verified
+                assert type(scope['returned_time_ms']) is int and scope['returned_time_ms'] >= 0
+                assert scope['returned_time_ms'] == scope['observed_time_ms']
+                observation['outcome'] = 'PASS'
+        except Exception as exc:
+            observation.update(outcome='FAIL', error={'type': type(exc).__name__, 'message': str(exc)[:4096]})
+        finally:
+            persist()
+
+    first, next_frame, last, previous = (report['outcomes'][name] for name in CURSOR_MOVE_OUTCOMES)
+    if last['outcome'] == 'PASS':
+        if position.get('available') is not True:
+            last.update(outcome='BLOCKED', reason='Stopped capture cursor unavailable; endpoint not established')
+        elif last['evidence']['returned_time_ms'] != position['position_ms']:
+            last.update(outcome='FAIL', reason='Last frame differs from stopped capture-latest cursor')
+    endpoints = first['outcome'] == last['outcome'] == 'PASS'
+    low = first['evidence'].get('returned_time_ms')
+    high = last['evidence'].get('returned_time_ms')
+    if endpoints and low > high:
+        first.update(outcome='FAIL', reason='First captured frame follows last captured frame')
+        endpoints = False
+    for observation, forward in ((next_frame, True), (previous, False)):
+        if observation['outcome'] != 'PASS':
+            continue
+        if not endpoints or low == high:
+            observation.update(outcome='BLOCKED', reason='Insufficient distinct endpoint observations for frame relationship')
+        else:
+            value = observation['evidence']['returned_time_ms']
+            valid = low < value <= high if forward else low <= value < high
+            observation['evidence']['frame_relationship_verified'] = valid
+            if not valid:
+                observation.update(outcome='FAIL', reason='Observed cursor violates source-defined next/previous frame relationship')
+    report['frame_relationship_scope'] = {
+        'first_time_ms': low, 'last_time_ms': high,
+        'first_frame_boundary': 'Source-defined first frame; no independent earliest-time API or first=0 assumption',
+        'distinct_endpoint_times_observed': endpoints and low < high,
+        'adjacent_frame_index_or_duration_verified': False}
+    persist()
+
+
 def collect_owned_capture(batch, public_call):
     version = batch.runtime.version
+    cursor_moves = batch.selected_nodeids == (CURSOR_MOVES_NODEID,)
+    if cursor_moves:
+        assert version == '2025.1', 'Cursor moves require the matching 2025 Authoring host'
     missing_only = batch.selected_nodeids == (CAPTURE_MISSING_NODEID,)
     capture_reads = missing_only or batch.selected_nodeids == (CAPTURE_READS_NODEID,)
     assert version in (('2021.1', '2022.1', '2023.1', '2024.1', '2025.1') if capture_reads
         else ('2024.1', '2025.1')), 'Capture version is not admitted for this node'
     readers = capture_reads or batch.selected_nodeids == (READERS_2025_NODEID,)
-    nodeid = CAPTURE_MISSING_NODEID if missing_only else CAPTURE_READS_NODEID if capture_reads else READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
+    nodeid = CURSOR_MOVES_NODEID if cursor_moves else CAPTURE_MISSING_NODEID if missing_only else CAPTURE_READS_NODEID if capture_reads else READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
     assert batch.selected_nodeids == (nodeid,), 'Capture requires its exact matching node'
     sound_id, bus_id, parent_id = (METER_2024_SOUND_ID, METER_2024_BUS_ID, METER_2024_PARENT_ID) if version == '2024.1' else (SOUND_ID, BUS_ID, PARENT_ID)
     parent_output, parent_key = ('volume-db', 'volume_db') if version == '2024.1' else ('work-unit-is-default', 'work_unit_is_default')
@@ -449,13 +530,23 @@ def collect_owned_capture(batch, public_call):
         report['remaining_same_parent_obligations'] = {
             'profiler-loaded-media-observation': ['2023.1', '2024.1', '2025.1']}
 
+    cleanup_active = False
+    if cursor_moves:
+        report['scope'] = 'Four 2025.1 user-cursor moves on one stopped capture; no acoustic or capture-content completeness proof'
+        report['limits'].update(public_calls=128, cleanup_reserve_calls=30,
+            cleanup_reserve_reply_bytes=2 * 1024 * 1024)
+
     def persist():
         raw = (json.dumps(report, ensure_ascii=False, indent=2) + '\n').encode()
         assert len(raw) <= 1024 * 1024, 'Capture report byte bound exceeded'
         temporary = path.with_suffix('.tmp'); temporary.write_bytes(raw); temporary.replace(path)
 
     def call(argv):
-        assert report['public_call_count'] < report['limits']['public_calls'], 'Capture public call bound exceeded'
+        reserve = report['limits'].get('cleanup_reserve_calls', 0) if not cleanup_active else 0
+        assert report['public_call_count'] < report['limits']['public_calls'] - reserve, 'Capture public call bound exceeded'
+        if cursor_moves and not cleanup_active:
+            assert report['total_reply_bytes'] + report['limits']['reply_bytes'] <= (
+                report['limits']['total_reply_bytes'] - report['limits']['cleanup_reserve_reply_bytes']), 'Capture cleanup byte reserve unavailable'
         report['public_call_count'] += 1
         try:
             result = public_call(argv)
@@ -559,19 +650,61 @@ def collect_owned_capture(batch, public_call):
         cleanup.append((label, action))
 
     def clean_one(label):
+        nonlocal cleanup_active
         pending = [(name, action) for name, action in cleanup if name == label]
         assert len(pending) == 1, ('Cleanup ownership unavailable', label)
         name, action = pending[0]
         cleanup.remove(pending[0])
+        previous_cleanup = cleanup_active
+        cleanup_active = True
         try:
             result = action()
         except Exception as exc:
             report['cleanup']['errors'].append({'action': name, 'type': type(exc).__name__, 'message': str(exc)[:4096]})
             persist()
             raise
+        finally:
+            cleanup_active = previous_cleanup
         report['cleanup']['receipts'].append({'action': name, 'result': result})
         persist()
         return result
+
+    def finish():
+        nonlocal cleanup_active
+        cleanup_active = True
+        for label, action in reversed(cleanup):
+            try:
+                report['cleanup']['receipts'].append({'action': label, 'result': action()})
+            except Exception as exc:
+                report['cleanup']['errors'].append({'action': label, 'type': type(exc).__name__, 'message': str(exc)[:4096]})
+            persist()
+        try:
+            if 'fixture_before' in report:
+                after = {'sound': exact(sound_id, *looping),
+                    'bus': exact(bus_id, *bus_fields),
+                    'parent': exact(parent_id, *parent_fields)}
+                if capture_reads and 'source' in report['fixture_before']:
+                    after.update(source=exact(CAPTURE_CAR_SOURCE_ID))
+                report['fixture_after'] = after
+                assert after == report['fixture_before'], 'Owned Sound/bus/parent values changed after cleanup'
+        except Exception as exc:
+            report['cleanup']['errors'].append({'action': 'fixture-preservation', 'type': type(exc).__name__, 'message': str(exc)[:4096]})
+        report['cleanup']['complete'] = not report['cleanup']['errors']
+        report['complete'] = (not report['errors'] and report['cleanup']['complete']
+            and all(row['outcome'] == 'PASS' for row in report['outcomes'].values()))
+        persist()
+
+    if cursor_moves:
+        persist()
+        try:
+            _collect_cursor_moves(call, report, persist, effect=effect, zero=zero,
+                own=own, clean_one=clean_one)
+        except Exception as exc:
+            report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:4096]})
+        finally:
+            finish()
+        assert report['complete'], report
+        return
 
     persist()
     try:
@@ -806,25 +939,5 @@ def collect_owned_capture(batch, public_call):
     except Exception as exc:
         report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:4096]})
     finally:
-        for label, action in reversed(cleanup):
-            try:
-                report['cleanup']['receipts'].append({'action': label, 'result': action()})
-            except Exception as exc:
-                report['cleanup']['errors'].append({'action': label, 'type': type(exc).__name__, 'message': str(exc)[:4096]})
-            persist()
-        try:
-            if 'fixture_before' in report:
-                after = {'sound': exact(sound_id, *looping),
-                    'bus': exact(bus_id, *bus_fields),
-                    'parent': exact(parent_id, *parent_fields)}
-                if capture_reads and 'source' in report['fixture_before']:
-                    after.update(source=exact(CAPTURE_CAR_SOURCE_ID))
-                report['fixture_after'] = after
-                assert after == report['fixture_before'], 'Owned Sound/bus/parent values changed after cleanup'
-        except Exception as exc:
-            report['cleanup']['errors'].append({'action': 'fixture-preservation', 'type': type(exc).__name__, 'message': str(exc)[:4096]})
-        report['cleanup']['complete'] = not report['cleanup']['errors']
-        report['complete'] = (not report['errors'] and report['cleanup']['complete']
-            and all(row['outcome'] == 'PASS' for row in report['outcomes'].values()))
-        persist()
+        finish()
     assert report['complete'], report
