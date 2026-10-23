@@ -1,4 +1,4 @@
-"""One real native collision graph with separate receipt-bound undo and redo."""
+"""Pinned native creation graphs with separate receipt-bound undo and redo."""
 import hashlib
 import json
 import os
@@ -23,7 +23,7 @@ from tests.destructive.test_gateway_workflow_transaction_matrix import (
 pytestmark = [
     pytest.mark.live, pytest.mark.destructive,
     pytest.mark.skipif(os.environ.get("WWISE_VERSION") != "2025.1",
-        reason="One pinned 2025 multiple-root source/history witness; other versions remain separate"),
+        reason="Pinned 2025 ordinary creation/history witnesses; other versions remain separate"),
 ]
 OWNER = "{ED2BCAC8-D7B6-4448-8900-439B557894F4}"
 ANCESTOR = "{8CF94195-E210-4967-89DB-CA103B48A267}"
@@ -37,11 +37,36 @@ IDENTITY_FIELDS = ["id", "name", "type", "path", "parent", "classId", "notes"]
 
 
 def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runtime):
+    _exercise_owned_creation_history(workflow_sandbox_runtime)
+
+
+def test_duplicate_siblings_below_new_parent_reference_owned_history(workflow_sandbox_runtime):
+    _exercise_owned_creation_history(workflow_sandbox_runtime, duplicate_siblings=True)
+
+
+def _assert_public_created_objects(verified, handles, specs, independent):
+    """Check the compound public roster against separate exact-GUID observations."""
+    business = verified["agent_result"]["business_result"]
+    assert business["configuration_complete"] is True, business
+    assert business["identity_source"] == "independently_verified_creation_occurrences", business
+    roster = business["created_objects"]
+    assert len(roster) == len(handles) == 3, roster
+    by_handle = {row["result_handle"]: row for row in roster}
+    assert len(by_handle) == len(roster) and set(by_handle) == set(handles.values()), roster
+    for declaration, handle in handles.items():
+        row, actual, spec = by_handle[handle], independent[declaration], specs[declaration]
+        assert row["compound_child_index"] == 0 and row["request_path"] == spec["request_path"], row
+        assert row["requested_name"] == spec["requested_name"], row
+        assert row["object"] == {key: actual[key] for key in ("id", "name", "type", "path")}, row
+        assert row["class_id"] == actual["class_id"] and row["parent_id"] == actual["parent"]["id"], row
+
+
+def _exercise_owned_creation_history(workflow_sandbox_runtime, *, duplicate_siblings=False):
     runtime = workflow_sandbox_runtime
     build = runtime.sandbox.metadata.get_info_version
     assert runtime.version == "2025.1"
     assert tuple(build.get(key) for key in ("year", "major", "minor", "build")) == (2025, 1, 7, 9143)
-    output = runtime.state_dir / "multiple-root-owned-history.json"
+    output = runtime.state_dir / ("duplicate-sibling-owned-history.json" if duplicate_siblings else "multiple-root-owned-history.json")
     assert not output.exists(), "Never overwrite an earlier native observation"
     output.parent.mkdir(parents=True, exist_ok=True)
     evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
@@ -52,7 +77,7 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
         "complete": False, "business_effect_verified": False, "stack_head_observed": False,
         "outside_scope_preservation_observed": False,
         "lifecycle_acceptance": "Requires final host-category-evidence/v3 PASS; this receipt alone grants no cleanup/source-integrity credit"}
-    category = {"category": "multiple-native-collision-roots-owned-history", "status": "FAIL",
+    category = {"category": "duplicate-siblings-new-parent-owned-history" if duplicate_siblings else "multiple-native-collision-roots-owned-history", "status": "FAIL",
         "observation_path": str(output), "verifier_strength": "actual_separate_stages_and_independent_graph_reference_preservation_history"}
     runtime.category_results.append(category)
 
@@ -205,15 +230,20 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
             {"type": "override", "action": "Enable", "property": "OverrideUserAuxSends", "context": "Self"}]
         assert sorted(metadata["dependencies"], key=lambda row: row["type"]) == sorted(dependencies, key=lambda row: row["type"]), metadata
         handles = {}
-        for declaration, name, parent_handle, kind in (("guns", "Guns", owner, types["Bus"]),
+        declarations = (("routing", "Routing", owner, types["Bus"]),
+            ("destination", "Send", "routing", types["AuxBus"]),
+            ("sender", "Send", "routing", types["AuxBus"])) if duplicate_siblings else (("guns", "Guns", owner, types["Bus"]),
                 ("destination", "Destination", "guns", types["AuxBus"]), ("cars", "Cars", owner, types["Bus"]),
-                ("sender", "Sender", "cars", types["AuxBus"])):
+                ("sender", "Sender", "cars", types["AuxBus"]))
+        for declaration, name, parent_handle, kind in declarations:
             declared = _update_business_draft(gateway, child, "draft-declare-new", ["--declaration-id", declaration,
                 "--parent-handle", handles.get(parent_handle, parent_handle), "--kind", kind, "--name", name,
                 *(["--field-value", field, handles["destination"]] if declaration == "sender" else [])], live=False)
             handles[declaration] = declared_business_object_handle(declared, declaration)
+        observation["declared_handles"] = handles
         _update_business_draft(gateway, child, "draft-check", live=True)
-        _update_business_draft(gateway, parent, "draft-declare-undo-plan", ["--display-name", "Two native collision roots and owned reference",
+        _update_business_draft(gateway, parent, "draft-declare-undo-plan", ["--display-name",
+            "Duplicate children below a new parent and owned reference" if duplicate_siblings else "Two native collision roots and owned reference",
             "--child-draft", child.draft_id, child.task_authority], live=False)
 
         def inspect_source(preview, shown):
@@ -221,14 +251,32 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
             assert len(calls) == 1, calls
             prepared = observation["source_prepared"] = calls[0]["prepared_operation"]
             specs = prepared["verification_plan"]["nodes"]
-            names = {node["requested_name"]: node for node in specs if node.get("existing_target") is False}
-            assert set(names) == {"Guns", "Cars", "Destination", "Sender"}, names
-            assert all(names[name]["class_id"] == (1376272 if name in {"Guns", "Cars"} else 3997712) for name in names)
             plan = prepared["pre_state"]["owned_result_stages"]
-            assert [next(node["requested_name"] for node in specs if node["request_path"] == stage["root"]) for stage in plan["creation_stages"]] == ["Guns", "Cars"]
-            assert prepared["semantic_preview"]["envelope"]["metadata"]["result_reference_execution"]["stage_count"] == 3
+            if duplicate_siblings:
+                facts = prepared["pre_state"]["planned_reference_context"]["facts"]
+                by_handle = {facts[node["request_path"]]["result_handle"]: node for node in specs if not node.get("existing_target")}
+                assert len(by_handle) == len(handles) == 3 and set(by_handle) == set(handles.values())
+                names = {declaration: by_handle[handle] for declaration, handle in handles.items()}
+                observation["occurrence_specs"] = names
+                assert {key: node["requested_name"] for key, node in names.items()} == {"routing": "Routing", "destination": "Send", "sender": "Send"}
+                assert len({node["request_path"] for node in names.values()}) == 3
+                assert all(node["class_id"] == (1376272 if declaration == "routing" else 3997712) for declaration, node in names.items())
+                assert names["destination"]["parent_request_path"] == names["sender"]["parent_request_path"] == names["routing"]["request_path"]
+                reference, = names["sender"]["references"]
+                assert reference["target_request_path"] == names["destination"]["request_path"] and reference["target_result_handle"] == handles["destination"]
+                assert [stage["root"] for stage in plan["creation_stages"]] == [names[key]["request_path"] for key in ("routing", "destination", "sender")]
+                assert all(stage["owned_parent"] is True and stage["parent"] == names["routing"]["request_path"] for stage in plan["creation_stages"][1:])
+                root_child, = plan["creation_stages"][0]["args"]["objects"][0]["children"]
+                assert root_child["name"] == "Routing" and "children" not in root_child, root_child
+                assert prepared["semantic_preview"]["envelope"]["metadata"]["result_reference_execution"]["stage_count"] == 4
+            else:
+                names = {node["requested_name"]: node for node in specs if node.get("existing_target") is False}
+                assert set(names) == {"Guns", "Cars", "Destination", "Sender"}, names
+                assert all(names[name]["class_id"] == (1376272 if name in {"Guns", "Cars"} else 3997712) for name in names)
+                assert [next(node["requested_name"] for node in specs if node["request_path"] == stage["root"]) for stage in plan["creation_stages"]] == ["Guns", "Cars"]
+                assert prepared["semantic_preview"]["envelope"]["metadata"]["result_reference_execution"]["stage_count"] == 3
             assert prepared["pre_state"]["field_read_platform"]["platform_id"] == WINDOWS
-            evidence, = names["Sender"]["new_object_default_evidence"]
+            evidence, = names["sender" if duplicate_siblings else "Sender"]["new_object_default_evidence"]
             assert evidence["derived_properties"] == {}, evidence
             applicability, = evidence["override_applicability"]
             assert applicability["kind"] == "not_applicable_on_class" and applicability["class_id"] == 3997712, evidence
@@ -243,27 +291,63 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
         phase, = [row["dispatch_result"] for row in execution["result"]["phases"] if "owned_result_execution" in row["dispatch_result"]]
         proof = observation["actual_stage_proof"] = phase["owned_result_execution"]
         prepared = observation["source_prepared"]
-        specs = {node["requested_name"]: node for node in prepared["verification_plan"]["nodes"] if not node.get("existing_target")}
+        specs = (observation["occurrence_specs"] if duplicate_siblings else
+            {node["requested_name"]: node for node in prepared["verification_plan"]["nodes"] if not node.get("existing_target")})
         created = {name: proof["identities"][spec["request_path"]] for name, spec in specs.items()}
         ids = {name: row["id"].upper() for name, row in created.items()}
-        assert len(set(ids.values())) == 4 and not set(ids.values()) & {OWNER, ANCESTOR, GUNS, CARS}
+        assert len(set(ids.values())) == (3 if duplicate_siblings else 4) and not set(ids.values()) & {OWNER, ANCESTOR, GUNS, CARS}
         stages = proof["stages"]
-        assert len(stages) == 3 and phase["result"] == stages[0]["dispatch_result"]["result"]
-        for stage, name in zip(stages[:2], ("Guns", "Cars"), strict=True):
-            assert stage["uri"] == SET and stage["dispatch_result"]["ok"] is True, stage
-            native_parent, = stage["args"]["objects"]
-            assert native_parent["object"] == OWNER and "name" not in native_parent
-            native_child, = native_parent["children"]
-            assert native_child["name"] == name and stage["args"]["onNameConflict"] == "rename", stage
-            result_parent, = stage["dispatch_result"]["result"]["objects"]
-            result_child, = result_parent["children"]
-            assert result_parent["id"] == OWNER and result_child["id"].upper() == ids[name], stage
-            assert result_child["name"] == created[name]["name"] and created[name]["name"].casefold() != name.casefold(), stage
-        receiver, = stages[2]["args"]["objects"]
-        assert stages[2]["uri"] == SET and receiver["object"].upper() == ids["Sender"] and "name" not in receiver
-        assert stages[2]["dispatch_result"]["ok"] is True
-        assert receiver["@UserAuxSend0"] == created["Destination"]["path"], receiver
-        cumulative = proof["creation_bindings"][1]["readbacks"]
+        assert len(stages) == (4 if duplicate_siblings else 3) and phase["result"] == stages[0]["dispatch_result"]["result"]
+        if duplicate_siblings:
+            for stage, declaration in zip(stages[:3], ("routing", "destination", "sender"), strict=True):
+                assert stage["uri"] == SET and stage["dispatch_result"]["ok"] is True, stage
+                native_parent, = stage["args"]["objects"]
+                expected_parent = OWNER if declaration == "routing" else ids["routing"]
+                assert native_parent["object"].upper() == expected_parent and "name" not in native_parent
+                assert set(native_parent) <= {"object", "children", "platform", "onNameConflict", "listMode"}, native_parent
+                native_child, = native_parent["children"]
+                assert native_child["name"] == ("Routing" if declaration == "routing" else "Send") and "children" not in native_child
+                assert "@UserAuxSend0" not in native_child, native_child
+                assert stage["args"]["onNameConflict"] == "rename", stage
+                result_parent, = stage["dispatch_result"]["result"]["objects"]
+                result_child, = result_parent["children"]
+                assert result_parent["id"].upper() == expected_parent and result_child["id"].upper() == ids[declaration], stage
+                assert result_child["name"] == created[declaration]["name"], stage
+            assert created["destination"]["name"].casefold() != created["sender"]["name"].casefold()
+            for index in (1, 2):
+                before_reads = proof["creation_bindings"][index]["before_readbacks"]
+                for declaration in (("routing",) if index == 1 else ("routing", "destination")):
+                    identity = created[declaration]["id"]
+                    assert any(record["uri"] == GET and record["args"] == {"from": {"id": [identity]}}
+                        and record["options"] == {"return": IDENTITY_FIELDS} for record in before_reads)
+                    assert any(record["uri"] == GET and record["args"] == {"from": {"id": [identity]}, "transform": [{"select": ["children"]}]}
+                        and record["options"] == {"return": ["id"]} for record in before_reads)
+                assert proof["creation_bindings"][index]["before_preservation"]
+                assert all(row["passed"] for row in proof["creation_bindings"][index]["before_preservation"])
+        else:
+            for stage, name in zip(stages[:2], ("Guns", "Cars"), strict=True):
+                assert stage["uri"] == SET and stage["dispatch_result"]["ok"] is True, stage
+                native_parent, = stage["args"]["objects"]
+                assert native_parent["object"] == OWNER and "name" not in native_parent
+                native_child, = native_parent["children"]
+                assert native_child["name"] == name and stage["args"]["onNameConflict"] == "rename", stage
+                result_parent, = stage["dispatch_result"]["result"]["objects"]
+                result_child, = result_parent["children"]
+                assert result_parent["id"] == OWNER and result_child["id"].upper() == ids[name], stage
+                assert result_child["name"] == created[name]["name"] and created[name]["name"].casefold() != name.casefold(), stage
+        sender_key, destination_key = ("sender", "destination") if duplicate_siblings else ("Sender", "Destination")
+        receiver, = stages[-1]["args"]["objects"]
+        assert stages[-1]["uri"] == SET and receiver["object"].upper() == ids[sender_key] and "name" not in receiver
+        assert stages[-1]["dispatch_result"]["ok"] is True
+        assert receiver["@UserAuxSend0"] == created[destination_key]["path"], receiver
+        if duplicate_siblings:
+            for declaration in ("destination", "sender"):
+                assert any(record["uri"] == GET and record["args"] == {"from": {"id": [created[declaration]["id"]]}}
+                    and record["options"] == {"return": IDENTITY_FIELDS} for record in proof["readbacks"])
+            assert any(record["uri"] == "ak.wwise.core.object.getPropertyInfo"
+                and record["args"] == {"property": "UserAuxSend0", "object": created["sender"]["id"]}
+                and record["options"] == {} for record in proof["readbacks"])
+        cumulative = proof["creation_bindings"][-1]["readbacks"]
         for row in created.values():
             assert any(record["uri"] == GET and record["args"] == {"from": {"id": [row["id"]]}}
                 and record["options"] == {"return": IDENTITY_FIELDS} for record in cumulative), row
@@ -280,18 +364,28 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
                 row, bound = state["descendants"][identity], created[name]
                 assert all(row[key] == bound[key] for key in ("id", "name", "type", "path", "notes")), (row, bound)
                 assert row["class_id"] == bound["classId"] and row["parent"]["id"] == bound["parent"]["id"], (row, bound)
-                assert (row["type"], row["class_id"]) == (("Bus", 1376272) if name in {"Guns", "Cars"} else ("AuxBus", 3997712)), row
-            for name, parent_name in (("Destination", "Guns"), ("Sender", "Cars")):
-                row = state["descendants"][ids[name]]
-                assert row["parent"]["id"].upper() == ids[parent_name] and row["path"] == created[parent_name]["path"] + "\\" + name, row
-            for name in ("Guns", "Cars"):
+                assert (row["type"], row["class_id"]) == (("Bus", 1376272) if name in ({"routing"} if duplicate_siblings else {"Guns", "Cars"}) else ("AuxBus", 3997712)), row
+            if duplicate_siblings:
+                for declaration in ("destination", "sender"):
+                    row = state["descendants"][ids[declaration]]
+                    assert row["parent"]["id"].upper() == ids["routing"] and row["path"] == created["routing"]["path"] + "\\" + row["name"], row
+                root = state["descendants"][ids["routing"]]
+                assert root["path"] == state["owner"]["path"] + "\\" + root["name"], root
+            else:
+                for name, parent_name in (("Destination", "Guns"), ("Sender", "Cars")):
+                    row = state["descendants"][ids[name]]
+                    assert row["parent"]["id"].upper() == ids[parent_name] and row["path"] == created[parent_name]["path"] + "\\" + name, row
+            for name in (("routing",) if duplicate_siblings else ("Guns", "Cars")):
                 assert state["descendants"][ids[name]]["parent"]["id"] == OWNER
-            state["sender"] = exact(label + "-sender-reference", ids["Sender"], reference=True)
+            state["sender"] = exact(label + "-sender-reference", ids[sender_key], reference=True)
             target = state["sender"]["references"]["UserAuxSend0"]
-            assert isinstance(target, dict) and target["id"].upper() == ids["Destination"], state
+            assert isinstance(target, dict) and target["id"].upper() == ids[destination_key], state
             return state
 
         after = observation["source_state"] = after_state("source")
+        if duplicate_siblings:
+            independent = {declaration: after["descendants"][identity] for declaration, identity in ids.items()}
+            _assert_public_created_objects(source["verify"], handles, specs, independent)
         for direction in ("undo", "redo"):
             history = _start_business_draft(gateway, "ak.wwise.core.undo." + direction)
             _update_business_draft(gateway, history, "draft-declare-core-plan", ["--value", "history_scope", "latest_project_history",
@@ -309,12 +403,12 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
                 presence = [row for row in binding["observations"] if row.get("kind") == "creation_presence"]
                 assert {row["object"]["id"].upper() for row in presence} == set(ids.values())
                 reference, = [row for row in binding["observations"] if row.get("kind") == "creation_field"]
-                assert reference["field"] == "UserAuxSend0" and reference["object_id"].upper() == ids["Sender"]
-                assert reference["value"].upper() == reference["internal_reference_target_id"].upper() == ids["Destination"]
+                assert reference["field"] == "UserAuxSend0" and reference["object_id"].upper() == ids[sender_key]
+                assert reference["value"].upper() == reference["internal_reference_target_id"].upper() == ids[destination_key]
                 assert reference["field_info"]["raw"]["restriction"]["type"] == "reference", reference
                 assert reference["field_kind"] == "reference" and reference["metadata_type"] == "", reference
                 retained = {row["object_before"]["id"].upper(): row for row in binding["observations"] if "object_before" in row}
-                assert set(retained) == {OWNER, GUNS, CARS}, retained
+                assert set(retained) == ({OWNER} if duplicate_siblings else {OWNER, GUNS, CARS}), retained
                 for identity in retained:
                     expected = before["owner"] if identity == OWNER else before["descendants"][identity]
                     row = retained[identity]
@@ -323,7 +417,8 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
                     assert row["before"] == row["after"] == expected["notes"] and row["class_id"] == expected["class_id"], row
                     assert row["parent_id"] == expected["parent"]["id"], row
                     assert row["preserved_children_before"] == (sorted([GUNS, CARS]) if identity == OWNER else []), row
-                    assert row["preserved_children_after"] == (sorted([GUNS, CARS, ids["Guns"], ids["Cars"]]) if identity == OWNER else []), row
+                    roots = [ids["routing"]] if duplicate_siblings else [ids["Guns"], ids["Cars"]]
+                    assert row["preserved_children_after"] == (sorted([GUNS, CARS, *roots]) if identity == OWNER else []), row
             result = complete(history, direction, inspect_history)
             assert result["verify"]["verification_strength"] == "scoped_history_effect_readback", result
             if direction == "undo":
@@ -335,7 +430,7 @@ def test_multiple_colliding_roots_reference_owned_history(workflow_sandbox_runti
             else:
                 observation["redo_state"] = after_state("redo")
                 assert observation["redo_state"] == after
-        assert len(observation["reads"]) == 20 and len(observation["transactions"]) == 3
+        assert len(observation["reads"]) == (19 if duplicate_siblings else 20) and len(observation["transactions"]) == 3
         observation.update(complete=True, business_effect_verified=True)
         category["status"] = "PASS"
     except BaseException as exc:
