@@ -6738,6 +6738,8 @@ def _prepare_object_set(
             for list_spec in prepared_specs:
                 is_root = list_spec.get("request_path") in root_paths
                 if is_root:
+                    from .documented_list_fields import certify_anonymous_marker
+                    certify_anonymous_marker(list_spec, proof)
                     list_spec["documented_list_element_class"] = list_spec["class_id"]
                 list_spec["target_index"] = index
                 list_spec.setdefault("platform", platform)
@@ -6914,6 +6916,8 @@ def _prepare_object_set(
                         nested_specs[member.request_path]["class_id"] not in allowed_classes for member in descriptor.objects):
                     raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "Requested nested List member class is not proved by its owner declaration")
                 for member in descriptor.objects:
+                    from .documented_list_fields import certify_anonymous_marker
+                    certify_anonymous_marker(nested_specs[member.request_path], binding)
                     nested_specs[member.request_path]["documented_list_element_class"] = nested_specs[member.request_path]["class_id"]
                 before_proof = observe_planned_list(binding, owner_spec["preexisting_id"], read=read) if owner_spec.get("preexisting_id") else None
                 planned_guards.append({"binding": binding, "before": before_proof})
@@ -8707,9 +8711,13 @@ def _prepare_object_node_specs(
                 version=version, read=read, identity_cache=identity_cache, property_info_cache=property_info_cache,
                 snapshot_cache=rtpc_snapshots, replace_all=rtpc_replace_all, platform=platform)
         elif node.anonymous:
-            if version not in {"2023.1", "2024.1", "2025.1"} or node.collection != "Effects" or type_info.name != "EffectSlot":
-                raise OperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Anonymous construction requires source-proven EffectSlot/Effects placement")
+            from .documented_list_fields import is_manual_marker_class
+            marker = node.collection == "Markers" and is_manual_marker_class(version, type_info.name, type_info.class_id)
+            if version not in {"2023.1", "2024.1", "2025.1"} or not (marker or node.collection == "Effects" and type_info.name == "EffectSlot"):
+                raise OperationContractError("ANONYMOUS_LIST_PLACEMENT_INVALID", "Anonymous construction requires source-proven List/type placement")
             spec["anonymous_list_member"] = True
+            if marker:
+                spec["manual_marker"] = True
         elif merge_existing:
             merge_target = _resolve_merge_node_target(node, spec, specs, node_paths=node_paths,
                 root_parent=root_parent, root_collection=root_collection, version=version, read=read,
@@ -20823,31 +20831,36 @@ def verify_prepared_operation(
                     # Native List order, not returned association order or post
                     # values, assigns stable declaration identities.
                     anonymous = [child for child in children if child.get("anonymous_list_member")]
-                    if any(child.get("collection") != "Effects" for child in anonymous):
-                        raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require their certified Effects placement")
-                    guards = [guard for guard in pre_state.get("documented_list_guards", [])
-                        if _same_identity(guard["evidence"]["scope"]["scope_value"], owner_id)
-                        and guard["evidence"]["declaration"]["name"] == "Effects"]
-                    planned = [guard for guard in pre_state.get("documented_planned_list_guards", [])
-                        if guard["binding"]["planned_owner"]["request_path"] == owner_spec["request_path"]
-                        and guard["binding"]["declaration"]["name"] == "Effects"]
-                    if len(guards) + len(planned) != 1:
-                        raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results need one exact source List proof")
-                    before = (guards[0] if guards else planned[0].get("before") or {"members": []})["members"]
-                    old_ids = [_identity_key(member["id"]) for member in before]
-                    replacement = owner_spec.get("list_mode", "append") == "replaceAll"
-                    prefix = [] if replacement else old_ids
-                    rows = read_object(object_id=owner_id, fields=("id", "@Effects"), platform=owner_spec.get("platform"))
-                    members = rows[0].get("@Effects") if len(rows) == 1 and _same_identity(rows[0].get("id"), owner_id) else None
-                    ids = [_reference_identity(member) for member in members] if isinstance(members, list) and len(members) <= OBJECT_LIST_MAX_SUBTREE_NODES else []
-                    reviewed = [child for child in children if child.get("collection") == "Effects"]
-                    if (len(ids) != len(prefix) + len(reviewed) or any(not _valid_object_id(identity) for identity in ids)
-                            or len({_identity_key(identity) for identity in ids}) != len(ids)
-                            or [_identity_key(identity) for identity in ids[:len(prefix)]] != prefix
-                            or any(_identity_key(identity) in old_ids for identity in ids[len(prefix):])):
-                        raise ObjectOperationContractError("ANONYMOUS_LIST_MEMBERSHIP_MISMATCH", "Anonymous creation requires the complete new ordered GUID population and preserved append prefix")
-                    return {child["request_path"]: identity for child, identity in zip(reviewed, ids[len(prefix):], strict=True)
-                        if child.get("anonymous_list_member")}
+                    collections = {child.get("collection") for child in anonymous}
+                    if (not collections <= {"Effects", "Markers"} or any(child.get("collection") == "Markers"
+                            and not isinstance(child.get("manual_marker"), Mapping) for child in anonymous)):
+                        raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results require their sealed List profile")
+                    bound_ids = {}
+                    for collection in sorted(collections):
+                        guards = [guard for guard in pre_state.get("documented_list_guards", [])
+                            if _same_identity(guard["evidence"]["scope"]["scope_value"], owner_id)
+                            and guard["evidence"]["declaration"]["name"] == collection]
+                        planned = [guard for guard in pre_state.get("documented_planned_list_guards", [])
+                            if guard["binding"]["planned_owner"]["request_path"] == owner_spec["request_path"]
+                            and guard["binding"]["declaration"]["name"] == collection]
+                        if len(guards) + len(planned) != 1:
+                            raise ObjectOperationContractError("INVALID_RESULT_BINDING", "Anonymous results need one exact source List proof")
+                        before = (guards[0] if guards else planned[0].get("before") or {"members": []})["members"]
+                        old_ids = [_identity_key(member["id"]) for member in before]
+                        replacement = owner_spec.get("list_mode", "append") == "replaceAll"
+                        prefix = [] if replacement else old_ids
+                        rows = read_object(object_id=owner_id, fields=("id", "@" + collection), platform=owner_spec.get("platform"))
+                        members = rows[0].get("@" + collection) if len(rows) == 1 and _same_identity(rows[0].get("id"), owner_id) else None
+                        ids = [_reference_identity(member) for member in members] if isinstance(members, list) and len(members) <= OBJECT_LIST_MAX_SUBTREE_NODES else []
+                        reviewed = [child for child in children if child.get("collection") == collection]
+                        if (len(ids) != len(prefix) + len(reviewed) or any(not _valid_object_id(identity) for identity in ids)
+                                or len({_identity_key(identity) for identity in ids}) != len(ids)
+                                or [_identity_key(identity) for identity in ids[:len(prefix)]] != prefix
+                                or any(_identity_key(identity) in old_ids for identity in ids[len(prefix):])):
+                            raise ObjectOperationContractError("ANONYMOUS_LIST_MEMBERSHIP_MISMATCH", "Anonymous creation requires the complete new ordered GUID population and preserved append prefix")
+                        bound_ids.update({child["request_path"]: identity for child, identity in zip(reviewed, ids[len(prefix):], strict=True)
+                            if child.get("anonymous_list_member")})
+                    return bound_ids
 
                 result_by_path = _bind_object_set_result_nodes(
                     result_nodes, specs, on_name_conflict=str(plan.get("on_name_conflict")),

@@ -214,6 +214,44 @@ def resolve_planned_list_evidence(session, value, *, owner_handle):
 
 
 
+def manual_marker_profile(version):
+    """One SDK-certified anonymous WObject profile, separate from Inner naming."""
+    if version not in {"2023.1", "2024.1", "2025.1"}:
+        return None
+    path = Path(__file__).resolve().parents[1] / "references" / "semantic" / version / "manual-marker-construction-source.json"
+    source = json.loads(path.read_text(encoding="utf-8"))
+    catalog = load_catalog(version)
+    if (source["contract"] != "waapi-skill.manual-marker-construction-source/v1" or source["version"] != version
+            or source["source"]["build"] != catalog["source"]["build"]
+            or source["source"]["archive_sha256"] != catalog["source"]["archive_sha256"]
+            or (source["owner_class_id"], source["collection"], source["element_class_id"], source["element_type"], source["native_name"])
+                != (16, "Markers", 5373968, "Marker", "")
+            or source["sdk_example"] != {"marker_input_mode": 2, "list_mode": "append",
+                "marker": {"type": "Marker", "name": "", "@Time": 1, "@Label": "Waapi Generated"}}):
+        raise ValueError("Manual Marker constructor differs from its matching SDK authority")
+    binding = resolve_class_list_evidence(version, 16, "Markers")
+    if binding["declaration"]["element_classes"] != [{"name": "Marker", "class_id": 5373968}]:
+        raise ValueError("Manual Marker requires the exact AudioFileSource List declaration")
+    return {**source, "source_sha256": canonical_sha256(source), "list_source": binding}
+
+
+def is_manual_marker_class(version, name, class_id):
+    return version in {"2023.1", "2024.1", "2025.1"} and (name, class_id) == ("Marker", 5373968)
+
+
+def certify_anonymous_marker(spec, binding):
+    """Bind the actual owner scope, never a base-name or Inner substitution."""
+    if not spec.get("manual_marker"):
+        return
+    profile = manual_marker_profile(binding["version"])
+    if (profile is None or binding["scope"]["class_id"] != 16
+            or binding["declaration"] != profile["list_source"]["declaration"]
+            or binding["scope"]["scope_kind"] == "object" and binding["scope"].get("owner", {}).get("type") != "AudioFileSource"
+            or spec["class_metadata"].get("type") != "WObject"):
+        raise ValueError("Anonymous Marker requires exact AudioFileSource16/Markers/Marker5373968 WObject placement")
+    spec["manual_marker"] = profile
+
+
 def owned_inner_identity(binding, member_class):
     """One observed Inner representation, bound to its exact List source.
 

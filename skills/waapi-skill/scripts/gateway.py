@@ -29726,7 +29726,7 @@ def _business_next_action_binding(
                     "anonymous_list_member": {
                         **operation_draft_prefix_copy_binding(declare_new_prefix),
                         "append": ["--declaration-id", "<task-local-id>", "--parent-handle", "<bound-or-planned-owner-handle>",
-                            "--kind", "<selected-EffectSlot-Type-Handle>", "--field", "object_list", "<selected-Effects-List-Field-Handle>",
+                            "--kind", "<selected-profile-Type-Handle>", "--field", "object_list", "<selected-owner-List-Field-Handle>",
                             "[--field-value <selected-class-Field-Handle> <business-value>]..."],
                         "native_name": "Gateway_owned_empty_string",
                         "semantics": business_contract["declaration"]["anonymous_list_member"],

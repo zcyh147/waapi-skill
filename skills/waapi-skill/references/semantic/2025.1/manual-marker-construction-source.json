@@ -1,0 +1,29 @@
+{
+  "contract": "waapi-skill.manual-marker-construction-source/v1",
+  "version": "2025.1",
+  "source": {
+    "build": "2025.1.7.9143",
+    "archive": "WwiseSDK-Windows.chm",
+    "archive_sha256": "c54b729388040e9df540a2f58d0d0eda966ac5da6410d3cd715ae256d898166d",
+    "index_member": "wobjects_index.html",
+    "index_sha256": "d5a0a36bc6ef604f309f1edc7fcddd77606de290cdcc6478c51fa204a44e77b4",
+    "member": "ak_wwise_core_object_set_example_adding_a_marker_to_an_audio_source.html",
+    "member_sha256": "a7c04d8f33f174e65dcce126fda7c15e076aa4f5e9bcc70be000031bad4c53cc"
+  },
+  "owner_class_id": 16,
+  "collection": "Markers",
+  "element_class_id": 5373968,
+  "element_type": "Marker",
+  "native_name": "",
+  "sdk_example": {
+    "marker_input_mode": 2,
+    "list_mode": "append",
+    "marker": {
+      "type": "Marker",
+      "name": "",
+      "@Time": 1,
+      "@Label": "Waapi Generated"
+    }
+  },
+  "scope": "explicitly authored Marker objects; no imported file-cue population or computed marker record claim"
+}
