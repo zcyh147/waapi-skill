@@ -84,9 +84,19 @@ repair, 50 directly affected checks passed in 2.08s. These counts overlap.
 Initial field-token, disclosure and exact-object fallback failures remain
 preserved in `r83-namespaced-reviewed-evidence`. Independent review found no
 material issue and checked all five definitions and embedded source hashes.
-Public-flow native acceptance, including actual custom-value RETURN/readback,
-remains pending its separate prepared test; the earlier advanced identity-only
-witness is not substituted for it. No Fresh or full gate ran for this slice.
+The separate closed-business witness passed at frozen `b3aedf70` on macOS
+Console2025.1.7.9143 in 8.73s: seven public query groups, 33 hashed native packets
+and zero transactions. Actual typed @MyCompany:Status and @@MyCompany:Status
+values were zero in all eight before/after observations; all four positive and
+negative native selections matched public IDs, with fresh class metadata,
+complete source scopes and unchanged source/cleanup. Root:
+`r83-namespaced-business-b3aedf70-2025-r1/root-review.json`. This completes the
+selected public-flow readback acceptance; it is separate from the earlier
+advanced identity-only witness. Equal local/resolved values do not prove an
+inheritance difference or all-version native coverage. A subsequent one-string
+schema disclosure cleanup `dbcb1eb3` preserves the mandatory live readback rule;
+five existing schema/source checks passed in 0.35s, without a native rerun.
+No Fresh or full gate ran for this slice.
 
 ## 2026-10-23 R81 reference and override query conditions
 
