@@ -5,6 +5,45 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R75 positive device fixture and R76 sequence queries
+
+The positive master-bus workflow uses a new owned copy of the currently assigned
+System device. Closed `object.copy` and `object.setReference` each receive their
+own preview, authorization, execution and verification. Independent reads prove
+the copied plugin identity and five actual selected-platform parameter values,
+the changed reference, and preservation of observed devices, peers and topology.
+
+| Console version | Frozen candidate | Result | Observation reads / native packets | Verified transactions |
+| --- | --- | --- | --- | --- |
+| 2024.1.13.9056 | `987b0702` | 1 passed, 10.47s | 38 / 152 | 2 |
+| 2025.1.7.9143 | `93c339bf` | 1 passed, 7.00s | 38 / 152 | 2 |
+
+Both source trees remain unchanged and passing sandboxes were cleaned. Exact
+packet hashes, observations and lifecycle checks are bound in
+`r75-system-copy-native-review.json` and the per-root `root-review.json` files.
+The first 2025 attempt at `987b0702` failed before any transaction because its
+test assumed two siblings; the committed 2025 fixture contains four. The repair
+requires the selected bus and peer, rejects duplicate GUIDs, and preserves all
+observed sibling rows/order. Original FAIL (8.36s, 11 reads, 22 packets) and
+quarantine remain retained. The valid 2024 effect was reused, not rerun.
+The earlier No_Output rejection remains indeterminate and was never replayed.
+These positive System-copy results do not establish arbitrary plugin eligibility.
+
+R76 sequence queries are integrated at `93fc2467`: closed filtering, ordered
+first/last/index/ranges, count/existence/all-match and concatenation reuse the
+existing related-output planner. Output explicitly identifies Gateway-derived
+sequences rather than claiming native function-return equality. Matching pinned
+source sections distinguish SELECT transformations from return expressions.
+The original affected selection passed 235 in 30.53s. Review found a discarded
+finite prefix before a later filter and a custom field colliding with an internal
+reducer marker. Both reproduced through the public Gateway and were repaired;
+70 affected controls passed in 16.31s (overlap with the earlier selection).
+Independent correction review found no further actionable issue. Twenty-six
+original log/handoff/review files are hash-archived in
+`r76-query-sequence-program-logs`; this is program evidence, not native sequence
+acceptance or a full gate. Record lists, metadata-bound comparison predicates,
+randomizer and remaining versioned query functions stay assigned to #181.
+
 ## 2026-10-23 R75 reference applicability and R76 structural history
 
 R75 candidate `3898c8ad98253bdf49a8ae253073e0e720d5ad3c` replaces invalid
@@ -26,7 +65,7 @@ source/cleanup checks are bound by `root-review.json`. The failed sandbox is
 quarantined; never verify or replay this transaction. The source project is
 unchanged. Matching plugin source identifies a `CanBeMasterSink=false` target
 restriction for No Output; its exact role applicability is under diagnosis.
-No successful reference effect or 2025 run is claimed.
+That original attempt provides no successful reference-effect credit; the subsequent positive fixture below is separate evidence.
 
 R76 structural property history is implemented at `988e60b1`, integrated with
 R75 at `c08ca046f3c28052ae1e83535f42ede677106fc0`. The existing receipt observer
@@ -38,8 +77,18 @@ Focused structural/context tests passed 152 in 100.34s; existing ordinary
 scalar/reference/policy/nonretry callers passed 37 in 25.51s. An additional
 zero-GUID platform boundary passed one in 0.81s; three post-merge shared-caller
 checks passed in 3.60s. Overlapping earlier runs and original fixture failures
-are retained in `r76-history-program-logs`. Structural history native witnesses
-remain pending. #177 and #192 stay open; no Fresh or full-gate result is added.
+are retained in `r76-history-program-logs`.
+
+The selected structural history workflow passed at frozen `9a055665` on
+2022.1 (10.52s, source change and undo, native type omitted) and 2023.1 (10.61s,
+source change, undo and redo, native type present). Both force tagged structural
+binding. They use 21/26 independent observation reads, 130/167 native packets,
+and 2/3 separately authorized verified transactions respectively. ContinuePlay,
+FadeInTime, owner, child and ordered membership are checked after each phase.
+Source integrity and cleanup passed. Evidence: `r76-structural-history-native-review.json`
+and `r76-association-history-9a055665-<year>-r1/root-review.json`.
+This proves the selected outcomes, not a global stack head or unobserved state.
+#177 and #192 stay open; no Fresh or full-gate result is added.
 
 ## 2026-10-23 R74 related list native acceptance
 
