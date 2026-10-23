@@ -210,7 +210,7 @@ def test_scoped_class_metadata_reuse_does_not_claim_an_observed_instance(tmp_pat
     assert 'branch_assertions' not in read(attachment['originals']['observation'])
 
 
-@pytest.mark.parametrize('damage', ['drop-read', 'drop-refresh', 'wrong-scope', 'changed-write', 'fake-instance'])
+@pytest.mark.parametrize('damage', ['drop-read', 'drop-refresh', 'wrong-scope', 'changed-write', 'null-uri', 'fake-instance'])
 def test_scoped_metadata_reuse_requires_observed_current_scope_calls(tmp_path, inputs, program, damage):
     bindings, attachment, read = bundle(tmp_path, program)
     attachment['include_scoped_metadata_mechanism'] = True
@@ -232,6 +232,8 @@ def test_scoped_metadata_reuse_requires_observed_current_scope_calls(tmp_path, i
         for call in calls:
             if call['uri'].endswith('setProperty'):
                 call['args']['value'] = 'not-the-observed-write'
+    elif damage == 'null-uri':
+        calls[0]['uri'] = None
     else:
         record['direct_recipient_instance_metadata'] = 'observed'
     changed = write(tmp_path / 'changed-scope.json', record)
