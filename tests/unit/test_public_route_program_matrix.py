@@ -126,6 +126,27 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
         return
 
+    if entry.uri in {"ak.wwise.core.profiler.moveCursor", "ak.wwise.core.profiler.setCursorTime"}:
+        # F4 observes the user cursor once after the control. Reuse the public
+        # transaction fixture; an empty generic readback is not native evidence.
+        from tests.unit.test_runtime_business_gateway import _ProfilerCursorControlClient, _public_runtime_preview
+        client = _ProfilerCursorControlClient(tmp_path)
+        declaration = (("--cursor-move", "next-frame") if entry.uri.endswith("moveCursor")
+            else ("--cursor-target-ms", "1234"))
+        previewed, invoke = _public_runtime_preview(tmp_path, client, tmp_path / "cursor-state", entry.uri, declaration)
+        executed = invoke(["execute", previewed["transaction_id"]])
+        verified = invoke(executed["next_command"]["gateway_argv"])
+        assert verified["verification"]["business_state_verified"] is True, verified
+        assert verified["verification"]["verification_strength"] == "independent_profiler_user_cursor_observation"
+        assert verified["verification"]["verification_scope"]["cursor_observation"] == {
+            "kind": "profiler-user-cursor-observation", "returned_time_ms": 1230,
+            "observed_time_ms": 1230, "capture_data_verified": False, "outcome": "matched"}
+        cursor_reads = [(args, options) for uri, args, options in client.calls
+            if uri == "ak.wwise.core.profiler.getCursorTime"]
+        assert cursor_reads == [({"cursor": "user"}, {})]
+        assert sum(uri == entry.uri for uri, _, _ in client.calls) == 1
+        return
+
     if entry.uri == "ak.wwise.core.blendContainer.addAssignment":
         # Complete live owner/index facts are mandatory; synthesized schema
         # arguments and an empty observation cannot prepare this public route.
