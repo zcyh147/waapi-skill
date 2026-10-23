@@ -5,6 +5,50 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R77 scalar conditions and R78 creation integration
+
+Integration `2589b9a17d9f41b7f903af7a71c34917488b9a94` combines the reviewed
+scalar-query repair `5f1eeb29` and creation counterpart `4515d479`. These are
+focused program results, not new native or Fresh acceptance.
+
+Scalar conditions now use actual property metadata for root `--where-field`
+and related matching/count/any/all views. The complete bounded source and
+relationship transforms precede the native predicate and final root limit.
+Unknown field authority remains distinct from an empty matching set. Initial
+affected checks passed 248 in 100.84s; a later selection-budget change passed
+11 directly affected checks in 4.94s. Independent review then found four real
+defects: an advanced-root cap could become1000, incomplete metadata discovery
+could select an ambiguous field, source removal could raise KeyError, and
+related selected-value disagreement could go unchecked. All60 five-version
+counterexamples failed before repair (16.64s), then passed (11.95s). Final
+selected scope/type/reducer/page/older-source controls passed111 in81.28s.
+These selections overlap; none is a full-suite or distinct-case total. Main
+reviewed the immutable repair and its original logs without repeating green
+checks. Original evidence is retained in `r77-query-field-program-logs` and
+`r77-query-field-repair-logs` below the ignored full-coverage evidence root.
+Reference/local/override predicates and record/function variants remain #181.
+
+Creation now admits ordinary no-collision compound set graphs and preserves
+the original standalone object.create planned-reference operation across all
+five versions. Actual native-chosen names/GUIDs are bound by class, parent and
+membership before dependent reference writes; no suffix or result-order guess
+is used. The2021 create route uses closed setReference stages, never object.set.
+Native stages/results stay separately retained, with independent final effects
+and preservation checks. Existing-only compound children keep their original
+route; creation-only children disclose one actual write and no dependent stage.
+
+The no-collision source/history selection passed8 in56.47s; the five-version
+original create caller and affected guards passed34 in42.98s. Main review found
+missing/incorrect creation-only stage disclosure; its original RED is retained
+and the corrected public source/history positive passed1 in9.91s. Counts overlap.
+Handoffs, selected logs and review are hash-archived in
+`r78-compound-program-logs`. No native witness is claimed for these new staged
+behaviors. Multi-root collisions, duplicate requested sibling names, richer
+graph forms and native-name create history remain #178/#192 work.
+
+No Fresh, Windows native, full Program or full Non-live gate ran for this
+increment. The PR remains draft and all affected functional tickets stay open.
+
 ## 2026-10-23 R78 Bed Mixer condition acceptance
 
 No runtime change was needed. Four-version public ShareSet setup/edit checks,
