@@ -11604,6 +11604,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if before["outcome"] != "complete":
                 raise OperationContractError("LOG_OBSERVATION_TOO_LARGE", "Log prestate exceeds the bounded complete-channel observation policy.", details=before)
             verification["console"] = host["isCommandLine"]
+            if host['isCommandLine'] and api == LOG_ADD_ITEM_URI:
+                from .runtime_inspection_business_contracts import CONSOLE_LOG_ADD_OBSERVER
+                verification['console_add_observer'] = dict(CONSOLE_LOG_ADD_OBSERVER)
+                warnings.append('Console add subscribes before one execution, waits at most 5 seconds for an exact matching addition event (64 events, 64 KiB per event), then unsubscribes. No exclusive writer or continuing contents proof.')
+            elif host['isCommandLine']:
+                warnings.append('Console clear is acknowledged only: its getter is documented empty and the addition-only Topic cannot prove clearing.')
             metadata["log_channel_before"] = before
             warnings.append("Log verification compares one bounded channel observation; concurrent identical messages cannot be attributed, and continuing channel state is unverified.")
         if blend_plan is not None:
@@ -20217,7 +20223,23 @@ def verify_prepared_operation(
         business_state_verified = False
         verification_strength = "bounded_log_channel_observation"
         check_result_schema(uri, version)
-        if all(item["passed"] for item in assertions):
+        if all(item["passed"] for item in assertions) and plan['console'] and uri == LOG_ADD_ITEM_URI:
+            from .runtime_log_observer import event_observation
+            verification_strength = 'bounded_execute_time_log_event'
+            try:
+                observation = event_observation(execution_result, plan)
+            except (ValueError, SemanticValidationError):
+                check('Execute-time log event matches its pinned publish schema', False, {})
+                observation = {'outcome': 'malformed_event', 'effect_observed': False}
+            check('Execute-time log observer integrity and unsubscribe succeeded',
+                observation['outcome'] not in {'console_event_cleanup_failed', 'malformed_event',
+                    'overflow', 'invalid_event_ingress', 'console_event_mismatch'},
+                {'outcome': observation['outcome']})
+            readbacks.append({'kind': 'log-channel-observation', **observation})
+            business_state_verified = observation['effect_observed']
+            if not business_state_verified:
+                success_status = 'result_schema_checked'
+        elif all(item["passed"] for item in assertions):
             try:
                 after = channel_snapshot(read_call(LOG_GET_URI, {"channel": plan["channel"]}, {}), version=version)
             except OperationContractError:
@@ -24775,7 +24797,9 @@ def verify_prepared_operation(
                 "observation": next((dict(row) for row in outcome.readbacks if row.get("kind") == "transport-action-observation"), {})})
     if kind == "log-channel-effect":
         observation = next((dict(row) for row in outcome.readbacks if row.get("kind") == "log-channel-observation"), {"outcome": "malformed_control_result"})
-        message = ("The requested log effect was observed in one bounded channel comparison. Concurrent identical writers, individual entry identity and continuing channel state are unverified."
+        message = ("The requested log addition was delivered in one bounded execute-time event. Exclusive writer causation, individual entry identity and continuing channel contents are unverified."
+            if outcome.business_state_verified and plan['console'] else
+            "The requested log effect was observed in one bounded channel comparison. Concurrent identical writers, individual entry identity and continuing channel state are unverified."
             if outcome.business_state_verified else
             "The log effect remains unverified; inspect the bounded channel observation. Missing or indistinguishable content does not prove the call never took effect. Do not replay the executed control.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,

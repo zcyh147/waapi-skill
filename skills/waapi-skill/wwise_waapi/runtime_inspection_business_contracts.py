@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .subscriptions import DEFAULT_WAIT_TIMEOUT, MAX_WAIT_EVENT_COUNT
+
 
 RUNTIME_INSPECTION_BUSINESS_CONTRACT = (
     "waapi-skill.runtime-inspection-business/v1"
@@ -42,6 +44,15 @@ PROFILER_MOVE_CURSOR_URI = "ak.wwise.core.profiler.moveCursor"
 PROFILER_SET_CURSOR_TIME_URI = "ak.wwise.core.profiler.setCursorTime"
 LOG_ADD_ITEM_URI = "ak.wwise.core.log.addItem"
 LOG_CLEAR_URI = "ak.wwise.core.log.clear"
+CONSOLE_LOG_ADD_OBSERVER = {
+    'topic': 'ak.wwise.core.log.itemAdded',
+    'ordering': 'subscribe_before_one_add; unsubscribe_before_execute_returns',
+    'wait_seconds': DEFAULT_WAIT_TIMEOUT,
+    'maximum_events': MAX_WAIT_EVENT_COUNT,
+    'maximum_event_bytes': 64 * 1024,
+    'matching': 'exact_sealed_channel_message_severity',
+    'boundary': 'One matching addition event; no exclusive writer, continuing channel contents, entry identity, or prior-state restoration proof.',
+}
 REMOTE_CONNECT_URI = "ak.wwise.core.remote.connect"
 TRANSPORT_CREATE_URI = "ak.wwise.core.transport.create"
 TRANSPORT_DESTROY_URI = "ak.wwise.core.transport.destroy"
@@ -809,7 +820,9 @@ def runtime_inspection_business_contract_data(
                 "add_effect": "matching message/severity multiplicity increases from prestate",
                 "clear_effect": "prior complete row contents absent at one observation; new messages can remain",
                 "unresolved": "oversized, unchanged matching multiplicity, indistinguishable prior rows, or unavailable readback never prove effect",
-                "console_effect": "unverified by this getter; Topic delivery is not established here",
+                "console_effect": "getter is documented empty; add uses a bounded execute-time addition event; clear effect remains unverified",
+                "console_add_observer": dict(CONSOLE_LOG_ADD_OBSERVER),
+                "console_clear_boundary": "Acknowledgment only: the Console getter is empty and the addition-only Topic cannot prove prior contents disappeared.",
                 "concurrency": "no exclusive causation, atomic clear, permanent emptiness or unrelated-channel observation claim",
             }} if operation in {LOG_ADD_ITEM_URI, LOG_CLEAR_URI} else {}),
             **({"field_semantics": {
