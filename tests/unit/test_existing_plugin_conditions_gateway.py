@@ -94,3 +94,81 @@ def test_product_existing_bed_mixer_condition_preserves_native_uint16_policy(tmp
                 "before": before[FIRST], "after": after[FIRST]}]}},
         recorded_class_metadata_provenance=deepcopy(FACTS["versions"][version]),
     )
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+def test_public_bed_shareset_setup_then_limit_edit_uses_one_selected_platform(tmp_path, version):
+    from tests.unit.test_new_object_conditions_gateway import ClassTask
+    from tests.unit.test_gameparameter_class_fields_gateway import CREATED
+    from tests.unit.test_time_modulator_range_gateway import start, finish
+    platform = "{33333333-3333-3333-3333-333333333333}"
+    facts = FACTS["versions"][version]
+    task = ClassTask(tmp_path, version, class_name="Effect")
+    task.class_id = facts["class"]["classId"]
+    task.types = [row for row in task.types if row["name"] != "Effect"] + [deepcopy(facts["class"])]
+    task.objects[FIRST].update(classId=1638416, path=r"\Effects\Default Work Unit")
+    for row in task.types:
+        if row["name"] == "WorkUnit":
+            row["classId"] = 1638416
+    # Explicit installed defaults/supports supplement the compact input facts;
+    # other-version models are never labeled native metadata captures.
+    task.metadata = {name: {**deepcopy(row["metadata"]), "default": 64 if name == "SystemAudioObjectLimit" else 0,
+        "supports": {"unlink": True}} for name, row in facts["fields"].items()}
+    before = deepcopy(task.objects)
+    original = task.call
+
+    def selected_view(uri, args=None, options=None):
+        args, options = args or {}, options or {}
+        if uri.endswith("object.get") and any(field.lstrip("@") in task.metadata for field in options.get("return", [])):
+            assert options.get("platform") == platform, (args, options)
+        if uri.endswith("isPropertyEnabled") or uri.endswith("setProperty"):
+            assert args.get("platform") == platform, args
+        result = original(uri, args, options)
+        if uri.endswith("object.get"):
+            # The ordinary class fixture stores bare scalar keys; the native
+            # ShareSet verifier explicitly requests directly stored @fields.
+            for row in result.get("return", []):
+                native = task.objects.get(row.get("id"), {})
+                for field in options.get("return", []):
+                    if field.startswith("@") and field[1:] in task.metadata and field[1:] in native:
+                        row[field] = deepcopy(native[field[1:]])
+        return result
+
+    task.call = selected_view
+    task.operation = "object.createPlugin"
+    start(task)
+    parent = task.bind(FIRST)
+    code, kinds = task.step("draft-discover-types", "--role", "effect", "--meaning", "Wwise 3D Audio Bed Mixer")
+    assert code == 0, kinds
+    kind, = kinds["type_candidates"]
+    code, found = task.step("draft-discover-fields", "--type-handle", kind["handle"],
+        "--meaning", "SystemAudioObjectsPolicy", "--platform", platform)
+    assert code == 0, found
+    policy = found["field_candidates"][0]["handle"]
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "bed", "--object-handle", parent,
+        "--field", "plugin_role", "effect", "--field", "plugin_placement", "shareset",
+        "--field", "plugin_name", "OwnedBed", "--field", "plugin_type_handle", kind["handle"],
+        "--field", "platform", platform, "--field-value", policy, "1")
+    assert code == 0, declared
+    _, _, _, setup_tx = finish(task)
+    created = deepcopy(task.objects[CREATED])
+    assert created["type"] == "Effect" and created["classId"] == 12451843
+    assert created["SystemAudioObjectsPolicy"] == 1 and created["SystemAudioObjectLimit"] == 64
+    task.operation = "object.setProperty"
+    start(task)
+    target = task.bind(CREATED)
+    code, found = task.step("draft-discover-fields", "--object-handle", target,
+        "--meaning", "SystemAudioObjectLimit", "--platform", platform)
+    assert code == 0, found
+    field = found["meaning_results"][0]["candidates"][0]["handle"]
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+        "--field-handle", field, "--business-value", "128")
+    assert code == 0, declared
+    preview, _, _, tx = finish(task)
+    assert tx != setup_tx and not preview["preview_summary"].get("derived_changes"), preview
+    assert task.objects == {**before, CREATED: {**created, "SystemAudioObjectLimit": 128}}
+    writes = [(uri, args) for uri, args, _ in task.calls if uri.endswith(("object.set", "setProperty"))]
+    assert len(writes) == 2
+    assert writes[0][1]["objects"] == [{"object": FIRST, "onNameConflict": "fail", "children": [
+        {"type": "Effect", "name": "OwnedBed", "classId": 12451843, "platform": platform, "@SystemAudioObjectsPolicy": 1}]}]
+    assert writes[1][1] == {"object": CREATED, "property": "SystemAudioObjectLimit", "value": 128, "platform": platform}
