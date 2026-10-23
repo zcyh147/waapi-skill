@@ -294,3 +294,91 @@ def test_selected_member_extension_typed_drift_is_rejected_without_pruning_nativ
     code,result = task.run('query-object','--kind','all-sounds','--max-results','2',
         '--include-related','children','first','volume-db')
     assert code == 2 and result['error_code'] == 'RELATED_QUERY_SCOPE_CHANGED',result
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_concat_finite_prefix_survives_a_later_filter_above_full_membership_cap(tmp_path,version):
+    task = SequenceTask(tmp_path,version)
+    task.rows[0]['children'] = [task.reference(SOUND)]*4097
+    task.rows[1]['children'] = []
+    code,result = task.run('query-object','--kind','all-sounds','--max-results','2',
+        '--include-related','combine','children','and','self','end','take','2','matching','kind-is','sound','volume-db')
+    assert code == 0,result
+    selected = result['agent_result'][0]['related']['projections'][0]['items']
+    assert [member['object']['id'] for member in selected] == [SOUND,SOUND]
+    assert [member['origin'] for member in selected] == [{'arm':0,'occurrence':0},{'arm':0,'occurrence':1}]
+    assert [member['volume_db'] for member in selected] == [-12,-12]
+    owner_queries = [args['waql'] for uri,args,_ in task.calls if uri.endswith('object.get') and ' select ' in args.get('waql','')]
+    assert owner_queries and all(query.endswith('take 2') for query in owner_queries)
+    assert all(' where ' not in query for query in owner_queries)
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_custom_meaning_matching_internal_reducer_marker_still_discovers_and_returns_field(tmp_path,version):
+    task = SequenceTask(tmp_path,version)
+    meaning = '__sequence_value__'
+    task.metadata[SOUND_CLASS][meaning] = {'name':meaning,'type':'int32'}
+    task.members[SOUND]['@'+meaning] = 0
+    task.members[OTHER]['@'+meaning] = -3
+    code,result = task.run('query-object','--kind','all-sounds','--max-results','2',
+        '--include-related-field','children',meaning)
+    assert code == 0,result
+    assert any(uri.endswith('getPropertyAndReferenceNames') for uri,_,_ in task.calls)
+    fields = result['agent_result'][0]['related']['children']['items']
+    assert [item['properties'][meaning] for item in fields] == [0,-3]
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('stages,expected,reads',[
+    (['take','2','matching','name-is','First'],[SOUND],True),
+    (['take','2','last','matching','name-is','First'],[],True),
+    (['take','0','matching','name-is','First'],[],False),
+    (['take','2','skip','2','matching','name-is','First'],[],False),
+    (['take','2','matching','name-is','First','take','0'],[],False),
+])
+def test_concat_prefix_later_stages_keep_order_and_empty_never_enumerates_arms(tmp_path,version,stages,expected,reads):
+    task = SequenceTask(tmp_path,version)
+    task.rows[0]['children'] = [task.reference(SOUND),task.reference(OTHER)]+[task.reference(SOUND)]*4095
+    task.rows[1]['children'] = []
+    code,result = task.run('query-object','--kind','all-sounds','--max-results','2',
+        '--include-related','combine','children','and','self','end',*stages,'volume-db',
+        '--include-related-field','combine','children','and','self','end',*stages,'Pitch')
+    assert code == 0,result
+    projection = result['agent_result'][0]['related']['projections'][0]
+    assert [member['object']['id'] for member in projection['items']] == expected
+    if expected:
+        assert projection['items'][0]['properties'] == {'Pitch':-560}
+        assert projection['items'][0]['origin'] == {'arm':0,'occurrence':0}
+    owner_queries = [args['waql'] for uri,args,_ in task.calls if uri.endswith('object.get') and ' select ' in args.get('waql','')]
+    assert bool(owner_queries) is reads
+    assert all(' where ' not in query and query.endswith('take 2') for query in owner_queries)
+    if not reads:
+        assert not any(uri.endswith(('getPropertyInfo','getPropertyAndReferenceNames')) for uri,_,_ in task.calls)
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_bounded_concat_prefix_member_values_trace_actual_selection_and_guid_packets(tmp_path,version):
+    from tests.unit.test_query_related_outputs import PARENT
+    from wwise_waapi.canonical import canonical_sha256
+    task = SequenceTask(tmp_path,version)
+    task.rows[0]['children'] = [task.reference(SOUND)]*4097
+    evidence = tmp_path/'prefix-packets'
+    evidence.mkdir()
+    task.env['WWISE_EVIDENCE_DIR'] = str(evidence)
+    code,result = task.run('query-object','--exact-id',PARENT['id'],
+        '--include-related','combine','children','and','self','end','take','2','matching','kind-is','sound','volume-db','--detail')
+    assert code == 0,result
+    items = result['agent_result'][0]['related']['projections'][0]['items']
+    assert [member['volume_db'] for member in items] == [-12,-12]
+    proof = result['related_scope_binding']
+    assert proof['sequence_source']['version'] == version
+    assert 'no native function-return equality' in proof['sequence_semantics']
+    membership, values = [], []
+    for read in result['related_read_evidence']:
+        assert (read['api'],read['args'],read['options']) in task.calls
+        packet = json.loads(Path(read['call']['evidence_path']).read_text())
+        assert packet['api'] == read['api']
+        assert canonical_sha256(packet['result']) == read['result_sha256']
+        if ' select children ' in read['args'].get('waql',''):
+            membership.append(packet['result']['return'])
+        elif '@Volume' in read['options'].get('return',[]):
+            values.extend(packet['result']['return'])
+    assert membership and all([member['id'] for member in sequence] == [SOUND,SOUND] for sequence in membership)
+    assert values and all(member['id'] == SOUND and member['@Volume'] == -12 for member in values)
+    assert list(result)[-1] == 'agent_result'

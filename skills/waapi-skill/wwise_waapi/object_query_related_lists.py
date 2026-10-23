@@ -290,12 +290,15 @@ class RelatedListPlan:
         if reducer in {'any','any-match'}: stages.append({'selection':'first'})
         conditions = []
         while stages and stages[0]['selection'] == 'matching': conditions.append(stages.pop(0))
-        # A finite initial window can stop later arms without materializing an
-        # unbounded prefix. Complex later stages keep the existing explicit cap.
+        # Later filtering/last cannot enlarge a leading finite window. Retain
+        # that input bound, then run every stage below in its declared order.
         required, offset, limit = None, 0, None
-        if all(stage['selection'] in {'first','at','skip','take'} for stage in stages):
+        if any(stage['selection'] == 'take' and stage['count'] == 0 for stage in stages):
+            required = 0  # Empty remains empty through every admitted stage.
+        else:
             for stage in stages:
                 kind,count = stage['selection'],stage.get('count',1)
+                if kind not in {'first','at','skip','take'}: break
                 if kind in {'skip','at'}:
                     amount = min(count,limit) if limit is not None else count
                     offset += amount
@@ -303,7 +306,9 @@ class RelatedListPlan:
                 if kind in {'first','at','take'}:
                     count = count if kind == 'take' else 1
                     limit = min(limit,count) if limit is not None else count
-            if limit is not None: required = offset+limit
+                if limit is not None:
+                    required = offset+limit if limit else 0
+                    if limit == 0: break
         for arm_index,arm in enumerate(sequence['arms']):
             if required is not None and len(rows) >= required: break
             values = self.arm_rows(owner,arm,None if required is None else required-len(rows),conditions)
@@ -506,7 +511,7 @@ class RelatedListPlan:
                 states = next_states
             if request['option'] == '--include-related' and request['hops'][-1][0] not in {'list','sequence'}:
                 states = terminal_states
-            if request['terminal'] == '__sequence_value__':
+            if request['option'] == '--include-related' and request.get('reducer') is not None:
                 continue
             unresolved, matched = [], []
             for frame, loc, prefix, path in states:

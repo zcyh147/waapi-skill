@@ -182,7 +182,7 @@ def parse_related_request(version: str, values: list[str], option: str) -> dict[
             raise ValueError(f"{option} {' '.join(values)}: {detail['reason']}")
     elif option != '--include-related':
         _meaning(terminal)
-    return {"hops": tuple(hops), "terminal": terminal, "option": option, "nodes":nodes}
+    return {"hops": tuple(hops), "terminal": terminal, "option": option, "nodes":nodes, "reducer":reducer}
 
 
 def related_sequence_specs(version, request):
