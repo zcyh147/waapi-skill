@@ -7,6 +7,19 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-23 R94 selected transport observations
 
+The separate five-case mixed-transport collector `440a3674`, integrated at
+`43c22a03`, completed one Mac Authoring 2025.1.7.9143 run in 229.49s with
+323 public calls. It independently rebuilt each two-object prestate: playDirectly
+changed playing/paused to playing/playing; pause changed stopped/playing to
+stopped/paused and playing/paused to paused/playing; playStop changed
+stopped/playing to playing/stopped and paused/stopped to playing/playing.
+Source hash/mtime, both loop restorations, owned process cleanup and port release
+passed. Raw diagnostic classifications remain unchanged; these observations are
+not older-version or acoustic proof. The selected three cases were not rerun.
+Code repair reused passing cases: only the failed Automation Mode owner check
+and the subsequently changed failure-interval control were rerun. No duplicate
+poststate reads were added merely for finer timestamps.
+
 Reviewed input repair `8a7160d4`, integrated at `e05bae10`, adds an explicit
 empty capture-data declaration, preserves repeated rows and their order across
 all five definitions, and admits signed numeric cursor targets in 2025. The
