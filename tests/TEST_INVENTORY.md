@@ -24,6 +24,28 @@ normalizer rewriting XML. Source hash/mtime/tree were unchanged and process
 cleanup completed. This is a fixture failure, not native query acceptance.
 Evidence: `r87-local-lists-7a0d95b3-2025-r1/root-review.json`.
 
+Test-only `f2f473c6` reproduced that failure using the actual existing sandbox
+normalizer, then passed both backends and 12 affected collector controls in
+12.84s. Original and prepared file hashes remain separately pinned; selected
+owner/member/Curve subtrees must match and prepared-byte drift stops before
+any query. Frozen `9f694d04` subsequently passed sequential native witnesses:
+
+| Mac Console version/build | Result | Read groups | Public live calls | Hashed packets | Transactions |
+| --- | --- | --- | --- | --- | --- |
+| 2025.1.7.9143 | PASS, 8.45s | 6 | 32 | 299 | 0 |
+| 2022.1.19.8584 | PASS, 9.90s | 5 | 23 | 239 | 0 |
+
+Both runs independently observed actual Sound/Synth RTPC owners, distinct input
+and Curve associations, complete/selected/combined projections, point values
+and repeated baseline preservation. The 2025 run additionally observed the
+AuxBus EffectSlot and related Effect projection. Composed RETURN and older
+GUID-grouped dispatch were observed on their respective hosts; all original
+packet hashes, source/prepared files and lifecycle cleanup passed. Neither run
+needed a continuation. Aggregate: `r87-local-list-native-review-2022-2025.json`;
+individual roots are `r87-local-lists-9f694d04-{2025-r2,2022-r1}/root-review.json`.
+This grants no 2021/2023/2024 native, other plug-in bridge, Marker or Fresh
+coverage. The original fixture failure remains unchanged.
+
 Reviewed plug-in correction `9c9cd6b5` preserves the requested Metadata
 ShareSet name while accepting the observed 2025 ASCII-space-to-underscore
 relation. It also requires the typed readback GUID to match the resolved
