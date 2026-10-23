@@ -53,8 +53,16 @@ class BoundCondition:
     value: object
 
     def clause(self):
-        from .builders.query import _literal
+        from .builders.query import _literal, _operator
         if not self.reference:
+            if ':' in self.field:
+                from .object_query_related_metadata import namespaced_property_token
+                prefix = '@@' if self.field.startswith('@@') else '@'
+                if not self.field.startswith(prefix) or not namespaced_property_token(self.field[len(prefix):]):
+                    raise ValueError('Only metadata-bound single-namespace property tokens compose in scalar conditions')
+                # This controlled property expression is distinct from generic
+                # caller accessors and from the unchanged RETURN grammar.
+                return 'where '+self.field+' '+_operator(self.operator)+' '+_literal(self.value)
             return _where_clause(QueryPredicate(self.field,self.operator,self.value))
         if self.value is None:
             present = self.field+' != null'
@@ -186,7 +194,8 @@ class ScalarConditionPlan:
         condition = condition['field_condition']
         groups = {}
         for index,row in enumerate(rows):
-            selection = self.binder.bind(condition['meaning'],row,row.get('classId'),'',index,option)
+            selection = self.binder.bind(condition['meaning'],row,row.get('classId'),'',index,option,
+                namespaced_property=MODES[condition['mode']][0]=='property')
             candidate = selection['candidate']
             if candidate is None or not selection['complete']:
                 raise RelatedQueryError('The field condition cannot be decided in every actual metadata scope; refine the meaning or source',
@@ -392,6 +401,9 @@ def field_condition_contract(version, *, maximum_conditions):
     reference_source = json.loads((Path(__file__).resolve().parents[1]/'references/semantic'/version/'query-reference-condition-sources.json').read_text())
     if reference_source['version']!=version or reference_source['wwise_build']!=_definition_graph(version).wwise_build:
         raise ValueError('Reference condition source does not match selected definitions')
+    namespaced_source = json.loads((Path(__file__).resolve().parents[1]/'references/semantic'/version/'query-namespaced-property-sources.json').read_text())
+    if namespaced_source['version']!=version or namespaced_source['wwise_build']!=_definition_graph(version).wwise_build:
+        raise ValueError('Namespaced property condition source does not match selected definitions')
     from .operation_object import DEFAULT_MAX_REQUEST_BYTES, DEFAULT_MAX_IDENTITY_PARENT_LITERAL_LENGTH, DEFAULT_MAX_NAME_LENGTH, DEFAULT_MAX_TYPE_LENGTH
     return {'root_option':'--where-field MODE MEANING COMPARISON VALUE',
         'related_selection':'matching-field MODE MEANING COMPARISON VALUE',
@@ -407,7 +419,12 @@ def field_condition_contract(version, *, maximum_conditions):
                 'name_characters':DEFAULT_MAX_NAME_LENGTH,'type_characters':DEFAULT_MAX_TYPE_LENGTH},
             'assignment_constraints':False},
         'comparisons':list(COMPARISONS),'types':'properties use exact live scalar metadata; references require discovered reference kind and canonical identity/null observations; ordered comparisons numeric only, matches-text native word-prefix/wildcard string matching; comparison constants are not mutation assignments or enum choices',
-        'field_token_boundary':'metadata-selected ASCII alphanumeric/underscore tokens; namespaced custom-token WHERE spelling is not yet established by the retained query evidence and is not classified as native absence',
+        'field_token_boundary':'metadata-selected ASCII alphanumeric/underscore tokens; ordinary/override scalar conditions additionally admit one namespace:property token, each component ASCII alphanumeric/underscore; no caller accessor grammar',
+        'namespaced_properties':{'modes':['ordinary','override-source-value'],
+            'token_pattern':'[A-Za-z0-9_]+:[A-Za-z0-9_]+','source':namespaced_source,
+            'custom_output_token_grammar_changed':False,'reference_token_grammar_changed':False,
+            'predicate_value_readback_required':True,
+            'native_boundary':'retained2025 component proves WHERE spelling/membership only; existing typed predicate-value RETURN/readback checks remain mandatory and fail closed; no custom RETURN, override difference or other-version native claim'},
         'authority':'complete actual source/member class or GUID live metadata; unknown is not false or zero',
         'root_limit_order':'native field predicates before final root take',
         'root_unknown':'bounded refinement/failure; never return unfiltered roots as matches',

@@ -7,6 +7,11 @@ from .canonical import canonical_json_bytes, canonical_sha256
 from .metadata_discovery import discover_metadata, MAX_METADATA_DISCOVERY_RESULT_BYTES
 
 
+def namespaced_property_token(value):
+    """Condition-only lexical shape; fresh property metadata supplies authority."""
+    return isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_]+:[A-Za-z0-9_]+', value) is not None
+
+
 class RelatedFieldBinder:
     def __init__(self, read, error):
         self.read, self.error = read, error
@@ -28,7 +33,7 @@ class RelatedFieldBinder:
             self.observations.append({'api': uri, 'args': copy.deepcopy(args), 'result': copy.deepcopy(result)})
         return copy.deepcopy(self.metadata_cache[key])
 
-    def bind(self, meaning, reference, class_id, native, index, option):
+    def bind(self, meaning, reference, class_id, native, index, option, *, namespaced_property=False):
         scope = {'classId': class_id} if type(class_id) is int and 0 <= class_id <= 4294967295 else {'object': reference['id'].upper()}
         def lookup(scope):
             key = (canonical_sha256(scope), meaning)
@@ -44,8 +49,6 @@ class RelatedFieldBinder:
                 chosen = exact if len(exact) == 1 else names
                 candidate = candidates.get(chosen[0]) if len(chosen) == 1 else None
                 complete = discovery.fallback_detail_scan.get('status') in {'complete', 'not_needed'}
-                if candidate and not re.fullmatch(r'[A-Za-z0-9_]+', candidate.get('name', '')):
-                    raise self.error('The discovered field token cannot be safely composed by this related-output contract; refine the field request', code='RELATED_QUERY_FIELD_TOKEN')
                 self.discoveries[key] = {'scope': scope, 'meaning': meaning, 'candidate': candidate,
                     'candidate_names': names, 'complete': complete}
             return self.discoveries[key]
@@ -59,6 +62,14 @@ class RelatedFieldBinder:
         # exact-object facts remain insufficient, retain scoped clarification.
         if selection['candidate'] is not None and selection['candidate'].get('kind') not in {'property', 'reference'}:
             selection = {**selection, 'insufficient_kind': selection['candidate'].get('kind'), 'candidate': None}
+        candidate = selection['candidate']
+        # Apply the current use's policy after exact-object kind fallback, on
+        # every bind. Cached discovery cannot grant a condition's authority to
+        # a later reference hop or custom output using the same field meaning.
+        if candidate and not (re.fullmatch(r'[A-Za-z0-9_]+', candidate.get('name', ''))
+                or namespaced_property and candidate.get('kind') == 'property'
+                and namespaced_property_token(candidate.get('name'))):
+            raise self.error('The discovered field token cannot be safely composed by this related-output contract; refine the field request', code='RELATED_QUERY_FIELD_TOKEN')
         self.selections.append({'path': native, 'requested_option': option, 'row_index': index,
             **{key: value for key, value in selection.items() if key != 'candidate'},
             'selected': ({'name': selection['candidate'].get('name'), 'kind': selection['candidate'].get('kind')}
