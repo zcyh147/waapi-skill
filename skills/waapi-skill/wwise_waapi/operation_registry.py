@@ -5246,7 +5246,8 @@ def _prepare_object_create(
             **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
-                "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
+                "dependent_write": "after actual GUID/class/parent/membership binding",
+                "stage_count": 1 + sum(1 for node in node_specs for field in node.get("references", []) if "target_request_path" in field)}}
                 if result_context and result_context['renames'] else {}),
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
@@ -5343,10 +5344,19 @@ def _prepare_object_create(
         from .owned_result_stages import prepare as prepare_owned_stages
         try:
             stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
-                node_specs, result_context, request.version)
+                node_specs, result_context, request.version, root_parent=parent.row, parent_children=parent_children)
         except ValueError as exc:
             raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
         if stage_plan is not None:
+            from .owned_result_stages import FIELDS as stage_fields
+            parent_rows = _rows(read(OBJECT_GET_URI, {'from': {'id': [parent.object]}}, {'return': stage_fields}))
+            if (len(parent_rows) != 1 or not _same_identity(parent_rows[0].get('id'), parent.object)
+                    or any(parent_rows[0].get(key) != parent.row.get(key) for key in ('name', 'type', 'path'))
+                    or type(parent_rows[0].get('classId')) is not int or not any(info.class_id == parent_rows[0]['classId']
+                        and info.name == parent_rows[0].get('type') for info in type_catalog)):
+                raise OperationContractError('INVALID_READBACK', 'Staged creation parent requires its exact live GUID/class identity')
+            stage_plan['parent_before'] = parent_rows[0]
+            graph_guard['field_snapshots'].append({'object_id': parent.object, 'fields': stage_fields, 'platform': None, 'rows': parent_rows})
             state["owned_result_stages"] = stage_plan
             from .owned_result_stages import preservation_rows
             try:
@@ -20605,7 +20615,16 @@ def verify_prepared_operation(
         result_nodes: tuple[ObjectResultNode, ...] = ()
         result_by_path: dict[str, ObjectResultNode] = {}
         try:
-            if kind == "object-create-graph":
+            if owned_stage_identities is not None:
+                # Project the validated business association roster, never a
+                # synthetic merged native response. Every native stage stays
+                # separately retained in owned_result_execution.
+                result_by_path = {spec['request_path']: ObjectResultNode(spec['request_path'], spec.get('parent_request_path'),
+                    owned_stage_identities[spec['request_path']]['id'], owned_stage_identities[spec['request_path']]['name'],
+                    len([child for child in specs if child.get('parent_request_path') == spec['request_path']]), spec.get('collection'))
+                    for spec in specs}
+                result_nodes = tuple(result_by_path.values())
+            elif kind == "object-create-graph":
                 result_nodes = flatten_create_result(payload)
                 result_by_path = {row.request_path: row for row in result_nodes}
             else:
