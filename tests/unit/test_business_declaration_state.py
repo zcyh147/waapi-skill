@@ -662,7 +662,7 @@ def _add_weather(session: BusinessDeclarationSession) -> BusinessDeclarationSess
         fields={"media_file": "/tmp/rain.wav", "volume_db": -4.0},
     )
 
-@pytest.mark.parametrize('settings_form', ['ordinary', 'model-field-names', 'unbound-model-operation'])
+@pytest.mark.parametrize('settings_form', ['ordinary', 'model-field-names', 'unbound-model-operation', 'unbound-compound-key', 'unvalidated-compound-child'])
 @pytest.mark.parametrize('depth', [11, 13])
 def test_non_model_settings_cannot_bypass_the_default_json_depth(settings_form, depth):
     deep = 'leaf'
@@ -673,5 +673,9 @@ def test_non_model_settings_cannot_bypass_the_default_json_depth(settings_form, 
         settings = {'authoring_model_plan': deep, 'authoring_model_binding': {}}
     if settings_form == 'unbound-model-operation':
         settings['authoring_model_binding'] = {'operation': 'ak.wwise.core.object.create', 'plan': deep}
+    if settings_form == 'unbound-compound-key':
+        settings = {'undo_plan': deep}
+    elif settings_form == 'unvalidated-compound-child':
+        settings = {'undo_plan': {'display_name': 'Untrusted', 'children': [deep]}}
     with pytest.raises(BusinessDeclarationError):
         BusinessDeclarationSession.create(_context(version='2025.1')).with_settings(settings)

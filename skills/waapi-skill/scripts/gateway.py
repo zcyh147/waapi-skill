@@ -22791,18 +22791,22 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
             }
         try:
-            result = dispatch(
-                dispatcher,
-                call_uri,
-                connection=connection,
-                version=detected_version,
-                args=runtime_call_args,
-                options=runtime_call_options,
-                protected_provider_binding=protected_provider_binding,
-                allow_destructive=True,
-                operation_timeout=float(capability.execution_contract["timeout_seconds"]),
-                result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
-            )
+            if prepared.get("pre_state", {}).get("owned_result_stages"):
+                result = dispatch_owned_result_stages(dispatcher, connection=connection, version=detected_version,
+                    prepared=prepared, operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+            else:
+                result = dispatch(
+                    dispatcher,
+                    call_uri,
+                    connection=connection,
+                    version=detected_version,
+                    args=runtime_call_args,
+                    options=runtime_call_options,
+                    protected_provider_binding=protected_provider_binding,
+                    allow_destructive=True,
+                    operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+                    result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+                )
         except Exception as exc:  # noqa: BLE001 - execution may already have reached Wwise
             indeterminate = store.mark_execution_indeterminate(
                 transaction_id,
@@ -23704,6 +23708,9 @@ def _dispatch_transaction_command_with_execution_lease(
                     return payload
             if agent_result["operation"] in {"waapi.call", "waapi.undoGroup"}:
                 projected_result = execution_result.get("result")
+                if agent_result["operation"] == "waapi.undoGroup" and isinstance(projected_result, Mapping):
+                    from wwise_waapi.owned_result_stages import public_result
+                    projected_result = public_result(projected_result)
                 if (
                     transaction_api == POST_EVENT_URI
                     and isinstance(agent_result.get("business_result"), Mapping)
@@ -23934,6 +23941,31 @@ def dispatch_host_control_transaction(
     }
 
 
+def dispatch_owned_result_stages(dispatcher, *, connection, version, prepared, operation_timeout, context=None, cancel_reserve_seconds=0.0):
+    """Materialize Gateway-owned stages on the existing session, never retry."""
+    from wwise_waapi.owned_result_stages import execute as execute_owned_stages
+    from wwise_waapi.execution_contracts import ExecutionContractRegistry
+    def call(uri, args, options, *, write):
+        contract = ExecutionContractRegistry().describe(version, uri)
+        if not write and contract.effect != "read":
+            raise OperationContractError("INVALID_PREVIEW", "Owned result binding requires catalog-proven reads")
+        validate_semantic_payload(uri, args, options, version=version)
+        remaining = connection.deadline.require_remaining("owned result stage") - cancel_reserve_seconds
+        if remaining <= 0:
+            raise OperationContractError('OWNED_RESULT_STAGE_DEADLINE', 'Owned stage stopped before consuming the reserved group cancellation budget')
+        result = dispatch(dispatcher, uri, connection=connection, version=version, args=args, options=options,
+            allow_destructive=write, operation_timeout=min(operation_timeout, contract.timeout_seconds, remaining),
+            result_limit_bytes=contract.result_limit_bytes)
+        if write:
+            return result
+        if result.get("ok") is not True:
+            raise OperationContractError("READBACK_FAILED", "Owned result stage binding read failed", details=dispatch_call_summary(result))
+        validate_semantic_result(uri, result.get("result"), version=version)
+        return result["result"]
+    return execute_owned_stages(prepared, write=lambda uri, args, options: call(uri, args, options, write=True),
+        read=lambda uri, args, options: call(uri, args, options, write=False), context=context)
+
+
 def dispatch_undo_group_execution_plan(
     dispatcher: WwiseDispatcher,
     *,
@@ -24031,19 +24063,26 @@ def dispatch_undo_group_execution_plan(
             float(sealed_timeout),
             max(0.001, remaining - cancel_reserve),
         )
-        result = dispatch(
-            dispatcher,
-            uri_value,
-            connection=connection,
-            version=version,
-            args=args_value,
-            options=options_value,
-            allow_destructive=True,
-            operation_timeout=operation_timeout,
-            result_limit_bytes=(
-                int(sealed_result_limit)
-            ),
-        )
+        prepared_child = phase.get("prepared_operation", {})
+        if prepared_child.get("pre_state", {}).get("owned_result_stages"):
+            from wwise_waapi.object_graph_paths import compound_rename_edits
+            context = {'edits': compound_rename_edits(inner_calls[:index])} if index is not None else None
+            result = dispatch_owned_result_stages(dispatcher, connection=connection, version=version,
+                prepared=prepared_child, operation_timeout=operation_timeout, context=context, cancel_reserve_seconds=cancel_reserve)
+        else:
+            result = dispatch(
+                dispatcher,
+                uri_value,
+                connection=connection,
+                version=version,
+                args=args_value,
+                options=options_value,
+                allow_destructive=True,
+                operation_timeout=operation_timeout,
+                result_limit_bytes=(
+                    int(sealed_result_limit)
+                ),
+            )
         row: dict[str, Any] = {
             "phase": phase_name,
             "uri": uri_value,
@@ -24224,7 +24263,7 @@ def dispatch_undo_group_execution_plan(
             }
         observation = cancellation_observation()
         return {
-            "status": "execution_cancelled",
+            "status": ("indeterminate" if inner_row.get("dispatch_result", {}).get("error_code") == "OWNED_RESULT_STAGE_INDETERMINATE" else "execution_cancelled"),
             "same_connection": True,
             "automatic_retry": False,
             "failed_phase": inner_row,

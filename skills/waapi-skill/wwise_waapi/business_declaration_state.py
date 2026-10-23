@@ -361,8 +361,8 @@ class BusinessDeclarationSession:
         }
         if len(canonical_json_bytes(payload)) > MAX_BUSINESS_SESSION_BYTES:
             raise ValueError("business declaration session exceeds its fixed byte limit")
-        # Model constructors have their own bounded depth/node grammar. Keep
-        # every other session field under the ordinary strict JSON depth guard.
+        # Model constructors and checked compound snapshots have their own
+        # validated depth/node grammar. Other fields keep the ordinary guard.
         from .authoring_model_business import MODEL_OPERATIONS
         binding = self.settings.get("authoring_model_binding")
         if (set(self.settings) == {"authoring_model_plan", "authoring_model_binding"}
@@ -370,6 +370,14 @@ class BusinessDeclarationSession:
             settings = _normalize_fields(self.settings, authoring_model_version=self.context.wwise_version)
             normalized = strict_json_copy({**payload, "settings": {}})
             normalized["settings"] = settings
+        elif set(self.settings) == {'undo_plan'}:
+            try:
+                normalized = strict_json_copy(payload)
+            except ValueError:
+                settings = _normalize_fields(self.settings, authoring_model_version=self.context.wwise_version,
+                    validate_compound_snapshot=True)
+                normalized = strict_json_copy({**payload, 'settings': {}})
+                normalized['settings'] = settings
         else:
             normalized = strict_json_copy(payload)
         assert isinstance(normalized, dict)
@@ -732,6 +740,7 @@ def _normalize_fields(
     *,
     draft_revision: int | None = None,
     authoring_model_version: str | None = None,
+    validate_compound_snapshot: bool = False,
 ) -> dict[str, Any]:
     if not isinstance(fields, Mapping) or len(fields) > MAX_BUSINESS_DECLARATION_FIELDS:
         raise business_repair(
@@ -756,6 +765,37 @@ def _normalize_fields(
                     or canonical_sha256({key: value for key, value in binding.items() if key != "sha256"}) != binding["sha256"]):
                 raise ValueError("Authoring model settings require their exact sealed business binding")
             return strict_json_copy(dict(fields), maximum_depth=64)
+    if authoring_model_version is not None and set(fields) == {"undo_plan"}:
+        if not validate_compound_snapshot:
+            try:
+                return strict_json_copy(dict(fields))
+            except ValueError:
+                pass  # Only a proved closed snapshot may exceed this guard.
+        try:
+            from .compound_undo_business import build_compound_undo_child_snapshot
+            from .operation_registry import UNDO_GROUP_MAX_CALLS, UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH
+            plan = fields["undo_plan"]
+            if (not isinstance(plan, Mapping) or not {"display_name", "children"} <= set(plan)
+                    or set(plan) - {"display_name", "children", "failure_cancellation"}
+                    or not isinstance(plan.get('display_name'), str) or not plan['display_name'].strip()
+                    or plan['display_name'] != plan['display_name'].strip() or len(plan['display_name']) > UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH
+                    or plan.get('failure_cancellation', 'native-default') not in {'undo-changes', 'preserve-changes', 'native-default'}
+                    or not isinstance(plan.get("children"), (list, tuple))
+                    or not 1 <= len(plan["children"]) <= UNDO_GROUP_MAX_CALLS):
+                raise ValueError("Compound settings require bounded closed child snapshots")
+            source_ids = set()
+            for child in plan["children"]:
+                if not isinstance(child, Mapping) or child.get('source_draft_id') in source_ids:
+                    raise ValueError('Compound settings require distinct closed child snapshots')
+                source_ids.add(child.get('source_draft_id'))
+                rebuilt = build_compound_undo_child_snapshot(version=authoring_model_version,
+                    source_draft_id=child["source_draft_id"], source_revision=child["source_revision"], request=child["request"])
+                if rebuilt != child:
+                    raise ValueError("Compound settings differ from their closed child request hashes")
+            return strict_json_copy(dict(fields), maximum_depth=64)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise business_repair('DECLARATION_FIELD_VALUE_INVALID', field='undo_plan',
+                draft_revision=draft_revision, action='use bounded Gateway-owned checked closed child snapshots') from exc
     normalized: dict[str, Any] = {}
     for name, value in fields.items():
         if not isinstance(name, str) or not _BUSINESS_FIELD.fullmatch(name):

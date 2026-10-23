@@ -3890,7 +3890,7 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
     if prepared_only:
         return source, before, shown
     code, result = task.finish(source, shown)
-    assert code == (0 if expected_verified else 2) and result["verified"] is expected_verified, result
+    assert code == (0 if expected_verified else 2) and result["verified"] is expected_verified, json.dumps(result)
     after = deepcopy(task.objects)
     source_call = task.call
     def history(uri, args=None, options=None):
@@ -4212,10 +4212,11 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
-    task = OwnedGraphTask(tmp_path, version, 'object.create')
+    operation = 'object.set' if native_rename else 'object.create'
+    task = OwnedGraphTask(tmp_path, version, operation)
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for cid, name in
         ((1638416, 'WorkUnit'), (1376272, 'Bus'), (3997712, 'AuxBus'))]
     task.objects = {SECOND: {'id': SECOND, 'name': 'Default Work Unit', 'type': 'WorkUnit', 'classId': 1638416,
@@ -4223,7 +4224,11 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     task.metadata = {'UserAuxSend0': {'name': 'UserAuxSend0', 'type': 'Reference',
         'restriction': {'type': 'reference', 'restrictions': [{'type': ['AuxBus']}]}}}
     if compound:
-        _start_parent_owned_graph_child(task, 'object.create')
+        _start_parent_owned_graph_child(task, operation)
+    if native_rename:
+        collision = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+        task.objects[collision] = {'id': collision, 'name': 'Routing', 'type': 'Bus', 'classId': 1376272,
+            'path': task.objects[SECOND]['path'] + r'\Routing', 'parent': {'id': SECOND}, 'notes': 'Keep collision'}
     if external:
         from tests.unit.test_object_graph_owned_choices_gateway import ROOT
         task.objects[ROOT] = {'id': ROOT, 'name': 'External', 'type': 'AuxBus', 'classId': 3997712,
@@ -4241,6 +4246,29 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     def call(uri, args=None, options=None):
         if uri.endswith('getProjectInfo'):
             return {**original(uri, args, options), 'currentPlatformId': platform, 'platforms': [{'id': platform, 'name': 'Windows'}]}
+        if native_rename and uri.endswith('object.set') and any('children' in item or '@UserAuxSend0' in item for item in args['objects']):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if any('children' in item for item in args['objects']):
+                assert args['onNameConflict'] == 'rename'
+                assert args['objects'][0]['children'][0]['name'] == 'Routing'
+                def create(node, parent):
+                    identity = ids[node['name']]
+                    name = 'Routing19' if node['name'] == 'Routing' else node['name']
+                    task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
+                        'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
+                        'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
+                        **{key: {'id': value} for key, value in node.items() if key.startswith('@')}}
+                    children = [create(child, identity) for child in node.get('children', [])]
+                    return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
+                children = [create(child, SECOND) for child in args['objects'][0]['children']]
+                assert '@UserAuxSend0' not in task.objects[ids['Sender']]
+                return {'objects': [{'id': SECOND, 'name': task.objects[SECOND]['name'], 'children': children}]}
+            for item in args['objects']:
+                assert set(item) == {'object', '@UserAuxSend0'}, item
+                matches = [row['id'] for row in task.objects.values() if row['path'] == item['@UserAuxSend0']]
+                assert matches == [ids['Destination']]
+                task.objects[item['object']]['@UserAuxSend0'] = {'id': matches[0]}
+            return {'objects': []}
         if uri.endswith('object.create'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             base = task.objects[SECOND]['path'] + r'\Routing'
@@ -4264,6 +4292,9 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         return original(uri, args, options)
     task.call = call
     parent = task.bind(SECOND)
+    if native_rename:
+        code, configured = task.step('draft-business-configure', '--name-conflict', 'rename')
+        assert code == 0, json.dumps(configured)
     kinds = {}
     for name in ('Bus', 'AuxBus'):
         code, found = task.step('draft-discover-types', '--role', 'object', '--meaning', name)
@@ -5107,3 +5138,94 @@ def test_render_source_without_compound_context_rejects_undeclared_opaque_member
     observations = [row for row in rejected['verification']['assertions']
         if row.get('kind') == 'effect_render_chain_observation']
     assert len(observations) == 1 and observations[0]['evidence']['source_matches'] is False, observations
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('creation_first', [False, True])
+def test_compound_native_named_set_graph_binds_actual_result_before_reference_and_history(tmp_path, version, creation_first):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, version,
+        compound=True, creation_first=creation_first, external=True, native_rename=True)
+    assert next(row for row in after.values() if row['name'] == 'Routing19')['path'].endswith(r'\Renamed parent\Routing19')
+    assert after['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] == 'Keep collision'
+    calls = [row for row in task.calls if row[0] == 'ak.wwise.core.object.set']
+    assert len(calls) == 2
+    assert '_waapi_' not in json.dumps(calls)
+
+
+def test_2021_native_named_set_graph_and_history_keep_explicit_pinned_boundary(tmp_path):
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask
+    task = OwnedGraphTask(tmp_path, '2021.1', 'object.create')
+    for operation in ('object.set', 'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'):
+        code, rejected = task.run('draft-start', operation)
+        assert code == 2 and '2021.1' in json.dumps(rejected), rejected
+    assert not task.calls
+
+
+@pytest.mark.parametrize('fault', ['collision-drift', 'duplicate-result', 'missing-child', 'wrong-class',
+    'wrong-parent', 'name-disagreement', 'receiver-metadata', 'changed-collision', 'lost-create-ack', 'lost-reference-ack'])
+def test_native_named_set_graph_stops_bad_association_without_dependent_write_or_retry(tmp_path, fault):
+    from copy import deepcopy
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, creation_first=False, external=True, native_rename=True, prepared_only=True)
+    code, confirmed = task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    original = task.call
+    if fault == 'collision-drift':
+        task.objects['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] = 'Unreviewed change'
+    def damaged(uri, args=None, options=None):
+        if fault == 'receiver-metadata' and uri.endswith('getPropertyInfo') and args.get('object') == '{88888888-8888-8888-8888-888888888888}':
+            return {**original(uri, args, options), 'type': 'String'}
+        result = original(uri, args, options)
+        if uri.endswith('object.set'):
+            creation = any('children' in item for item in args['objects'])
+            if creation:
+                root = result['objects'][0]['children'][0]
+                if fault == 'duplicate-result':
+                    root['children'].append(deepcopy(root['children'][0]))
+                elif fault == 'missing-child':
+                    root['children'].pop()
+                elif fault == 'wrong-class':
+                    task.objects['{77777777-7777-7777-7777-777777777777}']['classId'] = 1376272
+                elif fault == 'wrong-parent':
+                    task.objects['{77777777-7777-7777-7777-777777777777}']['parent'] = {'id': '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'}
+                elif fault == 'name-disagreement':
+                    root['name'] = 'Routing20'
+                elif fault == 'changed-collision':
+                    task.objects['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] = 'Unexpected write'
+                elif fault == 'lost-create-ack':
+                    raise TimeoutError('Creation acknowledgement lost')
+            elif fault == 'lost-reference-ack':
+                raise TimeoutError('Reference acknowledgement lost')
+        return result
+    task.call = damaged
+    code, rejected = task.run('execute', source)
+    assert code == 2, rejected
+    assert rejected.get('executed') is (fault != 'collision-drift'), rejected
+    writes = [row for row in task.calls if row[0] == 'ak.wwise.core.object.set']
+    assert len(writes) == (0 if fault == 'collision-drift' else 2 if fault == 'lost-reference-ack' else 1), rejected
+    if fault != 'collision-drift':
+        assert rejected['state'] == 'indeterminate' and rejected['automatic_retry'] is False, rejected
+    count = len(task.calls)
+    assert task.run('execute', source)[0] == 2
+    assert not any(row[0] == 'ak.wwise.core.object.set' for row in task.calls[count:])
+
+
+def test_native_named_set_graph_false_reference_effect_cannot_be_verified_or_replayed(tmp_path):
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, creation_first=False, external=True, native_rename=True, prepared_only=True)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    task.objects['{88888888-8888-8888-8888-888888888888}']['@UserAuxSend0'] = {'id': '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'}
+    code, failed = task.run('verify', source)
+    assert code == 2 and failed['verified'] is False, failed
+    count = len(task.calls)
+    assert task.run('execute', source)[0] == 2
+    assert not any(row[0] == 'ak.wwise.core.object.set' for row in task.calls[count:])
+
+
+@pytest.mark.parametrize('creation_first', [True, False])
+def test_native_named_graph_exact_object_set_ancestor_rename_closes_actual_created_child_roster(tmp_path, creation_first):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, creation_first=creation_first, external=True, native_rename=True, rename_operation='object.set')
+    assert next(row for row in after.values() if row['name'] == 'Routing19')['path'].endswith(r'\Renamed parent\Routing19')
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == 3

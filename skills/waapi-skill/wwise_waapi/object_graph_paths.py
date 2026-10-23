@@ -178,7 +178,8 @@ def prepare_compound_path_context(calls, *, read):
     """Seal missing GUID ancestry without changing any original child artifact."""
     edits = compound_rename_edits(calls)
     graphs = [call['prepared_operation'] for call in calls
-        if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph']
+        if call.get('prepared_operation', {}).get('verification_plan', {}).get('kind') == 'object-create-graph'
+        or call.get('prepared_operation', {}).get('pre_state', {}).get('owned_result_stages')]
     def affected(row):
         return isinstance(row, dict) and isinstance(row.get('path'), str) and any(
             row['path'] == node['pre_state']['path'] or row['path'].startswith(node['pre_state']['path'] + '\\')
@@ -362,6 +363,20 @@ def compound_created_child_roots(calls, phases):
     for index, call in enumerate(calls):
         child = call.get('prepared_operation', {})
         plan = child.get('verification_plan', {})
+        if child.get('pre_state', {}).get('owned_result_stages'):
+            from .owned_result_stages import validate as validate_owned_stages
+            from .creation_observations import ordinary_set_creation_graphs
+            phase = phases[index + 1]
+            if phase.get('phase') != 'inner' or type(phase.get('index')) is not int or phase['index'] != index:
+                raise ValueError('Staged created root lacks its actual indexed parent-owned phase')
+            result = phase.get('dispatch_result', {})
+            if result.get('ok') is not True:
+                raise ValueError('Staged created root lacks successful actual native acknowledgements')
+            actual = validate_owned_stages(child, result, context={'edits': compound_rename_edits(calls[:index])})
+            for group in ordinary_set_creation_graphs(plan, child['pre_state']):
+                roots.append({'child_index': index, 'request_path': group['root'],
+                    'parent_id': group['parent_id'].upper(), 'object_id': actual[group['root']]['id'].upper()})
+            continue
         if child.get('operation') != 'object.create' or plan.get('kind') != 'object-create-graph':
             continue
         phase = phases[index + 1]

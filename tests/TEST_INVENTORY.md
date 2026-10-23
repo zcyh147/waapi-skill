@@ -5,6 +5,81 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R78 Bed Mixer condition acceptance
+
+No runtime change was needed. Four-version public ShareSet setup/edit checks,
+existing policy alternatives and the 2021 constructor boundary passed 17 focused
+tests in 5.99s. The original four fixture failures (missing requested stored-field
+projection in a fake client) and corrected result are retained in
+`r78-bed-program-logs`; five files are hash-archived with their handoff/source plan.
+
+Frozen `df9af555619219b430c33b43f4392f91ebc08bae` passed one native workflow on
+each matching macOS Console: 2022.1 = 9.79s, 2023.1 = 10.03s, 2024.1 = 10.44s,
+2025.1 = 10.08s. Each has 25 independent observations, 115 hashed native packets
+and two separately authorized verified transactions. A standalone Bed Mixer
+ShareSet is created with policy1 only; its existing limit is then changed64→128.
+Every parameter read, setup, edit and verifier uses the same actual nonzero
+platform. Actual scalar metadata/enabled state, all four plugin parameters,
+identity/notes, WorkUnit membership, parent and existing RoomVerb peer are checked.
+Source integrity and cleanup passed; no audio rendering is claimed.
+
+Evidence: `r78-bed-mixer-native-review.json` and
+`r78-bed-df9af555-<year>-r1/root-review.json`. Matching 2021 captured host catalog
+and primary plugin corpus contain no Bed Mixer class, and its constructor
+backend is separately unavailable in the pinned function surface. No 2021 Bed
+case ran or received PASS credit; this is a scoped host/version boundary, not
+universal absence on every possible host. The source rationale remains in the
+archived plan. No Fresh, Windows, Authoring or full gate was added. #177 and the
+broader construction/plugin tickets remain open pending their full criteria.
+
+## 2026-10-23 R76 sequence and R77 Time native acceptance
+
+The R76 closed sequence workflow passed on all five pinned macOS Console
+builds at frozen `c98ccf574a6d82380046a56df53f7e5eef34ce26`:
+
+| Version | Result | Public reads | Native packets | Transactions |
+| --- | --- | --- | --- | --- |
+| 2021.1 | 1 passed, 9.65s | 7 | 155 | 0 |
+| 2022.1 | 1 passed, 9.20s | 7 | 155 | 0 |
+| 2023.1 | 1 passed, 9.04s | 7 | 155 | 0 |
+| 2024.1 | 1 passed, 8.57s | 7 | 155 | 0 |
+| 2025.1 | 1 passed, 9.19s | 7 | 155 | 0 |
+
+Independent child identities/order/Volume/Pitch/class anchor first, last,
+index, ranges, custom metadata scope, derived count/any/all/empty values,
+ordered combination and repeated occurrences. An exact repeated business result
+checks stability. No extra paging invocation was needed. All packet hashes,
+source integrity and teardown checks passed. Evidence:
+`r76-query-sequence-five-version-native-review.json` and
+`r76-query-sequences-c98ccf57-<year>-r1/root-review.json`.
+This is selected sequence acceptance, not every native predicate or record type.
+
+R77 adds test evidence, with **no runtime change**. The public fake setup/edit
+flow uses actual Time class 5111824 and matching five-version definitions;
+18 affected checks passed in 7.19s. Earlier runs overlap and original fixture
+failures are retained in `r77-time-program-logs` (nine archived files).
+The native workflow separately creates a standalone Time Modulator with only
+TimeModLoops=50, then edits its existing EnvelopeStopPlayback from true to false.
+Live scalar metadata/enabled state, loops, Duration, notes, identity, parent,
+peer Envelope values and complete WorkUnit membership are checked.
+
+| Version | Frozen candidate | Result | Observation reads / native packets | Verified transactions |
+| --- | --- | --- | --- | --- |
+| 2021.1 | `0070be26` | 1 passed, 9.25s | 25 / 115 | 2 |
+| 2022.1 | `0070be26` | 1 passed, 8.79s | 25 / 123 | 2 |
+| 2023.1 | `0070be26` | 1 passed, 9.78s | 25 / 123 | 2 |
+| 2024.1 | `0070be26` | 1 passed, 9.40s | 25 / 123 | 2 |
+| 2025.1 | `0070be26` | 1 passed, 5.98s | 25 / 123 | 2 |
+
+2021 omits currentPlatformId: both live fields explicitly certify unlink=false,
+so the enabled observation uses the existing null-GUID read convention and the
+mutation omits platform. Later versions use the actual disclosed platform.
+All source/packet/cleanup checks passed. Evidence:
+`r77-time-five-version-native-review.json` and per-root reviews. These are the
+representative count-50 existing edit and minimal setup, not every numeric
+endpoint, conditional constructor combination or complete Time/Bed Mixer family.
+No Fresh, Windows, Authoring or full Program/Non-live gate was added.
+
 ## 2026-10-23 R75 positive device fixture and R76 sequence queries
 
 The positive master-bus workflow uses a new owned copy of the currently assigned
@@ -40,8 +115,8 @@ reducer marker. Both reproduced through the public Gateway and were repaired;
 70 affected controls passed in 16.31s (overlap with the earlier selection).
 Independent correction review found no further actionable issue. Twenty-six
 original log/handoff/review files are hash-archived in
-`r76-query-sequence-program-logs`; this is program evidence, not native sequence
-acceptance or a full gate. Record lists, metadata-bound comparison predicates,
+`r76-query-sequence-program-logs`; these original runs are program evidence; subsequent native sequence acceptance
+is recorded above. Neither is a full gate. Record lists, metadata-bound comparison predicates,
 randomizer and remaining versioned query functions stay assigned to #181.
 
 ## 2026-10-23 R75 reference applicability and R76 structural history

@@ -5244,7 +5244,10 @@ def _prepare_object_create(
         metadata={
             "closed_object_tree": True,
             **({"native_default_reference_omissions": null_reference_omissions} if null_reference_omissions else {}),
-            "Gateway_rename_choices": result_context["renames"] if result_context else [],
+            "native_name_bindings": result_context["renames"] if result_context else [],
+            **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
+                "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
+                if result_context and result_context['renames'] else {}),
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
             "platform": platform,
@@ -5337,6 +5340,22 @@ def _prepare_object_create(
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
+        from .owned_result_stages import prepare as prepare_owned_stages
+        try:
+            stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
+                node_specs, result_context, request.version)
+        except ValueError as exc:
+            raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
+        if stage_plan is not None:
+            state["owned_result_stages"] = stage_plan
+            from .owned_result_stages import preservation_rows
+            try:
+                preservation_rows({'verification_plan': verification, 'pre_state': state})
+            except ValueError as exc:
+                raise OperationContractError('PLANNED_REFERENCE_STAGING_UNAVAILABLE', str(exc)) from exc
+            from .edit_history_business import capture_field_read_platform
+            state["field_read_platform"] = capture_field_read_platform(request.version,
+                stage_plan["creation_args"].get("platform"), read=read)
     if documented_guards:
         state["documented_list_guards"] = documented_guards
     from .documented_list_fields import capture_slot_reference_targets
@@ -7146,7 +7165,10 @@ def _prepare_object_set(
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
-            "Gateway_rename_choices": result_context["renames"] if result_context else [],
+            "native_name_bindings": result_context["renames"] if result_context else [],
+            **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
+                "dependent_write": "after actual GUID/class/parent/membership binding", "stage_count": 2}}
+                if result_context and result_context['renames'] else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -7221,6 +7243,22 @@ def _prepare_object_set(
     if result_context:
         graph_guard["path_snapshots"].extend(result_context["path_snapshots"])
         state["planned_reference_context"] = result_context
+        from .owned_result_stages import prepare as prepare_owned_stages
+        try:
+            stage_plan = prepare_owned_stages(preview.envelope.uri, preview.envelope.args, preview.envelope.options,
+                node_specs, result_context, request.version)
+        except ValueError as exc:
+            raise OperationContractError("PLANNED_REFERENCE_STAGING_UNAVAILABLE", str(exc)) from exc
+        if stage_plan is not None:
+            state["owned_result_stages"] = stage_plan
+            from .owned_result_stages import preservation_rows
+            try:
+                preservation_rows({'verification_plan': verification, 'pre_state': state})
+            except ValueError as exc:
+                raise OperationContractError('PLANNED_REFERENCE_STAGING_UNAVAILABLE', str(exc)) from exc
+            from .edit_history_business import capture_field_read_platform
+            state["field_read_platform"] = capture_field_read_platform(request.version,
+                stage_plan["creation_args"].get("platform"), read=read)
     reference_guards = [guard for spec in node_specs for guard in spec.get("documented_reference_lists", [])]
     changed_ids = {spec.get("target_id") or spec.get("preexisting_id") for spec in node_specs}
     for guard in reference_guards:
@@ -9472,6 +9510,9 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
             for rename in result_context["renames"]:
                 for snapshot in rename["collision_state"]:
                     expected = snapshot["rows"]
+                    if after_write and compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        expected = [project_compound_snapshot(row, compound_path_context) for row in expected]
                     identities = [row["id"] for row in expected]
                     actual = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, {"return": snapshot["fields"]}))
                     normalized = [{key: row[key] for key in snapshot["fields"] if key in row} for row in actual]
@@ -11093,6 +11134,18 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
             for path in paths.values()]
     elif kind == "object-set-batch":
         nodes = plan.get("nodes", [])
+        if state.get("owned_result_stages"):
+            from .creation_observations import ordinary_set_creation_graphs
+            try:
+                groups = ordinary_set_creation_graphs(plan, state)
+            except ValueError as exc:
+                raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
+            facts = state['planned_reference_context']['facts']
+            from .owned_result_stages import preservation_rows
+            return [{"object_id": "path:" + facts[node['request_path']]['path'].casefold(),
+                "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
+                {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
+                for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
         if (prepared.request.operation != "object.set" or not nodes
                 or any(node.get("existing_target") is not True or node.get("preexisting_id") is not None
                     or node.get("import") or node.get("children_request_paths") or node.get("list_request_paths")
@@ -19186,7 +19239,7 @@ def verify_prepared_operation(
                     child_business_state_verified = False
                     continue
                 phase_path_context = None
-                if path_context is not None:
+                if path_context is not None or prepared_child.get('pre_state', {}).get('owned_result_stages'):
                     from .object_graph_paths import compound_rename_edits
                     phase_path_context = {'edits': compound_rename_edits(inner_plan[:index + 1])}
                 child_verification = verify_prepared_operation(
@@ -20491,6 +20544,24 @@ def verify_prepared_operation(
             raise OperationContractError("INVALID_PREVIEW", "Object graph verification nodes are malformed.")
         specs = [dict(row) for row in raw_specs]
         history_graph = False
+        owned_stage_identities = None
+        if pre_state.get("owned_result_stages"):
+            from .owned_result_stages import validate as validate_owned_stages
+            try:
+                owned_stage_identities = validate_owned_stages(prepared, execution_result, context=compound_phase_path_context)
+            except (ValueError, KeyError, TypeError, StopIteration, SemanticValidationError) as exc:
+                check("Actual owned result stages match their immutable declaration and independent observations", False, {"error": str(exc)})
+            else:
+                check("Actual owned result stages match their immutable declaration and independent observations", True,
+                    {"sha256": canonical_sha256(execution_result['owned_result_execution'])})
+            if kind == "object-set-batch":
+                from .creation_observations import ordinary_set_creation_graphs
+                try:
+                    ordinary_set_creation_graphs(plan, pre_state)
+                except ValueError:
+                    pass
+                else:
+                    history_graph = True
         if kind == "object-create-graph" and len(specs) > 1:
             from .creation_observations import ordinary_creation_graph
             try:
@@ -20675,7 +20746,7 @@ def verify_prepared_operation(
             fields = _object_spec_return_fields(spec)
             platform = spec.get("platform")
             history_view = (pre_state or {}).get("field_read_platform", {})
-            history_fields = (kind == "object-create-graph"
+            history_fields = ((kind == "object-create-graph" or history_graph)
                 and history_view.get("status") == "certified")
             if history_fields:
                 fields = _dedupe_fields([*fields, "classId"])
@@ -20820,7 +20891,10 @@ def verify_prepared_operation(
                 else:
                     check("replacement ControlInput exposes a canonical GUID", False, row)
             expected_path = spec.get("expected_path")
-            if kind == 'object-create-graph' and compound_path_context:
+            if owned_stage_identities and not spec.get('existing_target'):
+                from .object_graph_paths import project_compound_path
+                expected_path = project_compound_path(owned_stage_identities[request_path]['path'], compound_path_context)
+            if kind == 'object-create-graph' and compound_path_context and not pre_state.get('owned_result_stages'):
                 from .creation_observations import ordinary_creation_graph
                 from .object_graph_paths import project_compound_path
                 _, original_paths = ordinary_creation_graph(plan, pre_state,
@@ -20870,7 +20944,7 @@ def verify_prepared_operation(
                     "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
                 if identity_ok and history_fields and len(specs) == 1:
                     created_history_metadata.append((spec, object_id))
-            if history_graph and not spec.get("preexisting_id"):
+            if history_graph and not spec.get("preexisting_id") and not spec.get("existing_target"):
                 identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
                 identity_ok = (result_node is not None and _same_identity(row.get("id"), object_id)
                     and type(row.get("classId")) is int and row["classId"] == spec.get("class_id")
@@ -23990,6 +24064,13 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
+    if kind in {"object-create-graph", "object-set-batch"} and owned_stage_identities and all(item.get("passed") is True for item in assertions):
+        from .owned_result_stages import observe_preservation
+        preserved = observe_preservation(prepared, owned_stage_identities, read=read_call, context=compound_path_context)
+        readbacks.extend(preserved)
+        for record in preserved:
+            check("Owned native creation retained parent/collision identity, class, notes and exact child membership",
+                record['passed'], {'object_id': record['object_id']})
     if created_history_metadata and all(item.get("passed") is True for item in assertions):
         # Optional receipt evidence follows all mandatory source readbacks.
         # A missing/failed optional read cannot consume a later required read.
@@ -24005,6 +24086,17 @@ def verify_prepared_operation(
         except OperationContractError as exc:
             record["error"] = exc.as_dict()
         readbacks.append(record)
+    if kind == "object-set-batch" and history_graph and all(item.get("passed") is True for item in assertions):
+        from .creation_observations import ordinary_set_creation_graphs
+        for group in ordinary_set_creation_graphs(plan, pre_state):
+            record = {"role": "created-graph-history-membership", "request_path": group['root'], "uri": OBJECT_GET_URI,
+                "args": {"from": {"id": [resolved_id_by_path[group['root']]]}, "transform": [{"select": ["descendants"]}]},
+                "options": {"return": [*IDENTITY_RETURN_FIELDS, "classId"]}}
+            try:
+                record["result"] = read_call(record['uri'], record['args'], record['options'])
+            except OperationContractError as exc:
+                record["error"] = exc.as_dict()
+            readbacks.append(record)
     if kind == "object-set-batch" and all(item.get("passed") is True for item in assertions):
         from .existing_field_observations import capture_after
         for proof in (pre_state or {}).get("existing_field_observations", []):

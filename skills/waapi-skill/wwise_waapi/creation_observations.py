@@ -89,7 +89,8 @@ def require_compound_creation_scope(calls):
     from .operation_registry import OperationContractError
     from .edit_history_business import MAX_OBSERVATIONS
     prepared = [row.get('prepared_operation', {}) for row in calls]
-    if not any(child.get('verification_plan', {}).get('kind') == 'object-create-graph' for child in prepared):
+    if not any(child.get('verification_plan', {}).get('kind') == 'object-create-graph'
+            or child.get('pre_state', {}).get('owned_result_stages') for child in prepared):
         return
     graphs, known_count = [], 0
     for child in prepared:
@@ -114,6 +115,13 @@ def require_compound_creation_scope(calls):
         elif kind in {'same-guid-notes', 'same-guid-property', 'same-guid-reference'} and not state.get('effect_render_chains'):
             known_count += 1
         elif kind == 'object-set-batch':
+            if state.get('owned_result_stages'):
+                groups = ordinary_set_creation_graphs(plan, state)
+                graphs.append(True)
+                from .owned_result_stages import preservation_rows
+                known_count += sum(len(group['nodes']) + sum(len(ordinary_creation_fields(node))
+                    for node in group['nodes']) for group in groups) + len(preservation_rows(child))
+                continue
             for node in plan.get('nodes', []):
                 proofs = [proof for proof in state.get('existing_field_observations', [])
                     if proof.get('request_path') == node.get('request_path')]
@@ -128,6 +136,46 @@ def require_compound_creation_scope(calls):
     if known_count > MAX_OBSERVATIONS:
         raise OperationContractError('UNDO_GROUP_OBSERVATION_LIMIT_EXCEEDED',
             'Compound created graph and known companion outcomes exceed the complete history observation bound.')
+
+
+def ordinary_set_creation_graphs(plan, state):
+    """Admit complete staged ordinary new trees below retained exact parents."""
+    nodes = plan.get('nodes', [])
+    if (not state.get('owned_result_stages') or plan.get('on_name_conflict') not in {'fail', 'rename'}
+            or not nodes or len(nodes) > 128 or plan.get('replaced_subtree_rows') or plan.get('replaced_list_subtree_rows')):
+        raise ValueError('Set creation history needs its complete owned ordinary stage plan')
+    existing = {node['request_path']: node for node in nodes if node.get('existing_target') is True}
+    new = {node['request_path']: node for node in nodes if node.get('existing_target') is False}
+    if not new or len(new) + len(existing) != len(nodes):
+        raise ValueError('Set creation history requires a complete distinct existing/new roster')
+    for node in nodes:
+        fields = ordinary_creation_fields(node)
+        if (fields is None or type(node.get('class_id')) is not int or node['class_id'] <= 0
+                or node.get('preexisting_id') is not None or node.get('collection') not in {None, 'children'}
+                or node.get('list_request_paths') or node.get('list_snapshots') or node.get('import_requested')
+                or node.get('requested_language') or node.get('graph_plugin_native')
+                or any('curve' in field or 'array' in field for field in fields)):
+            raise ValueError('Every set creation node requires its complete ordinary hierarchy observation')
+        if node.get('existing_target') and (fields or node.get('notes_supplied')
+                or node.get('requested_name') != node.get('original_name')):
+            raise ValueError('Staged set creation history currently retains its existing parents without field edits')
+    groups, visited = [], set()
+    for path, root in new.items():
+        parent = existing.get(root.get('parent_request_path'))
+        if parent is None:
+            continue
+        group = [node for child_path, node in new.items() if child_path == path or child_path.startswith(path + '.')]
+        paths = {node['request_path'] for node in group}
+        if any(node is not root and node.get('parent_request_path') not in paths for node in group):
+            raise ValueError('Set creation graph is not connected to its retained parent')
+        if any('target_request_path' in field and field['target_request_path'] not in paths
+                for node in group for field in ordinary_creation_fields(node)):
+            raise ValueError('Cross-tree creation references require their complete shared history observation')
+        groups.append({'root': path, 'parent_id': parent['target_id'], 'nodes': group})
+        visited.update(paths)
+    if visited != set(new) or len(visited) + sum(len(ordinary_creation_fields(node)) for node in new.values()) > 128:
+        raise ValueError('Set creation history lacks a complete bounded new graph partition')
+    return groups
 
 
 def capture_created_field_metadata(node: Mapping[str, Any], object_id: str, *, read: Any) -> list[dict[str, Any]]:
