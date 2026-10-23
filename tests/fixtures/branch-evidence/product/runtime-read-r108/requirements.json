@@ -1,0 +1,13 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getRTPCs|/resultSchema/properties/return/items/properties/value": {
+      "native_shape_sha256": "a582baf45f2eac3ddc3553ad8a309c82ad36806831a5c99f748e881732ac58d0",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact complete owned RPM read value; no setter-effect, other leaf, host or version credit"
+    }
+  }
+}

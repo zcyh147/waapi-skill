@@ -1,0 +1,37 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "runtime-owned-rtpc-value-2025",
+      "bindings": {
+        "artifact": "bindings.json",
+        "sha256": "a53b683d592f827644d8b90f668f276b356810bfe6a76ab62349f182e416bd75"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "bindings.json",
+          "sha256": "a53b683d592f827644d8b90f668f276b356810bfe6a76ab62349f182e416bd75"
+        },
+        "program": {
+          "artifact": "program.json",
+          "sha256": "c31c6438f70c44b80196b74994bfd8611569c4c3fae39acfbee6beede1aec85e"
+        },
+        "requirements": {
+          "artifact": "requirements.json",
+          "sha256": "0abe8990e70737b4502e34fc4923a99db9b475e10bcdd411603831cb4346ccda"
+        },
+        "capture": {
+          "artifact": "program-capture.json",
+          "sha256": "e296cbea3e45b8a2f7e5782cf0d71669689f50dc7eed60a167d0c55979445d13"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "attachment.json",
+      "sha256": "6be2cf91bd3a9d385043baeae1a9b7d74c7e4b7c09039b3b7c4c6d85793a0d34"
+    }
+  ]
+}
