@@ -5,6 +5,39 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R89 condition mapping and Inner policy increment
+
+Reviewed condition core `f8469066` maps 7,297 installed condition IDs across
+11 recipes: 7,012 source-definition outcomes and 285 explicit dependencies.
+These are source/mechanism assignments, not 7,012 observed native effects.
+It preserves all 655 prior non-installed requirements and reuses seven distinct
+native proof packages without new native runs. Existing focused reader checks
+passed 20 in 68.03s; the separate public class-route producer passed one in
+2.24s. Independent review found no actionable issue. Final integrated-source
+reconciliation and dependency completion remain pending.
+
+Reviewed Inner batch `f572d4ba` adds exact 2025 MetadataSlot identity binding
+and staged merge/replace/replaceAll policies. The final affected selection
+passed 29 checks in 43.43s; a separate merged-hierarchy selection passed two
+in 4.79s. These are scoped selections, not a new broad gate. Both reviewed
+batches are integrated at `46db6f4b`.
+
+The original named-List native node on frozen `46db6f4b` **failed in 11.24s**
+on Mac Console2025.1.7.9143. It passed the earlier binding point and obtained
+the actual MetadataSlot GUID, class, empty name and owner through an independent
+read. The next constructor-reference check stopped because native `@Metadata`
+returned a singleton list whereas the current check expected a scalar object.
+This is a remaining representation/consumer issue, not complete source success.
+The setup transaction was verified; source transaction
+`tx1-074k7119fvb2azts6edy` remains indeterminate and was not retried, verified or
+replayed. The run retained 43 public calls, 11 independent observations and
+128 hash-checked packets; three SET calls were acknowledged. Source full-tree
+hash, project mtime and tree metadata were unchanged, processes cleaned, and
+the failed sandbox quarantined. Exact record:
+`r89-named-list-46db6f4b-2025-r1/root-review.json`.
+
+No Fresh, full Program/Non-live gate or whole-ticket completion is claimed.
+
 ## 2026-10-23 R88 legacy ControlInput typed query
 
 Reviewed runtime `bf57bd55` certifies only the source-defined 2021 RTPC
