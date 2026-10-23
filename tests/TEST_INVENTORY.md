@@ -7,6 +7,19 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-23 R91 runtime verification and focused repair
 
+Reviewed capture-artifact candidate `0aeaee85`, integrated at `9cf8eac7`,
+binds the exact authorized destination before execution and independently checks
+the resulting bounded regular-file artifact. It explicitly does not certify
+capture-format validity or complete measurement content. Initial development
+slices passed 31 artifact controls, seven authorization/matrix controls and six
+size/existing-caller controls; ten affected filesystem-error controls and 20
+actual merge consumers passed separately. Review then reproduced a missing
+intermediate-directory symlink redirect that falsely verified another path.
+The repair passed that public regression and ten affected path controls, and
+narrow rereview found it resolved. The regression also proves redirected
+contents are not read before rejection. These overlapping component checks are
+not one aggregate gate, and no native save was performed by this increment.
+
 Reviewed log-effect candidate `71a86adf`, integrated at `927f4468`, observes the
 selected channel before execution and once afterward. Adding a message needs
 increased matching multiplicity; clearing reports remaining or competing
