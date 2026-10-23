@@ -287,9 +287,11 @@ def test_2025_native_named_set_with_owned_metadata_slot(workflow_sandbox_runtime
         slot, = slots
         assert slot['id'] == ids['slot'] and slot['class_id'] == 5570560 and slot['owner']['id'] == ids['sound'], slot
         slot_reference, = query('source-metadata-slot-reference', ['--exact-id', ids['slot'], *projection,
-            '--include', 'owner', '--include-field', 'Metadata'], 2)
+            '--include', 'owner', '--include-local-reference', 'Metadata'], 2)
         assert {key: slot_reference[key] for key in slot} == slot, slot_reference
-        assert slot_reference['references']['Metadata']['id'] == metadata_id, slot_reference
+        local_metadata = slot_reference['local_references']['Metadata']
+        assert isinstance(local_metadata, list) and len(local_metadata) == 1, slot_reference
+        assert isinstance(local_metadata[0], dict) and local_metadata[0].get('id') == metadata_id, slot_reference
         observation['independent_slot_reference'] = slot_reference
         assert exact('metadata-workunit-after-source', METADATA_WU) == metadata_wu
         assert query('metadata-children-after-source', ['--exact-id', METADATA_WU, '--relationship', 'children', *projection], 2) == [metadata_target]

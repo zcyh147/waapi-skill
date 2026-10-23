@@ -589,3 +589,67 @@ def test_nonempty_inner_list_cannot_be_normalized_from_omitted_projection(tmp_pa
     assert len(task.writes) == 3 and SECOND_SLOT not in task.objects and '@OutputBus' not in task.objects[SOUND]
     code, replay = task.run('execute', tx)
     assert code == 2 and len(task.writes) == 3, replay
+
+
+def metadata_local_reference():
+    from pathlib import Path
+    source = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'metadata-slot-local-reference-2025.json').read_text())
+    value = deepcopy(source['reference_read']['result']['return'][0]['@Metadata'])
+    value[0].update(id=METADATA, name='System settings')
+    return value
+
+
+@pytest.mark.parametrize('fault', ['wrong-target', 'multiple', 'empty', 'malformed'])
+def test_metadata_local_singleton_rejects_invalid_reference_before_dependent_write(tmp_path, fault):
+    task = named_list_task(tmp_path)
+    original = task.call
+    value = metadata_local_reference()
+    if fault == 'wrong-target':
+        value[0]['id'] = ROOT
+    elif fault == 'multiple':
+        value.append({'id': ROOT, 'name': 'Routing'})
+    elif fault == 'empty':
+        value = []
+    else:
+        value[0]['name'] = None
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.get') and args == {'from': {'id': [SLOT]}} and options == {'return': ['id', '@Metadata']}:
+            return {'return': [{'id': SLOT, '@Metadata': deepcopy(value)}]}
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, stopped = task.run('execute', tx)
+    assert code == 2 and stopped.get('executed') is not True, stopped
+    assert stopped['dispatch_result']['message'] == 'Required constructor reference changed before dependent write'
+    assert len(task.writes) == 2 and '@OutputBus' not in task.objects[SOUND]
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 2
+
+
+@pytest.mark.parametrize('fault', ['metadata-cardinality', 'unrelated-reference-array'])
+def test_metadata_local_relation_is_strict_in_final_graph_verification(tmp_path, fault):
+    task = named_list_task(tmp_path)
+    original = task.call
+    corrupt = False
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith('object.get'):
+            for row in result.get('return', []):
+                if row.get('id') == SLOT and '@Metadata' in row:
+                    row['@Metadata'] = metadata_local_reference()
+                    if corrupt and fault == 'metadata-cardinality':
+                        row['@Metadata'].append({'id': ROOT, 'name': 'Routing'})
+                if corrupt and fault == 'unrelated-reference-array' and row.get('id') == SOUND and 'OutputBus' in row:
+                    row['OutputBus'] = [row['OutputBus']]
+        return result
+    task.call = call
+    tx, shown = task.preview()
+    assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    code, executed = task.run('execute', tx)
+    assert code == 0 and executed['executed'] is True, executed
+    corrupt = True
+    code, rejected = task.run('verify', tx)
+    assert code == 2 and rejected['verified'] is False and rejected['state'] == 'verification_failed', rejected
+    assert len(task.writes) == 3
+    assert task.run('execute', tx)[0] == 2 and len(task.writes) == 3

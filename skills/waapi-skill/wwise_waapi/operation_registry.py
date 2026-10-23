@@ -11070,6 +11070,7 @@ def _normalize_replace_subtree_snapshot(
 
 
 def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
+    from .constructor_inputs import local_reference_field
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
@@ -11081,8 +11082,8 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
                 else ()
             ),
             *(row.get("name") for row in spec.get("properties", []) if isinstance(row, Mapping)),
-            *(row.get("name") for row in spec.get("references", []) if isinstance(row, Mapping)),
-            *(requirement["name"] for evidence in spec.get("new_object_default_evidence", [])
+            *(local_reference_field(spec, row.get("name")) for row in spec.get("references", []) if isinstance(row, Mapping)),
+            *(local_reference_field(spec, requirement["name"]) for evidence in spec.get("new_object_default_evidence", [])
               for requirement in evidence["requirements"]),
             *(plugin_verification_fields(normalize_plugin_creation(spec["source_plugin"]["descriptor"]))
               if "source_plugin" in spec else ()),
@@ -21224,10 +21225,17 @@ def verify_prepared_operation(
                           curve_type == "Curve" and _native_snapshot_equal(points, field_spec["curve"]["points"]),
                           {"expected": field_spec["curve"], "actual": curve, "observed_type": curve_type})
                     continue
-                actual = _reference_identity(_field_value(row, str(field_name)))
+                # Only the exact certified constructor profile interprets its
+                # observed local singleton array. Native read evidence stays raw.
+                from .constructor_inputs import local_reference_value
+                reference_row = row
+                local_key = "@" + str(field_name)
+                if field_name not in row and "@@" + str(field_name) not in row and local_key in row:
+                    reference_row = {**row, local_key: local_reference_value(spec, field_name, row[local_key])}
+                actual = _reference_identity(_field_value(reference_row, str(field_name)))
                 check(
                     f"{request_path}.{field_name} reference matches",
-                    _reference_requirement_matches(row, str(field_name), field_spec.get("target_id")),
+                    _reference_requirement_matches(reference_row, str(field_name), field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
             if "source_plugin" in spec:
