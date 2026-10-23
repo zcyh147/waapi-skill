@@ -166,14 +166,35 @@ class AuthoringBatchAdapter:
                  '--waapi-port', str(runtime.port), '--project-modification-policy', 'ask_before_changes'])
         status = gateway(['status'])
         observed, endpoint = status.get('wwise', {}), status.get('endpoint', {})
-        try:
-            project = Path(localize_waapi_host_path(status.get('project', {}).get('path', ''))).resolve(strict=True)
-        except (ValueError, OSError, TypeError) as exc:
-            raise ValueError('Node live Authoring ownership lacks its exact sandbox project') from exc
         if (any(observed.get(field) != self.info.get(field) for field in ('isCommandLine', 'processId', 'sessionId', 'version'))
                 or observed.get('isCommandLine') is not False
-                or endpoint != {'host': runtime.host, 'port': runtime.port, 'url': f'ws://{runtime.host}:{runtime.port}/waapi'}
-                or project != self.runtime.sandbox.sandbox_project.resolve(strict=True)):
+                or endpoint != {'host': runtime.host, 'port': runtime.port, 'url': f'ws://{runtime.host}:{runtime.port}/waapi'}):
+            raise ValueError('Node live Authoring ownership differs from its lifecycle proof')
+        project_identity = status.get('project')
+        if not isinstance(project_identity, dict):
+            raise ValueError('Node live Authoring ownership lacks its exact sandbox project')
+        if runtime.version == '2021.1':
+            # 2021 status exposes the Project hierarchy identity, not its file.
+            identity_fields = ('id', 'name', 'type', 'path')
+            if (project_identity.get('type') != 'Project'
+                    or any(not isinstance(project_identity.get(key), str) or not project_identity[key] for key in identity_fields)):
+                raise ValueError('Node live Authoring ownership lacks its exact Project identity')
+            observation = gateway(['query-object', '--exact-id', project_identity['id'],
+                '--include', 'file-path', '--max-results', '1'])
+            rows = observation.get('objects')
+            if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict)
+                    or observation.get('projection_complete') is False
+                    or any(rows[0].get(key) != project_identity[key] for key in identity_fields)
+                    or not isinstance(rows[0].get('file_path'), str) or not rows[0]['file_path']):
+                raise ValueError('Node live Authoring ownership lacks its exact Project file observation')
+            project_path = rows[0]['file_path']
+        else:
+            project_path = project_identity.get('path', '')
+        try:
+            project = Path(localize_waapi_host_path(project_path)).resolve(strict=True)
+        except (ValueError, OSError, TypeError) as exc:
+            raise ValueError('Node live Authoring ownership lacks its exact sandbox project') from exc
+        if project != self.runtime.sandbox.sandbox_project.resolve(strict=True):
             raise ValueError('Node live Authoring ownership differs from its lifecycle proof')
         return gateway
 
