@@ -378,9 +378,9 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
         elif plan["field"] not in covered.get((str(plan["object_id"]).upper(), _receipt_platform(plan, prepared["pre_state"])), set()):
             raise ValueError("Render source selected field is missing from its complete chain observation")
         return observations
+    if plan.get("kind") in {"object-create-graph", "object-set-batch"} and prepared.get('pre_state', {}).get('owned_result_stages'):
+        return _staged_creation_observations(prepared, execution, verification, compound_path_context, compound_phase_path_context)
     if plan.get("kind") == "object-set-batch":
-        if prepared.get('pre_state', {}).get('owned_result_stages'):
-            return _staged_set_creation_observations(prepared, execution, verification, compound_path_context, compound_phase_path_context)
         from .existing_field_observations import receipt_observations
         return receipt_observations(prepared, verification, path_context=compound_path_context)
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
@@ -472,12 +472,12 @@ def _created_membership_matches(result, observations):
         for expected in nodes)
 
 
-def _staged_set_creation_observations(prepared, execution, verification, path_context, phase_context):
-    from .creation_observations import ordinary_set_creation_graphs, ordinary_creation_fields
+def _staged_creation_observations(prepared, execution, verification, path_context, phase_context):
+    from .creation_observations import ordinary_staged_creation_graphs, ordinary_creation_fields
     from .owned_result_stages import validate as validate_stages
     from .object_graph_paths import project_compound_path
     plan, state = prepared['verification_plan'], prepared['pre_state']
-    groups = ordinary_set_creation_graphs(plan, state)
+    groups = ordinary_staged_creation_graphs(plan, state)
     actual = validate_stages(prepared, execution, context=phase_context)
     ids = {path: row['id'].upper() for path, row in actual.items()}
     view = state.get('field_read_platform', {})
@@ -487,7 +487,7 @@ def _staged_set_creation_observations(prepared, execution, verification, path_co
     witnesses = [row for row in verification['assertions'] if row.get('kind') == 'verified_created_node_identity']
     all_nodes = [node for group in groups for node in group['nodes']]
     if len(witnesses) != len(all_nodes) or any(row.get('passed') is not True for row in witnesses):
-        raise ValueError('Staged set receipt requires every independently observed actual created node')
+        raise ValueError('Staged creation receipt requires every independently observed actual created node')
     observations = []
     for group in groups:
         group_observations = []

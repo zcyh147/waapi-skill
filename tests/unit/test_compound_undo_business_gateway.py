@@ -4213,10 +4213,10 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False, duplicate_siblings=False, retained_duplicates=False, suffix_like=False, source_only=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False, duplicate_siblings=False, retained_duplicates=False, suffix_like=False, source_only=False, create_constructor=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
-    operation = 'object.set' if native_rename or set_graph else 'object.create'
+    operation = 'object.set' if (native_rename or set_graph) and not create_constructor else 'object.create'
     task = OwnedGraphTask(tmp_path, version, operation)
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for cid, name in
         ((1638416, 'WorkUnit'), (1376272, 'Bus'), (3997712, 'AuxBus'))]
@@ -4250,6 +4250,27 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     platform = '{44444444-4444-4444-4444-444444444444}'
     original = task.call
     duplicate_created, duplicate_roots_created = [], []
+    def create(node, parent):
+        if retained_duplicates and node['type'] == 'Bus':
+            key = ('Routing', 'Backup')[len(duplicate_roots_created)]
+            duplicate_roots_created.append(key)
+            identity, name = ids[key], ('Routing19' if key == 'Routing' else 'Routing83')
+        elif suffix_like and node['name'] == 'Send37':
+            identity, name = ids['Backup'], 'Send88'
+        elif duplicate_siblings and node['name'] == 'Send':
+            key = ('Destination', 'Sender')[len(duplicate_created)]
+            duplicate_created.append(key)
+            identity, name = ids[key], ('Send' if key == 'Destination' else 'Send37')
+        else:
+            identity = ids[node['name']]
+            name = node['name']
+        name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and not retained_duplicates and node['name'] in {'Routing', 'Backup'} else name
+        task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
+            'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
+            'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
+            **{key: {'id': value} for key, value in node.items() if key.startswith('@')}}
+        children = [create(child, identity) for child in node.get('children', [])]
+        return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
     def call(uri, args=None, options=None):
         if platform_certified and uri.endswith('getProjectInfo'):
             return {**original(uri, args, options), 'currentPlatformId': platform, 'platforms': [{'id': platform, 'name': 'Windows'}]}
@@ -4262,27 +4283,6 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
                 if multiple_roots:
                     assert len(args['objects']) == 1 and len(args['objects'][0]['children']) == 1
                     assert set(args['objects'][0]) == {'object', 'children'}
-                def create(node, parent):
-                    if retained_duplicates and node['type'] == 'Bus':
-                        key = ('Routing', 'Backup')[len(duplicate_roots_created)]
-                        duplicate_roots_created.append(key)
-                        identity, name = ids[key], ('Routing19' if key == 'Routing' else 'Routing83')
-                    elif suffix_like and node['name'] == 'Send37':
-                        identity, name = ids['Backup'], 'Send88'
-                    elif duplicate_siblings and node['name'] == 'Send':
-                        key = ('Destination', 'Sender')[len(duplicate_created)]
-                        duplicate_created.append(key)
-                        identity, name = ids[key], ('Send' if key == 'Destination' else 'Send37')
-                    else:
-                        identity = ids[node['name']]
-                        name = node['name']
-                    name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and not retained_duplicates and node['name'] in {'Routing', 'Backup'} else name
-                    task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
-                        'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
-                        'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
-                        **{key: {'id': value} for key, value in node.items() if key.startswith('@')}}
-                    children = [create(child, identity) for child in node.get('children', [])]
-                    return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
                 parent_id = args['objects'][0]['object']
                 children = [create(child, parent_id) for child in args['objects'][0]['children']]
                 assert '@UserAuxSend0' not in task.objects.get(ids['Sender'], {})
@@ -4293,6 +4293,16 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
                 assert matches == [ids['Destination']]
                 task.objects[item['object']]['@UserAuxSend0'] = {'id': matches[0]}
             return {'objects': []}
+        if create_constructor and uri == 'ak.wwise.core.object.setReference':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['object'] == ids['Sender'] and args['reference'] == 'UserAuxSend0'
+            assert args['value'] == ids['Destination']
+            task.objects[args['object']]['@UserAuxSend0'] = {'id': args['value']}
+            return {}
+        if create_constructor and uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['onNameConflict'] == 'rename'
+            return create(args, args['parent'])
         if uri.endswith('object.create'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             base = task.objects[SECOND]['path'] + r'\Routing'
@@ -4358,8 +4368,11 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
             assert after[ids['Sender']]['path'] == r'\Master-Mixer Hierarchy\Default Work Unit\Routing\Sender'
     else:
         source, shown = task.preview()
+        if prepared_only:
+            return task, source, before, shown
         code, verified = task.finish(source, shown)
         assert code == 0 and verified['verified'] is True, verified
+        task.source_verification = verified
         after = deepcopy(task.objects)
     if source_only:
         return task, source, before, after
@@ -5530,3 +5543,36 @@ def test_nested_duplicate_stage_cannot_omit_before_write_roster_read_from_rehash
     assert 'Owned creation stage lost its exact read association' in json.dumps(failed), failed
     assert task.run('execute', source)[0] == 2
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == count
+
+
+def test_create_duplicate_siblings_2021_bind_actual_occurrences_before_closed_reference(tmp_path):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2021.1',
+        native_rename=True, duplicate_siblings=True, create_constructor=True, source_only=True)
+    root, destination, sender = ('{66666666-6666-6666-6666-666666666666}',
+        '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}')
+    assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    assert after[destination]['name'] == 'Send' and after[sender]['name'] == 'Send37'
+    assert after[destination]['parent'] == after[sender]['parent'] == {'id': root}
+    creates = [args for uri, args, _ in task.calls if uri == 'ak.wwise.core.object.create']
+    assert [row['name'] for row in creates] == ['Routing', 'Send', 'Send']
+    assert [row['parent'] for row in creates[1:]] == [root, root]
+    assert all('children' not in row for row in creates)
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.setReference']) == 1
+    roster = task.source_verification['agent_result']['business_result']['created_objects']
+    assert {row['object']['id'] for row in roster} == {root, destination, sender}
+    assert len({row['result_handle'] for row in roster}) == 3
+    assert task.run('draft-start', 'ak.wwise.core.undo.undo')[0] == 2
+    assert task.run('draft-start', 'object.set')[0] == 2
+
+
+def test_compound_create_duplicate_siblings_reuse_owned_roster_for_undo_redo(tmp_path):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, native_rename=True, duplicate_siblings=True, create_constructor=True)
+    destination, sender = '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}'
+    assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    assert after[destination]['name'] == 'Send' and after[sender]['name'] == 'Send37'
+    assert after['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] == 'Keep collision'
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 3
+    assert [uri for uri, _, _ in task.calls if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}] == [
+        'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo']
+    assert len(task.source_verification['agent_result']['business_result']['created_objects']) == 3
