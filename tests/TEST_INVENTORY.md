@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R79 source-backed Action.Target kind
+
+Reviewed implementation `c667a640`, integrated at `35d1ae1e`, supports the existing
+Action.Target field when native metadata omits its kind. Matching SDK definitions
+certify Reference separately; actual Action GUID, class, ActionType and raw
+metadata remain bound through Field discovery, Preview, prewrite and verification.
+Native restrictions are unchanged. No global empty-kind allowance or Sound-only
+target restriction was added, and ordinary Show metadata remains visibility only.
+
+The first public counterexample failed before repair, then passed. Expanded
+controls passed 32 in 7.55s. The affected selection passed 110 with five new
+fixture assertion failures in 25.44s; only those five corrected Preview-notice
+checks reran and passed in 1.88s. Final eligibility/builder controls passed 13 in
+2.31s. These selections overlap. Original logs and their causal reconciliation
+are hash-archived in `r79-action-program-logs`; independent review found no
+remaining actionable issue in the selected diff.
+
+Frozen `35d1ae1e6c392a8bce0f13c436699270c39c845d` passed the existing Play Action
+retarget workflow on macOS Console 2025.1 in 9.84s and 2021.1 in 9.39s. Both
+actual object-scoped Target responses had empty native type/restriction, so the
+separate documented-kind proof was exercised. Each case has one verified
+transaction and 20 independent before/after queries; 2025 captured 85 native
+packets and 2021 captured 81. Raw metadata hashes match the original packets.
+The selected Action retains its GUID, intrinsic name, ActionType and other
+observed fields while its display path follows the new target. Event membership,
+peer Action/Event, old/new audio objects and sibling context are preserved.
+Source integrity and cleanup passed; the lifecycle removed the passing sandboxes.
+
+Evidence: `r79-action-target-native-review-2021-2025.json` and the two original
+root reviews. All five versions retain source/program checks; native 2022–2024
+was not repeated. No audio playback, complete Action-family, owned-history,
+Fresh or Windows native acceptance is claimed. Source-kind history support stays
+required work under #192; other #177/#178/#180 branches remain open. No full
+Program or Non-live gate was added for this increment.
+
 ## 2026-10-23 R77 scalar conditions and R78 creation integration
 
 Integration `2589b9a17d9f41b7f903af7a71c34917488b9a94` combines the reviewed
