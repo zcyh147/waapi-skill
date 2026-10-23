@@ -59,7 +59,7 @@ def _committed_2024_capture_objects():
     rows = {}
     for section, filename, names in (
         ('Actor-Mixer Hierarchy', 'Minigun.wwu', ('MnGn_Barrel_Loop',)),
-        ('Master-Mixer Hierarchy', 'Default Work Unit.wwu', ('Guns', 'SFX')),
+        ('Master-Mixer Hierarchy', 'Default Work Unit.wwu', ('Guns', 'SFX', 'Master Audio Bus')),
     ):
         root = ET.parse(fixture / section / filename).getroot()
         parents = {child: parent for parent in root.iter() for child in parent}
@@ -75,7 +75,15 @@ def _committed_2024_capture_objects():
                 'path': '\\' + '\\'.join([section, *[item.get('Name') for item in reversed(lineage)]])}
             if node.tag == 'Bus':
                 row.update({'classId': 1376272, '@Volume': 0.0,
-                    'parent': {'id': lineage[1].get('ID'), 'name': lineage[1].get('Name')}, 'parent.@Volume': 0.0})
+                    'parent': {'id': lineage[1].get('ID'), 'name': lineage[1].get('Name')},
+                    'parent.classId': 1376272 if lineage[1].tag == 'Bus' else 1638416})
+                if lineage[1].tag == 'Bus':
+                    row['parent.@Volume'] = 0.0
+                # Matching WObjects default: Same as parent, hence Guns has no
+                # independent processing/meter until configured explicitly.
+                if node.get('Name') == 'Guns':
+                    assert node.find("PropertyList/Property[@Name='BusChannelConfig']") is None
+                    row['@BusChannelConfig'] = 0
             else:
                 assert node.find("PropertyList/Property[@Name='IsLoopingEnabled']").get('Value') == 'True'
                 # Stored child Master references are unused: no child overrides;
@@ -159,9 +167,14 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                     for identity in ids if (row := self.rows.get(identity))]}
             if uri.endswith('getPropertyAndReferenceNames'):
                 return {'return': ['IsLoopingEnabled', 'IsLoopingInfinite'] if args.get('object') == sound_id
-                    else ['Volume']}
+                    else ['Volume', 'BusChannelConfig'] if version == '2024.1' and args.get('object') == bus_id else ['Volume']}
             if uri.endswith('getPropertyInfo'):
                 token = args['property']
+                if version == '2024.1' and token == 'BusChannelConfig':
+                    return {'name': token, 'type': 'int32', 'display': {'name': 'Bus Configuration'},
+                        'default': 0, 'dependencies': [], 'supports': {},
+                        'restriction': {'type': 'enum', 'values': [
+                            {'value': 0, 'displayName': 'Same as parent'}, {'value': 12546, 'displayName': '2.0'}]}}
                 return {'name': token, 'type': 'bool' if token.startswith('IsLooping') else 'Real64',
                     'display': {'name': token}, 'default': token == 'IsLoopingInfinite',
                     'dependencies': ([{'type': 'property', 'name': 'IsLoopingEnabled', 'action': 'Enable',
@@ -191,6 +204,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 if failure == 'empty-meter':
                     return {'meters': []}
                 row = self.rows[bus_id]
+                if version == '2024.1' and row['@BusChannelConfig'] == 0:
+                    row = next(item for item in self.rows.values() if item['name'] == 'Master Audio Bus')
                 return {'meters': [{'object': {key: deepcopy(row[key]) for key in options.get('return', ['id', 'name']) if key in row},
                     'source': 'Bus', 'configurationName': '1.0', 'configurationMask': 4,
                     'configurationType': 'Standard', 'channels': [{'name': 'C', 'value': -12.5}]}]}
@@ -279,12 +294,18 @@ def test_owned_2024_meter_public_flow_reaches_its_archived_final_category(owned_
     assert obj['related']['parent']['object'] == {'id': '{ED2BCAC8-D7B6-4448-8900-439B557894F4}', 'name': 'SFX'}
     assert report['fixture_before']['sound']['output_bus']['id'] == '{06362E8D-5A32-497A-B063-3DA95963CE47}'
     assert report['fixture_after'] == report['fixture_before'] and report['cleanup']['complete'] is True
+    assert report['fixture_before']['bus']['properties']['BusChannelConfig'] == 0
+    assert next(row['bus_processing'] for row in report['setup'] if 'bus_processing' in row)['verification']['business_state_verified'] is True
+    assert any(row['action'] == 'restore-bus-configuration' for row in report['cleanup']['receipts'])
     assert report['fixture_media']['proof']['sha256'] == report['fixture_media']['staging']['source']['sha256']
     assert report['cleanup']['capture_settings_prior_state_restored'] is False
     assert report['cleanup']['audition_media_prior_state_restored'] is False
     assert not client.transport and not client.registered and not batch.runtime.owned_root.exists()
     assert record['source']['hash_before'] == record['source']['hash_after']
-    assert not any(uri.endswith(('setCursorTime', 'saveCapture', 'log.addItem', 'log.clear', 'object.setProperty')) for uri, _, _ in client.calls)
+    assert not any(uri.endswith(('setCursorTime', 'saveCapture', 'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
+    assert [(args['object'], args['property'], args['value']) for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [
+        ('{06362E8D-5A32-497A-B063-3DA95963CE47}', 'BusChannelConfig', 12546),
+        ('{06362E8D-5A32-497A-B063-3DA95963CE47}', 'BusChannelConfig', 0)]
 
 
 def test_owned_2024_empty_meter_fails_final_acceptance_after_complete_cleanup(owned_authoring, tmp_path, monkeypatch):
@@ -303,6 +324,9 @@ def test_owned_2024_empty_meter_fails_final_acceptance_after_complete_cleanup(ow
     observation, = report['outcomes'].values()
     assert observation['outcome'] == 'FAIL' and 'missing from actual meter frame' in observation['error']['message']
     assert report['fixture_after'] == report['fixture_before']
+    assert report['fixture_after']['bus']['properties']['BusChannelConfig'] == 0
+    assert [args['value'] for uri, args, _ in client.calls if uri.endswith('object.setProperty')] == [12546, 0]
+    assert any(row['action'] == 'restore-bus-configuration' for row in report['cleanup']['receipts'])
     assert record['source']['hash_before'] == record['source']['hash_after']
     cleanup = [uri for uri, _, _ in client.calls if uri.endswith(('profiler.stopCapture', 'transport.destroy', 'profiler.unregisterMeter'))]
     assert cleanup == ['ak.wwise.core.profiler.stopCapture', 'ak.wwise.core.transport.destroy', 'ak.wwise.core.profiler.unregisterMeter']
