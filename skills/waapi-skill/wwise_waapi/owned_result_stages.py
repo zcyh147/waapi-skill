@@ -54,8 +54,6 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
                 or any('target_request_path' not in ref for ref in node.get('references', []))):
             raise ValueError('Existing field edits plus native-name creation need a separate declared child; this stage retains existing roots')
         children = [child for child in specs if child.get('parent_request_path') == node['request_path']]
-        if node.get('existing_target') and len(children) > 1:
-            raise ValueError('Native-name association currently needs one new child per retained parent; multi-collision alternatives remain #178/#192')
         if len({child['requested_name'].casefold() for child in children}) != len(children):
             raise ValueError('Fresh-parent siblings require distinct exact declared names')
         if not node.get('existing_target') and node.get('parent_request_path') not in by_path and not (uri == CREATE and node['request_path'] == '$'):
@@ -63,10 +61,29 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
     creation = deepcopy(args)
     for field in deferred:
         del native_node(creation, field['source'])['@' + field['field']]
+    stages = []
+    if uri == SET and creation_stage_count(specs) > 1:
+        for root in specs:
+            parent = by_path.get(root.get('parent_request_path'))
+            if not root.get('existing_target') and parent and parent.get('existing_target'):
+                native_parent = native_node(creation, parent['request_path'])
+                parent_args = {key: deepcopy(native_parent[key]) for key in ('object', 'platform', 'onNameConflict', 'listMode') if key in native_parent}
+                stages.append({'root': root['request_path'], 'parent': parent['request_path'],
+                    'node_paths': [node['request_path'] for node in specs if node is root or node['request_path'].startswith(root['request_path'] + '.')],
+                    'args': {**deepcopy(creation), 'objects': [{**parent_args,
+                        'children': [deepcopy(native_node(creation, root['request_path']))]}]}})
     return {'kind': KIND, 'version': version, 'uri': uri, 'creation_args': creation,
             'options': deepcopy(options), 'deferred': deferred,
+            **({'creation_stages': stages} if stages else {}),
             'prospective_paths': prospective_paths(specs, root_parent=root_parent),
             **({'parent_before': dict(root_parent), 'parent_children': list(parent_children), 'parent_id': args['parent']} if uri == CREATE else {})}
+
+
+def creation_stage_count(specs):
+    roots = [node for node in specs if node.get('existing_target')]
+    if any(sum(child.get('parent_request_path') == root['request_path'] for child in specs) > 1 for root in roots):
+        return sum(node.get('parent_request_path') in {root['request_path'] for root in roots} for node in specs)
+    return 1
 
 
 def prospective_paths(specs, *, root_parent=None):
@@ -174,16 +191,85 @@ def bind(prepared, result, *, read):
         actual = [str(child.get('id')).upper() for child in rows]
         if len(actual) != len(set(actual)) or set(actual) != expected:
             raise ValueError('Actual parent membership differs from complete sealed and returned GUID roster')
-    from .operation_registry import _read_property_info
+    observe_reference_metadata(prepared, identities, read=retained)
+    return identities, records
+
+
+def observe_reference_metadata(prepared, identities, *, read):
+    from .operation_registry import _read_property_info, _same_identity
+    plan = prepared['pre_state']['owned_result_stages']
+    by_path = {node['request_path']: node for node in prepared['verification_plan']['nodes']}
     context = prepared['pre_state'].get('planned_reference_context') or {'metadata': []}
+    if plan.get('creation_stages') and plan['deferred']:
+        # Earlier roots may have been created before other owned stages. A
+        # dependent reference must still consume their exact actual identity.
+        paths = list(dict.fromkeys(path for field in plan['deferred'] for path in (field['source'], field['target'])))
+        for path in paths:
+            payload = read(GET, {'from': {'id': [identities[path]['id']]}}, {'return': FIELDS})
+            if not isinstance(payload, Mapping) or payload.get('return') != [identities[path]]:
+                raise ValueError('Owned reference source/target drifted after its actual creation stage')
     for field in plan['deferred']:
         source = by_path[field['source']]
         metadata = [row['metadata'] for row in context['metadata'] if row['name'] == field['field']
             and (row.get('class_id') == source['class_id'] or isinstance(row.get('object_id'), str) and _same_identity(row['object_id'], source.get('target_id')))]
-        actual = _read_property_info(retained, object_id=identities[field['source']]['id'], name=field['field'])
+        actual = _read_property_info(read, object_id=identities[field['source']]['id'], name=field['field'])
         if not metadata or any(actual.as_dict() != row for row in metadata):
             raise ValueError('Actual created receiver field metadata differs from its sealed class/field authority')
-    return identities, records
+
+
+def split_stage_prepared(prepared, stage, identities):
+    """Materialize one sealed root against its proven parent and earlier roster."""
+    nodes = prepared['verification_plan']['nodes']
+    parent = deepcopy(next(node for node in nodes if node['request_path'] == stage['parent']))
+    children = [row for path, row in identities.items() if path != stage['parent']
+        and str(row.get('parent', {}).get('id')).upper() == parent['target_id'].upper()]
+    parent['preexisting_children'] = [*parent.get('preexisting_children', []), *children]
+    scoped = [parent, *(node for node in nodes if node['request_path'] in stage['node_paths'])]
+    return {**prepared, 'verification_plan': {**prepared['verification_plan'], 'nodes': scoped},
+        'pre_state': {**prepared['pre_state'], 'owned_result_stages': {**prepared['pre_state']['owned_result_stages'], 'deferred': []}}}
+
+
+def observe_owned_roster(prepared, identities, *, read):
+    """Recheck every cumulative new identity and its complete direct membership."""
+    nodes = prepared['verification_plan']['nodes']
+    if len(nodes) > DEFAULT_MAX_NODES or len(identities) > DEFAULT_MAX_NODES:
+        raise ValueError('Owned creation roster exceeds its sealed node bound')
+    for node in nodes:
+        path = node['request_path']
+        if node.get('existing_target') or path not in identities:
+            continue
+        expected = identities[path]
+        actual = read(GET, {'from': {'id': [expected['id']]}}, {'return': FIELDS})
+        if not isinstance(actual, Mapping) or actual.get('return') != [expected]:
+            raise ValueError('An earlier owned created identity changed between creation stages')
+        children = {identities[child['request_path']]['id'].upper() for child in nodes
+            if child.get('parent_request_path') == path and child['request_path'] in identities}
+        payload = read(GET, {'from': {'id': [expected['id']]}, 'transform': [{'select': ['children']}]}, {'return': ['id']})
+        rows = payload.get('return') if isinstance(payload, Mapping) else None
+        if (not isinstance(rows, list) or any(not isinstance(row, Mapping) or not isinstance(row.get('id'), str) for row in rows)
+                or len(rows) != len(children) or {row['id'].upper() for row in rows} != children):
+            raise ValueError('An earlier owned created subtree changed its complete child membership')
+
+
+def bind_split_stage(prepared, stage, result, identities, *, read, context, binding=None):
+    binding = binding if binding is not None else {'readbacks': [], 'preservation': []}
+    def observed_read(uri, args, options):
+        payload = read(uri, args, options)
+        binding['readbacks'].append({'uri': uri, 'args': args, 'options': options, 'result': payload})
+        return payload
+    scoped = split_stage_prepared(prepared, stage, identities)
+    bound, _ = bind(scoped, result, read=observed_read)
+    old_ids = {row['id'].upper() for row in identities.values()}
+    if any(bound[path]['id'].upper() in old_ids for path in stage['node_paths']):
+        raise ValueError('A later creation stage reused an earlier owned GUID')
+    actual = {**identities, **bound}
+    if identities:
+        observe_owned_roster(prepared, actual, read=observed_read)
+    preserved = observe_preservation(prepared, actual, read=read, context=context)
+    binding['preservation'] = preserved
+    if not all(row['passed'] for row in preserved):
+        raise ValueError('A creation stage changed its sealed retained scope; remaining writes stopped')
+    return actual, binding['readbacks'], preserved
 
 
 def reference_args(plan, identities):
@@ -210,6 +296,8 @@ def execute(prepared, *, write, read, context=None):
     """Execute the sealed stage pair once, retaining uncertainty as evidence."""
     from .builders.schema import validate_semantic_result
     plan = prepared['pre_state']['owned_result_stages']
+    if plan.get('creation_stages'):
+        return execute_split(prepared, write=write, read=read, context=context)
     records = []
     first = write(plan['uri'], plan['creation_args'], plan['options'])
     records.append({'uri': plan['uri'], 'args': plan['creation_args'], 'options': plan['options'], 'dispatch_result': first})
@@ -237,10 +325,98 @@ def execute(prepared, *, write, read, context=None):
                 'automatic_retry': False, 'failure': str(exc)}}
 
 
+def execute_split(prepared, *, write, read, context):
+    """Keep each actual creation result separate while proving one business roster."""
+    from .builders.schema import validate_semantic_result
+    plan = prepared['pre_state']['owned_result_stages']
+    records, bindings, identities, metadata_reads = [], [], {}, []
+    first = {}
+    try:
+        for stage in plan['creation_stages']:
+            result = write(plan['uri'], stage['args'], plan['options'])
+            records.append({'uri': plan['uri'], 'args': stage['args'], 'options': plan['options'], 'dispatch_result': result})
+            if not first:
+                first = result
+            if result.get('ok') is not True:
+                raise ValueError('Creation stage was not acknowledged; do not replay')
+            validate_semantic_result(plan['uri'], result.get('result'), version=plan['version'])
+            binding = {'readbacks': [], 'preservation': []}
+            bindings.append(binding)
+            identities, _, _ = bind_split_stage(prepared, stage, result['result'], identities, read=read, context=context, binding=binding)
+        def metadata_read(uri, args, options):
+            result = read(uri, args, options)
+            metadata_reads.append({'uri': uri, 'args': args, 'options': options, 'result': result})
+            return result
+        observe_reference_metadata(prepared, identities, read=metadata_read)
+        for call in reference_calls(plan, identities):
+            result = write(call['uri'], call['args'], call['options'])
+            records.append({**call, 'dispatch_result': result})
+            if result.get('ok') is not True:
+                raise ValueError('Dependent reference stage was not acknowledged; do not replay')
+            validate_semantic_result(call['uri'], result.get('result'), version=plan['version'])
+        return {**first, 'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan), 'stages': records,
+            'creation_bindings': bindings, 'identities': identities, 'readbacks': metadata_reads, 'phase_context': context}}
+    except Exception as exc:
+        return {**first, 'ok': False, 'error_code': 'OWNED_RESULT_STAGE_INDETERMINATE', 'message': str(exc),
+            'owned_result_execution': {'kind': KIND, 'plan_sha256': canonical_sha256(plan), 'stages': records,
+                'creation_bindings': bindings, 'automatic_retry': False, 'failure': str(exc)}}
+
+
+def validate_split(prepared, execution, *, context):
+    """Replay only retained evidence, never invent a merged native result tree."""
+    from .builders.schema import validate_semantic_payload, validate_semantic_result
+    plan = prepared['pre_state']['owned_result_stages']
+    proof = execution.get('owned_result_execution', {})
+    stages = proof.get('stages', [])
+    creations = plan['creation_stages']
+    bindings = proof.get('creation_bindings', [])
+    if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan)
+            or proof.get('phase_context') != context or len(bindings) != len(creations)
+            or len(stages) != len(creations) + bool(plan['deferred'])
+            or stages[0].get('dispatch_result', {}).get('result') != execution.get('result')):
+        raise ValueError('Owned creation stages differ from their sealed source association')
+    def replay(records, operation):
+        reads = iter(records)
+        def retained(uri, args, options):
+            row = next(reads)
+            if row.get('uri') != uri or row.get('args') != args or row.get('options') != options:
+                raise ValueError('Owned creation stage lost its exact read association')
+            validate_semantic_result(uri, row.get('result'), version=plan['version'])
+            return row['result']
+        result = operation(retained)
+        if next(reads, None) is not None:
+            raise ValueError('Owned creation stage has extra retained reads')
+        return result
+    identities = {}
+    for stage, actual, binding in zip(creations, stages[:len(creations)], bindings, strict=True):
+        if any(actual.get(key) != value for key, value in {'uri': plan['uri'], 'args': stage['args'], 'options': plan['options']}.items()):
+            raise ValueError('Creation stage is not its exact sealed ordinary root')
+        preserved = binding.get('preservation', [])
+        reads = [*binding.get('readbacks', []), *(item for row in preserved for item in (row, row['membership']))]
+        identities, observations, rebuilt = replay(reads, lambda read: bind_split_stage(prepared, stage,
+            actual.get('dispatch_result', {}).get('result'), identities, read=read, context=context))
+        if observations != binding.get('readbacks') or rebuilt != preserved:
+            raise ValueError('Creation stage readbacks differ from the actual ownership proof')
+    replay(proof.get('readbacks', []), lambda read: observe_reference_metadata(prepared, identities, read=read))
+    if identities != proof.get('identities'):
+        raise ValueError('Owned business roster differs from its actual per-stage observations')
+    for stage, call in zip(stages[len(creations):], reference_calls(plan, identities), strict=True):
+        if any(stage.get(key) != call[key] for key in ('uri', 'args', 'options')):
+            raise ValueError('Dependent stage did not use its complete owned business roster')
+    for stage in stages:
+        if stage.get('dispatch_result', {}).get('ok') is not True:
+            raise ValueError('Owned stage acknowledgement is incomplete')
+        validate_semantic_payload(stage['uri'], stage['args'], stage['options'], version=plan['version'])
+        validate_semantic_result(stage['uri'], stage['dispatch_result'].get('result'), version=plan['version'])
+    return identities
+
+
 def validate(prepared, execution, *, context=None):
     """Rebuild the association solely from retained actual native/read evidence."""
     from .builders.schema import validate_semantic_payload, validate_semantic_result
     plan = prepared['pre_state']['owned_result_stages']
+    if plan.get('creation_stages'):
+        return validate_split(prepared, execution, context=context)
     proof = execution.get('owned_result_execution', {})
     stages = proof.get('stages', [])
     if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan) or len(stages) != 1 + (len(plan['deferred']) if plan['uri'] == CREATE else bool(plan['deferred']))
@@ -310,12 +486,13 @@ def preservation_rows(prepared):
         if spec.get('existing_target'):
             before = {**spec['pre_state'], 'classId': spec['class_id']}
             rows[before['id'].upper()] = (before, sorted(str(row['id']).upper() for row in spec.get('preexisting_children', [])))
-    for rename in (prepared['pre_state'].get('planned_reference_context') or {}).get('renames', []):
-        for snapshot in rename['collision_state']:
-            for before in snapshot['rows']:
-                children = [row['id'].upper() for row in snapshot['rows']
-                    if str(row.get('parent', {}).get('id') if isinstance(row.get('parent'), Mapping) else row.get('parent')).upper() == before['id'].upper()]
-                rows[before['id'].upper()] = (before, sorted(children))
+    snapshots = [snapshot for rename in (prepared['pre_state'].get('planned_reference_context') or {}).get('renames', [])
+        for snapshot in rename['collision_state']] + stage_plan.get('collision_state', [])
+    for snapshot in snapshots:
+        for before in snapshot['rows']:
+            children = [row['id'].upper() for row in snapshot['rows']
+                if str(row.get('parent', {}).get('id') if isinstance(row.get('parent'), Mapping) else row.get('parent')).upper() == before['id'].upper()]
+            rows[before['id'].upper()] = (before, sorted(children))
     if len(rows) > DEFAULT_MAX_NODES or any(type(row.get('classId')) is not int or 'parent' not in row
             or not isinstance(row.get('notes'), str) for row, _ in rows.values()):
         raise ValueError('Owned result preservation requires complete bounded class/parent/notes images')
