@@ -16,6 +16,7 @@ from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
 from tests.destructive.support.sandbox_fixture import hash_project, wait_for_port_release
 from tests.destructive.support.category_evidence import exact_git_candidate, append_category_evidence, exact_transaction_outcomes
 from wwise_waapi.native_catalog import load_native_catalog
+from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 from wwise_waapi.host_paths import localize_waapi_host_path
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from wwise_waapi.filesystem_security import path_is_link_or_reparse
@@ -89,7 +90,7 @@ class AuthoringBatchAdapter:
             raise ValueError('Batch owner must prove a matching Wwise Authoring host')
         version = info.get('version', {})
         build = '.'.join(str(version.get(key)) for key in ('year', 'major', 'minor', 'build'))
-        if owner.version not in {'2024.1', '2025.1'} or build != load_native_catalog(owner.version, 'wwise-authoring')['provenance']['build']:
+        if build != load_native_catalog(owner.version, 'wwise-authoring')['provenance']['build']:
             raise ValueError('Authoring owner build differs from the independently pinned native context')
         if owner.lock._handle is None or owner.lock._handle.closed:
             raise ValueError('Authoring ownership lock is not held')
@@ -467,6 +468,16 @@ OWNED_AUTHORING_NODEIDS = (
       for variant in ('omitted', 'x-only', 'y-only', 'both')),
 )
 
+# General hostability does not grant a node new version support. New older-host
+# collectors need their own explicit entry after their matching fixture proof.
+OWNED_AUTHORING_NODE_VERSIONS = {
+    **dict.fromkeys(OWNED_AUTHORING_NODEIDS, ('2024.1', '2025.1')),
+    **dict.fromkeys(DIAGNOSTIC_NODEIDS, ('2024.1',)),
+    METER_2024_NODEID: ('2024.1',),
+    PROFILER_CAPTURE_NODEID: ('2025.1',),
+    TRANSPORT_SEMANTICS_NODEID: ('2025.1',),
+}
+
 
 def configure_authoring_batch_owner(config, items, *, repo_root: Path):
     """Allocate the existing lifecycle only after a closed exact collection."""
@@ -484,9 +495,11 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Authoring cannot launch from a parallel worker')
     if config.getoption('collectonly', default=False) or config.getoption('setupplan', default=False):
         return None
-    if (os.getenv('WWISE_VERSION') not in {'2024.1', '2025.1'}
+    if (os.getenv('WWISE_VERSION') not in SUPPORTED_WWISE_VERSION_KEYS
             or any(os.getenv(name) != '1' for name in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'))):
         raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
+    if any(os.getenv('WWISE_VERSION') not in OWNED_AUTHORING_NODE_VERSIONS[nodeid] for nodeid in selected):
+        raise pytest.UsageError('Selected owned Authoring node is not available on the requested version')
     if (set(selected).intersection(DIAGNOSTIC_NODEIDS)
             and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1')):
         raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')

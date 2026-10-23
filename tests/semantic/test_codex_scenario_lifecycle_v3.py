@@ -811,7 +811,8 @@ def test_prepared_receipt_failure_consumes_finish_without_repeating_shutdown(mon
         owner.finish('BLOCKED')
 
 
-@pytest.mark.parametrize('version,build', [('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143')])
+@pytest.mark.parametrize('version,build', [('2021.1', '2021.1.14.8108'), ('2022.1', '2022.1.19.8584'),
+    ('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143')])
 @pytest.mark.parametrize('broken', [None, 'roundtrip', 'native-argv', 'host', 'build', 'bottle-environment', 'bottle-proof'])
 def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proof(monkeypatch, tmp_path, version, build, broken):
     _install_fakes(monkeypatch, tmp_path, version=version)

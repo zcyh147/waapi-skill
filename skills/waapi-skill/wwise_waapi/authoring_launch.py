@@ -122,7 +122,7 @@ def owned_mac_authoring_context(*, console: Path, project: Path | None, owned_ro
                                 build: str | None, environment: dict[str, str] | None) -> OwnedMacAuthoringContext:
     if sys.platform != 'darwin':
         raise AuthoringLaunchError('Owned Authoring launch strategy requires Mac; native Windows ownership proof remains required')
-    if not isinstance(build, str) or not re.fullmatch(r'202[45]\.1\.\d+\.\d+', build):
+    if not isinstance(build, str) or not re.fullmatch(r'202[1-5]\.1\.\d+\.\d+', build):
         raise AuthoringLaunchError('Authoring launch requires an exact supported build')
     if project is None or owned_root is None or environment is None:
         raise AuthoringLaunchError('Authoring launch requires a private owned project, root and user environment')

@@ -15,18 +15,21 @@ def test_authoring_batch_rejects_environment_only_ownership(tmp_path, monkeypatc
 
 
 @pytest.fixture
-def owned_authoring(tmp_path, monkeypatch):
+def owned_authoring(tmp_path, monkeypatch, request):
     from types import SimpleNamespace
     from tests.destructive.support import authoring_batch
     monkeypatch.setattr(authoring_batch, "candidate_source_context", lambda _: {"candidate": "a" * 40, "sources": {"fake-code": "b" * 64}})
     from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle, ScenarioRuntime
     from tests.destructive.support.sandbox_fixture import SandboxMetadata, SandboxProject, hash_project
     from wwise_waapi.headless import HeadlessLifecycle
+    version = getattr(request, 'param', '2025.1')
+    build = {'2021.1': (2021, 1, 14, 8108), '2022.1': (2022, 1, 19, 8584),
+        '2023.1': (2023, 1, 19, 8928), '2025.1': (2025, 1, 7, 9143)}[version]
     root = tmp_path / 'batch'
     import os
     user_keys = ('USERPROFILE', 'APPDATA', 'LOCALAPPDATA') if os.name == 'nt' else ('HOME',)
     isolated = {key: str(root / 'owned' / key.lower()) for key in user_keys}
-    owner = ScenarioLifecycle(scenario_id='owned-authoring', version='2025.1', scenario_root=root,
+    owner = ScenarioLifecycle(scenario_id='owned-authoring', version=version, scenario_root=root,
         live_environment={}, launch_environment_overrides=isolated, lock_root=tmp_path / 'lock')
     source = tmp_path / 'source'
     source.mkdir()
@@ -41,14 +44,14 @@ def owned_authoring(tmp_path, monkeypatch):
         Path(path).mkdir(parents=True)
     proof = hash_project(source, preferred_strategy='full')
     metadata = SandboxMetadata(source_path=str(source_project), source_root=str(source),
-        sandbox_path=str(sandbox_path), sandbox_project_path=str(project), wwise_version='2025.1',
+        sandbox_path=str(sandbox_path), sandbox_project_path=str(project), wwise_version=version,
         copy_duration_seconds=0, source_hash=proof, sandbox_hash=proof,
         source_mtime_before=source_project.stat().st_mtime, identity_verified=True,
         launch_project_path=str(project), process_pid=1234, selected_port=31337)
     sandbox = SandboxProject(source_project=source_project, source_root=source,
         sandbox_root=owned / 'sandbox-root', sandbox_path=sandbox_path, sandbox_project=project, metadata=metadata)
     info = {'displayName': 'Wwise', 'isCommandLine': False, 'processId': 1234, 'sessionId': 'owned-session',
-        'version': {'year': 2025, 'major': 1, 'minor': 7, 'build': 9143, 'schema': 152}}
+        'version': dict(zip(('year', 'major', 'minor', 'build'), build))}
     process = HeadlessLifecycle(console_path=tmp_path / 'Wwise.exe', project_path=project, port=31337)
     process.process = SimpleNamespace(pid=1234, poll=lambda: None)
     process.command = ['Wwise.exe', str(project)]
@@ -72,12 +75,14 @@ def owned_authoring(tmp_path, monkeypatch):
             owner._lock_acquired = False
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1', '2025.1'], indirect=True)
 def test_authoring_batch_rejects_console_context_before_any_node(owned_authoring, tmp_path):
     owned_authoring.runtime.lifecycle.ready_result['isCommandLine'] = True
     with pytest.raises(ValueError, match='Authoring'):
         AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=['node'])
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1', '2025.1'], indirect=True)
 @pytest.mark.parametrize('damage', ['build', 'source-project', 'metadata', 'port', 'runtime-version', 'source-content', 'released-lock'])
 def test_authoring_batch_rejects_mismatched_owned_context(owned_authoring, tmp_path, damage):
     from dataclasses import replace
@@ -189,6 +194,7 @@ def test_authoring_batch_stays_prepared_until_last_teardown_report(owned_authori
     assert record['residual_state']['sandbox'] == 'retained'
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1', '2025.1'], indirect=True)
 def test_shared_owner_stops_prepared_then_releases_after_last_teardown(owned_authoring, tmp_path, monkeypatch):
     import json
     from types import SimpleNamespace
@@ -493,3 +499,14 @@ def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_aut
         assert owned_authoring.runtime.sandbox.sandbox_project.exists()
         assert (owned_authoring.runtime.evidence_root / 'lifecycle-release-error.json').exists()
     assert [row['argv'][0] for row in batch.receipts['last-node']] == ['config-set', 'status']
+
+
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1'], indirect=True)
+def test_authoring_batch_admits_matching_older_catalog_context(owned_authoring, tmp_path, monkeypatch):
+    calls = _install_public_gateway(monkeypatch, owned_authoring)
+    batch = AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=['future-owned-node'])
+    batch.node_gateway('future-owned-node')
+    assert calls[0] == ['config-set', '--wwise-version', owned_authoring.version, '--waapi-host', '127.0.0.1',
+        '--waapi-port', '31337', '--project-modification-policy', 'ask_before_changes']
+    assert calls[1] == ['status']
+    assert owned_authoring._lock_acquired is True

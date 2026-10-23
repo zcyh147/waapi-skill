@@ -132,20 +132,21 @@ def test_install_failure_stops_the_owner_once_without_claiming_pass(monkeypatch,
     assert events[-1] == ('finish', 'BLOCKED')
 
 
-def test_existing_driver_passes_only_explicit_nodes_to_the_owned_pytest_batch(monkeypatch, tmp_path):
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2025.1'])
+def test_existing_driver_passes_only_explicit_nodes_to_the_owned_pytest_batch(monkeypatch, tmp_path, version):
     from ci import test_driver
     captured = []
     monkeypatch.setattr(test_driver, 'run_live_test_command', lambda arguments, **kwargs: captured.append((arguments, kwargs)) or 0)
     root_option = '--owned-authoring-batch-root=' + str(tmp_path / 'batch')
     driver = test_driver.TestDriver(repo_root=tmp_path, environment={}, windows=False)
-    assert driver.run(test_driver.parse_request(['--version', '2025.1', '--mode', 'destructive', '--', root_option, NODE, '-q'])) == 0
+    assert driver.run(test_driver.parse_request(['--version', version, '--mode', 'destructive', '--', root_option, NODE, '-q'])) == 0
     arguments, options = captured[0]
     assert tuple(arguments[arguments.index('python') + 1:]) == ('-m', 'pytest', root_option, NODE, '-q')
     assert options['environment']['WWISE_AUTHORING_LIVE'] == '1'
     assert not any('project_mutation_sandbox' in arg for arg in arguments)
 
 
-@pytest.mark.parametrize('version,mode', [('all', 'destructive'), ('2023.1', 'destructive'), ('none', 'nonlive'), ('2025.1', 'live')])
+@pytest.mark.parametrize('version,mode', [('all', 'destructive'), ('2023.1', 'live'), ('none', 'nonlive'), ('2025.1', 'live')])
 def test_existing_driver_rejects_owned_batch_in_other_lanes_before_dispatch(version, mode):
     from ci import test_driver
     with pytest.raises(test_driver.TestDriverError, match='owned Authoring'):
@@ -201,3 +202,21 @@ def test_windows_owned_driver_has_an_explicit_unfinished_boundary_before_dispatc
         '--owned-authoring-batch-root=' + str(tmp_path / 'batch'), NODE])
     with pytest.raises(test_driver.TestDriverError, match='Mac'):
         driver.run(request)
+
+
+@pytest.mark.parametrize('version,nodeid', [
+    *[(version, nodeid) for version in ('2021.1', '2022.1', '2023.1')
+        for nodeid in authoring_batch.OWNED_AUTHORING_NODEIDS],
+    ('2024.1', authoring_batch.PROFILER_CAPTURE_NODEID),
+    ('2024.1', authoring_batch.TRANSPORT_SEMANTICS_NODEID),
+    ('2025.1', authoring_batch.METER_2024_NODEID),
+    *[('2025.1', nodeid) for nodeid in authoring_batch.DIAGNOSTIC_NODEIDS],
+])
+def test_owned_node_version_admission_is_closed_before_owner_start(monkeypatch, tmp_path, version, nodeid):
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('WWISE_VERSION', version)
+    config = _config(tmp_path)
+    config.args = [nodeid]
+    with pytest.raises(pytest.UsageError, match='Selected owned Authoring node is not available on'):
+        authoring_batch.configure_authoring_batch_owner(config, [SimpleNamespace(nodeid=nodeid)], repo_root=tmp_path)
+    assert events == []
