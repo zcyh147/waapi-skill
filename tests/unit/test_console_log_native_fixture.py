@@ -30,9 +30,15 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
             result['version'].update(minor=minor, build=build, displayName=f'v{version}.{minor}.{build}')
         return result
     client.call = call
-    execute = workflow.waapi_gateway.execute_gateway
-    monkeypatch.setattr(workflow.waapi_gateway, 'execute_gateway',
-        lambda argv, **kwargs: execute(argv, **kwargs, client_factory=lambda _: client))
+    connections = []
+    class Connection:
+        def __getattr__(self, name):
+            return getattr(client, name)
+    def factory(_url):
+        connection = Connection()
+        connections.append(connection)
+        return connection
+    monkeypatch.setattr(workflow.waapi_gateway, 'default_client_factory', factory)
     source = tmp_path / 'source'
     source.mkdir()
     source_project = source / 'SampleProject.wproj'
@@ -77,6 +83,7 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
     assert client.order == ['subscribed', 'add', 'unsubscribed']
     assert sum(uri == ADD for uri, _, _ in client.calls) == 1
     assert not any(uri.endswith('log.clear') for uri, _, _ in client.calls)
+    assert all('subscribe' not in vars(connection) for connection in connections)
     if scenario == 'matched':
         assert error is None
         assert [row['invocation']['outcome'] for row in records] == ['PENDING', 'PASS']
@@ -88,9 +95,146 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
     else:
         assert error is not None
         assert [row['invocation']['outcome'] for row in records] == ['FAIL']
-        assert category['status'] == 'FAIL' and transaction['state'] == 'indeterminate'
+        expected_state = 'result_schema_checked' if scenario == 'missing' else 'indeterminate'
+        assert category['status'] == 'FAIL' and transaction['state'] == expected_state
         assert final['residual_state']['sandbox'] == 'quarantined'
         assert Path(final['residual_state']['quarantine_path']).is_dir()
-        assert receipt['transaction']['execute']['automatic_retry'] is False
         assert receipt['transaction']['execute']['dispatch_result']['log_item_observation']['subscribed'] is True
-        assert 'verify' not in receipt['transaction']
+        if scenario == 'missing':
+            assert receipt['transaction']['execute']['dispatch_result']['result'] == {}
+            assert receipt['transaction']['verify']['verified'] is False
+            assert receipt['transaction']['verify']['verification']['verification_scope']['log_observation']['outcome'] == 'timeout'
+        else:
+            assert receipt['transaction']['execute']['automatic_retry'] is False
+            assert 'verify' not in receipt['transaction']
+
+
+@pytest.mark.parametrize('scenario', ('matched', 'native-error', 'missing'))
+def test_opted_in_console_log_diagnostic_reaches_final_writer_and_restores_hooks(tmp_path, monkeypatch, scenario):
+    from autobahn.asyncio.wamp import ApplicationSession
+    from autobahn.wamp.message import Event
+    from autobahn.wamp.request import Handler, Subscription
+    from waapi.client.event import EventHandler
+    import sys
+
+    clients = []
+    class DecodedClient(ConsoleLogClient):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            clients.append(self)
+            self.session = ApplicationSession()
+            self.session._session_id = 123
+            self.original_callback = None
+            self.handler = None
+
+        def subscribe(self, uri, callback, options=None):
+            self.order.append('subscribed')
+            self.original_callback = callback
+            self.handler = EventHandler(self, callback)
+            subscription = Subscription(42, uri, self.session, Handler(self.handler.on_event))
+            self.handler.subscription = subscription
+            self.session._subscriptions[42] = [subscription]
+            return self.handler
+
+        def unsubscribe(self, handler):
+            assert handler is self.handler
+            self.order.append('unsubscribed')
+            return True
+
+        def call(self, uri, args=None, options=None):
+            if uri != ADD:
+                return super().call(uri, args, options)
+            self.order.append('add')
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if scenario == 'native-error':
+                raise RuntimeError('external add failed without an EVENT')
+            if scenario == 'missing':
+                return {}
+            self.session.onMessage(Event(42, 99, kwargs={'channel': args['channel'],
+                'item': {'message': args['message'], 'severity': args['severity'], 'time': 1720000000, 'messageId': 'Custom'}}))
+            return {}
+
+    monkeypatch.setattr(sys.modules[__name__], 'ConsoleLogClient', DecodedClient)
+    monkeypatch.setenv('WWISE_CONSOLE_LOG_DIAGNOSTIC', 'decoded-event-v1')
+    if scenario == 'missing':
+        from wwise_waapi import runtime_log_observer
+        ticks = iter((0, 6))
+        monkeypatch.setattr(runtime_log_observer, 'monotonic', lambda: next(ticks, 6))
+    test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_path, monkeypatch, '2023.1', scenario)
+    receipt = json.loads((tmp_path / 'state/console-log-addition-observer.json').read_text())
+    diagnostic = receipt['delivery_diagnostic']
+    assert diagnostic['contract'] == 'waapi-skill.console-log-decoded-event-diagnostic/v1'
+    assert diagnostic['subscription_id'] == 42 and diagnostic['installed'] is True
+    expected = 1 if scenario == 'matched' else 0
+    assert diagnostic['decoded_events'] == diagnostic['callback_entries'] == expected
+    assert diagnostic['restored'] is True
+    assert len(json.dumps(diagnostic).encode()) <= 4096
+    client, = clients
+    assert 'onMessage' not in vars(client.session)
+    assert 'subscribe' not in vars(client)
+    assert client.handler._callback is client.original_callback
+
+
+@pytest.mark.parametrize('boundary', ('message', 'callback', 'body'))
+def test_log_diagnostic_delegates_original_exception_and_restores_exact_attributes(monkeypatch, boundary):
+    from autobahn.asyncio.wamp import ApplicationSession
+    from autobahn.wamp.message import Event
+    from autobahn.wamp.request import Handler, Subscription
+    from waapi.client.event import EventHandler
+    from tests.destructive.support.console_log_diagnostic import TOPIC, decoded_log_diagnostic
+
+    sentinel = RuntimeError('original failure')
+    calls = []
+    result = object()
+    def original_message(message):
+        calls.append(('message', message.subscription))
+        if boundary == 'message':
+            raise sentinel
+        return result
+    def original_callback(*args, **kwargs):
+        calls.append(('callback', args, kwargs))
+        if boundary == 'callback':
+            raise sentinel
+        return result
+    session = ApplicationSession()
+    session.onMessage = original_message
+    handler = EventHandler(callback=original_callback)
+    handler.subscription = Subscription(42, TOPIC, session, Handler(handler.on_event))
+    def subscribe(*args, **kwargs):
+        calls.append(('subscribe', args, kwargs))
+        return handler
+    client = SimpleNamespace(subscribe=subscribe)
+    factory = lambda _: client
+    gateway = SimpleNamespace(default_client_factory=factory)
+    receipt = {}
+    monkeypatch.setenv('WWISE_CONSOLE_LOG_DIAGNOSTIC', 'decoded-event-v1')
+    with pytest.raises(RuntimeError) as failure:
+        with decoded_log_diagnostic(gateway, receipt, version='2023.1'):
+            assert gateway.default_client_factory('unused').subscribe(TOPIC, original_callback) is handler
+            if boundary == 'message':
+                session.onMessage(Event(42, 99))
+            else:
+                assert session.onMessage(Event(43, 99)) is result
+                assert receipt['delivery_diagnostic']['decoded_events'] == 0
+                assert handler.on_event('unchanged', value=7) is None
+                raise sentinel
+    assert failure.value is sentinel
+    assert calls == ([('subscribe', (TOPIC, original_callback), {}), ('message', 42)] if boundary == 'message' else
+        [('subscribe', (TOPIC, original_callback), {}), ('message', 43), ('callback', ('unchanged',), {'value': 7})])
+    assert gateway.default_client_factory is factory and client.subscribe is subscribe
+    assert session.onMessage is original_message and handler._callback is original_callback
+    assert receipt['delivery_diagnostic']['restored'] is True
+
+
+def test_log_diagnostic_dependency_preflight_blocks_before_any_client(monkeypatch):
+    from tests.destructive.support import console_log_diagnostic
+    gateway = SimpleNamespace(default_client_factory=lambda _: pytest.fail('preflight connected'))
+    original = gateway.default_client_factory
+    monkeypatch.setenv('WWISE_CONSOLE_LOG_DIAGNOSTIC', 'decoded-event-v1')
+    monkeypatch.setattr(console_log_diagnostic, 'distribution_version', lambda _: 'unsupported')
+    receipt = {}
+    with pytest.raises(AssertionError, match='dependency versions differ'):
+        with console_log_diagnostic.decoded_log_diagnostic(gateway, receipt, version='2023.1'):
+            pytest.fail('unsupported preflight yielded')
+    assert gateway.default_client_factory is original
+    assert receipt['delivery_diagnostic']['installed'] is False
