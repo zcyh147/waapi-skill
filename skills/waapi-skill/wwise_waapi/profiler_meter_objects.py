@@ -145,8 +145,9 @@ def meter_scope(rows):
         obj = row.get('object')
         if not isinstance(obj, dict) or not canonical_guid(obj.get('id')) or not all(key in obj for key in IDENTITY):
             raise RelatedQueryError('Meter metadata requires complete actual object identities', code='METER_OBJECT_IDENTITY_INCOMPLETE')
-        facts.append({key:deepcopy(value) for key,value in row.items() if key != 'object'} | {
-            'object':{key:deepcopy(obj[key]) for key in (*IDENTITY,'classId') if key in obj}})
+        identity = {key:deepcopy(obj[key]) for key in (*IDENTITY,'classId') if key in obj}
+        identity['id'] = identity['id'].upper()
+        facts.append({key:deepcopy(value) for key,value in row.items() if key != 'object'} | {'object':identity})
     return facts
 
 

@@ -411,3 +411,23 @@ def test_meter_field_can_bind_instance_metadata_when_class_metadata_has_no_match
     assert all(row["object"]["properties"] == {"Volume":-6.0} for row in result["agent_result"]["meters"])
     assert [args for uri,args,_ in client.calls if uri.endswith("getPropertyAndReferenceNames")] == [
         {"classId":BUS_CLASS},{"object":BUS}]
+
+
+def test_meter_frame_comparison_uses_canonical_guid_identity_not_native_letter_case(tmp_path):
+    client,run = task(tmp_path)
+    for row in client.rows:
+        row["object"]["id"] = "{ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB}"
+    original = client.call
+    count = 0
+    def call(uri,args=None,options=None):
+        nonlocal count
+        if uri == METERS:
+            count += 1
+            if count == 2:
+                for row in client.rows:
+                    row["object"]["id"] = row["object"]["id"].lower()
+        return original(uri,args,options)
+    client.call = call
+    code,result = run("core-call",METERS,"--profiler-position","123","--meter-object-include-field","Bus Volume")
+    assert code == 0, result
+    assert all(row["object"]["properties"] == {"Volume":-6.0} for row in result["agent_result"]["meters"])
