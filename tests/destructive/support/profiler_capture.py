@@ -130,7 +130,12 @@ def collect_owned_capture(batch, public_call):
         assert len(pending) == 1, ('Cleanup ownership unavailable', label)
         name, action = pending[0]
         cleanup.remove(pending[0])
-        result = action()
+        try:
+            result = action()
+        except Exception as exc:
+            report['cleanup']['errors'].append({'action': name, 'type': type(exc).__name__, 'message': str(exc)[:4096]})
+            persist()
+            raise
         report['cleanup']['receipts'].append({'action': name, 'result': result})
         persist()
         return result

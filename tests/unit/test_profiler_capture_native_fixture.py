@@ -123,6 +123,8 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None):
             if uri.endswith('log.clear'):
                 self.logs[args['channel']] = []
                 return {}
+            if uri.endswith('profiler.stopCapture') and failure == 'explicit-stop-capture':
+                raise RuntimeError('fake explicit stop capture failure')
             if uri.endswith(('profiler.startCapture', 'profiler.stopCapture')):
                 return {'return': 1500}
             if uri.endswith(('profiler.enableProfilerData', 'transport.useOriginals')):
@@ -234,6 +236,31 @@ def test_cleanup_failure_retains_each_business_observation_without_acceptance(ow
     assert report['cleanup']['errors'][0]['action'] == 'unregister-meter'
     assert any('fake unregister failure' in json.dumps(row['payload']) for row in archived['receipts'])
     assert batch.lifecycle_result.quarantine_path and not batch.batch_seal_path.exists()
+
+
+def test_failed_explicit_stop_capture_persists_incomplete_cleanup_without_retry(owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, failure='explicit-stop-capture')
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL'
+    assert all(row['cleanup_complete'] is False and row['status'] == 'blocked'
+        and 'batch_finalization' not in row for row in record['categories'])
+    assert sum(uri == 'ak.wwise.core.profiler.stopCapture' for uri, _, _ in client.calls) == 1
+    assert batch.lifecycle_result.quarantine_path and not batch.batch_seal_path.exists()
+    archived = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    root = Path(archived['artifacts']['native-evidence']['path'])
+    report = json.loads((root / 'profiler-capture.json').read_text())
+    assert report['complete'] is False and report['cleanup']['complete'] is False
+    assert [row['action'] for row in report['cleanup']['errors']] == ['stop-capture']
+    assert report['outcomes']['profiler-meter-object-observation']['outcome'] == 'PASS'
+    assert not any(row['action'] == 'stop-capture' for row in report['cleanup']['receipts'])
+    failed = [row for row in archived['receipts'] if row['argv'][0] == 'execute'
+        and row['payload'].get('dispatch_result', {}).get('api') == 'ak.wwise.core.profiler.stopCapture']
+    assert len(failed) == 1 and failed[0]['exit_code'] == 2
+    assert failed[0]['payload']['state'] == 'indeterminate'
+    assert failed[0]['payload']['automatic_retry'] is False
+    assert record['source']['hash_before'] == record['source']['hash_after']
 
 
 @pytest.mark.parametrize('version,extra', [('2024.1', False), ('2025.1', True), ('2025.1', False)])
