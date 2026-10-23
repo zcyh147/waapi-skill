@@ -12,15 +12,23 @@ from tests.unit.test_workflow_source_guard import workflow
 
 
 @pytest.mark.parametrize('version',['2025.1','2022.1'])
-@pytest.mark.parametrize('fault',['none','object-metadata','wrong-class','wrong-owner','missing-member'])
+@pytest.mark.parametrize('fault',['none','object-metadata','wrong-class','wrong-owner','missing-member','prepared-drift'])
 def test_local_list_witness_uses_real_gateway_and_stops_invalid_members(tmp_path,workflow,monkeypatch,version,fault):
     from tests.destructive import test_query_local_list_outputs as witness
     source=tmp_path/'source';owned=tmp_path/'owned';sandbox=owned/'project'
-    for relative in witness.source_paths(version):
+    original=witness.REPO/'tests/_org'/version
+    # The workflow's real normalizer scans all WWUs and the full project. Media
+    # is unnecessary for this injected-native unit test; no process is launched.
+    for relative in [Path('SampleProject.wproj'),*(path.relative_to(original) for path in original.rglob('*.wwu'))]:
         target=source/relative;target.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copyfile(witness.REPO/'tests/_org'/version/relative,target)
-    (source/'SampleProject.wproj').write_text('<WwiseDocument/>')
+        shutil.copyfile(original/relative,target)
     shutil.copytree(source,sandbox)
+    prelaunch_io=owned/'prelaunch-io';prelaunch_io.mkdir()
+    prepared=workflow.normalize_project_copy(sandbox/'SampleProject.wproj',io_root=prelaunch_io,owned_root=owned,
+        request=workflow.ProjectPrelaunchRequest(scenario_id='gateway-workflow-transaction-matrix',
+            isolate_optional_sample_plugins=version=='2022.1',
+            auro_isolation_profile=workflow.WWISE_2025_SOUNDBANK_AURO_PROFILE if version=='2025.1' else None))
+    (owned/'prelaunch-helper-report.json').write_text(json.dumps(prepared.as_dict(),indent=2))
     task_root=tmp_path/'transport';task_root.mkdir()
     task=LocalListTask(task_root,version)
     task.info['version'].update(dict(zip(('year','major','minor','build'),witness.BUILDS[version])))
@@ -29,6 +37,13 @@ def test_local_list_witness_uses_real_gateway_and_stops_invalid_members(tmp_path
         sandbox=SimpleNamespace(source_root=source,sandbox_path=sandbox,
             metadata=SimpleNamespace(get_info_version=task.info['version'])),env=task.env)
     facts=witness.source_frame(runtime)
+    if version=='2025.1':
+        proof,=[row for row in prepared.as_dict()['auro_soundbank_isolation']['work_units']
+            if row['relative_path']=='Busses/Default Work Unit.wwu']
+        assert proof['input_sha256']==facts['wwus'][1]['sha256']
+        assert proof['output_sha256']==facts['wwus'][1]['prepared_sha256']
+        assert proof['input_sha256']!=proof['output_sha256']
+    assert all(row['source_sha256']==row['prepared_sha256'] for row in facts['business_subtrees'].values())
     fixture=json.loads((witness.REPO/'tests/fixtures/query-local-lists/native-metadata.json').read_text())
     task.objects={}
     prefix='\\Containers' if version=='2025.1' else '\\Actor-Mixer Hierarchy'
@@ -89,6 +104,11 @@ def test_local_list_witness_uses_real_gateway_and_stops_invalid_members(tmp_path
         phase='sound-full' if '--include-related-field' in argv and 'first' not in argv and witness.SOUND in argv else 'other'
         return workflow.waapi_gateway.execute_gateway(['--timeout','30','--state-dir',str(runtime.state_dir),*argv],env=runtime.env)
     runtime.raw_gateway=raw
+    if fault=='prepared-drift':
+        # Even formatting-only post-preparation drift must stop before WAAPI;
+        # semantic subtree equivalence never replaces prepared-byte integrity.
+        path=sandbox/witness.source_paths(version)[0]
+        path.write_bytes(path.read_bytes()+b'\n')
     if fault in {'none','object-metadata'}:witness.test_local_rtpc_and_effect_slot_outputs_keep_actual_owners(runtime,monkeypatch)
     else:
         with pytest.raises(AssertionError):witness.test_local_rtpc_and_effect_slot_outputs_keep_actual_owners(runtime,monkeypatch)
@@ -101,4 +121,7 @@ def test_local_list_witness_uses_real_gateway_and_stops_invalid_members(tmp_path
     if fault in {'none','object-metadata'}:
         assert len(receipt['groups'])==(6 if version=='2025.1' else 5)
         assert receipt['dispatch_count']>0 and receipt['transaction_count']==0
+    elif fault=='prepared-drift':
+        assert receipt['groups']==[] and receipt['dispatch_count']==0
+        assert 'Prepared WWU bytes drifted' in receipt['error']
     else:assert receipt['groups'][-1]['label']=='sound-full'

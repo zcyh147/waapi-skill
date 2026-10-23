@@ -5,6 +5,91 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R87 bounded condition evidence reuse
+
+Reviewed condition accounting `b4cf930e`, integrated at `d8fb3e44`, preserves
+the frozen original receipts and distinguishes six selected 2025 LFO members'
+reviewed mechanism reuse from directly observed recipient effects. Native,
+class metadata and current public program evidence remain separate; controlled
+captures grant no product publication credit and original native witness IDs
+are deduplicated. The source resolver retains all 5,669 original scalar IDs and
+shapes with no source-only coverage credit. This does not complete #177.
+
+Original focused evidence remains 139 PASS / 1 FAIL in 307.21s; subsequent
+scoped corrections passed nine checks in 56.43s and two in 8.61s with one
+overlap. Independent review then reproduced an uncaught malformed-trace URI
+error. The repaired negative and retained scope positive passed two checks in
+8.92s; the intermediate 1 PASS / 1 FAIL compatibility result is retained.
+Correction review verified source/hunk reconciliation and original receipt
+lineage without another green test run. No native or Fresh test was added for
+this accounting change. Reports: `r87-handoff-review/condition-correction-hashes.json`
+and `r87-condition-reviewed-evidence/correction-review.md`. Remaining grouped
+source-to-proof assignments, Music/BatchRename/fieldless dependencies and
+non-scalar condition coverage remain same-parent work.
+
+## 2026-10-23 R86/R87 local Lists and plug-in result identity
+
+Reviewed query implementation `22ff1cb5` adds closed local RTPC outputs for
+2022–2025 and EffectSlot outputs for 2023–2025, including related Curve points.
+The Synth class bridge is explicitly source-bound; it does not infer general
+plug-in inheritance. Original affected results were 672 PASS / 9 FAIL; the
+corrected selection passed 113 checks in 8.72s, the bridge selection 34 in
+2.45s, and the merged tracer eight in 0.68s. These overlap and are not summed.
+Test-only `00cdbcc2` exercised both real-Gateway/fake-client collector backends:
+ten controls passed in 9.60s, followed by four affected packet-proof checks in
+7.56s. Original fixture failures remain recorded.
+
+The first real local-List attempt on frozen `7a0d95b3`, Mac Console
+2025.1.7.9143, failed in 5.41s before any query or transaction. Its fixture
+incorrectly required raw source/copy byte equality despite the existing sandbox
+normalizer rewriting XML. Source hash/mtime/tree were unchanged and process
+cleanup completed. This is a fixture failure, not native query acceptance.
+Evidence: `r87-local-lists-7a0d95b3-2025-r1/root-review.json`.
+
+Test-only `f2f473c6` reproduced that failure using the actual existing sandbox
+normalizer, then passed both backends and 12 affected collector controls in
+12.84s. Original and prepared file hashes remain separately pinned; selected
+owner/member/Curve subtrees must match and prepared-byte drift stops before
+any query. Frozen `9f694d04` subsequently passed sequential native witnesses:
+
+| Mac Console version/build | Result | Read groups | Public live calls | Hashed packets | Transactions |
+| --- | --- | --- | --- | --- | --- |
+| 2025.1.7.9143 | PASS, 8.45s | 6 | 32 | 299 | 0 |
+| 2022.1.19.8584 | PASS, 9.90s | 5 | 23 | 239 | 0 |
+
+Both runs independently observed actual Sound/Synth RTPC owners, distinct input
+and Curve associations, complete/selected/combined projections, point values
+and repeated baseline preservation. The 2025 run additionally observed the
+AuxBus EffectSlot and related Effect projection. Composed RETURN and older
+GUID-grouped dispatch were observed on their respective hosts; all original
+packet hashes, source/prepared files and lifecycle cleanup passed. Neither run
+needed a continuation. Aggregate: `r87-local-list-native-review-2022-2025.json`;
+individual roots are `r87-local-lists-9f694d04-{2025-r2,2022-r1}/root-review.json`.
+This grants no 2021/2023/2024 native, other plug-in bridge, Marker or Fresh
+coverage. The original fixture failure remains unchanged.
+
+Reviewed plug-in correction `9c9cd6b5` preserves the requested Metadata
+ShareSet name while accepting the observed 2025 ASCII-space-to-underscore
+relation. It also requires the typed readback GUID to match the resolved
+created plug-in GUID. The substituted-GUID regression failed before repair;
+that case and three existing EffectSlot identity controls passed in 2.25s.
+Independent correction review found no further issue. Other name/version
+profiles remain separately assigned; this is not universal normalization proof.
+
+The next named-List attempt on the same frozen candidate failed in 6.32s.
+Its separately authorized Metadata setup transaction was **verified**, proving
+the repaired name binding on this native placement. The later source transaction
+`tx1-jve6tx3v5c6t7acyd617` is **indeterminate**: Bus and Sound/MetadataSlot SETs
+were acknowledged, but the slot returned an empty name and type
+`PluginInnerObject`, and result association stopped before later stages or
+typed slot verification. This does not establish a completed source workflow.
+The original 43 commands, 11 independent reads and 121 hashed packets remain
+in `r87-named-list-7a0d95b3-2025-r4/root-review.json`; all three native SET
+acknowledgements were checked against their original packets. No post-failure
+read, verification or replay occurred. Source integrity and process cleanup
+passed; the failed sandbox remains quarantined. Inner-object binding remains
+implementation work under #178/#180. No Fresh or full gate ran in this batch.
+
 ## 2026-10-23 R85 randomizer outputs and condition-source reconciliation
 
 Reviewed runtime `38676aac` exposes property-bound randomizer enabled/minimum/
