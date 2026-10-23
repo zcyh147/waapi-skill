@@ -108,7 +108,7 @@ def collect_owned_capture(batch, public_call):
         assert row['id'] == identity and all(isinstance(row[key], str) and row[key] for key in ('name', 'type', 'path')), row
         return row
 
-    def draft(operation, fields, *, role=None, identity=None, field_meaning=None):
+    def draft(operation, fields, *, role=None, identity=None, field_meaning=None, field_choice=None):
         started = call(['draft-start', operation])
         current, authority = started['draft'], started['task_authority']
         draft_id = current['draft_id']
@@ -125,6 +125,18 @@ def collect_owned_capture(batch, public_call):
             if field_meaning:
                 discovered = step('draft-discover-fields', ['--object-handle', handle, '--meaning', field_meaning])
                 field_handle = discovered_business_field_handle(discovered, field_meaning)
+                if field_choice is not None:
+                    candidates = discovered.get('field_candidates', []) or [candidate
+                        for row in discovered.get('meaning_results', []) for candidate in row.get('candidates', [])]
+                    candidate, = [row for row in candidates if row['handle'] == field_handle]
+                    value_input = candidate['value_input']
+                    value, label = field_choice
+                    assert value_input['type'] == 'integer', candidate
+                    choices = [row for row in value_input.get('choices', [])
+                        if type(row.get('value')) is int and row['value'] == value
+                        and (label is None or label in row.get('labels', []))]
+                    assert len(choices) == 1, ('Required source-backed choice not uniquely disclosed by live metadata', field_meaning, field_choice)
+                    arguments = ['--business-value', choices[0]['input']]
                 step('draft-declare-field-change', ['--object-handle', handle, '--field-handle', field_handle, *arguments])
             else:
                 step('draft-declare-runtime-control-plan', ['--' + role.replace('_', '-') + '-handle', handle, *arguments])
@@ -154,6 +166,12 @@ def collect_owned_capture(batch, public_call):
     def set_loop(value, *, before_execute=None):
         result = execute(draft('object.setProperty', ['--business-value', json.dumps(value)],
             identity=sound_id, field_meaning='IsLoopingEnabled'), before_execute=before_execute)
+        assert result['verification']['business_state_verified'] is True, result
+        return result
+
+    def set_bus_configuration(value, *, label=None, before_execute=None):
+        result = execute(draft('object.setProperty', [], identity=bus_id,
+            field_meaning='BusChannelConfig', field_choice=(value, label)), before_execute=before_execute)
         assert result['verification']['business_state_verified'] is True, result
         return result
 
@@ -209,13 +227,25 @@ def collect_owned_capture(batch, public_call):
             'Owned fixture requires live boolean loop values and already-infinite mode', original)
         if version == '2024.1':
             assert props['IsLoopingEnabled'] is True and original.get('output_bus', {}).get('id') == bus_id, original
-        before_bus = exact(bus_id, '--include', 'volume-db', '--include', 'parent')
+        bus_fields = ['--include', 'volume-db', '--include', 'parent']
+        if version == '2024.1':
+            bus_fields += ['--include-field', 'BusChannelConfig']
+        before_bus = exact(bus_id, *bus_fields)
         before_parent = exact(parent_id, '--include', parent_output)
         assert before_bus['name'] == ('Guns' if version == '2024.1' else 'WAAPI_V2_Weapons') and before_bus['type'] == 'Bus', before_bus
         assert before_bus['parent']['id'] == parent_id, before_bus
         assert before_parent['type'] == ('Bus' if version == '2024.1' else 'WorkUnit'), before_parent
         assert type(before_parent.get(parent_key)) in ((int, float) if version == '2024.1' else (bool,)), before_parent
         report['fixture_before'] = {'sound': original, 'bus': before_bus, 'parent': before_parent}
+        if version == '2024.1':
+            original_configuration = before_bus.get('properties', {}).get('BusChannelConfig')
+            assert type(original_configuration) is int and original_configuration == 0, before_bus
+            # Matching 2024 WObjects: 0=Same as parent, 12546=2.0. Authoring
+            # Help ch34s11s01: explicit channel configuration makes a bus mix;
+            # non-mixing buses have no meter. Live disclosure must match first.
+            report['setup'].append({'bus_processing': set_bus_configuration(12546, label='2.0',
+                before_execute=lambda: own('restore-bus-configuration',
+                    lambda: set_bus_configuration(original_configuration)))})
         # The matching WObjects.xml defines Loop Enable as bool, default false;
         # Infinite defaults true and requires Enable. Fresh Draft discovery owns
         # actual metadata before the one changed flag; never write a disabled child.
@@ -347,7 +377,7 @@ def collect_owned_capture(batch, public_call):
         try:
             if 'fixture_before' in report:
                 after = {'sound': exact(sound_id, *looping),
-                    'bus': exact(bus_id, '--include', 'volume-db', '--include', 'parent'),
+                    'bus': exact(bus_id, *bus_fields),
                     'parent': exact(parent_id, '--include', parent_output)}
                 report['fixture_after'] = after
                 assert after == report['fixture_before'], 'Owned Sound/bus/parent values changed after cleanup'
