@@ -5,6 +5,48 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R104 remaining Profiler capture reads
+
+Candidate `a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8` ran one owned Mac
+Authoring capture per pinned build, sequentially with `-AutomationMode`.
+Each raw pytest node failed and each final lifecycle stayed BLOCKED; individual
+observations below are not whole-node or ticket acceptance.
+
+| Build | Duration | Public calls | Independent collector outcomes |
+| --- | ---: | ---: | --- |
+| 2021.1.14.8108 | 97.91s | 122 | 5 PASS, 4 BLOCKED |
+| 2022.1.19.8584 | 104.45s | 132 | 5 PASS, 4 BLOCKED, 1 FAIL |
+| 2023.1.19.8928 | 131.55s | 173 | 11 PASS, 6 BLOCKED |
+| 2024.1.13.9056 | 131.01s | 173 | 11 PASS, 6 BLOCKED |
+| 2025.1.7.9143 | 114.20s | 139 | 3 PASS, 4 BLOCKED |
+
+Dry voice contributions were observed in all five versions. The applicable
+2023–2025 PerformanceMonitor and StreamedMedia reads returned data; 2023/2024
+also independently saved a capture and added/cleared the owned General log.
+Older voice/audio-object reads and filters retained their individual outcomes.
+The 2025 unit did not repeat its seven previously accepted reader checks.
+
+Unresolved outcomes exposed specific follow-through: CPU native results were
+complete but the collector retained only their first Gateway page; logical
+Cars routing did not provide the actual mixing-Bus handle expected by the
+collector; 2021 returned owned RPM data at its object-specific value instead
+of the requested global value, while later RTPC snapshots were empty.
+LoadedMedia remained empty despite the bounded Sound preparation probe.
+The additional 2022 failure is a real compatibility defect: Authoring returned
+`registerTime`/`unregisterTime`, while the reflected contract and normalizer
+expected `registrationTime`/`unregistrationTime`. These remain #186/#174 work,
+not native-absence exclusions. No repairs or automatic reruns occurred within
+this frozen batch.
+
+Evidence roots are `.waapi-skill-state/full-coverage/r104-capture-reads-native-<year>-r1`.
+Each `root-review.json` records the exact host, report hash and separate
+outcomes. All 616 candidate source hashes per root and archived artifact
+hashes were checked; original-project hash/mtime and fixture readbacks matched.
+Collector cleanup completed, lifecycle errors were empty, and terminal
+inspection found no owned process with port 8080 released. Failed owned trees
+remain sealed and retained. No Fresh, Windows, broad Program/Non-live, or
+complete five-version reader acceptance is claimed.
+
 ## 2026-10-24 R101–R103 transport states and Profiler reader observations
 
 The missing transport-state observations were collected once per older build,
