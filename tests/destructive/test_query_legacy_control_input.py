@@ -206,11 +206,17 @@ def test_legacy_control_input_typed_reads_keep_exact_rtpc_and_lfo_scope(workflow
         flags=['query-object','--exact-id',RTPC,'--max-results','1']
         for field in ('LfoFrequency','LfoDepth'):
             flags+=['--include-related-field','combine','reference','ControlInput','and','local-reference','ControlInput','end',field]
-        rows,_,_=read(current,flags)
+        rows,calls,packets=read(current,flags)
         row,=rows;assert row['id']==RTPC
         projection,=row['related']['projections'];items=projection['items'];assert len(items)==2
         assert [item['origin']['arm'] for item in items]==[0,1]
         for item in items:related(item)
+        actual_members=[raw for call,rows in native_rows(calls,packets) for raw in rows
+            if raw.get('id')==LFO and {'@LfoFrequency','@LfoDepth'}<=set(raw)]
+        assert actual_members
+        for raw in actual_members:
+            assert raw['type']=='ModulatorLfo' and raw['classId']==4194320
+            values({'properties':{'LfoFrequency':raw['@LfoFrequency'],'LfoDepth':raw['@LfoDepth']}})
         final=baseline(group('baseline-after'));assert canonical_json_bytes(final)==canonical_json_bytes(initial)
         observation['baseline_after']=final
         assert source_frame(runtime)==before
