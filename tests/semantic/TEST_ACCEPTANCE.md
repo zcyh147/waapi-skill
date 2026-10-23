@@ -105,6 +105,9 @@ directly affected units in fresh roots. Change no code or options mid-batch.
 During code repair, rerun the failed cases and callers affected by the fix;
 retain unaffected passing results. A single failed case does not by itself
 justify rerunning the whole Program, Non-live or native selection.
+For an existing large test file, select the specific affected test nodes.
+Sharing a file with an affected consumer does not justify rerunning every test
+in that file; broader selection needs a shared behavior that the change affects.
 
 At promotion, run the required development gate once on the combined change.
 Choose additional Fresh coverage by what the change could invalidate. A new
