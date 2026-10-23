@@ -451,3 +451,33 @@ def test_final_rtpc_consumer_rejects_resealed_public_native_field_mismatch(tmp_p
     changed = evaluate()
     assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
     assert 'complete native/public RTPC return' in changed['evidence_results']['program']['reason']
+
+
+def test_rtpc_capture_contract_cannot_be_bypassed_by_removing_markers(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_bundle, write_json
+    receipt, dispatch, context = public_rtpc_read(tmp_path, '2021.1')
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, dispatch, nodeid='mandatory-rtpc-capture',
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+    index = write_field_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2021.1', host='wwise-authoring', mode='construction')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    identity = next(key for key in document['bindings'] if key.endswith('/argsSchema/properties/time'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def evaluate():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row for row in result['obligations'] if row['id'] == identity)
+    assert evaluate()['state'] == 'verified'
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    del binding['runtime_read_program']
+    del program['runtime_read_program']
+    program['gateway']['payload']['is_command_line'] = True
+    for section in ('request', 'result'):
+        program['gateway']['payload']['schema_validation'][section]['version'] = '2022.1'
+    binding['evidence']['program'].update(write_json(base / 'program.json', program))
+    changed = evaluate()
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert 'exact current public read capture' in changed['evidence_results']['program']['reason']

@@ -108,7 +108,9 @@ def _portable_descriptor(descriptor, base):
 
 def validate_rtpc_program(record, binding, branch, root):
     """Apply actual read capture requirements to ordinary program evidence."""
-    captured = record['runtime_read_program']
+    captured = record.get('runtime_read_program')
+    if not isinstance(captured, dict):
+        raise ValueError('RTPC program needs exact current public read capture')
     version, host, _, kind, uri = branch['route'].split('|')
     payload = captured['gateway']['payload']
     if (uri != RTPC_URI or kind != 'function'

@@ -1374,9 +1374,14 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {}, category=category)
         record = read_sealed_artifact(descriptor, base)
-        if category == 'program' and ((binding or {}).get('runtime_read_program') or record.get('runtime_read_program')):
-            from tests.support.runtime_observation_evidence import validate_rtpc_program
-            validate_rtpc_program(record, binding or {}, branch, root)
+        if category == 'program':
+            from wwise_waapi.runtime_inspection_business_contracts import PROFILER_GET_RTPS_URI
+            # The source-owned exact read route determines capture eligibility;
+            # caller-removable evidence markers cannot disable this contract.
+            if ((branch.get('route') or '').endswith('|function|' + PROFILER_GET_RTPS_URI)
+                    and not (binding or {}).get('runtime_observation_attachment')):
+                from tests.support.runtime_observation_evidence import validate_rtpc_program
+                validate_rtpc_program(record, binding or {}, branch, root)
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
