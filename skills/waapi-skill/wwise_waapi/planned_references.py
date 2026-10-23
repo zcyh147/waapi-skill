@@ -6,7 +6,7 @@ from typing import Mapping
 
 from .business_declarations import NewDescendantTarget, business_repair
 from .metadata_restrictions import reference_type_token
-from .operation_object import DEFAULT_MAX_NODES, DEFAULT_MAX_NAME_LENGTH, ObjectOperationContractError
+from .operation_object import DEFAULT_MAX_NODES, ObjectOperationContractError
 
 
 class PlannedReferenceTarget:
@@ -120,20 +120,12 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
         collisions = [row for row in rows if row["id"] != exclude_id]
         if policy != "rename" or not collisions:
             return name, path, rows
-        for index in range(1, 33):
-            suffix = f"_waapi_{index}"
-            candidate = name[:DEFAULT_MAX_NAME_LENGTH - len(suffix)] + suffix
-            if candidate.casefold() in reserved:
-                continue
-            candidate_path = parent_path.rstrip("\\") + "\\" + candidate
-            if not observed(candidate_path):
-                if capture_collision is None:
-                    raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Rename preservation requires the graph observer")
-                renames.append({"request_path": request_path, "requested_name": name, "prepared_name": candidate,
-                    "native_path": candidate_path, "collision_state": [capture_collision(row) for row in collisions],
-                    "name_policy": "Gateway_selected_candidate; native_onNameConflict_remains_rename"})
-                return candidate, candidate_path, []
-        raise ObjectOperationContractError("PLANNED_REFERENCE_RENAME_SEARCH_LIMIT", "No free Gateway rename candidate was proved within 32 bounded choices")
+        if capture_collision is None:
+            raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Rename preservation requires the graph observer")
+        renames.append({"request_path": request_path, "requested_name": name,
+            "collision_state": [capture_collision(row) for row in collisions],
+            "name_policy": "native_selected_name_bound_after_creation"})
+        return name, path, rows
 
     def root_for(path):
         matches = [(prefix, value) for prefix, value in roots.items() if path == prefix or path.startswith(prefix + ".")]
@@ -212,7 +204,7 @@ def apply_result_name_choices(specs, context):
         if name is not None:
             spec["original_requested_name"] = spec["requested_name"]
             spec["requested_name"] = name
-        if path in context["bound_paths"]:
+        if path in context["bound_paths"] and not context["renames"]:
             fact = context["facts"][path]
             if name is None and fact["name"] != spec["requested_name"]:
                 spec["original_requested_name"] = spec["requested_name"]

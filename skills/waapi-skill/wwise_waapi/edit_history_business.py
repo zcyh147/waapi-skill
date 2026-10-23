@@ -308,7 +308,10 @@ def _compound_observations(prepared, execution, verification):
                 raise ValueError("Compound child observation range belongs to another typed child index")
             used.update(range(start, start + count))
             sections[name] = rows
-        observations.extend(_source_observations(child, phase["dispatch_result"], {**header, **sections}, compound_path_context=path_context))
+        from .object_graph_paths import compound_rename_edits
+        phase_context = {'edits': compound_rename_edits(calls[:index])} if child.get('pre_state', {}).get('owned_result_stages') else None
+        observations.extend(_source_observations(child, phase["dispatch_result"], {**header, **sections},
+            compound_path_context=path_context, compound_phase_path_context=phase_context))
     if not 1 <= len(observations) <= MAX_OBSERVATIONS:
         raise ValueError("Compound history receipt exceeds its observation bound")
     before_by_id, after_by_id = {}, {}
@@ -350,7 +353,7 @@ def _compound_observations(prepared, execution, verification):
 
 
 
-def _source_observations(prepared, execution, verification, *, compound_path_context=None) -> list[dict[str, Any]]:
+def _source_observations(prepared, execution, verification, *, compound_path_context=None, compound_phase_path_context=None) -> list[dict[str, Any]]:
     """Interpret actual source outcomes, including explicit parent-owned children."""
     if (execution.get("ok") is not True or verification.get("business_state_verified") is not True
             or verification.get("status") != "verified"):
@@ -369,6 +372,8 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
             raise ValueError("Render source selected field is missing from its complete chain observation")
         return observations
     if plan.get("kind") == "object-set-batch":
+        if prepared.get('pre_state', {}).get('owned_result_stages'):
+            return _staged_set_creation_observations(prepared, execution, verification, compound_path_context, compound_phase_path_context)
         from .existing_field_observations import receipt_observations
         return receipt_observations(prepared, verification, path_context=compound_path_context)
     if any(chain.get("derived") for chain in prepared.get("pre_state", {}).get("effect_render_chains", [])):
@@ -440,7 +445,8 @@ def _source_observations(prepared, execution, verification, *, compound_path_con
 
 
 def _created_membership_matches(result, observations):
-    nodes = [row for row in observations if row.get("kind") == "creation_presence" and row["request_path"] != "$"]
+    nodes = [row for row in observations if row.get("kind") == "creation_presence"
+        and row['object']['id'] != row.get('graph_root_id')]
     rows = result.get("return") if isinstance(result, Mapping) and set(result) == {"return"} else None
     if not isinstance(rows, list) or len(rows) != len(nodes) or any(not isinstance(row, Mapping) for row in rows):
         return False
@@ -457,6 +463,79 @@ def _created_membership_matches(result, observations):
         and 'parent' in found[expected["object"]["id"]]
         and _reference_value(found[expected["object"]["id"]]["parent"]) == expected["parent_id"]
         for expected in nodes)
+
+
+def _staged_set_creation_observations(prepared, execution, verification, path_context, phase_context):
+    from .creation_observations import ordinary_set_creation_graphs, ordinary_creation_fields
+    from .owned_result_stages import validate as validate_stages
+    from .object_graph_paths import project_compound_path
+    plan, state = prepared['verification_plan'], prepared['pre_state']
+    groups = ordinary_set_creation_graphs(plan, state)
+    actual = validate_stages(prepared, execution, context=phase_context)
+    ids = {path: row['id'].upper() for path, row in actual.items()}
+    view = state.get('field_read_platform', {})
+    if view.get('status') != 'certified' or not _GUID.fullmatch(str(view.get('platform_id'))):
+        raise ValueError('Staged creation receipt needs its certified original source field view')
+    witnesses = [row for row in verification['assertions'] if row.get('kind') == 'verified_created_node_identity']
+    all_nodes = [node for group in groups for node in group['nodes']]
+    if len(witnesses) != len(all_nodes) or any(row.get('passed') is not True for row in witnesses):
+        raise ValueError('Staged set receipt requires every independently observed actual created node')
+    observations = []
+    for group in groups:
+        group_observations = []
+        for node in group['nodes']:
+            path = node['request_path']
+            matches = [row['evidence'] for row in witnesses if row.get('evidence', {}).get('request_path') == path]
+            parent_id = group['parent_id'].upper() if path == group['root'] else ids[node['parent_request_path']]
+            expected_path = project_compound_path(actual[path]['path'], path_context)
+            if (len(matches) != 1 or type(matches[0].get('class_id')) is not int
+                    or matches[0]['class_id'] != node['class_id'] or str(matches[0].get('parent_id')).upper() != parent_id
+                    or _identity(matches[0]['object']) != {**_identity(actual[path]), 'path': expected_path}):
+                raise ValueError('Staged created node differs from the native result GUID/class/parent/path binding')
+            identity = _identity(matches[0]['object'])
+            group_observations.extend(_created_node_observations(node, identity, parent_id, view['platform_id'],
+                ordinary_creation_fields(node), prepared, verification, ids, ids[group['root']], compound_path_context=path_context))
+            if actual[path]['path'] != identity['path']:
+                next(row for row in reversed(group_observations) if row.get('kind') == 'creation_presence')['absence_paths'] = [actual[path]['path'], identity['path']]
+        records = [row for row in verification['readbacks'] if row.get('role') == 'created-graph-history-membership'
+            and row.get('request_path') == group['root']]
+        if (len(records) != 1 or records[0].get('uri') != GET
+                or records[0].get('args') != {'from': {'id': [ids[group['root']]]}, 'transform': [{'select': ['descendants']}]}
+                or 'error' in records[0] or not _created_membership_matches(records[0].get('result'), group_observations)):
+            raise ValueError('Staged creation receipt lacks its complete final created membership')
+        observations.extend(group_observations)
+    # Ordinary preservation uses the same exact identity/notes/class observer.
+    # The before image belongs to the sealed source, never a predicted suffix.
+    from .owned_result_stages import preservation_rows, observe_preservation
+    retained = [row for row in verification['readbacks'] if row.get('role') == 'owned-result-preservation']
+    reads = iter([item for record in retained for item in (record, record.get('membership', {}))])
+    def source_read(uri, args, options):
+        record = next(reads)
+        if record.get('uri') != uri or record.get('args') != args or record.get('options') != options:
+            raise ValueError('Final preservation source read is not exactly associated')
+        return record['result']
+    actual_preserved = observe_preservation(prepared, actual, read=source_read, context=path_context)
+    if (next(reads, None) is not None or actual_preserved != [{key: value for key, value in row.items()
+            if key != 'compound_child_index'} for row in retained]
+            or not all(row['passed'] for row in actual_preserved)):
+        raise ValueError('Receipt lacks the exact complete final preservation observation')
+    for before, children in preservation_rows(prepared):
+        identity = _identity(before)
+        after = {**identity, 'path': project_compound_path(identity['path'], path_context)}
+        if path_context:
+            rename = next((row for row in path_context['edits'] if row['target_id'].upper() == identity['id']), None)
+            if rename:
+                after['name'] = rename['requested_name']
+        created = [ids[group['root']] for group in groups if group['parent_id'].upper() == identity['id']]
+        records = [row for row in verification['readbacks'] if row.get('role') == 'owned-result-preservation'
+            and row.get('object_id', '').upper() == identity['id']]
+        if len(records) != 1 or records[0].get('passed') is not True:
+            raise ValueError('Staged creation receipt lacks its independently observed preservation image')
+        observations.append({'object_before': identity, 'object_after': after, 'field': 'notes',
+            'before': before['notes'], 'after': before['notes'], 'class_id': before['classId'],
+            'parent_id': _reference_value(before['parent']), 'preserved_children_before': children,
+            'preserved_children_after': sorted(set(children) | set(created))})
+    return observations
 
 
 def _created_node_observations(node, identity, parent_id, platform, materialized_fields, prepared, verification, graph_ids, graph_root_id, *, compound_path_context=None):
@@ -835,7 +914,8 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
             ids = list(dict.fromkeys(row["object_" + side]["id"] for row in group))
             args = {"from": {"id": ids}}
             options = {"return": list(dict.fromkeys([*IDENTITY,
-                *(["classId"] if any("class_id" in row for row in group) else []), *(_history_observation_field(row) for row in group)])),
+                *(["classId"] if any("class_id" in row for row in group) else []),
+                *(["parent"] if any("parent_id" in row for row in group) else []), *(_history_observation_field(row) for row in group)])),
                 **({"platform": platform} if platform is not None else {})}
             result = retained_read(GET, args, options)
             rows = result.get("return") if isinstance(result, Mapping) else None
@@ -860,6 +940,14 @@ def observe_history_state(binding: Mapping[str, Any], *, after_action: bool, rea
                     if expected.get("field_kind") == "reference" else
                     _scalar_matches(actual, expected[side], expected["metadata_type"])
                     if "metadata_type" in expected else isinstance(actual, str) and actual == expected[side])
+                if "parent_id" in expected:
+                    equal = equal and "parent" in row and _reference_value(row['parent']) == expected['parent_id']
+                membership_key = 'preserved_children_' + side
+                if membership_key in expected:
+                    membership = retained_read(GET, {'from': {'id': [identity['id']]}, 'transform': [{'select': ['children']}]}, {'return': ['id']})
+                    members = membership.get('return') if isinstance(membership, Mapping) else None
+                    member_ids = [str(member.get('id')).upper() for member in members] if isinstance(members, list) else []
+                    equal = equal and isinstance(members, list) and len(member_ids) == len(set(member_ids)) and sorted(member_ids) == expected[membership_key]
                 checks.append({"object": identity, "field": field, "platform": platform,
                     "expected": expected[side], "actual": actual,
                     **({"reference_observation": expected["reference_observation"]} if local_stored else {}),

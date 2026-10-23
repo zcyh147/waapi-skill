@@ -1698,20 +1698,20 @@ def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_valu
 
 
 @pytest.mark.parametrize("receiver,field_style,rename_case", (("existing", "handle", None), ("existing", "stable", None), ("new", "handle", None), ("new", "stable", None),
-    ("existing", "handle", "collision"), ("existing", "handle", "old-notes-effect"), ("existing", "handle", "candidate-drift"), ("existing", "handle", "parent-rename"), ("existing", "handle", "parent-collision"), ("existing", "handle", "parent-merge")))
+    ("existing", "handle", "collision"), ("new", "handle", "collision"), ("existing", "handle", "old-notes-effect"), ("existing", "handle", "collision-drift"), ("existing", "handle", "parent-rename"), ("existing", "handle", "parent-collision"), ("existing", "handle", "parent-merge")))
 def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(tmp_path, receiver, field_style, rename_case):
     task = OwnedGraphTask(tmp_path, "2025.1", "object.set")
     task.require_class_projection = True
     task.types = [{"classId": cid, "name": name, "type": "WObject"} for name, cid in (
         ("Sound", 65552), ("WorkUnit", 1638416), ("Bus", 1376272))]
     task.objects[FIRST].update(type="Sound", classId=65552)
-    task.objects[SECOND]["classId"] = 1638416
+    task.objects[SECOND].update(classId=1638416, parent=None)
     bus_parent = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
     task.objects[bus_parent] = {"id": bus_parent, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
         "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep buses"}
-    target_collision = rename_case in {"collision", "old-notes-effect", "candidate-drift"}
+    target_collision = rename_case in {"collision", "old-notes-effect", "collision-drift"}
     parent_rename = rename_case in {"parent-rename", "parent-collision", "parent-merge"}
-    prepared_bus_name = "New bus_waapi_1" if target_collision else "New bus"
+    prepared_bus_name = "New bus17" if target_collision else "New bus"
     prepared_parent_name = "Renamed routing_waapi_1" if rename_case == "parent-collision" else "Renamed routing"
     if parent_rename:
         work_unit = "{BCBCBCBC-BCBC-BCBC-BCBC-BCBCBCBCBCBC}"
@@ -1738,10 +1738,17 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
         "object": SECOND, "children": [{"type": "Sound", "name": sound_name, "@OutputBus": prepared_bus_path}]}
     expected_objects = [{"object": bus_parent, **({"name": prepared_parent_name} if parent_rename else {}),
         "children": [{"type": "Bus", "name": prepared_bus_name}]}, native_receiver]
+    expected_creation = deepcopy(expected_objects)
+    if target_collision:
+        expected_creation[0]['children'][0]['name'] = 'New bus'
+        if receiver == 'existing':
+            del expected_creation[1]['@OutputBus']
+        else:
+            del expected_creation[1]['children'][0]['@OutputBus']
     def call(uri, args=None, options=None):
         if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            assert args.get("object") == FIRST or args.get("classId") == 65552, args
+            assert args.get("object") in {FIRST, sound_id} or args.get("classId") == 65552, args
             if uri.endswith("getPropertyAndReferenceNames"):
                 return {"return": ["OutputBus"]}
             assert args["property"] == "OutputBus", args
@@ -1749,7 +1756,11 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
                 "restriction": {"type": "reference", "restrictions": [{"type": ["Bus"]}]}}
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            assert args["objects"] == expected_objects
+            if target_collision and all('children' not in item for item in args['objects']):
+                assert args == {'objects': [{'object': sound_id, '@OutputBus': prepared_bus_path}]}
+                task.objects[sound_id]['@OutputBus'] = {'id': bus_id}
+                return {'objects': []}
+            assert args["objects"] == expected_creation
             if parent_rename:
                 task.objects[bus_parent].update(name=prepared_parent_name, path=prepared_parent_path)
             task.objects[bus_id] = {"id": bus_id, "name": prepared_bus_name, "type": "Bus", "classId": 1376272,
@@ -1757,7 +1768,8 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
             if receiver == "new":
                 task.objects[sound_id] = {"id": sound_id, "name": sound_name, "type": "Sound", "classId": 65552,
                     "path": task.objects[SECOND]["path"] + "\\" + sound_name, "parent": {"id": SECOND}, "notes": ""}
-            task.objects[sound_id]["@OutputBus"] = {"id": bus_id}
+            if not target_collision:
+                task.objects[sound_id]["@OutputBus"] = {"id": bus_id}
             if rename_case == "old-notes-effect":
                 task.objects[CHILD]["notes"] = "Unexpected"
             source_result = {"id": FIRST, "name": sound_name} if receiver == "existing" else {
@@ -1797,21 +1809,30 @@ def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(
         assert not (task.path / 'state' / 'transactions').exists()
         return
     tx, shown = task.preview()
-    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"] == expected_objects
+    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"] == (expected_objects if not target_collision else [
+        {"object": bus_parent, "children": [{"type": "Bus", "name": "New bus"}]},
+        {"object": FIRST, "@OutputBus": task.objects[bus_parent]['path'] + r'\New bus'} if receiver == 'existing' else {
+            "object": SECOND, "children": [{"type": "Sound", "name": sound_name, "@OutputBus": task.objects[bus_parent]['path'] + r'\New bus'}]}])
     if rename_case:
         assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == ("merge" if rename_case == "parent-merge" else "rename")
-        assert (prepared_parent_name if parent_rename else "New bus_waapi_1") in json.dumps(shown)
-    if rename_case == "candidate-drift":
+        assert (prepared_parent_name if parent_rename else "New bus") in json.dumps(shown)
+        assert '_waapi_' not in json.dumps(shown)
+    if rename_case == "collision-drift":
         code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
         assert code == 0, confirmed
-        task.objects[ROOT] = {"id": ROOT, "name": prepared_bus_name, "type": "Bus", "classId": 1376272,
-            "path": prepared_bus_path, "parent": {"id": bus_parent}, "notes": "Unreviewed collision"}
+        task.objects[CHILD]['notes'] = 'Unreviewed collision drift'
         code, rejected = task.run("execute", tx)
         assert code == 2 and rejected.get("executed") is not True, rejected
         assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
         return
+    if rename_case == 'old-notes-effect':
+        assert task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+        code, rejected = task.run('execute', tx)
+        assert code == 2 and rejected['state'] == 'indeterminate', rejected
+        assert len([row for row in task.calls if row[0].endswith('object.set')]) == 1
+        return
     code, verified = task.finish(tx, shown)
-    assert code == (2 if rename_case == "old-notes-effect" else 0), json.dumps(verified)
+    assert code == 0, json.dumps(verified)
     assert (verified.get("verified") is True) == (rename_case != "old-notes-effect"), verified
     if rename_case == "collision":
         assert task.objects[CHILD]["notes"] == "Keep old collision"
