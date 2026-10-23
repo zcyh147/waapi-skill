@@ -2916,13 +2916,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--cursor-target-ms",
         type=int,
     )
-    draft_declare_runtime_control_plan.add_argument(
+    capture_data_input = draft_declare_runtime_control_plan.add_mutually_exclusive_group()
+    capture_data_input.add_argument(
         "--capture-data",
         action="append",
         nargs=2,
         default=[],
         metavar=("DATA_SET", "ENABLE_OR_DISABLE"),
     )
+    capture_data_input.add_argument("--capture-data-empty", action="store_true")
     draft_declare_runtime_control_plan.add_argument("--message")
     draft_declare_runtime_control_plan.add_argument("--log-channel")
     draft_declare_runtime_control_plan.add_argument(
@@ -13602,7 +13604,7 @@ def dispatch_business_runtime_control_plan(
     supplied = {
         "cursor_move": args.cursor_move,
         "cursor_target_ms": args.cursor_target_ms,
-        "capture_data_changes": args.capture_data or None,
+        "capture_data_changes": [] if args.capture_data_empty else args.capture_data or None,
         "message": args.message,
         "log_channel": args.log_channel,
         "severity": args.severity,
@@ -28478,10 +28480,10 @@ def _business_next_action_binding(
                 "--cursor-move first-frame|last-frame|next-frame|previous-frame"
             ],
             "ak.wwise.core.profiler.setCursorTime": [
-                "--cursor-target-ms <non-negative-integer-milliseconds>"
+                "--cursor-target-ms <signed-integer-milliseconds>"
             ],
             "ak.wwise.core.profiler.enableProfilerData": [
-                "--capture-data <disclosed-version-data-set> enable|disable (repeat)"
+                "--capture-data <disclosed-version-data-set> enable|disable (repeat, preserving rows and order) OR --capture-data-empty"
             ],
             "ak.wwise.core.log.addItem": [
                 "--message <exact-bounded-message>",

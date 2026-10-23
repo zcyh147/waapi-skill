@@ -2803,3 +2803,255 @@ def test_transport_create_matching_association_publishes_usable_zero_id_handle(
         env=_env(tmp_path, version=version), client_factory=lambda _url: client)
     assert code == 2, rejected
     assert sum(uri == "ak.wwise.core.transport.create" for uri, _, _ in client.calls) == 1
+
+
+class _ProfilerEnableDataClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str = "2025.1") -> None:
+        super().__init__(tmp_path, version=version)
+        self.calls: list[tuple[str, object, object]] = []
+        self.control_result: object = {}
+
+    def call(self, uri: str, args: object = None, options: object = None) -> object:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.profiler.enableProfilerData":
+            if isinstance(self.control_result, Exception):
+                raise self.control_result
+            return self.control_result
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("declaration,rows", [
+    (("--capture-data-empty",), []),
+    (("--capture-data", "voices", "enable", "--capture-data", "voices", "enable"),
+        [{"dataType": "voices", "enable": True}, {"dataType": "voices", "enable": True}]),
+    (("--capture-data", "voices", "enable", "--capture-data", "voices", "disable"),
+        [{"dataType": "voices", "enable": True}, {"dataType": "voices", "enable": False}]),
+    (("--capture-data", "voices", "disable", "--capture-data", "voices", "enable"),
+        [{"dataType": "voices", "enable": False}, {"dataType": "voices", "enable": True}]),
+], ids=("empty", "identical", "enable-disable", "disable-enable"))
+def test_profiler_capture_data_rows_execute_once_without_claiming_settings(
+    tmp_path: Path, version: str, declaration: tuple[str, ...], rows: list[dict[str, object]],
+) -> None:
+    operation = "ak.wwise.core.profiler.enableProfilerData"
+    client = _ProfilerEnableDataClient(tmp_path, version=version)
+    state = tmp_path / "capture-data-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, operation, declaration)
+    artifact = TransactionStore(state).load_preview(previewed["transaction_id"]).artifact
+    assert artifact["request"]["arguments"] == {"api": operation, "args": {"dataTypes": rows}, "options": {}}
+    assert not any(uri == operation for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is False, verified
+    assert verified["state"] == "result_schema_checked"
+    assert verified["verification"]["business_state_verified"] is False
+    assert [call for call in client.calls if call[0] == operation] == [(operation, {"dataTypes": rows}, {})]
+    boundary = verified["verification"]["verification_scope"]
+    assert boundary["enabled_settings_verified"] is False
+    assert boundary["empty_effect_verified"] is False
+    assert boundary["repeated_data_set_resolution_verified"] is False
+    assert boundary["prior_settings_restoration_verified"] is False
+    assert "acknowledged the submitted capture-data directives" in verified["verification"]["message"]
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2, rejected
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_capture_data_schema_and_continuation_disclose_list_and_observer_boundaries(tmp_path: Path, version: str) -> None:
+    operation = "ak.wwise.core.profiler.enableProfilerData"
+    env = _env(tmp_path, version=version)
+    def offline(*argv):
+        code, payload = gateway.execute_gateway(list(argv), env=env,
+            client_factory=lambda _: pytest.fail("Discovery must stay offline"))
+        assert code == 0, payload
+        return payload
+    schema = offline("request-schema", operation)
+    contract = schema["business_adapter"]["declaration"]
+    assert contract["input_forms"]["capture_data_changes"]["empty_flag"] == "--capture-data-empty"
+    semantics = contract["field_semantics"]["capture_data_changes"]
+    assert semantics["preserve_rows_and_order"] is True
+    assert semantics["empty_effect"] == "unspecified_by_native_documentation"
+    assert semantics["repeated_data_set_resolution"] == "unspecified_by_native_documentation"
+    assert semantics["native_legality_established_by_schema"] is False
+    boundary = contract["verification"]
+    assert boundary["strategy"] == "native_result_schema_only"
+    assert boundary["enabled_settings_verified"] is False
+    assert boundary["prior_settings_restoration_verified"] is False
+    started = offline("--state-dir", str(tmp_path / "state"), "draft-start", operation)
+    declaration = started["draft"]["next_action_binding"]["declaration"]
+    assert declaration["append_fields"] == contract
+    assert "--capture-data-empty" in declaration["append"][0]
+    assert declaration["native_request_input"] == "forbidden"
+
+
+@pytest.mark.parametrize("target_ms", (-1, -2))
+def test_profiler_signed_cursor_input_uses_returned_time_verifier_without_sentinel_meaning(tmp_path: Path, target_ms: int) -> None:
+    code, schema = gateway.execute_gateway(["request-schema", PROFILER_SET_CURSOR_TIME_URI], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("Schema is offline"))
+    assert code == 0, schema
+    contract = schema["business_adapter"]["declaration"]
+    assert contract["field_types"]["cursor_target_ms"] == "signed_integer_milliseconds"
+    assert contract["field_semantics"]["cursor_target_ms"]["negative_value_meaning"] == "not_specified_by_native_documentation"
+    assert contract["verification"]["comparison"] == "returned_time_not_requested_time"
+    code, started = gateway.execute_gateway(["--state-dir", str(tmp_path / "discovery-state"),
+        "draft-start", PROFILER_SET_CURSOR_TIME_URI], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("Draft start is offline"))
+    assert code == 0, started
+    declaration = started["draft"]["next_action_binding"]["declaration"]
+    assert declaration["append_fields"] == contract
+    assert "signed-integer-milliseconds" in declaration["append"][0]
+    client = _ProfilerCursorControlClient(tmp_path)
+    state = tmp_path / "signed-cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", str(target_ms)))
+    artifact = TransactionStore(state).load_preview(previewed["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["args"] == {"time": target_ms}
+    assert not any(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls)
+    executed = invoke(["execute", previewed["transaction_id"]])
+    verified = invoke(executed["next_command"]["gateway_argv"])
+    assert verified["verified"] is True, verified
+    observed = verified["verification"]["verification_scope"]["cursor_observation"]
+    assert observed["returned_time_ms"] == observed["observed_time_ms"] == 1230
+    assert (PROFILER_SET_CURSOR_TIME_URI, {"time": target_ms}, {}) in client.calls
+    assert sum(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, rejected
+    assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("declaration,parser_error", [
+    ((), False),
+    (("--capture-data-empty", "--capture-data", "voices", "enable"), True),
+    (("--capture-data", "voices", "enable", "--capture-data-empty"), True),
+    (("--capture-data", "unknown-data-set", "enable"), False),
+    (("--capture-data", "voices", "null"), False),
+    (("--capture-data", "voices"), True),
+    (("--capture-data-empty", "--args", '{"dataTypes":[]}'), True),
+], ids=("missing", "empty-plus-row", "row-plus-empty", "unknown-data-set", "null-outcome", "half-row", "native-input"))
+def test_profiler_capture_data_invalid_declaration_leaves_draft_unchanged(
+    tmp_path: Path, version: str, declaration: tuple[str, ...], parser_error: bool,
+) -> None:
+    operation = "ak.wwise.core.profiler.enableProfilerData"
+    state = tmp_path / "invalid-capture-state"
+    client = _ProfilerEnableDataClient(tmp_path, version=version)
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", operation)
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, before = run("draft-inspect", draft_id, "--task-authority", authority)
+    assert code == 0, before
+    argv = ("draft-declare-runtime-control-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", str(started["draft"]["revision"]), *declaration)
+    if parser_error:
+        with pytest.raises(SystemExit) as rejected:
+            run(*argv)
+        assert rejected.value.code == 2
+    else:
+        code, rejected = run(*argv)
+        assert code == 2, rejected
+        assert rejected["details"]["repair"]["field"] in {"runtime_control_plan", "capture_data_changes"}
+        assert rejected["details"]["repair"]["draft_changed"] is False
+    code, after = run("draft-inspect", draft_id, "--task-authority", authority)
+    assert code == 0, after
+    assert after["draft"] == before["draft"]
+    assert not any(uri == operation for uri, _, _ in client.calls)
+    assert not (state / "transactions-v1").exists()
+
+
+@pytest.mark.parametrize("operation,declaration", [
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "null")),
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "true")),
+    (PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "-1.5")),
+    (PROFILER_MOVE_CURSOR_URI, ("--capture-data-empty",)),
+])
+def test_profiler_new_input_forms_do_not_admit_nonintegers_or_undisclosed_fields(
+    tmp_path: Path, operation: str, declaration: tuple[str, ...],
+) -> None:
+    state = tmp_path / "invalid-input-state"
+    client = _ProfilerEnableDataClient(tmp_path)
+    env = _env(tmp_path)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", operation)
+    assert code == 0, started
+    argv = ("draft-declare-runtime-control-plan", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]), *declaration)
+    if operation == PROFILER_SET_CURSOR_TIME_URI:
+        with pytest.raises(SystemExit) as rejected:
+            run(*argv)
+        assert rejected.value.code == 2
+    else:
+        code, rejected = run(*argv)
+        assert code == 2 and "not disclosed" in rejected["message"], rejected
+    assert not any(uri == operation for uri, _, _ in client.calls)
+    assert not (state / "transactions-v1").exists()
+
+
+@pytest.mark.parametrize("operation,version,declaration", [
+    *[("ak.wwise.core.profiler.enableProfilerData", version, ("--capture-data-empty",))
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")],
+    (PROFILER_SET_CURSOR_TIME_URI, "2025.1", ("--cursor-target-ms", "-1")),
+])
+@pytest.mark.parametrize("failure", ("native-error", "malformed-result"))
+def test_profiler_new_input_shapes_retain_failure_and_cannot_reexecute(
+    tmp_path: Path, operation: str, version: str, declaration: tuple[str, ...], failure: str,
+) -> None:
+    client = _ProfilerEnableDataClient(tmp_path, version=version)
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri == operation and uri != "ak.wwise.core.profiler.enableProfilerData":
+            client.calls.append((uri, args, options))
+            if isinstance(client.control_result, Exception):
+                raise client.control_result
+            return client.control_result
+        return original(uri, args, options)
+    client.call = call
+    client.control_result = RuntimeError("native input outcome unavailable") if failure == "native-error" else {"unexpected": True}
+    state = tmp_path / "failed-input-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state, operation, declaration)
+    env = _env(tmp_path, version=version)
+    code, executed = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=env, client_factory=lambda _: client)
+    if failure == "native-error":
+        assert code == 2 and executed["automatic_retry"] is False, executed
+    else:
+        assert code == 0, executed
+        code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+            env=env, client_factory=lambda _: client)
+        assert code == 2 and verified["state"] == "verification_failed", verified
+        assert verified["verification"]["business_state_verified"] is False
+        assert "acknowledged the submitted" not in verified["verification"]["message"]
+    code, replay = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=env, client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+    assert not any(uri == GET_CURSOR_TIME_URI for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize("returned,observed,outcome", [(-1, -1, "unavailable"), (1230, 1220, "changed")])
+def test_profiler_signed_cursor_unavailable_or_changed_result_remains_unverified(
+    tmp_path: Path, returned: int, observed: int, outcome: str,
+) -> None:
+    client = _ProfilerCursorControlClient(tmp_path)
+    client.control_result, client.cursor_result = {"return": returned}, {"return": observed}
+    state = tmp_path / "signed-cursor-state"
+    previewed, invoke = _public_runtime_preview(tmp_path, client, state,
+        PROFILER_SET_CURSOR_TIME_URI, ("--cursor-target-ms", "-2"))
+    executed = invoke(["execute", previewed["transaction_id"]])
+    code, verified = gateway.execute_gateway(["--state-dir", str(state), *executed["next_command"]["gateway_argv"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == (0 if outcome == "unavailable" else 2), verified
+    assert verified["verified"] is False
+    assert verified["verification"]["business_state_verified"] is False
+    assert verified["verification"]["verification_scope"]["cursor_observation"]["outcome"] == outcome
+    assert verified["automatic_retry"] is False
+    code, replay = gateway.execute_gateway(["--state-dir", str(state), "execute", previewed["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, replay
+    assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1

@@ -33,6 +33,8 @@ from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS
 from .canonical import canonical_json_bytes, canonical_sha256
 from .runtime_inspection_business_contracts import (
     LOG_ADD_ITEM_URI, LOG_CLEAR_URI, LOG_GET_URI,
+    PROFILER_ENABLE_DATA_URI,
+    PROFILER_CAPTURE_DATA_VERIFICATION,
     PROFILER_GET_CURSOR_TIME_URI,
     PROFILER_MOVE_CURSOR_URI,
     PROFILER_SET_CURSOR_TIME_URI,
@@ -24702,6 +24704,15 @@ def verify_prepared_operation(
         verification_scope=plan.get("verification_scope") if plan.get("source_copy_live_fields") is True or kind == "blend-assignment" else None,
     )
 
+    if kind == "result-schema" and plan.get("uri") == PROFILER_ENABLE_DATA_URI:
+        message = (
+            "Wwise acknowledged the submitted capture-data directives; the native result schema was checked. "
+            if outcome.ok else
+            "The capture-data control result did not match its native result schema. "
+        ) + PROFILER_CAPTURE_DATA_VERIFICATION["boundary"] + " Do not replay the executed control."
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, False,
+            dict(PROFILER_CAPTURE_DATA_VERIFICATION))
     if kind == "blend-assignment" and not outcome.business_state_verified:
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions, outcome.readbacks,
             "Blend assignment result and bounded observations were checked; complete effect remains unverified for the disclosed scope. Do not replay automatically.",
