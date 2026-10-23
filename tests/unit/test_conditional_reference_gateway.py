@@ -65,6 +65,83 @@ def test_product_slew_rate_show_condition_changes_only_the_selected_field(tmp_pa
     )
 
 
+def test_product_media_pool_filter_show_string_metadata_linkage(tmp_path):
+    """Trace a controlled existing GUID, not native Filter naming/list creation."""
+    task = ScalarPropertyTask(tmp_path, "2025.1")
+    task.set_object_type(FIRST, "MediaPoolFilter", 5767184)
+    # Native class receipt condition-metadata-2025-r1/042.stdout (SHA256
+    # ab467c72e91891c910bf1107e161c81dad2031528c530ae5bf32d7ad539f6c8e).
+    # These are its exact type/default/support/restriction/dependency facts.
+    field_metadata = {
+        "name": "FieldName", "type": "string", "default": "",
+        "supports": {"rtpc": "None", "randomizer": False, "unlink": False},
+        "restriction": {},
+        "dependencies": [{
+            "type": "property", "action": "Show", "property": "CriteriaType", "context": "Self",
+            "conditions": [{"restriction": {"type": "enum", "values": [{"value": 0, "displayName": "0"}]}}],
+        }],
+    }
+    # Matching 2025.1.7.9143 WObjects.xml / WwiseObject[MediaPoolFilter].
+    # FieldName has no disclosed enum/domain. This nonempty starting text is
+    # controlled fake state, not a claimed valid native field-selection token.
+    task.metadata = {
+        "FieldName": field_metadata,
+        "CriteriaType": {"name": "CriteriaType", "type": "int32", "default": 0,
+            "restriction": {"type": "enum", "values": [
+                {"value": 0, "displayName": "Field"},
+                {"value": 1, "displayName": "Audio Description"},
+                {"value": 2, "displayName": "Audio Similarity"},
+            ]}},
+    }
+    task.objects[FIRST] = {
+        "id": FIRST, "name": "ControlledFilter", "type": "MediaPoolFilter", "classId": 5767184,
+        "path": r"\Queries\ControlledFilter", "notes": "preserve controlled state",
+        "CriteriaType": 0, "FieldName": "modeled previous value",
+    }
+    before = deepcopy(task.objects)
+    target = task.bind(FIRST)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", target, "--meaning", "FieldName")
+    assert code == 0, discovered
+    candidates = discovered["meaning_results"][0]["candidates"]
+    assert len(candidates) == 1, discovered
+    field = candidates[0]
+    for key, value in field_metadata.items():
+        assert field["metadata"][key] == value
+    # String business values are literal text, including the empty argv value.
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+        "--field-handle", field["handle"], "--business-value", "")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert not preview["preview_summary"].get("derived_changes"), preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    artifact = shown["artifact"]
+    assert artifact["request"]["arguments"]["value"] == ""
+    assert artifact["prepared_operation"]["dispatch"]["args"] == {
+        "object": FIRST, "property": "FieldName", "value": ""}
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects == {**before, FIRST: {**before[FIRST], "FieldName": ""}}
+    writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls
+              if uri.endswith(("setProperty", "setReference", "object.set"))]
+    assert len(writes) == 1 and writes[0]["args"] == {"object": FIRST, "property": "FieldName", "value": ""}
+    (tmp_path / "media-pool-filter-observation.json").write_text(json.dumps({
+        "native_effect": "unobserved", "identity": "controlled existing GUID and name/path",
+        "source": "2025.1.7.9143 WObjects.xml MediaPoolFilter / native class receipt042",
+        "before": before, "after": task.objects, "metadata": field_metadata,
+        "discovery": discovered, "declaration": declared, "preview": preview,
+        "transaction_show": shown, "execute": executed, "verify": verified, "writes": writes,
+    }, indent=2))
+
+
 def condition(name="ListenerRelativeRouting", value=True):
     return {"action": "Enable", "conditions": [{"restriction": {"type": "enum", "values": [{"displayName": "True" if value else "False", "value": value}]}}],
             "context": "Self", "property": name, "type": "property"}
