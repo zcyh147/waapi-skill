@@ -27,8 +27,11 @@ from tests.destructive.support.transport_semantics import (
     OLDER_FIXTURES, stage_owned_older_transport_media,
 )
 from tests.destructive.support.profiler_capture import (
-    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_NODE_OUTCOMES,
+    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_READS_NODEID, CAPTURE_NODE_OUTCOMES,
     stage_owned_2024_meter_media,
+    capture_node_outcomes,
+    stage_owned_capture_read_media,
+    READER_OUTCOMES, CAPTURE_READ_OUTCOMES,
 )
 
 
@@ -295,7 +298,7 @@ class AuthoringBatchAdapter:
                     if (report.get('contract') != 'waapi-skill.owned-profiler-capture/v1'
                             or report.get('candidate') != self.candidate or report.get('version') != runtime.version):
                         raise ValueError('Profiler capture report context differs from its owned batch')
-            for name in CAPTURE_NODE_OUTCOMES[capture_nodeid]:
+            for name in capture_node_outcomes(capture_nodeid, runtime.version):
                 observation = report.get('outcomes', {}).get(name, {'outcome': 'BLOCKED'})
                 business = observation.get('outcome', 'BLOCKED')
                 categories.append({'category': name, 'nodeid': capture_nodeid,
@@ -304,8 +307,14 @@ class AuthoringBatchAdapter:
                     'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
                     **({'reader_observation_status': observation.get('evidence', {}).get('observation_status', 'BLOCKED'),
                         'owned_identity_observed': observation.get('evidence', {}).get('owned_identity_observed', False),
-                        'attribution_boundary': 'A nonempty read alone grants no owned reader-obligation credit; no acoustic or measurement-effect proof'}
-                        if capture_nodeid == READERS_2025_NODEID else {}),
+                        'attribution_boundary': 'A nonempty read alone grants no owned reader-obligation credit; no acoustic or measurement-effect proof',
+                        **({'attribution_scope': observation.get('evidence', {}).get('attribution_scope', 'owned-object'),
+                            'attribution_boundary': 'Attribution follows the reader scope; capture-level data does not establish Sound/control effects; no acoustic proof',
+                            **({'preparation_or_streaming_control_effect_verified': False}
+                                if name in ('profiler-loaded-media-observation', 'profiler-streamed-media-observation') else {})}
+                            if capture_nodeid == CAPTURE_READS_NODEID else {})}
+                        if (capture_nodeid == READERS_2025_NODEID or capture_nodeid == CAPTURE_READS_NODEID
+                            and name in (*READER_OUTCOMES, *CAPTURE_READ_OUTCOMES)) else {}),
                     **({'observation_artifact': descriptor} if descriptor else {}),
                     **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})})
         for nodeid in (node for node in self.selected_nodeids if node in TRANSPORT_OBSERVATION_NODES):
@@ -501,6 +510,7 @@ OWNED_AUTHORING_NODEIDS = (
     TRANSPORT_OLDER_NODEID,
     PROFILER_CAPTURE_NODEID,
     READERS_2025_NODEID,
+    CAPTURE_READS_NODEID,
     METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
@@ -515,6 +525,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     METER_2024_NODEID: ('2024.1',),
     PROFILER_CAPTURE_NODEID: ('2025.1',),
     READERS_2025_NODEID: ('2025.1',),
+    CAPTURE_READS_NODEID: SUPPORTED_WWISE_VERSION_KEYS,
     TRANSPORT_SEMANTICS_NODEID: ('2025.1',),
     TRANSPORT_MIXED_NODEID: ('2025.1',),
     TRANSPORT_OLDER_NODEID: tuple(OLDER_FIXTURES),
@@ -549,6 +560,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
     if READERS_2025_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
         raise pytest.UsageError('Owned Profiler readers require only their matching 2025 Authoring node')
+    if CAPTURE_READS_NODEID in selected and len(selected) != 1:
+        raise pytest.UsageError('Owned capture reads require their exact single node')
     if METER_2024_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1'):
         raise pytest.UsageError('Owned meter projection requires only its matching 2024 Authoring node')
     if set(selected).intersection((TRANSPORT_SEMANTICS_NODEID, TRANSPORT_MIXED_NODEID)) and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
@@ -568,8 +581,10 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
             stage_owned_2024_meter_media(_sandbox, _io)
         if selected == (TRANSPORT_OLDER_NODEID,):
             stage_owned_older_transport_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
+        if selected == (CAPTURE_READS_NODEID,):
+            stage_owned_capture_read_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
     live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (READERS_2025_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
