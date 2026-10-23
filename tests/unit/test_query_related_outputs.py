@@ -204,7 +204,7 @@ def test_version_specific_documented_descriptors_use_the_same_related_record(tmp
 
 @pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('options', [
-    ['--include-related', 'children', 'first', 'volume-db'],
+    ['--include-related', 'children', 'first()', 'volume-db'],
     ['--include-related', 'parent.parent', 'volume-db'],
     ['--include-related', '@OutputBus', 'volume-db'],
     ['--include-related', 'parent', '@Volume'],
