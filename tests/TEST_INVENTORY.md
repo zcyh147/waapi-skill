@@ -67,7 +67,12 @@ This adds native owned-history evidence for the exercised 2025 Action flow.
 Program controls cover 2022 undo and 2023–2025 undo/redo, both source-certified
 and native-typed metadata, and the 2021 history/2022 redo catalog boundaries.
 No other-version native history, global stack-head, outside-scope, full Action
-family, Fresh or Windows acceptance follows. Other #192 obligations stay open.
+family, Fresh or Windows acceptance follows. Matching five-version definitions
+and public controls, retained R79 source effects, R76 matching-host history effects
+and the new 2025 integration support proportional shared-mechanism reuse; the
+review is `research/waapi-r80-action-history-version-reuse.md`. No additional
+per-version run was selected without a differing branch. Other #192 obligations
+stay open.
 
 Separately, creation implementation `27d0abe8` and repair `ba8af705`, integrated
 at `aec44f31`, stage ambiguous retained-parent roots individually and preserve
@@ -77,10 +82,29 @@ child inserted under an earlier root; its failing public counterexample passed
 after repair. Final affected controls passed 8 in 51.13s, including retained-read
 replay, source/history and prior identity/collision guards. Earlier applicable
 version/history controls remain separate overlapping evidence. Original logs,
-review and repair are archived in `r80-multiple-root-program-logs`. This is
-program evidence only; a zero-setup 2025 source/undo/redo native fixture is being
-prepared. Duplicate requested siblings and richer creation/history forms remain
-#178/#192 work. Neither increment ran a full Program or Non-live gate.
+review and repair are archived in `r80-multiple-root-program-logs`.
+
+The prepared native fixture first failed in 6.08s before any transaction because
+its observation directory did not yet exist (`35c6760f`). A test-only initialization
+repair then reached verified creation/reference and undo, but failed in 15.53s
+because an exact query for a deleted GUID returns a structured native Object not
+found error, not an empty list (`ace89c4f`). Both original FAIL roots/quarantines
+remain unchanged. The absence oracle now accepts only the exact owned GUID/query,
+endpoint/version and native error; eight mismatched controls were rejected using
+the retained real response. No Gateway behavior changed for these fixture repairs.
+
+Frozen `cfd0d19a79a6883626d32c1eba83c70e3e05e70e` passed the complete macOS Console
+2025.1.7.9143 workflow in 22.06s: zero setup transactions, three separately
+verified source/undo/redo transactions, 20 independent observations, 62 public
+commands and 285 hashed native packets. Separate native collision roots preserve
+actual GUID/name binding; cumulative membership is checked before the internal
+reference write. Undo restores the original scope and proves all four new GUIDs
+absent; redo restores the same graph, names and reference. Source hash/mtime/tree
+and final lifecycle cleanup passed. Evidence and Root review are in
+`r81-multiple-root-cfd0d19a-2025-r3`; the two failed roots remain alongside it.
+This proves the exercised 2025 ordinary two-root graph, not duplicate requested
+siblings, richer creation/history forms or other-version native effects. Those
+remain #178/#192 work. Neither increment ran a full Program or Non-live gate.
 
 ## 2026-10-23 R79 source-backed Action.Target kind
 
