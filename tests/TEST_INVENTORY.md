@@ -5,6 +5,100 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R85 randomizer outputs and condition-source reconciliation
+
+Reviewed runtime `38676aac` exposes property-bound randomizer enabled/minimum/
+maximum offsets through the existing root, related singleton and full/selected
+member planners. Fresh property metadata selects the field; fixed typed terminals
+retain owner/member scope, bounds and absent/false/zero distinctions. Matching
+primary definitions were checked for all five supported versions. The affected
+program selection passed 261 checks in 22.65s; independent review found no
+material issue. This does not expose arbitrary function strings or treat a
+Modifier as a separately addressable mutation identity.
+
+Test-only `0c0b0998` passed seven collector controls in 2.53s, including both
+native planner models and missing/wrong-type member failures. Original failed
+fixture attempts are retained in `r85-randomizer-fixture-review`; the final
+collector uses compact replies and preserves exact Gateway continuations.
+Those seven controls are program evidence, not native acceptance.
+
+Frozen `15a7780d` then passed sequential macOS Console workflows:
+
+| Version/build | Result | Public groups | Hashed native packets | Transactions |
+| --- | --- | --- | --- | --- |
+| 2025.1.7.9143 | PASS, 5.68s | 6 | 52 | 0 |
+| 2021.1.14.8108 | PASS, 9.51s | 6 | 80 | 0 |
+
+Each independently established the actual Footstep_Types Pitch randomizer
+enabled=true/min=-200/max=200 and Volume min=-5, related-parent results, complete
+child membership and the selected FS_Crouching member. The 2025 composed-member
+backend and 2021 GUID-grouped backend were observed separately. Scoped metadata,
+repeated root values, source hash/mtime/tree and lifecycle cleanup passed.
+The accepted aggregate is `r85-randomizer-native-review-2021-2025.json`; individual
+roots are `r85-randomizer-15a7780d-{2021,2025}-r1/root-review.json`. No omission in
+project XML was interpreted as an Enabled default. This gives no 2022–2024
+native or Fresh credit. Remaining versioned query contexts and source mappings
+stay assigned to #181; the final Program/Non-live gates are still outstanding.
+
+Condition reconciliation reused the already implemented evaluation mechanism
+for source-bound LFO, Compressor and Sidechain recipients; selected direct
+recipient effects remain unobserved, not new native passes. The exact reuse
+scope is `r85-condition-mechanism-reuse.json`. Test-only `9f018391` also passed
+one MediaPoolFilter FieldName public flow in 0.80s using the retained actual
+2025 metadata and an explicitly fake object. The requested empty string was
+preserved through Preview, execution and verification without a CriteriaType
+write. Its initial launch was blocked by an incomplete developer environment
+before testing; the existing complete interpreter resolved that prerequisite.
+This proves neither a native Filter instance nor its constructor/List placement.
+
+The finite reference-source audit checked all 136 pinned WObjects/plugin XML
+files across the five installed builds and resolved 1,034 inheritance edges.
+It found no additional mixed/repeated-category or non-Playlist mustChildOf
+field in that corpus. The exact 2021 ControlInput receipt has restriction {},
+whereas the matching 2022+ source introduces the per-type shared-only subset.
+These findings prevent synthetic cases from being reported as observed native
+gaps; they do not establish universal absence. Existing Playlist-list work and
+unresolved semantic questions retain their owners. Main verified 155 source/
+receipt hashes in `r85-reference-source-audit-review`; no new native run or
+whole-ticket completion follows from this source audit.
+
+## 2026-10-23 R84 named owned Lists: implementation and native constructor failure
+
+Reviewed `5441f931` adds source-certified named owned List occurrences to the
+existing staged creation mechanism, retaining actual GUID/class/owner, ordered
+membership and original per-stage results. Independent review reproduced an
+empty replaceAll partition defect: successive fragments could delete an earlier
+member. Correction `9b3a09d9` preserves the initial policy and explicitly appends
+later fragments of that same List, with complete prefix guards. The reproducer
+failed before the fix and passed afterward; six affected checks passed in 8.32s
+and two strengthened causal controls in 2.84s. Counts overlap. Original logs and
+both reviews are retained in `r84-named-list-reviewed-evidence`.
+
+The first selected native fixture at `72d5cce9` failed in 5.41s before any
+Draft or transaction because it expected the literal label Bus instead of the
+actual metadata label Audio Bus. Seven independent reads and 28 hashed packets
+are retained. Test-only `a2e3a953` uses the exact retained OutputBus and
+OverrideOutput metadata; its three full collector controls passed in 3.67s.
+
+The second native attempt at `2a3037eb` failed in 6.56s. The first SET created
+the Bus, but Wwise rejected the second SET because the new MetadataSlot omitted
+its required Metadata reference. The transaction is **indeterminate**, not a
+successful source workflow: the second stage's effect is not established, and
+no post-error read, verification or replay occurred. The 27 public commands,
+seven independent reads and 90 hashed packets remain in
+`r84-named-list-2a3037eb-2025-r2/root-review.json`. Transaction
+`tx1-jt6fhmahbbtcyd3vww00` and its quarantined sandbox are protected from replay.
+Both failed runs preserved source integrity and completed process cleanup.
+
+Matching 2025 definitions and the actual rejection establish this exact
+constructor requirement. Preparation had checked only supplied descriptors;
+the omission therefore reached execution. A source-certified completeness
+guard and a valid separately previewed Metadata ShareSet setup are now assigned
+implementation work under #178/#179. Generic notNull is not sufficient to
+infer constructor requirements: ordinary Sound creation may inherit OutputBus.
+The failed empty-slot witness, stronger List history and richer creation
+branches are not accepted as complete. No Fresh or broad gate was added.
+
 ## 2026-10-23 R84 related property outputs and existing EQ witness
 
 Reviewed `6e0aa118` extends existing related scalar-property terminals to fresh
