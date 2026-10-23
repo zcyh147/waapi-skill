@@ -27,13 +27,25 @@ overlap and do not represent a full-file or full-gate total. Independent static
 review found no material issue; originals, source notes and review are archived
 in `r81-reference-condition-program-logs`.
 
-No native or Fresh run accompanied this query increment. Existing projection
-and ordinary-condition native results prove their original scopes only. Native
-resolved/local/override predicates, known-unset and collision-specific behavior
-still need targeted observation. Exact namespaced custom-property WHERE token
-spelling remains a source question under #181; the disclosed current token
-boundary is not a finding of native absence. Other query records, reference
-chains, functions and legacy alternatives remain assigned to the same ticket.
+The reviewed test-only successor `f28e51c2`, integrated at frozen
+`eb02a2390a4c4d87ee5dd37f1280322c83f578eb`, passed on macOS Console2025.1.7.9143
+in5.88s: eight compact public query groups, eight invocations,82 hashed native
+packets and zero transactions. Independent unfiltered source/value observations
+and actual native WHERE membership prove resolved/local references, known-set
+null/setness/inequality and ordinary versus override scalar values. Fresh local
+UserAuxSend0 returned a present zero-GUID reference with matching native metadata;
+its null predicate selected the Sound, while setness and identity inequality
+selected no rows. The implementation preserves that native inequality outcome,
+not a Python complement. Source hash/mtime/tree and cleanup passed. Evidence root
+`r81-reference-query-eb02a239-2025-r1` includes the original final-v3 record and
+Root review. Existing all-five projection/program evidence remains separately
+attributed; the minimal oldest-backend predicate follow-up is being assessed.
+
+No Fresh or full gate ran. Collision-specific and exact namespaced custom-property
+WHERE token facts remain #181 work; the disclosed current token boundary is not
+native absence. Other query records, reference chains, functions and legacy
+alternatives remain assigned to the same ticket. This is2025 selected predicate
+evidence, not every-version native query coverage.
 
 ## 2026-10-23 R80 owned Action history and multiple-root creation
 
