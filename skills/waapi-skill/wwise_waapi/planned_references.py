@@ -66,7 +66,15 @@ def graph_result_bindings(roots, result_handles):
         def has_rtpc(node):
             return "rtpc" in node or node.get("anonymous") is True or any(isinstance(ref["target"], Mapping) and "new_control_input" in ref["target"] for ref in node.get("references", [])) or any(has_rtpc(child) for child in node.get("children", [])) or any(
                 has_rtpc(child) for descriptor in node.get("lists", []) for child in descriptor["objects"])
-        if not any(has_rtpc(node) for node, _ in roots):
+        def has_duplicate_children(node):
+            if "plugin" in node or "rtpc" in node or node.get("anonymous") is True:
+                return False
+            children = node.get("children", [])
+            ordinary = [child for child in children if "plugin" not in child
+                and "rtpc" not in child and child.get("anonymous") is not True]
+            names = [child["name"].casefold() for child in ordinary]
+            return len(names) != len(set(names)) or any(has_duplicate_children(child) for child in ordinary)
+        if not any(has_rtpc(node) or has_duplicate_children(node) for node, _ in roots):
             return []
     if targets - {row["result_handle"] for row in bindings}:
         raise ValueError("Every planned reference target must belong to this compiled graph")
@@ -186,13 +194,38 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, refere
             "relation": "parent" if node.collection == "children" else "owner"}
         facts[path] = fact
         return fact
+    def ordinary_rename(path):
+        node = by_path[path]
+        return (root_for(path)[1][1] == "rename" and node.collection == "children"
+            and node.plugin is None and node.rtpc is None and not node.anonymous)
+
+    sibling_names = {}
     for path in paths:
+        node = by_path[path]
+        if node.collection == "children" and node.plugin is None and node.rtpc is None and not node.anonymous:
+            key = (root_for(path)[0], node.parent_request_path, node.name.casefold())
+            sibling_names.setdefault(key, []).append(path)
         resolve(path)
-    if len({row["path"].casefold() for row in facts.values() if row["path"] is not None}) != sum(row["path"] is not None for row in facts.values()):
-        raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Planned reference paths must name distinct new occurrences")
+    duplicate_groups = [group for group in sibling_names.values() if len(group) > 1]
+    if any(not all(ordinary_rename(path) for path in group) for group in duplicate_groups):
+        raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Duplicate planned siblings require ordinary rename occurrences")
+    # A renamed ancestor also makes each descendant's prospective path opaque,
+    # even when those descendant request names are distinct.
+    ambiguous_paths = {path for path in paths if any(path == member or path.startswith(member + ".")
+        for group in duplicate_groups for member in group)}
+    prospective_paths = {}
+    for path, fact in facts.items():
+        if fact["path"] is not None:
+            prospective_paths.setdefault(fact["path"].casefold(), []).append(path)
+        if path in ambiguous_paths:
+            fact["prospective_path_ambiguous"] = True
+    if any(len(group) > 1 and not all(path in ambiguous_paths and ordinary_rename(path) for path in group)
+            for group in prospective_paths.values()):
+        raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Planned reference paths must name distinct new occurrences outside ordinary rename groups")
     return {"handles": handles, "facts": facts, "target_paths": sorted(selected), "bound_paths": sorted(ancestors),
         "path_snapshots": snapshots, "prepared_names": names, "renames": renames, "root_paths": root_paths,
-        "root_prepared_names": root_names, "metadata": []}
+        "root_prepared_names": root_names, "metadata": [],
+        "duplicate_sibling_groups": duplicate_groups, "ambiguous_paths": sorted(ambiguous_paths)}
 
 
 def apply_result_name_choices(specs, context):
@@ -204,7 +237,8 @@ def apply_result_name_choices(specs, context):
         if name is not None:
             spec["original_requested_name"] = spec["requested_name"]
             spec["requested_name"] = name
-        if path in context["bound_paths"] and not context["renames"]:
+        if (path in context["bound_paths"] and not context["renames"]
+                and path not in context.get("ambiguous_paths", [])):
             fact = context["facts"][path]
             if name is None and fact["name"] != spec["requested_name"]:
                 spec["original_requested_name"] = spec["requested_name"]

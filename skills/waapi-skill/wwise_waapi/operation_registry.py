@@ -6032,7 +6032,8 @@ def _prepare_object_set(
                     result_nodes.append(replace(normalized, request_path=prefix + ".owned_control_input",
                         parent_request_path=None, collection="ControlInput"))
             result_nodes.extend(normalize_object_forest(result_item.get("children", []), base_path=prefix + ".children",
-                allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
+                on_name_conflict=result_item.get("on_name_conflict", conflict),
+                replace_owned=result_item.get("on_name_conflict", conflict) == "replace", allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
             result_nodes.extend(node for descriptor in normalize_object_lists(result_item.get("lists", []),
                 request_path=prefix + ".lists", allow_platform=True, allow_language=True,
                 allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS) for node in descriptor.nodes)
@@ -7182,7 +7183,7 @@ def _prepare_object_set(
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
                 "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
                 "stage_count": creation_stage_count(node_specs) + bool(deferred_reference_stage)}}
-                if (result_context and result_context['renames']) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
+                if (result_context and (result_context['renames'] or result_context.get('duplicate_sibling_groups'))) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -20865,7 +20866,11 @@ def verify_prepared_operation(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if effective_conflict == "rename" and spec.get("existing_target") is not True:
+            if owned_stage_identities is not None and spec.get("existing_target") is not True:
+                # Native conflict naming is certified by the owned GUID/name
+                # association, never a guessed prefix or suffix convention.
+                name_ok = row.get("name") == owned_stage_identities[request_path]["name"] == returned_name
+            elif effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
                 name_ok = (
@@ -21024,6 +21029,9 @@ def verify_prepared_operation(
                 assertions.append({"name": "created hierarchy node is independently verified",
                     "kind": "verified_created_node_identity", "passed": bool(identity_ok),
                     "evidence": {"request_path": request_path, "object": identity,
+                        "requested_name": spec.get("original_requested_name", spec["requested_name"]),
+                        **({"result_handle": pre_state["planned_reference_context"]["facts"][request_path]["result_handle"]}
+                           if request_path in pre_state.get("planned_reference_context", {}).get("facts", {}) else {}),
                         "class_id": row.get("classId"), "parent_id": expected_parent_id}})
                 if identity_ok and history_fields:
                     created_history_metadata.append((spec, object_id))

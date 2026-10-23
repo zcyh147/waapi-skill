@@ -213,3 +213,14 @@ def verified_created_root_identity(verification: Mapping[str, Any]) -> dict[str,
     except ValueError:
         return None
     return {"id": value.object_id, "name": value.name, "type": value.object_type, "path": value.path}
+
+
+def verified_created_objects(verification):
+    """Project independently verified occurrences without merging native results."""
+    from copy import deepcopy
+    if verification.get("business_state_verified") is not True:
+        return []
+    return [{**deepcopy(row["evidence"]),
+        **({"compound_child_index": row["compound_child_index"]} if "compound_child_index" in row else {})}
+        for row in verification.get("assertions", [])
+        if row.get("kind") == "verified_created_node_identity" and row.get("passed") is True]
