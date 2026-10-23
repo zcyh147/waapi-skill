@@ -20866,7 +20866,11 @@ def verify_prepared_operation(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if effective_conflict == "rename" and spec.get("existing_target") is not True:
+            if owned_stage_identities is not None and spec.get("existing_target") is not True:
+                # Native conflict naming is certified by the owned GUID/name
+                # association, never a guessed prefix or suffix convention.
+                name_ok = row.get("name") == owned_stage_identities[request_path]["name"] == returned_name
+            elif effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
                 name_ok = (
