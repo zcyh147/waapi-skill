@@ -46,7 +46,8 @@ def _bundle(tmp_path, build='2025.1.7.9143'):
 
 
 @pytest.mark.parametrize('build', ['2021.1.14.8108', '2022.1.19.8584', '2023.1.19.8928', '2024.1.13.9056', '2025.1.7.9143'])
-def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_proof(tmp_path, monkeypatch, build):
+@pytest.mark.parametrize('automation_requested', [False, True], ids=['normal', 'automation-requested'])
+def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_proof(tmp_path, monkeypatch, build, automation_requested):
     from tests.unit.test_headless_lifecycle import FakeClient
     facts = _bundle(tmp_path, build=build)
     native_project = 'Z:\\Owned fixture\\Sandbox 雨 & quote.wproj'
@@ -69,7 +70,7 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     lifecycle = HeadlessLifecycle(console_path=facts.console, project_path=facts.project, port=8080,
         host_kind='wwise-authoring', authoring_build=facts.build, authoring_owned_root=facts.owned,
         launch_env={'HOME': str(facts.home), 'WINEPREFIX': str(facts.prefix),
-                    'AK_AUTOMATION_MODE': '1',
+                    **({'AK_AUTOMATION_MODE': '1'} if automation_requested else {}),
                     'CX_ENV': 'WINEPREFIX=/unowned/bottle HOME=/unowned/home', 'WINE_WAIT_CHILD_PIPE': '15',
                     'AK_AUTHORING_ARGS_OVERRIDE': 'unowned.wproj'},
         launch_cwd_path=facts.project.parent, process_factory=process_factory,
@@ -111,17 +112,21 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
         '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe'}[build]
     # Actual retained owned 2024/2025 readiness used this direct-Wine route,
     # without native-app alternate-loader/wait-child options.
-    assert command == [str(facts.cx / 'bin/wine'), 'start.exe', '/wait', native_executable, native_project]
+    # The exact installed 2021.1 SDK documents this Wwise.exe startup option.
+    # Later matching SDKs omit it, so their current launch stays unchanged.
+    startup_arguments = ['-AutomationMode'] if automation_requested and build == '2021.1.14.8108' else []
+    assert command == [str(facts.cx / 'bin/wine'), 'start.exe', '/wait', native_executable,
+                       *startup_arguments, native_project]
     assert options['cwd'] == str(facts.project.parent)
     assert options['env']['HOME'] == str(facts.home)
     assert options['env']['WINEPREFIX'] == str(facts.prefix)
-    assert options['env']['AK_AUTOMATION_MODE'] == '1'
+    assert options['env'].get('AK_AUTOMATION_MODE') == ('1' if automation_requested else None)
     assert not {'CX_ENV', 'WINE_WAIT_CHILD_PIPE', 'AK_AUTHORING_ARGS_OVERRIDE'} & set(options['env'])
     assert lifecycle.process is process
     assert lifecycle.ready_result['isCommandLine'] is False
     assert lifecycle.launch_project_attestation == {'method': 'owned_winepath_roundtrip',
         'project': str(facts.project), 'native_project': native_project, 'roundtrip_project': str(facts.project),
-        'requested_startup_environment': {'AK_AUTOMATION_MODE': '1'},
+        **({'requested_startup_environment': {'AK_AUTOMATION_MODE': '1'}} if automation_requested else {}),
         'build': build, 'bottle_resolution': {'name': 'Wwise2019x64', 'private_prefix': str(facts.prefix),
             'managed_reference': str(facts.cx / 'support/Wwise2019x64'),
             'configuration': str(facts.cx / 'support/Wwise2019x64/cxbottle.conf'),
