@@ -1417,6 +1417,8 @@ class _RuntimeControlDraftClient:
                     }
                 ]
             }
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
         if (
             uri == "ak.wwise.core.object.get"
             and self.version == "2021.1"

@@ -23246,6 +23246,20 @@ def _dispatch_transaction_command_with_execution_lease(
                     if exc.error_code not in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}:
                         raise
                     transport_lifetime_error = exc
+            elif (request_payload.get("arguments", {}).get("api") == TRANSPORT_EXECUTE_ACTION_URI
+                    and request_payload.get("arguments", {}).get("args", {}).get("transport") is not None):
+                try:
+                    current_authority = runtime_transport_authority_snapshot(
+                        request_payload, state_dir=store.state_dir,
+                        context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                            detected_version=detected_version, live_info=live_info))
+                    if prepared.get("pre_state", {}).get("transport_authority") != current_authority:
+                        raise RuntimeTransportHandleError("TRANSPORT_HANDLE_GENERATION_DRIFT",
+                            "The executed transport action no longer binds its original local capability generation.")
+                except RuntimeTransportHandleError as exc:
+                    if exc.error_code not in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED", "TRANSPORT_HANDLE_NOT_BOUND"}:
+                        raise
+                    transport_lifetime_error = exc
             if prepared.get("verification_plan", {}).get("kind") == "soundengine-state-effect":
                 try:
                     current_authority = soundengine_authority_snapshot(
