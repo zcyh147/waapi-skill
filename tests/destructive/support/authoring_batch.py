@@ -27,7 +27,7 @@ from tests.destructive.support.transport_semantics import (
     OLDER_FIXTURES, stage_owned_older_transport_media,
 )
 from tests.destructive.support.profiler_capture import (
-    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_READS_NODEID, CAPTURE_NODE_OUTCOMES,
+    NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, CAPTURE_NODE_OUTCOMES,
     stage_owned_2024_meter_media,
     capture_node_outcomes,
     stage_owned_capture_read_media,
@@ -317,9 +317,12 @@ class AuthoringBatchAdapter:
                             'attribution_boundary': 'Attribution follows the reader scope; capture-level data does not establish Sound/control effects; no acoustic proof',
                             **({'preparation_or_streaming_control_effect_verified': False}
                                 if name in ('profiler-loaded-media-observation', 'profiler-streamed-media-observation') else {})}
-                            if capture_nodeid in (CAPTURE_READS_NODEID, LOADED_EVENT_NODEID) else {})}
-                        if (capture_nodeid in (READERS_2025_NODEID, LOADED_EVENT_NODEID) or capture_nodeid == CAPTURE_READS_NODEID
+                            if capture_nodeid in (CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, LOADED_EVENT_NODEID) else {})}
+                        if (capture_nodeid in (READERS_2025_NODEID, LOADED_EVENT_NODEID) or capture_nodeid in (CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID)
                             and name in (*READER_OUTCOMES, *CAPTURE_READ_OUTCOMES)) else {}),
+                    **({'coverage_scope': 'selected_missing_runtime_reads', 'parent_workflow_complete': False,
+                        'remaining_same_parent_obligations': report.get('remaining_same_parent_obligations', {})}
+                        if capture_nodeid == CAPTURE_MISSING_NODEID else {}),
                     **({'observation_artifact': descriptor} if descriptor else {}),
                     **({'batch_finalization': self.batch_seal_descriptor} if outcome == 'PASS' else {})})
         for nodeid in (node for node in self.selected_nodeids if node in TRANSPORT_OBSERVATION_NODES):
@@ -517,6 +520,7 @@ OWNED_AUTHORING_NODEIDS = (
     READERS_2025_NODEID,
     CAPTURE_READS_NODEID,
     LOADED_EVENT_NODEID,
+    CAPTURE_MISSING_NODEID,
     METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
@@ -533,6 +537,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     READERS_2025_NODEID: ('2025.1',),
     CAPTURE_READS_NODEID: SUPPORTED_WWISE_VERSION_KEYS,
     LOADED_EVENT_NODEID: ('2025.1',),
+    CAPTURE_MISSING_NODEID: SUPPORTED_WWISE_VERSION_KEYS,
     TRANSPORT_SEMANTICS_NODEID: ('2025.1',),
     TRANSPORT_MIXED_NODEID: ('2025.1',),
     TRANSPORT_OLDER_NODEID: tuple(OLDER_FIXTURES),
@@ -567,7 +572,7 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
     if READERS_2025_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
         raise pytest.UsageError('Owned Profiler readers require only their matching 2025 Authoring node')
-    if CAPTURE_READS_NODEID in selected and len(selected) != 1:
+    if set(selected).intersection((CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID)) and len(selected) != 1:
         raise pytest.UsageError('Owned capture reads require their exact single node')
     if LOADED_EVENT_NODEID in selected and len(selected) != 1:
         raise pytest.UsageError('Loaded Event probe requires its exact single 2025 node')
@@ -590,10 +595,10 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
             stage_owned_2024_meter_media(_sandbox, _io)
         if selected == (TRANSPORT_OLDER_NODEID,):
             stage_owned_older_transport_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
-        if selected == (CAPTURE_READS_NODEID,):
+        if selected in ((CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,)):
             stage_owned_capture_read_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
     live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (LOADED_EVENT_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
