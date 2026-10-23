@@ -3891,6 +3891,7 @@ def _compound_from_graph_task(task, *, notes_id, expected_error=None, companion=
         return source, before, shown
     code, result = task.finish(source, shown)
     assert code == (0 if expected_verified else 2) and result["verified"] is expected_verified, json.dumps(result)
+    task.source_verification = result
     after = deepcopy(task.objects)
     source_call = task.call
     def history(uri, args=None, options=None):
@@ -4212,10 +4213,10 @@ def test_created_graph_history_observes_every_actual_node_and_nested_fields(tmp_
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 1
 
 
-def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False):
+def _exercise_created_graph_internal_reference_history(tmp_path, version, *, target_name='Destination', compound=False, creation_first=True, external=False, external_ancestor_only=False, rename_operation='object.setName', notes_child_order=None, notes_child_operation='object.setNotes', notes_child_id=None, prepared_only=False, native_rename=False, set_graph=False, collision=True, planned_reference=True, platform_certified=True, multiple_roots=False, duplicate_siblings=False, retained_duplicates=False, suffix_like=False, source_only=False, create_constructor=False):
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, SECOND
-    operation = 'object.set' if native_rename or set_graph else 'object.create'
+    operation = 'object.set' if (native_rename or set_graph) and not create_constructor else 'object.create'
     task = OwnedGraphTask(tmp_path, version, operation)
     task.types = [{'classId': cid, 'name': name, 'type': 'WObject'} for cid, name in
         ((1638416, 'WorkUnit'), (1376272, 'Bus'), (3997712, 'AuxBus'))]
@@ -4248,6 +4249,28 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
         'Destination': '{77777777-7777-7777-7777-777777777777}', 'Sender': '{88888888-8888-8888-8888-888888888888}'}
     platform = '{44444444-4444-4444-4444-444444444444}'
     original = task.call
+    duplicate_created, duplicate_roots_created = [], []
+    def create(node, parent):
+        if retained_duplicates and node['type'] == 'Bus':
+            key = ('Routing', 'Backup')[len(duplicate_roots_created)]
+            duplicate_roots_created.append(key)
+            identity, name = ids[key], ('Routing19' if key == 'Routing' else 'Routing83')
+        elif suffix_like and node['name'] == 'Send37':
+            identity, name = ids['Backup'], 'Send88'
+        elif duplicate_siblings and node['name'] == 'Send':
+            key = ('Destination', 'Sender')[len(duplicate_created)]
+            duplicate_created.append(key)
+            identity, name = ids[key], ('Send' if key == 'Destination' else 'Send37')
+        else:
+            identity = ids[node['name']]
+            name = node['name']
+        name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and not retained_duplicates and node['name'] in {'Routing', 'Backup'} else name
+        task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
+            'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
+            'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
+            **{key: {'id': value} for key, value in node.items() if key.startswith('@')}}
+        children = [create(child, identity) for child in node.get('children', [])]
+        return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
     def call(uri, args=None, options=None):
         if platform_certified and uri.endswith('getProjectInfo'):
             return {**original(uri, args, options), 'currentPlatformId': platform, 'platforms': [{'id': platform, 'name': 'Windows'}]}
@@ -4255,28 +4278,31 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             if any('children' in item for item in args['objects']):
                 assert args['onNameConflict'] == ('rename' if native_rename else 'fail')
-                assert args['objects'][0]['children'][0]['name'] in ({'Routing', 'Backup'} if multiple_roots else {'Routing'})
+                if not duplicate_siblings:
+                    assert args['objects'][0]['children'][0]['name'] in ({'Routing', 'Backup'} if multiple_roots else {'Routing'})
                 if multiple_roots:
                     assert len(args['objects']) == 1 and len(args['objects'][0]['children']) == 1
                     assert set(args['objects'][0]) == {'object', 'children'}
-                def create(node, parent):
-                    identity = ids[node['name']]
-                    name = node['name'] + ('19' if node['name'] == 'Routing' else '37') if native_rename and collision and node['name'] in {'Routing', 'Backup'} else node['name']
-                    task.objects[identity] = {'id': identity, 'name': name, 'type': node['type'],
-                        'classId': 1376272 if node['type'] == 'Bus' else 3997712, 'parent': {'id': parent},
-                        'path': task.objects[parent]['path'] + '\\' + name, 'notes': '',
-                        **{key: {'id': value} for key, value in node.items() if key.startswith('@')}}
-                    children = [create(child, identity) for child in node.get('children', [])]
-                    return {'id': identity, 'name': name, **({'children': list(reversed(children))} if children else {})}
-                children = [create(child, SECOND) for child in args['objects'][0]['children']]
+                parent_id = args['objects'][0]['object']
+                children = [create(child, parent_id) for child in args['objects'][0]['children']]
                 assert '@UserAuxSend0' not in task.objects.get(ids['Sender'], {})
-                return {'objects': [{'id': SECOND, 'name': task.objects[SECOND]['name'], 'children': children}]}
+                return {'objects': [{'id': parent_id, 'name': task.objects[parent_id]['name'], 'children': children}]}
             for item in args['objects']:
                 assert set(item) == {'object', '@UserAuxSend0'}, item
                 matches = [row['id'] for row in task.objects.values() if row['path'] == item['@UserAuxSend0']]
                 assert matches == [ids['Destination']]
                 task.objects[item['object']]['@UserAuxSend0'] = {'id': matches[0]}
             return {'objects': []}
+        if create_constructor and uri == 'ak.wwise.core.object.setReference':
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['object'] in {ids['Sender'], ids['Backup']} and args['reference'] == 'UserAuxSend0'
+            assert args['value'] == ids['Destination']
+            task.objects[args['object']]['@UserAuxSend0'] = {'id': args['value']}
+            return {}
+        if create_constructor and uri.endswith('object.create'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args['onNameConflict'] == 'rename'
+            return create(args, args['parent'])
         if uri.endswith('object.create'):
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             base = task.objects[SECOND]['path'] + r'\Routing'
@@ -4315,15 +4341,19 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
     assert code == 0, root
     root = root['draft']['declared_object']['result_handle']
     external_fields = ['--field-value', field, task.bind(ROOT)] if external else []
-    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', target_name, *external_fields)
+    code, target = task.step('draft-declare-new', '--declaration-id', 'target', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Send' if duplicate_siblings else target_name, *external_fields)
     assert code == 0, target
     if multiple_roots:
-        code, second = task.step('draft-declare-new', '--declaration-id', 'backup', '--parent-handle', parent, '--kind', kinds['Bus'], '--name', 'Backup')
+        code, second = task.step('draft-declare-new', '--declaration-id', 'backup', '--parent-handle', parent, '--kind', kinds['Bus'], '--name', 'Routing' if retained_duplicates else 'Backup')
         assert code == 0, second
         root = second['draft']['declared_object']['result_handle']
-    code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Sender',
+    code, sender = task.step('draft-declare-new', '--declaration-id', 'sender', '--parent-handle', root, '--kind', kinds['AuxBus'], '--name', 'Send' if duplicate_siblings else 'Sender',
         *(['--field-value', field, target['draft']['declared_object']['result_handle']] if planned_reference else []))
     assert code == 0, sender
+    if suffix_like:
+        assert task.step('draft-declare-new', '--declaration-id', 'suffix-like', '--parent-handle', root,
+            '--kind', kinds['AuxBus'], '--name', 'Send37',
+            *(['--field-value', field, target['draft']['declared_object']['result_handle']] if create_constructor else []))[0] == 0
     before = deepcopy(task.objects)
     if compound:
         _install_created_graph_rename_client(task)
@@ -4339,9 +4369,14 @@ def _exercise_created_graph_internal_reference_history(tmp_path, version, *, tar
             assert after[ids['Sender']]['path'] == r'\Master-Mixer Hierarchy\Default Work Unit\Routing\Sender'
     else:
         source, shown = task.preview()
+        if prepared_only:
+            return task, source, before, shown
         code, verified = task.finish(source, shown)
         assert code == 0 and verified['verified'] is True, verified
+        task.source_verification = verified
         after = deepcopy(task.objects)
+    if source_only:
+        return task, source, before, after
     if version == '2021.1':
         assert task.run('draft-start', 'ak.wwise.core.undo.undo')[0] == 2
         return
@@ -5383,3 +5418,226 @@ def test_split_creation_verification_requires_retained_complete_earlier_owned_me
     assert 'Owned creation stage lost its exact read association' in json.dumps(failed), failed
     assert task.run('execute', source)[0] == 2
     assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == count
+
+
+def test_compound_nested_duplicate_siblings_keep_occurrence_reference_and_owned_history(tmp_path):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, native_rename=True, duplicate_siblings=True)
+    destination, sender = '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}'
+    assert after[destination]['name'] == 'Send' and after[sender]['name'] == 'Send37'
+    assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    assert after[destination]['parent'] == after[sender]['parent'] == {'id': '{66666666-6666-6666-6666-666666666666}'}
+    assert after['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] == before['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes']
+    writes = [args for uri, args, _ in task.calls if uri == 'ak.wwise.core.object.set']
+    assert len(writes) == 4
+    assert writes[1]['objects'][0]['object'] == writes[2]['objects'][0]['object'] == '{66666666-6666-6666-6666-666666666666}'
+    assert writes[1]['objects'][0]['children'][0]['name'] == writes[2]['objects'][0]['children'][0]['name'] == 'Send'
+    assert all('name' not in row for args in writes for row in args['objects'])
+    roster = task.source_verification['agent_result']['business_result']['created_objects']
+    assert {row['object']['id'] for row in roster} == set(after) - set(before)
+    duplicates = [row for row in roster if row['requested_name'] == 'Send']
+    assert len(duplicates) == 2 and len({row['result_handle'] for row in duplicates}) == 2
+    assert {row['object']['name'] for row in duplicates} == {'Send', 'Send37'}
+
+
+@pytest.mark.parametrize('shape', ['retained-parent', 'no-reference', 'suffix-like'])
+def test_duplicate_rename_source_keeps_each_owned_occurrence_without_path_guessing(tmp_path, shape):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=shape != 'no-reference', native_rename=True, duplicate_siblings=shape != 'retained-parent',
+        multiple_roots=shape == 'retained-parent', retained_duplicates=shape == 'retained-parent',
+        suffix_like=shape == 'suffix-like', planned_reference=shape != 'no-reference', source_only=True)
+    assert len(after) - len(before) == (4 if shape in {'retained-parent', 'suffix-like'} else 3)
+    destination, sender = '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}'
+    if shape == 'no-reference':
+        assert '@UserAuxSend0' not in after[sender]
+    else:
+        assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    if shape == 'retained-parent':
+        assert after['{99999999-9999-9999-9999-999999999999}']['name'] == 'Routing83'
+    if shape == 'suffix-like':
+        assert after[sender]['name'] == 'Send37'
+        assert after['{99999999-9999-9999-9999-999999999999}']['name'] == 'Send88'
+    code, shown = task.run('transaction-show', source)
+    assert code == 0, shown
+    execution = next(event['details']['dispatch_result'] for event in shown['events'] if event['event_type'] == 'execution_completed')
+    actual = next(row['dispatch_result'] for row in execution['result']['phases'] if 'owned_result_execution' in row['dispatch_result']) if shape != 'no-reference' else execution
+    proof = actual['owned_result_execution']
+    assert actual['result'] == proof['stages'][0]['dispatch_result']['result']
+    assert len(proof['stages']) == (5 if shape == 'suffix-like' else 3)
+    assert not any(uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'} for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('fault,expected_writes', [('wrong-parent-association', 2), ('reused-owned-guid', 3),
+    ('extra-earlier-child', 2), ('changed-owned-parent', 3), ('changed-reference-metadata', 3), ('between-stages-extra-child', 1)])
+def test_nested_duplicate_stages_stop_bad_owned_proof_before_reference_without_retry(tmp_path, fault, expected_writes):
+    from copy import deepcopy
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, native_rename=True, duplicate_siblings=True, prepared_only=True)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    original = task.call
+    writes = []
+    injected = False
+    root, destination = '{66666666-6666-6666-6666-666666666666}', '{77777777-7777-7777-7777-777777777777}'
+    def damaged(uri, args=None, options=None):
+        nonlocal injected
+        result = original(uri, args, options)
+        if (fault == 'between-stages-extra-child' and len(writes) == 1 and not injected
+                and uri == 'ak.wwise.core.object.get'
+                and args == {'from': {'id': ['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']}, 'transform': [{'select': ['children']}]}):
+            injected = True
+            identity = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
+            task.objects[identity] = {'id': identity, 'name': 'Rogue', 'type': 'AuxBus', 'classId': 3997712,
+                'parent': {'id': root}, 'path': task.objects[root]['path'] + r'\Rogue', 'notes': ''}
+        if uri.endswith('object.set') and any('children' in row for row in args['objects']):
+            writes.append(deepcopy(args))
+            if len(writes) == 2:
+                if fault == 'wrong-parent-association':
+                    result['objects'][0]['id'] = '{22222222-2222-2222-2222-222222222222}'
+                elif fault == 'extra-earlier-child':
+                    identity = '{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}'
+                    task.objects[identity] = {'id': identity, 'name': 'Rogue', 'type': 'AuxBus', 'classId': 3997712,
+                        'parent': {'id': root}, 'path': task.objects[root]['path'] + r'\Rogue', 'notes': ''}
+            if len(writes) == 3:
+                if fault == 'reused-owned-guid':
+                    result['objects'][0]['children'][0]['id'] = destination
+                elif fault == 'changed-owned-parent':
+                    task.objects[root]['notes'] = 'Unexpected parent edit'
+                elif fault == 'changed-reference-metadata':
+                    task.metadata['UserAuxSend0']['type'] = 'String'
+        return result
+    task.call = damaged
+    code, failed = task.run('execute', source)
+    assert code == 2 and failed['state'] == 'indeterminate' and failed['automatic_retry'] is False, failed
+    assert len(writes) == expected_writes
+    assert all('@UserAuxSend0' not in row for args in writes for row in args['objects'])
+    assert task.run('execute', source)[0] == 2
+    assert len(writes) == expected_writes
+
+
+def test_nested_duplicate_stage_cannot_omit_before_write_roster_read_from_rehashed_receipt(tmp_path):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, native_rename=True, duplicate_siblings=True, prepared_only=True)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    assert task.run('execute', source)[0] == 0
+    code, full = task.run('transaction-show', source)
+    assert code == 0, full
+    events = full['events']
+    execution = next(event['details']['dispatch_result'] for event in events if event['event_type'] == 'execution_completed')
+    actual = next(phase['dispatch_result'] for phase in execution['result']['phases'] if 'owned_result_execution' in phase['dispatch_result'])
+    reads = actual['owned_result_execution']['creation_bindings'][1]['before_readbacks']
+    assert len(reads) == 2
+    reads.pop()
+    previous = ''
+    for event in events:
+        event['previous_event_hash'] = previous
+        event.pop('event_hash')
+        event['event_hash'] = previous = canonical_sha256(event)
+    directory = task.path / 'state' / 'transactions' / source
+    (directory / 'events.jsonl').write_bytes(b''.join(canonical_json_bytes(event) + b'\n' for event in events))
+    state_path = directory / 'state.json'
+    record = json.loads(state_path.read_text()); record['last_event_hash'] = previous
+    state_path.write_bytes(canonical_json_bytes(record))
+    count = len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set'])
+    code, failed = task.run('verify', source)
+    assert code == 2 and failed.get('verified') is not True, failed
+    assert 'Owned creation stage lost its exact read association' in json.dumps(failed), failed
+    assert task.run('execute', source)[0] == 2
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.set']) == count
+
+
+def test_create_duplicate_siblings_2021_bind_actual_occurrences_before_closed_reference(tmp_path):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2021.1',
+        native_rename=True, duplicate_siblings=True, create_constructor=True, source_only=True)
+    root, destination, sender = ('{66666666-6666-6666-6666-666666666666}',
+        '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}')
+    assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    assert after[destination]['name'] == 'Send' and after[sender]['name'] == 'Send37'
+    assert after[destination]['parent'] == after[sender]['parent'] == {'id': root}
+    creates = [args for uri, args, _ in task.calls if uri == 'ak.wwise.core.object.create']
+    assert [row['name'] for row in creates] == ['Routing', 'Send', 'Send']
+    assert [row['parent'] for row in creates[1:]] == [root, root]
+    assert all('children' not in row for row in creates)
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.setReference']) == 1
+    roster = task.source_verification['agent_result']['business_result']['created_objects']
+    assert {row['object']['id'] for row in roster} == {root, destination, sender}
+    assert len({row['result_handle'] for row in roster}) == 3
+    assert task.run('draft-start', 'ak.wwise.core.undo.undo')[0] == 2
+    assert task.run('draft-start', 'object.set')[0] == 2
+
+
+def test_compound_create_duplicate_siblings_reuse_owned_roster_for_undo_redo(tmp_path):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, '2025.1',
+        compound=True, native_rename=True, duplicate_siblings=True, create_constructor=True)
+    destination, sender = '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}'
+    assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    assert after[destination]['name'] == 'Send' and after[sender]['name'] == 'Send37'
+    assert after['{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}']['notes'] == 'Keep collision'
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == 3
+    assert [uri for uri, _, _ in task.calls if uri in {'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo'}] == [
+        'ak.wwise.core.undo.undo', 'ak.wwise.core.undo.redo']
+    assert len(task.source_verification['agent_result']['business_result']['created_objects']) == 3
+
+
+@pytest.mark.parametrize('version,reference,suffix_like,stage_count', [
+    ('2022.1', False, False, 3), ('2023.1', True, False, 4), ('2024.1', True, True, 6)])
+def test_create_duplicate_sources_keep_versioned_stage_counts_and_actual_bindings(tmp_path, version, reference, suffix_like, stage_count):
+    task, source, before, after = _exercise_created_graph_internal_reference_history(tmp_path, version,
+        native_rename=True, duplicate_siblings=True, create_constructor=True, source_only=True,
+        planned_reference=reference, suffix_like=suffix_like)
+    code, shown = task.run('transaction-show', source)
+    assert code == 0, shown
+    prepared = shown['artifact']['prepared_operation']
+    metadata = prepared['semantic_preview']['envelope']['metadata']['result_reference_execution']
+    assert metadata['stage_count'] == stage_count
+    execution = next(row['details']['dispatch_result'] for row in shown['events'] if row['event_type'] == 'execution_completed')
+    proof = execution['owned_result_execution']
+    assert len(proof['stages']) == stage_count
+    assert execution['result'] == proof['stages'][0]['dispatch_result']['result']
+    assert all('id' not in stage['args'] for stage in proof['stages'])
+    destination, sender = '{77777777-7777-7777-7777-777777777777}', '{88888888-8888-8888-8888-888888888888}'
+    if reference:
+        assert after[sender]['@UserAuxSend0'] == {'id': destination}
+    else:
+        assert '@UserAuxSend0' not in after[sender]
+    if suffix_like:
+        assert after['{99999999-9999-9999-9999-999999999999}']['@UserAuxSend0'] == {'id': destination}
+        assert len([stage for stage in proof['stages'] if stage['uri'] == 'ak.wwise.core.object.setReference']) == 2
+    assert not any(uri.startswith('ak.wwise.core.undo.') for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('fault,creations,references', [
+    ('prewrite-parent-drift', 0, 0), ('reused-owned-guid', 2, 0),
+    ('earlier-roster-drift', 2, 0), ('lost-reference-ack', 3, 1)])
+def test_create_duplicate_stages_stop_invalid_proof_without_reference_or_retry(tmp_path, fault, creations, references):
+    task, source, before, shown = _exercise_created_graph_internal_reference_history(tmp_path, '2021.1',
+        native_rename=True, duplicate_siblings=True, create_constructor=True, prepared_only=True)
+    assert task.run('confirm', source, '--confirmation-token', shown['confirmation']['token'])[0] == 0
+    if fault == 'prewrite-parent-drift':
+        task.objects['{22222222-2222-2222-2222-222222222222}']['notes'] = 'Unapproved parent edit'
+    original = task.call
+    count = 0
+    def damaged(uri, args=None, options=None):
+        nonlocal count
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.object.create':
+            count += 1
+            if count == 2 and fault == 'reused-owned-guid':
+                result['id'] = '{66666666-6666-6666-6666-666666666666}'
+            if count == 2 and fault == 'earlier-roster-drift':
+                task.objects['{66666666-6666-6666-6666-666666666666}']['notes'] = 'Unapproved created parent edit'
+        if uri == 'ak.wwise.core.object.setReference' and fault == 'lost-reference-ack':
+            raise TimeoutError('Reference acknowledgement lost')
+        return result
+    task.call = damaged
+    code, failed = task.run('execute', source)
+    assert code == 2, failed
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.create']) == creations
+    assert len([row for row in task.calls if row[0] == 'ak.wwise.core.object.setReference']) == references
+    if creations:
+        assert failed['state'] == 'indeterminate' and failed['automatic_retry'] is False, failed
+    else:
+        assert failed.get('executed') is not True, failed
+    previous = len([row for row in task.calls if row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.object.setReference'}])
+    assert task.run('execute', source)[0] == 2
+    assert len([row for row in task.calls if row[0] in {'ak.wwise.core.object.create', 'ak.wwise.core.object.setReference'}]) == previous

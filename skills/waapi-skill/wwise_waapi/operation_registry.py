@@ -5235,6 +5235,7 @@ def _prepare_object_create(
         dispatch_args["platform"] = platform
     if list_name is not None:
         dispatch_args["list"] = list_name
+    from .owned_result_stages import creation_stage_count
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.create",
         args=dispatch_args,
@@ -5247,8 +5248,8 @@ def _prepare_object_create(
             "native_name_bindings": result_context["renames"] if result_context else [],
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
                 "dependent_write": "after actual GUID/class/parent/membership binding",
-                "stage_count": 1 + sum(1 for node in node_specs for field in node.get("references", []) if "target_request_path" in field)}}
-                if result_context and result_context['renames'] else {}),
+                "stage_count": creation_stage_count(node_specs) + sum(1 for node in node_specs for field in node.get("references", []) if "target_request_path" in field)}}
+                if result_context and (result_context['renames'] or result_context.get('duplicate_sibling_groups')) else {}),
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
             "platform": platform,
@@ -6032,7 +6033,8 @@ def _prepare_object_set(
                     result_nodes.append(replace(normalized, request_path=prefix + ".owned_control_input",
                         parent_request_path=None, collection="ControlInput"))
             result_nodes.extend(normalize_object_forest(result_item.get("children", []), base_path=prefix + ".children",
-                allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
+                on_name_conflict=result_item.get("on_name_conflict", conflict),
+                replace_owned=result_item.get("on_name_conflict", conflict) == "replace", allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
             result_nodes.extend(node for descriptor in normalize_object_lists(result_item.get("lists", []),
                 request_path=prefix + ".lists", allow_platform=True, allow_language=True,
                 allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS) for node in descriptor.nodes)
@@ -7182,7 +7184,7 @@ def _prepare_object_set(
             **({"result_reference_execution": {"mode": "owned_result_stages", "native_selected_names_known": False,
                 "dependent_write": "after actual GUID/class/parent/membership binding" if deferred_reference_stage else "none",
                 "stage_count": creation_stage_count(node_specs) + bool(deferred_reference_stage)}}
-                if (result_context and result_context['renames']) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
+                if (result_context and (result_context['renames'] or result_context.get('duplicate_sibling_groups'))) or (stage_new_graphs and any(not node.get('existing_target') for node in node_specs)) else {}),
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -11171,6 +11173,18 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
     plan, state = prepared.verification_plan, prepared.pre_state
     kind = plan.get("kind")
     scopes = []
+    if kind in {"object-create-graph", "object-set-batch"} and state.get("owned_result_stages"):
+        from .creation_observations import ordinary_staged_creation_graphs
+        try:
+            groups = ordinary_staged_creation_graphs(plan, state)
+        except ValueError as exc:
+            raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
+        paths = state['owned_result_stages']['prospective_paths']
+        from .owned_result_stages import preservation_rows
+        return [{"object_id": "path:" + paths[node['request_path']].casefold(),
+            "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
+            {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
+            for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
     if kind == "object-create-graph":
         _require_compound_ordinary_creation(prepared)
         from .creation_observations import ordinary_creation_graph
@@ -11179,18 +11193,6 @@ def _compound_outcome_scopes(prepared: PreparedOperation, *, version: str, read:
             for path in paths.values()]
     elif kind == "object-set-batch":
         nodes = plan.get("nodes", [])
-        if state.get("owned_result_stages"):
-            from .creation_observations import ordinary_set_creation_graphs
-            try:
-                groups = ordinary_set_creation_graphs(plan, state)
-            except ValueError as exc:
-                raise OperationContractError("UNDO_GROUP_CHILD_OBSERVATION_REQUIRED", str(exc)) from exc
-            paths = state['owned_result_stages']['prospective_paths']
-            from .owned_result_stages import preservation_rows
-            return [{"object_id": "path:" + paths[node['request_path']].casefold(),
-                "field": "presence", "kind": "all", "platform": None} for group in groups for node in group['nodes']] + [
-                {'object_id': row['id'], 'field': 'notes', 'kind': 'all', 'platform': None}
-                for row, _ in preservation_rows({'verification_plan': plan, 'pre_state': state})]
         if (prepared.request.operation != "object.set" or not nodes
                 or any(node.get("existing_target") is not True or node.get("preexisting_id") is not None
                     or node.get("import") or node.get("children_request_paths") or node.get("list_request_paths")
@@ -20615,15 +20617,15 @@ def verify_prepared_operation(
             else:
                 check("Actual owned result stages match their immutable declaration and independent observations", True,
                     {"sha256": canonical_sha256(execution_result['owned_result_execution'])})
-            if kind == "object-set-batch":
-                from .creation_observations import ordinary_set_creation_graphs
+            if kind in {"object-create-graph", "object-set-batch"}:
+                from .creation_observations import ordinary_staged_creation_graphs
                 try:
-                    ordinary_set_creation_graphs(plan, pre_state)
+                    ordinary_staged_creation_graphs(plan, pre_state)
                 except ValueError:
                     pass
                 else:
                     history_graph = True
-        if kind == "object-create-graph" and len(specs) > 1:
+        if kind == "object-create-graph" and not pre_state.get("owned_result_stages") and len(specs) > 1:
             from .creation_observations import ordinary_creation_graph
             try:
                 ordinary_creation_graph(plan, pre_state or {}, parent=prepared.get("resolved_roles", {}).get("parent", {}).get("row"))
@@ -20865,7 +20867,11 @@ def verify_prepared_operation(
                 "on_name_conflict",
                 plan.get("on_name_conflict"),
             )
-            if effective_conflict == "rename" and spec.get("existing_target") is not True:
+            if owned_stage_identities is not None and spec.get("existing_target") is not True:
+                # Native conflict naming is certified by the owned GUID/name
+                # association, never a guessed prefix or suffix convention.
+                name_ok = row.get("name") == owned_stage_identities[request_path]["name"] == returned_name
+            elif effective_conflict == "rename" and spec.get("existing_target") is not True:
                 actual_name = row.get("name")
                 requested_name = spec.get("requested_name")
                 name_ok = (
@@ -21024,6 +21030,9 @@ def verify_prepared_operation(
                 assertions.append({"name": "created hierarchy node is independently verified",
                     "kind": "verified_created_node_identity", "passed": bool(identity_ok),
                     "evidence": {"request_path": request_path, "object": identity,
+                        "requested_name": spec.get("original_requested_name", spec["requested_name"]),
+                        **({"result_handle": pre_state["planned_reference_context"]["facts"][request_path]["result_handle"]}
+                           if request_path in pre_state.get("planned_reference_context", {}).get("facts", {}) else {}),
                         "class_id": row.get("classId"), "parent_id": expected_parent_id}})
                 if identity_ok and history_fields:
                     created_history_metadata.append((spec, object_id))
@@ -21770,6 +21779,9 @@ def verify_prepared_operation(
                 if collided_id is not None:
                     collided_rows = read_object(object_id=collided_id, fields=IDENTITY_RETURN_FIELDS)
                     expected_collision = dict(before_rows[0])
+                    if pre_state.get("owned_result_stages") and compound_path_context:
+                        from .object_graph_paths import project_compound_snapshot
+                        expected_collision = project_compound_snapshot(expected_collision, compound_path_context)
                     unchanged = len(collided_rows) == 1 and all(
                         (
                             _same_identity(
@@ -24155,7 +24167,7 @@ def verify_prepared_operation(
         for spec, object_id in created_history_metadata:
             readbacks.extend(capture_created_field_metadata(spec, object_id, read=read_call))
     if kind == "object-create-graph" and history_graph and all(item.get("passed") is True for item in assertions):
-        record = {"role": "created-graph-history-membership", "uri": OBJECT_GET_URI,
+        record = {"role": "created-graph-history-membership", **({"request_path": "$"} if pre_state.get("owned_result_stages") else {}), "uri": OBJECT_GET_URI,
             "args": {"from": {"id": [resolved_id_by_path.get("$")]}, "transform": [{"select": ["descendants"]}]},
             "options": {"return": [*IDENTITY_RETURN_FIELDS, "classId"]}}
         try:
@@ -24164,8 +24176,8 @@ def verify_prepared_operation(
             record["error"] = exc.as_dict()
         readbacks.append(record)
     if kind == "object-set-batch" and history_graph and all(item.get("passed") is True for item in assertions):
-        from .creation_observations import ordinary_set_creation_graphs
-        for group in ordinary_set_creation_graphs(plan, pre_state):
+        from .creation_observations import ordinary_staged_creation_graphs
+        for group in ordinary_staged_creation_graphs(plan, pre_state):
             record = {"role": "created-graph-history-membership", "request_path": group['root'], "uri": OBJECT_GET_URI,
                 "args": {"from": {"id": [resolved_id_by_path[group['root']]]}, "transform": [{"select": ["descendants"]}]},
                 "options": {"return": [*IDENTITY_RETURN_FIELDS, "classId"]}}

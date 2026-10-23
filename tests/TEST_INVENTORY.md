@@ -5,6 +5,39 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R82 duplicate creation and namespaced query witness
+
+Reviewed SET implementation `878cde58`, integrated at `79f76858`, gives duplicate
+ordinary rename declarations distinct result handles. It creates an ambiguous
+sibling group in declaration order against the actual owned parent GUID, retains
+each native result separately, and checks the cumulative created roster before
+later writes. Public results and owned history retain every observed occurrence;
+actual names are verified exactly without guessing Wwise suffixes.
+
+The public source/verify/undo/redo tracer passed in 27.96s; the public complete
+roster assertion initially failed, then passed in 28.24s. Focused shape and causal
+controls retained their initial failures: the suffix-like name repair passed in
+5.24s, and a corrected between-stage test hook passed in 4.03s. Final affected
+existing callers passed nine checks in 25.33s. Original logs and two independent
+reviews are retained in `r82-reviewed-evidence`; overlapping runs are not summed.
+Reviews found no material issue. These are program checks, not native duplicate
+creation evidence. CREATE duplicate staging across 2021–2025 and broader
+constructor/history alternatives remain assigned to #178/#192.
+
+Test-only candidate `1c5a07b7` passed one macOS Console2025.1.7.9143 namespaced
+query witness in 9.71s. The private project copy loaded the official
+`MyCompany:Status` custom property; fresh actual Sound metadata disclosed its
+integer default zero and enumeration. Seven public query groups and nine hashed
+native packets showed both ordinary and override-source-value WHERE predicates
+select the Sound for zero and no object for one. The fixture made zero
+transactions; original project/work-unit data, source hash/mtime/tree and cleanup
+passed. Root `r82-namespaced-query-1c5a07b7-2025-r1` retains final-v3 evidence,
+exact packets and Main review. Thirteen fixture program checks passed in 0.51s
+before the native run. This proves matching-2025 token/membership acceptance,
+not custom-value RETURN, an inheritance difference, or five-version native
+coverage. The corresponding metadata-bound public compiler repair is still
+#181 implementation work. No Fresh or full gate ran for this slice.
+
 ## 2026-10-23 R81 reference and override query conditions
 
 Reviewed implementation `6316028a`, integrated at `39052582`, adds metadata-bound

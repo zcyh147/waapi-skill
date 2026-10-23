@@ -105,6 +105,13 @@ def require_compound_creation_scope(calls):
             for item in chain.get('metadata', []):
                 key = (str(item['scope'].get('object_id')).upper(), chain.get('platform'))
                 covered.setdefault(key, set()).add(item['field'])
+        if kind in {'object-create-graph', 'object-set-batch'} and state.get('owned_result_stages'):
+            groups = ordinary_staged_creation_graphs(plan, state)
+            graphs.append(True)
+            from .owned_result_stages import preservation_rows
+            known_count += sum(len(group['nodes']) + sum(len(ordinary_creation_fields(node))
+                for node in group['nodes']) for group in groups) + len(preservation_rows(child))
+            continue
         if kind == 'object-create-graph':
             nodes, _ = ordinary_creation_graph(plan, state,
                 parent=child.get('resolved_roles', {}).get('parent', {}).get('row'), max_observations=MAX_OBSERVATIONS)
@@ -115,13 +122,6 @@ def require_compound_creation_scope(calls):
         elif kind in {'same-guid-notes', 'same-guid-property', 'same-guid-reference'} and not state.get('effect_render_chains'):
             known_count += 1
         elif kind == 'object-set-batch':
-            if state.get('owned_result_stages'):
-                groups = ordinary_set_creation_graphs(plan, state)
-                graphs.append(True)
-                from .owned_result_stages import preservation_rows
-                known_count += sum(len(group['nodes']) + sum(len(ordinary_creation_fields(node))
-                    for node in group['nodes']) for group in groups) + len(preservation_rows(child))
-                continue
             for node in plan.get('nodes', []):
                 proofs = [proof for proof in state.get('existing_field_observations', [])
                     if proof.get('request_path') == node.get('request_path')]
@@ -138,7 +138,7 @@ def require_compound_creation_scope(calls):
             'Compound created graph and known companion outcomes exceed the complete history observation bound.')
 
 
-def ordinary_set_creation_graphs(plan, state):
+def ordinary_staged_creation_graphs(plan, state):
     """Admit complete staged ordinary new trees below retained exact parents."""
     nodes = plan.get('nodes', [])
     if (not state.get('owned_result_stages') or plan.get('on_name_conflict') not in {'fail', 'rename'}
@@ -159,6 +159,18 @@ def ordinary_set_creation_graphs(plan, state):
         if node.get('existing_target') and (fields or node.get('notes_supplied')
                 or node.get('requested_name') != node.get('original_name')):
             raise ValueError('Staged set creation history currently retains its existing parents without field edits')
+    if plan.get('kind') == 'object-create-graph':
+        stage = state['owned_result_stages']
+        if (existing or plan.get('list') is not None or nodes[0]['request_path'] != '$'
+                or nodes[0].get('parent_request_path') is not None
+                or stage.get('uri') != 'ak.wwise.core.object.create'
+                or str(stage.get('parent_id')).upper() != str(plan.get('parent_id')).upper()
+                or any(node['request_path'] != '$' and node.get('parent_request_path') not in new for node in nodes)
+                or any('target_request_path' in field and field['target_request_path'] not in new
+                    for node in nodes for field in ordinary_creation_fields(node))
+                or len(new) + sum(len(ordinary_creation_fields(node)) for node in nodes) > 128):
+            raise ValueError('Staged CREATE history requires its complete bounded new graph and exact retained parent')
+        return [{'root': '$', 'parent_id': plan['parent_id'], 'nodes': nodes}]
     groups, visited = [], set()
     for path, root in new.items():
         parent = existing.get(root.get('parent_request_path'))
@@ -213,3 +225,14 @@ def verified_created_root_identity(verification: Mapping[str, Any]) -> dict[str,
     except ValueError:
         return None
     return {"id": value.object_id, "name": value.name, "type": value.object_type, "path": value.path}
+
+
+def verified_created_objects(verification):
+    """Project independently verified occurrences without merging native results."""
+    from copy import deepcopy
+    if verification.get("business_state_verified") is not True:
+        return []
+    return [{**deepcopy(row["evidence"]),
+        **({"compound_child_index": row["compound_child_index"]} if "compound_child_index" in row else {})}
+        for row in verification.get("assertions", [])
+        if row.get("kind") == "verified_created_node_identity" and row.get("passed") is True]

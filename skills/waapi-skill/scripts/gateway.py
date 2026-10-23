@@ -23336,6 +23336,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 agent_result["business_result"] = _created_root_business_result(verification.as_dict(), transaction_id)
             elif staged_voice:
                 agent_result["business_result"] = dict(payload["creation_result"])
+            from wwise_waapi.creation_observations import verified_created_objects
+            created_objects = verified_created_objects(verification.as_dict())
+            if created_objects:
+                agent_result.setdefault("business_result", {}).update(created_objects=created_objects,
+                    configuration_complete=verification.business_state_verified,
+                    identity_source="independently_verified_creation_occurrences")
             save_origin = prepared.get('pre_state', {}).get('source_copy_save_origin')
             if isinstance(save_origin, Mapping) and save_origin.get('stage') == 'final':
                 payload['next_command'] = transaction_next_command('verify', ['verify', save_origin['parent']['transaction_id']], state_dir=args.state_dir)

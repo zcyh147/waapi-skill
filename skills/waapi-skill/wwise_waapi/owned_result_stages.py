@@ -29,7 +29,7 @@ def native_node(args, path):
 
 
 def prepare(uri, args, options, specs, context, version, *, force=False, root_parent=None, parent_children=()):
-    if not force and (not context or not context.get('renames')):
+    if not force and (not context or not (context.get('renames') or context.get('duplicate_sibling_groups'))):
         return None
     if force and not any(not node.get('existing_target') for node in specs):
         return None
@@ -54,36 +54,102 @@ def prepare(uri, args, options, specs, context, version, *, force=False, root_pa
                 or any('target_request_path' not in ref for ref in node.get('references', []))):
             raise ValueError('Existing field edits plus native-name creation need a separate declared child; this stage retains existing roots')
         children = [child for child in specs if child.get('parent_request_path') == node['request_path']]
-        if len({child['requested_name'].casefold() for child in children}) != len(children):
-            raise ValueError('Fresh-parent siblings require distinct exact declared names')
         if not node.get('existing_target') and node.get('parent_request_path') not in by_path and not (uri == CREATE and node['request_path'] == '$'):
             raise ValueError('Every staged new occurrence needs its declared parent association')
     creation = deepcopy(args)
     for field in deferred:
         del native_node(creation, field['source'])['@' + field['field']]
+    def prune(node, path):
+        children = [child for child in specs if child.get('parent_request_path') == path]
+        if any(child['request_path'] not in paths for child in children):
+            node.pop('children', None)
+        else:
+            for child, raw in zip(children, node.get('children', []), strict=True):
+                prune(raw, child['request_path'])
     stages = []
     if uri == SET and creation_stage_count(specs) > 1:
-        for root in specs:
-            parent = by_path.get(root.get('parent_request_path'))
-            if not root.get('existing_target') and parent and parent.get('existing_target'):
+        for root, paths in creation_chunks(specs):
+            parent = by_path[root['parent_request_path']]
+            retained = parent
+            while not retained.get('existing_target'):
+                retained = by_path[retained['parent_request_path']]
+            inherited = native_node(creation, retained['request_path'])
+            parent_args = {key: deepcopy(inherited[key]) for key in ('platform', 'onNameConflict', 'listMode') if key in inherited}
+            if parent.get('existing_target'):
+                parent_args['object'] = parent['target_id']
+            else:
                 native_parent = native_node(creation, parent['request_path'])
-                parent_args = {key: deepcopy(native_parent[key]) for key in ('object', 'platform', 'onNameConflict', 'listMode') if key in native_parent}
-                stages.append({'root': root['request_path'], 'parent': parent['request_path'],
-                    'node_paths': [node['request_path'] for node in specs if node is root or node['request_path'].startswith(root['request_path'] + '.')],
-                    'args': {**deepcopy(creation), 'objects': [{**parent_args,
-                        'children': [deepcopy(native_node(creation, root['request_path']))]}]}})
+                if 'platform' in native_parent:
+                    parent_args['platform'] = native_parent['platform']
+            chunk = deepcopy(native_node(creation, root['request_path']))
+            prune(chunk, root['request_path'])
+            stages.append({'root': root['request_path'], 'parent': parent['request_path'], 'node_paths': paths,
+                **({'owned_parent': True} if not parent.get('existing_target') else {}),
+                'args': {**deepcopy(creation), 'objects': [{**parent_args, 'children': [chunk]}]}})
+    if uri == CREATE and creation_stage_count(specs) > 1:
+        for root, paths in creation_chunks(specs):
+            chunk = deepcopy(native_node(creation, root['request_path']))
+            prune(chunk, root['request_path'])
+            parent_path = root.get('parent_request_path')
+            controls = {key: deepcopy(creation[key]) for key in ('onNameConflict', 'autoAddToSourceControl', 'platform') if key in creation}
+            if parent_path is None:
+                controls['parent'] = creation['parent']
+            stages.append({'constructor': CREATE, 'root': root['request_path'], 'parent': parent_path,
+                'node_paths': paths, **({'owned_parent': True} if parent_path is not None else {}),
+                'args': {**chunk, **controls}})
     return {'kind': KIND, 'version': version, 'uri': uri, 'creation_args': creation,
             'options': deepcopy(options), 'deferred': deferred,
-            **({'creation_stages': stages} if stages else {}),
+            **({'creation_stages': stages, 'pre_creation_roster_check': True} if stages else {}),
             'prospective_paths': prospective_paths(specs, root_parent=root_parent),
             **({'parent_before': dict(root_parent), 'parent_children': list(parent_children), 'parent_id': args['parent']} if uri == CREATE else {})}
 
 
+def creation_chunks(specs):
+    """Cut ambiguous sibling frontiers; retain ordinary unambiguous subtrees."""
+    children = {}
+    for node in specs:
+        children.setdefault(node.get('parent_request_path'), []).append(node)
+    roots = []
+    def visit(root):
+        paths = []
+        deferred = []
+        def collect(node):
+            paths.append(node['request_path'])
+            group = children.get(node['request_path'], [])
+            if len({child['requested_name'].casefold() for child in group}) != len(group):
+                deferred.extend(group)
+            else:
+                for child in group:
+                    collect(child)
+        collect(root)
+        roots.append((root, paths))
+        for child in deferred:
+            visit(child)
+    for parent in specs:
+        if parent.get('existing_target'):
+            for root in children.get(parent['request_path'], []):
+                visit(root)
+    if not any(node.get('existing_target') for node in specs):
+        for root in children.get(None, []):
+            visit(root)
+    return roots
+
+
 def creation_stage_count(specs):
-    roots = [node for node in specs if node.get('existing_target')]
-    if any(sum(child.get('parent_request_path') == root['request_path'] for child in specs) > 1 for root in roots):
-        return sum(node.get('parent_request_path') in {root['request_path'] for root in roots} for node in specs)
-    return 1
+    return max(1, len(creation_chunks(specs)))
+
+
+def materialize_creation_args(stage, identities):
+    args = deepcopy(stage['args'])
+    if stage.get('owned_parent'):
+        parent = identities.get(stage['parent'])
+        if parent is None:
+            raise ValueError('Creation stage lacks its earlier owned parent association')
+        if stage.get('constructor') == CREATE:
+            args['parent'] = parent['id']
+        else:
+            args['objects'][0]['object'] = parent['id']
+    return args
 
 
 def prospective_paths(specs, *, root_parent=None):
@@ -133,7 +199,7 @@ def bind(prepared, result, *, read):
             bind_occurrence(child, matches[0])
     for node in returned:
         if node.parent_request_path is None:
-            matches = ([by_path['$']] if plan['uri'] == CREATE else [spec for spec in specs if spec.get('existing_target') and _same_identity(spec.get('target_id'), node.object)])
+            matches = ([by_path[plan.get('stage_root', '$')]] if plan['uri'] == CREATE else [spec for spec in specs if spec.get('existing_target') and _same_identity(spec.get('target_id'), node.object)])
             if len(matches) != 1:
                 raise ValueError('Native parent association is not one sealed exact GUID')
             bind_occurrence(node, matches[0])
@@ -220,9 +286,23 @@ def observe_reference_metadata(prepared, identities, *, read):
 def split_stage_prepared(prepared, stage, identities):
     """Materialize one sealed root against its proven parent and earlier roster."""
     nodes = prepared['verification_plan']['nodes']
+    if stage.get('constructor') == CREATE:
+        plan = prepared['pre_state']['owned_result_stages']
+        parent = identities[stage['parent']] if stage.get('owned_parent') else plan['parent_before']
+        previous = [row for row in identities.values()
+            if str(row.get('parent', {}).get('id') if isinstance(row.get('parent'), Mapping) else row.get('parent')).upper() == parent['id'].upper()]
+        children = ([] if stage.get('owned_parent') else plan['parent_children']) + previous
+        return {**prepared, 'verification_plan': {**prepared['verification_plan'], 'parent_id': parent['id'],
+                'nodes': [node for node in nodes if node['request_path'] in stage['node_paths']]},
+            'pre_state': {**prepared['pre_state'], 'owned_result_stages': {**plan, 'deferred': [],
+                'stage_root': stage['root'], 'parent_id': parent['id'], 'parent_children': children}}}
     parent = deepcopy(next(node for node in nodes if node['request_path'] == stage['parent']))
+    if stage.get('owned_parent'):
+        actual = identities[stage['parent']]
+        parent.update(existing_target=True, target_id=actual['id'], pre_state=actual,
+            original_name=actual['name'], requested_name=actual['name'], preexisting_children=[])
     children = [row for path, row in identities.items() if path != stage['parent']
-        and str(row.get('parent', {}).get('id')).upper() == parent['target_id'].upper()]
+        and str(row.get('parent', {}).get('id') if isinstance(row.get('parent'), Mapping) else row.get('parent')).upper() == parent['target_id'].upper()]
     parent['preexisting_children'] = [*parent.get('preexisting_children', []), *children]
     scoped = [parent, *(node for node in nodes if node['request_path'] in stage['node_paths'])]
     return {**prepared, 'verification_plan': {**prepared['verification_plan'], 'nodes': scoped},
@@ -262,6 +342,8 @@ def bind_split_stage(prepared, stage, result, identities, *, read, context, bind
     old_ids = {row['id'].upper() for row in identities.values()}
     if any(bound[path]['id'].upper() in old_ids for path in stage['node_paths']):
         raise ValueError('A later creation stage reused an earlier owned GUID')
+    if any(bound[path] != row for path, row in identities.items() if path in bound):
+        raise ValueError('An earlier owned parent identity changed during a later creation stage')
     actual = {**identities, **bound}
     if identities:
         observe_owned_roster(prepared, actual, read=observed_read)
@@ -270,6 +352,19 @@ def bind_split_stage(prepared, stage, result, identities, *, read, context, bind
     if not all(row['passed'] for row in preserved):
         raise ValueError('A creation stage changed its sealed retained scope; remaining writes stopped')
     return actual, binding['readbacks'], preserved
+
+
+def observe_before_creation(prepared, identities, *, read, context, binding):
+    if not identities:
+        return
+    def observed(uri, args, options):
+        result = read(uri, args, options)
+        binding['before_readbacks'].append({'uri': uri, 'args': args, 'options': options, 'result': result})
+        return result
+    observe_owned_roster(prepared, identities, read=observed)
+    binding['before_preservation'] = observe_preservation(prepared, identities, read=read, context=context)
+    if not all(row['passed'] for row in binding['before_preservation']):
+        raise ValueError('Earlier creation changed its sealed preservation scope; later write stopped')
 
 
 def reference_args(plan, identities):
@@ -333,15 +428,17 @@ def execute_split(prepared, *, write, read, context):
     first = {}
     try:
         for stage in plan['creation_stages']:
-            result = write(plan['uri'], stage['args'], plan['options'])
-            records.append({'uri': plan['uri'], 'args': stage['args'], 'options': plan['options'], 'dispatch_result': result})
+            binding = {'readbacks': [], 'preservation': [], 'before_readbacks': [], 'before_preservation': []}
+            bindings.append(binding)
+            observe_before_creation(prepared, identities, read=read, context=context, binding=binding)
+            args = materialize_creation_args(stage, identities)
+            result = write(plan['uri'], args, plan['options'])
+            records.append({'uri': plan['uri'], 'args': args, 'options': plan['options'], 'dispatch_result': result})
             if not first:
                 first = result
             if result.get('ok') is not True:
                 raise ValueError('Creation stage was not acknowledged; do not replay')
             validate_semantic_result(plan['uri'], result.get('result'), version=plan['version'])
-            binding = {'readbacks': [], 'preservation': []}
-            bindings.append(binding)
             identities, _, _ = bind_split_stage(prepared, stage, result['result'], identities, read=read, context=context, binding=binding)
         def metadata_read(uri, args, options):
             result = read(uri, args, options)
@@ -372,7 +469,7 @@ def validate_split(prepared, execution, *, context):
     bindings = proof.get('creation_bindings', [])
     if (proof.get('kind') != KIND or proof.get('plan_sha256') != canonical_sha256(plan)
             or proof.get('phase_context') != context or len(bindings) != len(creations)
-            or len(stages) != len(creations) + bool(plan['deferred'])
+            or len(stages) != len(creations) + (len(plan['deferred']) if plan['uri'] == CREATE else bool(plan['deferred']))
             or stages[0].get('dispatch_result', {}).get('result') != execution.get('result')):
         raise ValueError('Owned creation stages differ from their sealed source association')
     def replay(records, operation):
@@ -389,8 +486,16 @@ def validate_split(prepared, execution, *, context):
         return result
     identities = {}
     for stage, actual, binding in zip(creations, stages[:len(creations)], bindings, strict=True):
-        if any(actual.get(key) != value for key, value in {'uri': plan['uri'], 'args': stage['args'], 'options': plan['options']}.items()):
+        if any(actual.get(key) != value for key, value in {'uri': plan['uri'], 'args': materialize_creation_args(stage, identities), 'options': plan['options']}.items()):
             raise ValueError('Creation stage is not its exact sealed ordinary root')
+        if plan.get('pre_creation_roster_check'):
+            before_preserved = binding.get('before_preservation', [])
+            before_reads = [*binding.get('before_readbacks', []), *(item for row in before_preserved for item in (row, row['membership']))]
+            rebuilt_before = {'before_readbacks': [], 'before_preservation': []}
+            replay(before_reads, lambda read: observe_before_creation(prepared, identities,
+                read=read, context=context, binding=rebuilt_before))
+            if rebuilt_before != {key: binding.get(key, []) for key in rebuilt_before}:
+                raise ValueError('Before-creation proof differs from its sealed partial roster')
         preserved = binding.get('preservation', [])
         reads = [*binding.get('readbacks', []), *(item for row in preserved for item in (row, row['membership']))]
         identities, observations, rebuilt = replay(reads, lambda read: bind_split_stage(prepared, stage,
