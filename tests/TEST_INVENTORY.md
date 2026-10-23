@@ -7,6 +7,35 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-23 R91 runtime verification and focused repair
 
+The published `ca6af9ac` preflight passed 826 checks in 94.49s (GitHub run
+39955331464). Its preceding run on `77988814` retained three failures: the
+roster count and two cursor matrix fixtures. The test-only repair passed those
+three cases and 31 directly affected cursor controls in 32.72s. Runtime
+verification was unchanged. This preflight is not the full Program gate.
+
+The matching Mac Authoring 2024.1.13.9056 meter workflow on `7c17cd54`
+passed in 96.70s, with 116 public calls. Its independently checked nested and
+related values belong to the selected Guns Bus. The isolated fixture temporarily
+used its live-disclosed 2.0 channel configuration, then restored the original
+value; source hash/mtime, selected values, process cleanup and port release
+passed. The preceding `eca991f4` attempt remains a failure: the default
+non-mixing Guns Bus did not appear in the frame. Matching Authoring help explains
+that non-mixing buses have no meters. Source-grounded fake success and empty
+frame controls passed in 36.46s after the fixture repair. Neither the native
+failure nor the earlier 2025 success was replayed or regraded. This increment
+does not establish 2024 cursor/log/file effects or whole-ticket completion.
+
+Source successor publication at `705591b8`, integrated in `77988814`, retains
+the original native artifacts and verifies complete current program phases.
+Five affected version workflows on frozen `29b34d4c` passed in 45.43s;
+interface and branch generation/checks passed, while require-complete returned
+2 for unfinished scope. Its 26 Source leaves and five business descriptors were
+preserved. Regeneration removed stale verified credit from 65 older metadata
+rows lacking current-candidate equivalence; their reconciliation remains under
+#181/#195. Later Authoring fixture changes require the declared source map to
+be refreshed at the next stable integration batch, without another native run
+merely to refresh that map.
+
 The owned 2025 profiler collector was integrated at `9ed95f41` after its
 public fake-host flow reached the actual archived final category writer.
 The affected success case passed in 25.61s. An explicit cleanup-failure
