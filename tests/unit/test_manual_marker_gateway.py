@@ -10,6 +10,7 @@ from tests.unit.test_list_merge_existing_conditions_gateway import select_field
 
 VERSIONS = ('2023.1', '2024.1', '2025.1')
 MARKER = '{99999999-9999-9999-9999-999999999999}'
+UNTOUCHED_MARKER = '{88888888-8888-8888-8888-888888888888}'
 
 
 def marker_task(path, version='2025.1', *, fault=None, omit_empty_markers=False):
@@ -399,12 +400,16 @@ def test_relative_marker_display_cannot_derive_mutation_paths(tmp_path, shape):
     assert code == 2 and task.writes == [], result
 
 
-def relative_marker_notes_task(path, *, value='Requested Marker notes', fault=None):
+def relative_marker_notes_task(path, *, value='Requested Marker notes', fault=None, untouched_peer=False):
     task = retained_marker_task(path)
     task.objects[MARKER]['notes'] = 'Keep selected notes'
     task.objects[CHILD] = {'id': CHILD, 'name': '', 'type': 'Marker', 'classId': 5373968,
         'path': '[Marker]', 'owner': {'id': FIRST}, 'notes': 'Keep peer notes', '@Time': 0.02, '@Label': 'Peer'}
     task.objects[FIRST]['@Markers'].append({'id': CHILD})
+    if untouched_peer:
+        task.objects[UNTOUCHED_MARKER] = {'id': UNTOUCHED_MARKER, 'name': '', 'type': 'Marker', 'classId': 5373968,
+            'path': '[Marker]', 'owner': {'id': FIRST}, 'notes': 'Keep untouched notes', '@Time': 0.03, '@Label': 'Untouched'}
+        task.objects[FIRST]['@Markers'].append({'id': UNTOUCHED_MARKER})
     handle = task.bind(MARKER)
     code, result = task.step('draft-declare-existing', '--declaration-id', 'edit', '--object-handle', handle,
         '--field', 'notes', value); assert code == 0, result
@@ -456,6 +461,64 @@ def test_relative_marker_notes_prewrite_keeps_original_selected_and_peer_proof(t
     elif fault == 'peer-notes': task.objects[CHILD]['notes'] = 'Unexpected peer edit'
     elif fault == 'order': task.objects[FIRST]['@Markers'].reverse()
     else: task.objects[MARKER]['owner'] = {'id': SECOND}
+    code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and task.writes == [], rejected
+
+
+def relative_marker_batch_notes_task(path, *, fault=None):
+    task = relative_marker_notes_task(path, untouched_peer=True)
+    peer = task.bind(CHILD)
+    code, result = task.step('draft-declare-existing', '--declaration-id', 'peer-edit', '--object-handle', peer,
+        '--field', 'notes', ''); assert code == 0, result
+    original = task.call
+    def native(uri, args=None, options=None):
+        if uri.endswith('object.set'):
+            assert args['objects'] == [{'object': MARKER, 'notes': 'Requested Marker notes'}, {'object': CHILD, 'notes': ''}]
+            task.calls.append((uri, deepcopy(args), deepcopy(options))); task.writes.append(deepcopy(args))
+            for row in args['objects']: task.objects[row['object']]['notes'] = row['notes']
+            if fault == 'first-notes': task.objects[MARKER]['notes'] = 'Wrong first notes'
+            elif fault == 'second-notes': task.objects[CHILD]['notes'] = 'Wrong second notes'
+            elif fault == 'untouched-notes': task.objects[UNTOUCHED_MARKER]['notes'] = 'Unexpected notes'
+            elif fault == 'untouched-path': task.objects[UNTOUCHED_MARKER]['path'] = '[Other]'
+            elif fault == 'order': task.objects[FIRST]['@Markers'].reverse()
+            elif fault == 'owner': task.objects[CHILD]['owner'] = {'id': SECOND}
+            elif fault == 'class': task.objects[CHILD]['classId'] = 16
+            return {'objects': [{'id': CHILD, 'name': ''}, {'id': MARKER, 'name': ''}]}
+        return original(uri, args, options)
+    task.call = native
+    return task
+
+
+def test_relative_marker_notes_batch_projects_all_declared_guids_and_preserves_untouched_peer(tmp_path):
+    task = relative_marker_batch_notes_task(tmp_path)
+    before = deepcopy(task.objects)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified['verified'] is True and len(task.writes) == 1, verified
+    assert task.objects == {**before, MARKER: {**before[MARKER], 'notes': 'Requested Marker notes'},
+        CHILD: {**before[CHILD], 'notes': ''}}
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, rejected
+
+
+@pytest.mark.parametrize('fault', ['first-notes', 'second-notes', 'untouched-notes', 'untouched-path', 'order', 'owner', 'class'])
+def test_relative_marker_notes_batch_rejects_wrong_intent_or_undeclared_peer_change_without_retry(tmp_path, fault):
+    task = relative_marker_batch_notes_task(tmp_path, fault=fault)
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified['verified'] is False and len(task.writes) == 1, verified
+    code, rejected = task.run('execute', tx)
+    assert code == 2 and len(task.writes) == 1, rejected
+
+
+@pytest.mark.parametrize('identity', [MARKER, CHILD, UNTOUCHED_MARKER])
+def test_relative_marker_notes_batch_prewrite_uses_original_full_roster(tmp_path, identity):
+    task = relative_marker_batch_notes_task(tmp_path)
+    tx, shown = task.preview()
+    task.objects[identity]['notes'] = 'Premature notes change'
     code, result = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token']); assert code == 0, result
     code, rejected = task.run('execute', tx)
     assert code == 2 and task.writes == [], rejected

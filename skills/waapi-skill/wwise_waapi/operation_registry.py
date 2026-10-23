@@ -9598,18 +9598,20 @@ def _new_object_class_metadata_assertions(pre_state, *, read, readbacks=None):
 def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferred_render_chains=(), compound_path_context=None):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = _new_object_class_metadata_assertions(pre_state, read=read) if after_write else []
+    declared_notes = {_identity_key(node["target_id"]): node["requested_notes"]
+        for node in pre_state.get("object_set_nodes", [])
+        if node.get("existing_target") is True and node.get("notes_supplied") is True} if after_write else {}
     owned_proofs = ([pre_state["owned_identity"]] if isinstance(pre_state, Mapping) and pre_state.get("owned_identity") is not None else [])
     for node in pre_state.get("object_set_nodes", []):
         owned = node.get("owned_identity")
         if owned is None:
             continue
-        if (after_write and node.get("existing_target") is True and node.get("notes_supplied") is True
-                and _same_identity(node.get("target_id"), owned["object_id"])):
-            owned = {**owned, "members": [
-                {**member, "notes": node["requested_notes"]} if _same_identity(member["id"], owned["object_id"]) else member
-                for member in owned["members"]]}
         owned_proofs.append(owned)
     for owned in owned_proofs:
+        if declared_notes:
+            owned = {**owned, "members": [
+                {**member, "notes": declared_notes[_identity_key(member["id"])]} if _identity_key(member["id"]) in declared_notes else member
+                for member in owned["members"]]}
         from .documented_list_fields import capture_owned_empty_identity
         try:
             rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owned["object_id"]]}},
