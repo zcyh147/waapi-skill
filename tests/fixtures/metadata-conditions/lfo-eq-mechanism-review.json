@@ -1,0 +1,64 @@
+{
+  "contract": "waapi-skill.condition-mechanism-review/v1",
+  "review_id": "r85-lfo-smoothing-2025-eq",
+  "owner_issue": 177,
+  "parent_issue": 174,
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "host": "wwise-console",
+  "source_roster_sha256": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
+  "selected_members": {
+    "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies/148/condition": "532d753c9d03ba5050b5c444d7315b59257c2d6890acd45dd7391d226453d070",
+    "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies/148/Enumeration/2": "5e2dee09ee78a49c3bdc805ab853d0d37106fc1c901f76c3d62500fac607e704",
+    "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies/148/Enumeration/2/value/0": "391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf",
+    "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies/148/Enumeration/2/value/1": "cc11310c456c3690d5a74c23aa31cc25b4e74cdae146c71e54ad9dbc1d109fde",
+    "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies/148/Enumeration/2/value/2": "a4aab3f1f08004e907d2357fafe74cab56359bcb32e23f52e7eb1d3a9c0a2ad3",
+    "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|PluginModule/WwiseObject[ModulatorLfo]/Properties/Property[LfoSmoothing]/Dependencies/148/Enumeration/2/value/3": "2bf175f9655e7bb7357b9f0a7c6051465a5ae701104ffe741b98e852c0e4d460"
+  },
+  "group_id": "c9efa14d7c536c4e99826ebf02a7cdff725289fd2e7970029e24ef88206756ba",
+  "source_file_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+  "program_model_sha256": "c2830f814fcc72238db6ebf0c0e0d0007756d24554c2d3ffaedf8e5fb36fb246",
+  "controller_source_type": "int32",
+  "selected_field": "LfoSmoothing",
+  "controller": "LfoWaveform",
+  "current_sources": {
+    "skills/waapi-skill/scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+    "skills/waapi-skill/scripts/gateway.py": "02a2043daa58e44029d373fc5bc2995ddd2260915dbf071042d9e21ba1b58bdf",
+    "skills/waapi-skill/wwise_waapi/business_declarations.py": "6fd0f8a08d952a0093d02a8400111aa82ea6718eb0458f7f84461299d6e4baab",
+    "skills/waapi-skill/wwise_waapi/operation_registry.py": "6ec0d235888261baf04d69f3715ed1598099056784dd411b115a5a3abb60367f",
+    "skills/waapi-skill/wwise_waapi/metadata_restrictions.py": "a040f4aee638809b0dce2cc52664a2673e3cc7add5fcbb068f1b0a25825ab5c3",
+    "skills/waapi-skill/wwise_waapi/builders/metadata.py": "ac58211914543aca3e3fdfdbe77095d2b8179f53091bb045fd5cf3452aea1cbf",
+    "docs/branch-coverage-condition-sources.json": "b51b1227a381938be503fb9065928a2fb8928808fe24a864679305c647bd0fcd",
+    "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz": "b113f5511fa87c21679b99ab46197a7731203b0012d3b8e0052e195fea2e6978",
+    "skills/waapi-skill/resources/metadata/2025.1/object-types.json": "518f72403f7dc8e1d2adfa398a81ac607fd45a0d89d156810033a27ad51cb59d",
+    "tests/unit/test_scalar_condition_product_gateway.py": "934270f31f82fd8672c8b133f7719632310d3d3473b0ab8182795a04109550b6",
+    "tests/unit/test_conditional_reference_gateway.py": "aa7ccd5207d289dcd07a6e665cfb39ccffed2f89095aafa79bbcac1085d7b89d",
+    "tests/unit/test_condition_closure_gateway.py": "4d6bf43a21fef5e9aaf3b640fb0e6ad25d15ff63708f7ecb2c828dd18af115cf"
+  },
+  "originals": {
+    "category": "9ebc179ab4db0696581ac749d16d49c61b649899cca2d847bd908f47a3048afa",
+    "observation": "5ee31cf038bdc4c96ad9f06335dd5bac259222f0a64296f2c5afffd27e598a6c",
+    "class_metadata": "5a60c0ebd7785d45404ac01de998bd81a36b63eda25ab1c63f46bfbf5fa56868",
+    "accepted_review": "05da8271c0408e59290f1548a27c70b12b03837a7b3b83abe2d238137543f98d"
+  },
+  "witness": {
+    "run_id": "r84-eq-gain-66a2a1f1-2025-r2",
+    "candidate": "66a2a1f11ee57947821bdd4645744c86aacaa520",
+    "nodeid": "tests/destructive/test_eq_gain_condition.py::test_existing_eq_gain_preserves_condition_controllers_and_context",
+    "record_index": 1
+  },
+  "public_program_node": "tests/unit/test_scalar_condition_product_gateway.py::test_product_self_scalar_source_conditions[2025.1]",
+  "justification": "Accepted R85 exact ModulatorLfo source/class and enum1/2/3/4 public workflows bridge to the actual R84 Effect scalar/typed multi-enum/composed closure witness. Real64/Real32 and source int32/program int16 are retained domains, not claimed equal metadata; finite integer literals and Gateway scalar comparison parameterize these differences. This proves reviewed mechanism reuse only; original fake Sound identity is not a native LFO instance.",
+  "direct_recipient_native_effect": "not_observed",
+  "new_native_runs": 0,
+  "metadata_mechanism_basis": {
+    "metadata_scope": "object_type",
+    "direct_recipient_instance_metadata": "not_observed",
+    "current_guard_controls": [
+      "tests/unit/test_conditional_reference_gateway.py::test_reference_route_guards_and_verifies_satisfied_activation",
+      "tests/unit/test_conditional_reference_gateway.py::test_property_condition_is_preserved_revalidated_and_verified",
+      "tests/unit/test_condition_closure_gateway.py::test_every_branch_of_recursive_metadata_closure_is_guarded"
+    ],
+    "reason": "Actual class-scoped LFO receipt and exact source/class/typed graph link to current public object-scoped acquisition, refresh and verifier reads; native EQ observes object-scoped metadata before/after. Controlled public drift tests establish guard behavior. No native LFO instance metadata or per-recipient effect is asserted."
+  }
+}

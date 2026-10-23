@@ -10,7 +10,7 @@ from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FI
 from tests.unit.test_time_modulator_range_gateway import finish
 
 
-def run_scalar_public_workflow(path, group, *, before_values=None):
+def run_scalar_public_workflow(path, group, *, before_values=None, capture_scope=False):
     path.mkdir()
     model = group["model"]
     task = ScalarPropertyTask(path, group["version"])
@@ -38,10 +38,14 @@ def run_scalar_public_workflow(path, group, *, before_values=None):
               if uri.endswith(("setProperty", "setReference", "object.set"))]
     assert len(writes) == 1
     assert writes[0]["args"] == {"object": FIRST, "property": group["field"], "value": model["requested"]}
-    return {"gateway": {"argv": ["--state-dir", str(path / "state"), "verify", transaction],
+    result = {"gateway": {"argv": ["--state-dir", str(path / "state"), "verify", transaction],
                         "exit_code": code, "payload": verified},
             "native_call": writes[0], "observations": {"metadata": deepcopy(candidate["metadata"]),
                 "before": before, "after": after}, "input_fact_provenance": deepcopy(model["provenance"])}
+    if capture_scope:
+        result['object_scope_call_trace'] = [{'uri': uri, 'args': deepcopy(args), 'options': deepcopy(options)}
+                                             for uri, args, options in task.calls]
+    return result
 
 
 def _business_value(value):
@@ -49,12 +53,12 @@ def _business_value(value):
     return value if isinstance(value, str) else json.dumps(value)
 
 
-def run_scalar_public_group(path, group, *, observed=None):
+def run_scalar_public_group(path, group, *, observed=None, capture_scope=False):
     path.mkdir()
     if observed is None:
         observed = {"workflows": {}, "negative_controls": {}}
     for flow in group["workflows"]:
-        observed["workflows"][flow["id"]] = run_scalar_public_workflow(path / flow["id"], group, before_values=flow["before"])
+        observed["workflows"][flow["id"]] = run_scalar_public_workflow(path / flow["id"], group, before_values=flow["before"], capture_scope=capture_scope)
     for control in group["negative_controls"]:
         child = path / control["id"]
         child.mkdir()
