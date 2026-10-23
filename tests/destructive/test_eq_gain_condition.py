@@ -135,7 +135,7 @@ def test_existing_eq_gain_preserves_condition_controllers_and_context(workflow_s
         if len(fields) > 8:
             # The public query owns an eight-custom-field ceiling. Keep both
             # exact identity frames equal before joining the bounded results.
-            row = objects(label + "-fields-1", identity, platform, fields[:8])
+            row = deepcopy(objects(label + "-fields-1", identity, platform, fields[:8]))
             extra = objects(label + "-fields-2", identity, platform, fields[8:])
             _same({key: value for key, value in row.items() if key != "properties"},
                 {key: value for key, value in extra.items() if key != "properties"})

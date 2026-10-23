@@ -232,6 +232,12 @@ def test_eq_full_collector_uses_public_gateway_with_fake_native_transport(tmp_pa
         assert len(observation["reads"]) == 19
         target_queries = [argv for argv in commands if argv[0] == "query-object" and argv[2] == collector.TARGET]
         assert len(target_queries) == 4 and [argv.count("--include-field") for argv in target_queries] == [8, 1, 8, 1]
+        for phase in ("before", "after"):
+            first, = [row for row in observation["reads"] if row["label"] == phase + "-target-fields-1"]
+            second, = [row for row in observation["reads"] if row["label"] == phase + "-target-fields-2"]
+            assert set(first["payload"]["agent_result"][0]["properties"]) == set(collector.FIELDS[:8])
+            assert set(second["payload"]["agent_result"][0]["properties"]) == set(collector.FIELDS[8:])
+            assert set(observation[phase]["target"]["properties"]) == set(collector.FIELDS)
         assert set(observation["metadata_before"]) == set(collector.METADATA_FIELDS)
         assert observation["metadata_after"] == observation["metadata_before"]
     else:
