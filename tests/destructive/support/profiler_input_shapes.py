@@ -162,9 +162,11 @@ def collect_enablement_inputs(runtime):
         observed.finish()
 
 
-def collect_signed_cursor_inputs(runtime):
+def collect_signed_cursor_inputs(runtime, *, remaining_minus_two=False):
     assert runtime.version == '2025.1', 'Signed cursor observations require the matching2025 definition'
-    observed = _InputObservation(runtime, 'profiler-signed-cursor-inputs', ['minus-one', 'minus-two'])
+    selected = (('minus-two', -2),) if remaining_minus_two else (('minus-one', -1), ('minus-two', -2))
+    name = 'profiler-signed-cursor-inputs-minus-two' if remaining_minus_two else 'profiler-signed-cursor-inputs'
+    observed = _InputObservation(runtime, name, [label for label, _ in selected])
     report = observed.report
     report['cleanup'].update(complete=False, capture_stop_acknowledged=False,
         capture_state_independently_observed=False)
@@ -203,7 +205,7 @@ def collect_signed_cursor_inputs(runtime):
             'Console captured cursor unavailable; signed probes not attempted')
         prior = observed.call(['core-call', PREFIX + 'getCursorTime', '--profiler-cursor', 'user-cursor'])['agent_result']
         report['user_cursor_before'] = prior
-        for case, target in zip(report['cases'], (-1, -2), strict=True):
+        for case, (_, target) in zip(report['cases'], selected, strict=True):
             verified = observed.transaction('setCursorTime', ['--cursor-target-ms', str(target)], case)
             # The existing verifier owns one returned-time/user-cursor comparison.
             # Preserve unavailable/changed results; never reinterpret the input.

@@ -301,3 +301,53 @@ def test_unknown_capture_start_retains_final_failure_without_followup_writes(tmp
     assert 'stop_capture' not in report['cleanup'] and 'cursor_restoration' not in report['cleanup']
     assert len(final['transactions']) == 1 and final['transactions'][0]['state'] == 'indeterminate'
     assert Path(final['residual_state']['quarantine_path']).is_dir()
+
+
+@pytest.mark.parametrize('outcome', ('accepted', 'native-error'))
+def test_remaining_minus_two_node_persists_only_selected_probe(tmp_path, monkeypatch, outcome):
+    context = _runtime(tmp_path, monkeypatch, fault='cursor-native-error' if outcome == 'native-error' else None)
+    workflow, runtime, client, _, _ = context
+    node = 'test_profiler_remaining_minus_two_input_native_observation'
+    error = None
+    try:
+        getattr(workflow, node)(runtime)
+    except AssertionError as exc:
+        error = exc
+    records = _finish(context, tmp_path, monkeypatch, [(node, error)])
+    final = records[-1]
+    category, = final['categories']
+    assert final['invocation']['selected_test_nodeids'] == [MODULE + node]
+    assert category['category'] == 'profiler-signed-cursor-inputs-minus-two'
+    report_path = Path(category['observation_path'])
+    assert report_path.name == 'profiler-signed-cursor-inputs-minus-two.json'
+    assert not (runtime.state_dir / 'profiler-signed-cursor-inputs.json').exists()
+    report = json.loads(report_path.read_text())
+    case, = report['cases']
+    assert case['name'] == 'minus-two' and case['declaration'] == ['--cursor-target-ms', '-2']
+    assert report['capture_position']['available'] is True and report['capture_read_attempts'] <= 2
+    assert sum(uri == PREFIX + 'startCapture' for uri, _, _ in client.calls) == 1
+    assert sum(uri == PREFIX + 'stopCapture' for uri, _, _ in client.calls) == 1
+    targets = [args['time'] for uri, args, _ in client.calls if uri == PREFIX + 'setCursorTime']
+    assert -1 not in targets
+    assert case['execute'] == next(row['payload'] for row in report['calls']
+        if row['argv'] == ['execute', case['transaction_id']])
+    assert category['business_effect_verified'] is False
+    if outcome == 'accepted':
+        assert error is None and targets == [-2, 1470]
+        assert [row['invocation']['outcome'] for row in records] == ['PENDING', 'PASS']
+        assert category['status'] == 'blocked' and report['complete'] is True
+        assert case['native_outcome'] == 'accepted' and case['cursor_observation']['outcome'] == 'matched'
+        assert case['verify']['agent_result'] == next(row['payload']['agent_result'] for row in report['calls']
+            if row['argv'] == ['verify', case['transaction_id']])
+        assert report['cleanup']['cursor_restored_to_observed_time_ms'] == 1470
+        assert len(final['transactions']) == 4 and final['residual_state']['sandbox'] == 'deleted'
+    else:
+        assert error is not None and targets == [-2]
+        assert [row['invocation']['outcome'] for row in records] == ['FAIL']
+        assert category['status'] == 'FAIL' and report['complete'] is False
+        assert case['native_outcome'] == 'indeterminate' and case['execute']['automatic_retry'] is False
+        assert 'verify' not in case and 'cursor_restoration' not in report['cleanup']
+        assert report['cleanup']['complete'] is False
+        assert len(final['transactions']) == 3
+        assert sum(row['state'] == 'indeterminate' for row in final['transactions']) == 1
+        assert Path(final['residual_state']['quarantine_path']).is_dir()
