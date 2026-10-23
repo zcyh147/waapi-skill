@@ -509,8 +509,6 @@ def launch_sandboxed_wwise(
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
     strategy_arguments = {}
     if host_kind == 'wwise-authoring':
-        if contract.version not in {'2024.1', '2025.1'}:
-            raise SandboxFixtureError('Authoring requires a pinned supported native catalog')
         build = load_native_catalog(contract.version, 'wwise-authoring')['provenance']['build']
         strategy_arguments = {'host_kind': host_kind, 'authoring_build': build, 'authoring_owned_root': case_owned_root}
         port = 8080

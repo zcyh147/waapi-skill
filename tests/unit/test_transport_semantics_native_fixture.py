@@ -165,7 +165,8 @@ def test_selected_semantics_node_uses_exact_2025_owner_and_child_startup_recipe(
     config.args = [NODEID, *([NODE] if extra else [])]
     items = [SimpleNamespace(nodeid=name) for name in config.args]
     if version != '2025.1' or extra:
-        with pytest.raises(pytest.UsageError, match='only their matching 2025'):
+        message = 'Selected owned Authoring node is not available on the requested version' if version != '2025.1' else 'only their matching 2025'
+        with pytest.raises(pytest.UsageError, match=message):
             authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
         assert not events
     else:

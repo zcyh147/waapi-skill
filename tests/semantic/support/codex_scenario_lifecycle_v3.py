@@ -226,8 +226,6 @@ class ScenarioLifecycle:
             scenario_root=self.scenario_root,
         )
         if host_kind == 'wwise-authoring':
-            if version not in {'2024.1', '2025.1'}:
-                raise ValueError('owned Authoring lifecycle requires the pinned 2024.1/2025.1 catalog')
             home = self.launch_environment_overrides.get('HOME')
             if home is None:
                 raise ValueError('owned Authoring lifecycle requires a private HOME')

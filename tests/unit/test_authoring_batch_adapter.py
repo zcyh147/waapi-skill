@@ -15,18 +15,21 @@ def test_authoring_batch_rejects_environment_only_ownership(tmp_path, monkeypatc
 
 
 @pytest.fixture
-def owned_authoring(tmp_path, monkeypatch):
+def owned_authoring(tmp_path, monkeypatch, request):
     from types import SimpleNamespace
     from tests.destructive.support import authoring_batch
     monkeypatch.setattr(authoring_batch, "candidate_source_context", lambda _: {"candidate": "a" * 40, "sources": {"fake-code": "b" * 64}})
     from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle, ScenarioRuntime
     from tests.destructive.support.sandbox_fixture import SandboxMetadata, SandboxProject, hash_project
     from wwise_waapi.headless import HeadlessLifecycle
+    version = getattr(request, 'param', '2025.1')
+    build = {'2021.1': (2021, 1, 14, 8108), '2022.1': (2022, 1, 19, 8584),
+        '2023.1': (2023, 1, 19, 8928), '2025.1': (2025, 1, 7, 9143)}[version]
     root = tmp_path / 'batch'
     import os
     user_keys = ('USERPROFILE', 'APPDATA', 'LOCALAPPDATA') if os.name == 'nt' else ('HOME',)
     isolated = {key: str(root / 'owned' / key.lower()) for key in user_keys}
-    owner = ScenarioLifecycle(scenario_id='owned-authoring', version='2025.1', scenario_root=root,
+    owner = ScenarioLifecycle(scenario_id='owned-authoring', version=version, scenario_root=root,
         live_environment={}, launch_environment_overrides=isolated, lock_root=tmp_path / 'lock')
     source = tmp_path / 'source'
     source.mkdir()
@@ -41,14 +44,14 @@ def owned_authoring(tmp_path, monkeypatch):
         Path(path).mkdir(parents=True)
     proof = hash_project(source, preferred_strategy='full')
     metadata = SandboxMetadata(source_path=str(source_project), source_root=str(source),
-        sandbox_path=str(sandbox_path), sandbox_project_path=str(project), wwise_version='2025.1',
+        sandbox_path=str(sandbox_path), sandbox_project_path=str(project), wwise_version=version,
         copy_duration_seconds=0, source_hash=proof, sandbox_hash=proof,
         source_mtime_before=source_project.stat().st_mtime, identity_verified=True,
         launch_project_path=str(project), process_pid=1234, selected_port=31337)
     sandbox = SandboxProject(source_project=source_project, source_root=source,
         sandbox_root=owned / 'sandbox-root', sandbox_path=sandbox_path, sandbox_project=project, metadata=metadata)
     info = {'displayName': 'Wwise', 'isCommandLine': False, 'processId': 1234, 'sessionId': 'owned-session',
-        'version': {'year': 2025, 'major': 1, 'minor': 7, 'build': 9143, 'schema': 152}}
+        'version': dict(zip(('year', 'major', 'minor', 'build'), build))}
     process = HeadlessLifecycle(console_path=tmp_path / 'Wwise.exe', project_path=project, port=31337)
     process.process = SimpleNamespace(pid=1234, poll=lambda: None)
     process.command = ['Wwise.exe', str(project)]
@@ -72,12 +75,14 @@ def owned_authoring(tmp_path, monkeypatch):
             owner._lock_acquired = False
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1', '2025.1'], indirect=True)
 def test_authoring_batch_rejects_console_context_before_any_node(owned_authoring, tmp_path):
     owned_authoring.runtime.lifecycle.ready_result['isCommandLine'] = True
     with pytest.raises(ValueError, match='Authoring'):
         AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=['node'])
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1', '2025.1'], indirect=True)
 @pytest.mark.parametrize('damage', ['build', 'source-project', 'metadata', 'port', 'runtime-version', 'source-content', 'released-lock'])
 def test_authoring_batch_rejects_mismatched_owned_context(owned_authoring, tmp_path, damage):
     from dataclasses import replace
@@ -126,8 +131,15 @@ def _install_public_gateway(monkeypatch, owner, *, damage=None):
                     port += 1
                 elif damage == 'console':
                     info['isCommandLine'] = True
-                payload.update(wwise=info, project={'path': project, 'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'},
+                project_identity = {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}',
+                    'name': 'SampleProject', 'type': 'Project', 'path': '\\'}
+                payload.update(wwise=info, project=project_identity if version == '2021.1' else {'path': project, 'id': project_identity['id']},
                     endpoint={'host': host, 'port': port, 'url': f'ws://{host}:{port}/waapi'})
+            elif argv[0] == 'query-object':
+                assert version == '2021.1'
+                project_file = owner.runtime.sandbox.source_project if damage == 'project' else owner.runtime.sandbox.sandbox_project
+                payload['objects'] = [{'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}',
+                    'name': 'SampleProject', 'type': 'Project', 'path': '\\', 'file_path': str(project_file)}]
             receipts.append({'argv': list(argv), 'exit_code': 0, 'payload': payload})
             (evidence / f'{len(receipts)}-fake-dispatch.json').write_text(json.dumps({'argv': list(argv), 'result': payload}))
             return payload
@@ -147,13 +159,15 @@ def test_authoring_node_attaches_through_public_status_and_retains_its_own_recei
     assert 'node-b' not in batch.receipts
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2025.1'], indirect=True)
 @pytest.mark.parametrize('damage', ['build', 'session', 'project', 'endpoint', 'console'])
 def test_authoring_node_rejects_live_ownership_drift_before_layout_call(owned_authoring, tmp_path, monkeypatch, damage):
     calls = _install_public_gateway(monkeypatch, owned_authoring, damage=damage)
     batch = AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=['node'])
     with pytest.raises(ValueError, match='live Authoring ownership'):
         batch.node_gateway('node')
-    assert [argv[0] for argv in calls] == ['config-set', 'status']
+    assert [argv[0] for argv in calls] == (['config-set', 'status', 'query-object']
+        if owned_authoring.version == '2021.1' and damage == 'project' else ['config-set', 'status'])
 
 
 @pytest.mark.parametrize('damage', ['missing-private-user-state', 'unbound-private-user-state'])
@@ -189,6 +203,7 @@ def test_authoring_batch_stays_prepared_until_last_teardown_report(owned_authori
     assert record['residual_state']['sandbox'] == 'retained'
 
 
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1', '2025.1'], indirect=True)
 def test_shared_owner_stops_prepared_then_releases_after_last_teardown(owned_authoring, tmp_path, monkeypatch):
     import json
     from types import SimpleNamespace
@@ -493,3 +508,70 @@ def test_authoring_finalization_waits_boundedly_for_exact_port_release(owned_aut
         assert owned_authoring.runtime.sandbox.sandbox_project.exists()
         assert (owned_authoring.runtime.evidence_root / 'lifecycle-release-error.json').exists()
     assert [row['argv'][0] for row in batch.receipts['last-node']] == ['config-set', 'status']
+
+
+@pytest.mark.parametrize('owned_authoring', ['2021.1', '2022.1', '2023.1'], indirect=True)
+def test_authoring_batch_admits_matching_older_catalog_context(owned_authoring, tmp_path, monkeypatch):
+    calls = _install_public_gateway(monkeypatch, owned_authoring)
+    batch = AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=['future-owned-node'])
+    batch.node_gateway('future-owned-node')
+    assert calls[0] == ['config-set', '--wwise-version', owned_authoring.version, '--waapi-host', '127.0.0.1',
+        '--waapi-port', '31337', '--project-modification-policy', 'ask_before_changes']
+    assert calls[1] == ['status']
+    assert any(argv[0] == 'query-object' for argv in calls) is (owned_authoring.version == '2021.1')
+    assert owned_authoring._lock_acquired is True
+
+
+@pytest.mark.parametrize('owned_authoring', ['2021.1'], indirect=True)
+@pytest.mark.parametrize('damage', [None, 'wine-file', 'missing-file', 'duplicate', 'foreign-file', 'id', 'name', 'type', 'path', 'empty', 'malformed', 'file-type'])
+def test_authoring_2021_node_binds_project_file_through_real_public_exact_projection(owned_authoring, tmp_path, monkeypatch, damage):
+    from copy import deepcopy
+    from tests.destructive.support import authoring_batch
+    from tests.unit.test_runtime_business_gateway import gateway as public_gateway, FakeClient, _env
+    identity = {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', 'name': 'SampleProject', 'type': 'Project', 'path': '\\'}
+    info = deepcopy(owned_authoring.runtime.lifecycle.ready_result)
+    info.update(apiVersion=1, platform='macosx', configuration='release')
+    row = {**identity, 'filePath': str(owned_authoring.runtime.sandbox.sandbox_project)}
+    if damage == 'wine-file':
+        from pathlib import PureWindowsPath
+        row['filePath'] = str(PureWindowsPath('Z:/').joinpath(*owned_authoring.runtime.sandbox.sandbox_project.parts[1:]))
+    elif damage == 'missing-file':
+        row.pop('filePath')
+    elif damage == 'foreign-file':
+        row['filePath'] = str(owned_authoring.runtime.sandbox.source_project)
+    elif damage == 'file-type':
+        row['filePath'] = True
+    elif damage in {'id', 'name', 'type', 'path'}:
+        row[damage] = {'id': '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}', 'name': 'ForeignProject',
+            'type': 'Event', 'path': '\\ForeignProject'}[damage]
+    rows = [row, row] if damage == 'duplicate' else [] if damage == 'empty' else [42] if damage == 'malformed' else [row]
+    client = FakeClient({'ak.wwise.core.getInfo': [info] * 8, 'ak.wwise.core.object.get': [
+        {'return': [identity]}, {'return': rows}]})
+    env = _env(tmp_path, version='2021.1')
+    calls = []
+    def factory(*, skill_source, runtime, version, receipts):
+        def invoke(argv):
+            calls.append(list(argv))
+            code, payload = public_gateway.execute_gateway(['--state-dir', str(runtime.owned_root / 'state'), *argv],
+                env=env, client_factory=lambda _: client)
+            receipts.append({'argv': list(argv), 'exit_code': code, 'payload': payload})
+            if code != 0 or payload.get('ok') is not True:
+                raise ValueError('Public project observation failed: ' + str(payload))
+            return payload
+        return invoke
+    monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
+    batch = AuthoringBatchAdapter(owner=owned_authoring, repo_root=tmp_path, selected_nodeids=['node'])
+    if damage not in {None, 'wine-file'}:
+        with pytest.raises(ValueError, match='Authoring ownership|Public project observation failed'):
+            batch.node_gateway('node')
+        assert [argv[0] for argv in calls] == ['config-set', 'status', 'query-object']
+        assert all(uri in {'ak.wwise.core.getInfo', 'ak.wwise.core.object.get'} for uri, _, _ in client.calls)
+        return
+    batch.node_gateway('node')
+    assert calls[1:] == [['status'], ['query-object', '--exact-id', identity['id'], '--include', 'file-path', '--max-results', '1']]
+    query_receipt = batch.receipts['node'][-1]['payload']
+    assert query_receipt['objects'] == [{**identity, 'file_path': row['filePath']}]
+    assert query_receipt['count'] == 1
+    object_reads = [call for call in client.calls if call[0] == 'ak.wwise.core.object.get']
+    assert len(object_reads) == 2
+    assert object_reads[-1][2] == {'return': ['id', 'name', 'type', 'path', 'filePath']}

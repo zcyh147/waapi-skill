@@ -45,7 +45,7 @@ def _bundle(tmp_path, build='2025.1.7.9143'):
                            owned=owned, project=project, home=home, prefix=prefix, build=build)
 
 
-@pytest.mark.parametrize('build', ['2024.1.13.9056', '2025.1.7.9143'])
+@pytest.mark.parametrize('build', ['2021.1.14.8108', '2022.1.19.8584', '2023.1.19.8928', '2024.1.13.9056', '2025.1.7.9143'])
 def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_proof(tmp_path, monkeypatch, build):
     from tests.unit.test_headless_lifecycle import FakeClient
     facts = _bundle(tmp_path, build=build)
@@ -103,7 +103,11 @@ def test_existing_lifecycle_owns_mac_authoring_command_environment_and_project_p
     assert checked_ports == [('127.0.0.1', 8080)]
     assert len(started) == 1
     command, options = started[0]
-    native_executable = {'2024.1.13.9056': 'c:/Program Files/Audiokinetic/Wwise 2024.1.13.9056/Authoring/x64/Release/bin/Wwise.exe',
+    native_executable = {
+        '2021.1.14.8108': 'c:/Program Files/Audiokinetic/Wwise 2021.1.14.8108/Authoring/x64/Release/bin/Wwise.exe',
+        '2022.1.19.8584': 'c:/Program Files/Audiokinetic/Wwise 2022.1.19.8584/Authoring/x64/Release/bin/Wwise.exe',
+        '2023.1.19.8928': 'c:/Program Files/Audiokinetic/Wwise 2023.1.19.8928/Authoring/x64/Release/bin/Wwise.exe',
+        '2024.1.13.9056': 'c:/Program Files/Audiokinetic/Wwise 2024.1.13.9056/Authoring/x64/Release/bin/Wwise.exe',
         '2025.1.7.9143': 'c:/Program Files/Audiokinetic/Wwise 2025.1.7.9143/Authoring/x64/Release/bin/Wwise.exe'}[build]
     # Actual retained owned 2024/2025 readiness used this direct-Wine route,
     # without native-app alternate-loader/wait-child options.

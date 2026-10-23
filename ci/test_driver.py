@@ -289,8 +289,8 @@ def parse_request(arguments: Sequence[str]) -> TestRequest | None:
         raise TestDriverError("matrix/focused mode requires version 'all'")
     if mode in {"smoke", "live", "destructive"} and version == "none":
         raise TestDriverError(f"mode '{mode}' requires a real Wwise version or 'all'")
-    if _owned_authoring_requested(pytest_args) and (mode != 'destructive' or version not in {'2024.1', '2025.1'}):
-        raise TestDriverError('owned Authoring requires one exact 2024.1/2025.1 destructive lane')
+    if _owned_authoring_requested(pytest_args) and (mode != 'destructive' or version not in SUPPORTED_VERSIONS):
+        raise TestDriverError('owned Authoring requires one exact supported destructive lane')
     return TestRequest(version=version, mode=mode, pytest_args=pytest_args)
 
 
@@ -561,8 +561,8 @@ class TestDriver:
         self, version: str, mode: str, pytest_args: Sequence[str]
     ) -> int:
         owned_authoring = _owned_authoring_requested(pytest_args)
-        if owned_authoring and (mode != 'destructive' or version not in {'2024.1', '2025.1'} or self.windows):
-            raise TestDriverError('owned Authoring currently requires one exact Mac 2024.1/2025.1 destructive lane')
+        if owned_authoring and (mode != 'destructive' or version not in SUPPORTED_VERSIONS or self.windows):
+            raise TestDriverError('owned Authoring currently requires one exact Mac supported destructive lane')
         defaults = default_live_paths(
             version,
             mode,
