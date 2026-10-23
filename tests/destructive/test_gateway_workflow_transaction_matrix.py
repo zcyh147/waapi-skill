@@ -11253,7 +11253,8 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
     track = "{8D76C40F-1C73-42C7-9A26-8C0E56E6898F}"
     child = "{CFAF8A1B-1DF5-4711-80DA-D61A42F859D7}"
     getter = "ak.wwise.core.blendContainer.getAssignments"
-    category = {"category": "blend-assignment", "status": "FAIL", "version": runtime.version}
+    category = {"category": "blend-assignment", "status": "FAIL", "version": runtime.version,
+                "verifier_strength": "blend_assignment_order_and_observed_preservation"}
     runtime.category_results.append(category)
     receipt = {"candidate": runtime.candidate, "version": runtime.version, "build": runtime.sandbox.metadata.get_info_version, "source_member": str(source),
                "source_sha256": source_hash, "native_assignment_effect_verified": False, "transactions": {}}

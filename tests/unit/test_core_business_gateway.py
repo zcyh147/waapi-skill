@@ -1511,3 +1511,31 @@ def test_blend_assignment_schema_discloses_clamping_and_edge_effect_boundary(tmp
     assert declaration["field_semantics"]["insertion_index"]["omitted_effect"] == "append"
     assert declaration["field_semantics"]["edges"]["effect_scope"] == "crossfade_GameParameter_only"
     assert "unproved" in declaration["field_semantics"]["edges"]["verification_boundary"]
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize(("requested", "effective"), [(-9, 0), (99, 2)])
+def test_blend_assignment_materializes_documented_clamp_in_immutable_native_envelope(tmp_path, version, requested, effective):
+    task = _BlendAssignmentTask(tmp_path, version)
+    native = task.call
+    received = []
+    def observed_negative_append(uri, args=None, options=None):
+        if uri == task.uri:
+            received.append(dict(args))
+            # Exact 2024 native observation: a raw negative index appended.
+            # The shared fake must not hide missing Gateway materialization.
+            if args.get("index", 0) < 0:
+                args = {**args, "index": 99}
+        return native(uri, args, options)
+    task.call = observed_negative_append
+    preview = task.preview(requested)
+    assert preview["preview_summary"]["blend_assignment"]["requested_index"] == requested
+    assert task.artifact["dispatch"]["args"]["index"] == effective
+    assert task.artifact["semantic_preview"]["envelope"]["args"]["index"] == effective
+    assert task.artifact["request"]["arguments"]["args"]["index"] == requested
+    code, executed = task.execute()
+    assert code == 0, json.dumps({key: executed.get(key) for key in ("error_code", "message", "details")})
+    code, verified = task.raw("verify", task.tx)
+    assert code == 0, json.dumps({key: verified.get(key) for key in ("error_code", "message", "details", "verification")})
+    assert verified["verification"]["business_state_verified"] is True
+    assert len(received) == 1 and received[0]["index"] == effective

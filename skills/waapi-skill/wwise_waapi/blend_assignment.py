@@ -101,10 +101,17 @@ def observe(track_id, child_id, *, read, version):
             "assignments": ordered, "native_assignments": deepcopy(assignments)}
 
 
+def materialize_index(args, assignment_count):
+    """Own documented explicit-index clamping; omission remains native append."""
+    if "index" not in args:
+        return dict(args)
+    return {**args, "index": max(0, min(args["index"], assignment_count))}
+
+
 def prepare(args, *, read, version):
     before = observe(args["object"], args["child"], read=read, version=version)
     order = [row["child"] for row in before["assignments"]]
-    position = max(0, min(args.get("index", len(order)), len(order)))
+    position = materialize_index(args, len(order)).get("index", len(order))
     existing = _guid(args["child"]) in order
     expected = None if existing else [*order[:position], _guid(args["child"]), *order[position:]]
     unobserved = []
