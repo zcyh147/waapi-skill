@@ -23,6 +23,8 @@ from wwise_waapi.filesystem_security import path_is_link_or_reparse
 from tests.destructive.support.transport_semantics import (
     NODEID as TRANSPORT_SEMANTICS_NODEID, CONTRACT as TRANSPORT_SEMANTICS_CONTRACT,
     MIXED_NODEID as TRANSPORT_MIXED_NODEID, MIXED_CONTRACT as TRANSPORT_MIXED_CONTRACT,
+    OLDER_NODEID as TRANSPORT_OLDER_NODEID, OLDER_CONTRACT as TRANSPORT_OLDER_CONTRACT,
+    OLDER_FIXTURES, stage_owned_older_transport_media,
 )
 from tests.destructive.support.profiler_capture import (
     NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, CAPTURE_NODE_OUTCOMES,
@@ -39,6 +41,7 @@ DIAGNOSTIC_NODEIDS = (MEDIA_PRESERVATION_DIAGNOSTIC_NODEID, SOUNDCASTER_FRONTEND
 TRANSPORT_OBSERVATION_NODES = {
     TRANSPORT_SEMANTICS_NODEID: (TRANSPORT_SEMANTICS_CONTRACT, 'transport-semantics.json', 'selected-transport-semantics-observations'),
     TRANSPORT_MIXED_NODEID: (TRANSPORT_MIXED_CONTRACT, 'transport-mixed-semantics.json', 'mixed-transport-semantics-observations'),
+    TRANSPORT_OLDER_NODEID: (TRANSPORT_OLDER_CONTRACT, 'transport-older-semantics.json', 'older-transport-semantics-observations'),
 }
 
 
@@ -311,7 +314,7 @@ class AuthoringBatchAdapter:
                 if path.exists():
                     report = json.loads(path.read_text(encoding='utf-8'))
                     if (report.get('contract') != contract
-                            or report.get('candidate') != self.candidate or report.get('version') != '2025.1'
+                            or report.get('candidate') != self.candidate or report.get('version') != runtime.version
                             or report.get('business_effect_verified') is not False
                             or report.get('coverage_credit') != 'none_pending_semantics'):
                         raise ValueError('Transport observation report context or effect boundary changed')
@@ -491,6 +494,7 @@ OWNED_AUTHORING_NODEIDS = (
     *DIAGNOSTIC_NODEIDS,
     TRANSPORT_SEMANTICS_NODEID,
     TRANSPORT_MIXED_NODEID,
+    TRANSPORT_OLDER_NODEID,
     PROFILER_CAPTURE_NODEID,
     METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
@@ -507,6 +511,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     PROFILER_CAPTURE_NODEID: ('2025.1',),
     TRANSPORT_SEMANTICS_NODEID: ('2025.1',),
     TRANSPORT_MIXED_NODEID: ('2025.1',),
+    TRANSPORT_OLDER_NODEID: tuple(OLDER_FIXTURES),
 }
 
 
@@ -538,8 +543,10 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Profiler capture requires only its matching 2025 Authoring node')
     if METER_2024_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1'):
         raise pytest.UsageError('Owned meter projection requires only its matching 2024 Authoring node')
-    if set(selected).intersection(TRANSPORT_OBSERVATION_NODES) and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
+    if set(selected).intersection((TRANSPORT_SEMANTICS_NODEID, TRANSPORT_MIXED_NODEID)) and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
         raise pytest.UsageError('Transport observations require only their matching 2025 Authoring node')
+    if TRANSPORT_OLDER_NODEID in selected and len(selected) != 1:
+        raise pytest.UsageError('Older transport observations require their exact single node')
     root = Path(raw_root)
     if (not root.is_absolute() or os.path.lexists(root)
             or any(path_is_link_or_reparse(part) for part in root.parents)
@@ -551,8 +558,10 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
             raise ValueError('Owned Authoring source candidate changed before launch')
         if selected == (METER_2024_NODEID,):
             stage_owned_2024_meter_media(_sandbox, _io)
+        if selected == (TRANSPORT_OLDER_NODEID,):
+            stage_owned_older_transport_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
     live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',

@@ -24,7 +24,7 @@ def owned_authoring(tmp_path, monkeypatch, request):
     from wwise_waapi.headless import HeadlessLifecycle
     version = getattr(request, 'param', '2025.1')
     build = {'2021.1': (2021, 1, 14, 8108), '2022.1': (2022, 1, 19, 8584),
-        '2023.1': (2023, 1, 19, 8928), '2025.1': (2025, 1, 7, 9143)}[version]
+        '2023.1': (2023, 1, 19, 8928), '2024.1': (2024, 1, 13, 9056), '2025.1': (2025, 1, 7, 9143)}[version]
     root = tmp_path / 'batch'
     import os
     user_keys = ('USERPROFILE', 'APPDATA', 'LOCALAPPDATA') if os.name == 'nt' else ('HOME',)
