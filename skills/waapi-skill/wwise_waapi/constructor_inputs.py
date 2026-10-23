@@ -66,6 +66,29 @@ def complete(spec):
     return True
 
 
+def local_reference_field(spec, name):
+    """Select the observed local getter for this sealed constructor input only."""
+    proof = authority(spec)
+    return ('@' + name if proof is not None and spec.get('constructor_inputs') == proof
+        and name in proof['required_references'] else name)
+
+
+def local_reference_value(spec, name, value):
+    """Interpret only the certified MetadataSlot local singleton representation.
+
+    The SDK/live field remains a scalar reference. Its 2025 @Metadata getter
+    returns one object-reference row inside an array. Keep the original native
+    value in evidence; this relation never changes ordinary reference parsing.
+    """
+    if local_reference_field(spec, name) != '@' + name or not isinstance(value, list):
+        return value
+    from .operation_registry import _reference_value_is_observed
+    if (len(value) == 1 and isinstance(value[0], Mapping)
+            and _reference_value_is_observed(value[0]) and UUID(value[0]['id']).int != 0):
+        return value[0]
+    return value
+
+
 def observe(specs, identities, *, read):
     """Keep required scalar references intact before each dependent write."""
     for spec in specs:
@@ -83,7 +106,7 @@ def observe(specs, identities, *, read):
             raise ValueError('Required constructor reference owner is not one exact GUID')
         for name in fields:
             field, = [row for row in spec['references'] if row['name'] == name]
-            actual = rows[0].get('@' + name)
+            actual = local_reference_value(spec, name, rows[0].get('@' + name))
             actual = actual.get('id') if isinstance(actual, dict) else actual
             if not isinstance(actual, str) or actual.upper() != field.get('target_id', '').upper():
                 raise ValueError('Required constructor reference changed before dependent write')

@@ -33,6 +33,7 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         'metadata': '{44444444-4444-4444-4444-444444444444}'}
     observed_bus_name = 'Observed native Bus'
     native_slot = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'named-list-inner-2025-result.json').read_text())['slot']
+    native_reference = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'metadata-slot-local-reference-2025.json').read_text())
 
     class ListTask(OwnedGraphTask):
         def call(self, uri, args=None, options=None):
@@ -79,7 +80,10 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
                         if owned else {'id': oid, 'name': name})
                     if owned:
                         assert node.get('@Metadata') == new['metadata'], 'MetadataSlot requires its verified Metadata ShareSet'
-                        self.objects[oid]['@Metadata'] = {'id': node['@Metadata']}
+                        reference = deepcopy(native_reference['reference_read']['result']['return'][0]['@Metadata'])
+                        reference[0]['id'] = node['@Metadata']
+                        assert reference[0]['name'] == self.objects[node['@Metadata']]['name']
+                        self.objects[oid]['@Metadata'] = reference
                     if '@Metadata' in node and isinstance(node['@Metadata'], list):
                         slots = [create(slot, oid, owned=True) for slot in node['@Metadata']]
                         self.objects[oid]['@Metadata'] = [{'id': row['id'], 'name': row['name']} for row in slots]
@@ -105,9 +109,8 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
     task = ListTask(tmp_path, '2025.1', 'object.set')
     fixture = json.loads((Path(__file__).parents[1] / 'fixtures' / 'metadata' / 'named-list-sound-2025-output-bus.json').read_text())
     task.metadata = {name: deepcopy(row['result']) for name, row in fixture['fields'].items()}
-    # Matching MetadataSlot SDK/WObjects constructor semantics; program transport, not native metadata capture.
-    task.metadata['Metadata'] = {'name': 'Metadata', 'type': 'Reference',
-        'restriction': {'type': 'reference', 'restrictions': [{'type': ['Metadata']}, 'notNull']}}
+    # Exact retained R89 live field metadata and local reference representation.
+    task.metadata['Metadata'] = deepcopy(native_reference['field_metadata']['result'])
     assert task.metadata['OverrideOutput']['default'] is False
     assert task.metadata['OutputBus']['type'] == ''
     task.types = [{'classId': cid, 'name': name, 'type': 'Inner' if name == 'MetadataSlot' else 'WObject'} for name, cid in (
@@ -179,7 +182,8 @@ def test_named_list_native_collector_end_to_end_real_gateway_fake_transport(tmp_
         assert observation['output_bus_field']['metadata']['dependencies'] == task.metadata['OutputBus']['dependencies']
         assert observation['independent_created']['sound']['properties']['OverrideOutput'] is True
         assert writes[2][1]['objects'][0]['children'][0]['@OverrideOutput'] is True
-        assert observation['independent_slot_reference']['references']['Metadata']['id'] == new['metadata']
+        assert observation['independent_slot_reference']['local_references']['Metadata'] == [
+            {'id': new['metadata'], 'name': 'R84_System_Output_Settings'}]
         assert writes[0][1]['objects'][0]['children'][0]['name'] == 'R84 System Output Settings'
         assert observation['metadata_target']['name'] == 'R84_System_Output_Settings'
         assert observation['metadata_target']['class_id'] == 58982409
