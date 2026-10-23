@@ -5,6 +5,47 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R86/R87 local Lists and plug-in result identity
+
+Reviewed query implementation `22ff1cb5` adds closed local RTPC outputs for
+2022–2025 and EffectSlot outputs for 2023–2025, including related Curve points.
+The Synth class bridge is explicitly source-bound; it does not infer general
+plug-in inheritance. Original affected results were 672 PASS / 9 FAIL; the
+corrected selection passed 113 checks in 8.72s, the bridge selection 34 in
+2.45s, and the merged tracer eight in 0.68s. These overlap and are not summed.
+Test-only `00cdbcc2` exercised both real-Gateway/fake-client collector backends:
+ten controls passed in 9.60s, followed by four affected packet-proof checks in
+7.56s. Original fixture failures remain recorded.
+
+The first real local-List attempt on frozen `7a0d95b3`, Mac Console
+2025.1.7.9143, failed in 5.41s before any query or transaction. Its fixture
+incorrectly required raw source/copy byte equality despite the existing sandbox
+normalizer rewriting XML. Source hash/mtime/tree were unchanged and process
+cleanup completed. This is a fixture failure, not native query acceptance.
+Evidence: `r87-local-lists-7a0d95b3-2025-r1/root-review.json`.
+
+Reviewed plug-in correction `9c9cd6b5` preserves the requested Metadata
+ShareSet name while accepting the observed 2025 ASCII-space-to-underscore
+relation. It also requires the typed readback GUID to match the resolved
+created plug-in GUID. The substituted-GUID regression failed before repair;
+that case and three existing EffectSlot identity controls passed in 2.25s.
+Independent correction review found no further issue. Other name/version
+profiles remain separately assigned; this is not universal normalization proof.
+
+The next named-List attempt on the same frozen candidate failed in 6.32s.
+Its separately authorized Metadata setup transaction was **verified**, proving
+the repaired name binding on this native placement. The later source transaction
+`tx1-jve6tx3v5c6t7acyd617` is **indeterminate**: Bus and Sound/MetadataSlot SETs
+were acknowledged, but the slot returned an empty name and type
+`PluginInnerObject`, and result association stopped before later stages or
+typed slot verification. This does not establish a completed source workflow.
+The original 43 commands, 11 independent reads and 121 hashed packets remain
+in `r87-named-list-7a0d95b3-2025-r4/root-review.json`; all three native SET
+acknowledgements were checked against their original packets. No post-failure
+read, verification or replay occurred. Source integrity and process cleanup
+passed; the failed sandbox remains quarantined. Inner-object binding remains
+implementation work under #178/#180. No Fresh or full gate ran in this batch.
+
 ## 2026-10-23 R85 randomizer outputs and condition-source reconciliation
 
 Reviewed runtime `38676aac` exposes property-bound randomizer enabled/minimum/
