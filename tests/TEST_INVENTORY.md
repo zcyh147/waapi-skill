@@ -87,6 +87,14 @@ and 2/3 separately authorized verified transactions respectively. ContinuePlay,
 FadeInTime, owner, child and ordered membership are checked after each phase.
 Source integrity and cleanup passed. Evidence: `r76-structural-history-native-review.json`
 and `r76-association-history-9a055665-<year>-r1/root-review.json`.
+The same tagged source/undo/redo workflow then passed on 2024.1 (10.49s)
+and 2025.1 (10.22s) at frozen `bb0e5bea`. Each has 26 observation reads,
+167 hashed native packets and three verified transactions, with unchanged source
+and clean teardown. These resolve the exact later-version association reversal
+outcome that generic history and source-write component evidence alone could not
+prove. The 2022/2023 witnesses were reused without rerunning. The combined
+`r76-structural-history-native-review-2022-2025.json` binds all four original
+candidates/results. Wwise 2021 retains its pinned history API boundary.
 This proves the selected outcomes, not a global stack head or unobserved state.
 #177 and #192 stay open; no Fresh or full-gate result is added.
 
