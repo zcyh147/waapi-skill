@@ -57,8 +57,22 @@ passed. Root `r82-namespaced-query-1c5a07b7-2025-r1` retains final-v3 evidence,
 exact packets and Main review. Thirteen fixture program checks passed in 0.51s
 before the native run. This proves matching-2025 token/membership acceptance,
 not custom-value RETURN, an inheritance difference, or five-version native
-coverage. The corresponding metadata-bound public compiler repair is still
-#181 implementation work. No Fresh or full gate ran for this slice.
+coverage. Reviewed implementation `778df7fa`, integrated at `633731c0`, now
+admits fresh metadata-selected namespaced scalar properties in ordinary and
+override-source-value business conditions. Token permission is applied on every
+binding after actual-object kind fallback; cached discovery cannot grant the
+condition's permission to outputs or reference hops. Generic accessor grammar
+and mandatory typed predicate-value RETURN/readback checks are unchanged.
+
+The final five-version focused file passed 96 checks in 7.21s. The existing
+scalar/reference/related selection passed 170 in 18.25s; after its last fallback
+repair, 50 directly affected checks passed in 2.08s. These counts overlap.
+Initial field-token, disclosure and exact-object fallback failures remain
+preserved in `r83-namespaced-reviewed-evidence`. Independent review found no
+material issue and checked all five definitions and embedded source hashes.
+Public-flow native acceptance, including actual custom-value RETURN/readback,
+remains pending its separate prepared test; the earlier advanced identity-only
+witness is not substituted for it. No Fresh or full gate ran for this slice.
 
 ## 2026-10-23 R81 reference and override query conditions
 
