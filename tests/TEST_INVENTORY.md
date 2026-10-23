@@ -5,6 +5,53 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-23 R80 owned Action history and multiple-root creation
+
+Action history implementation `274119a3`, integrated at `62e4bac0`, retains the
+actual before/after Action identity, class, parent and typed ActionType in the
+source verifier's original read. Owned undo/redo consumes that witness and
+revalidates native metadata and source-kind authority. It does not reconstruct
+paths or enrich old executed receipts. Ordinary history and creation observers
+remain on their existing contracts.
+
+The initial public failure passed after repair. The expanded selection retained
+46 passes and two native-typed metadata-extension failures; the two failures and
+two valid counterparts then passed (4 in 4.20s). A parent-extension failure was
+repaired and its four affected controls passed in 4.16s. Existing source/history
+callers passed 58 in 24.89s. A malformed-witness diagnostic failure was repaired;
+eight legacy/forged-receipt controls and a valid flow passed in 4.67s. The selections
+overlap; original failures and repair attribution are retained in
+`r80-action-history-program-logs`. Independent Root review found no actionable
+issue in this slice.
+
+Frozen `62e4bac0468d45bec124c9cd0715ea6639f711df` passed the macOS Console
+2025.1.7.9143 Action retarget/undo/redo workflow in 14.35s. Three separately
+authorized transactions verified; 30 independent queries and 163 hash-checked
+native packets establish actual Target/path/controller changes and restoration,
+Event children, peer Action and old/new audio-target preservation. Final v3
+lifecycle evidence proves unchanged source hash/mtime/tree and completed process
+and passing-sandbox cleanup. Evidence root:
+`r80-action-history-62e4bac0-2025-r1`, including `root-review.json`.
+
+This adds native owned-history evidence for the exercised 2025 Action flow.
+Program controls cover 2022 undo and 2023–2025 undo/redo, both source-certified
+and native-typed metadata, and the 2021 history/2022 redo catalog boundaries.
+No other-version native history, global stack-head, outside-scope, full Action
+family, Fresh or Windows acceptance follows. Other #192 obligations stay open.
+
+Separately, creation implementation `27d0abe8` and repair `ba8af705`, integrated
+at `aec44f31`, stage ambiguous retained-parent roots individually and preserve
+actual native GUIDs/names and separate results. The cumulative created roster is
+reobserved before dependent reference writes. Independent review exposed an extra
+child inserted under an earlier root; its failing public counterexample passed
+after repair. Final affected controls passed 8 in 51.13s, including retained-read
+replay, source/history and prior identity/collision guards. Earlier applicable
+version/history controls remain separate overlapping evidence. Original logs,
+review and repair are archived in `r80-multiple-root-program-logs`. This is
+program evidence only; a zero-setup 2025 source/undo/redo native fixture is being
+prepared. Duplicate requested siblings and richer creation/history forms remain
+#178/#192 work. Neither increment ran a full Program or Non-live gate.
+
 ## 2026-10-23 R79 source-backed Action.Target kind
 
 Reviewed implementation `c667a640`, integrated at `35d1ae1e`, supports the existing
