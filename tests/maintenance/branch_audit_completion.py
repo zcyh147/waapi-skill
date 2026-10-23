@@ -171,6 +171,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_source_copy_capture.py',
                  'tests/support/runtime_observation_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',
+                 'tests/unit/test_rtpc_field_branch_evidence.py',
                  'tests/support/condition_mechanism_reuse.py', 'tests/support/condition_source_resolution.py',
                  'tests/maintenance/reconcile_condition_sources.py',
                  'tests/fixtures/metadata-conditions/lfo-eq-mechanism-review.json',
@@ -940,13 +941,19 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
         from tests.support.source_copy_native_evidence import validate_source_equivalence
         validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
         return
+    if proof.get('runtime_read_review'):
+        from tests.support.runtime_observation_evidence import validate_rtpc_source_review, RTPC_ORIGINAL_CANDIDATE
+        if proof['from_candidate'] != RTPC_ORIGINAL_CANDIDATE or not binding.get('runtime_observation_attachment'):
+            raise ValueError('RTPC guard review requires its exact original runtime producer')
+        validate_rtpc_source_review(proof['runtime_read_review'], sources, branch, root, base)
+        return
     for name, seal in sources.items():
         path = (root / name).resolve()
         if not path.is_relative_to(root.resolve()) or hashlib.sha256(path.read_bytes()).hexdigest() != seal:
             raise ValueError('equivalence relevant source changed')
 
 
-def validate_native_source(context, descriptor, branch, candidate, binding, base, root):
+def validate_native_source(context, descriptor, branch, candidate, binding, base, root, historical_sources=None):
     """Bridge an original producer's Git identity to the reviewed branch candidate."""
     import hashlib
     import subprocess
@@ -960,13 +967,19 @@ def validate_native_source(context, descriptor, branch, candidate, binding, base
         sources = context.get('relevant_sources')
         selected = binding.get('relevant_sources', [])
         if sources is None:
-            sources = {}
-            for name in selected:
-                completed = subprocess.run(['git', 'show', context['candidate'] + ':' + name], cwd=root,
-                                           check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if completed.returncode:
-                    raise ValueError('original native source candidate unavailable')
-                sources[name] = hashlib.sha256(completed.stdout).hexdigest()
+            key = (str(root.resolve()), context['candidate'], tuple(sorted(selected)))
+            if historical_sources is not None and key in historical_sources:
+                sources = dict(historical_sources[key])
+            else:
+                sources = {}
+                for name in selected:
+                    completed = subprocess.run(['git', 'show', context['candidate'] + ':' + name], cwd=root,
+                                               check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if completed.returncode:
+                        raise ValueError('original native source candidate unavailable')
+                    sources[name] = hashlib.sha256(completed.stdout).hexdigest()
+                if historical_sources is not None:
+                    historical_sources[key] = tuple(sorted(sources.items()))
         else:
             sources = {name: sources[name] for name in selected}
     proof = binding.get('native_equivalence', {})
@@ -1346,7 +1359,7 @@ def _created_topic_catalog(catalog_root, version, seal):
     return load_native_catalog(version, 'wwise-console', root=Path(catalog_root))
 
 
-def evidence_result(descriptor, branch, candidate, category, scope_kind, base, binding=None, source_root=None, reference_edges=None):
+def evidence_result(descriptor, branch, candidate, category, scope_kind, base, binding=None, source_root=None, reference_edges=None, historical_sources=None):
     """Read preserved run records. A declaration/test filename has no PASS credit."""
     from pathlib import Path
     root = source_root or Path(__file__).resolve().parents[2]
@@ -1361,9 +1374,12 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {}, category=category)
         record = read_sealed_artifact(descriptor, base)
+        if category == 'program' and ((binding or {}).get('runtime_read_program') or record.get('runtime_read_program')):
+            from tests.support.runtime_observation_evidence import validate_rtpc_program
+            validate_rtpc_program(record, binding or {}, branch, root)
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
-            validate_runtime_evidence(record, binding, branch, category, base, root)
+            validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
         if record.get('candidate_sha256') != candidate:
             validate_equivalence((binding or {}).get('equivalence', {}), descriptor, record, branch, candidate, binding or {}, base, root)
         if record.get('scope_kind', 'product') != scope_kind:
@@ -1526,7 +1542,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                     raise ValueError('native version/build mismatch')
                 observed_hosts.add(context['host'])
                 if not metadata_replay:
-                    validate_native_source(context, item, branch, candidate, binding, base, root)
+                    validate_native_source(context, item, branch, candidate, binding, base, root, historical_sources)
             if observed_hosts != required_hosts:
                 raise ValueError('native host context evidence mismatch')
         if category == 'native_absence':
@@ -1605,6 +1621,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
 
     condition_reuse_reviews, condition_reuse_runs = set(), set()
     definition_contexts, definition_proofs = {}, {}
+    historical_sources = {}  # Immutable Git objects only; never shared across evaluations.
     for branch in native['obligations']:
         branch['requirements'] = []
         route = routes.get(branch['route'])
@@ -1649,7 +1666,8 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 branch['reasons'] = ['present native schema or missing Skill implementation cannot become native absence']
                 continue
             result, reason = evidence_result(binding.get('evidence', {}).get('native_absence', {}), branch,
-                native['candidate_sha256'], 'native_absence', scope_kind, evidence_base or root, binding, root)
+                native['candidate_sha256'], 'native_absence', scope_kind, evidence_base or root, binding, root,
+                historical_sources=historical_sources)
             branch['state'] = 'proven_native_absence' if result == 'passed' else 'unresolved'
             branch['reasons'] = [] if reason is None else [reason]
             continue
@@ -1687,7 +1705,8 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
         branch['requirements'] = sorted(set(branch['requirements'] + extra))
         for required in branch['requirements']:
             outcome, reason = evidence_result(binding.get('evidence', {}).get(required, {}), branch,
-                native['candidate_sha256'], required, scope_kind, evidence_base or root, binding, root, reference_edges)
+                native['candidate_sha256'], required, scope_kind, evidence_base or root, binding, root, reference_edges,
+                historical_sources=historical_sources)
             branch['evidence_results'][required] = {'outcome': outcome, 'reason': reason}
         outcomes = {r['outcome'] for r in branch['evidence_results'].values()}
         if branch['evidence_results'].get('native', {}).get('outcome') == 'reviewed_mechanism_reuse':
