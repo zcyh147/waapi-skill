@@ -9131,6 +9131,7 @@ def _read_property_info(
     name: str,
     object_id: Any | None = None,
     class_id: int | None = None,
+    reference_kind_version: str | None = None,
 ) -> PropertyInfoMetadataRecord:
     args: dict[str, Any] = {"property": name}
     if object_id is not None:
@@ -9156,7 +9157,10 @@ def _read_property_info(
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
-    if info.type is None and info.restriction.get("type") != "reference":
+    if reference_kind_version is not None and object_id is not None:
+        from .reference_kind_evidence import certify
+        info = certify(info, version=reference_kind_version, object_id=object_id, read=read)
+    if info.type is None and not info.is_reference:
         raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": name, "unavailable_facts": ["type"]})
     return info
 
@@ -9546,10 +9550,10 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
     if isinstance(condition_metadata, Mapping):
         condition_metadata_groups.append(condition_metadata)
     observed_fields = {}
-    def observed_field(object_id, name):
-        key = (object_id, name)
+    def observed_field(object_id, name, kind_version=None):
+        key = (object_id, name, kind_version)
         if key not in observed_fields:
-            observed_fields[key] = _read_property_info(read, object_id=object_id, name=name)
+            observed_fields[key] = _read_property_info(read, object_id=object_id, name=name, reference_kind_version=kind_version)
         return observed_fields[key]
     for condition_metadata in condition_metadata_groups:
         for proof in condition_metadata.get("override_applicability", []):
@@ -9564,7 +9568,8 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
                 "passed": bool(passed), "evidence": evidence})
         for expected in condition_metadata["fields"]:
             name = expected.get("field_binding", {}).get("token", expected["name"])
-            observed = observed_field(condition_metadata["object_id"], name).as_dict()
+            kind_version = expected.get("reference_kind_evidence", {}).get("version")
+            observed = observed_field(condition_metadata["object_id"], name, kind_version).as_dict()
             assertions.append({"name": f"condition metadata {name} unchanged",
                                "passed": _native_snapshot_equal(observed, expected),
                                "evidence": {"expected": expected, "actual": observed}})
@@ -9592,7 +9597,10 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False, deferr
                     "evidence": {"uri": OBJECT_IS_PROPERTY_ENABLED_URI, "args": args, "result": result}})
         for selected in condition_metadata.get("native_fields", []):
             name = selected["token"]
-            observed = dict(observed_field(condition_metadata["object_id"], name).raw)
+            expected = next((item for item in condition_metadata["fields"]
+                if item.get("field_binding", {}).get("token", item.get("name")) == name), {})
+            observed = dict(observed_field(condition_metadata["object_id"], name,
+                expected.get("reference_kind_evidence", {}).get("version")).raw)
             assertions.append({"name": f"selected native metadata {name} unchanged",
                                "passed": _native_snapshot_equal(observed, selected["metadata"]),
                                "evidence": {"expected": selected["metadata"], "actual": observed}})
@@ -12038,7 +12046,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             metadata["field_read_platform"] = capture_field_read_platform(request.version, platform, read=read)
             if metadata["field_read_platform"]["status"] == "certified":
                 observation_platform = metadata["field_read_platform"]["platform_id"]
-        info = _read_property_info(read, object_id=source.object, name=field_value)
+        info = _read_property_info(read, object_id=source.object, name=field_value,
+            reference_kind_version=request.version if request.operation == "object.setReference" else None)
         metadata["field_info"] = info.as_dict()
         # Every exact selected field stays bound through prewrite and verify,
         # including dependency-free fields and cleared references. Raw facts

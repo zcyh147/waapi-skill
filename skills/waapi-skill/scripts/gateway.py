@@ -20327,6 +20327,16 @@ def dispatch_business_field_discovery(
         metadata = candidate.get("metadata")
         if not isinstance(metadata, Mapping):
             continue
+        if binding.record.operation == "object.setReference" and scope_kind == "object" and kind == "unknown":
+            from wwise_waapi.reference_kind_evidence import certify
+            from wwise_waapi.builders.metadata import bind_get_property_info_result, GET_PROPERTY_INFO_URI
+            native_info = read_call(GET_PROPERTY_INFO_URI, {"object": scope_value, "property": candidate["name"]}, {})
+            info = bind_get_property_info_result(native_info, field_token=str(candidate["name"]),
+                available_names=(str(candidate["name"]),))
+            info = certify(info, version=detected_version, object_id=scope_value, read=read_call)
+            if info.reference_kind_evidence:
+                candidate = {**candidate, "kind": "reference", "kind_evidence": dict(info.reference_kind_evidence)}
+                kind = "reference"
         value_type = metadata_typed_value_type(str(metadata.get("type", "")))
         if binding.record.operation == "object.setProperty":
             accepted = kind == "property" and value_type is not None
@@ -20574,6 +20584,7 @@ def dispatch_business_field_discovery(
                 "handle": bound.handle,
                 "label": label,
                 "field_kind": bound.field_kind,
+                **({"kind_evidence": dict(candidate["kind_evidence"])} if candidate.get("kind_evidence") else {}),
                 "value_type": bound.value_type,
                 "platform": bound.platform,
                 **({"applicability": dict(bound.applicability)} if bound.applicability is not None else {}),
@@ -32295,6 +32306,12 @@ def transaction_show_summary(
     condition_groups = list(condition_state.get("condition_metadata_guards", []))
     if isinstance(condition_state.get("condition_metadata"), Mapping):
         condition_groups.append(condition_state["condition_metadata"])
+    kind_proofs = [info["reference_kind_evidence"] for group in condition_groups for info in group.get("fields", [])
+        if info.get("reference_kind_evidence")]
+    if kind_proofs:
+        derived_notice["reference_kind_evidence"] = [{"field": proof["field"], "object_id": proof["object_id"],
+            "version": proof["version"], "authority": "pinned_sdk_field_kind", "source_sha256": proof["source_sha256"],
+            "restrictions_authority": proof["restrictions_authority"]} for proof in kind_proofs]
     structural = [proof for group in condition_groups for proof in group.get("structural_applicability", [])]
     if structural:
         derived_notice["reference_applicability"] = [{"kind": proof["kind"], "object_id": proof["object_id"],

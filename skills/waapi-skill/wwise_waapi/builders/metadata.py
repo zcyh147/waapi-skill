@@ -112,6 +112,12 @@ class PropertyInfoMetadataRecord:
     audio_engine_id: int | None = None
     raw: Mapping[str, Any] = field(default_factory=dict)
     field_binding: Mapping[str, Any] = field(default_factory=dict)
+    reference_kind_evidence: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_reference(self) -> bool:
+        return ((isinstance(self.type, str) and self.type.casefold() in {"reference", "objectreference"})
+            or self.restriction.get("type") == "reference" or bool(self.reference_kind_evidence))
 
     def as_dict(self, *, include_raw: bool = False) -> dict[str, Any]:
         payload = {
@@ -128,6 +134,8 @@ class PropertyInfoMetadataRecord:
         if self.field_binding:
             payload["name"] = self.raw.get("name")
             payload["field_binding"] = dict(self.field_binding)
+        if self.reference_kind_evidence:
+            payload["reference_kind_evidence"] = dict(self.reference_kind_evidence)
         if include_raw:
             payload["raw"] = dict(self.raw)
         return payload

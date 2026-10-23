@@ -491,7 +491,7 @@ def _require_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
     restriction_type = metadata.restriction.get("type")
     supports_reference = (
         metadata.supports.get("reference") is True
-        or (isinstance(metadata.type, str) and metadata.type.lower() in {"reference", "objectreference"})
+        or metadata.is_reference
         or (isinstance(restriction_type, str) and restriction_type.casefold() == "reference")
     )
     constrained = metadata.supports.get("constrained") is True or bool(metadata.restriction.get("constraints")) or bool(metadata.restriction.get("ordering"))
