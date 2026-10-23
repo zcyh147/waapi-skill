@@ -1,4 +1,4 @@
-"""One owned 2025 capture, with independent meter/cursor/file observations.
+"""Owned 2024 meter capture and 2025 meter/cursor/file/log observations.
 
 This collector uses only the public Gateway. The existing Authoring batch owns
 launch, source integrity, process cleanup, archival and final acceptance.
@@ -17,23 +17,66 @@ from tests.semantic.support.typed_gateway_input import discovered_business_field
 
 NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_meter_cursor_capture')
+METER_2024_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_runtime_owned_2024_meter_projection')
+METER_2024_SOUND_ID = '{DB017C8E-EC99-415B-93CF-F7A6136D1AC2}'
+METER_2024_BUS_ID = '{06362E8D-5A32-497A-B063-3DA95963CE47}'
+METER_2024_PARENT_ID = '{ED2BCAC8-D7B6-4448-8900-439B557894F4}'
+METER_2024_MEDIA = 'Originals/SFX/Minigun/MnGn_Barrel_Loop.wav'
+METER_2024_MEDIA_SOURCE = Path('/Applications/Audiokinetic/SampleProject2024.1.13.9056/SampleProject') / METER_2024_MEDIA
+METER_2024_MEDIA_SHA256 = '637e45b1415306ab6833da81607a4d1405136830b7828a291fa8721806dccb7d'
 SOUND_ID = '{FBF74BF9-8B83-44A8-AC8A-BA85372ECDC4}'
 BUS_ID = '{8DD26D7F-389D-4487-B09F-5C675BF2E8D9}'
 # Structural parent in the committed Busses WWU; Main Audio Bus is a sibling.
 PARENT_ID = '{A74EEB4A-0805-4AFA-969C-53DCB862B550}'
 OUTCOMES = ('profiler-meter-object-observation', 'profiler-cursor-snap-readback',
     'profiler-saved-capture-artifact', 'runtime-owned-log-add', 'runtime-owned-log-clear')
+CAPTURE_NODE_OUTCOMES = {NODEID: OUTCOMES, METER_2024_NODEID: OUTCOMES[:1]}
 PREFIX = 'ak.wwise.core.'
 
 
+def stage_owned_2024_meter_media(sandbox, io_root):
+    """Supply one omitted original in the owned copy; authored XML is untouched."""
+    from wwise_waapi.filesystem_security import path_is_link_or_reparse
+    from wwise_waapi.operation_soundbank import capture_file_proof, prove_artifact_path
+    source = METER_2024_MEDIA_SOURCE
+    before = capture_file_proof(source, field='matching installed 2024 original',
+        io_root=source.parents[2], max_bytes=16 * 1024 * 1024)
+    assert before['sha256'] == METER_2024_MEDIA_SHA256, 'Matching installed 2024 original differs'
+    assert sandbox.sandbox_path.resolve(strict=True) != sandbox.source_root.resolve(strict=True)
+    target = sandbox.sandbox_path / METER_2024_MEDIA
+    prove_artifact_path(target, field='owned 2024 original destination', io_root=sandbox.sandbox_path,
+        expect_directory=False)
+    assert not any(path_is_link_or_reparse(part) for part in (target, *target.parents)
+        if part.exists() or part.is_symlink()), '2024 media destination traverses a link'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with source.open('rb') as original:
+        raw = original.read(16 * 1024 * 1024 + 1)
+    assert len(raw) == before['size'] and hashlib.sha256(raw).hexdigest() == METER_2024_MEDIA_SHA256
+    with target.open('xb') as output:
+        output.write(raw)
+    staged = capture_file_proof(target, field='owned staged 2024 original',
+        io_root=sandbox.sandbox_path, max_bytes=16 * 1024 * 1024)
+    after = capture_file_proof(source, field='matching installed 2024 original',
+        io_root=source.parents[2], max_bytes=16 * 1024 * 1024)
+    assert after == before and staged['sha256'] == before['sha256'], '2024 original changed during staging'
+    (io_root / 'profiler-meter-media.json').write_text(json.dumps({'source': before, 'staged': staged,
+        'authored_xml_changed': False, 'scope': 'One existing missing original copied only into owned sandbox'}) + '\n')
+
+
 def collect_owned_capture(batch, public_call):
-    assert batch.runtime.version == '2025.1', 'This capture case is pinned to 2025.1'
-    destination = Path(batch.node_runtimes[NODEID].runner_environment['WWISE_EVIDENCE_DIR'])
+    version = batch.runtime.version
+    assert version in ('2024.1', '2025.1'), 'Capture cases are pinned to 2024.1/2025.1'
+    nodeid = METER_2024_NODEID if version == '2024.1' else NODEID
+    assert batch.selected_nodeids == (nodeid,), 'Capture requires its exact matching node'
+    sound_id, bus_id, parent_id = (METER_2024_SOUND_ID, METER_2024_BUS_ID, METER_2024_PARENT_ID) if version == '2024.1' else (SOUND_ID, BUS_ID, PARENT_ID)
+    parent_output, parent_key = ('volume-db', 'volume_db') if version == '2024.1' else ('work-unit-is-default', 'work_unit_is_default')
+    destination = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
     destination.mkdir(parents=True, exist_ok=True)
     path = destination / 'profiler-capture.json'
     report = {'contract': 'waapi-skill.owned-profiler-capture/v1', 'candidate': batch.candidate,
-        'host': batch.info, 'version': '2025.1', 'complete': False, 'setup': [], 'errors': [],
-        'outcomes': {name: {'outcome': 'BLOCKED', 'reason': 'shared setup incomplete'} for name in OUTCOMES},
+        'host': batch.info, 'version': version, 'complete': False, 'setup': [], 'errors': [],
+        'outcomes': {name: {'outcome': 'BLOCKED', 'reason': 'shared setup incomplete'} for name in CAPTURE_NODE_OUTCOMES[nodeid]},
         'cleanup': {'complete': False, 'receipts': [], 'errors': [],
             'capture_settings_prior_state_restored': False,
             'audition_media_prior_state_restored': False,
@@ -110,7 +153,7 @@ def collect_owned_capture(batch, public_call):
 
     def set_loop(value, *, before_execute=None):
         result = execute(draft('object.setProperty', ['--business-value', json.dumps(value)],
-            identity=SOUND_ID, field_meaning='IsLoopingEnabled'), before_execute=before_execute)
+            identity=sound_id, field_meaning='IsLoopingEnabled'), before_execute=before_execute)
         assert result['verification']['business_state_verified'] is True, result
         return result
 
@@ -144,25 +187,34 @@ def collect_owned_capture(batch, public_call):
     persist()
     try:
         from wwise_waapi.operation_soundbank import capture_file_proof
-        media = batch.runtime.sandbox.sandbox_path / 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav'
+        media = batch.runtime.sandbox.sandbox_path / (METER_2024_MEDIA if version == '2024.1' else 'Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav')
         proof = capture_file_proof(media, field='owned integration audio', io_root=batch.runtime.owned_root,
             max_bytes=16 * 1024 * 1024)
         with wave.open(str(media)) as source:
             assert source.getnframes() > 0 and source.getframerate() > 0
             duration = source.getnframes() / source.getframerate()
         report['fixture_media'] = {'proof': proof, 'duration_seconds': duration,
-            'source_scope': 'Existing integration-v2 audit_tail.wav; no source/media edits'}
+            'source_scope': ('One staged matching 2024 original; no authored XML/source edits' if version == '2024.1' else 'Existing integration-v2 audit_tail.wav; no source/media edits')}
+        if version == '2024.1':
+            staging = json.loads((batch.runtime.io_root / 'profiler-meter-media.json').read_text())
+            assert proof['sha256'] == staging['source']['sha256'] == staging['staged']['sha256'] == METER_2024_MEDIA_SHA256
+            report['fixture_media']['staging'] = staging
         looping = ['--include-field', 'IsLoopingEnabled', '--include-field', 'IsLoopingInfinite']
-        original = exact(SOUND_ID, *looping)
-        assert original['name'] == 'RFL_Tail' and original['type'] == 'Sound', original
+        if version == '2024.1':
+            looping += ['--include', 'output-bus']
+        original = exact(sound_id, *looping)
+        assert original['name'] == ('MnGn_Barrel_Loop' if version == '2024.1' else 'RFL_Tail') and original['type'] == 'Sound', original
         props = original.get('properties', {})
         assert type(props.get('IsLoopingEnabled')) is bool and props.get('IsLoopingInfinite') is True, (
             'Owned fixture requires live boolean loop values and already-infinite mode', original)
-        before_bus = exact(BUS_ID, '--include', 'volume-db', '--include', 'parent')
-        before_parent = exact(PARENT_ID, '--include', 'work-unit-is-default')
-        assert before_bus['name'] == 'WAAPI_V2_Weapons' and before_bus['type'] == 'Bus', before_bus
-        assert before_bus['parent']['id'] == PARENT_ID, before_bus
-        assert before_parent['type'] == 'WorkUnit' and type(before_parent.get('work_unit_is_default')) is bool, before_parent
+        if version == '2024.1':
+            assert props['IsLoopingEnabled'] is True and original.get('output_bus', {}).get('id') == bus_id, original
+        before_bus = exact(bus_id, '--include', 'volume-db', '--include', 'parent')
+        before_parent = exact(parent_id, '--include', parent_output)
+        assert before_bus['name'] == ('Guns' if version == '2024.1' else 'WAAPI_V2_Weapons') and before_bus['type'] == 'Bus', before_bus
+        assert before_bus['parent']['id'] == parent_id, before_bus
+        assert before_parent['type'] == ('Bus' if version == '2024.1' else 'WorkUnit'), before_parent
+        assert type(before_parent.get(parent_key)) in ((int, float) if version == '2024.1' else (bool,)), before_parent
         report['fixture_before'] = {'sound': original, 'bus': before_bus, 'parent': before_parent}
         # The matching WObjects.xml defines Loop Enable as bool, default false;
         # Infinite defaults true and requires Enable. Fresh Draft discovery owns
@@ -173,11 +225,11 @@ def collect_owned_capture(batch, public_call):
         report['setup'].append({'originals': effect('transport.useOriginals', ['--audition-media', 'originals'])})
         report['setup'].append({'enable_meters': effect('profiler.enableProfilerData', ['--capture-data', 'meters', 'enable'],
             before_execute=lambda: own('disable-meters-data', lambda: effect('profiler.enableProfilerData', ['--capture-data', 'meters', 'disable'])))})
-        report['setup'].append({'register_meter': effect('profiler.registerMeter', role='meter_object', identity=BUS_ID,
-            before_execute=lambda: own('unregister-meter', lambda: effect('profiler.unregisterMeter', role='meter_object', identity=BUS_ID)))})
+        report['setup'].append({'register_meter': effect('profiler.registerMeter', role='meter_object', identity=bus_id,
+            before_execute=lambda: own('unregister-meter', lambda: effect('profiler.unregisterMeter', role='meter_object', identity=bus_id)))})
         report['setup'].append({'start_capture': zero('profiler.startCapture',
             before_execute=lambda: own('stop-capture', lambda: zero('profiler.stopCapture')))})
-        created = effect('transport.create', role='target', identity=SOUND_ID)
+        created = effect('transport.create', role='target', identity=sound_id)
         handle = created['agent_result']['business_result']['transport_handle']
         own('destroy-transport', lambda: effect('transport.destroy', ['--transport-handle', handle]))
         own('stop-transport', lambda: effect('transport.executeAction', ['--audition-action', 'stop',
@@ -194,21 +246,21 @@ def collect_owned_capture(batch, public_call):
         def meters():
             payload = call(['core-call', PREFIX + 'profiler.getMeters', '--profiler-position', fixed_time,
                 '--max-results', '64', '--meter-object-include', 'volume-db',
-                '--meter-object-include-related', 'parent', 'work-unit-is-default'])
+                '--meter-object-include-related', 'parent', parent_output])
             pages = [payload['agent_result']]
             while not pages[-1]['complete']:
                 assert len(pages) < report['limits']['meter_pages'], 'Meter page bound exceeded'
                 pages.append(call(pages[-1]['next_command']['gateway_argv'])['agent_result'])
             rows = [row for page in pages for row in page['meters']]
-            observed = [row for row in rows if row['object'].get('id') == BUS_ID]
+            observed = [row for row in rows if row['object'].get('id') == bus_id]
             assert observed, 'Non-default registered bus missing from actual meter frame'
             for row in observed:
                 obj = row['object']
                 assert all(obj[key] == before_bus[key] for key in ('id', 'name', 'type', 'path')), obj
                 assert obj['volume_db'] == before_bus['volume_db'], obj
                 parent = obj['related']['parent']
-                assert parent['object']['id'] == PARENT_ID and parent['object']['name'] == before_parent['name'], parent
-                assert type(parent.get('work_unit_is_default')) is bool and parent['work_unit_is_default'] == before_parent['work_unit_is_default'], parent
+                assert parent['object']['id'] == parent_id and parent['object']['name'] == before_parent['name'], parent
+                assert type(parent.get(parent_key)) in ((int, float) if version == '2024.1' else (bool,)) and parent[parent_key] == before_parent[parent_key], parent
                 assert isinstance(row['source'], str) and row['source'], row
                 assert isinstance(row['configurationName'], str) and row['configurationName']
                 assert isinstance(row['configurationType'], str) and row['configurationType']
@@ -223,64 +275,66 @@ def collect_owned_capture(batch, public_call):
         # executes at most once; cleanup never repeats an attempted stop.
         report['setup'].append({'stop_capture': clean_one('stop-capture')})
 
-        def cursor():
-            verified = effect('profiler.setCursorTime', ['--cursor-target-ms', fixed_time])
-            scope = verified['verification']['verification_scope']['cursor_observation']
-            read = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'user-cursor'])['agent_result']
-            assert verified['verification']['business_state_verified'] is True and scope['outcome'] == 'matched', verified
-            assert read['available'] is True and read['position_ms'] == scope['returned_time_ms'] == scope['observed_time_ms'], (scope, read)
-            return {'requested_time_ms': position['position_ms'], 'snapped_time_ms': scope['returned_time_ms'],
-                'user_cursor': read, 'transaction': verified, 'capture_data_completeness_verified': False}
-        outcome(OUTCOMES[1], cursor)
+        if version == '2025.1':
+            def cursor():
+                verified = effect('profiler.setCursorTime', ['--cursor-target-ms', fixed_time])
+                scope = verified['verification']['verification_scope']['cursor_observation']
+                read = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'user-cursor'])['agent_result']
+                assert verified['verification']['business_state_verified'] is True and scope['outcome'] == 'matched', verified
+                assert read['available'] is True and read['position_ms'] == scope['returned_time_ms'] == scope['observed_time_ms'], (scope, read)
+                return {'requested_time_ms': position['position_ms'], 'snapped_time_ms': scope['returned_time_ms'],
+                    'user_cursor': read, 'transaction': verified, 'capture_data_completeness_verified': False}
+            outcome(OUTCOMES[1], cursor)
 
-        def saved():
-            output = destination / 'saved-capture'; output.mkdir()
-            sibling = output / 'preserve.txt'; sibling.write_bytes(b'owned sibling preservation sentinel\n')
-            before = hashlib.sha256(sibling.read_bytes()).hexdigest()
-            verified = effect('profiler.saveCapture', ['--capture-output-directory', str(output), '--capture-name', 'OwnedCapture'])
-            assert verified['verification']['business_state_verified'] is True, verified
-            scope = verified['verification']['verification_scope']
-            proof = capture_file_proof(output / 'OwnedCapture.prof', field='exact saved capture',
-                io_root=destination, max_bytes=512 * 1024 * 1024)
-            assert proof['size'] > 0 and hashlib.sha256(sibling.read_bytes()).hexdigest() == before
-            return {**scope, 'file': proof, 'sibling_sha256': before, 'transaction': verified}
-        outcome(OUTCOMES[2], saved)
+            def saved():
+                output = destination / 'saved-capture'; output.mkdir()
+                sibling = output / 'preserve.txt'; sibling.write_bytes(b'owned sibling preservation sentinel\n')
+                before = hashlib.sha256(sibling.read_bytes()).hexdigest()
+                verified = effect('profiler.saveCapture', ['--capture-output-directory', str(output), '--capture-name', 'OwnedCapture'])
+                assert verified['verification']['business_state_verified'] is True, verified
+                scope = verified['verification']['verification_scope']
+                proof = capture_file_proof(output / 'OwnedCapture.prof', field='exact saved capture',
+                    io_root=destination, max_bytes=512 * 1024 * 1024)
+                assert proof['size'] > 0 and hashlib.sha256(sibling.read_bytes()).hexdigest() == before
+                return {**scope, 'file': proof, 'sibling_sha256': before, 'transaction': verified}
+            outcome(OUTCOMES[2], saved)
         clean_one('stop-transport')
         state = call(['core-call', PREFIX + 'transport.getState', '--transport-handle', handle])['agent_result']
         assert state['state'] == 'stopped', state
         report['cleanup']['transport_stopped_observation'] = state
         clean_one('destroy-transport')
 
-        # General log belongs to this isolated host. Other-channel contents are
-        # observed separately; no continuous/exclusive log-state promise is made.
-        def log(channel):
-            result = call(['core-call', PREFIX + 'log.get', '--log-channel', channel, '--max-results', '40'])['agent_result']
-            assert result['truncated'] is False, 'Owned log baseline exceeds the 40-row collection bound'
-            return result['items']
-        before_other = log('source-control')
-        report['logs'] = {'other_channel': 'source-control', 'other_before': before_other,
-            'general_before': log('general'), 'scope': 'Exact owned Authoring host; selected General channel only'}
-        message = 'WAAPI owned capture ' + uuid.uuid4().hex
-        report['logs']['message'] = message
-        def add_log():
-            verified = effect('log.addItem', ['--message', message, '--severity', 'message'])
-            observed = verified['verification']['verification_scope']['log_observation']
-            assert verified['verification']['business_state_verified'] is True and observed['outcome'] == 'new_matching_item', verified
-            rows = log('general')
-            assert sum(row.get('message') == message and row.get('severity') == 'Message' for row in rows) == 1, rows
-            return {'message': message, 'rows_after': rows, 'transaction': verified,
-                'exclusive_causation_verified': False}
-        outcome(OUTCOMES[3], add_log)
-        def clear_log():
-            verified = effect('log.clear', ['--log-channel', 'general'])
-            observed = verified['verification']['verification_scope']['log_observation']
-            assert verified['verification']['business_state_verified'] is True and observed['outcome'] == 'prior_contents_absent', verified
-            rows, other = log('general'), log('source-control')
-            assert not any(row.get('message') == message for row in rows), rows
-            assert other == before_other, 'Unselected source-control log changed'
-            return {'rows_after': rows, 'other_after': other, 'transaction': verified,
-                'continuing_channel_state_verified': False}
-        outcome(OUTCOMES[4], clear_log)
+        if version == '2025.1':
+            # General log belongs to this isolated host. Other-channel contents are
+            # observed separately; no continuous/exclusive log-state promise is made.
+            def log(channel):
+                result = call(['core-call', PREFIX + 'log.get', '--log-channel', channel, '--max-results', '40'])['agent_result']
+                assert result['truncated'] is False, 'Owned log baseline exceeds the 40-row collection bound'
+                return result['items']
+            before_other = log('source-control')
+            report['logs'] = {'other_channel': 'source-control', 'other_before': before_other,
+                'general_before': log('general'), 'scope': 'Exact owned Authoring host; selected General channel only'}
+            message = 'WAAPI owned capture ' + uuid.uuid4().hex
+            report['logs']['message'] = message
+            def add_log():
+                verified = effect('log.addItem', ['--message', message, '--severity', 'message'])
+                observed = verified['verification']['verification_scope']['log_observation']
+                assert verified['verification']['business_state_verified'] is True and observed['outcome'] == 'new_matching_item', verified
+                rows = log('general')
+                assert sum(row.get('message') == message and row.get('severity') == 'Message' for row in rows) == 1, rows
+                return {'message': message, 'rows_after': rows, 'transaction': verified,
+                    'exclusive_causation_verified': False}
+            outcome(OUTCOMES[3], add_log)
+            def clear_log():
+                verified = effect('log.clear', ['--log-channel', 'general'])
+                observed = verified['verification']['verification_scope']['log_observation']
+                assert verified['verification']['business_state_verified'] is True and observed['outcome'] == 'prior_contents_absent', verified
+                rows, other = log('general'), log('source-control')
+                assert not any(row.get('message') == message for row in rows), rows
+                assert other == before_other, 'Unselected source-control log changed'
+                return {'rows_after': rows, 'other_after': other, 'transaction': verified,
+                    'continuing_channel_state_verified': False}
+            outcome(OUTCOMES[4], clear_log)
     except Exception as exc:
         report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:4096]})
     finally:
@@ -292,9 +346,9 @@ def collect_owned_capture(batch, public_call):
             persist()
         try:
             if 'fixture_before' in report:
-                after = {'sound': exact(SOUND_ID, *looping),
-                    'bus': exact(BUS_ID, '--include', 'volume-db', '--include', 'parent'),
-                    'parent': exact(PARENT_ID, '--include', 'work-unit-is-default')}
+                after = {'sound': exact(sound_id, *looping),
+                    'bus': exact(bus_id, '--include', 'volume-db', '--include', 'parent'),
+                    'parent': exact(parent_id, '--include', parent_output)}
                 report['fixture_after'] = after
                 assert after == report['fixture_before'], 'Owned Sound/bus/parent values changed after cleanup'
         except Exception as exc:
