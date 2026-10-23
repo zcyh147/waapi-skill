@@ -124,9 +124,17 @@ def wait_for_port_release(
             return
         except PortUnavailable as exc:
             if time.monotonic() >= deadline:
+                cause = exc.__cause__
+                if isinstance(cause, OSError):
+                    diagnostic = (
+                        f"; last bind error: {type(cause).__name__} "
+                        f"(errno={cause.errno!r}): {str(cause)[:512]}"
+                    )
+                else:
+                    diagnostic = f"; last probe error: {type(exc).__name__}: {str(exc)[:512]}"
                 raise SandboxFixtureError(
-                    f"Wwise WAAPI port 0.0.0.0:{port} remained occupied after "
-                    f"the {timeout_seconds:g}-second release wait"
+                    f"Wwise WAAPI port 0.0.0.0:{port} remained unavailable for binding after "
+                    f"the {timeout_seconds:g}-second release wait{diagnostic}"
                 ) from exc
             time.sleep(poll_interval_seconds)
 
