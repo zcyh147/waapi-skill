@@ -1369,3 +1369,13 @@ def test_exact_live_token_binding_distinguishes_optional_type_absence_from_malfo
 def test_blend_track_relative_identity_requires_the_observed_version_profile(version):
     with pytest.raises(ValueError):
         normalize_live_object_identity({"id": OBJECT_ID, "name": "On-Load", "type": "BlendTrack", "path": "On-Load"}, version=version)
+
+
+@pytest.mark.parametrize("version,object_type,name", [
+    ("2022.1", "Platform", "Mac"), ("2023.1", "Platform", "Mac"),
+    ("2024.1", "Platform", "Mac"), ("2025.1", "Platform", "Mac"),
+    (None, "Platform", "Mac"), ("2021.1", "Sound", "Rain"), ("2021.1", "Language", "SFX"),
+])
+def test_platform_display_identity_does_not_relax_unobserved_types_or_versions(version, object_type, name):
+    with pytest.raises(ValueError, match="absolute Wwise path or a reviewed derived display identity"):
+        normalize_live_object_identity({"id": OBJECT_ID, "name": name, "type": object_type, "path": name}, version=version)

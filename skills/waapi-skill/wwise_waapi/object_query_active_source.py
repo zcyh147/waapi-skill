@@ -49,7 +49,7 @@ def _identity(row):
         _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", "Object identity is incomplete.")
     if identity["type"] != "Project":
         try:
-            actual = normalize_live_object_identity(row)
+            actual = normalize_live_object_identity(row, version="2021.1")
         except ValueError as exc:
             _fail("ACTIVE_SOURCE_INVALID_OBSERVATION", str(exc))
         identity.update(name=actual.name, type=actual.object_type, path=actual.path)
