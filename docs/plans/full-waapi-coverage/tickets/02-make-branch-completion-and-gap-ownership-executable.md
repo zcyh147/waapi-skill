@@ -58,6 +58,16 @@ The existing dependency on this shared checker now blocks final acceptance
 again. Unaffected implementation work may continue; this ticket cannot close
 until the repair and its focused verification are complete.
 
+The reopened repair is integrated at `9ba83f9a`. It preserves all identities
+and adds resolved-parent classification plus exact-field public counterexample
+receipts. Independent review's flag-attribution finding is fixed. The all-owner
+empty-candidate sweep found 179 rejected and 155 unknown candidates; these are
+explicit unresolved classifications, not capability exclusions or completed
+product branches. Focused results and limitations are recorded in
+[the test inventory](../../../../tests/TEST_INVENTORY.md). The ticket remains
+open while its interaction with the pending runtime admission is integrated;
+no full-gate or current global completion result is claimed.
+
 ### Original delivery
 
 See [LEDGER.md](../LEDGER.md) for the existing audit CLI, exact binding and evidence requirements, original-producer readers, reviewed reuse, and controlled proof scope. The generated product inventory retains 272,313 obligations across 1,683 native host/build routes: 268,559 unresolved, 3,638 missing implementation and 116 exact approved exclusions; none has received verified execution credit. Every functional obligation is owned by #177–#193. #194 owns the formal Fresh archive bridge; #195 remains acceptance only.
