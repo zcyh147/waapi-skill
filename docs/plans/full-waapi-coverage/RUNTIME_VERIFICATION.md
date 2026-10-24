@@ -25,9 +25,44 @@ publication are still required before this method yields current coverage.
 
 Use retained facts first and collect only missing business-risk evidence. Do not
 create another native run just to force every boolean value, two metadata entries
-or repeated result rows. Actual metadata association, recursive-child meaning,
-driver alternatives, applicable ray identifiers and host/version differences
-still need their listed native evidence.
+or repeated result rows. R124 initially retained native requirements for metadata
+association, recursive children, object-valued drivers and ray identifiers. The
+code-based refinement below supersedes that classification only for the exact
+opaque output leaves; host/version differences and control effects remain.
+
+### Opaque diagnostic output classification — R126 implementation decision
+
+Main applies the approved risk method to the remaining44 output leaves after
+reviewing the actual Gateway paths and five-version public tests at `036f9590`.
+These comprise metadata class/source IDs20, recursive child references10,
+GUID-valued driver values10 and emitter-local ray indices4. Gateway validates
+and preserves these values; none drives target selection, pipeline authority,
+mutation, geometry interpretation or control decisions.
+
+`runtime_inspection_business.py` preserves AudioObject metadata, while
+`builders/stable_reads.py` preserves contribution nesting and values through
+the bounded JSON copy. `test_runtime_result_reference_gateway.py` exercises
+populated metadata and recursive numeric/GUID values through the public Gateway,
+including malformed results and real issued input handles. The contribution
+branch tests cover the applicable ray field and both hosts. Matching native
+definitions supply field meanings; a new fixture merely forcing their presence
+would test Wwise feature population rather than another Gateway behavior.
+
+The exact successor must keep all6,292 branch IDs, shapes and ownership, retain
+R124 and historical failures unchanged, and classify these44 as conditional
+program preservation. The intended effective totals are2,120 conditional leaves
+and272 native anchors; these are requirements, not verified coverage counts.
+Program proof and the retained same-route native availability, attributable
+nonempty data and semantic anchors are both mandatory. Missing native gates,
+wrong versions/hosts, incomplete cleanup or unrelated-route evidence cannot
+grant completion. Independent review and current publication remain required.
+
+The completion claim is faithful optional diagnostic output when Wwise supplies
+it. It does not claim that these runs observed populated metadata, recursive
+children, object-valued conditions or spatial rays. Any construction/control
+workflow that creates such conditions retains its own implementation and
+effect-verification obligations; no API, parameter or business operation is
+removed from the project scope by this classification.
 
 ### Narrow LoadedMedia representative support
 

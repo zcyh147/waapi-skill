@@ -743,14 +743,16 @@ def validate_evidence(record, binding, branch, category, base, root, edges):
         raise ValueError('Fixed-row exact native branch assertion differs')
 
 
-def write_fixed_bundle(output, program_path, originals, *, inventory, selected=None, name_prefix=''):
+def write_fixed_bundle(output, program_path, originals, *, inventory, selected=None, name_prefix='', mappings=None):
     """Publish independent assertions through the existing runtime attachment."""
     captured = json.loads(Path(program_path).read_bytes()); uri = captured['native_call']['uri']
     payload = captured['gateway']['payload']; version = payload['schema_validation']['result']['version']
     host = 'wwise-console' if payload['is_command_line'] else 'wwise-authoring'
     route = next(r for r in inventory['native_coverage']['routes'] if r['uri'] == uri and r['version'] == version and r['host'] == host)
     public = next(r for r in inventory['routes'] if r['id'] == route['public_route'])
-    mapped = mappings(inventory, captured, route, selected)
+    mapped = globals()['mappings'](inventory, captured, route, selected) if mappings is None else mappings
+    if selected is not None and {m['branch']['id'] for m in mapped} != selected:
+        raise ValueError('Every selected fixed-row branch needs its explicit mapped occurrence')
     profile = native_profile({'route':route['id']}) if originals is not None else None
     if name_prefix and (not name_prefix.endswith('-') or '/' in name_prefix or '..' in name_prefix):
         raise ValueError('Fixed flow prefix must be a simple filename prefix')
