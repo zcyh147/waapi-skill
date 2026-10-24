@@ -1642,6 +1642,10 @@ def build_parser() -> argparse.ArgumentParser:
             "requested voice-path order; omit for the dry path"
         ),
     )
+    profiler_voice_contributions.add_argument(
+        "--bus-path", choices=("dry-path", "wwise-default"),
+        help="Choose the dry voice path or leave path selection to Wwise; conflicts with Bus selectors",
+    )
     profiler_voice_contributions.set_defaults(
         time=None,
         voice_pipeline_id=None,
@@ -6418,6 +6422,8 @@ def preflight_stable_read_input(
         )
     bus_object_ids = tuple(args.bus_object_id)
     bus_instance_handles = tuple(args.bus_instance_handle)
+    if args.bus_path is not None and (bus_object_ids or bus_instance_handles):
+        raise GatewayInputError("--bus-path conflicts with explicit Bus object identities or instance handles")
     if bus_object_ids and bus_instance_handles:
         raise GatewayInputError(
             "profiler-voice-contributions accepts either Bus object identities or "
@@ -6449,16 +6455,17 @@ def preflight_stable_read_input(
                 "profiler-voice-contributions Bus instance handles must be unique"
             )
     if args.game_object_id is not None:
-        if re.fullmatch(r"[0-9]+", args.game_object_id) is None:
+        minimum_game_object_id = -(1 << 63) if version in {"2024.1", "2025.1"} else 0
+        if re.fullmatch(r"-?[0-9]+", args.game_object_id) is None:
             raise GatewayInputError(
-                "profiler-voice-contributions --game-object-id must be an "
-                "unsigned 64-bit integer"
+                "profiler-voice-contributions --game-object-id must be an integer "
+                f"in [{minimum_game_object_id}, {(1 << 64) - 1}] for Wwise {version}"
             )
         game_object_id = int(args.game_object_id)
-        if not 0 <= game_object_id <= (1 << 64) - 1:
+        if not minimum_game_object_id <= game_object_id <= (1 << 64) - 1:
             raise GatewayInputError(
-                "profiler-voice-contributions --game-object-id must be an "
-                "unsigned 64-bit integer"
+                "profiler-voice-contributions --game-object-id must be an integer "
+                f"in [{minimum_game_object_id}, {(1 << 64) - 1}] for Wwise {version}"
             )
         args.game_object_id = game_object_id
     # Validate the shared capture value now; pipeline IDs are derived from the
@@ -7447,6 +7454,23 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri == "ak.wwise.core.profiler.getVoiceContributions":
+        commands[0].update({
+            "required_inputs": ["capture", "voice"], "optional_inputs": ["game_object", "bus_selection"],
+            "input_forms": {
+                "capture": {"exactly_one_of": ["--capture-ms <nonnegative-milliseconds>", "--capture latest|user-cursor"]},
+                "voice": {"exactly_one_of": ["--voice-object-id <canonical-guid>", "--voice-instance-handle <issued-handle>"]},
+                "game_object": {"arguments": ["--game-object-id", "<integer>"], "only_with": "--voice-object-id",
+                    "domain": "int64-or-uint64" if capability.version in {"2024.1", "2025.1"} else "uint64",
+                    "minimum": -(1 << 63) if capability.version in {"2024.1", "2025.1"} else 0,
+                    "maximum": (1 << 64) - 1, "version": capability.version},
+                "bus_selection": {"at_most_one_of": ["--bus-object-id <canonical-guid> (repeat in path order)",
+                    "--bus-instance-handle <issued-handle> (repeat in path order)", "--bus-path dry-path|wwise-default"],
+                    "choices": {"dry-path": "Explicit empty dry path", "wwise-default": "Leave path selection to Wwise; no dry-path equivalence claim"},
+                    "unspecified": "Selected Bus identities retain their order; no Bus selectors means the dry path"},
+            },
+            "observation_authority": "Reported contribution values at the selected capture position; no prospective effect authority",
+        })
     if capability.uri == "ak.wwise.core.object.isPropertyEnabled":
         commands[0].update({
             "required_inputs": ["object", "field_choice", "platform"],
@@ -15246,7 +15270,7 @@ def dispatch_command(
             version=detected_version,
             time=args.time,
             voice_pipeline_id=voice_pipeline_id,
-            bus_pipeline_ids=bus_pipeline_ids,
+            bus_pipeline_ids=None if args.bus_path == "wwise-default" else bus_pipeline_ids,
         )
         return dispatch_profiler_voice_contributions_request(
             request,

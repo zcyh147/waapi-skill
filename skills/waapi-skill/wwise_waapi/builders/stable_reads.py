@@ -217,7 +217,7 @@ def build_profiler_voice_contributions_request(
     version: str,
     time: Any,
     voice_pipeline_id: Any,
-    bus_pipeline_ids: Sequence[Any] = (),
+    bus_pipeline_ids: Sequence[Any] | None = (),
 ) -> StableReadRequest:
     """Build a closed voice-path contribution query for all five versions."""
 
@@ -226,15 +226,15 @@ def build_profiler_voice_contributions_request(
         frozenset(SUPPORTED_WWISE_VERSION_KEYS),
         GET_VOICE_CONTRIBUTIONS_URI,
     )
-    if isinstance(bus_pipeline_ids, (str, bytes)) or not isinstance(
+    if bus_pipeline_ids is not None and (isinstance(bus_pipeline_ids, (str, bytes)) or not isinstance(
         bus_pipeline_ids, Sequence
-    ):
+    )):
         raise _input_error(
             "bus_pipeline_ids must be an ordered array of pipeline identifiers.",
             field="bus_pipeline_ids",
             actual_type=type(bus_pipeline_ids).__name__,
         )
-    if len(bus_pipeline_ids) > MAX_BUS_PIPELINE_IDS:
+    if bus_pipeline_ids is not None and len(bus_pipeline_ids) > MAX_BUS_PIPELINE_IDS:
         raise _input_error(
             "Too many bus pipeline identifiers were supplied.",
             field="bus_pipeline_ids",
@@ -243,7 +243,7 @@ def build_profiler_voice_contributions_request(
         )
     buses = [
         normalize_pipeline_id(value, field=f"bus_pipeline_ids[{index}]")
-        for index, value in enumerate(bus_pipeline_ids)
+        for index, value in enumerate(bus_pipeline_ids or ())
     ]
     if len(set(buses)) != len(buses):
         raise _input_error(
@@ -255,7 +255,7 @@ def build_profiler_voice_contributions_request(
             voice_pipeline_id,
             field="voice_pipeline_id",
         ),
-        "bussesPipelineID": buses,
+        **({"bussesPipelineID": buses} if bus_pipeline_ids is not None else {}),
         "time": normalize_profiler_time(time),
     }
     return StableReadRequest(
@@ -441,40 +441,30 @@ def normalize_profiler_voice_contributions_result(
             "The successful result.return value must be an object when reported.",
             actual_type=type(contribution).__name__,
         )
-    for field in ("volume", "LPF", "HPF", "objects"):
-        if field not in contribution:
-            raise _result_error(
-                GET_VOICE_CONTRIBUTIONS_URI,
-                "The reported voice contribution omitted a required stable field.",
-                missing_field=field,
-            )
-    volume = _finite_result_number(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        contribution["volume"],
-        field="volume",
-    )
-    lpf = _finite_result_number(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        contribution["LPF"],
-        field="LPF",
-    )
-    hpf = _finite_result_number(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        contribution["HPF"],
-        field="HPF",
-    )
-    objects = contribution["objects"]
-    if not isinstance(objects, list):
+    stable_fields = ("volume", "LPF", "HPF", "objects")
+    missing = [field for field in stable_fields if field not in contribution]
+    if missing and version not in {"2021.1", "2022.1"}:
         raise _result_error(
             GET_VOICE_CONTRIBUTIONS_URI,
-            "The reported voice contribution objects field must be an array.",
-            field="objects",
-            actual_type=type(objects).__name__,
+            "The reported voice contribution omitted a required stable field.",
+            missing_field=missing[0],
         )
-    normalized_objects = _bounded_json_copy(
-        GET_VOICE_CONTRIBUTIONS_URI,
-        objects,
-    )
+    measurements = {
+        field: _finite_result_number(GET_VOICE_CONTRIBUTIONS_URI, contribution[field], field=field)
+        if field in contribution else None
+        for field in ("volume", "LPF", "HPF")
+    }
+    normalized_objects = None
+    if "objects" in contribution:
+        objects = contribution["objects"]
+        if not isinstance(objects, list):
+            raise _result_error(
+                GET_VOICE_CONTRIBUTIONS_URI,
+                "The reported voice contribution objects field must be an array.",
+                field="objects",
+                actual_type=type(objects).__name__,
+            )
+        normalized_objects = _bounded_json_copy(GET_VOICE_CONTRIBUTIONS_URI, objects)
     dsf_reported = "DSF" in contribution
     if dsf_reported and not dsf_available:
         raise _result_error(
@@ -494,15 +484,16 @@ def normalize_profiler_voice_contributions_result(
     )
     return {
         "contribution_reported": True,
-        "volume": volume,
-        "lpf": lpf,
-        "hpf": hpf,
+        "volume": measurements["volume"],
+        "lpf": measurements["LPF"],
+        "hpf": measurements["HPF"],
         "dsf": {
             "feature_available": dsf_available,
             "reported": dsf_reported,
             "value": dsf_value,
         },
         "objects": normalized_objects,
+        **({"unreported_fields": [{"LPF": "lpf", "HPF": "hpf"}.get(field, field) for field in missing]} if missing else {}),
     }
 
 

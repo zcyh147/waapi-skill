@@ -942,10 +942,10 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
         validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
         return
     if proof.get('runtime_read_review'):
-        from tests.support.runtime_observation_evidence import validate_rtpc_source_review, RTPC_ORIGINAL_CANDIDATE
+        from tests.support.runtime_observation_evidence import validate_runtime_source_review, RTPC_ORIGINAL_CANDIDATE
         if proof['from_candidate'] != RTPC_ORIGINAL_CANDIDATE or not binding.get('runtime_observation_attachment'):
             raise ValueError('RTPC guard review requires its exact original runtime producer')
-        validate_rtpc_source_review(proof['runtime_read_review'], sources, branch, root, base)
+        validate_runtime_source_review(proof['runtime_read_review'], sources, branch, root, base)
         return
     for name, seal in sources.items():
         path = (root / name).resolve()
@@ -1383,6 +1383,10 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                     and not (binding or {}).get('runtime_observation_attachment')):
                 from tests.support.runtime_observation_evidence import validate_rtpc_program
                 rtpc_normalized = validate_rtpc_program(record, binding or {}, branch, root, reference_edges)
+            if ((branch.get('route') or '').endswith('|function|ak.wwise.core.profiler.getVoiceContributions')
+                    and not (binding or {}).get('runtime_observation_attachment')):
+                from tests.support.runtime_observation_evidence import validate_contribution_program
+                validate_contribution_program(record, binding or {}, branch, root)
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
