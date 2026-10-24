@@ -314,93 +314,68 @@ def normalize_profiler_game_objects_result(
                 row_index=index,
                 actual_type=type(row).__name__,
             )
-        register_field, unregister_field = (
-            ("registrationTime", "unregistrationTime")
-            if version == "2022.1"
-            else ("registerTime", "unregisterTime")
-        )
-        if version == "2022.1":
-            # Console reflection uses registrationTime; retained Authoring
-            # 2022.1.19.8584 rows use registerTime. Never mix partial pairs or
-            # silently prefer one of two contradictory timestamp values.
-            timestamp_pairs = (
-                ("registrationTime", "unregistrationTime"),
-                ("registerTime", "unregisterTime"),
-            )
-            timestamp_values = None
-            for pair in timestamp_pairs:
-                if not any(field in row for field in pair):
-                    continue
-                for field in pair:
-                    if field not in row:
-                        raise _result_error(
-                            GET_GAME_OBJECTS_URI,
-                            "A game-object row omitted a required stable field.",
-                            row_index=index,
-                            missing_field=field,
-                        )
-                values = tuple(
-                    _int32_result(GET_GAME_OBJECTS_URI, row[field], field=field, row_index=index)
-                    for field in pair
-                )
-                if timestamp_values is not None:
-                    for position, (expected, actual) in enumerate(zip(timestamp_values, values)):
-                        if expected != actual:
-                            raise _result_error(
-                                GET_GAME_OBJECTS_URI,
-                                "A game-object row returned conflicting timestamp aliases.",
-                                row_index=index,
-                                conflicting_fields=[timestamp_pairs[0][position], pair[position]],
-                            )
-                timestamp_values = values
-                register_field, unregister_field = pair
-        for field in ("id", "name", register_field, unregister_field):
-            if field not in row:
-                raise _result_error(
-                    GET_GAME_OBJECTS_URI,
-                    "A game-object row omitted a required stable field.",
-                    row_index=index,
-                    missing_field=field,
-                )
-        object_id = row["id"]
-        if (
+        if version != "2022.1":
+            for field in ("id", "name", "registerTime", "unregisterTime"):
+                if field not in row:
+                    raise _result_error(
+                        GET_GAME_OBJECTS_URI,
+                        "A game-object row omitted a required stable field.",
+                        row_index=index,
+                        missing_field=field,
+                    )
+        object_id = row.get("id")
+        minimum_id = 0 if version in {"2022.1", "2023.1"} else -(1 << 63)
+        if "id" in row and (
             not isinstance(object_id, int)
             or isinstance(object_id, bool)
-            or not -(1 << 63) <= object_id <= (1 << 64) - 1
+            or not minimum_id <= object_id <= (1 << 64) - 1
         ):
             raise _result_error(
                 GET_GAME_OBJECTS_URI,
                 "A game-object id was not a supported 64-bit integer.",
                 row_index=index,
                 field="id",
+                minimum=minimum_id,
+                maximum=(1 << 64) - 1,
                 actual_type=type(object_id).__name__,
             )
-        name = _bounded_result_string(
-            GET_GAME_OBJECTS_URI,
-            row["name"],
-            field="name",
-            row_index=index,
-        )
-        register_time = _int32_result(
-            GET_GAME_OBJECTS_URI,
-            row[register_field],
-            field=register_field,
-            row_index=index,
-        )
-        unregister_time = _int32_result(
-            GET_GAME_OBJECTS_URI,
-            row[unregister_field],
-            field=unregister_field,
-            row_index=index,
-        )
-        normalized.append(
-            {
-                "id": object_id,
-                "name": name,
-                "register_time": register_time,
-                "unregister_time": unregister_time,
-            }
-        )
+        projected = {
+            "id": object_id,
+            "name": (
+                _bounded_result_string(
+                    GET_GAME_OBJECTS_URI, row["name"], field="name", row_index=index,
+                )
+                if "name" in row else None
+            ),
+        }
+        for public_field, modern_field, reflected_2022_field in (
+            ("register_time", "registerTime", "registrationTime"),
+            ("unregister_time", "unregisterTime", "unregistrationTime"),
+        ):
+            fields = (
+                (reflected_2022_field, modern_field)
+                if version == "2022.1" else (modern_field,)
+            )
+            # Each 2022 field is optional independently. Validate every present
+            # alias before reconciling values; an absent partner is not a zero.
+            values = [
+                (field, _int32_result(
+                    GET_GAME_OBJECTS_URI, row[field], field=field, row_index=index,
+                ))
+                for field in fields if field in row
+            ]
+            if len(values) == 2 and values[0][1] != values[1][1]:
+                raise _result_error(
+                    GET_GAME_OBJECTS_URI,
+                    "A game-object row returned conflicting timestamp aliases.",
+                    row_index=index,
+                    conflicting_fields=[field for field, _ in values],
+                )
+            projected[public_field] = values[0][1] if values else None
+        unreported = [field for field, value in projected.items() if value is None]
+        if unreported:
+            projected["unreported_fields"] = unreported
+        normalized.append(projected)
     return {
         "count": len(normalized),
         "game_objects": normalized,
