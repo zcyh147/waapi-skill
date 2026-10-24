@@ -532,10 +532,10 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': '85b32438fc9395f377af0338e33991edeef11c49a0d4c890f0db8b526f10169f'},
+        'after': 'a50be58acdca7231e7bb72a5eb90cd52781e6221e9c6aa8cd035e1c8140983a3'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
-        'after': 'db81794ea4f995e5385257cf507540c580f9474cd3848b1714c02c9387398633'},
+        'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'},
     'skills/waapi-skill/wwise_waapi/builders/schema.py': {
         'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
         'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
@@ -544,15 +544,18 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility'],
     'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
         'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
+        'module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES',
         'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
         'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload'],
-    'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request', 'normalize_profiler_voice_contributions_result'],
+    'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request',
+        'normalize_profiler_voice_contributions_result', 'normalize_profiler_game_objects_result'],
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
         '_validate_resolved_sections', '_runtime_result_reference_schema']}
 RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
     'post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
-    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; original finalized PASS retained')
+    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
+    'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
