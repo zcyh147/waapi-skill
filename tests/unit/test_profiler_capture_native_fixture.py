@@ -163,7 +163,7 @@ NATIVE_CPU_2025 = json.loads(r'''{"return":[{"elementName":"CAkAudioMgr::Perform
 
 def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1', readers=False,
         capture_reads=False, cpu_native_version=None, native_rtpc=False, mixing_bus=None, missing_reads=False,
-        partial_seed=None, cursor_moves=False):
+        partial_seed=None, cursor_moves=False, meter_spellings=False):
     from tests.destructive.support import authoring_batch
     from tests.destructive.support.profiler_capture import (
         NODEID, SOUND_ID, BUS_ID, collect_owned_capture,
@@ -173,6 +173,9 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
     game_object = 18446744073709551614 if native_rtpc else 1
     capture_time = 100 if failure == 'cursor-single-frame' else {'2024.1': 45621, '2025.1': 46869}.get(cpu_native_version, 1500)
     nodeid, sound_id, bus_id = NODEID, SOUND_ID, BUS_ID
+    if meter_spellings:
+        from tests.destructive.support.profiler_capture import METER_SPELLING_NODEID
+        nodeid = METER_SPELLING_NODEID
     if cursor_moves:
         from tests.destructive.support.profiler_capture import CURSOR_MOVES_NODEID
         nodeid = CURSOR_MOVES_NODEID
@@ -439,9 +442,12 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
                 if failure == 'empty-meter':
                     return {'meters': []}
                 row = self.rows[bus_id]
+                if meter_spellings:
+                    row = {**row, 'states': ['synthetic exact-key value'], 'suppportsRandomizer': False,
+                        'supportsRandomizer': True}
                 if version == '2024.1' and row['@BusChannelConfig'] == 0:
                     row = next(item for item in self.rows.values() if item['name'] == 'Master Audio Bus')
-                return {'meters': [{'object': {key: deepcopy(row[key]) for key in options.get('return', ['id', 'name']) if key in row},
+                return {'meters': [{'object': {key: deepcopy(row[key]) for key in (options or {}).get('return', ['id', 'name']) if key in row},
                     'source': 'Bus', 'configurationName': '1.0', 'configurationMask': 4,
                     'configurationType': 'Standard', 'channels': [{'name': 'C', 'value': -12.5}]}]}
             if uri.endswith('profiler.registerMeter'):
@@ -479,6 +485,35 @@ def _capture_host(owner, tmp_path, monkeypatch, *, failure=None, version='2025.1
             return super().call(uri, args, options)
 
     client = Client()
+    if meter_spellings:
+        class DiagnosticClient:
+            def call(self, uri, args=None, **kwargs):
+                options = kwargs.get('options')
+                selector = options['return'][-1] if options else None
+                if uri.endswith('getMeters') and selector == 'states' and failure == 'native-rejection':
+                    from autobahn.wamp.exception import ApplicationError
+                    from waapi.wamp.interface import WaapiRequestFailed
+                    client.calls.append((uri, deepcopy(args), deepcopy(options)))
+                    raise WaapiRequestFailed(ApplicationError('ak.wwise.invalid_return_option',
+                        'fake exact states selector rejected', field='states'))
+                result = client.call(uri, args, options)
+                if uri.endswith('getMeters') and selector == 'states':
+                    if failure == 'omission':
+                        result['meters'][0]['object'].pop('states')
+                        result['meters'][0]['object']['customStates'] = []
+                    elif failure == 'malformed-result':
+                        result['meters'][0]['channels'][0]['value'] = 'fake malformed native channel'
+                    elif failure == 'session-loss':
+                        raise RuntimeError('fake connection lost after states dispatch')
+                return result
+
+            def disconnect(self):
+                return client.disconnect()
+
+        def native_client(*, url, allow_exception):
+            assert url == runtime.lifecycle.waapi_url and allow_exception is True
+            return DiagnosticClient()
+        monkeypatch.setattr('waapi.WaapiClient', native_client)
     def factory(*, skill_source, runtime, version, receipts):
         env = _env(runtime.owned_root, version=version)
         set_gateway_config(env, wwise_version=version, project_modification_policy='ask_before_changes')
@@ -1432,3 +1467,166 @@ def test_capture_owner_requires_exact_single_2025_selection(tmp_path, monkeypatc
     else:
         authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
         assert [row[0] for row in events] == ['construct', 'start', 'install']
+
+
+def test_meter_anomaly_diagnostic_reaches_final_writer_without_business_credit(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
+    collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS'
+    assert len(record['categories']) == 4
+    assert all(row['status'] == 'blocked' and row['business_effect_verified'] is False
+        and row['alias_equivalence_verified'] is False and row['coverage_credit'] == 'none_pending_semantics'
+        and row['observation_task_status'] == 'PASS' and row['batch_finalization']
+        for row in record['categories'])
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    root = Path(archive['artifacts']['native-evidence']['path'])
+    report = json.loads((root / 'profiler-capture.json').read_text())
+    diagnostic = report['meter_spelling_diagnostic']
+    observations = diagnostic['observations']
+    assert [row['selector'] for row in observations] == [None, 'states', 'suppportsRandomizer', 'supportsRandomizer']
+    assert [row['native_status'] for row in observations] == ['returned'] * 4
+    assert all(row['observation_status'] == 'PASS' and row['owned_bus_rows'] == [0]
+        and row['request_schema']['status'] == row['result_schema']['status'] == 'PASS' for row in observations)
+    assert [row['owned_bus_selected_key_present'] for row in observations] == [None, [True], [True], [True]]
+    packets = [json.loads((root / row['artifact']['path']).read_text()) for row in observations]
+    assert packets[0]['request'] == {'uri': 'ak.wwise.core.profiler.getMeters', 'args': {'time': 1500}}
+    assert [row['request']['options'] for row in packets[1:]] == [
+        {'return': ['id', 'name', 'states']}, {'return': ['id', 'name', 'suppportsRandomizer']},
+        {'return': ['id', 'name', 'supportsRandomizer']}]
+    assert packets[1]['result']['meters'][0]['object']['states'] == ['synthetic exact-key value']
+    assert packets[2]['result']['meters'][0]['object']['suppportsRandomizer'] is False
+    assert packets[3]['result']['meters'][0]['object']['supportsRandomizer'] is True
+    assert all(packet['context']['info']['sessionId'] == 'owned-session'
+        and packet['context']['owned_bus']['name'] == 'WAAPI_V2_Weapons' for packet in packets)
+    assert len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 4
+    assert not any(uri.endswith(('setCursorTime', 'saveCapture', 'log.addItem', 'log.clear')) for uri, _, _ in client.calls)
+    assert not client.registered and not client.transport and not batch.runtime.owned_root.exists()
+    assert report['fixture_after'] == report['fixture_before']
+    assert record['source']['hash_before'] == record['source']['hash_after']
+
+
+def test_meter_anomaly_missing_packet_cannot_complete_persisted_diagnostic(
+        owned_authoring, tmp_path, monkeypatch):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
+    collect(batch, call)
+    nodeid, = batch.selected_nodeids
+    root = Path(batch.node_runtimes[nodeid].runner_environment['WWISE_EVIDENCE_DIR'])
+    (root / 'meter-spelling-1.json').unlink()  # Remove only this fake control's produced packet.
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=True)
+    assert final['outcome'] == 'PASS'  # Lifecycle completion remains distinct from diagnostic proof.
+    categories = record['categories']
+    assert categories[1]['observation_task_status'] == 'BLOCKED'
+    assert categories[1]['diagnostic_packet_status'] == 'missing_or_changed'
+    assert all(row['status'] == 'blocked' and row['business_effect_verified'] is False for row in categories)
+    assert all(row['observation_task_status'] == 'PASS' for i, row in enumerate(categories) if i != 1)
+
+
+@pytest.mark.parametrize('failure', ['native-rejection', 'omission', 'malformed-result', 'session-loss', 'cleanup'])
+def test_meter_anomaly_outcomes_preserve_independent_packets_and_owned_cleanup(
+        owned_authoring, tmp_path, monkeypatch, failure):
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch,
+        meter_spellings=True, failure=failure)
+    diagnostic_passed = failure in ('native-rejection', 'omission')
+    if diagnostic_passed:
+        collect(batch, call)
+    else:
+        with pytest.raises(AssertionError):
+            collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=diagnostic_passed)
+    assert final['outcome'] == ('PASS' if diagnostic_passed else 'FAIL')
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    root = Path(archive['artifacts']['native-evidence']['path'])
+    report = json.loads((root / 'profiler-capture.json').read_text())
+    observations = report['meter_spelling_diagnostic']['observations']
+    states_packet = json.loads((root / observations[1]['artifact']['path']).read_text())
+    categories = record['categories']
+    assert len(categories) == 4 and all(row['status'] == 'blocked'
+        and row['business_effect_verified'] is False and row['alias_equivalence_verified'] is False
+        and row['coverage_credit'] == 'none_pending_semantics' for row in categories)
+    assert report['cleanup']['complete'] is (failure != 'cleanup')
+    assert report['fixture_before'] == report['fixture_after']
+    assert record['source']['hash_before'] == record['source']['hash_after']
+    assert not client.transport
+    if failure == 'session-loss':
+        assert len(observations) == 2 and len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 2
+        assert 'fake connection lost' in states_packet['diagnostic_error']['message']
+        assert observations[1]['observation_status'] == 'BLOCKED'
+        assert 'result' not in states_packet and 'native_error' not in states_packet
+        assert all(row['outcome'] == 'BLOCKED' for row in list(report['outcomes'].values())[1:])
+    else:
+        assert len(observations) == 4 and len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 4
+        assert all(row['observation_status'] == 'PASS' for i, row in enumerate(observations) if i != 1)
+        comparator = json.loads((root / observations[3]['artifact']['path']).read_text())
+        assert comparator['result']['meters'][0]['object']['supportsRandomizer'] is True
+    if failure == 'native-rejection':
+        assert observations[1]['native_status'] == 'native_rejected' and observations[1]['observation_status'] == 'PASS'
+        assert observations[1]['request_schema']['status'] == 'PASS'
+        assert observations[1]['result_schema']['status'] == 'not_returned'
+        assert states_packet['native_error']['uri'] == 'ak.wwise.invalid_return_option'
+        assert states_packet['native_error']['kwargs'] == {'field': 'states'}
+        assert states_packet['info_after']['sessionId'] == 'owned-session' and 'result' not in states_packet
+    elif failure == 'omission':
+        assert observations[1]['native_status'] == 'returned' and observations[1]['owned_bus_selected_key_present'] == [False]
+        assert states_packet['result']['meters'][0]['object']['customStates'] == []
+        assert 'states' not in states_packet['result']['meters'][0]['object']
+    elif failure == 'malformed-result':
+        assert observations[1]['native_status'] == 'returned' and observations[1]['result_schema']['status'] == 'FAIL'
+        assert states_packet['result']['meters'][0]['channels'][0]['value'] == 'fake malformed native channel'
+        assert observations[1]['observation_status'] == 'BLOCKED'
+    elif failure == 'cleanup':
+        assert all(row['observation_status'] == 'PASS' for row in observations)
+        assert any(row['action'] == 'unregister-meter' for row in report['cleanup']['errors'])
+        assert sum(uri.endswith('unregisterMeter') for uri, _, _ in client.calls) == 1
+    if diagnostic_passed:
+        assert all(row['observation_task_status'] == 'PASS' and row['batch_finalization'] for row in categories)
+        assert not batch.runtime.owned_root.exists() and not client.registered
+    else:
+        assert all(row['observation_task_status'] == 'BLOCKED' and 'batch_finalization' not in row for row in categories)
+        assert batch.lifecycle_result.quarantine_path and not batch.batch_seal_path.exists()
+
+
+@pytest.mark.parametrize('version,extra', [('2024.1', False), ('2025.1', True), ('2025.1', False)])
+def test_meter_anomaly_owner_admits_only_exact_2025_node_in_automation_mode(
+        tmp_path, monkeypatch, version, extra):
+    from tests.destructive.support import authoring_batch
+    from tests.destructive.support.profiler_capture import METER_SPELLING_NODEID
+    from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
+    events = _fakes(monkeypatch, tmp_path)
+    monkeypatch.setenv('WWISE_VERSION', version)
+    monkeypatch.delenv('AK_AUTOMATION_MODE', raising=False)
+    config = _config(tmp_path)
+    config.args = [METER_SPELLING_NODEID, *([NODE] if extra else [])]
+    items = [SimpleNamespace(nodeid=name) for name in config.args]
+    if version != '2025.1' or extra:
+        with pytest.raises(pytest.UsageError):
+            authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert not events
+    else:
+        authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
+        assert [row[0] for row in events] == ['construct', 'start', 'install']
+        assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
+        assert 'AK_AUTOMATION_MODE' not in authoring_batch.os.environ
+
+
+def test_meter_anomaly_oversized_packet_blocks_diagnostic_but_preserves_cleanup(
+        owned_authoring, tmp_path, monkeypatch):
+    from tests.destructive.support import meter_spelling_diagnostic
+    batch, call, client, collect = _capture_host(owned_authoring, tmp_path, monkeypatch, meter_spellings=True)
+    monkeypatch.setattr(meter_spelling_diagnostic, 'MAX_PACKET_BYTES', 1024)
+    with pytest.raises(AssertionError):
+        collect(batch, call)
+    final, record = _finish(batch, tmp_path, monkeypatch, passed=False)
+    assert final['outcome'] == 'FAIL' and batch.lifecycle_result.quarantine_path
+    archive = json.loads(Path(batch.observation_artifacts[batch.selected_nodeids[0]]['path']).read_text())
+    root = Path(archive['artifacts']['native-evidence']['path'])
+    report = json.loads((root / 'profiler-capture.json').read_text())
+    observations = report['meter_spelling_diagnostic']['observations']
+    assert len(observations) == 1 and observations[0]['observation_status'] == 'BLOCKED'
+    assert observations[0]['packet_error']['bytes'] > 1024 and 'artifact' not in observations[0]
+    assert len([uri for uri, _, _ in client.calls if uri.endswith('getMeters')]) == 1
+    assert all(row['observation_task_status'] == 'BLOCKED' and row['status'] == 'blocked'
+        and 'batch_finalization' not in row for row in record['categories'])
+    assert report['cleanup']['complete'] is True and not client.registered and not client.transport
+    assert record['source']['hash_before'] == record['source']['hash_after']

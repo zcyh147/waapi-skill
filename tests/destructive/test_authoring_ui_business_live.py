@@ -75,6 +75,13 @@ def test_runtime_owned_2025_meter_cursor_capture(owned_authoring_layout_node):
 
 @pytest.mark.live
 @pytest.mark.destructive
+def test_runtime_owned_2025_meter_spelling_diagnostic(owned_authoring_layout_node):
+    from tests.destructive.support.profiler_capture import collect_owned_capture
+    collect_owned_capture(*owned_authoring_layout_node)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
 def test_runtime_owned_2025_profiler_cursor_moves(owned_authoring_layout_node):
     from tests.destructive.support.profiler_capture import collect_owned_capture
     collect_owned_capture(*owned_authoring_layout_node)

@@ -28,11 +28,12 @@ from tests.destructive.support.transport_semantics import (
 )
 from tests.destructive.support.profiler_capture import (
     NODEID as PROFILER_CAPTURE_NODEID, METER_2024_NODEID, READERS_2025_NODEID, CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, CURSOR_MOVES_NODEID, CAPTURE_NODE_OUTCOMES,
-    stage_owned_2024_meter_media,
+    stage_owned_2024_meter_media, METER_SPELLING_NODEID,
     capture_node_outcomes,
     stage_owned_capture_read_media,
     READER_OUTCOMES, CAPTURE_READ_OUTCOMES,
 )
+from tests.destructive.support.meter_spelling_diagnostic import meter_packet_present
 from tests.destructive.support.loaded_media_probe import NODEID as LOADED_EVENT_NODEID, OUTCOME as LOADED_EVENT_OUTCOME
 
 from tests.destructive.support.integration_demo import NODEID as DEMO_NODEID
@@ -300,6 +301,7 @@ class AuthoringBatchAdapter:
             # Consume the exact archived collector output, including partial
             # observations. A passing sibling never fills another outcome.
             report = {}
+            root = None
             descriptor = self.observation_artifacts.get(capture_nodeid)
             if descriptor:
                 archived = json.loads(Path(descriptor['path']).read_text(encoding='utf-8'))
@@ -315,14 +317,24 @@ class AuthoringBatchAdapter:
             for name in names:
                 observation = report.get('outcomes', {}).get(name, {'outcome': 'BLOCKED'})
                 business = observation.get('outcome', 'BLOCKED')
+                packet_present = (meter_packet_present(root, name, observation)
+                    if capture_nodeid == METER_SPELLING_NODEID else True)
                 categories.append({'category': name, 'nodeid': capture_nodeid,
                     'status': 'PASS' if outcome == 'PASS' and business == 'PASS' else 'FAIL' if business == 'FAIL' else 'blocked',
                     **({'observation_build': report.get('reflection', {}).get('build'),
                         'scoped_reflection_identity': report.get('reflection', {}).get('identity'),
                         'coverage_credit': 'separate exact-build observation; no pinned 9143, 2023/2024 or R106 replacement'}
                         if capture_nodeid == DEMO_NODEID else {}),
-                    'business_outcome': business, 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
-                    'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
+                    **({'status': 'blocked', 'observation_task_status': 'PASS' if outcome == 'PASS' and business == 'PASS' and packet_present else 'BLOCKED',
+                        'diagnostic_packet_status': 'sealed' if packet_present else 'missing_or_changed',
+                        'business_effect_verified': False, 'alias_equivalence_verified': False,
+                        'coverage_credit': 'none_pending_semantics', 'native_status': observation.get('evidence', {}).get('native_status'),
+                        'reason': 'Exact request/key observation only; omission and equality do not establish alias meaning'}
+                        if capture_nodeid == METER_SPELLING_NODEID else {}),
+                    'business_outcome': 'BLOCKED' if capture_nodeid == METER_SPELLING_NODEID else business, 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
+                    'verifier_strength': ('bounded_fixed_native_request_and_key_observation_no_alias_or_business_proof'
+                        if capture_nodeid == METER_SPELLING_NODEID else
+                        'independent_public_capture_outcome_and_owned_post_teardown_proofs'),
                     **({'reader_observation_status': observation.get('evidence', {}).get('observation_status', 'BLOCKED'),
                         'owned_identity_observed': observation.get('evidence', {}).get('owned_identity_observed', False),
                         'attribution_boundary': 'A nonempty read alone grants no owned reader-obligation credit; no acoustic or measurement-effect proof',
@@ -537,6 +549,7 @@ OWNED_AUTHORING_NODEIDS = (
     DEMO_NODEID,
     CAPTURE_MISSING_NODEID,
     METER_2024_NODEID,
+    METER_SPELLING_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
     *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
       for variant in ('omitted', 'x-only', 'y-only', 'both')),
@@ -548,6 +561,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     **dict.fromkeys(OWNED_AUTHORING_NODEIDS, ('2024.1', '2025.1')),
     **dict.fromkeys(DIAGNOSTIC_NODEIDS, ('2024.1',)),
     METER_2024_NODEID: ('2024.1',),
+    METER_SPELLING_NODEID: ('2025.1',),
     PROFILER_CAPTURE_NODEID: ('2025.1',),
     CURSOR_MOVES_NODEID: ('2025.1',),
     READERS_2025_NODEID: ('2025.1',),
@@ -597,6 +611,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned capture reads require their exact single node')
     if LOADED_EVENT_NODEID in selected and len(selected) != 1:
         raise pytest.UsageError('Loaded Event probe requires its exact single 2025 node')
+    if METER_SPELLING_NODEID in selected and len(selected) != 1:
+        raise pytest.UsageError('Meter spelling diagnostic requires its exact single 2025 Authoring node')
     if METER_2024_NODEID in selected and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1'):
         raise pytest.UsageError('Owned meter projection requires only its matching 2024 Authoring node')
     if set(selected).intersection((TRANSPORT_SEMANTICS_NODEID, TRANSPORT_MIXED_NODEID)) and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2025.1'):
@@ -636,7 +652,7 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
             stage_owned_older_transport_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
         if selected in ((CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,)):
             stage_owned_capture_read_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
-    if selected in ((PROFILER_CAPTURE_NODEID,), (CURSOR_MOVES_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (DEMO_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (CURSOR_MOVES_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (DEMO_NODEID,), (METER_2024_NODEID,), (METER_SPELLING_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
