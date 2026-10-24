@@ -346,6 +346,79 @@ def test_missing_transport_api_is_a_version_boundary_without_connection(tmp_path
     assert payload['error_code'] != 'AUTHORING_HOST_REQUIRED'
 
 
+def test_overlong_native_original_blocks_before_any_runtime_effect(tmp_path, monkeypatch):
+    from tests.destructive.support.console_profiler_probe import NODE_NAME
+    from tests.destructive.support.profiler_capture import CAPTURE_CAR_SOURCE_ID, CAPTURE_CAR_MEDIA
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    owned = tmp_path / ('long-owned-' + 'x' * 120)
+    owned.mkdir()
+    context = _console_context(owned, monkeypatch)
+    workflow, runtime, client, _, _ = context
+    media = runtime.sandbox.sandbox_path / CAPTURE_CAR_MEDIA
+    native = 'Z:' + media.as_posix()
+    assert len(native) + 1 > 260  # ASCII fixture exceeds the verified Windows bound.
+    client.rows[CAPTURE_CAR_SOURCE_ID]['originalFilePath'] = native
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, NODE_NAME)(runtime)
+    final = _finish(context, owned, monkeypatch, [(NODE_NAME, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert report['native_source_path_limit'] == {'flavor': 'drive',
+        'utf16_units_including_nul': len(native) + 1, 'allowed_units_including_nul': 260}
+    assert f"{len(native) + 1} UTF-16 units including NUL exceeds allowed 260" in report['errors'][0]['message']
+    assert report['setup'] == {} and final['transactions'] == []
+    assert not any(uri.startswith(('ak.wwise.core.transport.', 'ak.wwise.core.profiler.'))
+        for uri, _, _ in client.calls)
+    assert report['fixture_before'] == report['fixture_after'] and report['cleanup']['complete']
+    assert final['residual_state']['sandbox'] == 'quarantined'
+
+
+@pytest.mark.parametrize('namespace,allowed', [('windows-260', True), ('windows-261', False), ('long-posix', True)])
+def test_console_native_path_limit_counts_utf16_and_preserves_posix(tmp_path, monkeypatch, namespace, allowed):
+    from tests.destructive.support.console_profiler_probe import NODE_NAME
+    from tests.destructive.support.profiler_capture import CAPTURE_CAR_SOURCE_ID, CAPTURE_CAR_MEDIA
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    if namespace == 'long-posix':
+        owned = tmp_path / ('x' * 120)
+    else:
+        # The rejected path includes U+1F697: two UTF-16 units, one Python
+        # character, four UTF-8 bytes. The allowed ASCII path is exactly 260 units.
+        target = 260 if allowed else 261
+        stem = 'car-' if allowed else 'car-🚗-'
+        base = 'Z:' + (tmp_path / stem / 'SampleProject' / CAPTURE_CAR_MEDIA).as_posix()
+        padding = target - (len(base) + 1 + (0 if allowed else 1))
+        assert padding > 0
+        owned = tmp_path / (stem + 'x' * padding)
+    owned.mkdir()
+    context = _console_context(owned, monkeypatch)
+    workflow, runtime, client, _, _ = context
+    media = runtime.sandbox.sandbox_path / CAPTURE_CAR_MEDIA
+    native = media.as_posix() if namespace == 'long-posix' else 'Z:' + media.as_posix()
+    client.rows[CAPTURE_CAR_SOURCE_ID]['originalFilePath'] = native
+    failure = None
+    if allowed:
+        getattr(workflow, NODE_NAME)(runtime)
+    else:
+        with pytest.raises(AssertionError, match='261 UTF-16 units including NUL exceeds allowed 260') as caught:
+            getattr(workflow, NODE_NAME)(runtime)
+        failure = caught.value
+    final = _finish(context, owned, monkeypatch, [(NODE_NAME, failure)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    if namespace == 'long-posix':
+        assert len(native) + 1 > 260
+        assert 'native_source_path_limit' not in report
+    else:
+        assert report['native_source_path_limit']['utf16_units_including_nul'] == (260 if allowed else 261)
+        assert report['native_source_path_limit']['allowed_units_including_nul'] == 260
+    assert report['complete'] is allowed
+    assert final['invocation']['outcome'] == ('PASS' if allowed else 'FAIL')
+    assert final['residual_state']['sandbox'] == ('deleted' if allowed else 'quarantined')
+    assert report['fixture_before'] == report['fixture_after'] and report['cleanup']['complete']
+    if not allowed:
+        assert final['transactions'] == [] and report['setup'] == {}
+        assert not any(uri.startswith(('ak.wwise.core.transport.', 'ak.wwise.core.profiler.'))
+            for uri, _, _ in client.calls)
+
+
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
 @pytest.mark.parametrize('changed_binding', [False, True])
 def test_unicode_project_draft_preserves_exact_binding(tmp_path, monkeypatch, version, changed_binding):
