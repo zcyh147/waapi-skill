@@ -174,7 +174,7 @@ def test_save_capture_boundary_teardown_portable_consumer(request,tmp_path,versi
         assert all(r['state']!='verified'for r in evaluate(missing)['obligations'])
         if version=='2025.1':
             identity=routes[0]+'|/argsSchema/properties/file/@empty/string'
-            for damage in ('field-borrow','flag-borrow','authority','dispatched','artifact','teardown','source'):
+            for damage in ('field-borrow','flag-borrow','authority','dispatched','artifact','teardown','source','rejection-extra-0','rejection-extra-1'):
                 changed=deepcopy(bindings);bound=changed['bindings'][identity]
                 record=deepcopy(completion.read_sealed_artifact(bound['evidence']['program'],base));proof=record['file_destination_boundary']
                 if damage=='field-borrow':proof['rejections'][0]['gateway']['payload']['details']['repair']['field']='capture_name'
@@ -183,6 +183,9 @@ def test_save_capture_boundary_teardown_portable_consumer(request,tmp_path,versi
                 elif damage=='dispatched':proof['rejections'][1]['native_calls'].append(deepcopy(proof['valid']['native_call']))
                 elif damage=='artifact':proof['valid']['public_calls'][-1]['gateway']['payload']['events'][-1]['details']['verification']['readbacks'][0]['nonempty']=False
                 elif damage=='teardown':proof['phase_reports']['teardown']='failed'
+                elif damage.startswith('rejection-extra-'):
+                    i=int(damage[-1]);trace=proof['rejections'][i]['native_calls'];trace.append({'ordinal':trace[-1]['ordinal']+1,'uri':'ak.wwise.core.log.clear','args':{'channel':'General'},'options':{},'result':{}})
+                    if i==0:record['native_calls']=deepcopy(trace)
                 else:proof['valid']['source_context']['capture']['tests/support/runtime_owned_control_evidence.py']='0'*64
                 bound['evidence']['program']={**runtime.write_json(base/('bad-boundary-'+damage+'.json'),record),'nodeid':request.node.nodeid}
                 row=next(r for r in evaluate(changed)['obligations']if r['id']==identity)

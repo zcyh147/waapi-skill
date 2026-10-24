@@ -367,9 +367,18 @@ def validate_file_boundary_receipt(record,branch,binding,checks,root=None):
             or proof['source_context']!=valid['source_context']or record['relevant_sources']!=valid['source_context']['packaged']
             or context!={k:v for k,v in zip(('version','host','build'),branch['route'].split('|')[:3],strict=True)}or len(proof['rejections'])!=2):
         raise ValueError('Exact boundary scope/current valid counterpart differs')
-    declaration=valid['public_calls'][1]['gateway']['argv'];found=set()
+    accepted=valid['public_calls'][1];declaration=accepted['gateway']['argv'];found=set()
+    accepted_calls=valid['native_reads'][accepted['native_start']:accepted['native_end']]
+    if [x['uri']for x in accepted_calls]!=['ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo']:
+        raise ValueError('Exact read-only declaration context required')
     for rejected in proof['rejections']:
         gateway=rejected['gateway'];argv=gateway['argv'];payload=gateway['payload'];calls=rejected['native_calls']
+        # A rejection cannot conceal any other dispatch. Both failed declarations
+        # have the same read-only connection/project context as their accepted
+        # same-Draft counterpart, including exact trace types and session facts.
+        if (audit.digest(calls)!=audit.digest(accepted_calls)
+                or any(payload.get(k)!=accepted['gateway']['payload'].get(k)for k in ('endpoint','detected_version','is_command_line'))):
+            raise ValueError('Rejected destination read-only context/session trace differs')
         changed=[i for i,(a,b)in enumerate(zip(argv,declaration,strict=True))if a!=b]
         if len(changed)!=1 or argv[changed[0]]!=''or changed[0]==0:raise ValueError('File boundary must change only one public destination value')
         flag=argv[changed[0]-1];field=review(root)['file_boundary_authority']['flags'].get(flag)
