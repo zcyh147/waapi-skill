@@ -19,7 +19,7 @@ from tests.support import extra_runtime_read_evidence as extra
 URI='ak.wwise.core.profiler.getMeters'
 URIS=frozenset({URI})
 SUPPORT='tests/fixtures/runtime-meter/support-review.json'
-SUPPORT_SHA='cc0b702a4ea40a1aada871256a78a0c8d33708cce3fe521a29c5c31c69a332a9'
+SUPPORT_SHA='18594040da2afa4a090a8e1a2c8756b8a5f23391a93e8a5bdb69c4f91fe1efc0'
 CONTRACT='waapi-skill.meter-runtime-read-assessment/v1'
 
 
@@ -32,6 +32,11 @@ def review(root=audit.ROOT):
             or d['pending_native_business_anchor_ids']!=[k for k in d['native_root_ids']if '|wwise-console|'in k]
             or set(d['profiles'])!={k for k in d['native_root_ids']if '|wwise-authoring|'in k}):
         raise ValueError('Exact meter scope/pending/native root ownership differs')
+    singles={k for k,v in expected.items()if v['pointer']=='/optionsSchema/@definition/waapi_definitions.json/definitions/returnExpression/@cardinality/single'}
+    marker={'kind':'gateway-owned-identity-augmentation','public_flag':'--meter-object-include','requested_outputs':['notes'],
+        'native_return':['id','name','type','path','notes'],'native_cardinality':5,'literal_native_single':False}
+    if len(singles)!=4 or d['normalized_input_choices']!={k:{'native_shape_sha256':expected[k]['native_shape_sha256'],**marker}for k in singles}:
+        raise ValueError('Exact source-owned meter single-output normalization differs')
     return d
 
 
@@ -96,6 +101,7 @@ def _capture(captured_json,root):
     from wwise_waapi.builders.schema import validate_semantic_payload,validate_semantic_result,validate_resolved_semantic_result
     from wwise_waapi.profiler_meter_objects import compile_meter_object_options
     from wwise_waapi.runtime_inspection_business import materialize_runtime_inspection_business_request,normalize_runtime_inspection_result
+    if len(captured_json.encode('utf-8'))>80*1024*1024:raise ValueError('Meter capture exceeds its finite byte budget')
     c=json.loads(captured_json);g=c['gateway'];native=c['native_call'];trace=c['native_reads'];calls=c['public_calls'];p=g['payload'];argv=g['argv']
     allowed={URI,'ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo','ak.wwise.core.profiler.getCursorTime',
         'ak.wwise.core.object.getPropertyAndReferenceNames','ak.wwise.core.object.getPropertyInfo','ak.wwise.core.object.get'}
@@ -170,7 +176,7 @@ def _code_bindings(branch):
     construction=('profiler_meter_objects.py#compile_meter_object_options'if branch['pointer'].startswith('/optionsSchema')else'runtime_inspection_business.py#materialize_runtime_inspection_business_request')
     validation='validate_resolved_semantic_result'if branch['pointer'].startswith('/resultSchema')else'validate_semantic_payload'
     return {k:{'source':'skills/waapi-skill/wwise_waapi/'+source,'selector':branch['pointer']}for k,source in (
-        ('construction',construction),('validation','builders/schema.py#'+validation),('verifier','profiler_meter_objects.py#compile_meter_object_options'))}
+        ('construction',construction),('validation','builders/schema.py#'+validation),('verifier','profiler_meter_objects.py#MeterObjectOptions'))}
 
 
 def _selected_occurrence(captured,pointer):
@@ -178,12 +184,42 @@ def _selected_occurrence(captured,pointer):
     if pointer.startswith(prefix)and '/object/'in pointer:
         token=pointer.split('/object/',1)[1].split('/')[0]
         # Optional object fields count only when explicitly selected at this root.
-        if token not in {'id','name','type','path'}and token not in captured['native_call']['options'].get('return',[]):return False
+        if token not in captured['native_call']['options'].get('return',['id','name']):return False
     return True
 
 
-def mappings(inventory,captured,route):
-    return [m for m in extra.mappings(inventory,captured,route)if _selected_occurrence(captured,m['program_pointer'])]
+def _normalized_single(branch,captured,root=audit.ROOT):
+    marker=review(root)['normalized_input_choices'].get(branch['id'])
+    if marker is None:return None
+    argv=captured['gateway']['argv'];native=captured['native_call']
+    if (len(argv)==8 and argv[:2]==['core-call',URI]and argv[2]=='--profiler-position'
+            and argv[4]=='--max-results'and argv[6:]==['--meter-object-include','notes']
+            and native['options']=={'return':['id','name','type','path','notes']}):
+        return marker
+    return None
+
+
+def mappings(inventory,captured,route,*,seen=frozenset()):
+    branches=[b for b in inventory['native_coverage']['obligations']if b['route']==route['id']]
+    edges={b['id']:b for b in branches if b['kind']=='reference'};found=[]
+    for branch in branches:
+        if branch['id']in seen:continue
+        normalized=_normalized_single(branch,captured)
+        if normalized is not None:
+            found.append({'branch':branch,'program_pointer':'/native_call/options/return',
+                'reference_chain':runtime._contribution_chains(branch,edges)[0],'normalized_input_choice':normalized});continue
+        if branch['pointer']in runtime.CONTRIBUTION_CURSOR_POINTERS:
+            cursors=[r for r in captured['native_reads']if r['uri'].endswith('.getCursorTime')]
+            if cursors and extra.predicate(branch,cursors[0]['args']['cursor'],audit.ROOT):
+                found.append({'branch':branch,'program_pointer':f"/runtime_read_program/native_reads/{cursors[0]['ordinal']}/args/cursor",'reference_chain':runtime._contribution_chains(branch,edges)[0]})
+            continue
+        effective=extra._effective(branch,audit.ROOT)
+        for chain in runtime._contribution_chains(effective,edges):
+            hit=next(((p,v)for p,v in remaining._log_occurrences(captured,runtime._contribution_pattern(effective,chain,edges))
+                if _selected_occurrence(captured,p)and extra.predicate(branch,v,audit.ROOT)),None)
+            if hit:
+                found.append({'branch':branch,'program_pointer':hit[0],'reference_chain':chain});break
+    return found
 
 
 def validate_evidence(record,binding,branch,category,base,root,edges=None):
@@ -195,6 +231,13 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
             or any(binding.get(k)!=v for k,v in _code_bindings(branch).items())or not _selected_occurrence(c,binding['observation_pointer'])):
         raise ValueError('Exact meter public source/selected-root/binding/host differs')
     pointer=binding['observation_pointer'];effective=extra._effective(branch,root)
+    normalized=_normalized_single(branch,c,root)
+    if branch['id']in d['normalized_input_choices']:
+        completion.exact_observation_pointer(branch,binding,'/native_call','options',edges or {})
+        if normalized is None or binding.get('normalized_input_choice')!=normalized or pointer!='/native_call/options/return':
+            raise ValueError('Exact disclosed one-output identity normalization required; no literal native-single claim')
+        return {'observation_pointer':pointer}
+    if binding.get('normalized_input_choice')is not None:raise ValueError('Unlisted meter branch cannot borrow normalization')
     if branch['pointer']in runtime.CONTRIBUTION_CURSOR_POINTERS:
         completion.exact_observation_pointer(branch,{**binding,'observation_pointer':'/native_call/args/time'},'/native_call','args',edges or {})
         cursor,=[r for r in c['native_reads']if r['uri'].endswith('.getCursorTime')]
@@ -254,7 +297,7 @@ def write_bundle(output,captures,*,inventory,name_prefix=''):
     for number,path in enumerate(captures):
         captured=json.loads(Path(path).read_bytes());native=captured['native_call'];gateway=captured['gateway'];context=_capture(json.dumps(captured),audit.ROOT)
         route,=[r for r in inventory['native_coverage']['routes']if r['uri']==native['uri']and all(r[k]==v for k,v in context.items())]
-        public,=[r for r in inventory['routes']if r['id']==route['public_route']];mapped=[m for m in mappings(inventory,captured,route)if m['branch']['id']not in seen]
+        public,=[r for r in inventory['routes']if r['id']==route['public_route']];mapped=mappings(inventory,captured,route,seen=seen)
         if not mapped:continue
         prefix=(name_prefix or'meter-')+str(number)+'-';cp=write(prefix+'capture.json',captured)
         program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':captured['source_context']['packaged'],'gateway':gateway,'native_call':native,
@@ -263,11 +306,12 @@ def write_bundle(output,captures,*,inventory,name_prefix=''):
         for m in mapped:
             b=m['branch'];identity=b['id'];pointer=m['program_pointer'];pp='/gateway/payload/agent_result'
             check=({'pointer':pointer,'absent':True}if b['kind']=='optional_presence'and b['value']=='absent'else
-                {'pointer':pointer,'cardinality':b['value']}if b['kind']=='collection_cardinality'else{'pointer':pointer,'equals':completion.pointer_value(program,pointer)})
+                {'pointer':pointer,'cardinality':b['value']}if b['kind']=='collection_cardinality'and not m.get('normalized_input_choice')else{'pointer':pointer,'equals':completion.pointer_value(program,pointer)})
             program['branch_assertions'][identity]={'native_shape_sha256':b['shape_sha256'],'native_route':route['id'],'checks':[check,{'pointer':pp,'equals':completion.pointer_value(program,pp)}]}
             binding={'branch_id':identity,'native_shape_sha256':b['shape_sha256'],'public_route':public['id'],'public_route_sha256':audit.digest(public),
                 'input':{'gateway_argv':gateway['argv'],'selector':pointer},'dispatch_pointer':'/native_call','observation_pointer':pointer,
-                'gateway_observation_pointer':pp,'reference_chain':m['reference_chain'],'relevant_sources':sorted(captured['source_context']['packaged']),'evidence':{},**_code_bindings(b)}
+                'gateway_observation_pointer':pp,'reference_chain':m['reference_chain'],
+                **({'normalized_input_choice':m['normalized_input_choice']}if m.get('normalized_input_choice')else{}),'relevant_sources':sorted(captured['source_context']['packaged']),'evidence':{},**_code_bindings(b)}
             validate_evidence(program,binding,b,'program',output,audit.ROOT,{x['id']:x for x in inventory['native_coverage']['obligations']if x['kind']=='reference'})
             bindings['bindings'][identity]=binding;policies['branches'][identity]=remaining.policy(remaining.exact_entry(b));seen.add(identity)
             attach_gate(output,index,candidate,b,cp,prefix)

@@ -66941,5 +66941,75 @@
       "issuer_sha256": "23432483f65075880d8c649ea692cb96e1c4e88796786da35b812626f1a1d66e",
       "native_rows": 2
     }
+  },
+  "normalized_input_choices": {
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/optionsSchema/@definition/waapi_definitions.json/definitions/returnExpression/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "kind": "gateway-owned-identity-augmentation",
+      "public_flag": "--meter-object-include",
+      "requested_outputs": [
+        "notes"
+      ],
+      "native_return": [
+        "id",
+        "name",
+        "type",
+        "path",
+        "notes"
+      ],
+      "native_cardinality": 5,
+      "literal_native_single": false
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.profiler.getMeters|/optionsSchema/@definition/waapi_definitions.json/definitions/returnExpression/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "kind": "gateway-owned-identity-augmentation",
+      "public_flag": "--meter-object-include",
+      "requested_outputs": [
+        "notes"
+      ],
+      "native_return": [
+        "id",
+        "name",
+        "type",
+        "path",
+        "notes"
+      ],
+      "native_cardinality": 5,
+      "literal_native_single": false
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/optionsSchema/@definition/waapi_definitions.json/definitions/returnExpression/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "kind": "gateway-owned-identity-augmentation",
+      "public_flag": "--meter-object-include",
+      "requested_outputs": [
+        "notes"
+      ],
+      "native_return": [
+        "id",
+        "name",
+        "type",
+        "path",
+        "notes"
+      ],
+      "native_cardinality": 5,
+      "literal_native_single": false
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.profiler.getMeters|/optionsSchema/@definition/waapi_definitions.json/definitions/returnExpression/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "kind": "gateway-owned-identity-augmentation",
+      "public_flag": "--meter-object-include",
+      "requested_outputs": [
+        "notes"
+      ],
+      "native_return": [
+        "id",
+        "name",
+        "type",
+        "path",
+        "notes"
+      ],
+      "native_cardinality": 5,
+      "literal_native_single": false
+    }
   }
 }
