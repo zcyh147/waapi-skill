@@ -31,6 +31,9 @@ def program_source_context(root=audit.ROOT, *, flow=None):
     names = subprocess.check_output(['git', 'ls-files', '--', 'skills/waapi-skill'],
         cwd=root, text=True).splitlines()
     dependencies = ['tests/support/runtime_observation_evidence.py',
+        'tests/support/console_runtime_read_evidence.py',
+        'tests/unit/test_console_runtime_read_evidence.py',
+        'tests/fixtures/runtime-console-reads/r125-profiles.json',
         'tests/support/qualified_runtime_read_evidence.py',
         'tests/unit/test_qualified_runtime_read_evidence.py',
         'tests/unit/test_runtime_observation_branch_evidence.py',
@@ -316,6 +319,9 @@ def _validate_rtpc_structure(record, binding, branch, root):
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
+    from tests.support.console_runtime_read_evidence import selected, validate_evidence as validate_console_read
+    if selected(branch['id'], root):
+        return validate_console_read(record,binding,branch,category,base,root,reference_edges or {})
     if branch['route'].endswith('|function|ak.wwise.core.profiler.getLoadedMedia'):
         from tests.support.loaded_media_runtime_evidence import validate_evidence
         return validate_evidence(record, binding, branch, category, base, root, reference_edges or {})
@@ -423,7 +429,8 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
             raise ValueError('Runtime observation requires exact reviewed program/native policy')
         observation_hashes = {'capture': proof['capture']['sha256']}
         from tests.support.fixed_runtime_read_evidence import URIS
-        if identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions', 'ak.wwise.core.profiler.getLoadedMedia'}:
+        from tests.support.console_runtime_read_evidence import selected as selected_console_read
+        if selected_console_read(identity) or identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions', 'ak.wwise.core.profiler.getLoadedMedia'}:
             raw = proof['mapping']['raw_observation']
             _portable_descriptor(raw, base)
             observation_hashes['raw'] = raw['sha256']

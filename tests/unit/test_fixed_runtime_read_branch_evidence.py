@@ -31,7 +31,7 @@ def original_read(uri=URI, *, filtered=False):
 
 
 def public_fixed_read(tmp_path, *, version='2025.1', host='wwise-authoring', rows=None,
-                      view='diagnostics', position='40042', fields=None, uri=URI, filtered=False, public_calls=None, handle_index=0, seed_rows=None):
+                      view='diagnostics', position='40042', fields=None, uri=URI, filtered=False, public_calls=None, handle_index=0, seed_rows=None, original_argv=None):
     operation = uri
     original, raw = original_read(operation, filtered=filtered)
     context = program_source_context(flow=operation)
@@ -61,6 +61,8 @@ def public_fixed_read(tmp_path, *, version='2025.1', host='wwise-authoring', row
     if operation.endswith('.getGameObjects'):
         argv = ['profiler-game-objects', *(['--capture-ms', position] if position.isdecimal() else
             ['--capture', 'latest' if position == 'capture-latest' else 'user-cursor'])]
+    if original_argv is not None:
+        argv = deepcopy(original_argv)
     def public_receipt(argv, code, payload):
         # Evidence-only copy of the Gateway-written immutable issuer record;
         # the public payload and argv are preserved exactly.

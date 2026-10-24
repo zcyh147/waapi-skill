@@ -203,12 +203,13 @@ def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, 
         return receipt
     position = str(source_args['time'])
     voice = run(['core-call', PREFIX + 'getVoices', '--profiler-position', position, '--max-results', '64'])
-    busses = run(['core-call', PREFIX + 'getBusses', '--profiler-position', position, '--max-results', '64'])
+    busses = (run(['core-call', PREFIX + 'getBusses', '--profiler-position', position, '--max-results', '64'])
+        if source_args.get('bussesPipelineID') else None)
     capture = ['--capture-ms', position] if cursor is None else ['--capture', cursor]
     selected_voice = (['--voice-object-id', rows['getVoices'][0]['objectGUID']]
         if identity_forms == 'object-voice' else ['--voice-instance-handle',
             voice['payload']['agent_result']['return'][0]['voice_instance_handle']])
-    selected_busses = ([value for row in rows['getBusses'] for value in ('--bus-object-id', row['objectGUID'])]
+    selected_busses = [] if not source_args.get('bussesPipelineID') else ([value for row in rows['getBusses'] for value in ('--bus-object-id', row['objectGUID'])]
         if identity_forms == 'object-bus' else [value for row in busses['payload']['agent_result']['return']
             for value in ('--bus-instance-handle', row['bus_instance_handle'])])
     argv = ['profiler-voice-contributions', *capture, *selected_voice, *selected_busses]
