@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/HPF/@presence/present",
+  "proof": {
+    "artifact": "2022.1-wwise-authoring-original-proof-29.json",
+    "sha256": "d92584347dc8309985c45d62cb7751ab940addcb235f7e50c5c007e3d9df3230"
+  },
+  "evidence": {
+    "artifact": "2022.1-wwise-authoring-original-native.json",
+    "sha256": "051595510395e49368ad8409c2a9299332777434b29e4c666478b9f9cdaec8c0",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_missing_profiler_reads"
+  },
+  "native_equivalence": {
+    "artifact": "2022.1-wwise-authoring-original-native-equivalence-29.json",
+    "sha256": "73162b07659b3c24deceb0f217c7fad4fbb298aa24d78eb828b0e2ce2262ff10"
+  }
+}
