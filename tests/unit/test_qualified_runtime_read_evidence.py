@@ -14,7 +14,7 @@ RTPC_CATEGORY = 'profiler-rtpcs-observation'
 NODE = 'd6e9da42fb2f751cbc535eeb'
 
 
-def rtpc_program(tmp_path, version):
+def rtpc_program(tmp_path, version, program_inputs=None):
     from tests.support.qualified_runtime_read_evidence import retained_read, fixture_path
     original = fixture_path(version)
     capture = retained_read(version, RTPC_CATEGORY)['capture']
@@ -25,15 +25,50 @@ def rtpc_program(tmp_path, version):
     assert receipt['payload']['agent_result']['return'][7] == {
         'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'name': 'RPM',
         'gameObjectId': 18446744073709551614, 'value': 1000.0}
+    if program_inputs is not None:
+        program_inputs.update(gateway=receipt,native_call=native,source_context=context)
     path = tmp_path / 'program-capture.json'
     write_program_receipt(path, receipt, native, nodeid=f'qualified-{version}-rtpc',
         phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
     return path, original
 
 
+
+class _PacketCases(dict):
+    """Execute each existing public producer in the requesting node, once."""
+    def __init__(self, produce):
+        super().__init__(); self.produce=produce; self.program_inputs={}
+    def __missing__(self, key):
+        value, inputs=self.produce(key)
+        self[key]=value; self.program_inputs[key]=inputs
+        return value
+
+
+def _formal_output(request, version, category, inputs):
+    import os
+    directory=os.environ.get('WAAPI_QUALIFIED_READER_CAPTURE_DIR')
+    if directory:
+        from tests.support.runtime_observation_evidence import register_runtime_program_output
+        register_runtime_program_output(request.node,Path(directory)/(version+'-'+category+'.json'),**inputs)
+
 @pytest.fixture(scope='module')
 def inventory():
-    return audit.build_inventory()
+    # Exact committed R114 routes; collection/capture does not regenerate inventory.
+    import gzip
+    from tests.support.qualified_runtime_read_evidence import PROFILES, CATEGORIES
+    stored=json.loads((audit.ROOT/'docs/branch-coverage-inventory.json').read_bytes())
+    packed=json.loads(gzip.decompress((audit.ROOT/'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
+    routes={f"{v}|wwise-authoring|{PROFILES[v]['build']}|function|{CATEGORIES[c]}"
+        for v in ('2023.1','2024.1') for c in ('profiler-rtpcs-observation','profiler-contributions-bus-observation')}
+    rows=[]
+    for encoded in packed['rows']:
+        if encoded.get('route') is None or packed['routes'][encoded['route']] not in routes: continue
+        route=packed['routes'][encoded['route']];row=dict(encoded);row.update(packed['contexts'][row.pop('context')])
+        row.update(route=route,id=route+'|'+row['pointer'],shape_sha256=packed['shapes'][row.pop('shape')]);rows.append(row)
+    native_routes=[r for r in stored['native_coverage']['routes'] if r['id'] in routes]
+    return {'routes':[r for r in stored['routes'] if r['id'] in {n['public_route'] for n in native_routes}],
+        'native_coverage':{'candidate_sha256':'b'*64,'catalogs':stored['native_coverage']['catalogs'],
+            'routes':native_routes,'obligations':rows}}
 
 
 def test_one_qualified_read_reaches_final_consumer_without_regrading_lifecycle(tmp_path, inventory):
@@ -74,10 +109,11 @@ def test_one_qualified_read_reaches_final_consumer_without_regrading_lifecycle(t
 
 @pytest.mark.parametrize('version', ('2023.1', '2024.1'))
 @pytest.mark.parametrize('category', (RTPC_CATEGORY, 'profiler-contributions-bus-observation'))
-def test_all_independently_observed_result_selectors_reach_final_consumer(tmp_path, inventory, version, category):
+def test_all_independently_observed_result_selectors_reach_final_consumer(tmp_path, inventory, version, category, request):
     from tests.support.qualified_runtime_read_evidence import write_qualified_read_bundle
+    program_inputs={}
     if category == RTPC_CATEGORY:
-        capture, original = rtpc_program(tmp_path, version)
+        capture, original = rtpc_program(tmp_path, version,program_inputs)
     else:
         from tests.support.qualified_runtime_read_evidence import retained_contribution_inputs
         from tests.unit.test_contribution_branch_evidence import public_contribution_flow
@@ -86,10 +122,12 @@ def test_all_independently_observed_result_selectors_reach_final_consumer(tmp_pa
             tmp_path / 'public', version, retained=inputs)
         assert receipt['payload']['agent_result']['volume'] == -9.0
         assert len(receipt['payload']['agent_result']['objects']) == 7
+        program_inputs.update(gateway=receipt,native_call=native,source_context=context,native_reads=trace,public_calls=calls)
         capture = tmp_path / 'program-capture.json'
         write_program_receipt(capture, receipt, native, nodeid=f'qualified-{version}-contribution',
             phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
             native_reads=trace, public_calls=calls)
+    _formal_output(request,version,category,program_inputs)
     index = write_qualified_read_bundle(tmp_path / 'bundle', capture, original,
         inventory=inventory, version=version, category=category)
     policy = json.loads((index.parent / 'requirements.json').read_bytes())
@@ -227,39 +265,37 @@ def r124_cases(tmp_path_factory):
     from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
     from tests.unit.test_contribution_branch_evidence import public_contribution_flow
     inventory = _r124_inventory()
-    cases = {}
-    for version in ('2021.1', '2023.1', '2024.1'):
-        categories = ['profiler-voices-seed', 'profiler-busses-seed']
-        if version == '2021.1': categories.append('profiler-contributions-bus-observation')
-        for category in categories:
-            root = tmp_path_factory.mktemp('r124-' + version + '-' + category)
-            retained = retained_read(version, category)
-            if category.endswith('-seed'):
-                receipt, native, context, trace = public_fixed_read(root / 'public', version=version,
-                    uri=retained['raw']['api'], position=str(retained['profile']['time']), rows=retained['raw']['result']['return'])
-                calls = [{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}]
-            else:
-                receipt, native, context, trace, calls, _ = public_contribution_flow(root / 'public', version,
-                    retained=retained_contribution_inputs(version))
-            assert native['result'] == retained['raw']['result']
-            capture = root / 'program.json'
-            write_program_receipt(capture, receipt, native, nodeid=version + '-' + category,
-                phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
-                native_reads=trace, public_calls=calls)
-            selected = {s['id'] for s in anchor_profile(version, category)['selectors']}
-            index = write_qualified_read_bundle(root / 'bundle', capture, fixture_path(version),
-                inventory=inventory, version=version, category=category, selected=selected)
-            policy = json.loads((index.parent / 'requirements.json').read_bytes())
-            document, base, _ = audit.portable_binding_inputs(index, policy)
-            cases[version, category] = (inventory, index, policy, document, base, selected)
-    return cases
+    def produce(key):
+        version,category=key
+        root=tmp_path_factory.mktemp('r124-'+version+'-'+category)
+        retained=retained_read(version,category)
+        if category.endswith('-seed'):
+            receipt,native,context,trace=public_fixed_read(root/'public',version=version,
+                uri=retained['raw']['api'],position=str(retained['profile']['time']),rows=retained['raw']['result']['return'])
+            calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}]
+        else:
+            receipt,native,context,trace,calls,_=public_contribution_flow(root/'public',version,
+                retained=retained_contribution_inputs(version))
+        assert native['result']==retained['raw']['result']
+        inputs=dict(gateway=receipt,native_call=native,source_context=context,native_reads=trace,public_calls=calls)
+        capture=root/'program.json'
+        write_program_receipt(capture,nodeid=version+'-'+category,
+            phase_reports=dict.fromkeys(('setup','call','teardown'),'passed'),**inputs)
+        selected={s['id'] for s in anchor_profile(version,category)['selectors']}
+        index=write_qualified_read_bundle(root/'bundle',capture,fixture_path(version),
+            inventory=inventory,version=version,category=category,selected=selected)
+        policy=json.loads((index.parent/'requirements.json').read_bytes())
+        document,base,_=audit.portable_binding_inputs(index,policy)
+        return (inventory,index,policy,document,base,selected),inputs
+    return _PacketCases(produce)
 
 
 @pytest.mark.parametrize('version,category', [
     (v, c) for v in ('2021.1', '2023.1', '2024.1') for c in ('profiler-voices-seed', 'profiler-busses-seed')
 ] + [('2021.1', 'profiler-contributions-bus-observation')])
-def test_r124_all43_native_anchors_replay_complete_original_public_packets(r124_cases, version, category):
+def test_r124_all43_native_anchors_replay_complete_original_public_packets(r124_cases, version, category, request):
     inventory, index, policy, document, base, selected = r124_cases[version, category]
+    _formal_output(request,version,category,r124_cases.program_inputs[version,category])
     result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
         evidence_base=base, requirements_document=policy)
     observed = [r for r in result['obligations'] if r['id'] in selected]
@@ -367,8 +403,8 @@ def r125_cases(tmp_path_factory):
     from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
     inventory = _r124_inventory(q.R104_SELECTORS)
     scope = json.loads((audit.ROOT / q.R104_SELECTORS).read_bytes())
-    cases = {}
-    for key, profile in scope['profiles'].items():
+    def produce(key):
+        profile=scope['profiles'][key]
         version, category = key.split('|'); root = tmp_path_factory.mktemp('r125-' + key.replace('|', '-'))
         retained = q.retained_read(version, category); rows = retained['raw']['result']['return']
         if category == 'r104-object-rtpcs-observation':
@@ -389,8 +425,9 @@ def r125_cases(tmp_path_factory):
             inventory=inventory, version=version, category=category, selected=selected)
         policy = json.loads((index.parent / 'requirements.json').read_bytes())
         document, base, _ = audit.portable_binding_inputs(index, policy)
-        cases[key] = (inventory, index, policy, document, base, selected)
-    return cases
+        inputs=dict(gateway=receipt,native_call=native,source_context=context,**extra)
+        return (inventory,index,policy,document,base,selected),inputs
+    return _PacketCases(produce)
 
 
 @pytest.mark.parametrize('key', [
@@ -398,8 +435,9 @@ def r125_cases(tmp_path_factory):
     '2022.1|r104-audio-objects-observation', '2022.1|r104-game-objects-observation',
     '2023.1|r104-audio-objects-observation', '2023.1|r104-game-objects-observation',
     '2024.1|r104-audio-objects-observation', '2024.1|r104-game-objects-observation'])
-def test_r125_all22_native_anchors_replay_eight_complete_original_public_packets(r125_cases, key):
+def test_r125_all22_native_anchors_replay_eight_complete_original_public_packets(r125_cases, key, request):
     inventory, index, policy, document, base, selected = r125_cases[key]
+    _formal_output(request,*key.split('|'),r125_cases.program_inputs[key])
     result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
         evidence_base=base, requirements_document=policy)
     observed = [r for r in result['obligations'] if r['id'] in selected]

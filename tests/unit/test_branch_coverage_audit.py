@@ -442,3 +442,104 @@ def test_runtime_common_base_preserves_existing_global_source_freshness(runtime_
     else:
         document, _, _ = audit.portable_binding_inputs(stage['index'], stage['policy'])
         assert set(document['bindings']) == set(stage['policy']['branches'])
+
+
+def test_runtime_prefixed_families_share_one_base_without_overwrite_or_duplicate_credit(tmp_path):
+    """One fixed packet and one qualified RTPC packet use the ordinary importer."""
+    import json
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support import runtime_observation_evidence as runtime
+    from tests.support import qualified_runtime_read_evidence as qualified
+    from tests.unit.test_console_runtime_read_evidence import packet_case
+    from tests.unit.test_qualified_runtime_read_evidence import rtpc_program
+    import gzip
+    stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    packed = json.loads(gzip.decompress((audit.ROOT / 'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
+    inventory, fixed_index, fixed_policy, _, _, fixed_ids = packet_case(tmp_path / 'fixed', '2021.1', 'busses', (stored, packed), bundle_prefix='console-2021-busses-')
+    capture, original = rtpc_program(tmp_path / 'rtpc', '2023.1')
+    # The accepted R114 original packet owns this scalar, not a synthetic row.
+    route = next(r for r in stored['native_coverage']['routes'] if r['version'] == '2023.1'
+        and r['host'] == 'wwise-authoring' and r['uri'] == runtime.RTPC_URI)
+    identity = route['id'] + '|/resultSchema/properties/return/items/properties/value'
+    # Include the route's committed reference edges in the ordinary portable input.
+    rows = []
+    for encoded in packed['rows']:
+        if encoded.get('route') is None or packed['routes'][encoded['route']] != route['id']: continue
+        branch = dict(encoded); branch.update(packed['contexts'][branch.pop('context')])
+        branch.update(route=route['id'], id=route['id'] + '|' + branch['pointer'], shape_sha256=packed['shapes'][branch.pop('shape')]); rows.append(branch)
+    rtpc_inventory = {'routes': [r for r in stored['routes'] if r['id'] == route['public_route']],
+        'native_coverage': {'candidate_sha256': 'e' * 64, 'catalogs': stored['native_coverage']['catalogs'], 'routes': [route], 'obligations': rows}}
+    rtpc_index = qualified.write_qualified_read_bundle(tmp_path / 'qualified', capture, original,
+        inventory=rtpc_inventory, version='2023.1', category='profiler-rtpcs-observation', selected={identity}, name_prefix='qualified-2023-rtpc-')
+    rtpc_policy = json.loads((rtpc_index.parent / 'qualified-2023-rtpc-requirements.json').read_bytes())
+    # Reuse this one public packet to check stage-level prefix forwarding and
+    # selection. Unselected flow keys confer no binding or native credit.
+    from copy import deepcopy
+    stage_inventory=deepcopy(rtpc_inventory)
+    stage_inventory['native_coverage']['routes']=[r for r in stored['native_coverage']['routes'] if r['uri']==runtime.RTPC_URI]
+    stage_inventory['routes']=[r for r in stored['routes'] if r['id'] in {n['public_route'] for n in stage_inventory['native_coverage']['routes']}]
+    capture_keys={(v,h,m):capture for v in ('2021.1','2022.1','2023.1','2024.1','2025.1')
+        for h in ('wwise-console','wwise-authoring') for m in ('construction','data')}
+    stage_index=runtime.write_field_stage(tmp_path/'rtpc-stage',capture_keys,{},inventory=stage_inventory,
+        family_prefix='rtpc-',selected_ids={identity})
+    stage_document=json.loads(stage_index.read_bytes())
+    assert len(stage_document['entries'])==1
+    assert stage_document['entries'][0]['bindings']['artifact'].startswith('rtpc-2023.1-wwise-authoring-data-')
+    stage_policy=json.loads((stage_index.parent/'requirements.json').read_bytes())
+    assert set(stage_policy['branches'])=={identity}
+    stage_bindings,_,_=audit.portable_binding_inputs(stage_index,stage_policy)
+    assert set(stage_bindings['bindings'])=={identity}
+    components = [(fixed_index, fixed_policy), (rtpc_index, rtpc_policy)]
+    combined, policy = runtime.write_runtime_composition(tmp_path / 'combined', components)
+    document, base, _ = audit.portable_binding_inputs(combined, policy)
+    assert set(document['bindings']) == fixed_ids | {identity}
+    assert policy['branches'] == {**fixed_policy['branches'], **rtpc_policy['branches']}
+    # Every original gzip and reader artifact keeps its exact relative identity/bytes.
+    original_bytes = (base / 'qualified-2023-rtpc-qualified-original.json.gz').read_bytes()
+    assert original_bytes == original.read_bytes()
+    foreign = tmp_path / 'different'; foreign.mkdir()
+    path = foreign / 'qualified-2023-rtpc-qualified-original.json.gz'; path.write_bytes(b'foreign')
+    with pytest.raises(ValueError, match='common-base path collision'):
+        runtime.copy_runtime_common_base_file(path, base / path.name)
+    assert (base / path.name).read_bytes() == original_bytes
+    with pytest.raises(ValueError, match='duplicates an exact branch'):
+        runtime.write_runtime_composition(tmp_path / 'duplicate', [*components, components[0]])
+
+
+def test_runtime_publication_plan_assigns_native_facts_before_unique_program_rows():
+    from tests.support.runtime_observation_evidence import runtime_publication_plan
+    plan = runtime_publication_plan()
+    assert len(plan['native_owners']) == 272
+    counts = {}
+    for owner in plan['native_owners'].values(): counts[owner] = counts.get(owner, 0) + 1
+    assert counts == {'console': 106, 'qualified': 85, 'strict-seed': 12, 'existing-fixed': 48,
+        'existing-rtpc': 6, 'existing-contribution': 15}
+    assert len(plan['console_packets']) == 25 and len(plan['qualified_packets']) == 19
+    assert len(plan['strict_seed_packets']) == 2
+    assigned = [identity for family in plan['program_ids'].values() for identity in family]
+    assigned += [identity for packet in plan['console_packets'] + plan['qualified_packets'] + plan['strict_seed_packets'] for identity in packet['ids']]
+    assert len(assigned) == len(set(assigned)) == 6292
+    # The four older R125 Voices packets remain seed provenance only.
+    assert all(p['version'] == '2025.1' for p in plan['console_packets'] if p['category'] == 'voices')
+
+
+def test_runtime_common_base_keeps_existing_global_attachment_rosters_and_bytes(tmp_path):
+    """Projection preserves existing41/655 transport; it grants no new credit."""
+    import json
+    import hashlib
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.runtime_observation_evidence import write_runtime_composition
+    source = audit.ROOT / 'docs/branch-coverage-evidence-index.json'
+    original = json.loads(source.read_bytes())
+    policy = json.loads((audit.ROOT / 'docs/branch-coverage-requirements.json').read_bytes())
+    target, observed_policy = write_runtime_composition(tmp_path / 'projection', [(source, policy)])
+    observed = json.loads(target.read_bytes())
+    assert observed['entries'] == original['entries'] and len(observed['entries']) == 41
+    assert observed_policy == policy and len(policy['branches']) == 655
+    for key in ('metadata_attachments', 'source_attachments', 'source_native_attachments'):
+        assert observed[key] == original[key]
+    original_base = (source.parent / original['base']).resolve()
+    for path in (target.parent / observed['base']).rglob('*'):
+        if path.is_file():
+            relative = path.relative_to(target.parent / observed['base'])
+            assert path.read_bytes() == (original_base / relative).read_bytes()

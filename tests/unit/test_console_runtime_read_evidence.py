@@ -28,7 +28,7 @@ def committed_tables():
     return stored,packed
 
 
-def packet_case(tmp_path,version,key,tables):
+def packet_case(tmp_path,version,key,tables,program_inputs=None,bundle_prefix=""):
     from tests.support import console_runtime_read_evidence as console
     from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
     from tests.unit.test_rtpc_field_branch_evidence import public_rtpc_read
@@ -56,11 +56,13 @@ def packet_case(tmp_path,version,key,tables):
             uri=uri,position=str(original['profile']['time']),rows=original['raw']['result']['return'],original_argv=original['receipt']['argv'])
         extra={'native_reads':trace,'public_calls':[{'gateway':receipt,'native_start':0,'native_end':len(trace)}]}
     assert native['result']==original['raw']['result']
+    if program_inputs is not None:
+        program_inputs.update(gateway=receipt,native_call=native,source_context=context,**extra)
     capture=tmp_path/'program.json'
     write_program_receipt(capture,receipt,native,nodeid='r125-'+version+'-'+key,
         phase_reports=dict.fromkeys(('setup','call','teardown'),'passed'),source_context=context,**extra)
-    index=console.write_bundle(tmp_path/'bundle',capture,inventory=inventory,version=version,key=key)
-    policy=json.loads((index.parent/'requirements.json').read_bytes());document,base,_=audit.portable_binding_inputs(index,policy)
+    index=console.write_bundle(tmp_path/'bundle',capture,inventory=inventory,version=version,key=key,name_prefix=bundle_prefix)
+    policy=json.loads((index.parent/(bundle_prefix+'requirements.json')).read_bytes());document,base,_=audit.portable_binding_inputs(index,policy)
     return inventory,index,policy,document,base,ids
 
 
@@ -71,17 +73,24 @@ CASES=[(v,k) for v in ('2021.1','2022.1','2023.1','2024.1','2025.1')
 
 @pytest.fixture(scope='module')
 def packet_cache(tmp_path_factory,committed_tables):
-    cases={}
+    cases={}; inputs={}
     def get(version,key):
         if (version,key) not in cases:
-            cases[version,key]=packet_case(tmp_path_factory.mktemp('r125-'+version+'-'+key),version,key,committed_tables)
+            inputs[version,key]={}
+            cases[version,key]=packet_case(tmp_path_factory.mktemp('r125-'+version+'-'+key),version,key,committed_tables,inputs[version,key])
         return cases[version,key]
+    get.program_inputs=inputs
     return get
 
 
 @pytest.mark.parametrize('version,key',CASES,ids=[v+'-'+k for v,k in CASES])
-def test_r125_new106_anchors_use_25_complete_original_public_packets(packet_cache,version,key):
+def test_r125_new106_anchors_use_25_complete_original_public_packets(packet_cache,version,key,request):
     inventory,index,policy,document,base,ids=packet_cache(version,key)
+    import os
+    directory=os.environ.get('WAAPI_CONSOLE_READER_CAPTURE_DIR')
+    if directory:
+        from tests.support.runtime_observation_evidence import register_runtime_program_output
+        register_runtime_program_output(request.node,Path(directory)/(version+'-'+key+'.json'),**packet_cache.program_inputs[version,key])
     result=completion.evaluate_coverage(audit.ROOT,inventory,document,digest=audit.digest,evidence_base=base,requirements_document=policy)
     observed=[r for r in result['obligations'] if r['id'] in ids]
     assert len(observed)==len(ids)
@@ -148,3 +157,37 @@ def test_r125_resealed_corruption_reuses_complete_packets(packet_cache):
                     {**branch,'id':branch['id']+'/oneOf/1'}):
         with pytest.raises(ValueError,match='exact106|Exact R125'):
             console.profile_for_branch(changed)
+
+
+def test_retained_packet_formal_output_waits_for_real_teardown_and_rechecks_source(tmp_path, monkeypatch):
+    from tests import conftest
+    from tests.support.runtime_observation_evidence import register_runtime_program_output
+    from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
+    from tests.support.console_runtime_read_evidence import original_observation
+    original = original_observation('2021.1', 'busses')
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public', version='2021.1', host='wwise-console',
+        uri=original['reader']['uri'], position='1898', rows=original['raw']['result']['return'], original_argv=original['receipt']['argv'])
+    inputs = dict(gateway=receipt, native_call=native, source_context=context, native_reads=trace,
+        public_calls=[{'gateway':receipt, 'native_start':0, 'native_end':len(trace)}])
+    probe = tmp_path / 'test_formal_packet.py'
+    probe.write_text('import pytest\n@pytest.mark.parametrize("damage", ["none", "teardown", "source"])\ndef test_packet(formal_packet, damage):\n    formal_packet(damage)\n')
+    class Producer:
+        @pytest.fixture
+        def formal_packet(self, request):
+            selected = {}
+            def run(damage):
+                selected['damage'] = damage
+                selected['inputs'] = deepcopy(inputs)
+                register_runtime_program_output(request.node, tmp_path / (damage + '.json'), **selected['inputs'])
+                assert not (tmp_path / (damage + '.json')).exists()
+            yield run
+            if selected['damage'] == 'teardown': raise RuntimeError('actual retained-packet fixture teardown failure')
+            if selected['damage'] == 'source':
+                selected['inputs']['source_context']['capture']['tests/support/console_runtime_read_evidence.py'] = '0' * 64
+    class Reports:
+        pytest_runtest_makereport = staticmethod(conftest.pytest_runtest_makereport)
+    monkeypatch.setenv('PYTEST_DISABLE_PLUGIN_AUTOLOAD', '1')
+    result = pytest.main([str(probe), '--rootdir', str(tmp_path), '-q', '-p', 'no:cacheprovider'], plugins=[Producer(), Reports()])
+    assert int(result) == 1
+    assert json.loads((tmp_path / 'none.json').read_bytes())['phase_reports'] == dict.fromkeys(('setup','call','teardown'), 'passed')
+    assert not (tmp_path / 'teardown.json').exists() and not (tmp_path / 'source.json').exists()

@@ -371,8 +371,9 @@ def selected_mappings(inventory, captured, version, category):
     return route, mappings
 
 
-def write_qualified_read_bundle(output, program_path, original, *, inventory, version, category, selected=None):
+def write_qualified_read_bundle(output, program_path, original, *, inventory, version, category, selected=None, name_prefix=""):
     """Add one retained observation to ordinary shared per-branch program output."""
+    runtime.validate_runtime_file_prefix(name_prefix)
     is_r104 = category.startswith('r104-')
     original_fixture = r104_fixture_path(version) if is_r104 else fixture_path(version)
     root_locator = r104_profile(version, category)['original_root'] if is_r104 else original_root(version)
@@ -390,28 +391,32 @@ def write_qualified_read_bundle(output, program_path, original, *, inventory, ve
     output = Path(output)
     if category.endswith('-seed') or (is_r104 and category != 'r104-object-rtpcs-observation'):
         from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
-        index_path = write_fixed_bundle(output, program_path, None, inventory=inventory, selected={r['branch']['id'] for r in mappings})
+        index_path = write_fixed_bundle(output, program_path, None, inventory=inventory, selected={r['branch']['id'] for r in mappings}, name_prefix=name_prefix)
     elif category in {'profiler-rtpcs-observation', 'r104-object-rtpcs-observation'}:
         index_path = runtime.write_field_bundle(output, program_path, None, inventory=inventory,
-            version=version, host='wwise-authoring', mode='data', mappings=mappings)
+            version=version, host='wwise-authoring', mode='data', mappings=mappings, name_prefix=name_prefix)
     else:
         index_path = runtime.write_read_bundle(output, program_path, None, inventory=inventory,
-            version=version, host='wwise-authoring', mode='qualified-data', mappings=mappings)
+            version=version, host='wwise-authoring', mode='qualified-data', mappings=mappings, name_prefix=name_prefix)
     index = json.loads(index_path.read_bytes())
-    shutil.copyfile(original_fixture, output / 'qualified-original.json.gz')
+    if not (category.endswith('-seed') or (is_r104 and category != 'r104-object-rtpcs-observation')):
+        for entry in index['entries']: entry['id']=name_prefix+entry['id']
+    def filename(name): return name_prefix + name
+    def write(name, value): return runtime.write_json(output / filename(name), value)
+    shutil.copyfile(original_fixture, output / filename('qualified-original.json.gz'))
     assessment = {'contract': 'waapi-skill.qualified-retained-read-assessment/v1',
         'version': version, 'category': category, 'original_candidate': R104_CANDIDATE if is_r104 else CANDIDATE,
         'original_workflow_outcome': 'BLOCKED', 'original_finalization': 'BLOCKED',
         'successful_finalization': False, 'qualified_read_fact': 'PASS',
         'lifecycle_obligations': [] if is_r104 else lifecycle_obligations(version),
-        'archive': {'artifact': 'qualified-original.json.gz', 'sha256': retained['profile']['archive']},
+        'archive': {'artifact': filename('qualified-original.json.gz'), 'sha256': retained['profile']['archive']},
         'program_capture': index['entries'][0]['origin']['capture'],
         'source_changes': runtime.RTPC_REVIEWED_SOURCE_CHANGES,
         'changed_symbols': runtime.RTPC_REVIEWED_SOURCE_SYMBOLS}
     if is_r104:
         assessment['source_changes'], assessment['changed_symbols'] = r104_source_review()
         assessment['retained_facts'] = retained['facts']
-    assessment_descriptor = runtime.write_json(output / 'qualified-assessment.json', assessment)
+    assessment_descriptor = write('qualified-assessment.json', assessment)
     bindings = completion.read_sealed_artifact(index['entries'][0]['bindings'], output)['bindings']
     attachments = []
     for number, mapping in enumerate(mappings):
@@ -421,8 +426,8 @@ def write_qualified_read_bundle(output, program_path, original, *, inventory, ve
             'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
             'program_pointer': pointer, 'reference_chain': mapping['reference_chain'],
             'observed': completion.pointer_value(retained['raw'], pointer.removeprefix('/native_call'))}
-        descriptor = runtime.write_json(output / f'qualified-native-{number}.json', native)
-        attachments.append(runtime.write_json(output / f'qualified-attachment-{number}.json', {
+        descriptor = write(f'qualified-native-{number}.json', native)
+        attachments.append(write(f'qualified-attachment-{number}.json', {
             'contract': 'waapi-skill.qualified-retained-read-attachment/v1', 'branch_id': identity,
             'assessment': assessment_descriptor, 'evidence': descriptor}))
     index['qualified_runtime_read_attachments'] = attachments

@@ -69,6 +69,14 @@ def write_program_receipt(path, gateway, native_call, *, nodeid, phase_reports, 
         **({'public_calls': public_calls} if public_calls is not None else {})})
 
 
+
+def register_runtime_program_output(item, path, **inputs):
+    """Write from the actual public execution only after this node's final reports."""
+    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+    register_exact_evidence_finalizer(item, lambda phases: write_program_receipt(
+        path, nodeid=item.nodeid, phase_reports=phases, **inputs))
+
+
 def archive_reader(descriptor, base):
     """Resolve original POSIX archive identities without touching their old paths."""
     import base64
@@ -933,8 +941,10 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
     return destination('index.json')
 
 
-def write_field_stage(output, captures, originals, *, inventory, guard_replays=None):
+def write_field_stage(output, captures, originals, *, inventory, guard_replays=None, family_prefix="", selected_ids=None):
     """Combine five-version read flows in the ordinary portable index format."""
+    if family_prefix not in {'', 'rtpc-'}:
+        raise ValueError('Closed RTPC family prefix required')
     versions = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
     fields = {(version, host, mode) for version in versions
         for host in ('wwise-console', 'wwise-authoring') for mode in ('construction', 'data')}
@@ -950,11 +960,21 @@ def write_field_stage(output, captures, originals, *, inventory, guard_replays=N
     policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
     index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.', 'entries': []}
     attachments = []
+    wanted = None if selected_ids is None else set(selected_ids)
+    if wanted is not None and not wanted <= {b['id'] for b in inventory['native_coverage']['obligations'] if (b.get('route') or '').endswith('|function|' + RTPC_URI)}:
+        raise ValueError('RTPC stage selected IDs escape its exact routes')
     for version, host, mode in sorted(expected):
+        if wanted is not None and not any(i.startswith(f'{version}|{host}|') for i in wanted):
+            continue
         original = originals.get(version) if host == 'wwise-authoring' and mode == 'data' else None
+        mappings = None
+        if wanted is not None:
+            _, mappings = rtpc_field_mappings(inventory, version=version, host=host, mode=mode)
+            mappings = [m for m in mappings if m['branch']['id'] in wanted]
+            if not mappings: continue
         flow = write_field_bundle(output, captures[version, host, mode], original,
-            inventory=inventory, version=version, host=host, mode=mode,
-            name_prefix=f'{version}-{host}-{mode}-', guard_replay=(guard_replays or {}).get(version))
+            inventory=inventory, version=version, host=host, mode=mode, mappings=mappings,
+            name_prefix=f'{family_prefix}{version}-{host}-{mode}-', guard_replay=(guard_replays or {}).get(version))
         document = json.loads(flow.read_bytes())
         index['entries'].extend(document['entries'])
         attachments.extend(document.get('runtime_observation_attachments', []))
@@ -962,6 +982,8 @@ def write_field_stage(output, captures, originals, *, inventory, guard_replays=N
         if policy['branches'].keys() & flow_policy['branches'].keys():
             raise ValueError('RTPC stage repeats an exact native branch')
         policy['branches'].update(flow_policy['branches'])
+    if wanted is not None and set(policy['branches']) != wanted:
+        raise ValueError('RTPC stage has unproved selected branches')
     if attachments:
         index['runtime_observation_attachments'] = attachments
     write_json(output / 'requirements.json', policy)
@@ -1629,8 +1651,10 @@ def _validate_contribution_branch(record, binding, branch, root):
             raise ValueError('Contribution legacy driver preservation requires its explicit pinned compatibility disclosure')
 
 
-def write_read_stage(output, captures, originals, *, inventory):
+def write_read_stage(output, captures, originals, *, inventory, family_prefix="", selected_ids=None):
     """Join independently selected contribution branches in one portable index."""
+    if family_prefix not in {'', 'contribution-'}:
+        raise ValueError('Closed contribution family prefix required')
     versions = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
     expected = {(version, host, mode) for version in versions for host in ('wwise-console', 'wwise-authoring')
         for mode in ('rich', 'single', 'empty', 'absent', 'omit', 'cursor-capture', 'cursor-user')}
@@ -1648,18 +1672,24 @@ def write_read_stage(output, captures, originals, *, inventory):
     policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
     index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.', 'entries': []}
     attachments, selected = [], set()
+    wanted = {row['id'] for row in inventory['native_coverage']['obligations']
+        if (row.get('route') or '').endswith('|function|' + CONTRIBUTION_URI)
+        and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
+    if selected_ids is not None:
+        if not set(selected_ids) <= wanted: raise ValueError('Contribution stage selected IDs escape its exact routes')
+        wanted = set(selected_ids)
     for version, host, mode in sorted(expected, key=lambda key: (key[2] != 'original', key)):
         captured = json.loads(Path(captures[version, host, mode]).read_bytes())
         route_ids = {row['id'] for row in inventory['native_coverage']['obligations']
             if row['route'] is not None and row['route'].split('|')[:2] == [version, host]
             and row['route'].endswith('|function|' + CONTRIBUTION_URI)
             and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
-        _, mappings = contribution_field_mappings(inventory, captured, version=version, host=host, selected=route_ids - selected)
+        _, mappings = contribution_field_mappings(inventory, captured, version=version, host=host, selected=route_ids & wanted - selected)
         if not mappings:
             continue
         flow = write_read_bundle(output, captures[version, host, mode], originals.get(version) if mode == 'original' else None,
             inventory=inventory, version=version, host=host, mode=mode, mappings=mappings,
-            name_prefix=f'{version}-{host}-{mode}-')
+            name_prefix=f'{family_prefix}{version}-{host}-{mode}-')
         document = json.loads(flow.read_bytes())
         index['entries'].extend(document['entries'])
         attachments.extend(document.get('runtime_observation_attachments', []))
@@ -1668,11 +1698,8 @@ def write_read_stage(output, captures, originals, *, inventory):
             raise ValueError('Contribution batch repeats an exact branch')
         selected |= flow_policy['branches'].keys()
         policy['branches'].update(flow_policy['branches'])
-    all_ids = {row['id'] for row in inventory['native_coverage']['obligations']
-        if (row.get('route') or '').endswith('|function|' + CONTRIBUTION_URI)
-        and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
-    if selected != all_ids:
-        raise ValueError('Contribution batch has unproved exact branches: ' + repr(sorted(all_ids - selected)))
+    if selected != wanted:
+        raise ValueError('Contribution batch has unproved exact branches: ' + repr(sorted(wanted - selected)))
     if attachments:
         index['runtime_observation_attachments'] = attachments
     write_json(output / 'index.json', index)
@@ -1829,3 +1856,135 @@ def apply_runtime_preservation_gates(obligations, policies, gates):
                 row['state'] = 'implemented_unverified'
             row['reasons'].append('Exact reviewed runtime preservation policy or native anchors missing: '
                 + (', '.join(failed) if anchors is not None else 'unreviewed successor'))
+
+
+def validate_runtime_file_prefix(prefix):
+    if prefix and (len(prefix) > 128 or not prefix.endswith('-') or '..' in prefix
+            or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789.-' for c in prefix)):
+        raise ValueError('Closed runtime filename prefix required')
+
+
+def copy_runtime_common_base_file(source, destination):
+    """Project exact bytes at the existing relative locator, never overwrite."""
+    raw = Path(source).read_bytes(); destination = Path(destination)
+    if destination.exists():
+        if destination.read_bytes() != raw:
+            raise ValueError('Runtime common-base path collision')
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(raw)
+
+
+def write_runtime_composition(output, components):
+    """Compose existing ordinary indices without changing nested descriptors."""
+    output = Path(output); output.mkdir(parents=True, exist_ok=False)
+    base = output / 'evidence'
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': 'evidence', 'entries': []}
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    entry_ids = set()
+    attachment_keys = ('metadata_attachments','source_attachments','source_native_attachments',
+        'runtime_observation_attachments','qualified_runtime_read_attachments',
+        'condition_mechanism_attachments','condition_definition_attachments')
+    for index_path, original_policy in components:
+        index_path = Path(index_path); document = json.loads(index_path.read_bytes())
+        source = (index_path.parent / document['base']).resolve()
+        if (set(document) - {'contract','base','entries',*attachment_keys}
+                or document['contract'] != index['contract'] or original_policy['contract'] != policy['contract']
+                or policy['branches'].keys() & original_policy['branches'].keys()):
+            raise ValueError('Runtime composition duplicates an exact branch or contract')
+        for entry in document['entries']:
+            if entry['id'] in entry_ids:
+                raise ValueError('Runtime composition duplicates an entry identity')
+            entry_ids.add(entry['id'])
+        seen = {}
+        def retain(value):
+            if isinstance(value, dict):
+                # The existing portable importer projects these origin locators.
+                if value.get('contract') == 'waapi-skill.branch-bindings/v1': return
+                if value.get('contract') == 'waapi-skill.class-metadata-read/v1':
+                    seal = json.loads((source / value['seal']['artifact']).read_bytes())
+                    for item in seal['files']:
+                        retain({'artifact':str(Path(value['root']) / item['path']), 'sha256':item['sha256']})
+                if isinstance(value.get('artifact'), str) and isinstance(value.get('sha256'), str):
+                    name = value['artifact']
+                    if not Path(name).is_absolute():
+                        origin = source / name
+                        if not origin.resolve().is_relative_to(source):
+                            raise ValueError('Runtime common-base artifact escapes its original base')
+                        raw = origin.read_bytes()
+                        if sha(raw) != value['sha256'] or name in seen and seen[name] != value['sha256']:
+                            raise ValueError('Runtime common-base original descriptor changed')
+                        if name not in seen:
+                            seen[name] = value['sha256']
+                            copy_runtime_common_base_file(origin, base / name)
+                            if origin.suffix in {'.json', '.jsonl'}:
+                                try: records = [json.loads(raw)]
+                                except json.JSONDecodeError as error:
+                                    if error.msg != 'Extra data': raise
+                                    records = [json.loads(line) for line in raw.splitlines() if line.strip()]
+                                for row in records: retain(row)
+                for child in value.values(): retain(child)
+            elif isinstance(value, list):
+                for child in value: retain(child)
+        retain(document)
+        index['entries'].extend(document['entries'])
+        for key in attachment_keys:
+            if document.get(key): index.setdefault(key, []).extend(document[key])
+        policy['branches'].update(original_policy['branches'])
+    write_json(output / 'requirements.json', policy)
+    write_json(output / 'index.json', index)
+    return output / 'index.json', policy
+
+
+def runtime_publication_plan(root=audit.ROOT):
+    """Allocate the accepted native roster first; generic flows own the remainder."""
+    from tests.support import console_runtime_read_evidence as console
+    from tests.support import qualified_runtime_read_evidence as qualified
+    review = runtime_risk_review(root); anchors = set(review['still_native_anchor_ids'])
+    owners = {}; external = set(); packets = {'console': [], 'qualified': [], 'strict-seed': []}
+    def take(kind, version, category, identities):
+        identities = sorted(set(identities) & anchors - owners.keys())
+        if identities:
+            owners.update(dict.fromkeys(identities, kind))
+            if kind in packets:
+                packets[kind].append({'version':version, 'category':category, 'ids':identities})
+                external.update(identities)
+    scope = console.profiles(root)
+    for version, profile in scope['profiles'].items():
+        for category, reader in profile['readers'].items():
+            take('console', version, category, reader['selectors'])
+    for path, seal in ((qualified.ANCHOR_SELECTORS, qualified.ANCHOR_SELECTORS_SHA),
+                       (qualified.R104_SELECTORS, qualified.R104_SELECTORS_SHA)):
+        raw = (root / path).read_bytes()
+        if sha(raw) != seal: raise ValueError('Runtime publication qualified roster changed')
+        for key, profile in json.loads(raw)['profiles'].items():
+            version, category = key.split('|')
+            take('qualified', version, category, [row['id'] for row in profile['selectors']])
+    # These four original R114 packets already have qualified admission. Select
+    # only their remaining semantic anchors, not the former82 codec occurrences.
+    for version in ('2023.1', '2024.1'):
+        for category in ('profiler-rtpcs-observation', 'profiler-contributions-bus-observation'):
+            route = f"{version}|wwise-authoring|{qualified.PROFILES[version]['build']}|function|{qualified.CATEGORIES[category]}"
+            take('qualified', version, category, [i for i in anchors if review['entries'][i]['route'] == route])
+    seed_path = root / 'tests/fixtures/runtime-fixed-reads/r105-2022-seed-selectors.json'
+    raw = seed_path.read_bytes()
+    if sha(raw) != '0af89b4294b789f910a876fbe2d8debf9944ea0a128f6521bd2207a03c08e626':
+        raise ValueError('Runtime publication strict seed roster changed')
+    for name, profile in json.loads(raw)['profiles'].items():
+        take('strict-seed', '2022.1', name, profile['matching_missing_ids'])
+    for family, directory in (('rtpc','runtime-rtpc-complete-r112'),
+            ('contribution','runtime-contributions-r113'), ('fixed','runtime-fixed-reads-r121')):
+        base = root / 'tests/fixtures/branch-evidence/product' / directory
+        index = json.loads((base / 'index.json').read_bytes())
+        for descriptor in index.get('runtime_observation_attachments', []):
+            item = completion.read_sealed_artifact(descriptor, base)
+            take('existing-' + family, None, None, [item['branch_id']])
+    if set(owners) != anchors:
+        raise ValueError('Runtime publication lacks an accepted native source: ' + repr(sorted(anchors - owners.keys())))
+    program = {family:sorted(i for i,e in review['entries'].items() if e['family'] == family and i not in external)
+        for family in ('fixed','rtpc','contribution')}
+    assigned = [i for values in program.values() for i in values] + [i for rows in packets.values() for row in rows for i in row['ids']]
+    if len(assigned) != 6292 or set(assigned) != set(review['entries']) or len(set(assigned)) != len(assigned):
+        raise ValueError('Runtime publication exact6292 union is not unique')
+    return {'native_owners':owners, 'console_packets':packets['console'], 'qualified_packets':packets['qualified'],
+        'strict_seed_packets':packets['strict-seed'], 'program_ids':program}

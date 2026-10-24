@@ -929,7 +929,7 @@ def r105_seed_inventory():
 
 
 @pytest.mark.parametrize('name', ('getVoices','getBusses'))
-def test_r105_2022_strict_seed_packets_reach_existing_final_consumer(tmp_path, r105_seed_inventory, name):
+def test_r105_2022_strict_seed_packets_reach_existing_final_consumer(tmp_path, r105_seed_inventory, name, request):
     from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
     from tests.support.runtime_observation_evidence import archive_reader
     inventory, expected = r105_seed_inventory
@@ -942,6 +942,12 @@ def test_r105_2022_strict_seed_packets_reach_existing_final_consumer(tmp_path, r
     receipt, native, context, trace = public_fixed_read(tmp_path/'public',version='2022.1',
         uri=profile['uri'],position='23637',rows=packet['result']['return'],public_calls=calls)
     assert receipt['argv'] == profile['public_argv'] and native['result'] == packet['result']
+    import os
+    directory=os.environ.get('WAAPI_STRICT_SEED_CAPTURE_DIR')
+    if directory:
+        from tests.support.runtime_observation_evidence import register_runtime_program_output
+        register_runtime_program_output(request.node,Path(directory)/('2022.1-'+name+'.json'),
+            gateway=receipt,native_call=native,source_context=context,native_reads=trace,public_calls=calls)
     capture = tmp_path/'capture.json'
     write_program_receipt(capture,receipt,native,nodeid='r105-seed-'+name,
         phase_reports=dict.fromkeys(('setup','call','teardown'),'passed'),source_context=context,native_reads=trace,public_calls=calls)

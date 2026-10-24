@@ -134,8 +134,9 @@ def original_observation(version, key, originals=None, root=audit.ROOT):
         sources=sources,archive=descriptor,category_descriptor=category_descriptor)
 
 
-def write_bundle(output, program_path, *, inventory, version, key):
+def write_bundle(output, program_path, *, inventory, version, key, name_prefix=""):
     """Add one exact finalized packet to an ordinary existing program bundle."""
+    runtime.validate_runtime_file_prefix(name_prefix)
     original = original_observation(version,key); captured = json.loads(Path(program_path).read_bytes())
     selected_ids = set(original['reader']['selectors']); uri = original['reader']['uri']
     route, = [r for r in inventory['native_coverage']['routes'] if r['version']==version and r['host']=='wwise-console' and r['uri']==uri]
@@ -151,18 +152,22 @@ def write_bundle(output, program_path, *, inventory, version, key):
         raise ValueError('Every selected R125 occurrence must be independently mapped')
     output = Path(output)
     if uri in fixed.URIS:
-        index = fixed.write_fixed_bundle(output,program_path,None,inventory=inventory,selected=selected_ids,mappings=mappings)
+        index = fixed.write_fixed_bundle(output,program_path,None,inventory=inventory,selected=selected_ids,mappings=mappings,name_prefix=name_prefix)
     elif uri == runtime.RTPC_URI:
-        index = runtime.write_field_bundle(output,program_path,None,inventory=inventory,version=version,host='wwise-console',mode='data',mappings=mappings)
+        index = runtime.write_field_bundle(output,program_path,None,inventory=inventory,version=version,host='wwise-console',mode='data',mappings=mappings,name_prefix=name_prefix)
     else:
-        index = runtime.write_read_bundle(output,program_path,None,inventory=inventory,version=version,host='wwise-console',mode='r125-data',mappings=mappings)
-    index_doc = json.loads(index.read_bytes()); bindings = completion.read_sealed_artifact(index_doc['entries'][0]['bindings'],output)['bindings']
+        index = runtime.write_read_bundle(output,program_path,None,inventory=inventory,version=version,host='wwise-console',mode='r125-data',mappings=mappings,name_prefix=name_prefix)
+    index_doc = json.loads(index.read_bytes())
+    if uri not in fixed.URIS:
+        for entry in index_doc['entries']: entry['id']=name_prefix+entry['id']
+    bindings = completion.read_sealed_artifact(index_doc['entries'][0]['bindings'],output)['bindings']
     for filename in (version+'-original.json.gz',version+'-category.json'):
         shutil.copyfile(audit.ROOT/FIXTURE/filename,output/filename)
-    def emit(name,value): return runtime.write_json(output/name,value)
-    def descriptor(name): return {'artifact':name,'sha256':runtime.sha((output/name).read_bytes())}
-    (output/'original-capture.json').write_bytes(original['capture_raw'])
-    (output/'original-raw.json').write_bytes(original['read'](original['raw_path']))
+    def filename(name): return name_prefix+name
+    def emit(name,value): return runtime.write_json(output/filename(name),value)
+    def descriptor(name): return {'artifact':filename(name),'sha256':runtime.sha((output/filename(name)).read_bytes())}
+    (output/filename('original-capture.json')).write_bytes(original['capture_raw'])
+    (output/filename('original-raw.json')).write_bytes(original['read'](original['raw_path']))
     capture_descriptor = descriptor('original-capture.json'); raw_descriptor = descriptor('original-raw.json')
     native_run = {**original['category_descriptor'],'observation_sha256':[capture_descriptor['sha256'],raw_descriptor['sha256']]}
     native = {'candidate_sha256':inventory['native_coverage']['candidate_sha256'],'scope_kind':'product',
