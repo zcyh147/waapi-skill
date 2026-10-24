@@ -218,3 +218,30 @@ def test_retained_packet_formal_output_waits_for_real_teardown_and_rechecks_sour
     assert int(result) == 1
     assert json.loads((tmp_path / 'none.json').read_bytes())['phase_reports'] == dict.fromkeys(('setup','call','teardown'), 'passed')
     assert not (tmp_path / 'teardown.json').exists() and not (tmp_path / 'source.json').exists()
+
+
+def test_reviewed_log_message_source_delta_keeps_original_map_and_rejects_unlisted_changes(tmp_path, monkeypatch):
+    """A reviewed log-only successor never makes arbitrary read-source drift eligible."""
+    from tests.support import console_runtime_read_evidence as console
+    from tests.support import runtime_observation_evidence as runtime
+    from tests.support import source_copy_native_evidence as source
+    original = json.loads((audit.ROOT / console.FIXTURE / 'r125-source-map.json').read_bytes())
+    assert original['candidate'] == '0d56a083da7a7965d734df3e02c0fb5681a75c70'
+    historical = original['sources']
+    current = console.reviewed_source_context(historical)
+    gateway = 'skills/waapi-skill/scripts/gateway.py'
+    assert historical[gateway] == 'c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4'
+    assert current[gateway] == '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'
+    for damaged in ({**historical, gateway: '0' * 64}, {**historical, 'unreviewed.py': '0' * 64}):
+        with pytest.raises(ValueError, match='R125 exact reviewed source delta'):
+            console.reviewed_source_context(damaged)
+    successor = source.successor_dependency_review()
+    assert len(successor['current_sources']) == 619
+    assert all(runtime.sha((audit.ROOT / name).read_bytes()) == seal
+               for name, seal in successor['current_sources'].items())
+    review = tmp_path / source.SUCCESSOR_REVIEW_PATH
+    review.parent.mkdir(parents=True)
+    review.write_text('{}')
+    monkeypatch.setattr(audit, 'ROOT', tmp_path)
+    with pytest.raises(ValueError, match='Reviewed Source successor changed'):
+        source.successor_dependency_review()

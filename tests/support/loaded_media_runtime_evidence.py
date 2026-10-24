@@ -13,7 +13,7 @@ URI = 'ak.wwise.core.profiler.getLoadedMedia'
 ROUTE = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
 ANCHOR = ROUTE + '|/resultSchema/properties/return/@cardinality/single'
 FIXTURE = 'tests/fixtures/runtime-loaded-media'
-REVIEW_SHA = '6d01288485ea78648bfaf65b48ee39697280828629257f72a1ff1e25dcf7044c'
+REVIEW_SHA = '5a3a7dd27e424e6d60e748d6f6c0aac59901ba6eb18014b84e02202ad041ae43'
 ORIGINAL_CANDIDATE = '7289081b552c5f428013ba0b6bacaf7d05843481'
 PREFIX = '/private/tmp/waapi-r122-demo-native-r4/evidence/'
 CATEGORY = 'profiler-loaded-media-observation'
@@ -431,7 +431,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None,name_pr
     return output/(name_prefix+'index.json')
 
 
-COMPOSITE_REVIEW_SHA = 'c778e6dbd69b56de353c5d79d2ff4797cbce1e844e295f6642465aa429f9e613'
+COMPOSITE_REVIEW_SHA = 'dc063453dce6fa3dc2f2d212bab7b542bb13ad17a6ba28c9c96f1e3fb96bcf16'
 COMPOSITE_ROUTES = {
     '2023.1': '2023.1|wwise-authoring|2023.1.19.8928|function|' + URI,
     '2024.1': '2024.1|wwise-authoring|2024.1.13.9056|function|' + URI,

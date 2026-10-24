@@ -560,23 +560,26 @@ RTPC_ORIGINAL_CANDIDATE = '503688449ba9f9db964a5fb7116ac6be2fb07198'
 RTPC_GUARD_FILE = RTPC_SOURCE.split('#')[0]
 RTPC_GUARD_CHANGE = {
     'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c',
-    'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}
+    'after': 'dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3'}
 UNICODE_CONTEXT_SOURCE = 'skills/waapi-skill/wwise_waapi/business_declarations.py'
 UNICODE_CONTEXT_SOURCE_CHANGE = {'before': 'aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3', 'after': '9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070'}
 METER_SOURCE = 'skills/waapi-skill/wwise_waapi/profiler_meter_objects.py'
 METER_SOURCE_CHANGE = {'before': '33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b', 'after': '980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63'}
 METER_SOURCE_SYMBOLS = ['METER_OUTPUT_NAMES: admit existing media-size-bytes -> mediaSize binding; meter-root only; nearby comment']
 METER_SOURCE_REASON = 'Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged.'
+LOG_MESSAGE_SOURCE_CHANGES = {'skills/waapi-skill/scripts/gateway.py': {'before': 'c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4', 'after': '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d', 'after': 'dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d', 'after': '14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594'}}
+LOG_MESSAGE_SOURCE_SYMBOLS = {'skills/waapi-skill/scripts/gateway.py': ['module import: MAX_LOG_MESSAGE_BYTES', 'transaction_verify_terminal_budget: exact valid2023-25 log.addItem rendered allowance only, resolved native request validation; ordinary global24576B retained', 'project_successful_transaction_verify_payload: successful exact log-only duplicate scope projection; exact agent_result/full durable journal retained'], 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': ['module import: MAX_LOG_MESSAGE_BYTES', 'materialize_runtime_control_business_request: log.addItem exact empty/whitespace UTF-8 message only; no NUL, required type/field and16KiB bound retained'], 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': ['MAX_LOG_MESSAGE_BYTES = 16 * 1024', '_CONTRACTS[LOG_ADD_ITEM_URI]: input_forms/field_types message disclosure only']}
+LOG_MESSAGE_SOURCE_REASON = 'Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers.'
 RTPC_REVIEWED_SOURCE_CHANGES = {
     METER_SOURCE: METER_SOURCE_CHANGE,
     UNICODE_CONTEXT_SOURCE: UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
-        'after': 'f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d'},
+        'after': '14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594'},
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': 'c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4'},
+        'after': '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'},
@@ -614,8 +617,11 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
         'prepare_operation/verify_prepared_operation: exact log observation plan, verifier selection and message only'],
     'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': [
         'compare_channel: exact Console log observation guard only']}
+RTPC_REVIEWED_SOURCE_SYMBOLS['skills/waapi-skill/scripts/gateway.py'] += LOG_MESSAGE_SOURCE_SYMBOLS['skills/waapi-skill/scripts/gateway.py']
+RTPC_REVIEWED_SOURCE_SYMBOLS['skills/waapi-skill/wwise_waapi/runtime_inspection_business.py'] += LOG_MESSAGE_SOURCE_SYMBOLS['skills/waapi-skill/wwise_waapi/runtime_inspection_business.py']
+RTPC_REVIEWED_SOURCE_SYMBOLS['skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py'] += LOG_MESSAGE_SOURCE_SYMBOLS['skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py']
 RTPC_REVIEWED_SOURCE_REASON = (
-    METER_SOURCE_REASON + ' Reviewed already-attested host finish metadata only; no additional call or successful Profiler request/result change. '
+    METER_SOURCE_REASON + ' ' + LOG_MESSAGE_SOURCE_REASON + ' Reviewed already-attested host finish metadata only; no additional call or successful Profiler request/result change. '
     'Exact reviewed nine-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '

@@ -275,9 +275,22 @@ def test_empty_classification_preserves_native_valid_message_and_exact_local_def
     assert classify_empty_candidate(ROOT, severity, cache=cache)['status'] == 'rejected'
     changed = dict(severity, shape_sha256='0' * 64)
     assert classify_empty_candidate(ROOT, changed, cache=cache)['status'] == 'unknown'
-    unknown_route = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.log.get'
-    unknown = next(row for row in _native_rows(unknown_route) if row['pointer'] == '/resultSchema/properties/items/@cardinality/empty')
-    assert classify_empty_candidate(ROOT, unknown, cache=cache)['status'] == 'unknown'
+    annotated_route = '2021.1|wwise-console|2021.1.14.8108|function|ak.wwise.core.log.get'
+    annotated = next(row for row in _native_rows(annotated_route) if row['pointer'] == '/resultSchema/properties/items/@cardinality/empty')
+    assert classify_empty_candidate(ROOT, annotated, cache=cache)['status'] == 'accepted'
+    # Existing annotation knowledge must not admit an actual unsupported constraint.
+    from wwise_waapi.native_catalog import load_native_catalog
+    from tests.maintenance.branch_audit_completion import validate_native_alternative
+    catalog = deepcopy(load_native_catalog('2025.1', 'wwise-console', root=ROOT / 'skills/waapi-skill/resources/native-catalog'))
+    schema = {'type': 'string', 'descriptionOverride': 'display annotation', 'optionalPositional': True, 'minLength': 1}
+    catalog['schemas'][ROUTE.split('|')[-1]]['argsSchema'] = schema
+    selected = {'route': ROUTE, 'pointer': '/argsSchema', 'shape_sha256': audit.digest(schema)}
+    with pytest.raises(ValueError, match='does not satisfy'):
+        validate_native_alternative(ROOT, selected, '', catalog=catalog, require_known=True)
+    schema['not'] = {'const': 'blocked'}
+    selected['shape_sha256'] = audit.digest(schema)
+    with pytest.raises(ValueError, match='unrecognized'):
+        validate_native_alternative(ROOT, selected, '', catalog=catalog, require_known=True)
     aliases = []
     for version, build in (('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143')):
         for host in ('wwise-console', 'wwise-authoring'):
