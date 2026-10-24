@@ -169,3 +169,9 @@ def test_console_loaded_media_exact_scope_and_canonical_parent_policy(inventory)
                     {**branch,'owner_issue':187}):
         with pytest.raises(ValueError,match='exact reviewed Console'):
             console_branch(damaged)
+
+
+def test_console_loaded_capture_seals_authoritative_remaining_policy():
+    context=runtime.program_source_context(flow=URI)
+    assert {'tests/support/runtime_remaining_evidence.py',
+            'tests/fixtures/runtime/runtime-remaining-policy-r127.json'} <= context['capture'].keys()
