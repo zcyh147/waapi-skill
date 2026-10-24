@@ -88,7 +88,7 @@ def test_live_reflection_requires_all_twelve_receipts_and_stops_on_mismatch(tmp_
 from tests.unit.test_authoring_batch_adapter import owned_authoring
 
 
-@pytest.mark.parametrize('failure', [None, 'empty', 'unrelated', 'cleanup', 'schema-mismatch', 'wrong-ui-token', 'ui-timeout', 'partial', 'discovery-warmup', 'discovery-empty', 'discovery-ambiguous', 'startup-exit', 'startup-timeout', 'output-overflow', 'cleanup-kill', 'startup-deadline', 'discovery-deadline'])
+@pytest.mark.parametrize('failure', [None, 'empty', 'unrelated', 'cleanup', 'schema-mismatch', 'wrong-ui-token', 'ui-timeout', 'partial', 'discovery-warmup', 'discovery-empty', 'discovery-ambiguous', 'startup-exit', 'startup-timeout', 'output-overflow', 'cleanup-kill', 'startup-deadline', 'discovery-deadline', 'port-fd-missing'])
 def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path, monkeypatch, failure):
     """All producer/Gateway/finalizer code runs; only process/UI are fake."""
     import subprocess
@@ -121,7 +121,7 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
     startup_case = failure in ('discovery-warmup', 'discovery-empty', 'discovery-ambiguous',
         'startup-exit', 'startup-timeout', 'startup-deadline', 'discovery-deadline', 'output-overflow', 'cleanup-kill')
     passed = failure in (None, 'discovery-warmup', 'cleanup-kill')
-    readiness_failure = failure in ('discovery-empty', 'discovery-ambiguous', 'startup-exit', 'startup-timeout', 'startup-deadline', 'discovery-deadline', 'output-overflow')
+    readiness_failure = failure in ('discovery-empty', 'discovery-ambiguous', 'startup-exit', 'startup-timeout', 'startup-deadline', 'discovery-deadline', 'output-overflow', 'port-fd-missing')
     launches = []
     from io import BytesIO
     class Child:
@@ -155,7 +155,10 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
             return SimpleNamespace(returncode=packet['socket_exit'], stdout=raw, stderr=b'')
         assert '-iTCP:32123' in argv
         assert 0 < kwargs['timeout'] <= 5
-        return SimpleNamespace(returncode=0, stdout=b'p23456\n')
+        if failure == 'port-fd-missing':
+            return SimpleNamespace(returncode=0, stdout=b'p23456\n', stderr=b'')
+        control = json.loads((Path(__file__).parents[1] / 'fixtures/integration-demo-lsof-field-control.json').read_text())
+        return SimpleNamespace(returncode=0, stdout=control['stdout'].replace(str(control['pid']), '23456').encode(), stderr=b'')
     monkeypatch.setattr(subprocess, 'run', run)
     monkeypatch.setattr(codex_harness, 'terminate_process_group', lambda process: None if failure == 'cleanup-kill' else setattr(process, 'returncode', 0))
     monkeypatch.setattr(codex_harness, 'kill_process_group', lambda process: setattr(process, 'returncode', -9))
@@ -259,3 +262,10 @@ def test_stock_demo_producer_gateway_and_final_writer(owned_authoring, tmp_path,
         assert output_receipt['poll'] == child.returncode and stopped['process_group_absent'] is True
         if failure == 'cleanup-kill':
             assert stopped['cleanup_action'] == 'kill'
+
+    if failure == 'port-fd-missing':
+        assert report['remote_port_ownership']['owned'] is False
+        assert report['remote_port_ownership']['stdout'] == 'p23456\n'
+        assert report['remote_port_ownership']['exit_code'] == 0
+        assert producer.command_port is None
+        assert 'not owned by the exact Demo PID' in report['errors'][0]['message']

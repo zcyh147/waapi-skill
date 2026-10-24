@@ -53,8 +53,18 @@ No universal prior-state restoration or waveform requirement is added here.
   candidate, times and cleanup evidence. Bind these facts to their exact audit
   branches; no repeated cursor, setter, meter or other reader run is needed.
 - Nonempty LoadedMedia remains an independent read obligation on 2023–2025.
-  R106's complete empty Event-preparation result does not establish native
-  absence, SDK equivalence or that this read is unsupported.
+  R124 supplied a separate exact-build observation on matching Mac
+  Authoring/stock SDK2025.1.11.9262: the complete public snapshot at99328ms
+  contained Area1 media124871431 (`Ambience_40.wav`, VORBIS,160821 bytes,
+  `soundBank=Prepared`). The source-preserving lifecycle and paired cleanup
+  passed; Demo required SIGKILL before process-group absence was proved.
+  The existing evidence consumer still needs the narrow original profile and
+  current replay. Any representative mapping to a different pinned patch must
+  retain the actual9262 provenance and justify the selected schema/behavior
+  relationship; this is not a9143 execution claim. Older-version obligations
+  remain visible. R106's complete empty Event-preparation result and R124's
+  earlier failed attempts remain unchanged; neither establishes native absence.
+  The SDK producer observation does not verify Authoring `transport.prepare`.
 
 ## Authoritative sources and accounting
 
