@@ -126,12 +126,20 @@ def validate_rtpc_program(record, binding, branch, root):
         raise ValueError('RTPC program needs exact current public read capture')
     argv = captured['gateway']['argv']
     position = argv[argv.index('--profiler-position') + 1]
-    if position.isdecimal():
-        reported = payload['agent_result']['profiler_position']
-        native_time = record['native_call']['args']['time']
-        if (type(native_time) is not int or native_time != int(position)
-                or type(reported) is not str or not reported.isdecimal() or int(reported) != int(position)):
+    from wwise_waapi.runtime_inspection_business import _profiler_time, RuntimeInspectionBusinessError
+    try:
+        requested = _profiler_time(position)
+        reported = _profiler_time(payload['agent_result']['profiler_position'])
+    except (RuntimeInspectionBusinessError, TypeError) as exc:
+        raise ValueError('RTPC capture must satisfy the public profiler-position contract') from exc
+    native_time = record['native_call']['args']['time']
+    if type(requested) is int:
+        if type(native_time) is not int or type(reported) is not int or native_time != requested or reported != requested:
             raise ValueError('RTPC numeric profiler position must match native and public time')
+    elif requested != reported:
+        # Recognized cursor choices remain a separate normalization path;
+        # this does not prove its unresolved two-read cursor branches.
+        raise ValueError('RTPC cursor position must retain its explicit reported choice')
     native_rows = record['native_call']['result']['return']
     public_rows = record['gateway']['payload']['agent_result']['return']
     # These complete RTPC reads copy the entire array without transformation.
@@ -142,7 +150,8 @@ def validate_rtpc_program(record, binding, branch, root):
             or audit.digest(native_rows) != audit.digest(public_rows)):
         raise ValueError('Program must preserve complete native/public RTPC return arrays')
     if branch['pointer'] == '/resultSchema' or branch['pointer'].startswith('/resultSchema/'):
-        pointer = binding.get('program_observation_pointer', binding['observation_pointer'])
+        pointer = (binding['program_observation_pointer'] if binding.get('runtime_observation_attachment')
+            else binding['observation_pointer'])
         parent = '/native_call/result/return'
         result_root = branch['pointer'] in {'/resultSchema', '/resultSchema/additionalProperties'}
         expected_public = ('/gateway/payload/agent_result' if result_root else pointer.replace(
@@ -175,8 +184,12 @@ def _validate_rtpc_structure(record, binding, branch, root):
         if node is not False:
             raise ValueError('RTPC structural predicate requires exact closed native properties')
         node = completion.pointer_value(schema, branch['pointer'].rsplit('/', 1)[0])
-    observed = completion.pointer_value(record,
-        binding.get('program_observation_pointer', binding['observation_pointer']))
+    pointer = (binding['program_observation_pointer'] if binding.get('runtime_observation_attachment')
+        else binding['observation_pointer'])
+    expected = RTPC_STRUCTURE_POINTERS[branch['pointer']]
+    if pointer != expected:
+        raise ValueError('RTPC exact native structural observation differs')
+    observed = completion.pointer_value(record, expected)
     if node.get('type') == 'object':
         if (type(observed) is not dict or not set(node.get('required', ())) <= observed.keys()
                 or node.get('additionalProperties') is False and not observed.keys() <= node.get('properties', {}).keys()):

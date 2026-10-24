@@ -630,3 +630,43 @@ def test_rtpc_structural_credit_rejects_resealed_wrong_container(shape_bundle, i
     reason = changed['evidence_results']['program']['reason']
     assert ('native object structure predicate' in reason if damage == 'native-extra-key' else
         'existing native/public row' in reason or 'index out of range' in reason)
+
+
+@pytest.mark.parametrize('damage,reason', [
+    ('request-position', 'public profiler-position contract'),
+    ('proxy-pointer', 'native object structure predicate'),
+])
+def test_rtpc_capture_rejects_resealed_request_or_structure_proxy(shape_bundle, inventory, tmp_path, damage, reason):
+    import shutil
+    from tests.support.runtime_observation_evidence import write_json
+    base = tmp_path / 'bundle'
+    shutil.copytree(shape_bundle.parent, base)
+    policy = json.loads((base / 'requirements.json').read_bytes())
+    document, _, _ = audit.portable_binding_inputs(base / 'index.json', policy)
+    identity = next(key for key in document['bindings'] if key.startswith('2021.1|wwise-authoring|')
+        and key.endswith('/argsSchema/additionalProperties'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def evaluate():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row for row in result['obligations'] if row['id'] == identity)
+    assert evaluate()['state'] == 'verified'
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    if damage == 'request-position':
+        argv = program['gateway']['argv']
+        argv[argv.index('--profiler-position') + 1] = 'not-a-position'
+        binding['input']['gateway_argv'] = deepcopy(argv)
+    else:
+        program['native_call']['args']['invented'] = True
+        program['valid_proxy'] = {'time': 23637}
+        binding['program_observation_pointer'] = '/valid_proxy'
+        for check in program['branch_assertions'][identity]['checks']:
+            if check['pointer'] == '/native_call/args':
+                check['equals'] = deepcopy(program['native_call']['args'])
+    program['runtime_read_program']['gateway'] = deepcopy(program['gateway'])
+    program['runtime_read_program']['native_call'] = deepcopy(program['native_call'])
+    binding['evidence']['program'].update(write_json(base / 'forged-program.json', program))
+    changed = evaluate()
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert reason in changed['evidence_results']['program']['reason']
