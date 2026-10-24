@@ -34,6 +34,10 @@ No universal prior-state restoration or waveform requirement is added here.
   the Gateway around its single dispatch. The retained 2025 event proves that
   exact effect. The 2023/2024 bounded waits received no event; they remain
   unresolved observations, not native absence or an inherent Console limit.
+  R121's one distinct 2023 two-session diagnostic also observed zero events
+  after independent ACK and one acknowledged addition; both unsubscribed and
+  the original schema-only verification/FAIL remains unchanged. This narrows
+  the retained observation without establishing native absence or the cause.
   An unchanged retry is not the next step without a distinct source-backed
   diagnosis. Authoring getter-based add/clear facts remain separate.
 - The 2025 `moveCursor` returned time has a suitable independent user-cursor

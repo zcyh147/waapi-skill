@@ -589,6 +589,21 @@ failed sandboxes remain quarantined. Evidence roots below
 with `root-review.json`. Required unresolved observations remain under #186;
 original failures and transactions are not replayed or regraded.
 
+R121 then ran exactly one distinct 2023.1.19.8928 Console diagnostic on frozen
+candidate `0534446d8dba76e3a67077d95d2b87d88ad863be`: **FAIL in 18.93s**.
+An independent public `log.itemAdded` subscription acknowledged before the
+single prepared General/Message addition; the original same-execution-session
+observer remained in place. The native add acknowledged `{}`, but both
+subscriptions observed zero events and unsubscribed. The retained diagnostic
+classification is `neither_session_matched`; original verification remains
+`result_schema_checked` and node/category FAIL. This supplies a two-session
+no-event fact, not native absence, an effect pass or a regrade of R98.
+Source content/mtime/tree matched, the failed sandbox remains quarantined,
+no native processes remained, and port32343 was free after teardown. Evidence
+is `.waapi-skill-state/full-coverage/r121-console-log-peer-native-2023-r1/`
+with `root-review.json`, category evidence and the partial/final receipt.
+No 2024/2025 retry, new diagnostic or native repeat followed this attempt.
+
 Candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` then launched owned
 Authoring 2021.1.14.8108 with the documented `-AutomationMode` argument and
 reached WAAPI readiness in 28.79s. The transport node failed in 32.85s before
