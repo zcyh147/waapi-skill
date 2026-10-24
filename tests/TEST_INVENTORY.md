@@ -5,6 +5,41 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R123 source compatibility and IntegrationDemo checkpoint
+
+Reviewed runtime successor `8a64b499`, integrated as `18065490`, passed
+20 current public-Gateway fake replays of complete retained original arrays in
+58.50s. These cover R103/R118/R119 fixed readers and strict/qualified RTPC and
+contribution reads. Eight negative controls reuse four of those same replays:
+resealed source-hash drift and consistently truncated native/public results
+still fail admission. Exact whole-original-to-current source maps and original
+PASS/BLOCKED attribution remain enforced. These are source-review unit proofs,
+not formal after-teardown publication or new native observations; logs and seals
+are recorded in `/tmp/waapi-r123-runtime-source-compatibility-proof.json`.
+Source preparation `24b6568c`, integrated as `a6cfb115`, separately pins the
+619-source successor review while preserving R92, five native predecessors and
+26 shapes. Its final five current public captures and successor publication
+remain pending the settled combined candidate. The runtime helper changes alter
+candidate identity, so final contexts must be regenerated. No current global
+coverage credit follows from either preparation merge.
+
+IntegrationDemo r1 on `0a4d1b4a` remains FAIL/lifecycle BLOCKED: the fixture
+compared three schema fields against the complete four-field live result.
+Reviewed repair `ea9db027` preserves exact schema/session checks; r2 passed all
+12 actual 2025.1.11.9262 schema reads, then failed on its sole discovery result,
+`consoles: []`, before any transaction or LoadedMedia read. Both roots preserve
+source and cleanup evidence at
+`/private/tmp/waapi-r122-demo-native-r{1,2}/evidence/root-review.json`;
+empty discovery does not establish its cause or authorize an unchanged retry.
+
+The separate SDK-only diagnostic observed the actual main menu and exact owned
+PID's UDP24024/TCP listener. Cleanup required SIGKILL (exit -9); process-group
+absence, released ports and source preservation were checked in
+`/private/tmp/waapi-r123-demo-sdk-startup-diagnostic-r1/evidence/root-review.json`.
+This establishes startup/socket prerequisites for that diagnostic only, not
+Authoring discovery or nonempty LoadedMedia. Historical failures remain unchanged;
+no Fresh, broad gate, pinned9143 replacement or whole-#186 acceptance is claimed.
+
 ## 2026-10-24 R120–R121 Unicode Draft binding and fixture path checks
 
 Reviewed candidate `3694f194bb59204a81194faab84097ac815ba754`, integrated as
