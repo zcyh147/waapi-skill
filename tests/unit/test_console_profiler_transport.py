@@ -20,8 +20,9 @@ def _forbid_real_client_or_socket(monkeypatch):
     monkeypatch.setattr(socket, 'socket', forbidden)
 
 
-def test_2025_console_create_publishes_usable_zero_transport(tmp_path):
-    client = _TransportCreateAssociationClient(tmp_path, version='2025.1',
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_console_create_publishes_usable_zero_transport(tmp_path, version):
+    client = _TransportCreateAssociationClient(tmp_path, version=version,
         observed_object='{11111111-1111-1111-1111-111111111111}', observed_game_object=123)
     original = client.call
     def call(uri, args=None, options=None):
@@ -43,18 +44,22 @@ def test_2025_console_create_publishes_usable_zero_transport(tmp_path):
     assert all(args == {'transport': 0} for uri, args, _ in client.calls if uri.endswith('transport.getState'))
 
 
-def _console_context(tmp_path, monkeypatch, fault=None):
+def _console_context(tmp_path, monkeypatch, fault=None, *, version='2025.1'):
     import hashlib
     import wave
     from tests.unit.test_profiler_input_native_fixture import _runtime
     from tests.unit.test_profiler_capture_native_fixture import _committed_car_capture_objects
     from tests.destructive.support import profiler_capture
-    context = _runtime(tmp_path, monkeypatch)
+    context = _runtime(tmp_path, monkeypatch, version)
     workflow, runtime, client, _, _ = context
-    rows = _committed_car_capture_objects('2025.1')
+    rows = _committed_car_capture_objects(version)
+    rows['{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'] = {'id': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}',
+        'name': 'SampleProject', 'type': 'Project', 'path': '\\', 'filePath': str(client.project_file)}
     car = profiler_capture.CAPTURE_CAR_ID
     source = profiler_capture.CAPTURE_CAR_SOURCE_ID
-    installed = tmp_path / 'installed/SampleProject2025.1.7.9143/SampleProject'
+    from tests.destructive.support.profiler_input_shapes import BUILDS
+    build = '2025.1.7.9143' if version == '2022.1' else '.'.join(map(str, BUILDS[version]))
+    installed = tmp_path / ('installed/SampleProject' + build + '/SampleProject')
     media = installed / profiler_capture.CAPTURE_CAR_MEDIA
     media.parent.mkdir(parents=True)
     with wave.open(str(media), 'wb') as stream:
@@ -64,19 +69,40 @@ def _console_context(tmp_path, monkeypatch, fault=None):
     monkeypatch.setattr(profiler_capture, 'CAPTURE_CAR_SHA256', hashlib.sha256(media.read_bytes()).hexdigest())
     runtime.state_dir.mkdir(parents=True, exist_ok=True)
     # Stage through the actual existing attestation/staging helper.
-    profiler_capture.stage_owned_capture_read_media(runtime.sandbox, runtime.state_dir, version='2025.1')
+    profiler_capture.stage_owned_capture_read_media(runtime.sandbox, runtime.state_dir, version=version)
     rows[source]['originalFilePath'] = str(runtime.sandbox.sandbox_path / profiler_capture.CAPTURE_CAR_MEDIA)
+    if version == '2021.1':
+        rows['{44444444-4444-4444-4444-444444444444}'] = {
+            'id': '{44444444-4444-4444-4444-444444444444}', 'name': 'Mac', 'type': 'Platform', 'path': 'Mac'}
+        language = {'id': '{55555555-5555-5555-5555-555555555555}', 'name': 'SFX'}
+        rows[language['id']] = {**language, 'type': 'Language', 'path': r'\Languages\SFX'}
+        rows[car].update({'originalWavFilePath': rows[source]['originalFilePath'], 'audioSource:language': language})
+        rows[source].update({'classId': 16, 'parent': {'id': car}, 'audioSource:language': language,
+            'originalWavFilePath': rows[source]['originalFilePath']})
     client.rows, client.transport_rows, client.playing, client.created = rows, [], False, False
     original = client.call
     def call(uri, args=None, options=None):
         if uri.endswith('object.get'):
             client.calls.append((uri, deepcopy(args), deepcopy(options)))
             ids = args.get('from', {}).get('id', [])
-            if 'waql' in args:
+            if args.get('from', {}).get('ofType') == ['Project']:
+                ids = ['{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}']
+            if args.get('waql') == 'from type Project take 1':
+                ids = ['{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}']
+            elif args.get('waql', '').startswith('from type Platform'):
+                ids = ['{44444444-4444-4444-4444-444444444444}']
+            elif args.get('waql', '').startswith('from type Language'):
+                ids = ['{55555555-5555-5555-5555-555555555555}']
+            elif 'select children' in args.get('waql', ''):
+                ids = [source]
+            elif 'waql' in args:
                 ids = [identity for identity in rows if identity in args['waql']]
             return {'return': [{key: deepcopy(row.get(key, row.get('@' + key)))
                 for key in options['return'] if key in row or '@' + key in row}
                 for identity in ids if (row := rows.get(identity))]}
+        if uri.endswith('object.getTypes'):
+            return {'return': [{'classId': 65552, 'name': 'Sound', 'type': 'WObject'},
+                {'classId': 16, 'name': 'AudioSource', 'type': 'WObject'}]}
         if uri.endswith('getPropertyAndReferenceNames'):
             return {'return': ['IsLoopingEnabled', 'IsLoopingInfinite']}
         if uri.endswith('getPropertyInfo'):
@@ -188,19 +214,23 @@ def test_console_probe_retains_blocked_failure_and_finishes_owned_cleanup(tmp_pa
         assert report['cleanup']['complete'] is True
 
 
-@pytest.mark.parametrize('fault', [None, 'playing', 'unrelated', 'stale-time', 'silence', 'malformed', 'cleanup', 'missing-ack', 'wrong-ack', 'duplicate-ack'])
-def test_console_capture_log_ack_gates_one_play_and_archives_correlated_diagnostic(tmp_path, monkeypatch, fault):
+@pytest.mark.parametrize('version,fault', [('2025.1', fault) for fault in
+    [None, 'playing', 'unrelated', 'stale-time', 'silence', 'malformed', 'cleanup', 'missing-ack', 'wrong-ack', 'duplicate-ack']]
+    + [(version, 'playing') for version in ['2021.1', '2022.1', '2023.1', '2024.1']])
+def test_console_capture_log_ack_gates_one_play_and_archives_correlated_diagnostic(tmp_path, monkeypatch, version, fault):
     import subprocess
     from types import SimpleNamespace
     from tests.destructive.support.console_profiler_probe import collect_console_profiler
     from tests.unit.test_profiler_input_native_fixture import _finish
     from tests.destructive.support.profiler_capture import CAPTURE_CAR_ID
-    context = _console_context(tmp_path, monkeypatch, None if fault == 'playing' else 'nonplaying')
+    context = _console_context(tmp_path, monkeypatch, None if fault == 'playing' else 'nonplaying', version=version)
     workflow, runtime, client, _, _ = context
     topic = 'ak.wwise.core.profiler.captureLog.itemAdded'
     packet = {'time': 1500, 'type': 'Message', 'description': 'controlled media-open failure',
         'severity': 'Error', 'errorCodeName': 'FileNotFound', 'objectId': CAPTURE_CAR_ID,
         'gameObjectId': 123, 'playingId': 42}
+    if version == '2021.1':
+        packet.pop('errorCodeName')
     if fault == 'unrelated':
         packet['objectId'] = '{11111111-1111-1111-1111-111111111111}'
     if fault == 'playing':
@@ -247,12 +277,15 @@ def test_console_capture_log_ack_gates_one_play_and_archives_correlated_diagnost
     monkeypatch.setattr(type(runtime), 'raw_gateway', raw)
     failure = None
     if fault == 'playing':
-        workflow.test_console_owned_2025_transport_profiler_diagnostic(runtime)
+        getattr(workflow, 'test_console_owned_2025_transport_profiler_diagnostic' if version == '2025.1'
+            else 'test_console_owned_older_transport_profiler_diagnostic')(runtime)
     else:
         with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
-            workflow.test_console_owned_2025_transport_profiler_diagnostic(runtime)
+            getattr(workflow, 'test_console_owned_2025_transport_profiler_diagnostic' if version == '2025.1'
+            else 'test_console_owned_older_transport_profiler_diagnostic')(runtime)
         failure = caught.value
-    final = _finish(context, tmp_path, monkeypatch, [('test_console_owned_2025_transport_profiler_diagnostic', failure)])[-1]
+    node = 'test_console_owned_2025_transport_profiler_diagnostic' if version == '2025.1' else 'test_console_owned_older_transport_profiler_diagnostic'
+    final = _finish(context, tmp_path, monkeypatch, [(node, failure)])[-1]
     report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
     observed = report['play_diagnostic']
     assert final['categories'][0]['status'] == ('PASS' if fault == 'playing' else 'blocked')
@@ -265,6 +298,15 @@ def test_console_capture_log_ack_gates_one_play_and_archives_correlated_diagnost
     assert actions.count('play') == (0 if fault in ('missing-ack', 'wrong-ack') else 1)
     assert actions.count('stop') == 1
     assert observed['cause_proven'] is False
+    if version != '2025.1':
+        uris = [uri for uri, _, _ in client.calls]
+        assert uris.count('ak.wwise.core.transport.useOriginals') == (1 if version in ('2023.1', '2024.1') else 0)
+        assert uris.count('ak.wwise.core.transport.prepare') == (0 if version == '2021.1' else 1)
+        assert uris.count('ak.wwise.core.profiler.getVoices') == 1
+        from wwise_waapi.native_catalog import load_native_catalog
+        pinned = load_native_catalog(version, 'wwise-console')['definitions']['documents']['waapi_definitions.json']['definitions']['voiceReturnOptions']['items']['enum']
+        _, _, options = next(call for call in client.calls if call[0] == 'ak.wwise.core.profiler.getVoices')
+        assert set(options['return']) == set(pinned) and len(options['return']) == len(pinned)
     if fault in ('missing-ack', 'wrong-ack'):
         assert not observed['started_before_execute']
         assert not observed['events']
@@ -294,3 +336,11 @@ def test_console_capture_log_ack_gates_one_play_and_archives_correlated_diagnost
                 else 'matching_identity_and_capture_interval')
         if fault not in ('malformed', 'cleanup'):
             assert report['playback']['state'] == ('playing' if fault == 'playing' else 'stopped')
+
+
+@pytest.mark.parametrize('version,operation', [('2021.1', 'prepare'), ('2021.1', 'useOriginals'), ('2022.1', 'useOriginals')])
+def test_missing_transport_api_is_a_version_boundary_without_connection(tmp_path, version, operation):
+    code, payload = gateway.execute_gateway(['request-schema', 'ak.wwise.core.transport.' + operation],
+        env=_env(tmp_path, version=version), client_factory=lambda _: pytest.fail('Absent route connected'))
+    assert code == 2 and payload.get('ok') is False, payload
+    assert payload['error_code'] != 'AUTHORING_HOST_REQUIRED'
