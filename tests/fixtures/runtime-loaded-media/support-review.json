@@ -512,5 +512,22 @@
     "path": "docs/branch-coverage-requirements.json",
     "sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a",
     "candidate": "8b600cfaa45f6670da76187db2dd76e27b613ae3"
+  },
+  "packaged_source_review": {
+    "reviewed_candidate": "bb24bee9ab01cd9b16e6c5549bbbe3d90a86366a",
+    "packaged_source_count": 413,
+    "unchanged_source_count": 412,
+    "changes": {
+      "skills/waapi-skill/scripts/gateway.py": {
+        "before": "0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827",
+        "after": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4"
+      }
+    },
+    "symbols": {
+      "skills/waapi-skill/scripts/gateway.py": [
+        "_execute_gateway_unconstrained"
+      ]
+    },
+    "reason": "Only reviewed Gateway exception-finish context changes: preserve the already-attested boolean getInfo.isCommandLine without a new live call, then reinsert the same agent_result last. Successful native request/args/options/result and LoadedMedia replay remain unchanged; all other412 packaged sources remain exact. No9143 native execution or generic patch compatibility."
   }
 }
