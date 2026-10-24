@@ -35,13 +35,19 @@ def _grouped_context(tmp_path, monkeypatch, *, version='2024.1', fault=None):
             'baseVolume': -8.9, 'gameAuxSendVolume': 0, 'envelope': 0, 'normalizationGain': 0,
             'lowPassFilter': 0, 'highPassFilter': 0, 'priority': 50,
             'isStarted': True, 'isVirtual': False, 'isForcedVirtual': False}
+    if fault == 'approved-voice-anchors':
+        for optional in ('gameAuxSendVolume', 'envelope', 'normalizationGain', 'lowPassFilter', 'highPassFilter'):
+            voice.pop(optional)
     game = voice['gameObjectID']
     bus_id = '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}'
     client.rows[CAPTURE_RPM_ID] = {'id': CAPTURE_RPM_ID, 'name': 'RPM', 'type': 'GameParameter',
         'path': r'\Game Parameters\Default Work Unit\RPM'}
     original = client.call
+    host_drift_ready = False
     def call(uri, args=None, options=None):
+        nonlocal host_drift_ready
         if uri == PREFIX + 'getVoices':
+            host_drift_ready = fault == 'host-drift'
             client.calls.append((uri, deepcopy(args), deepcopy(options)))
             return {'return': [] if fault == 'empty-voices' else [
                 {key: value for key, value in voice.items() if key in options['return']}]}
@@ -49,11 +55,14 @@ def _grouped_context(tmp_path, monkeypatch, *, version='2024.1', fault=None):
             client.calls.append((uri, deepcopy(args), deepcopy(options)))
             if fault == 'connection' and uri.endswith('getBusses'):
                 raise ConnectionResetError('controlled shared connection loss')
+            if fault == 'game-objects-dispatch' and uri.endswith('getGameObjects'):
+                raise RuntimeError('controlled reader-specific GameObjects dispatch failure')
             if fault == 'invalid-game-objects' and uri.endswith('getGameObjects'):
                 return {'return': [{}]}
             if fault == 'invalid-busses' and uri.endswith('getBusses'):
                 return {'return': [{'gameObjectID': 'not-an-integer'}]}
             if uri.endswith('getBusses'):
+                host_drift_ready = False
                 row = {'pipelineID': 2, 'objectGUID': bus_id, 'objectName': 'Main Audio Bus',
                     'gameObjectID': game, 'gameObjectName': 'Transport/Soundcaster',
                     'volume': 0, 'downstreamGain': 0, 'voiceCount': 1, 'depth': 0}
@@ -68,12 +77,18 @@ def _grouped_context(tmp_path, monkeypatch, *, version='2024.1', fault=None):
                     'registrationTime' if version == '2022.1' else 'registerTime': 0,
                     'unregistrationTime' if version == '2022.1' else 'unregisterTime': -1}
             else:
+                if fault == 'empty-contribution':
+                    return {'return': {'objects': []}}
+                if fault == 'partial-contribution':
+                    return {'return': {'LPF': 0, 'objects': []}}
                 return {'return': {'volume': -8.9, 'LPF': 0, 'HPF': 0,
                     **({'DSF': 0} if version == '2025.1' else {}), 'objects': []}}
             if options and 'return' in options:
                 row = {key: value for key, value in row.items() if key in options['return']}
             return {'return': [] if fault == 'empty-audio' and uri.endswith('getAudioObjects') else [row]}
         result = original(uri, args, options)
+        if fault == 'host-drift' and host_drift_ready and uri == 'ak.wwise.core.getInfo':
+            result['isCommandLine'] = False
         if uri.endswith('transport.getList'):
             for row in result['list']:
                 row['gameObject'] = game
@@ -113,7 +128,7 @@ def test_grouped_console_reads_reach_final_writer_at_one_numeric_position(tmp_pa
     assert report['outcomes']['rtpcs']['evidence']['setter_effect_verified'] is False
 
 
-@pytest.mark.parametrize('fault,failed', [('empty-audio', 'audio_objects'), ('invalid-busses', 'busses'), ('empty-voices', 'voices'), ('invalid-game-objects', 'game_objects')])
+@pytest.mark.parametrize('fault,failed', [('empty-audio', 'audio_objects'), ('invalid-busses', 'busses'), ('empty-voices', 'voices'), ('invalid-game-objects', 'game_objects'), ('game-objects-dispatch', 'game_objects')])
 def test_grouped_reader_failure_preserves_sibling_facts_after_final_cleanup(tmp_path, monkeypatch, fault, failed):
     context = _grouped_context(tmp_path, monkeypatch, fault=fault)
     workflow, runtime, client, _, _ = context
@@ -137,6 +152,12 @@ def test_grouped_reader_failure_preserves_sibling_facts_after_final_cleanup(tmp_
     else:
         assert report['outcomes']['voices']['outcome'] == report['outcomes']['contributions_dry']['outcome'] == 'PASS'
         assert report['outcomes']['voices']['evidence']['agent_result']['return'][0]['soundID'] == 564536357
+    if fault == 'game-objects-dispatch':
+        packet = report['outcomes']['game_objects']['evidence']['gateway_result']
+        assert packet['semantic_preview']['uri'] == packet['call']['api'] == PREFIX + 'getGameObjects'
+        assert packet['call']['error_code'] == 'RuntimeError'
+        assert sum(uri == PREFIX + 'getGameObjects' for uri, _, _ in client.calls) == 1
+        assert sum(uri == PREFIX + 'getVoiceContributions' for uri, _, _ in client.calls) == 1
     if fault == 'invalid-busses':
         assert report['outcomes']['busses']['evidence']['gateway_result']['ok'] is False
         assert report['outcomes']['audio_objects']['outcome'] == 'PASS'
@@ -173,3 +194,99 @@ def test_grouped_shared_failure_stops_dependents_and_cleanup_cannot_create_pass(
             assert not any(uri == PREFIX + 'getAudioObjects' for uri, _, _ in client.calls)
     executed = [call['argv'][1] for call in report['calls'] if call['argv'][0] == 'execute']
     assert len(executed) == len(set(executed))
+
+
+def test_older_empty_contribution_retains_missing_values_and_successful_siblings(tmp_path, monkeypatch):
+    context = _grouped_context(tmp_path, monkeypatch, version='2022.1', fault='empty-contribution')
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(NODE, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    contribution = report['outcomes']['contributions_dry']
+    assert contribution['outcome'] == 'BLOCKED' and contribution['evidence']['nonempty'] is False
+    result = contribution['evidence']['agent_result']
+    assert result['contribution_reported'] is True and result['objects'] == []
+    assert result['volume'] is result['lpf'] is result['hpf'] is None
+    assert result['unreported_fields'] == ['volume', 'lpf', 'hpf']
+    assert all(row['outcome'] == 'PASS' for name, row in report['outcomes'].items() if name != 'contributions_dry')
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+    assert final['invocation']['outcome'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+    assert sum(uri == PREFIX + 'getVoiceContributions' for uri, _, _ in client.calls) == 1
+
+
+def test_2025_voice_requires_approved_anchors_without_optional_diagnostics(tmp_path, monkeypatch):
+    context = _grouped_context(tmp_path, monkeypatch, version='2025.1', fault='approved-voice-anchors')
+    workflow, runtime, client, _, _ = context
+    getattr(workflow, NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(NODE, None)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'PASS' and report['cleanup']['complete']
+    assert final['residual_state']['sandbox'] == 'deleted'
+    voice = report['outcomes']['voices']['evidence']['agent_result']['return'][0]
+    assert {field: voice[field] for field in ('baseVolume', 'soundID', 'priority', 'isStarted', 'isVirtual', 'isForcedVirtual')} == {
+        'baseVolume': -8.9, 'soundID': 564536357, 'priority': 50, 'isStarted': True, 'isVirtual': False, 'isForcedVirtual': False}
+    assert not set(('gameAuxSendVolume', 'envelope', 'normalizationGain', 'lowPassFilter', 'highPassFilter')) & voice.keys()
+    assert report['outcomes']['voices']['outcome'] == report['outcomes']['contributions_dry']['outcome'] == 'PASS'
+    assert sum(uri == PREFIX + 'getVoiceContributions' for uri, _, _ in client.calls) == 1
+
+
+def test_grouped_reader_host_drift_stops_console_claims_and_later_reads(tmp_path, monkeypatch):
+    context = _grouped_context(tmp_path, monkeypatch, fault='host-drift')
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(NODE, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert report['outcomes']['voices']['outcome'] == 'PASS'
+    busses = report['outcomes']['busses']
+    assert busses['outcome'] == 'BLOCKED'
+    assert busses['evidence']['gateway_result']['is_command_line'] is False
+    assert not any(uri in (PREFIX + 'getAudioObjects', PREFIX + 'getRTPCs', PREFIX + 'getVoiceContributions')
+        for uri, _, _ in client.calls)
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+    assert final['invocation']['outcome'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+
+
+@pytest.mark.parametrize('host', [True, False, None], ids=['console', 'authoring', 'unknown'])
+def test_gateway_result_error_preserves_only_attested_boolean_host(tmp_path, host):
+    from tests.unit.test_stable_read_adapters import FakeClient, _live_info, _gateway_env, waapi_gateway
+    info = _live_info('2024.1')
+    if host is None:
+        info.pop('isCommandLine')
+    else:
+        info['isCommandLine'] = host
+    client = FakeClient({'ak.wwise.core.getInfo': info, PREFIX + 'getGameObjects': {'return': [{}]}})
+    code, payload = waapi_gateway.execute_gateway(['profiler-game-objects', '--capture-ms', '1500'],
+        env=_gateway_env(tmp_path, '2024.1'), client_factory=lambda _: client)
+    assert code == 2 and payload['error_code'] == 'SemanticValidationError'
+    assert payload['details']['uri'] == PREFIX + 'getGameObjects'
+    if host is None:
+        assert 'is_command_line' not in payload
+    else:
+        assert payload['is_command_line'] is host
+    assert payload['detected_version'] == '2024.1' and client.disconnected
+    assert [uri for uri, _, _ in client.calls] == ['ak.wwise.core.getInfo', PREFIX + 'getGameObjects']
+
+
+def test_offline_gateway_does_not_invent_attested_host(tmp_path):
+    from tests.unit.test_stable_read_adapters import _gateway_env, waapi_gateway
+    code, payload = waapi_gateway.execute_gateway(['request-schema', PREFIX + 'getVoices'],
+        env=_gateway_env(tmp_path, '2024.1'), client_factory=lambda _: pytest.fail('Offline route connected'))
+    assert code == 0 and 'is_command_line' not in payload
+
+
+def test_older_partial_contribution_preserves_unreported_optional_scalars(tmp_path, monkeypatch):
+    context = _grouped_context(tmp_path, monkeypatch, version='2022.1', fault='partial-contribution')
+    workflow, runtime, client, _, _ = context
+    getattr(workflow, NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(NODE, None)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    contribution = report['outcomes']['contributions_dry']
+    assert contribution['outcome'] == 'PASS' and contribution['evidence']['reported_finite_scalar'] is True
+    result = contribution['evidence']['agent_result']
+    assert result['lpf'] == 0 and result['volume'] is result['hpf'] is None
+    assert result['objects'] == [] and result['unreported_fields'] == ['volume', 'hpf']
+    assert report['cleanup']['complete'] and final['invocation']['outcome'] == 'PASS'
+    assert final['residual_state']['sandbox'] == 'deleted'
+    assert sum(uri == PREFIX + 'getVoiceContributions' for uri, _, _ in client.calls) == 1

@@ -3612,6 +3612,7 @@ def _execute_gateway_unconstrained(
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
+    runtime_is_command_line: bool | None = None
     command_routing_started = False
 
     def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
@@ -3641,6 +3642,10 @@ def _execute_gateway_unconstrained(
             enriched["endpoint"] = dict(runtime_endpoint)
         if runtime_detected_version is not None and "detected_version" not in enriched:
             enriched["detected_version"] = runtime_detected_version
+        if runtime_is_command_line is not None and "is_command_line" not in enriched:
+            enriched["is_command_line"] = runtime_is_command_line
+            if "agent_result" in enriched:
+                enriched["agent_result"] = enriched.pop("agent_result")
         if (
             (args.command.startswith("draft-") and args.command != "draft-start")
             or args.command == "transaction-show"
@@ -3799,6 +3804,8 @@ def _execute_gateway_unconstrained(
                     time.sleep(PROJECT_TRANSITION_SETTLE_POLL_SECONDS)
             detected_version = version_key_from_get_info(require_mapping(live_info, "getInfo response"))
             runtime_detected_version = detected_version
+            observed_host = live_info.get("isCommandLine")
+            runtime_is_command_line = observed_host if isinstance(observed_host, bool) else None
             if connection.version_hint and connection.version_hint != detected_version:
                 raise GatewayInputError(
                     f"Connected Wwise is {detected_version}, but the requested version is {connection.version_hint}"

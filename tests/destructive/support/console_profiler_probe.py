@@ -373,8 +373,9 @@ def _collect_runtime_read_batch(call, report, persist, *, position_ms):
         # stops the group. Only a response attributable to this reader is independent.
         payload = call(argv, strict=False)
         evidence['gateway_result'] = payload
-        assert payload.get('endpoint') == report['endpoint'] and payload.get('detected_version') == report['version'], (
-            'Shared connection/version context changed; remaining readers not attempted')
+        assert (payload.get('endpoint') == report['endpoint'] and payload.get('detected_version') == report['version']
+            and payload.get('is_command_line') is True), (
+            'Shared connection/version/Console host context changed; remaining readers not attempted')
         if payload.get('ok') is not True:
             code = payload.get('error_code') or payload.get('call', {}).get('error_code')
             expected_api = PREFIX + 'profiler.' + {
@@ -384,7 +385,9 @@ def _collect_runtime_read_batch(call, report, persist, *, position_ms):
             result_failure = (code in ('RUNTIME_INSPECTION_RESULT_INVALID', 'INVALID_STABLE_READ_RESULT')
                 or (code in ('SemanticValidationError', 'SEMANTIC_SCHEMA_MISMATCH')
                     and str(details.get('section', '')).startswith('result')))
-            attributable = (payload.get('api_attempted') == expected_api
+            stable_dispatch_failure = (payload.get('semantic_preview', {}).get('uri') == expected_api
+                and payload.get('call', {}).get('api') == expected_api)
+            attributable = (payload.get('api_attempted') == expected_api or stable_dispatch_failure
                 or (result_failure and details.get('uri', details.get('api')) == expected_api))
             fatal = code in ('TIMEOUT', 'ConnectionError', 'ConnectionRefusedError', 'ConnectionResetError',
                 'ConnectionClosed', 'ConnectionClosedError', 'OSError', 'VERSION_MISMATCH')
@@ -398,7 +401,14 @@ def _collect_runtime_read_batch(call, report, persist, *, position_ms):
         if row_field == 'objects' and rows is None and result.get('contribution_reported') is False:
             rows = []
         assert isinstance(rows, list) and all(isinstance(row, dict) for row in rows), 'Malformed public reader array'
-        evidence['nonempty'] = bool(rows) or (name == 'contributions_dry' and result.get('contribution_reported') is True)
+        evidence['nonempty'] = bool(rows)
+        if name == 'contributions_dry':
+            scalars = [result.get(field) for field in ('volume', 'lpf', 'hpf')]
+            if result.get('dsf', {}).get('reported') is True:
+                scalars.append(result['dsf'].get('value'))
+            evidence['reported_finite_scalar'] = any(type(value) in (int, float) and math.isfinite(value)
+                for value in scalars)
+            evidence['nonempty'] = bool(rows) or evidence['reported_finite_scalar']
         evidence['complete'] = result.get('complete', not result.get('truncated', False)) is True
         owned = []
         if name == 'voices':
@@ -407,8 +417,7 @@ def _collect_runtime_read_batch(call, report, persist, *, position_ms):
             evidence['older_diagnostics_role'] = 'same-frame seed only; no additional coverage claim'
             if report['version'] == '2025.1':
                 owned = [i for i in owned if all(field in rows[i] for field in (
-                    'soundID', 'baseVolume', 'gameAuxSendVolume', 'envelope', 'normalizationGain',
-                    'lowPassFilter', 'highPassFilter', 'priority', 'isStarted', 'isVirtual', 'isForcedVirtual'))]
+                    'soundID', 'baseVolume', 'priority', 'isStarted', 'isVirtual', 'isForcedVirtual'))]
         elif name == 'busses':
             owned = [i for i, row in enumerate(rows) if row.get('gameObjectID') == game_object
                 and isinstance(row.get('objectGUID'), str) and isinstance(row.get('objectName'), str)
