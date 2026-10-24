@@ -620,7 +620,7 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
             "api": operation,
             "intent": intent(operation),
             "supported_versions": list(runtime_inspection_business_versions(operation)),
-            **({"console_versions": ["2025.1"], "console_business_evidence": "pending_owned_native_observation"}
+            **({"console_versions": ["2025.1"]}
                 if operation.startswith("ak.wwise.core.transport.") else {}),
             "host_requirement": (
                 "wwise-authoring"

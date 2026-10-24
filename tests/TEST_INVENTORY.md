@@ -5,6 +5,38 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R117→R118 controlled Console playback and Voices observation
+
+Frozen candidate `6e0fb16a53466ab9dd57ea647fc21fb02c0c22e1` ran the single
+`test_console_owned_2025_transport_profiler_diagnostic` on owned macOS Console
+2025.1.7.9143. R117 failed in **18.54s**: the accepted capture-log stream
+reported `ErrorCode_FileNotFound` naming the exact staged Car WAV, and the
+independent state remained `stopped`; no Voices read occurred. The file's host
+hash matched, but its native path was 264 UTF-16 units (265 including NUL),
+above the matching Windows SDK's `AK_MAX_PATH` of 260. The error lacked object/
+gameObject identity, so automatic correlation remains unresolved. This failed
+root and its quarantined sandbox are preserved.
+
+R118 changed only the existing owned `WWISE_SANDBOX_ROOT` to the shorter same-
+`Y:` repository state root `.waapi-skill-state/r118-owned`. The selected native
+WAV path is 216 units (217 including NUL). The same candidate, source/media,
+action, host and observer then **passed in 12.76s**: independent state was
+`playing`, and one complete owned identity Voices row was returned at capture
+T=6016ms. Cleanup completed, source hash/mtime/tree and exact fixture readbacks
+matched, port30629 was released, no native processes remained, and the final
+sandbox was deleted through the existing two-phase finalizer. The capture-log
+observer received 3 of 8 requested events and ended on idle timeout; this is
+not event-count completion or a separate Topic coverage pass.
+
+Retained roots are `.waapi-skill-state/full-coverage/` plus
+`r117-console-profiler-native-2025-r1` and `r118-console-profiler-native-2025-r1`.
+This is narrow Console2025 Car playback and complete identity Voices evidence;
+it supports the changed pathname prerequisite without proving path length was
+the sole cause, other versions/hosts, other datasets or other selected fields.
+No native repeat, Fresh campaign or broad matrix was run for the subsequent
+removal of one developer-status catalog field; native source pins remain tied
+to their exact frozen candidate pending explicit source-transition review.
+
 ## 2026-10-24 R116 Console playback prerequisite observation
 
 Unmerged candidate `e9f54e881a42a8a4c0698b191586a27df9aae88a` ran only
