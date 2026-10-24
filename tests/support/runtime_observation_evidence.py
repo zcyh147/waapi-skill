@@ -51,6 +51,15 @@ def program_source_context(root=audit.ROOT, *, flow=None):
             'tests/unit/test_runtime_log_branch_evidence.py'))
     if flow in {'ak.wwise.core.profiler.' + name for name in ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects')}:
         dependencies.extend(('tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_fixed_runtime_read_branch_evidence.py'))
+    if flow in {'ak.wwise.core.transport.'+n for n in ('create','destroy','executeAction','prepare','useOriginals','getList','getState')}:
+        dependencies.extend(('tests/support/runtime_transport_evidence.py',
+            'tests/unit/test_runtime_transport_branch_evidence.py',
+            'tests/fixtures/runtime-transport/support-review.json',
+            'tests/support/runtime_cursor_evidence.py','tests/fixtures/runtime-cursor/support-review.json',
+            'tests/support/extra_runtime_read_evidence.py','tests/fixtures/runtime-extra-reads/support-review.json',
+            'tests/unit/test_runtime_log_branch_evidence.py',
+            'tests/support/fixed_runtime_read_evidence.py','tests/support/runtime_remaining_evidence.py',
+            'tests/fixtures/runtime/runtime-remaining-policy-r127.json'))
     if flow in {'ak.wwise.core.profiler.'+n for n in ('enableProfilerData','startCapture','stopCapture')}:
         dependencies.extend(('tests/support/runtime_capture_control_evidence.py',
             'tests/unit/test_runtime_capture_control_evidence.py',

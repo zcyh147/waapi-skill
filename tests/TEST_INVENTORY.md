@@ -27,7 +27,15 @@ unchanged 2,744-ID ledger contains 2,668 candidate program obligations, four
 native root gates, 60 unresolved literal spellings and 12 empty-input questions.
 Those unresolved items remain assigned; Console root evidence is still needed.
 Only profiler_meter_objects.py changed in the packaged tree. Exact source-reuse
-reconciliation and the final combined gates remain outstanding.
+reconciliation is complete at `b120332a`: 27 full historical/current map
+comparisons, all 413 package paths and all 619 Source dependencies were checked.
+The existing focused compatibility guard passed in 0.64s; original maps and
+outcomes remain unchanged. No producer was repeated for the hash update.
+
+The shared R93 archive added at `9f1cf26a` preserves all 255 files of the
+original 2024 meter workflow byte-for-byte, including its actual 412-path
+package map. Both meter consumers reuse this single artifact. Archiving grants
+no new native or branch credit. The final combined gates remain outstanding.
 
 ## 2026-10-24 R134 capture control evidence
 

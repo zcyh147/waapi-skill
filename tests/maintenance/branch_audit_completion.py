@@ -174,6 +174,9 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
                  'tests/fixtures/runtime-loaded-media/console-review.json',
                  'tests/unit/test_console_loaded_media_evidence.py',
+                 'tests/support/runtime_transport_evidence.py',
+                 'tests/unit/test_runtime_transport_branch_evidence.py',
+                 'tests/fixtures/runtime-transport/support-review.json',
                  'tests/support/runtime_capture_control_evidence.py',
                  'tests/unit/test_runtime_capture_control_evidence.py',
                  'tests/fixtures/runtime-capture-controls/support-review.json',
@@ -1299,6 +1302,12 @@ def approved_boundary(root, branch, binding, route, public, digest):
         if required in ('wwise-console', 'wwise-authoring') and route['host'] != required and boundary.get('required_host') == required:
             return {'kind':'wrong_host','required_host':required,'error_code':'AUTHORING_HOST_REQUIRED' if required == 'wwise-authoring' else 'CONSOLE_HOST_REQUIRED'}
         return None
+    if boundary.get('kind') == 'explicit_media_choice':
+        owned={f'2023.1|{host}|2023.1.19.8928|function|ak.wwise.core.transport.useOriginals|{pointer}'
+            for host in ('wwise-console','wwise-authoring')for pointer in ('/argsSchema/@empty/object','/argsSchema/properties/enable/@presence/absent')}
+        if branch['id']not in owned:return None
+        from tests.support.runtime_transport_evidence import approved_media_boundary
+        return approved_media_boundary(root,branch,binding)
     if boundary.get('kind') != 'prohibited_field':
         return None
     policy = json.loads((root / 'skills/waapi-skill/resources/native_surface_policy.json').read_text())
@@ -1335,7 +1344,7 @@ def approved_boundary(root, branch, binding, route, public, digest):
         'approval_sources': {name:digest((root / name).read_text()) for name in approved_sources}}
 
 
-def validate_boundary_receipt(record, branch, binding, checks):
+def validate_boundary_receipt(record, branch, binding, checks, *, root=None):
     boundary, gateway = branch['approved_boundary'], record['gateway']
     payload, calls = gateway['payload'], record.get('native_calls')
     uri = branch['route'].split('|')[4]
@@ -1343,7 +1352,10 @@ def validate_boundary_receipt(record, branch, binding, checks):
             or not isinstance(calls, list) or any(c['uri'] == uri for c in calls)
             or not any(c['pointer'] == '/gateway/payload/error_code' and c.get('equals') == payload.get('error_code') for c in checks)):
         raise ValueError('exact rejected public input and no-target-dispatch proof missing')
-    if boundary['kind'] == 'wrong_host':
+    if boundary['kind'] == 'explicit_media_choice':
+        from tests.support.runtime_transport_evidence import validate_media_boundary_receipt
+        validate_media_boundary_receipt(record,branch,binding,checks,root)
+    elif boundary['kind'] == 'wrong_host':
         infos = [c['result'] for c in calls if c['uri'] == 'ak.wwise.core.getInfo']
         version, host, build = branch['route'].split('|')[:3]
         if (len(infos) != 1 or native_host_context(infos[0], 'isCommandLine') != {'version':version,'host':host,'build':build}
@@ -1564,9 +1576,15 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         if (binding or {}).get('disposition') == 'schema_counterexample':
             raise ValueError('counterexample requires a conclusively rejected empty candidate')
         normalized_construction = None
+        transport_create_omission_preserved = False
         from tests.support.runtime_remaining_evidence import selected as remaining_selected, validate_evidence as validate_remaining
         if remaining_selected(branch['id'], root):
             normalized_construction=validate_remaining(record,binding or {},branch,category,base,root,reference_edges)
+            # A source-owned exact twenty-leaf validator checks the successful
+            # native ACK and uncertain public handling; no agent_result exists.
+            if normalized_construction == {'transport_create_omission_preserved':True}:
+                transport_create_omission_preserved = True
+                normalized_construction = None
         if category == 'program':
             from wwise_waapi.runtime_inspection_business_contracts import PROFILER_GET_RTPS_URI
             # The source-owned exact read route determines capture eligibility;
@@ -1687,7 +1705,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         for artifact in record.get('artifacts', []):
             read_sealed_artifact(artifact, base)
         if boundary is not None:
-            validate_boundary_receipt(record, branch, binding, checks)
+            validate_boundary_receipt(record, branch, binding, checks, root=root)
         if category == 'native' and binding.get('source_copy_native_proof'):
             from tests.support.source_copy_native_evidence import validate_source_native
             validate_source_native(record, binding, branch, base)
@@ -1724,10 +1742,11 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                 public_equals = True
             if public_pointer.startswith('/stream_records/'):
                 validate_created_topic_program(record, branch, binding, checks, root, reference_edges or {})
-            elif (not public_pointer.startswith('/gateway/payload/agent_result')
+            elif (not (public_pointer.startswith('/gateway/payload/agent_result')
+                    or transport_create_omission_preserved and public_pointer=='/gateway/payload/dispatch_result/result')
                     or not public_equals):
                 raise ValueError('exact public Gateway result assertion missing')
-            if gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True or not gateway['argv']:
+            if not transport_create_omission_preserved and (gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True or not gateway['argv']):
                 raise ValueError('successful public Gateway receipt missing')
         if category in ('native', 'live_metadata', 'native_absence'):
             expected_version = branch['route'].split('|')[0] if branch['route'] else branch['version']
