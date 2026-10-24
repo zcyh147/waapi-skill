@@ -194,11 +194,11 @@ def test_r124_qualified_seed_admission_reads_exact_owned_array():
     assert original['capture']['cleanup']['complete'] is True
 
 
-def _r124_inventory():
+def _r124_inventory(scope_path=None):
     """Read only43 selected obligations plus their reference edges; no generator."""
     import gzip
     from tests.support.qualified_runtime_read_evidence import ANCHOR_SELECTORS
-    scope = json.loads((audit.ROOT / ANCHOR_SELECTORS).read_bytes())
+    scope = json.loads((audit.ROOT / (scope_path or ANCHOR_SELECTORS)).read_bytes())
     selected = {s['id'] for p in scope['profiles'].values() for s in p['selectors']}
     routes = {p['route'] for p in scope['profiles'].values()}
     stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
@@ -208,7 +208,7 @@ def _r124_inventory():
         if encoded.get('route') is None or packed['routes'][encoded['route']] not in routes:
             continue
         route = packed['routes'][encoded['route']]
-        if route + '|' + encoded['pointer'] not in selected and encoded['kind'] != 'reference':
+        if route + '|' + encoded['pointer'] not in selected and encoded['kind'] != 'reference' and not (scope_path and route.endswith('.getRTPCs')):
             continue
         row = dict(encoded); row.update(packed['contexts'][row.pop('context')])
         row.update(route=route, id=route + '|' + row['pointer'], shape_sha256=packed['shapes'][row.pop('shape')])
@@ -345,3 +345,144 @@ def test_r124_qualified_anchor_controls_reuse_one_complete_public_capture(tmp_pa
             inventory=inventory, version='2021.1', category='profiler-voices-seed', selected={extra})
     with pytest.raises(ValueError, match='exact retained read categories'):
         qualified.retained_read('2021.1', 'profiler-rtpcs-observation')
+
+
+def test_r125_assessed_r104_reads_preserve_failed_workflow_and_completed_cleanup():
+    from tests.support.qualified_runtime_read_evidence import retained_read
+    retained = retained_read('2021.1', 'r104-object-rtpcs-observation')
+    assert retained['raw']['result']['return'] == [
+        {'gameObjectId': 18446744073709551614, 'id': '{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}', 'name': 'RPM', 'value': 1000.0},
+        {'gameObjectId': 18446744073709551614, 'id': '{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}', 'name': 'Engine_Load', 'value': 1.0}]
+    assert retained['facts']['original_workflow_outcome'] == 'BLOCKED'
+    assert retained['facts']['original_read_outcome'] == 'BLOCKED'
+    assert retained['facts']['collector_owned_identity_observed'] is False
+    assert retained['facts']['physical_cleanup_complete'] is True
+    assert retained['facts']['post_terminal_port_8080_bindable'] is True
+    assert retained['facts']['qualified_scope'] == 'object-specific read facts only; global setter effect unverified'
+
+
+@pytest.fixture(scope='module')
+def r125_cases(tmp_path_factory):
+    from tests.support import qualified_runtime_read_evidence as q
+    from tests.unit.test_fixed_runtime_read_branch_evidence import public_fixed_read
+    inventory = _r124_inventory(q.R104_SELECTORS)
+    scope = json.loads((audit.ROOT / q.R104_SELECTORS).read_bytes())
+    cases = {}
+    for key, profile in scope['profiles'].items():
+        version, category = key.split('|'); root = tmp_path_factory.mktemp('r125-' + key.replace('|', '-'))
+        retained = q.retained_read(version, category); rows = retained['raw']['result']['return']
+        if category == 'r104-object-rtpcs-observation':
+            receipt, native, context = public_rtpc_read(root / 'public', version=version,
+                position=str(profile['time']), rows=rows)
+            extra = {}
+        else:
+            receipt, native, context, trace = public_fixed_read(root / 'public', version=version,
+                uri=profile['uri'], position=str(profile['time']), rows=rows)
+            extra = {'native_reads': trace, 'public_calls': [{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}]}
+        assert receipt['argv'] == profile['public_argv']
+        assert native['result'] == retained['raw']['result']
+        capture = root / 'program.json'
+        write_program_receipt(capture, receipt, native, nodeid='r125-' + key,
+            phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context, **extra)
+        selected = {s['id'] for s in profile['selectors']}
+        index = q.write_qualified_read_bundle(root / 'bundle', capture, q.r104_fixture_path(version),
+            inventory=inventory, version=version, category=category, selected=selected)
+        policy = json.loads((index.parent / 'requirements.json').read_bytes())
+        document, base, _ = audit.portable_binding_inputs(index, policy)
+        cases[key] = (inventory, index, policy, document, base, selected)
+    return cases
+
+
+@pytest.mark.parametrize('key', [
+    '2021.1|r104-audio-objects-observation', '2021.1|r104-object-rtpcs-observation',
+    '2022.1|r104-audio-objects-observation', '2022.1|r104-game-objects-observation',
+    '2023.1|r104-audio-objects-observation', '2023.1|r104-game-objects-observation',
+    '2024.1|r104-audio-objects-observation', '2024.1|r104-game-objects-observation'])
+def test_r125_all22_native_anchors_replay_eight_complete_original_public_packets(r125_cases, key):
+    inventory, index, policy, document, base, selected = r125_cases[key]
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
+        evidence_base=base, requirements_document=policy)
+    observed = [r for r in result['obligations'] if r['id'] in selected]
+    assert len(observed) == (4 if 'audio' in key else 3 if 'rtpcs' in key else 1)
+    assert all(r['state'] == 'verified' and r['evidence_results']['native']['outcome'] == 'passed' for r in observed), json.dumps(observed)
+    assessment = completion.read_sealed_artifact(next(iter(document['bindings'].values()))['qualified_runtime_read_attachment'], base)
+    assert assessment['original_workflow_outcome'] == assessment['original_finalization'] == 'BLOCKED'
+    assert assessment['successful_finalization'] is False
+    assert assessment['lifecycle_obligations'] == []
+    facts = assessment['retained_facts']
+    assert facts['physical_cleanup_complete'] is True and facts['post_terminal_port_8080_bindable'] is True
+    assert facts['cleanup_credit_transferred'] is False
+    if '2022.1|r104-game' in key:
+        assert facts['original_public_exit_code'] == 2 and facts['original_read_outcome'] == 'FAIL'
+    if 'rtpcs' in key:
+        assert facts['original_read_outcome'] == 'BLOCKED' and facts['collector_owned_identity_observed'] is False
+        assert 'global setter effect unverified' in facts['qualified_scope']
+    print('R125_RETAINED_NATIVE_ANCHORS', key, len(observed))
+
+
+def test_r125_qualified_r104_controls_preserve_exact_scope_and_failures(r125_cases):
+    """Reuse admitted packets for related, resealed damage; never invent a new workflow PASS."""
+    from tests.support import qualified_runtime_read_evidence as q
+    inventory, index, policy, document, base, selected = r125_cases['2021.1|r104-object-rtpcs-observation']
+    target = next(i for i in selected if i.endswith('/value')); original = document['bindings'][target]
+    policy = deepcopy(policy); policy['branches'] = {target: policy['branches'][target]}
+    for damage in ('value', 'global-effect-pass', 'cleanup-credit', 'workflow-pass', 'r105-lifecycle',
+                   'public-pass', 'r105-source', 'archive', 'category', 'time', 'empty', 'drop-second-row',
+                   'stale-source', 'failed-teardown', 'truncated'):
+        binding = deepcopy(original)
+        assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
+        native = completion.read_sealed_artifact(binding['evidence']['native'], base)
+        if damage == 'value': native['observed'] = 2575.0
+        elif damage == 'global-effect-pass': assessment['retained_facts']['collector_owned_identity_observed'] = True
+        elif damage == 'cleanup-credit': assessment['retained_facts']['cleanup_credit_transferred'] = True
+        elif damage == 'workflow-pass': assessment['original_workflow_outcome'] = 'PASS'
+        elif damage == 'public-pass': assessment['retained_facts']['original_read_outcome'] = 'PASS'
+        elif damage == 'r105-lifecycle': assessment['lifecycle_obligations'] = q.lifecycle_obligations('2021.1')
+        elif damage == 'r105-source': assessment['source_changes'] = q.runtime.RTPC_REVIEWED_SOURCE_CHANGES
+        elif damage == 'archive': assessment['archive']['sha256'] = '0' * 64
+        elif damage == 'category': assessment['category'] = 'profiler-rtpcs-observation'
+        else:
+            program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+            capture = program['runtime_read_program']
+            if damage == 'time': program['native_call']['args']['time'] += 1
+            elif damage == 'empty': program['native_call']['result']['return'] = []
+            elif damage == 'drop-second-row': program['native_call']['result']['return'].pop()
+            elif damage == 'stale-source': capture['source_context']['capture']['tests/support/qualified_runtime_read_evidence.py'] = '0' * 64
+            elif damage == 'failed-teardown': capture['phase_reports']['teardown'] = 'failed'
+            elif damage == 'truncated': program['gateway']['payload']['agent_result'].update(complete=False, truncated=True)
+            capture['gateway'] = deepcopy(program['gateway']); capture['native_call'] = deepcopy(program['native_call'])
+            assessment['program_capture'] = write_json(base / (damage + '-capture.json'), capture)
+            binding['evidence']['program'].update(write_json(base / (damage + '-program.json'), program))
+        binding['qualified_runtime_read_attachment'] = write_json(base / (damage + '-assessment.json'), assessment)
+        native['assessment_sha256'] = binding['qualified_runtime_read_attachment']['sha256']
+        binding['evidence']['native'].update(write_json(base / (damage + '-native.json'), native))
+        result = completion.evaluate_coverage(audit.ROOT, inventory,
+            {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {target: binding}},
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        row = next(r for r in result['obligations'] if r['id'] == target)
+        assert row['state'] != 'verified', (damage, row)
+        assert row['evidence_results']['native']['outcome'] == 'missing', (damage, row)
+    # The raw-only exception is not permission to manufacture a historical public success.
+    inventory, index, policy, document, base, selected = r125_cases['2022.1|r104-game-objects-observation']
+    target, = selected; binding = deepcopy(document['bindings'][target])
+    assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
+    assessment['retained_facts']['original_public_exit_code'] = 0
+    binding['qualified_runtime_read_attachment'] = write_json(base / 'forged-public-pass-assessment.json', assessment)
+    native = completion.read_sealed_artifact(binding['evidence']['native'], base)
+    native['assessment_sha256'] = binding['qualified_runtime_read_attachment']['sha256']
+    binding['evidence']['native'].update(write_json(base / 'forged-public-pass-native.json', native))
+    result = completion.evaluate_coverage(audit.ROOT, inventory,
+        {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {target: binding}}, digest=audit.digest,
+        evidence_base=base, requirements_document=policy)
+    row = next(r for r in result['obligations'] if r['id'] == target)
+    assert row['evidence_results']['native']['outcome'] == 'missing'
+    with pytest.raises(ValueError, match='Only exact22 assessed R104'):
+        q.retained_read('2022.1', 'r104-object-rtpcs-observation')
+    # A real but unapproved field does not inherit native credit from its row.
+    retained = q.retained_read('2021.1', 'r104-object-rtpcs-observation')
+    extra = retained['profile']['route'] + '|/resultSchema/properties/return/items/properties/name'
+    source = r125_cases['2021.1|r104-object-rtpcs-observation']
+    assessment = completion.read_sealed_artifact(source[3]['bindings'][next(iter(source[5]))]['qualified_runtime_read_attachment'], source[4])
+    with pytest.raises(ValueError, match='no independently observed native result fact'):
+        q.write_qualified_read_bundle(base / 'extra', source[4] / assessment['program_capture']['artifact'], q.r104_fixture_path('2021.1'),
+            inventory=source[0], version='2021.1', category='r104-object-rtpcs-observation', selected={extra})
