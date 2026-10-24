@@ -5,6 +5,23 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R127 meter media-size output
+
+Reviewed integration `e6cef72e` exposes the existing closed `media-size-bytes`
+output on meter objects. It reuses the reflected `mediaSize` integer field,
+existing projection, whole-result validation and retained paging. The focused
+public test covers 2024.1/2025.1 on both Console and Authoring: exact same-API
+construction, zero/nonzero/absent values, complete pages, malformed off-page
+rejection and unknown-name rejection. Together with the three existing older
+unavailable-version checks, seven cases passed in 1.60s.
+
+This is fake-client program evidence, not native media-size population. The
+production diff only extends the named-output allowlist and its comment.
+Historical evidence remains unchanged; exact source compatibility reconciliation
+is pending before current evidence reuse. Fourteen legacy option spellings and
+two 2025 source inconsistencies remain separate #186 work. No native, Fresh or
+full-gate run was added for this deterministic output change.
+
 ## 2026-10-24 R126 runtime publication readiness
 
 Reviewed integration `a3eabbef` adds collision-checked composition, exact native

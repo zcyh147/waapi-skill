@@ -148,6 +148,14 @@ use bounded whole-result program checks without manufacturing native values.
 Console LoadedMedia support and the complete public mapping of meter return
 choices remain unresolved implementation work, not exclusions or passing rows.
 
+The finite meter audit confirmed one concrete omission: the existing
+`media-size-bytes` business output was filtered out at the meter root.
+Reviewed `e6cef72e` restores that same-API choice for 2024/2025 and preserves
+zero, nonzero and absent results through the existing bounded path. This fixes
+that omission only. Fourteen legacy namespace spellings and the 2025 `states`
+and `suppportsRandomizer` source rows still need exact reconciliation; a similar
+canonical name or related-object result does not by itself prove equivalence.
+
 Implement the log family first through existing public tests, actual teardown
 receipts, portable evidence and the ordinary completion consumer. The first
 tracer must reject removal of its native witness. Extend shared mechanisms
