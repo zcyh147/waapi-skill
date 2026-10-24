@@ -52,10 +52,11 @@ The exact successor must keep all6,292 branch IDs, shapes and ownership, retain
 R124 and historical failures unchanged, and classify these44 as conditional
 program preservation. The intended effective totals are2,120 conditional leaves
 and272 native anchors; these are requirements, not verified coverage counts.
-Program proof and the retained same-route native availability, attributable
+The exact implementation and independent review were integrated as `a7414f3b`;
+current formal publication remains pending. Program proof and retained same-route native availability, attributable
 nonempty data and semantic anchors are both mandatory. Missing native gates,
 wrong versions/hosts, incomplete cleanup or unrelated-route evidence cannot
-grant completion. Independent review and current publication remain required.
+grant completion.
 
 The completion claim is faithful optional diagnostic output when Wwise supplies
 it. It does not claim that these runs observed populated metadata, recursive
