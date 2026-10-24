@@ -5,6 +5,44 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R112 complete RTPC program branch publication
+
+Reviewed mechanism `d87f5125`, integrated at `7bc03a2`, adds exact scalar
+predicate checks and two-step cursor construction proof to the existing RTPC
+evidence consumer. It also discloses the legacy name compatibility actually
+enforced after successful Gateway row validation: preserve string labels,
+including native MIDI names outside the 2021–2024 reflected regex. The 2025
+contract receives no legacy exception. R111's reviewed structure and
+optional/empty/single-result checks are included in this combined publication.
+
+Artifact `7b63cec5`, integrated at `61e30412`, adds the standalone
+`tests/fixtures/branch-evidence/product/runtime-rtpc-complete-r112/index.json`.
+On stable source `7bc03a2`, **72 actual setup/call/teardown receipts passed once
+in 11.20s**. Final evaluation records **402 program PASS, 304 verified
+(280 program-only plus 24 original native-backed), 98 native-missing and zero
+unselected RTPC branches**. The original 182 requirement objects are unchanged.
+Native credit remains limited to 15 exact 2022 Authoring leaves and nine exact
+2025 Authoring leaves; synthetic shapes and normalized cursor construction
+receive no native-occurrence credit.
+
+The first evaluator completed in 24.75s, but an incorrect reporting count
+assertion prevented saving its result. One bounded recovery re-imported the
+unchanged package and evaluated it in 24.33s, persisting actual results before
+reporting assertions. No receipts, tests or native workflows were rerun.
+The committed `reader-proof.json` and `capture-manifest.json` retain the final
+result/input seals and 72 unique phase-complete receipt identities. Independent
+review checked all 488 package files, portable seals, current 413+9 source maps,
+the original six native artifacts, exact three-file source bridge and unchanged
+pre-recovery files without rerunning the evaluator.
+
+Focused mechanism verification included the exact 88 new scalar/cursor
+branches and seven corruption controls. Three fixture failures in that run
+were corrected; the failed/affected follow-up passed 26 checks in 37.25s.
+Earlier successful selections were not repeated solely for a unified log.
+The global index/policy/ledger remain unchanged; this package supersedes no
+historical bytes and must not be combined with overlapping R108/R110 inputs.
+No new native/Fresh run, full gate or whole-ticket acceptance is claimed.
+
 ## 2026-10-24 R110 standalone RTPC branch publication
 
 Package `793c9f8a0222bde34156a47518488a4d43fe3467`, integrated at

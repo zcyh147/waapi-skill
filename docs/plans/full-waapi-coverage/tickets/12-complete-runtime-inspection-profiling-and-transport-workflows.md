@@ -30,6 +30,31 @@ Users can inspect and control the permitted profiling/transport sessions and rec
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
 
+## Implementation checkpoint — 2026-10-24 R112
+
+The reviewed RTPC mechanism and standalone evidence package are integrated at
+`61e30412`. All 402 RTPC schema branches now have exact public program evidence:
+304 meet their requirements, while 98 still require matching native data.
+The package includes five-version/two-host structural and optional-result
+handling, scalar predicates and the actual ordered cursor-time-to-RTPC query
+construction. Legacy native MIDI labels remain unchanged and their compatibility
+rule is disclosed after actual row validation. This is not whole-ticket closure.
+
+The 72 actual program receipts passed once in 11.20s. A reporting-count typo
+required one evaluation-only recovery using the same package; no tests or
+native workflows were repeated. Independent mechanism and artifact reviews
+found no remaining scoped issue. Exact results, original native scope and
+recovery limits are recorded in `tests/TEST_INVENTORY.md` and the committed
+`runtime-rtpc-complete-r112/reader-proof.json`.
+
+Next, bind retained contribution and reader observations through their existing
+public business interfaces, grouped by shared implementation. The first
+contribution flow is an end-to-end tracer before extending the applicable
+five-version lanes, not a separate package per field. Global evidence integration,
+the 98 RTPC native-data requirements, other runtime branches and the previously
+identified missing native facts remain assigned here. No new Fresh or repeated
+native campaign is authorized by this checkpoint.
+
 ## Execution note — 2026-10-24
 
 Use [runtime verification decisions](../RUNTIME_VERIFICATION.md) to distinguish
