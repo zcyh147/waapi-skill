@@ -439,6 +439,9 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
     if branch['route'].endswith('|ak.wwise.core.profiler.getCursorTime'):
         from tests.support.runtime_cursor_evidence import validate_evidence as validate_cursor
         return validate_cursor(record,binding,branch,category,base,root,edges)
+    if entry['family']=='extra_reads' and branch['route'].split('|')[-1] in {'ak.wwise.core.profiler.'+n for n in ('getCpuUsage','getPerformanceMonitor','getStreamedMedia')}:
+        from tests.support.extra_runtime_read_evidence import validate_evidence as validate_extra
+        return validate_extra(record,binding,branch,category,base,root,edges)
     if entry['family']=='console_loaded_media':
         from tests.support.loaded_media_runtime_evidence import validate_console_evidence
         return validate_console_evidence(record,binding,branch,category,base,root,edges)
