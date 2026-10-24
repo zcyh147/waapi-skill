@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "rtpc-2021.1-wwise-console-structure",
+      "bindings": {
+        "artifact": "2021.1-wwise-console-structure-bindings.json",
+        "sha256": "0754a9da17071bbb00fa540a5c8729cdaaafb15a1f8e4d509eae5c3f8221a906"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "2021.1-wwise-console-structure-bindings.json",
+          "sha256": "0754a9da17071bbb00fa540a5c8729cdaaafb15a1f8e4d509eae5c3f8221a906"
+        },
+        "program": {
+          "artifact": "2021.1-wwise-console-structure-program.json",
+          "sha256": "d68fba7b9ed778bfb9b459a203d5f71230d716de4a5a559852ba0a54b7733467"
+        },
+        "requirements": {
+          "artifact": "2021.1-wwise-console-structure-requirements.json",
+          "sha256": "cbf55ef9a586d810c59fc8f3b1c4dfc719ac38c799635a35821b0f99ce355dec"
+        },
+        "capture": {
+          "artifact": "2021.1-wwise-console-structure-program-capture.json",
+          "sha256": "4ef9c0786623f3281373c3aedf679a0967a3d79e3a13f73f429efd77452d4c7a"
+        }
+      }
+    }
+  ]
+}

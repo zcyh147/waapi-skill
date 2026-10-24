@@ -1,0 +1,33 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1": {
+      "native_shape_sha256": "46f0eca6e30e845752c8b1259e94732b76a84653341e434d65aa817126b2d228",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact public choice to ordered cursor read to numeric RTPC construction; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref": {
+      "native_shape_sha256": "f72676ff26630debef861148ffe4033c668fc9b24d84a20d7c754c1328aec72f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact public choice to ordered cursor read to numeric RTPC construction; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor": {
+      "native_shape_sha256": "b6177e66ca25e1f83db5adcac350aff92816fc7c18a3b5202344c2de22bfb206",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact public choice to ordered cursor read to numeric RTPC construction; no actual native occurrence/data/effect claim"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getRTPCs|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1": {
+      "native_shape_sha256": "47ee4b87312f219001c8d947f53aa0bbd7c7bb7b88eea51cce7b10f28289b1f4",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact public choice to ordered cursor read to numeric RTPC construction; no actual native occurrence/data/effect claim"
+    }
+  }
+}
