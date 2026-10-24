@@ -13,7 +13,7 @@ URI = 'ak.wwise.core.profiler.getLoadedMedia'
 ROUTE = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
 ANCHOR = ROUTE + '|/resultSchema/properties/return/@cardinality/single'
 FIXTURE = 'tests/fixtures/runtime-loaded-media'
-REVIEW_SHA = '9aa07016d1a79e974e78ae053f219e1299ba16f18be25b5b0c33ca73044c73d6'
+REVIEW_SHA = '26c435deb3f789be9e8d872541be834342fd280b95dc212b32ff20ae56a86e5d'
 ORIGINAL_CANDIDATE = '7289081b552c5f428013ba0b6bacaf7d05843481'
 PREFIX = '/private/tmp/waapi-r122-demo-native-r4/evidence/'
 CATEGORY = 'profiler-loaded-media-observation'
@@ -30,9 +30,17 @@ def review(root=audit.ROOT):
             or any(result[key] != value for key, value in BASIS.items())):
         raise ValueError('Exact LoadedMedia representative scope differs')
     baseline = result['prior_policy_absent']
-    original = (root / baseline['path']).read_bytes()
-    if runtime.sha(original) != baseline['sha256'] or set(result['entries']) & set(json.loads(original)['branches']):
+    import subprocess
+    original_blob = subprocess.run(['git', 'show', baseline['candidate'] + ':' + baseline['path']],
+        cwd=root, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    original = original_blob.stdout
+    if (original_blob.returncode or runtime.sha(original) != baseline['sha256']
+            or set(result['entries']) & set(json.loads(original)['branches'])):
         raise ValueError('LoadedMedia prior-policy absence baseline changed')
+    published = json.loads((root / baseline['path']).read_bytes())['branches']
+    if any(identity in published and published[identity] != policy(entry)
+            for identity, entry in result['entries'].items()):
+        raise ValueError('Unreviewed published LoadedMedia policy differs')
     for name, seal in result['files'].items():
         if runtime.sha((root / FIXTURE / name).read_bytes()) != seal:
             raise ValueError('Original LoadedMedia source-owned closure changed: ' + name)

@@ -510,6 +510,7 @@
   },
   "prior_policy_absent": {
     "path": "docs/branch-coverage-requirements.json",
-    "sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a"
+    "sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a",
+    "candidate": "8b600cfaa45f6670da76187db2dd76e27b613ae3"
   }
 }

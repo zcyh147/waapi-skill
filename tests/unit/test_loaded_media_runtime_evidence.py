@@ -245,3 +245,54 @@ def test_loaded_media_fact_does_not_support_other_catalog_routes(inventory,corru
         outcome,reason=completion.evidence_result(binding['evidence']['native'],branch,
             inventory['native_coverage']['candidate_sha256'],'native','product',base,binding,audit.ROOT)
         assert outcome=='missing', (branch['id'],outcome,reason)
+
+
+def test_loaded_media_publishes_first_global_requirements_without_rewriting_baseline(tmp_path,inventory,corruption_inputs,monkeypatch):
+    import shutil
+    document,base,policies=corruption_inputs
+    published=tmp_path/'published'
+    published.mkdir()
+    # An isolated ordinary repository view: genuine packaged bytes and Git
+    # objects, actual mutable global requirements, immutable source-owned data.
+    import subprocess
+    git_dir=subprocess.check_output(['git','rev-parse','--absolute-git-dir'],cwd=audit.ROOT,text=True).strip()
+    (published/'.git').write_text('gitdir: '+git_dir+'\n')
+    shutil.copytree(audit.ROOT/'skills/waapi-skill',published/'skills/waapi-skill',
+        ignore=shutil.ignore_patterns('.venv','__pycache__','.pytest_cache','.coverage','.DS_Store'))
+    captured=completion.read_sealed_artifact(document['bindings'][ANCHOR]['evidence']['program'],base)['runtime_read_program']
+    dependencies=set(captured['source_context']['capture']) | {
+        'tests/fixtures/runtime/runtime-risk-policy-r124.json',
+        'docs/plans/full-waapi-coverage/SPEC.md'}
+    for name in dependencies:
+        target=published/name;target.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(audit.ROOT/name,target)
+    shutil.copytree(FIXTURE,published/'tests/fixtures/runtime-loaded-media',dirs_exist_ok=True)
+    global_path=published/'docs/branch-coverage-requirements.json'
+    global_policy=json.loads((audit.ROOT/'docs/branch-coverage-requirements.json').read_bytes())
+    assert not set(policies['branches']) & set(global_policy['branches'])
+    global_policy['branches'].update(deepcopy(policies['branches']))
+    runtime.write_json(global_path,global_policy)
+    imported,evidence_base,_=audit.portable_binding_inputs(base/'index.json',json.loads(global_path.read_bytes()))
+    result=completion.evaluate_coverage(published,inventory,imported,digest=audit.digest,evidence_base=evidence_base)
+    rows={r['id']:r for r in result['obligations'] if r['route']==ROUTE}
+    assert len(rows)==31 and {r['state'] for r in rows.values()}=={'verified'},json.dumps(rows)
+    # Changing a published policy without the reviewed source-owned map fails.
+    global_policy['branches'][ANCHOR]['categories']=['program']
+    runtime.write_json(global_path,global_policy)
+    with pytest.raises(ValueError,match='Unreviewed published LoadedMedia policy differs'):
+        completion.evaluate_coverage(published,inventory,imported,digest=audit.digest,evidence_base=evidence_base)
+    global_policy['branches'][ANCHOR]=deepcopy(policies['branches'][ANCHOR])
+    runtime.write_json(global_path,global_policy)
+    import subprocess
+    actual_run=subprocess.run
+    baseline='8b600cfaa45f6670da76187db2dd76e27b613ae3:docs/branch-coverage-requirements.json'
+    def wrong_original_blob(argv,**kwargs):
+        if argv==['git','show',baseline] and kwargs.get('cwd')==published:
+            # The mutable published document cannot masquerade as the pinned
+            # historical blob, even with the immutable candidate label.
+            return subprocess.CompletedProcess(argv,0,global_path.read_bytes(),b'')
+        return actual_run(argv,**kwargs)
+    with monkeypatch.context() as external_git:
+        external_git.setattr(subprocess,'run',wrong_original_blob)
+        with pytest.raises(ValueError,match='LoadedMedia prior-policy absence baseline changed'):
+            completion.evaluate_coverage(published,inventory,imported,digest=audit.digest,evidence_base=evidence_base)
