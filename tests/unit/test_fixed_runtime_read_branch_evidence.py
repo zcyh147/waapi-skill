@@ -1101,7 +1101,8 @@ def test_runtime_risk_preservation_fails_closed_on_missing_or_changed_anchors(tm
 
 def test_runtime_risk_successor_retains_semantic_anchors_and_frozen_history():
     from tests.support.runtime_observation_evidence import runtime_risk_review, runtime_successor_requirements
-    review = runtime_risk_review(audit.ROOT)
+    # R124 stays an immutable historical decision; R126 composes its exact successor.
+    review = json.loads((audit.ROOT / 'tests/fixtures/runtime/runtime-risk-policy-r124.json').read_bytes())
     assert len(review['entries']) == 6292
     assert len(review['changed_ids']) == 2076
     assert len(review['still_native_anchor_ids']) == 316
@@ -1183,3 +1184,141 @@ def test_console_host_metadata_source_successor_keeps_retained_read_and_exact_pa
     branch = next(r for r in rows if r['id'] == identity)
     with pytest.raises(ValueError, match='exact reviewed native-profile source/branch closure'):
         fixed.validate_source_review(resealed, review['historical_sources'], branch, audit.ROOT, base)
+
+
+def test_opaque_metadata_successor_requires_same_route_native_and_whole_public_program(tmp_path):
+    """Optional fields stay exact; current native availability is a separate prerequisite."""
+    import gzip
+    from tests.support import fixed_runtime_read_evidence as fixed
+    uri = 'ak.wwise.core.profiler.getAudioObjects'
+    route_id = '2025.1|wwise-authoring|2025.1.7.9143|function|' + uri
+    prefix = route_id + '|/resultSchema/@definition/waapi_definitions.json/definitions/audioObjectReturn/properties/'
+    anchors = {prefix + field for field in ('audioObjectID', 'busGUID', 'busPipelineID', 'gameObjectID')}
+    opaque = {prefix + 'metadata/items/properties/' + field for field in ('metadataClassID', 'sourceShortID')}
+    wanted = anchors | opaque
+    stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    packed = json.loads(gzip.decompress((audit.ROOT / 'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
+    rows = []
+    for encoded in packed['rows']:
+        if encoded.get('route') is None or packed['routes'][encoded['route']] != route_id:
+            continue
+        row = dict(encoded); row.update(packed['contexts'][row.pop('context')])
+        row.update(route=route_id, id=route_id + '|' + row['pointer'], shape_sha256=packed['shapes'][row.pop('shape')])
+        rows.append(row)
+    assert wanted <= {row['id'] for row in rows}
+    route, = [r for r in stored['native_coverage']['routes'] if r['id'] == route_id]
+    inventory = {'routes': [r for r in stored['routes'] if r['id'] == route['public_route']],
+        'native_coverage': {'candidate_sha256': 'e' * 64, 'catalogs': stored['native_coverage']['catalogs'],
+            'routes': [route], 'obligations': rows}}
+    prior = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    indexes = []
+    for label, selected, originals, native_rows in (
+        ('native-', anchors, FIXTURE, None), ('opaque-', opaque, None, typed_fixed_rows('2025.1', uri))):
+        receipt, native, context, trace = public_fixed_read(tmp_path / label, uri=uri, rows=native_rows)
+        capture = tmp_path / (label + 'capture.json')
+        write_program_receipt(capture, receipt, native, nodeid=label + 'opaque-policy',
+            phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
+            native_reads=trace, public_calls=[{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}])
+        index = fixed.write_fixed_bundle(tmp_path / 'bundle', capture, originals,
+            inventory=inventory, selected=selected, name_prefix=label)
+        indexes.append(json.loads(index.read_bytes()))
+        prior['branches'].update(json.loads((index.parent / (label + 'requirements.json')).read_bytes())['branches'])
+    combined = deepcopy(indexes[0]); combined['entries'] += indexes[1]['entries']
+    index = tmp_path / 'bundle/combined-index.json'; write_json(index, combined)
+    successor = deepcopy(prior)
+    for identity in opaque:
+        successor['branches'][identity].update(categories=['program'],
+            reason='User-approved runtime risk policy: opaque_audio_object_metadata_preservation'
+                + '; exact native anchors required; native value occurrence unclaimed')
+    document, base, _ = audit.portable_binding_inputs(index, successor)
+    def consume(bindings, requirements=successor):
+        result = completion.evaluate_coverage(audit.ROOT, inventory, bindings, digest=audit.digest,
+            evidence_base=base, requirements_document=requirements)
+        return {row['id']: row for row in result['obligations']}
+    observed = consume(document)
+    assert all(observed[identity]['state'] == 'verified' for identity in wanted), json.dumps(observed)
+    assert all(observed[identity]['runtime_native_anchor_status'] == 'passed' for identity in opaque)
+    assert all('native' not in observed[identity]['evidence_results'] for identity in opaque)
+    program = completion.read_sealed_artifact(document['bindings'][next(iter(opaque))]['evidence']['program'], base)
+    assert program['gateway']['payload']['agent_result']['return'][0]['metadata'] == program['native_call']['result']['return'][0]['metadata']
+    from tests.support.runtime_observation_evidence import runtime_successor_requirements
+    assert runtime_successor_requirements(prior) == successor
+    for damage in ('anchor', 'wrong-route', 'native-policy', 'empty-native', 'program'):
+        damaged = deepcopy(document); policies = deepcopy(successor)
+        anchor = sorted(anchors)[0]
+        if damage == 'anchor':
+            del damaged['bindings'][anchor]
+        elif damage == 'wrong-route':
+            binding = damaged['bindings'][anchor]
+            proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'], base)
+            proof['branch_id'] = proof['branch_id'].replace('|wwise-authoring|', '|wwise-console|')
+            binding['runtime_observation_attachment'] = write_json(base / 'opaque-foreign-proof.json', proof)
+        elif damage == 'native-policy':
+            policies['branches'][anchor]['categories'] = ['program']
+        elif damage == 'empty-native':
+            binding = damaged['bindings'][anchor]
+            record = completion.read_sealed_artifact(binding['evidence']['native'], base)
+            raw = completion.read_sealed_artifact(record['observation_artifacts']['raw'], base)
+            raw['result']['return'] = []
+            record['observation_artifacts']['raw'] = write_json(base / 'opaque-empty-raw.json', raw)
+            binding['native_observations_sha256']['raw'] = record['observation_artifacts']['raw']['sha256']
+            binding['evidence']['native'].update(write_json(base / 'opaque-empty-native.json', record))
+        else:
+            damaged['bindings'][next(iter(opaque))]['evidence']['program']['sha256'] = '0' * 64
+        bad = consume(damaged, policies)
+        assert any(bad[identity]['state'] != 'verified' for identity in opaque), (damage, bad)
+    for field, value in (('reason', 'caller downgrade'), ('native_shape_sha256', '0' * 64)):
+        damaged = deepcopy(successor)
+        damaged['branches'][next(iter(opaque))][field] = value
+        with pytest.raises(ValueError, match='portable requirement differs'):
+            audit.portable_binding_inputs(index, damaged)
+
+
+def test_opaque_successor_exact_44_roster_keeps_history_shapes_owners_and_retained_gates(tmp_path):
+    from tests.support import runtime_observation_evidence as runtime
+    original = json.loads((audit.ROOT / runtime.RUNTIME_RISK_POLICY).read_bytes())
+    effective = runtime.runtime_risk_review(audit.ROOT)
+    pointers = ('/metadata/items/properties/metadataClassID', '/metadata/items/properties/sourceShortID',
+        '/voiceContributionsObject/properties/children/items/$ref',
+        '/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/1',
+        '/voiceContributionsObject/properties/index')
+    expected = {identity for identity in original['still_native_anchor_ids']
+        if any(original['entries'][identity]['pointer'].endswith(pointer) for pointer in pointers)}
+    assert len(expected) == 44
+    assert len(effective['entries']) == 6292 and len(effective['changed_ids']) == 2120
+    assert len(effective['still_native_anchor_ids']) == 272
+    assert set(effective['changed_ids']) - set(original['changed_ids']) == expected
+    assert set(original['still_native_anchor_ids']) - set(effective['still_native_anchor_ids']) == expected
+    assert effective['historical_packages'] == original['historical_packages']
+    assert effective['all_ids_sha256'] == original['all_ids_sha256']
+    delta = json.loads((audit.ROOT / runtime.RUNTIME_OPAQUE_POLICY).read_bytes())
+    assert len(delta['dependency_updates']) == 144
+    families = {}
+    for identity, transition in delta['entries'].items():
+        families[transition['family']] = families.get(transition['family'], 0) + 1
+        before, after = original['entries'][identity], effective['entries'][identity]
+        assert all(before[key] == after[key] for key in
+            ('route', 'pointer', 'kind', 'native_shape_sha256', 'owner_issue', 'parent_issue', 'blocks_issue', 'old_policy_sha256'))
+        assert transition['before_policy']['categories'] == ['program', 'native']
+        assert transition['after_policy'] == runtime.runtime_preservation_policy(after)
+    assert families == {'metadata': 20, 'children': 10, 'driver_value': 10, 'ray_index': 4}
+    retained = set(effective['still_native_anchor_ids'])
+    for identity in effective['changed_ids']:
+        entry = effective['entries'][identity]
+        assert entry['required_native_anchor_ids'] and set(entry['required_native_anchor_ids']) <= retained
+        assert all(effective['entries'][anchor]['route'] == entry['route'] for anchor in entry['required_native_anchor_ids'])
+    # The original native policy cannot be downgraded outside the exact44 set.
+    identity = next(iter(retained)); entry = original['entries'][identity]
+    package = json.loads((audit.ROOT / original['historical_packages'][entry['family']]['path']).read_bytes())
+    before = package['branches'][identity]
+    assert not runtime.runtime_successor_policy_matches(effective, identity, before,
+        {**before, 'categories': ['program']})
+    # Tampering the source-owned successor fails even with intact historical packages.
+    import shutil
+    for path in [runtime.RUNTIME_RISK_POLICY, runtime.RUNTIME_OPAQUE_POLICY,
+            *(row['path'] for row in original['historical_packages'].values())]:
+        target = tmp_path / path; target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(audit.ROOT / path, target)
+    (tmp_path / runtime.RUNTIME_OPAQUE_POLICY).write_text('{}')
+    with pytest.raises(ValueError, match='Exact reviewed runtime opaque successor changed'):
+        runtime.runtime_risk_review(tmp_path)

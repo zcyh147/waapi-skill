@@ -171,6 +171,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_source_copy_capture.py',
                  'tests/support/runtime_observation_evidence.py',
                  'tests/fixtures/runtime/runtime-risk-policy-r124.json',
+                 'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
                  'tests/support/qualified_runtime_read_evidence.py',
                  'tests/support/fixed_runtime_read_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',

@@ -37,6 +37,7 @@ def program_source_context(root=audit.ROOT, *, flow=None):
         'tests/unit/test_rtpc_field_branch_evidence.py',
         'tests/unit/test_runtime_business_gateway.py', 'tests/support/gateway_config.py',
         'tests/support/exact_evidence_finalization.py', 'tests/conftest.py',
+        'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
         'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py']
     if flow in {'ak.wwise.core.profiler.' + name for name in ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects')}:
         dependencies.extend(('tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_fixed_runtime_read_branch_evidence.py'))
@@ -1675,6 +1676,8 @@ def write_read_stage(output, captures, originals, *, inventory):
 # User-approved exact successor; historical requirement packages remain immutable.
 RUNTIME_RISK_POLICY = 'tests/fixtures/runtime/runtime-risk-policy-r124.json'
 RUNTIME_RISK_POLICY_SHA = 'a139358c1f98a15ce99e28961bb1e4b8e059976a8665df5ab350637ccd6e2a57'
+RUNTIME_OPAQUE_POLICY = 'tests/fixtures/runtime/runtime-opaque-policy-r126.json'
+RUNTIME_OPAQUE_POLICY_SHA = '00b3d385535770ba2315f1a06fc64f002d8a4a43507e841736b08c42620ea591'
 RUNTIME_RISK_URIS = frozenset('ak.wwise.core.profiler.' + name for name in
     ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects', 'getVoiceContributions', 'getRTPCs'))
 
@@ -1690,7 +1693,56 @@ def runtime_risk_review(root):
     for package in review['historical_packages'].values():
         if sha((root / package['path']).read_bytes()) != package['sha256']:
             raise ValueError('Immutable historical runtime requirements changed')
-    return review
+    return _runtime_opaque_successor(review, root)
+
+
+def _runtime_opaque_successor(predecessor, root):
+    """Compose the exact source-owned delta without rewriting the R124 record."""
+    raw = (root / RUNTIME_OPAQUE_POLICY).read_bytes()
+    if sha(raw) != RUNTIME_OPAQUE_POLICY_SHA:
+        raise ValueError('Exact reviewed runtime opaque successor changed')
+    delta = json.loads(raw)
+    if (delta['predecessor'] != {'path': RUNTIME_RISK_POLICY, 'sha256': RUNTIME_RISK_POLICY_SHA}
+            or len(delta['entries']) != 44 or len(delta['dependency_updates']) != 144):
+        raise ValueError('Runtime opaque successor roster differs')
+    result = deepcopy(predecessor)
+    changed = set(delta['entries'])
+    if not changed <= set(predecessor['still_native_anchor_ids']):
+        raise ValueError('Runtime opaque successor must retain exact predecessor identities')
+    for identity, transition in delta['entries'].items():
+        entry = result['entries'][identity]
+        if (audit.digest(entry) != transition['before_entry_sha256']
+                or audit.digest(transition['before_policy']) != entry['old_policy_sha256']
+                or any(transition[key] != entry[key] for key in
+                    ('route', 'pointer', 'kind', 'native_shape_sha256', 'owner_issue', 'parent_issue', 'blocks_issue'))):
+            raise ValueError('Runtime opaque successor predecessor differs')
+        entry.update(proposed_categories=['program'], role='conditional_opaque_result_preservation',
+            rationale_key=transition['rationale_key'], required_native_anchor_ids=transition['required_native_anchor_ids'])
+        if transition['after_policy'] != runtime_preservation_policy(entry):
+            raise ValueError('Runtime opaque successor proposed policy differs')
+    for identity, transition in delta['dependency_updates'].items():
+        entry = result['entries'][identity]
+        if (entry['required_native_anchor_ids'] != transition['before']
+                or transition['after'] != [anchor for anchor in transition['before'] if anchor not in changed]):
+            raise ValueError('Runtime opaque successor dependency transition differs')
+        entry['required_native_anchor_ids'] = transition['after']
+    result['changed_ids'] = sorted(set(predecessor['changed_ids']) | changed)
+    result['still_native_anchor_ids'] = sorted(set(predecessor['still_native_anchor_ids']) - changed)
+    for route in result['by_route_anchors'].values():
+        for field in ('all_retained_native_ids', 'retained_native_semantic_ids'):
+            route[field] = [identity for identity in route[field] if identity not in changed]
+    retained = set(result['still_native_anchor_ids'])
+    for identity in result['changed_ids']:
+        entry = result['entries'][identity]
+        anchors = entry['required_native_anchor_ids']
+        if (not anchors or not set(anchors) <= retained
+                or any(result['entries'][anchor]['route'] != entry['route'] for anchor in anchors)):
+            raise ValueError('Runtime opaque preservation requires retained same-route native anchors')
+    if len(result['changed_ids']) != 2120 or len(retained) != 272:
+        raise ValueError('Runtime opaque successor effective counts differ')
+    result['counts'].update(changed_ids=2120, proposed_native_ids=272, native_to_program=2120)
+    result['opaque_successor'] = {'path': RUNTIME_OPAQUE_POLICY, 'sha256': RUNTIME_OPAQUE_POLICY_SHA}
+    return result
 
 
 def runtime_preservation_policy(entry):
