@@ -170,6 +170,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
                  'tests/unit/test_source_copy_capture.py',
                  'tests/support/runtime_observation_evidence.py',
+                 'tests/fixtures/runtime/runtime-risk-policy-r124.json',
                  'tests/support/qualified_runtime_read_evidence.py',
                  'tests/support/fixed_runtime_read_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',
@@ -1640,6 +1641,8 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
     policies = requirements_document['branches']
     if not isinstance(policies, dict) or set(policies) - ids:
         raise ValueError('requirements must name exact in-scope branches')
+    from tests.support.runtime_observation_evidence import runtime_preservation_gates, apply_runtime_preservation_gates
+    preservation_gates = runtime_preservation_gates(root, policies, native['obligations']) if scope is None else {}
     public = {r['id']: r for r in inventory['routes']}
     routes = {r['id']: r for r in native['routes']}
     symbols = {}
@@ -1760,6 +1763,7 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             branch['metadata_scope'] = 'object_type'
             branch['direct_recipient_instance_metadata'] = 'not_observed'
         branch['state'] = 'verified' if outcomes <= {'passed', 'reviewed_mechanism_reuse', 'reviewed_class_metadata_and_object_scope_mechanism'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
+    apply_runtime_preservation_gates(native['obligations'], policies, preservation_gates)
     complete_states = {'verified', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:

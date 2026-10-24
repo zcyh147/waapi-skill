@@ -369,6 +369,16 @@ def portable_binding_inputs(index_path, requirements):
                 raise ValueError("invalid original metadata JSONL index")
             descriptor = {**descriptor, "record_index":record_index}
         return read_sealed_artifact(descriptor, base)
+    from tests.support.runtime_observation_evidence import runtime_risk_review, runtime_successor_policy_matches, runtime_risk_route
+    risk_review = None
+    def accepts_runtime_successor(identity, original, proposed):
+        nonlocal risk_review
+        if not runtime_risk_route(identity):
+            return False
+        if risk_review is None:
+            risk_review = runtime_risk_review(ROOT)
+        return runtime_successor_policy_matches(risk_review, identity, original, proposed)
+    attachment_requirements = deepcopy(requirements)
     bindings, names = {}, set()
     source_capture_origins = {}
     for entry in index['entries']:
@@ -406,8 +416,12 @@ def portable_binding_inputs(index_path, requirements):
         if (policy.get('contract') != 'waapi-skill.branch-evidence-requirements/v1'
                 or set(policy['branches']) != set(expected['bindings'])
                 or any(key in requirements['branches'] and requirements['branches'][key] != value
+                       and not accepts_runtime_successor(key, value, requirements['branches'][key])
                        for key, value in policy['branches'].items())):
             raise ValueError('portable requirement differs from reviewed exact branch policy')
+        # Attachments validate original native facts against original requirements.
+        # Successor requirements change the downstream proof method, never history.
+        attachment_requirements['branches'].update(policy['branches'])
         bindings.update(projected['bindings'])
         for identity in projected['bindings']:
             source_capture_origins[identity] = originals['capture']
@@ -543,11 +557,11 @@ def portable_binding_inputs(index_path, requirements):
     if 'runtime_observation_attachments' in index:
         from tests.support.runtime_observation_evidence import attach_runtime_observations
         attach_runtime_observations(index['runtime_observation_attachments'], bindings, read, base,
-            requirements, source_capture_origins)
+            attachment_requirements, source_capture_origins)
     if 'qualified_runtime_read_attachments' in index:
         from tests.support.qualified_runtime_read_evidence import attach_qualified_reads
         attach_qualified_reads(index['qualified_runtime_read_attachments'], bindings, read,
-                               requirements, source_capture_origins)
+                               attachment_requirements, source_capture_origins)
     if 'condition_mechanism_attachments' in index:
         from tests.support.condition_mechanism_reuse import attach_condition_mechanisms
         condition_mechanism_reuse = attach_condition_mechanisms(index['condition_mechanism_attachments'], bindings, read, base, ROOT)

@@ -1662,3 +1662,103 @@ def write_read_stage(output, captures, originals, *, inventory):
     write_json(output / 'index.json', index)
     write_json(output / 'requirements.json', policy)
     return output / 'index.json'
+
+
+# User-approved exact successor; historical requirement packages remain immutable.
+RUNTIME_RISK_POLICY = 'tests/fixtures/runtime/runtime-risk-policy-r124.json'
+RUNTIME_RISK_POLICY_SHA = 'a139358c1f98a15ce99e28961bb1e4b8e059976a8665df5ab350637ccd6e2a57'
+RUNTIME_RISK_URIS = frozenset('ak.wwise.core.profiler.' + name for name in
+    ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects', 'getVoiceContributions', 'getRTPCs'))
+
+
+def runtime_risk_review(root):
+    raw = (root / RUNTIME_RISK_POLICY).read_bytes()
+    if sha(raw) != RUNTIME_RISK_POLICY_SHA:
+        raise ValueError('Exact reviewed runtime risk policy changed')
+    review = json.loads(raw)
+    if (len(review['entries']) != 6292 or len(review['changed_ids']) != 2076
+            or len(review['still_native_anchor_ids']) != 316):
+        raise ValueError('Runtime risk policy roster differs')
+    for package in review['historical_packages'].values():
+        if sha((root / package['path']).read_bytes()) != package['sha256']:
+            raise ValueError('Immutable historical runtime requirements changed')
+    return review
+
+
+def runtime_preservation_policy(entry):
+    return {'native_shape_sha256': entry['native_shape_sha256'], 'categories': ['program'],
+        'reason': 'User-approved runtime risk policy: ' + entry['rationale_key']
+            + '; exact native anchors required; native value occurrence unclaimed'}
+
+
+def runtime_successor_requirements(requirements, root=audit.ROOT):
+    """Produce only the sealed per-ID successor; no caller-selected downgrade."""
+    review = runtime_risk_review(root)
+    result = deepcopy(requirements)
+    changed = set(review['changed_ids'])
+    for identity, policy in result['branches'].items():
+        if identity in changed:
+            entry = review['entries'][identity]
+            if audit.digest(policy) != entry['old_policy_sha256']:
+                raise ValueError('Runtime successor requires exact original policy digest')
+            result['branches'][identity] = runtime_preservation_policy(entry)
+    return result
+
+
+def runtime_risk_route(identity):
+    parts = identity.split('|')
+    return len(parts) >= 5 and parts[4] in RUNTIME_RISK_URIS
+
+
+def runtime_successor_policy_matches(review, identity, original, proposed):
+    entry = review['entries'].get(identity, {})
+    return (identity in review['changed_ids']
+        and audit.digest(original) == entry['old_policy_sha256']
+        and proposed == runtime_preservation_policy(entry))
+
+
+def runtime_preservation_gates(root, policies, obligations):
+    """Flat exact-route anchor prerequisites for this closed runtime roster only."""
+    if not any(branch['id'] in policies and runtime_risk_route(branch['id']) for branch in obligations):
+        return {}
+    review = runtime_risk_review(root)
+    changed = set(review['changed_ids'])
+    gates = {}
+    for branch in obligations:
+        identity = branch['id']
+        if identity not in changed or identity not in policies:
+            continue
+        entry, policy = review['entries'][identity], policies[identity]
+        if 'native' in policy.get('categories', []):
+            continue  # Existing stricter packages/qualified assessments retain their own policy and facts.
+        if (policy != runtime_preservation_policy(entry)
+                or branch['shape_sha256'] != entry['native_shape_sha256']
+                or branch['route'] != entry['route']
+                or any(branch.get(key) != entry[key] for key in ('owner_issue', 'parent_issue', 'blocks_issue'))):
+            gates[identity] = None
+        else:
+            gates[identity] = entry['required_native_anchor_ids']
+    return gates
+
+
+def apply_runtime_preservation_gates(obligations, policies, gates):
+    rows = {row['id']: row for row in obligations}
+    for identity, anchors in gates.items():
+        row = rows[identity]
+        failed = []
+        for anchor in anchors or ():
+            witness = rows.get(anchor, {})
+            if (witness.get('route') != row['route']
+                    or 'native' not in policies.get(anchor, {}).get('categories', [])
+                    or witness.get('state') != 'verified'
+                    or witness.get('evidence_results', {}).get('native', {}).get('outcome') != 'passed'):
+                failed.append(anchor)
+        row['runtime_native_anchor_requirements'] = anchors
+        row['runtime_native_anchor_status'] = 'passed' if anchors is not None and not failed else 'missing'
+        if anchors is None or failed:
+            if anchors is None and row['state'] != 'missing_implementation':
+                row['state'] = 'unresolved'
+            elif row['state'] == 'verified':
+                row['state'] = 'implemented_unverified'
+            row['reasons'].append('Exact reviewed runtime preservation policy or native anchors missing: '
+                + (', '.join(failed) if anchors is not None else 'unreviewed successor'))

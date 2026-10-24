@@ -964,3 +964,175 @@ def test_r105_2022_strict_seed_packets_reach_existing_final_consumer(tmp_path, r
     bad = observed(document)[identity]
     assert bad['evidence_results']['native']['outcome']=='missing',json.dumps(bad)
     assert any(token in bad['evidence_results']['native']['reason'] for token in ('seed','profile','original')),json.dumps(bad)
+
+
+def _risk_policy_case(tmp_path):
+    """Five exact obligations from committed reflection, not a generated inventory."""
+    import gzip
+    route_id = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
+    prefix = route_id + '|/resultSchema'
+    ids = {
+        'baseline': prefix + '/@definition/waapi_definitions.json/definitions/voiceReturn/properties/pipelineID',
+        'state': prefix + '/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual',
+        'boolean': prefix + '/@definition/waapi_definitions.json/definitions/voiceReturn/properties/isVirtual/@boolean/true',
+        'multiple': prefix + '/properties/return/@cardinality/multiple',
+        'reference': prefix + '/properties/return/items/$ref',
+    }
+    stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    packed = json.loads(gzip.decompress((audit.ROOT / 'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
+    wanted = set(ids.values())
+    rows = []
+    for encoded in packed['rows']:
+        if encoded.get('route') is None or packed['routes'][encoded['route']] != route_id:
+            continue
+        if route_id + '|' + encoded['pointer'] not in wanted:
+            continue
+        row = dict(encoded)
+        row.update(packed['contexts'][row.pop('context')])
+        row.update(route=route_id, id=route_id + '|' + row['pointer'], shape_sha256=packed['shapes'][row.pop('shape')])
+        rows.append(row)
+    assert {row['id'] for row in rows} == wanted
+    route = next(r for r in stored['native_coverage']['routes'] if r['id'] == route_id)
+    public = next(r for r in stored['routes'] if r['id'] == route['public_route'])
+    small = {'routes': [public], 'native_coverage': {
+        'candidate_sha256': 'a' * 64, 'catalogs': stored['native_coverage']['catalogs'],
+        'routes': [route], 'obligations': rows}}
+    from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
+    destination = tmp_path / 'bundle'
+    # The original real row is nonvirtual; synthetic program rows prove true/multiple decoding.
+    original = public_fixed_read(tmp_path / 'native')
+    synthetic = public_fixed_read(tmp_path / 'program', rows=typed_fixed_rows('2025.1', URI))
+    indexes = []
+    for label, data, selected, originals in (
+        ('anchors-', original, {ids['baseline'], ids['state']}, FIXTURE),
+        ('preserve-', synthetic, {ids['boolean'], ids['multiple'], ids['reference']}, None),
+    ):
+        receipt, native, context, trace = data
+        path = tmp_path / (label + 'capture.json')
+        write_program_receipt(path, receipt, native, nodeid=label + 'risk',
+            phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context,
+            native_reads=trace, public_calls=[{'gateway': receipt, 'native_start': 0, 'native_end': len(trace)}])
+        indexes.append(write_fixed_bundle(destination, path, originals, inventory=small,
+            selected=selected, name_prefix=label))
+    documents = [json.loads(p.read_bytes()) for p in indexes]
+    combined = deepcopy(documents[0])
+    combined['entries'] += documents[1]['entries']
+    combined.setdefault('runtime_observation_attachments', []).extend(documents[1].get('runtime_observation_attachments', []))
+    from tests.support.runtime_observation_evidence import write_json
+    index = destination / 'combined-index.json'
+    write_json(index, combined)
+    previous = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    for label in ('anchors-', 'preserve-'):
+        previous['branches'].update(json.loads((destination / (label + 'requirements.json')).read_bytes())['branches'])
+    successor = deepcopy(previous)
+    rationales = {'boolean': 'boolean_value_preservation_not_forced_runtime_state',
+        'multiple': 'collection_cardinality_preservation_not_required_native_multiplicity',
+        'reference': 'reference_decoder_reachability_with_field_semantic_anchor'}
+    for name, rationale in rationales.items():
+        successor['branches'][ids[name]].update(categories=['program'],
+            reason='User-approved runtime risk policy: ' + rationale + '; exact native anchors required; native value occurrence unclaimed')
+    return small, index, previous, successor, ids
+
+
+def test_runtime_risk_successor_accepts_preservation_only_with_exact_native_anchors(tmp_path):
+    small, index, previous, successor, ids = _risk_policy_case(tmp_path)
+    document, base, _ = audit.portable_binding_inputs(index, successor)
+    result = completion.evaluate_coverage(audit.ROOT, small, document,
+        digest=audit.digest, evidence_base=base, requirements_document=successor)
+    observed = {row['id']: row for row in result['obligations']}
+    assert observed[ids['boolean']]['state'] == 'verified', observed[ids['boolean']]
+    assert observed[ids['multiple']]['state'] == 'verified', observed[ids['multiple']]
+    assert result['completion']['complete'] is True
+    # Evidence remains a real nonvirtual row, not a native true/multiple claim.
+    assert observed[ids['state']]['evidence_results']['native']['outcome'] == 'passed'
+    assert 'native' not in observed[ids['boolean']]['evidence_results']
+    assert previous['branches'][ids['boolean']]['categories'] == ['program', 'native']
+    for field, value in (('reason', 'unreviewed downgrade'), ('native_shape_sha256', '0' * 64)):
+        damaged = deepcopy(successor)
+        damaged['branches'][ids['boolean']][field] = value
+        with pytest.raises(ValueError, match='portable requirement differs'):
+            audit.portable_binding_inputs(index, damaged)
+
+
+def test_runtime_risk_preservation_fails_closed_on_missing_or_changed_anchors(tmp_path):
+    small, index, _previous, successor, ids = _risk_policy_case(tmp_path)
+    document, base, _ = audit.portable_binding_inputs(index, successor)
+    from tests.support.runtime_observation_evidence import write_json
+    cases = ('native-binding', 'native-policy', 'native-category', 'native-stale',
+             'wrong-route', 'empty-native', 'program', 'policy', 'unreviewed-reason')
+    for damage in cases:
+        bindings = deepcopy(document)
+        requirements = deepcopy(successor)
+        target = ids['baseline']
+        if damage == 'native-binding':
+            del bindings['bindings'][target]
+        elif damage == 'native-policy':
+            del requirements['branches'][target]
+        elif damage == 'native-category':
+            requirements['branches'][target]['categories'] = ['program']
+        elif damage == 'native-stale':
+            bindings['bindings'][target]['evidence']['native']['sha256'] = '0' * 64
+        elif damage == 'wrong-route':
+            binding = bindings['bindings'][target]
+            proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'], base)
+            proof['branch_id'] = proof['branch_id'].replace('|wwise-authoring|', '|wwise-console|')
+            binding['runtime_observation_attachment'] = write_json(base / 'foreign-proof.json', proof)
+        elif damage == 'empty-native':
+            binding = bindings['bindings'][target]
+            record = completion.read_sealed_artifact(binding['evidence']['native'], base)
+            raw = completion.read_sealed_artifact(record['observation_artifacts']['raw'], base)
+            raw['result']['return'] = []
+            record['observation_artifacts']['raw'] = write_json(base / 'empty-raw.json', raw)
+            binding['native_observations_sha256']['raw'] = record['observation_artifacts']['raw']['sha256']
+            descriptor = write_json(base / 'empty-native.json', record)
+            binding['evidence']['native'].update(descriptor)
+        elif damage == 'program':
+            bindings['bindings'][ids['boolean']]['evidence']['program']['sha256'] = '0' * 64
+        elif damage == 'policy':
+            del requirements['branches'][ids['boolean']]
+        else:
+            requirements['branches'][ids['boolean']]['reason'] = 'unreviewed program-only downgrade'
+        result = completion.evaluate_coverage(audit.ROOT, small, bindings,
+            digest=audit.digest, evidence_base=base, requirements_document=requirements)
+        observed = {row['id']: row for row in result['obligations']}
+        assert result['completion']['complete'] is False, damage
+        assert observed[ids['boolean']]['state'] != 'verified', (damage, observed[ids['boolean']])
+
+
+def test_runtime_risk_successor_retains_semantic_anchors_and_frozen_history():
+    from tests.support.runtime_observation_evidence import runtime_risk_review, runtime_successor_requirements
+    review = runtime_risk_review(audit.ROOT)
+    assert len(review['entries']) == 6292
+    assert len(review['changed_ids']) == 2076
+    assert len(review['still_native_anchor_ids']) == 316
+    assert len(review['by_route_anchors']) == 58
+    for family in ('fixed', 'contribution', 'rtpc'):
+        original = json.loads((audit.ROOT / review['historical_packages'][family]['path']).read_bytes())
+        successor = runtime_successor_requirements(original)
+        assert set(successor['branches']) == set(original['branches'])
+        assert all(successor['branches'][identity]['native_shape_sha256'] == policy['native_shape_sha256']
+                   for identity, policy in original['branches'].items())
+        assert sha((audit.ROOT / review['historical_packages'][family]['path']).read_bytes()) == review['historical_packages'][family]['sha256']
+    semantic = [entry for entry in review['entries'].values() if entry['role'] in
+        {'native_recursive_hierarchy_anchor', 'native_driver_value_semantic_anchor'}]
+    assert len(semantic) == 30
+    assert all(entry['old_categories'] == entry['proposed_categories'] == ['program', 'native'] for entry in semantic)
+    assert sum(entry['pointer'].endswith('/metadata/items/properties/metadataClassID') and
+        entry['proposed_categories'] == ['program', 'native'] for entry in review['entries'].values()) == 10
+    assert sum(entry['pointer'].endswith('/voiceContributionsObject/properties/index') and
+        entry['proposed_categories'] == ['program', 'native'] for entry in review['entries'].values()) == 4
+    changed = deepcopy(original)
+    selected = next(identity for identity in changed['branches'] if identity in review['changed_ids'])
+    changed['branches'][selected]['reason'] += ' changed'
+    with pytest.raises(ValueError, match='exact original policy digest'):
+        runtime_successor_requirements(changed)
+
+
+def test_runtime_risk_policy_does_not_add_dependencies_to_unrelated_consumers(tmp_path):
+    small = {'routes': [], 'native_coverage': {'candidate_sha256': 'a' * 64,
+        'catalogs': {}, 'routes': [], 'obligations': []}}
+    result = completion.evaluate_coverage(tmp_path, small,
+        {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {}}, digest=audit.digest,
+        requirements_document={'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}})
+    assert result['completion']['complete'] is False
+    assert result['obligations'] == []
