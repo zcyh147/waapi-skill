@@ -254,7 +254,7 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
     if (len(before) != 413 or assessment['source_changes'] != runtime.RTPC_REVIEWED_SOURCE_CHANGES
             or changes != runtime.RTPC_REVIEWED_SOURCE_CHANGES
             or assessment['changed_symbols'] != runtime.RTPC_REVIEWED_SOURCE_SYMBOLS):
-        raise ValueError('Exact reviewed four-file source transition differs')
+        raise ValueError('Exact reviewed five-file source transition differs')
     runtime._portable_descriptor(assessment['program_capture'], base)
     capture = completion.read_sealed_artifact(assessment['program_capture'], base)
     program = completion.read_sealed_artifact(binding['evidence']['program'], base)

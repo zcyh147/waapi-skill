@@ -171,6 +171,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_source_copy_capture.py',
                  'tests/support/runtime_observation_evidence.py',
                  'tests/support/qualified_runtime_read_evidence.py',
+                 'tests/support/fixed_runtime_read_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',
                  'tests/unit/test_rtpc_field_branch_evidence.py',
                  'tests/support/condition_mechanism_reuse.py', 'tests/support/condition_source_resolution.py',
@@ -944,7 +945,9 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
         return
     if proof.get('runtime_read_review'):
         from tests.support.runtime_observation_evidence import validate_runtime_source_review, RTPC_ORIGINAL_CANDIDATE
-        if proof['from_candidate'] != RTPC_ORIGINAL_CANDIDATE or not binding.get('runtime_observation_attachment'):
+        from tests.support.fixed_runtime_read_evidence import URIS, native_profile
+        expected_original = native_profile(branch)['candidate'] if (branch.get('route') or '').split('|')[-1] in URIS else RTPC_ORIGINAL_CANDIDATE
+        if proof['from_candidate'] != expected_original or not binding.get('runtime_observation_attachment'):
             raise ValueError('RTPC guard review requires its exact original runtime producer')
         validate_runtime_source_review(proof['runtime_read_review'], sources, branch, root, base)
         return
@@ -1399,6 +1402,10 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                     and not (binding or {}).get('runtime_observation_attachment')):
                 from tests.support.runtime_observation_evidence import validate_contribution_program
                 normalized_construction = validate_contribution_program(record, binding or {}, branch, root, reference_edges)
+        if category == 'program' and not (binding or {}).get('runtime_observation_attachment'):
+            from tests.support.fixed_runtime_read_evidence import URIS, validate_program
+            if (branch.get('route') or '').split('|')[-1] in URIS:
+                normalized_construction = validate_program(record, binding or {}, branch, root, reference_edges)
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
