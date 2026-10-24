@@ -201,8 +201,11 @@ def collect_loaded_event_probe(batch, public_call, *, demo=None):
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise TimeoutError('Owned Demo discovery attribution exceeded total deadline')
-                    report['remote_port_ownership'] = demo.owns_port(console['commandPort'], console['host'],
-                        timeout_seconds=min(5, remaining))
+                    try:
+                        demo.owns_port(console['commandPort'], console['host'], timeout_seconds=min(5, remaining))
+                    finally:
+                        report['remote_port_ownership'] = demo.port_ownership_receipt
+                        persist()
                     live()
                     if time.monotonic() >= deadline:
                         raise TimeoutError('Owned Demo discovery attribution exceeded total deadline')

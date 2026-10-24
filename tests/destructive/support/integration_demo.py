@@ -180,6 +180,7 @@ class OwnedIntegrationDemo:
         self.token = secrets.token_hex(24)
         self.before = None
         self.command_port = None
+        self.port_ownership_receipt = None
         self.ready = runtime.evidence_root / 'integration-demo-ready.json'
         self.action = runtime.evidence_root / 'integration-demo-action.json'
         self.used = False
@@ -334,9 +335,26 @@ class OwnedIntegrationDemo:
             return value
         if self.process is None or self.process.poll() is not None or type(port) is not int or not 1 <= port <= 65535:
             raise ValueError('Demo process/port ownership is unavailable')
-        result = subprocess.run(['/usr/sbin/lsof', '-nP', '-a', '-p', str(self.process.pid),
-            '-iTCP:' + str(port), '-sTCP:LISTEN', '-Fp'], capture_output=True, timeout=remaining(), check=False)
-        if result.returncode or len(result.stdout) > 4096 or result.stdout.decode().splitlines() != ['p' + str(self.process.pid)]:
+        argv = ['/usr/sbin/lsof', '-nP', '-a', '-p', str(self.process.pid),
+            '-iTCP:' + str(port), '-sTCP:LISTEN', '-Fp']
+        receipt = self.port_ownership_receipt = {'pid': self.process.pid, 'host': host,
+            'command_port': port, 'argv': argv, 'owned': False, 'local_interface_proof': None}
+        try:
+            result = subprocess.run(argv, capture_output=True, timeout=remaining(), check=False)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            receipt.update(error={'type': type(exc).__name__, 'message': str(exc)[:1024]},
+                stdout=(getattr(exc, 'stdout', None) or b'')[:4096].decode('utf-8', 'replace'),
+                stderr=(getattr(exc, 'stderr', None) or b'')[:4096].decode('utf-8', 'replace'))
+            raise
+        receipt.update(exit_code=result.returncode, stdout=result.stdout[:4096].decode('utf-8', 'replace'),
+            stderr=result.stderr[:4096].decode('utf-8', 'replace'),
+            output_overflow=len(result.stdout) > 4096 or len(result.stderr) > 4096,
+            post_returncode=self.process.poll())
+        # -Fp selects process fields, but lsof still emits a file descriptor
+        # marker for each matching socket. Require one exact PID and numeric FDs.
+        fields = rb'p' + str(self.process.pid).encode('ascii') + rb'\n(?:f[0-9]+\n)+'
+        if (result.returncode or receipt['output_overflow'] or receipt['post_returncode'] is not None
+                or re.fullmatch(fields, result.stdout) is None):
             raise ValueError('Remote command port is not owned by the exact Demo PID')
         import ipaddress
         address = ipaddress.ip_address(host)
@@ -349,8 +367,8 @@ class OwnedIntegrationDemo:
             interface_proof = interfaces.stdout.decode('utf-8')
         remaining()
         self.command_port, self.remote_host = port, host
-        return {'pid': self.process.pid, 'host': host, 'command_port': port,
-            'stdout': result.stdout.decode(), 'local_interface_proof': interface_proof}
+        receipt.update(owned=True, local_interface_proof=interface_proof)
+        return receipt
 
     def __call__(self):
         """Main performs CUA once; this callback only coordinates bounded files."""
