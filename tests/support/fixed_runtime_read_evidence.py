@@ -31,7 +31,7 @@ R118_CHANGES = {
     runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '118f9a62be178b2ad10d9f8525163582f0a1996ec2c2aee4c0856d71ee75c963',
-        'after': '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'},
+        'after': 'eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b'},
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': 'c66426240e65d05559c1266ca32b52b3fd2caad08cf0309b37a892373747291d',
         'after': '14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594'},
@@ -59,7 +59,7 @@ R119_CHANGES = {
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': runtime.LOG_MESSAGE_SOURCE_CHANGES['skills/waapi-skill/wwise_waapi/runtime_inspection_business.py'],
     runtime.METER_SOURCE: runtime.METER_SOURCE_CHANGE, runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
-        'before': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388', 'after': '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'},
+        'before': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388', 'after': 'eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b'},
     'skills/waapi-skill/wwise_waapi/operation_registry.py': {
         'before': 'f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a', 'after': '3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d'},
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
@@ -677,7 +677,7 @@ def mappings(inventory, captured, route, selected=None):
     return found
 
 
-REVIEWED_CHANGES = {runtime.METER_SOURCE: runtime.METER_SOURCE_CHANGE, runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE, 'skills/waapi-skill/scripts/gateway.py': {'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03', 'after': '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'}, 'skills/waapi-skill/wwise_waapi/builders/schema.py': {'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d', 'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}, 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {'before': '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d', 'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'}, 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '691d93149f80e619539c40db64d1b9d34b86771b0660740eb948356c92a034e1', 'after': '3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c', 'after': 'dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'd3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12', 'after': '14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594'}, 'skills/waapi-skill/wwise_waapi/transport_action.py': {'before': '3f9828a964b75ce04cc683b8cf0479d4d82b4eddd05c7d26bb4cde6e0b096ec4', 'after': 'f1dfed2fc9e2697d37e022262d440a7d3ace7005d4f5e57b939d7550d7efa2a5'},
+REVIEWED_CHANGES = {runtime.METER_SOURCE: runtime.METER_SOURCE_CHANGE, runtime.UNICODE_CONTEXT_SOURCE: runtime.UNICODE_CONTEXT_SOURCE_CHANGE, 'skills/waapi-skill/scripts/gateway.py': {'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03', 'after': 'eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b'}, 'skills/waapi-skill/wwise_waapi/builders/schema.py': {'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d', 'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}, 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {'before': '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d', 'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'}, 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '691d93149f80e619539c40db64d1b9d34b86771b0660740eb948356c92a034e1', 'after': '3b298a11c9326d47b968783e536d09d290a8fff4a5a7080b5f5f99d5e7c2734d'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c', 'after': 'dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'd3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12', 'after': '14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594'}, 'skills/waapi-skill/wwise_waapi/transport_action.py': {'before': '3f9828a964b75ce04cc683b8cf0479d4d82b4eddd05c7d26bb4cde6e0b096ec4', 'after': 'f1dfed2fc9e2697d37e022262d440a7d3ace7005d4f5e57b939d7550d7efa2a5'},
     'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': {
         'before': '62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8', 'after': '1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00'}}
 REVIEWED_SYMBOLS = {

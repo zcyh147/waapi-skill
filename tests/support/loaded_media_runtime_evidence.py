@@ -13,7 +13,7 @@ URI = 'ak.wwise.core.profiler.getLoadedMedia'
 ROUTE = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
 ANCHOR = ROUTE + '|/resultSchema/properties/return/@cardinality/single'
 FIXTURE = 'tests/fixtures/runtime-loaded-media'
-REVIEW_SHA = '5a3a7dd27e424e6d60e748d6f6c0aac59901ba6eb18014b84e02202ad041ae43'
+REVIEW_SHA = 'b057658180e471e6dc95dfd6b2854333546770dbedc30e27b5d9016d60945cb9'
 ORIGINAL_CANDIDATE = '7289081b552c5f428013ba0b6bacaf7d05843481'
 PREFIX = '/private/tmp/waapi-r122-demo-native-r4/evidence/'
 CATEGORY = 'profiler-loaded-media-observation'
@@ -431,7 +431,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None,name_pr
     return output/(name_prefix+'index.json')
 
 
-COMPOSITE_REVIEW_SHA = 'dc063453dce6fa3dc2f2d212bab7b542bb13ad17a6ba28c9c96f1e3fb96bcf16'
+COMPOSITE_REVIEW_SHA = '26786a45fc2da0512112b63157557a6bd2d1ff33c31a1b3f98d80996e4897ce7'
 COMPOSITE_ROUTES = {
     '2023.1': '2023.1|wwise-authoring|2023.1.19.8928|function|' + URI,
     '2024.1': '2024.1|wwise-authoring|2024.1.13.9056|function|' + URI,
@@ -819,7 +819,7 @@ def _positive_from_proof(proof, base, root):
     return original_observation(base,root=root,copied_prefix=artifact[:-len(suffix)])
 
 
-CONSOLE_REVIEW_SHA = '28212e928267426880727329effbe50bbf718434a1e157e455a5840e7893487e'
+CONSOLE_REVIEW_SHA = '277617b04b40e5a32998190de319c3f45fbc80858c6f7854db1d6f6d04da8fd4'
 CONSOLE_CANDIDATE = '2dc0ee57718f41b2378d8d4415572366de322704'
 CONSOLE_ROUTES = {version: version+'|wwise-console|'+build+'|function|'+URI for version,build in (
     ('2023.1','2023.1.19.8928'),('2024.1','2024.1.13.9056'),('2025.1','2025.1.7.9143'))}

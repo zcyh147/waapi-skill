@@ -15,7 +15,7 @@ from tests.maintenance import branch_audit_completion as completion
 from tests.support import runtime_observation_evidence as runtime
 
 SUPPORT='tests/fixtures/runtime-log/retained-log-support.json'
-SUPPORT_SHA = 'd1d86d7269434d9d9cba3a8f65acf1c4b5800bea864ee9361a527d02020cfdc9'
+SUPPORT_SHA = '00194ae56f9d832335d10a4bb52cdec245cd528749c5b58d64af8e2345b289a9'
 CONTRACT='waapi-skill.retained-log-assessment/v1'
 
 

@@ -435,7 +435,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -459,7 +459,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -1058,7 +1058,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -1082,7 +1082,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -1680,7 +1680,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "aa568412867db30c172052a5cc9ad4211f5880e790b06ef82d0836458ea03ae8",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/authoring_launch.py": {
           "before": "869143e92554a1bc750bf120ca7f3951d5c3bde223d87ea83e74e49e8c660223",
@@ -1712,7 +1712,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "32cf1ee0bb394ff5624a70add21922a9100567f1e8af30548b7442c25fc6984e",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "2ff1f9be8dc790795f87190fbd45f3805dda32f908664796c263feef92c9a708",
@@ -3619,7 +3619,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/authoring_launch.py": {
           "before": "765fa8454e883abf17fde0ef524cee50a2c8ae58c2c3cd4554735aca7df42887",
@@ -3651,7 +3651,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "d3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12",
@@ -4133,7 +4133,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/authoring_launch.py": {
           "before": "765fa8454e883abf17fde0ef524cee50a2c8ae58c2c3cd4554735aca7df42887",
@@ -4165,7 +4165,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "d3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12",
@@ -4643,7 +4643,16 @@
         "skills/waapi-skill/wwise_waapi/wal_read_continuation.py": "5b8ed242f4f20744a96a229dae21a2ca11ba8b5db18eb4e0b0d34f4ef5dad8a9",
         "skills/waapi-skill/wwise_waapi/waql.py": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
       },
-      "source_changes": {},
+      "source_changes": {
+        "skills/waapi-skill/scripts/gateway.py": {
+          "before": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb",
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+          "before": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3",
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
+        }
+      },
       "calls": [
         {
           "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r128-console-log-native-2023-r1/pytest/gateway-workflows-2023-10/dispatcher-evidence/1792841137986519000-823148eab14d44cea45c758460dda7fe-ak_wwise_core_log_clear.json",
@@ -5083,7 +5092,16 @@
         "skills/waapi-skill/wwise_waapi/wal_read_continuation.py": "5b8ed242f4f20744a96a229dae21a2ca11ba8b5db18eb4e0b0d34f4ef5dad8a9",
         "skills/waapi-skill/wwise_waapi/waql.py": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
       },
-      "source_changes": {},
+      "source_changes": {
+        "skills/waapi-skill/scripts/gateway.py": {
+          "before": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb",
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
+        },
+        "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+          "before": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3",
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
+        }
+      },
       "calls": [
         {
           "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r128-console-log-native-2024-r1/pytest/gateway-workflows-2024-10/dispatcher-evidence/1792841160315091000-95753a77bb93492f9b7e74319c530207-ak_wwise_core_log_clear.json",
@@ -5290,8 +5308,32 @@
   },
   "pending_native_business_anchor_ids": [],
   "current_source_review": {
-    "candidate": "9ba83f9a513c178fab69c2d4e4104a540b8b2279",
-    "packaged_tree": "de35205b5023aed23bc5f37feee66340c1280c08",
-    "reviewed_delta": "Exact meter output allowlist plus operation-local exact log-message acceptance and bounded successful log summary; existing ordinary nonempty log request/result/observer/cleanup semantics retained. Historical maps and outcomes unchanged."
+    "candidate": "c8498cb37ef6c253da7b319b49a2f8fa1b4e8aec",
+    "packaged_tree": "e9344acf56dd0394c90e91db6603fa3a7d553f05",
+    "reviewed_product": "96229ce8d169a5de79a979acdcb4b8cfcc3cc678",
+    "changes": {
+      "skills/waapi-skill/scripts/gateway.py": {
+        "before": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb",
+        "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
+      },
+      "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+        "before": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3",
+        "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
+      }
+    },
+    "symbols": {
+      "skills/waapi-skill/scripts/gateway.py": [
+        "dispatch_runtime_inspection_business_read: forward only already-attested detected_version to existing normalizer; no query/request/output assembly change"
+      ],
+      "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": [
+        "normalize_runtime_inspection_result: optional version argument and only exact2021/2022 getCursorTime absent-return unavailable/null reason; present values and noncursor branches unchanged"
+      ]
+    },
+    "reason": "Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required.",
+    "prior_review": {
+      "candidate": "9ba83f9a513c178fab69c2d4e4104a540b8b2279",
+      "packaged_tree": "de35205b5023aed23bc5f37feee66340c1280c08",
+      "reviewed_delta": "Exact meter output allowlist plus operation-local exact log-message acceptance and bounded successful log summary; existing ordinary nonempty log request/result/observer/cleanup semantics retained. Historical maps and outcomes unchanged."
+    }
   }
 }

@@ -2372,7 +2372,7 @@
     "skills/waapi-skill/resources/waql/2025.1/object-get-examples.json": "6d3e7a06a1efb259fea2d16a8fdd6a79a84d52c53012fb6a5de57302b9e69d28",
     "skills/waapi-skill/scripts/__init__.py": "2caa9cc1a34eab6d11cc1c89c21fdd0f80a442909e72f64fb7964db38a0dc1de",
     "skills/waapi-skill/scripts/config.py": "d5384a25d6d7d8fe0886ce67d362b21cd331911b0c6441d7d224d538a4a78909",
-    "skills/waapi-skill/scripts/gateway.py": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb",
+    "skills/waapi-skill/scripts/gateway.py": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b",
     "skills/waapi-skill/scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
     "skills/waapi-skill/scripts/setup_environment.py": "b42b182f55f0c199ceff3d695bfcba9644c750c1f1f10b858cd6d9819ba35f2e",
     "skills/waapi-skill/wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
@@ -2516,7 +2516,7 @@
     "skills/waapi-skill/wwise_waapi/remote_transition.py": "9915680f29bc7bb3bf1c14d6637b5be079bae95b1f7c8a00a6f8576730e91b2f",
     "skills/waapi-skill/wwise_waapi/render_history_observations.py": "2330474930db1d2aba3e9ee4ac135ba2fd658027b85ccff73e84ca13252e024e",
     "skills/waapi-skill/wwise_waapi/runtime_game_object_handles.py": "ee007ebc2e1d2ed4c7c54f14df7bd4f24c44ffb455d882ed25d975caac82d329",
-    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3",
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712",
     "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594",
     "skills/waapi-skill/wwise_waapi/runtime_inspection_observations.py": "49aeabef2d4ee22ff00887b74a0cf7fad6d572d6879c3b2892cf36fe2ae9750f",
     "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00",
@@ -2575,7 +2575,7 @@
     "tests/destructive/support/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tests/destructive/support/api_coverage.py": "02f172a8e0608734f85fe93321cd9a2225e7e22a2805994ede477919aaf92be6",
     "tests/destructive/support/api_coverage_audit.py": "d0269ef9e280ce251b51bb5f33212f43cddc1c12be57c3b0ba8dc998b4f90d99",
-    "tests/destructive/support/authoring_batch.py": "c6845c80a38146aa1a68dbc5c1ce5d1197c9ff40c640ddb766c79bad378a5880",
+    "tests/destructive/support/authoring_batch.py": "955df44b1426a92a60dcade0c8476f349de4e8a52176f0e0a702bffdf8a03e75",
     "tests/destructive/support/category_evidence.py": "cd5ca301cf6439fdd82e6b7775ba5b16c152643694f79b4be02fde7618f676d7",
     "tests/destructive/support/condition_finalization.py": "4c423624d658311d19a065ff6a65a6858476c41ea6d97e9c9405618e3de9e8bb",
     "tests/destructive/support/console_file_observation.py": "880f37d09e9ec6333cf74172665bd83200b5d513ba1b2612bb75c5b42141a968",
@@ -2609,7 +2609,7 @@
     "tests/destructive/test_2025_1_soundbank_audio_sandbox.py": "7561239a91c2f3ff1004d370fcc23d3f349d48f0d6bfaaeaf704da64fa63fc24",
     "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py": "52e50f0b5a7df444e5d1ba75d8a485c39e8ee1dcb2f7b57d32eddf7837fe71f0",
     "tests/destructive/test_attenuation_activation_gateway.py": "52fbe6af28500f73d63205465df8f8d8ba31082ce8ab095d01503c1d581a9e8a",
-    "tests/destructive/test_authoring_ui_business_live.py": "87848c8cd11be0bff12b7c05a06b1454709bde4f49177e59f10542d74d6ff44a",
+    "tests/destructive/test_authoring_ui_business_live.py": "3fcc9f643bb35b1cb42d40cccffb5345392dcc2e11de9905d8f6118a7c5f8d99",
     "tests/destructive/test_condition_visibility_gateway.py": "a6ff1844657a51a71a67b953a642f9cac54ca20297c90d5488a094dcf5afa522",
     "tests/destructive/test_cross_family_derived_identity.py": "2b4c3c4731bb97d51a0f5098ae9a5fdc6c7cef030bb7da8bd17d28be4f1c36c9",
     "tests/destructive/test_cross_family_effects.py": "e90ddfbc5a61556cf10b787b497553b3f7f8258ffb7ae211bc2d43b17863e747",
@@ -3553,6 +3553,39 @@
         }
       ],
       "scope": "Same619 current membership; historical maps, five native predecessors/26 Source shapes and all prior reviews unchanged. Current capture/publishing remains separately required; no native rerun or generic compatibility."
+    },
+    "exact_cursor_omission_and_meter_diagnostic_successor_review": {
+      "from_source_basis": "d72e935c930fa8f86257a19ab9d071bb80114ca4",
+      "to_source_basis": "c8498cb37ef6c253da7b319b49a2f8fa1b4e8aec",
+      "reviewed_product": "96229ce8d169a5de79a979acdcb4b8cfcc3cc678",
+      "reviewed_diagnostic": "e4488dd5581162be618bc7e0e3dddedceb850dea",
+      "changed_dependencies": [
+        {
+          "path": "skills/waapi-skill/scripts/gateway.py",
+          "before_sha256": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb",
+          "after_sha256": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b",
+          "source_relevance": "Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
+        },
+        {
+          "path": "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py",
+          "before_sha256": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3",
+          "after_sha256": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712",
+          "source_relevance": "Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
+        },
+        {
+          "path": "tests/destructive/support/authoring_batch.py",
+          "before_sha256": "c6845c80a38146aa1a68dbc5c1ce5d1197c9ff40c640ddb766c79bad378a5880",
+          "after_sha256": "955df44b1426a92a60dcade0c8476f349de4e8a52176f0e0a702bffdf8a03e75",
+          "source_relevance": "Reviewed e4488dd5 developer-only opt-in meter spelling diagnostic: existing branch-disabled/native Source-selected collector and test AST remain unchanged, per independent /tmp/waapi-r132-meter-and-cursor-review-proof.json. No new Source-selected dependency, native fact, membership or effect is admitted."
+        },
+        {
+          "path": "tests/destructive/test_authoring_ui_business_live.py",
+          "before_sha256": "87848c8cd11be0bff12b7c05a06b1454709bde4f49177e59f10542d74d6ff44a",
+          "after_sha256": "3fcc9f643bb35b1cb42d40cccffb5345392dcc2e11de9905d8f6118a7c5f8d99",
+          "source_relevance": "Reviewed e4488dd5 developer-only opt-in meter spelling diagnostic: existing branch-disabled/native Source-selected collector and test AST remain unchanged, per independent /tmp/waapi-r132-meter-and-cursor-review-proof.json. No new Source-selected dependency, native fact, membership or effect is admitted."
+        }
+      ],
+      "scope": "Same619 memberships, historical_current_sources, earlier increment metadata, predecessors/five actual native Source facts and26 selected shapes remain unchanged. Only exact two product plus two independently reviewed developer-only diagnostic current dependencies; no new native or publication credit."
     }
   },
   "predecessor_attachments": [
@@ -3608,5 +3641,5 @@
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059"
   },
-  "source_basis": "d72e935c930fa8f86257a19ab9d071bb80114ca4"
+  "source_basis": "c8498cb37ef6c253da7b319b49a2f8fa1b4e8aec"
 }

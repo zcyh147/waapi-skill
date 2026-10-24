@@ -20,7 +20,7 @@ from tests.support import fixed_runtime_read_evidence as fixed
 
 URIS=frozenset('ak.wwise.core.profiler.'+n for n in ('getCpuUsage','getPerformanceMonitor','getStreamedMedia'))
 SUPPORT='tests/fixtures/runtime-extra-reads/support-review.json'
-SUPPORT_SHA='7ebbb682d62b1458f318b7b90ed1a70a5c7257358cb8a947acb008a3d824bd7a'
+SUPPORT_SHA = 'ac0a4aefa260fbc1908c62bc943e88f7a0590aa6320fcd094123c00ee4375f35'
 CONTRACT='waapi-skill.extra-runtime-read-assessment/v1'
 
 

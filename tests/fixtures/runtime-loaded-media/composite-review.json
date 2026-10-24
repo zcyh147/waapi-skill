@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.loaded-media-composite-review/v1",
   "authority": "docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md",
-  "positive_review_sha256": "5a3a7dd27e424e6d60e748d6f6c0aac59901ba6eb18014b84e02202ad041ae43",
+  "positive_review_sha256": "b057658180e471e6dc95dfd6b2854333546770dbedc30e27b5d9016d60945cb9",
   "profiles": {
     "2023.1": {
       "build": "2023.1.19.8928",
@@ -220,7 +220,7 @@
       "packaged_source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -240,7 +240,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -255,7 +255,7 @@
           "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
         }
       },
-      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers."
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     },
     "2024.1": {
       "build": "2024.1.13.9056",
@@ -475,7 +475,7 @@
       "packaged_source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -495,7 +495,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -510,7 +510,7 @@
           "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
         }
       },
-      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers."
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged. Reviewed fc170122 exact log.addItem message materialization/disclosure and successful log transaction projection/resolved rendered-budget guard only. Profiler read request/result/normalizer, capture cursor, host requirements and Source copy/Save/graph verification paths are unchanged; global24KiB and ordinary non-log output paths remain unchanged. No original native map, fact, failure or archive is rewritten; complete current public replay remains required by existing consumers. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     }
   },
   "entries": {

@@ -221,7 +221,7 @@ def test_retained_packet_formal_output_waits_for_real_teardown_and_rechecks_sour
 
 
 def test_reviewed_log_message_source_delta_keeps_original_map_and_rejects_unlisted_changes(tmp_path, monkeypatch):
-    """A reviewed log-only successor never makes arbitrary read-source drift eligible."""
+    """Exact reviewed successors never make arbitrary source drift eligible."""
     from tests.support import console_runtime_read_evidence as console
     from tests.support import runtime_observation_evidence as runtime
     from tests.support import source_copy_native_evidence as source
@@ -231,10 +231,35 @@ def test_reviewed_log_message_source_delta_keeps_original_map_and_rejects_unlist
     current = console.reviewed_source_context(historical)
     gateway = 'skills/waapi-skill/scripts/gateway.py'
     assert historical[gateway] == 'c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4'
-    assert current[gateway] == '27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb'
+    assert current[gateway] == 'eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b'
+    business='skills/waapi-skill/wwise_waapi/runtime_inspection_business.py'
+    assert current[business]=='dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712'
     for damaged in ({**historical, gateway: '0' * 64}, {**historical, 'unreviewed.py': '0' * 64}):
         with pytest.raises(ValueError, match='R125 exact reviewed source delta'):
             console.reviewed_source_context(damaged)
+    from tests.support import fixed_runtime_read_evidence as fixed
+    from tests.support import qualified_runtime_read_evidence as qualified
+    from tests.support import loaded_media_runtime_evidence as loaded
+    from tests.support import runtime_remaining_evidence as remaining
+    from tests.support import runtime_log_retained_evidence as retained
+    from tests.support import extra_runtime_read_evidence as extra
+    endpoints={gateway:current[gateway],business:current[business]}
+    for changes in (runtime.RTPC_REVIEWED_SOURCE_CHANGES,fixed.REVIEWED_CHANGES,
+                    fixed.R118_CHANGES,fixed.R119_CHANGES,qualified.r104_source_review()[0]):
+        assert {name:changes[name]['after']for name in endpoints}==endpoints
+    positive=loaded.review();composite=loaded.composite_review();console_loaded=loaded.console_review()
+    assert composite['positive_review_sha256']==console_loaded['positive_review_sha256']==loaded.REVIEW_SHA
+    for changes in [positive['packaged_source_review']['changes'],console_loaded['packaged_source_changes'],
+                    *[p['packaged_source_changes']for p in composite['profiles'].values()],
+                    remaining.support()['packaged_source_changes'],
+                    *[p['source_changes']for p in retained.review()['providers'].values()],
+                    *[p['source_changes']for p in extra.review()['providers'].values()]]:
+        assert {name:changes[name]['after']for name in endpoints}==endpoints
+    for label in ('r128-2023','r128-2024'):
+        provider=retained.review()['providers'][label]
+        assert provider['source_changes']==runtime.CURSOR_OMISSION_SOURCE_CHANGES
+        assert {name:provider['sources'][name]for name in endpoints}=={
+            name:pair['before']for name,pair in runtime.CURSOR_OMISSION_SOURCE_CHANGES.items()}
     successor = source.successor_dependency_review()
     assert len(successor['current_sources']) == 619
     assert all(runtime.sha((audit.ROOT / name).read_bytes()) == seal

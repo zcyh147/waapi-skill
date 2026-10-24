@@ -15459,18 +15459,18 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d",
           "after": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594"
         }
       },
-      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged."
+      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     },
     "console-2024.1": {
       "version": "2024.1",
@@ -15902,18 +15902,18 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d",
           "after": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594"
         }
       },
-      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged."
+      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     },
     "console-2025.1": {
       "version": "2025.1",
@@ -16345,18 +16345,18 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d",
           "after": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594"
         }
       },
-      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged."
+      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     },
     "authoring-2023.1": {
       "version": "2023.1",
@@ -16788,7 +16788,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -16812,7 +16812,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -16823,7 +16823,7 @@
           "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
         }
       },
-      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged."
+      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     },
     "authoring-2024.1": {
       "version": "2024.1",
@@ -17255,7 +17255,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -17279,7 +17279,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -17290,7 +17290,7 @@
           "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
         }
       },
-      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged."
+      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     },
     "authoring-2025.1": {
       "version": "2025.1",
@@ -17722,7 +17722,7 @@
       "source_changes": {
         "skills/waapi-skill/scripts/gateway.py": {
           "before": "9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03",
-          "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+          "after": "eaac3a17e3ab76abe2cd0ec74e5b79e4e2281f7a7d65c8e3bf34f64b3c89763b"
         },
         "skills/waapi-skill/wwise_waapi/builders/schema.py": {
           "before": "4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d",
@@ -17746,7 +17746,7 @@
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
           "before": "62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c",
-          "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+          "after": "dcdfdaab82e8bd5faac9d762bd08ee917067dade291594c34e125a67be570712"
         },
         "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
           "before": "69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4",
@@ -17757,7 +17757,7 @@
           "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
         }
       },
-      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged."
+      "source_review_reason": "Exact complete diagnostic arrays and time/options; current public compiler and whole-result replay preserve this closed non-authority mode. Existing source deltas reviewed for runtime readers; original sources/outcomes and partial CPU public delivery remain unchanged. Separate later cursor increment: Reviewed96229ce8 only forwards the already-attested detected_version to the existing runtime normalizer and adds an optional version argument plus the exact getCursorTime/absent-return/2021.1-or-2022.1 unavailable/null reason branch. Existing -1 and all present scalar values, every noncursor normalizer branch, public request/materializer, host/connection/cleanup and exact agent_result assembly are unchanged. Retained noncursor facts and present cursor prerequisites do not enter the new branch; no native missing-value occurrence or new effect is claimed. Original maps/outcomes/archives remain unchanged; existing current program proof stays required."
     }
   },
   "profiles": {
