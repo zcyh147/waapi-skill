@@ -5,6 +5,17 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R114 program selection repair
+
+Read-only execution-boundary review found 69 newly added fake-only unit files
+missing from the fixed Program roster. Reviewed commit `b786cdb8`, integrated
+at `7f56f676`, registers those files and strengthens the existing cross-platform
+roster assertion; the original ordered selection and sentinels are preserved.
+The exact roster assertion failed with 273 versus 342 entries, then passed
+once in 0.25s through the locked developer wrapper. This verifies selection,
+not execution of the 69 files or a full Program gate. Existing focused business
+results retain their original scope; the final combined gate remains required.
+
 ## 2026-10-24 R113 contribution contracts and standalone evidence
 
 Reviewed mechanism `9ad5cc2f`, integrated at `a51e0c35`, preserves legal
