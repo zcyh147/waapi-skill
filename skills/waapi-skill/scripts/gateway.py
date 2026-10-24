@@ -1715,10 +1715,12 @@ def build_parser() -> argparse.ArgumentParser:
     add_meter_object_arguments(core_call)
     core_call.add_argument("--profiler-position")
     core_call.add_argument("--profiler-cursor")
-    core_call.add_argument(
+    core_call_result_selection = core_call.add_mutually_exclusive_group()
+    core_call_result_selection.add_argument(
         "--result-view",
         choices=("summary", "identity", "diagnostics", "capture-defaults", "empty-selection"),
     )
+    core_call_result_selection.add_argument("--result-field", dest="result_fields", action="append")
     core_call.add_argument("--bus-instance-handle")
     core_call.add_argument("--voice-instance-handle")
     core_call.add_argument("--transport-handle")
@@ -5261,6 +5263,11 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
+    if args.result_fields is not None and args.api not in {
+        "ak.wwise.core.profiler.getVoices", "ak.wwise.core.profiler.getBusses",
+        "ak.wwise.core.profiler.getAudioObjects",
+    }:
+        raise GatewayInputError("result_fields applies only to profiler.getVoices, getBusses, or getAudioObjects; use the operation's disclosed inputs")
     from wwise_waapi.profiler_meter_objects import METERS_URI, meter_arguments_supplied, compile_meter_object_options
     meter_supplied = meter_arguments_supplied(args)
     if meter_supplied and args.api != METERS_URI:
@@ -5335,7 +5342,7 @@ def preflight_core_business_input(
             from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
             if args.runtime_observation is not None or args.runtime_page is not None:
                 if args.runtime_observation is None or args.runtime_page is None or meter_supplied or any(value is not None for value in
-                        (args.log_channel, args.max_results, args.profiler_position, args.profiler_cursor, args.result_view,
+                        (args.log_channel, args.max_results, args.profiler_position, args.profiler_cursor, args.result_view, args.result_fields,
                          args.bus_instance_handle, args.voice_instance_handle, args.transport_handle)):
                     raise GatewayInputError("Copy only the exact runtime observation and page continuation")
                 observation = RuntimeInspectionObservationStore(resolve_transaction_state_directory(args, env=env)).resolve(args.runtime_observation)
@@ -5360,6 +5367,7 @@ def preflight_core_business_input(
                         args.profiler_position,
                         args.profiler_cursor,
                         args.result_view,
+                        args.result_fields,
                         args.bus_instance_handle,
                         args.voice_instance_handle,
                     )
@@ -5382,6 +5390,7 @@ def preflight_core_business_input(
                 profiler_position=args.profiler_position,
                 profiler_cursor=args.profiler_cursor,
                 result_view=args.result_view,
+                result_fields=args.result_fields,
                 bus_instance_handle=args.bus_instance_handle,
                 voice_instance_handle=args.voice_instance_handle,
                 transport_handle=args.transport_handle,

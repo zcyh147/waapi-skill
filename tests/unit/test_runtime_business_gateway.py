@@ -17,6 +17,8 @@ from wwise_waapi.canonical import canonical_sha256
 LOG_GET_URI = "ak.wwise.core.log.get"
 GET_CURSOR_TIME_URI = "ak.wwise.core.profiler.getCursorTime"
 GET_VOICES_URI = "ak.wwise.core.profiler.getVoices"
+GET_BUSSES_URI = "ak.wwise.core.profiler.getBusses"
+GET_AUDIO_OBJECTS_URI = "ak.wwise.core.profiler.getAudioObjects"
 TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
 PROFILER_MOVE_CURSOR_URI = "ak.wwise.core.profiler.moveCursor"
 PROFILER_SET_CURSOR_TIME_URI = "ak.wwise.core.profiler.setCursorTime"
@@ -485,6 +487,293 @@ def test_log_get_blocks_retired_draft_before_state_or_connection(tmp_path: Path)
     assert not (state_dir / "operation-drafts-v1").exists()
 
 
+def _pinned_profiler_return_fields(version: str, operation: str, host: str = "wwise-authoring") -> list[str]:
+    catalog = json.loads((Path(__file__).resolve().parents[2] / "skills/waapi-skill/resources/native-catalog"
+                          / version / (host + ".json")).read_bytes())
+    definition = {GET_VOICES_URI: "voiceReturnOptions", GET_BUSSES_URI: "busReturnOptions",
+                  GET_AUDIO_OBJECTS_URI: "audioObjectReturnOptions"}[operation]
+    schema = catalog["definitions"]["documents"]["waapi_definitions.json"]["definitions"][definition]
+    assert schema["type"] == "array" and schema["items"]["type"] == "string"
+    assert not schema.get("uniqueItems")
+    assert isinstance(schema["items"]["enum"], list)
+    return schema["items"]["enum"]
+
+
+def test_profiler_voice_can_select_only_name_and_level_through_public_gateway(tmp_path: Path) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == GET_VOICES_URI:
+            return {"return": [{"objectName": "Rifle", "baseVolume": -3.5}]}
+        return original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway([
+        "--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+        "--profiler-position", "123", "--result-field", "objectName", "--result-field", "baseVolume",
+    ], env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == GET_VOICES_URI) == {
+        "return": ["objectName", "baseVolume"],
+    }
+    assert payload["agent_result"]["return"] == [{"objectName": "Rifle", "baseVolume": -3.5}]
+    assert list(payload)[-1] == "agent_result"
+
+
+def _profiler_field_read(tmp_path, operation, rows, *, version="2025.1", console=False):
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == operation:
+            return {"return": [dict(row) for row in rows]}
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result["isCommandLine"] = console
+        return result
+    client.call = call
+    env = _env(tmp_path, version=version)
+    state = tmp_path / "state"
+    def read(*argv):
+        return gateway.execute_gateway([
+            "--state-dir", str(state), "core-call", operation, "--profiler-position", "123", *argv,
+        ], env=env, client_factory=lambda _url: client)
+    return read, calls, state, env
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("console", (False, True))
+@pytest.mark.parametrize("operation,fields,row", (
+    (GET_VOICES_URI, ["objectName", "baseVolume"], {"objectName": "Rifle", "baseVolume": -3.5}),
+    (GET_BUSSES_URI, ["objectName", "volume"], {"objectName": "Weapons", "volume": -2.0}),
+    (GET_AUDIO_OBJECTS_URI, ["audioObjectName", "rmsMeter"], {"audioObjectName": "Rifle", "rmsMeter": [-4.0]}),
+))
+def test_profiler_explicit_fields_match_each_pinned_host_version_profile(
+    tmp_path, version, console, operation, fields, row,
+):
+    read, calls, _state, env = _profiler_field_read(tmp_path, operation, [row], version=version, console=console)
+    code, schema = gateway.execute_gateway(["request-schema", operation], env=env,
+        client_factory=lambda _url: pytest.fail("Projection choices must be disclosed offline"))
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    choices = declaration["value_choices"]["result_fields"]
+    pinned = _pinned_profiler_return_fields(version, operation, "wwise-console" if console else "wwise-authoring")
+    assert set(choices) == set(pinned) and len(choices) == len(pinned)
+    assert declaration["input_forms"]["result_fields"] == {
+        "flag": "--result-field", "repeatable": True, "minimum_items": 1, "maximum_items": 64,
+        "bound_owner": "Gateway request resource policy", "order_preserved": True,
+        "repetitions_preserved": True, "mutually_exclusive_with": ["result_view"],
+    }
+    assert "no identity fields are appended" in declaration["result_fields_meaning"]["projection"]
+    flags = [argument for field in fields for argument in ("--result-field", field)]
+    code, payload = read(*flags)
+    assert code == 0, payload
+    assert [(args, options) for uri, args, options in calls if uri == operation] == [
+        ({"time": 123}, {"return": fields}),
+    ]
+    assert payload["agent_result"]["return"] == [row]
+    assert payload["agent_result"]["complete"] is True
+    assert payload["agent_result"]["instantaneous_native_resource_authority"] is False
+    assert list(payload)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("operation,name_field,value_field", (
+    (GET_VOICES_URI, "objectName", "baseVolume"),
+    (GET_BUSSES_URI, "objectName", "volume"),
+    (GET_AUDIO_OBJECTS_URI, "audioObjectName", "rmsMeter"),
+))
+@pytest.mark.parametrize("repeat", (False, True))
+def test_profiler_explicit_field_order_and_repetition_survive_dispatch(tmp_path, operation, name_field, value_field, repeat):
+    value = [-3.5] if operation == GET_AUDIO_OBJECTS_URI else -3.5
+    row = {name_field: "Voice", value_field: value}
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [row])
+    fields = [value_field, name_field, value_field] if repeat else [value_field, name_field]
+    code, payload = read(*[argument for field in fields for argument in ("--result-field", field)])
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == operation) == {"return": fields}
+    assert payload["agent_result"]["return"] == [{value_field: value, name_field: "Voice"}]
+
+
+@pytest.mark.parametrize("operation,pipeline,guid", (
+    (GET_VOICES_URI, "pipelineID", "objectGUID"),
+    (GET_BUSSES_URI, "pipelineID", "objectGUID"),
+    (GET_AUDIO_OBJECTS_URI, "busPipelineID", "busGUID"),
+))
+@pytest.mark.parametrize("basis", ("pipeline-only", "pipeline-guid", "pipeline-game-object", "complete"))
+def test_profiler_explicit_pipeline_fields_remain_visible_without_invented_instance_authority(
+    tmp_path, operation, pipeline, guid, basis,
+):
+    row = {pipeline: 42}
+    if basis in {"pipeline-guid", "complete"}:
+        row[guid] = _RuntimeControlDraftClient.target_id
+    if basis in {"pipeline-game-object", "complete"}:
+        row["gameObjectID"] = 1
+    fields = [pipeline, guid, "gameObjectID"]
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [row])
+    code, payload = read(*[argument for field in fields for argument in ("--result-field", field)])
+    assert code == 0, payload
+    projected = dict(payload["agent_result"]["return"][0])
+    handle = projected.pop("voice_instance_handle" if operation == GET_VOICES_URI else "bus_instance_handle", None)
+    assert projected == row
+    assert (handle is not None) is (basis == "complete")
+    assert next(options for uri, _args, options in calls if uri == operation) == {"return": fields}
+
+
+def test_profiler_explicit_projection_omits_unselected_and_unreported_native_fields(tmp_path):
+    read, _calls, _state, _env_value = _profiler_field_read(tmp_path, GET_VOICES_URI, [
+        {"objectName": "Only label", "isStarted": True},
+        {"objectName": "Label and level", "baseVolume": -3.5, "isVirtual": False},
+    ])
+    code, payload = read("--result-field", "objectName", "--result-field", "baseVolume")
+    assert code == 0, payload
+    assert payload["agent_result"]["return"] == [
+        {"objectName": "Only label"}, {"objectName": "Label and level", "baseVolume": -3.5},
+    ]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation,name_field,value_field", (
+    (GET_VOICES_URI, "objectName", "baseVolume"),
+    (GET_BUSSES_URI, "objectName", "volume"),
+    (GET_AUDIO_OBJECTS_URI, "audioObjectName", "rmsMeter"),
+))
+@pytest.mark.parametrize("select_value", (False, True))
+def test_profiler_explicit_fields_validate_off_page_selected_and_unselected_values(
+    tmp_path, version, operation, name_field, value_field, select_value,
+):
+    read, _calls, state, _env_value = _profiler_field_read(tmp_path, operation, [
+        {name_field: "Off-page malformed value", value_field: None},
+        {name_field: "Visible valid row", value_field: [-3.5] if operation == GET_AUDIO_OBJECTS_URI else -3.5},
+    ], version=version)
+    fields = [name_field, value_field] if select_value else [name_field]
+    code, payload = read("--max-results", "1", *[argument for field in fields for argument in ("--result-field", field)])
+    assert code == 2, payload
+    assert payload["error_code"] == "SemanticValidationError"
+    assert "agent_result" not in payload
+    assert not list((state / "runtime-inspection-observations-v1").glob("**/*.json"))
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_explicit_fields_reject_wrong_version_choice_before_connection(tmp_path, version):
+    wrong = "effectCount" if version in {"2021.1", "2022.1"} else "mixerID"
+    allowed = "mixerID" if version in {"2021.1", "2022.1"} else "effectCount"
+    code, payload = gateway.execute_gateway([
+        "core-call", GET_BUSSES_URI, "--profiler-position", "123", "--result-field", wrong,
+    ], env=_env(tmp_path, version=version), client_factory=lambda _url: pytest.fail("Wrong-version field must not connect"))
+    assert code == 2, payload
+    assert wrong in payload["message"] and allowed in payload["message"] and version in payload["message"]
+    assert "permitted choices" in payload["message"]
+
+
+@pytest.mark.parametrize("operation", (GET_VOICES_URI, GET_BUSSES_URI, GET_AUDIO_OBJECTS_URI))
+def test_profiler_explicit_fields_reject_unknown_choices_and_bound_before_connection(tmp_path, operation):
+    for fields, expected in ((["invented-field"], "permitted choices"), (["objectName"] * 65, "64")):
+        code, payload = gateway.execute_gateway([
+            "core-call", operation, "--profiler-position", "123",
+            *[argument for field in fields for argument in ("--result-field", field)],
+        ], env=_env(tmp_path), client_factory=lambda _url: pytest.fail("Invalid field selection must not connect"))
+        assert code == 2, payload
+        assert "result_fields" in payload["message"] and expected in payload["message"]
+
+
+def test_profiler_explicit_fields_accept_the_disclosed_request_ceiling(tmp_path):
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, GET_VOICES_URI, [{"objectName": "Voice"}])
+    code, payload = read(*[argument for _ in range(64) for argument in ("--result-field", "objectName")])
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == GET_VOICES_URI) == {"return": ["objectName"] * 64}
+    assert payload["agent_result"]["return"] == [{"objectName": "Voice"}]
+
+
+@pytest.mark.parametrize("view", ("summary", "identity", "diagnostics", "capture-defaults", "empty-selection"))
+def test_profiler_explicit_fields_conflict_with_every_explicit_preset(tmp_path, view):
+    with pytest.raises(SystemExit) as exc:
+        gateway.execute_gateway([
+            "core-call", GET_VOICES_URI, "--profiler-position", "123", "--result-view", view,
+            "--result-field", "objectName",
+        ], env=_env(tmp_path), client_factory=lambda _url: pytest.fail("Conflicting selection must not connect"))
+    assert exc.value.code == 2
+
+
+@pytest.mark.parametrize("operation", (LOG_GET_URI, GET_CURSOR_TIME_URI, TRANSPORT_GET_STATE_URI,
+    "ak.wwise.core.profiler.getRTPCs", "ak.wwise.core.profiler.getMeters", "ak.wwise.core.object.isLinked"))
+def test_profiler_explicit_field_flag_is_not_a_projection_escape_for_other_readers(tmp_path, operation):
+    code, payload = gateway.execute_gateway([
+        "core-call", operation, "--result-field", "objectName",
+    ], env=_env(tmp_path), client_factory=lambda _url: pytest.fail("Unrelated reader projection must not connect"))
+    assert code == 2, payload
+    assert "result_fields applies only" in payload["message"]
+
+
+def test_profiler_explicit_field_pages_preserve_projection_without_reread_or_new_selection(tmp_path):
+    read, calls, _state, env = _profiler_field_read(tmp_path, GET_VOICES_URI, [
+        {"objectName": f"Voice{index}", "baseVolume": -3.5, "isStarted": True} for index in range(5)
+    ])
+    code, payload = read("--max-results", "2", "--result-field", "objectName", "--result-field", "baseVolume")
+    assert code == 0, payload
+    assert len([uri for uri, _args, _options in calls if uri == GET_VOICES_URI]) == 1
+    pages = [payload["agent_result"]]
+    continuation = pages[0]["next_command"]["full_argv"][3:]
+    code, invalid = gateway.execute_gateway([*continuation, "--result-field", "isStarted"], env=env,
+        client_factory=lambda _url: pytest.fail("Cached page cannot accept a new projection"))
+    assert code == 2 and "exact runtime observation" in invalid["message"], invalid
+    while pages[-1].get("next_command"):
+        code, payload = gateway.execute_gateway(pages[-1]["next_command"]["full_argv"][3:], env=env,
+            client_factory=lambda _url: pytest.fail("Explicit projection pages must remain offline"))
+        assert code == 0, payload
+        pages.append(payload["agent_result"])
+    assert [row for page in pages for row in page["return"]] == [
+        {"objectName": f"Voice{index}", "baseVolume": -3.5} for index in (3, 4, 1, 2, 0)
+    ]
+    assert pages[-1]["complete"] is True
+
+
+@pytest.mark.parametrize("change", ("configuration", "version", "expiry"))
+def test_profiler_explicit_field_pages_retain_configuration_version_and_lifetime_guards(tmp_path, monkeypatch, change):
+    read, _calls, _state, env = _profiler_field_read(tmp_path, GET_VOICES_URI, [
+        {"objectName": "First"}, {"objectName": "Second"},
+    ])
+    code, payload = read("--max-results", "1", "--result-field", "objectName")
+    assert code == 0, payload
+    continuation = payload["agent_result"]["next_command"]["full_argv"][3:]
+    if change == "configuration":
+        set_gateway_config(env, waapi_port=31338)
+    elif change == "version":
+        set_gateway_config(env, wwise_version="2024.1")
+    else:
+        import time
+        expired = time.time() + 901
+        monkeypatch.setattr(time, "time", lambda: expired)
+    code, invalid = gateway.execute_gateway(continuation, env=env,
+        client_factory=lambda _url: pytest.fail("Changed or expired cached reads must not connect"))
+    assert code == 2, invalid
+    assert ("expired" if change == "expiry" else "configuration or operation changed") in invalid["message"]
+    assert "agent_result" not in invalid
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("operation", (GET_VOICES_URI, GET_BUSSES_URI, GET_AUDIO_OBJECTS_URI))
+@pytest.mark.parametrize("view", (None, "summary", "identity"))
+def test_profiler_existing_summary_identity_and_omitted_selection_keep_native_presets(tmp_path, version, operation, view):
+    summaries = {
+        GET_VOICES_URI: ["pipelineID", "objectName", "gameObjectName", "baseVolume", "isStarted", "isVirtual", "objectGUID", "gameObjectID"],
+        GET_BUSSES_URI: ["pipelineID", "objectName", "gameObjectName", "volume", "downstreamGain", "voiceCount", "depth", "objectGUID", "gameObjectID"],
+        GET_AUDIO_OBJECTS_URI: ["audioObjectID", "audioObjectName", "busPipelineID", "busName", "gameObjectName", "rmsMeter", "peakMeter", "busGUID", "gameObjectID"],
+    }
+    identities = {
+        GET_VOICES_URI: ["pipelineID", "playingID", "objectGUID", "objectName", "playTargetGUID", "playTargetName", "gameObjectID", "gameObjectName"],
+        GET_BUSSES_URI: ["pipelineID", "objectGUID", "objectName", "gameObjectID", "gameObjectName"],
+        GET_AUDIO_OBJECTS_URI: ["audioObjectID", "audioObjectName", "busPipelineID", "busGUID", "busName", "gameObjectID", "gameObjectName", "instigatorPipelineID"],
+    }
+    read, calls, _state, _env_value = _profiler_field_read(tmp_path, operation, [], version=version)
+    code, payload = read(*(["--result-view", view] if view is not None else []))
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == operation) == {
+        "return": identities[operation] if view == "identity" else summaries[operation],
+    }
+
+
 def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
     tmp_path: Path,
 ) -> None:
@@ -500,6 +789,7 @@ def test_profiler_voice_schema_exposes_position_view_bound_and_handle_only(
     assert declaration["optional_fields"] == [
         "max_results",
         "result_view",
+        "result_fields",
         "voice_instance_handle",
     ]
     encoded = json.dumps(payload, sort_keys=True)
@@ -633,7 +923,8 @@ def test_runtime_schema_discloses_accepted_business_meanings_and_position_forms(
         channels += ["source-control", "lua"]
     expectations = {
         LOG_GET_URI: {"log_channel": channels},
-        GET_VOICES_URI: {"result_view": ["summary", "identity", "diagnostics", "capture-defaults", "empty-selection"]},
+        GET_VOICES_URI: {"result_view": ["summary", "identity", "diagnostics", "capture-defaults", "empty-selection"],
+                         "result_fields": _pinned_profiler_return_fields(version, GET_VOICES_URI)},
         "ak.wwise.core.transport.executeAction": {
             "audition_action": ["play", "stop", "pause", "toggle-play-stop", "play-directly"],
             "transport_scope": ["one-transport", "all-active"],
