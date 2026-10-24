@@ -321,7 +321,7 @@
       "scope": "New versioned closed query/constructor/runtime helper or source resource in the full Skill candidate closure; no new Source effect claim."
     },
     "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
-      "current_sha256": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+      "current_sha256": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
       "historical": null,
       "scope": "New versioned closed query/constructor/runtime helper or source resource in the full Skill candidate closure; no new Source effect claim."
     },
@@ -2507,7 +2507,7 @@
     "skills/waapi-skill/wwise_waapi/platform_paths.py": "00149d5c4213da5d76d748ef21607051677f6364625853e7838c75701693a527",
     "skills/waapi-skill/wwise_waapi/playlist_reference_conditions.py": "e387299d850319a6905f88aed34c2eace36457769e9cc7d829759bd106f3662f",
     "skills/waapi-skill/wwise_waapi/profiler_capture_artifact.py": "12ee2ebd89a17d75fce0f126da57a7b1f001dd49e39e8a45363dea598f77ddec",
-    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
     "skills/waapi-skill/wwise_waapi/project_setting_business.py": "87e116602cdc4c1b7ad58f6bf4405c4dd6d2cdea4c9e353e8276b7bd9cf84c70",
     "skills/waapi-skill/wwise_waapi/project_setting_business_contracts.py": "5b94b93d61193b1ba69fc06e4d0bc1edee246854b2328e0cd13135ce2ff1df90",
     "skills/waapi-skill/wwise_waapi/recovery.py": "4d62eba5ed05df9acc0f44783520fa831d70427d3f5045f6d7af57478abf9476",
@@ -2621,7 +2621,7 @@
     "tests/destructive/test_expansion_gateway_goals.py": "7f89f7fa98153cbc131ef2e36dc6b2d15bafaf7c0def306ed44dec781b5b7773",
     "tests/destructive/test_gameparameter_creation_feasibility.py": "e991f64bce8300813a1e4ec9e2ef8faa31342ca1ed3b826d6d758b127ba710a5",
     "tests/destructive/test_gateway_transaction_matrix.py": "f694a0f545badec8f9fb1c0ddae933ee0e60437240071d96684805ad7188b318",
-    "tests/destructive/test_gateway_workflow_transaction_matrix.py": "2515d07c94886176b18839d83386ec3e6be562f1f21f9d2d68f489a86084dd20",
+    "tests/destructive/test_gateway_workflow_transaction_matrix.py": "bb229796a73488c2f7a7f19b903b5405d93fcf0c9a17367d9e8a4a886215fb0e",
     "tests/destructive/test_object_deferred_sandbox.py": "bc45b526fa7bdf8e9406192a2ecbc9ea835d043dba5199b5c722a7a989484d14",
     "tests/destructive/test_project_mutation_sandbox.py": "d87e11577aa8bc99b1d7dafd47496bf95d8328fc3ca65034f2ced377b6e88c95",
     "tests/destructive/test_repair_metadata_preflight.py": "355ea3916567b441029127447983c502bc16c51e3edc81d98478f981c22f97a1",
@@ -3493,7 +3493,35 @@
       "returned GUID/name verification",
       "original preservation",
       "five original native predecessor descriptors"
-    ]
+    ],
+    "meter_media_size_successor_review": {
+      "previous_source_basis": "0d56a083da7a7965d734df3e02c0fb5681a75c70",
+      "source_basis": "e6cef72e1162ef76329b27b231a60d5fcef2e53c",
+      "changed_dependencies": [
+        {
+          "path": "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py",
+          "before_sha256": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+          "after_sha256": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63",
+          "source_relevance": "Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged."
+        }
+      ],
+      "independent_product_review": "/tmp/waapi-r127-meter-media-size-review.md",
+      "scope": "Same619 current-source membership, original five predecessors/26 Source shapes and historical maps unchanged; only exact meter-root selection delta. No Source native rerun or new effect credit."
+    },
+    "additional_console_reader_successor_review": {
+      "source_basis": "2dc0ee57718f41b2378d8d4415572366de322704",
+      "previous_source_basis": "e6cef72e1162ef76329b27b231a60d5fcef2e53c",
+      "changed_dependencies": [
+        {
+          "path": "tests/destructive/test_gateway_workflow_transaction_matrix.py",
+          "before_sha256": "2515d07c94886176b18839d83386ec3e6be562f1f21f9d2d68f489a86084dd20",
+          "after_sha256": "bb229796a73488c2f7a7f19b903b5405d93fcf0c9a17367d9e8a4a886215fb0e",
+          "source_relevance": "Adds only the exact2023+ additional Console reader node and its closed media-staging/version fixture choice. All prior named nodes except that fixture are AST-identical; selected Source node IDs cannot satisfy the added condition. Existing Source launch/copy/save/graph/cleanup behavior unchanged."
+        }
+      ],
+      "independent_review": "/tmp/waapi-r127-console-additional-read-collector-review.md",
+      "scope": "Same619 membership, five original native predecessors/26 Source shapes, original maps and prior Gateway/matrix reviews unchanged. No Source native rerun or Source effect credit."
+    }
   },
   "predecessor_attachments": [
     {
@@ -3548,5 +3576,5 @@
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059"
   },
-  "source_basis": "0d56a083da7a7965d734df3e02c0fb5681a75c70"
+  "source_basis": "2dc0ee57718f41b2378d8d4415572366de322704"
 }

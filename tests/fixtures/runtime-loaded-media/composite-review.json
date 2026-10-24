@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.loaded-media-composite-review/v1",
   "authority": "docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md",
-  "positive_review_sha256": "b0c96141eb54a2ff058bde6e846a03d91f33def3a8ff010bdcd054fc2a8ae2c3",
+  "positive_review_sha256": "6d01288485ea78648bfaf65b48ee39697280828629257f72a1ff1e25dcf7044c",
   "profiles": {
     "2023.1": {
       "build": "2023.1.19.8928",
@@ -249,9 +249,13 @@
         "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": {
           "before": "62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8",
           "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
+        },
+        "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+          "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+          "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
         }
       },
-      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields."
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged."
     },
     "2024.1": {
       "build": "2024.1.13.9056",
@@ -500,9 +504,13 @@
         "skills/waapi-skill/wwise_waapi/runtime_log_effects.py": {
           "before": "62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8",
           "after": "1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00"
+        },
+        "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+          "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+          "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
         }
       },
-      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields."
+      "reviewed_source_relevance": "Exact R104 packaged delta already reviewed for retained runtime reads; LoadedMedia compiler/normalizer have no lane-specific version branch. Gateway snapshot delivery, shape validation and isolated policy changes require current exact whole-array replay; GameObjects alias/log/RTPC/meter changes do not alter this fixed LoadedMedia request or five fields. Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged."
     }
   },
   "entries": {
