@@ -5,6 +5,39 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R124 attributable IntegrationDemo LoadedMedia observation
+
+One named Mac Authoring/stock SDK test passed on matching **2025.1.11.9262**
+at candidate `7289081b`: 1 passed in 163.60s, 164.52s including the launcher.
+The public reader returned one complete page at capture position 99328ms:
+media `124871431`, `Ambience_40.wav`, `VORBIS`, 160821 bytes, SoundBank
+`Prepared`. The stock Prepare Event/Bank page supplied the Area1 producer;
+the retained native row, rather than the UI action alone, establishes the
+nonempty attributable observation. All 12 scoped live schemas matched.
+
+The final category and lifecycle passed, the 297-file source tree/hash/mtime
+and SDK fixture were unchanged, and the owned sandbox was removed by the
+lifecycle. Post-terminal inspection found no owned processes; TCP8080,
+TCP50218 and UDP24024 were free. Evidence is retained under
+`/private/tmp/waapi-r122-demo-native-r4/evidence`, including `root-review.json`,
+the raw capture, finalization and actual UI screenshot. The reader observation
+does not prove the separately exposed preparation/streaming-control operations,
+pinned build9143, older-version behavior or whole-#186 acceptance.
+
+Earlier r3 remains FAIL/lifecycle BLOCKED. It found the correct Demo immediately
+but its fixture misread macOS lsof's `pPID`/`fFD` output. The reviewed five-file
+repair retained exact PID/port ownership, deadlines and bounded failure output;
+11 focused controls passed before this single native rerun. r1/r2/r3 are not
+regraded. Missing global Reflect/Motion plug-ins remain recorded; none was
+installed, renamed or bypassed to obtain this Area1 observation.
+
+The user separately approved risk-based native acceptance in
+`docs/plans/full-waapi-coverage/SPEC.md`: all API/parameter/branch code coverage
+remains five-version, while native work targets actual business semantics,
+nonempty attribution, host/version differences and cleanup rather than forcing
+every return-value combination. Its scoped evidence-policy implementation and
+review are still in progress; this entry grants no resulting coverage credit.
+
 ## 2026-10-24 R123 source compatibility and IntegrationDemo checkpoint
 
 Reviewed runtime successor `8a64b499`, integrated as `18065490`, passed
