@@ -1493,6 +1493,16 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                 raise ValueError('mapped native dispatch URI mismatch')
             public_pointer = binding.get('gateway_observation_pointer', '/gateway/payload/agent_result')
             public_equals = any(c['pointer'] == public_pointer and 'equals' in c for c in checks)
+            if (not public_equals and (branch.get('route') or '').endswith('|function|' + PROFILER_GET_RTPS_URI)
+                    and branch['kind'] == 'optional_presence' and branch.get('value') == 'absent'
+                    and public_pointer.startswith('/gateway/payload/agent_result/return/')
+                    and {'pointer': public_pointer, 'absent': True} in checks
+                    and isinstance(pointer_value(record, public_pointer.rsplit('/', 1)[0]), dict)
+                    and any(c['pointer'] == public_pointer.rsplit('/', 1)[0]
+                        and isinstance(c.get('equals'), dict) for c in checks)):
+                # validate_rtpc_program already requires the same absent field
+                # within existing native/public rows and complete array equality.
+                public_equals = True
             if (not public_equals and branch['route'] is not None
                     and branch['route'].endswith('|function|ak.wwise.core.object.getPropertyInfo')
                     and branch['pointer'] == '/resultSchema/properties/default/@presence/absent'

@@ -124,6 +124,22 @@ def validate_rtpc_program(record, binding, branch, root):
             or payload.get('is_command_line') != (host == 'wwise-console')
             or any(payload['schema_validation'][section]['version'] != version for section in ('request', 'result'))):
         raise ValueError('RTPC program needs exact current public read capture')
+    argv = captured['gateway']['argv']
+    position = argv[argv.index('--profiler-position') + 1]
+    from wwise_waapi.runtime_inspection_business import _profiler_time, RuntimeInspectionBusinessError
+    try:
+        requested = _profiler_time(position)
+        reported = _profiler_time(payload['agent_result']['profiler_position'])
+    except (RuntimeInspectionBusinessError, TypeError) as exc:
+        raise ValueError('RTPC capture must satisfy the public profiler-position contract') from exc
+    native_time = record['native_call']['args']['time']
+    if type(requested) is int:
+        if type(native_time) is not int or type(reported) is not int or native_time != requested or reported != requested:
+            raise ValueError('RTPC numeric profiler position must match native and public time')
+    elif requested != reported:
+        # Recognized cursor choices remain a separate normalization path;
+        # this does not prove its unresolved two-read cursor branches.
+        raise ValueError('RTPC cursor position must retain its explicit reported choice')
     native_rows = record['native_call']['result']['return']
     public_rows = record['gateway']['payload']['agent_result']['return']
     # These complete RTPC reads copy the entire array without transformation.
@@ -133,13 +149,56 @@ def validate_rtpc_program(record, binding, branch, root):
             or not isinstance(native_rows, list) or not isinstance(public_rows, list)
             or audit.digest(native_rows) != audit.digest(public_rows)):
         raise ValueError('Program must preserve complete native/public RTPC return arrays')
-    if branch['pointer'].startswith('/resultSchema/'):
-        pointer = binding.get('program_observation_pointer', binding['observation_pointer'])
+    if branch['pointer'] == '/resultSchema' or branch['pointer'].startswith('/resultSchema/'):
+        pointer = (binding['program_observation_pointer'] if binding.get('runtime_observation_attachment')
+            else binding['observation_pointer'])
         parent = '/native_call/result/return'
-        if (pointer != parent and not pointer.startswith(parent + '/')
-                or binding['gateway_observation_pointer'] != pointer.replace(
-                    '/native_call/result', '/gateway/payload/agent_result', 1)):
+        result_root = branch['pointer'] in {'/resultSchema', '/resultSchema/additionalProperties'}
+        expected_public = ('/gateway/payload/agent_result' if result_root else pointer.replace(
+            '/native_call/result', '/gateway/payload/agent_result', 1))
+        if ((pointer != '/native_call/result' if result_root else pointer != parent and not pointer.startswith(parent + '/'))
+                or binding['gateway_observation_pointer'] != expected_public):
             raise ValueError('RTPC result needs the corresponding exact public field occurrence')
+        if branch['kind'] == 'optional_presence' and branch.get('value') == 'absent':
+            public_pointer = binding['gateway_observation_pointer']
+            native_parent = completion.pointer_value(record, pointer.rsplit('/', 1)[0])
+            public_parent = completion.pointer_value(record, public_pointer.rsplit('/', 1)[0])
+            field = pointer.rsplit('/', 1)[1]
+            if (not isinstance(native_parent, dict) or not isinstance(public_parent, dict)
+                    or field in native_parent or field in public_parent):
+                raise ValueError('RTPC absence needs an existing native/public row and same absent field')
+    if branch['pointer'] in RTPC_STRUCTURE_POINTERS:
+        _validate_rtpc_structure(record, binding, branch, root)
+
+
+def _validate_rtpc_structure(record, binding, branch, root):
+    """Prove only the addressed native container, never its descendants."""
+    from wwise_waapi.native_catalog import load_native_catalog
+    version, host, _, _, _ = branch['route'].split('|')
+    catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+    schema = catalog['schemas'][RTPC_URI]
+    node = completion.pointer_value(schema, branch['pointer'])
+    if audit.digest(node) != branch['shape_sha256']:
+        raise ValueError('RTPC structural predicate reflection shape differs')
+    if branch['pointer'].endswith('/additionalProperties'):
+        if node is not False:
+            raise ValueError('RTPC structural predicate requires exact closed native properties')
+        node = completion.pointer_value(schema, branch['pointer'].rsplit('/', 1)[0])
+    pointer = (binding['program_observation_pointer'] if binding.get('runtime_observation_attachment')
+        else binding['observation_pointer'])
+    expected = RTPC_STRUCTURE_POINTERS[branch['pointer']]
+    if pointer != expected:
+        raise ValueError('RTPC exact native structural observation differs')
+    observed = completion.pointer_value(record, expected)
+    if node.get('type') == 'object':
+        if (type(observed) is not dict or not set(node.get('required', ())) <= observed.keys()
+                or node.get('additionalProperties') is False and not observed.keys() <= node.get('properties', {}).keys()):
+            raise ValueError('RTPC exact native object structure predicate failed')
+    elif node.get('type') == 'array':
+        if type(observed) is not list:
+            raise ValueError('RTPC exact native array structure predicate failed')
+    else:
+        raise ValueError('RTPC structural predicate is outside approved container scope')
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
@@ -337,6 +396,16 @@ def write_bundle(output, program_path, originals, *, inventory):
 
 
 RTPC_URI = 'ak.wwise.core.profiler.getRTPCs'
+RTPC_STRUCTURE_POINTERS = {
+    '/argsSchema': '/native_call/args',
+    '/argsSchema/additionalProperties': '/native_call/args',
+    '/optionsSchema': '/native_call/options',
+    '/optionsSchema/additionalProperties': '/native_call/options',
+    '/resultSchema': '/native_call/result',
+    '/resultSchema/properties/return': '/native_call/result/return',
+    '/resultSchema/properties/return/items': '/native_call/result/return/0',
+    '/resultSchema/properties/return/items/additionalProperties': '/native_call/result/return/0',
+    '/resultSchema/additionalProperties': '/native_call/result'}
 RTPC_SOURCE = 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#'
 RTPC_NATIVE_PARENT = '/observations/capture/outcomes/profiler-rtpcs-observation/evidence'
 RTPC_ORIGINAL_CANDIDATE = '503688449ba9f9db964a5fb7116ac6be2fb07198'
@@ -476,6 +545,23 @@ def rtpc_field_mappings(inventory, *, version, host, mode):
             if pointer + '/@presence/present' in rows:
                 add(pointer + '/@presence/present', observed)
         add('/resultSchema/properties/return/@cardinality/multiple', '/native_call/result/return')
+    elif mode == 'single':
+        add('/resultSchema/properties/return/@cardinality/single', '/native_call/result/return')
+        for field in ('id', 'name', 'gameObjectId', 'value'):
+            pointer = '/resultSchema/properties/return/items/properties/' + field + '/@presence/absent'
+            if pointer in rows:
+                add(pointer, '/native_call/result/return/0/' + field)
+        pointer = '/resultSchema/properties/return/items/@empty/object'
+        if pointer in rows:
+            add(pointer, '/native_call/result/return/0')
+        pointer = '/resultSchema/properties/return/items/properties/name/@empty/string'
+        if pointer in rows:
+            add(pointer, '/native_call/result/return/0/name')
+    elif mode == 'empty':
+        add('/resultSchema/properties/return/@cardinality/empty', '/native_call/result/return')
+    elif mode == 'structure':
+        for pointer, observed in RTPC_STRUCTURE_POINTERS.items():
+            add(pointer, observed)
     else:
         raise ValueError('RTPC mappings support only data or deterministic construction')
     return route, selected
@@ -555,19 +641,26 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
     for mapping in mappings:
         branch = mapping['branch']
         identity, pointer = branch['id'], mapping['program_pointer']
-        value = completion.pointer_value(captured, pointer)
+        absent = branch['kind'] == 'optional_presence' and branch.get('value') == 'absent'
+        value = None if absent else completion.pointer_value(captured, pointer)
         public_pointer = (pointer.replace('/native_call/result', '/gateway/payload/agent_result')
-            if mode == 'data' else '/gateway/payload/agent_result/profiler_position')
-        check = ({'pointer': pointer, 'cardinality': 'multiple'}
-            if branch['kind'] == 'collection_cardinality' else {'pointer': pointer, 'equals': value})
-        checks = [check, {'pointer': public_pointer, 'equals': completion.pointer_value(captured, public_pointer)},
+            if branch['pointer'].startswith('/resultSchema') else '/gateway/payload/agent_result/profiler_position')
+        check = ({'pointer': pointer, 'absent': True} if absent else
+            {'pointer': pointer, 'cardinality': branch['value']} if branch['kind'] == 'collection_cardinality'
+            else {'pointer': pointer, 'equals': value})
+        checks = [check, ({'pointer': public_pointer, 'absent': True} if absent else
+            {'pointer': public_pointer, 'equals': completion.pointer_value(captured, public_pointer)}),
             {'pointer': '/gateway/payload/agent_result/complete', 'equals': True}]
+        if absent:
+            parent = public_pointer.rsplit('/', 1)[0]
+            checks.append({'pointer': parent, 'equals': completion.pointer_value(captured, parent)})
         assertion = {'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route']}
         program['branch_assertions'][identity] = {**assertion, 'checks': checks}
         policy['branches'][identity] = {'native_shape_sha256': branch['shape_sha256'],
             'categories': ['program', 'native'] if mode == 'data' else ['program'],
             'reason': ('Exact observed RTPC data/reference/presence/cardinality; independent native fact required'
-                if mode == 'data' else 'Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference')}
+                if mode == 'data' else 'Deterministic closed numeric time/reference/minimum/empty-options construction; no native data/effect inference'
+                if mode == 'construction' else 'SPEC section 5 deterministic RTPC decoder/structure preservation; no actual native occurrence/data/effect or descendant credit')}
         binding = {'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'],
             'runtime_read_program': True,
             'public_route': public['id'], 'public_route_sha256': audit.digest(public),
@@ -577,8 +670,8 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
             'relevant_sources': sorted(sources), 'evidence': {},
             **{key: {'source': RTPC_SOURCE + symbol, 'selector': branch['pointer']} for key, symbol in (
                 ('construction', 'materialize_runtime_inspection_business_request'),
-                ('validation', 'normalize_runtime_inspection_result' if mode == 'data' else (
-                    'materialize_runtime_inspection_business_request' if branch['pointer'].startswith('/optionsSchema/') else '_profiler_time')),
+                ('validation', 'normalize_runtime_inspection_result' if branch['pointer'].startswith('/resultSchema') else (
+                    'materialize_runtime_inspection_business_request' if mode == 'structure' or branch['pointer'].startswith('/optionsSchema/') else '_profiler_time')),
                 ('verifier', 'normalize_runtime_inspection_result'))}}
         document['bindings'][identity] = binding
         if native is not None:
@@ -640,9 +733,12 @@ def write_field_bundle(output, program_path, originals, *, inventory, version, h
 def write_field_stage(output, captures, originals, *, inventory, guard_replays=None):
     """Combine five-version read flows in the ordinary portable index format."""
     versions = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
-    expected = {(version, host, mode) for version in versions
+    fields = {(version, host, mode) for version in versions
         for host in ('wwise-console', 'wwise-authoring') for mode in ('construction', 'data')}
-    if set(captures) != expected or set(originals) - {'2022.1', '2025.1'}:
+    shapes = {(version, host, mode) for version in versions
+        for host in ('wwise-console', 'wwise-authoring') for mode in ('structure', 'empty', 'single')}
+    expected = set(captures)
+    if expected not in (fields, shapes, fields | shapes) or set(originals) - {'2022.1', '2025.1'}:
         raise ValueError('RTPC stage requires all exact five-version public flows and only qualified originals')
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
