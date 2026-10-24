@@ -338,6 +338,8 @@ tests/unit/test_rtpc_field_branch_evidence.py
 tests/unit/test_rtpc_result_gateway.py
 tests/unit/test_runtime_observation_branch_evidence.py
 tests/unit/test_runtime_log_branch_evidence.py
+tests/unit/test_runtime_cursor_branch_evidence.py
+tests/unit/test_extra_runtime_read_evidence.py
 tests/unit/test_console_runtime_read_batch.py
 tests/unit/test_console_runtime_read_evidence.py
 tests/unit/test_loaded_media_runtime_evidence.py
