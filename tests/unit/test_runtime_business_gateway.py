@@ -1210,8 +1210,9 @@ def test_transport_state_rejects_invented_native_id_before_connection(
     assert "copied exactly" in payload["message"]
 
 
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1"])
 def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
-    tmp_path: Path,
+    tmp_path: Path, version: str,
 ) -> None:
     client = FakeClient(
         {
@@ -1223,11 +1224,11 @@ def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
                     "platform": "macosx",
                     "configuration": "release",
                     "version": {
-                        "year": 2025,
+                        "year": int(version[:4]),
                         "major": 1,
                         "minor": 0,
                         "build": 1,
-                        "displayName": "v2025.1.0.1",
+                        "displayName": f"v{version}.0.1",
                     },
                 }
             ],
@@ -1242,7 +1243,7 @@ def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
             "--transport-handle",
             "trh1-" + "61" * 16,
         ],
-        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
+        env=set_gateway_config(_env(tmp_path), wwise_version=version),
         client_factory=lambda _url: client,
     )
 
