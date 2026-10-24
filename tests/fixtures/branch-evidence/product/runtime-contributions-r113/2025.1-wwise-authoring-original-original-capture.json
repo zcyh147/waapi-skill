@@ -1,0 +1,3003 @@
+{
+  "contract": "waapi-skill.owned-profiler-capture/v1",
+  "candidate": "503688449ba9f9db964a5fb7116ac6be2fb07198",
+  "host": {
+    "directories": {
+      "user": "Y:\\Library\\Application Support\\Audiokinetic\\Wwise",
+      "install": "Z:\\Applications\\Audiokinetic\\Wwise2025.1.7.9143\\",
+      "authoring": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\",
+      "bin": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\",
+      "help": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\Help\\"
+    },
+    "displayName": "Wwise",
+    "platform": "x64",
+    "version": {
+      "displayName": "v2025.1.7",
+      "year": 2025,
+      "major": 1,
+      "minor": 7,
+      "build": 9143,
+      "nickname": "",
+      "schema": 133
+    },
+    "sessionId": "{C90EB759-A14C-4E29-B611-0986AC8C3C4B}",
+    "apiVersion": 1,
+    "branch": "wwise_v2025.1.7",
+    "copyright": "(C) 2006-2026. Audiokinetic Inc. All rights reserved.",
+    "configuration": "release",
+    "isCommandLine": false,
+    "processId": 192,
+    "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\Wwise.exe"
+  },
+  "version": "2025.1",
+  "complete": true,
+  "setup": [
+    {
+      "originals": {
+        "ok": true,
+        "status": "result_schema_checked",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "verify",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "detected_version": "2025.1",
+        "is_command_line": false,
+        "transaction_id": "tx1-tyeyrjee3jx4ecej6jkq",
+        "state": "result_schema_checked",
+        "artifact_hash": "9ab50239b43b26d6c2baed2cdae37ff82e78be80f424b1c4035ac58c6508ed9b",
+        "verification": {
+          "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+          "contract": "waapi-skill.operation-verification/v1",
+          "operation": "waapi.call",
+          "status": "result_schema_checked",
+          "ok": true,
+          "verification_strength": "complete_reflected_schema",
+          "business_state_verified": false,
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "failed_assertion_count": 0,
+          "assertions_canonical_sha256": "123b178b75032e42a2eb25a4305ba1522dbca5c8dc94fb8b917303686dc09276",
+          "readback_count": 0,
+          "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "canonical_sha256": "23a30283fb226d0446aed10c0db7136ba0b2b964197309d536933855643224f6",
+          "full_evidence_in_stdout": false
+        },
+        "guard_validation": {
+          "ok": true,
+          "status": "valid",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "post_verification",
+          "project_transition": null,
+          "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+          "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+          "expires_at": "2026-10-23T22:08:14.548266Z"
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "item_type": "function",
+          "category": "core",
+          "version": "2025.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791496738984000-bca63afeece04fd5bf074079a2b1a94a-ak_wwise_core_getProjectInfo.json",
+          "timeout": 29.95475804200396
+        },
+        "executed": true,
+        "verified": false,
+        "result_schema_checked": true,
+        "verification_strength": "complete_reflected_schema",
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.transport.useOriginals",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "9e8341620cd91d3ce3a3a52cf0a9456e045a228d9fccc5e952620a3d3774f082",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "9e8341620cd91d3ce3a3a52cf0a9456e045a228d9fccc5e952620a3d3774f082",
+            "api": "ak.wwise.core.transport.useOriginals",
+            "phase": "verified",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "automatic_retry": false,
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-verify-success-summary/v1",
+          "detail_level": "digest-verification-evidence",
+          "fixed_projection_limit_bytes": 22528,
+          "stdout_budget_bytes": 24576,
+          "session_context_reserve_bytes": 2048,
+          "projected_payload_bytes": 6261,
+          "verification_canonical_sha256": "23a30283fb226d0446aed10c0db7136ba0b2b964197309d536933855643224f6",
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "readback_count": 0,
+          "full_verification_evidence_in_stdout": false,
+          "full_verification_evidence_persisted": true,
+          "journal_event": "verification_recorded",
+          "agent_result_exact": true,
+          "cleanup_exact": true,
+          "truncated": false
+        },
+        "recovery": {
+          "contract": "waapi-skill.recovery/v1",
+          "stage": "known_write_outcome",
+          "project_write_outcome": "executed_not_business_verified",
+          "modification_policy": "ask_before_changes",
+          "read_only_continuation_allowed": true,
+          "cleanup_complete": true,
+          "additional_read_permission_required": false,
+          "scope": "existing_authorized_task_only",
+          "actions": [
+            "inspect_transaction",
+            "independent_read_only_diagnosis"
+          ],
+          "max_reconnect_attempts": 1,
+          "service_start_requires_existing_task_authorization": true,
+          "original_write_replay_allowed": false,
+          "next_change": "preview_then_explicit_confirmation"
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "adapter_version": "2025.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "adapter_version": "2025.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "operation": "waapi.call",
+          "transaction_id": "tx1-tyeyrjee3jx4ecej6jkq",
+          "artifact_hash": "9ab50239b43b26d6c2baed2cdae37ff82e78be80f424b1c4035ac58c6508ed9b",
+          "state": "result_schema_checked",
+          "executed": true,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.transport.useOriginals",
+              "args": {
+                "enable": true
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "verified": false,
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.transport.useOriginals",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "9e8341620cd91d3ce3a3a52cf0a9456e045a228d9fccc5e952620a3d3774f082",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "9e8341620cd91d3ce3a3a52cf0a9456e045a228d9fccc5e952620a3d3774f082",
+              "api": "ak.wwise.core.transport.useOriginals",
+              "phase": "verified",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "result": {}
+        }
+      }
+    },
+    {
+      "enable_capture_reads": {
+        "ok": true,
+        "status": "result_schema_checked",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "verify",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "detected_version": "2025.1",
+        "is_command_line": false,
+        "transaction_id": "tx1-v8xpezyn7h00avfyc12j",
+        "state": "result_schema_checked",
+        "artifact_hash": "6f4a6702a4df2e183e01af2da505378dad8ba940b495764f383339084f06ccb1",
+        "verification": {
+          "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+          "contract": "waapi-skill.operation-verification/v1",
+          "operation": "waapi.call",
+          "status": "result_schema_checked",
+          "ok": true,
+          "verification_strength": "complete_reflected_schema",
+          "business_state_verified": false,
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "failed_assertion_count": 0,
+          "assertions_canonical_sha256": "0cea22610e58139bf2098c21c6e866f7c641430515dc2dde25531a5efe47f8dd",
+          "readback_count": 0,
+          "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "canonical_sha256": "d5b357d2c9e6f3993fadaa9040c63e34a4db67ac001976afbdb3fe7326a058fa",
+          "full_evidence_in_stdout": false,
+          "verification_scope": {
+            "strategy": "native_result_schema_only",
+            "enabled_settings_verified": false,
+            "empty_effect_verified": false,
+            "repeated_data_set_resolution_verified": false,
+            "prior_settings_restoration_verified": false,
+            "boundary": "Native acknowledgment does not establish final enabled settings, empty-list effects, repeated-data-set resolution, or prior-setting restoration."
+          }
+        },
+        "guard_validation": {
+          "ok": true,
+          "status": "valid",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "post_verification",
+          "project_transition": null,
+          "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+          "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+          "expires_at": "2026-10-23T22:08:18.961928Z"
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "item_type": "function",
+          "category": "core",
+          "version": "2025.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791501228048000-7c28e5715d4045759093add900cdee06-ak_wwise_core_getProjectInfo.json",
+          "timeout": 29.954697792010847
+        },
+        "executed": true,
+        "verified": false,
+        "result_schema_checked": true,
+        "verification_strength": "complete_reflected_schema",
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.profiler.enableProfilerData",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+            "api": "ak.wwise.core.profiler.enableProfilerData",
+            "phase": "verified",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "automatic_retry": false,
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-verify-success-summary/v1",
+          "detail_level": "digest-verification-evidence",
+          "fixed_projection_limit_bytes": 22528,
+          "stdout_budget_bytes": 24576,
+          "session_context_reserve_bytes": 2048,
+          "projected_payload_bytes": 7024,
+          "verification_canonical_sha256": "d5b357d2c9e6f3993fadaa9040c63e34a4db67ac001976afbdb3fe7326a058fa",
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "readback_count": 0,
+          "full_verification_evidence_in_stdout": false,
+          "full_verification_evidence_persisted": true,
+          "journal_event": "verification_recorded",
+          "agent_result_exact": true,
+          "cleanup_exact": true,
+          "truncated": false
+        },
+        "recovery": {
+          "contract": "waapi-skill.recovery/v1",
+          "stage": "known_write_outcome",
+          "project_write_outcome": "executed_not_business_verified",
+          "modification_policy": "ask_before_changes",
+          "read_only_continuation_allowed": true,
+          "cleanup_complete": true,
+          "additional_read_permission_required": false,
+          "scope": "existing_authorized_task_only",
+          "actions": [
+            "inspect_transaction",
+            "independent_read_only_diagnosis"
+          ],
+          "max_reconnect_attempts": 1,
+          "service_start_requires_existing_task_authorization": true,
+          "original_write_replay_allowed": false,
+          "next_change": "preview_then_explicit_confirmation"
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "adapter_version": "2025.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "adapter_version": "2025.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "operation": "waapi.call",
+          "transaction_id": "tx1-v8xpezyn7h00avfyc12j",
+          "artifact_hash": "6f4a6702a4df2e183e01af2da505378dad8ba940b495764f383339084f06ccb1",
+          "state": "result_schema_checked",
+          "executed": true,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.profiler.enableProfilerData",
+              "args": {
+                "dataTypes": [
+                  {
+                    "dataType": "voices",
+                    "enable": true
+                  },
+                  {
+                    "dataType": "voiceInspector",
+                    "enable": true
+                  },
+                  {
+                    "dataType": "gameSyncs",
+                    "enable": true
+                  }
+                ]
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "verified": false,
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.profiler.enableProfilerData",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+              "api": "ak.wwise.core.profiler.enableProfilerData",
+              "phase": "verified",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "result": {}
+        }
+      }
+    },
+    {
+      "start_capture": {
+        "ok": true,
+        "status": "result_schema_checked",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "verify",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "detected_version": "2025.1",
+        "is_command_line": false,
+        "transaction_id": "tx1-hf23kg4mcq9kfmx32hn2",
+        "state": "result_schema_checked",
+        "artifact_hash": "bb0a1ed48772592a2f11d1fe6a0787d088e8a8299ae1239488501ff0c00c05e4",
+        "verification": {
+          "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+          "contract": "waapi-skill.operation-verification/v1",
+          "operation": "waapi.call",
+          "status": "result_schema_checked",
+          "ok": true,
+          "verification_strength": "complete_reflected_schema",
+          "business_state_verified": false,
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "failed_assertion_count": 0,
+          "assertions_canonical_sha256": "72bccfb9cec5d207e077e1d806e3386c53955f3f3a853c3e1ecff29d936a123a",
+          "readback_count": 0,
+          "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "canonical_sha256": "3a23ed80c3b5a7a5c4cdfdd75e8588946fecde7d54a3b501632bc42a5594c884",
+          "full_evidence_in_stdout": false
+        },
+        "guard_validation": {
+          "ok": true,
+          "status": "valid",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "post_verification",
+          "project_transition": null,
+          "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+          "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+          "expires_at": "2026-10-23T22:08:22.315563Z"
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "item_type": "function",
+          "category": "core",
+          "version": "2025.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791504563593000-260905daafd34ad58fe13a1bb26841f7-ak_wwise_core_getProjectInfo.json",
+          "timeout": 29.954193166049663
+        },
+        "executed": true,
+        "verified": false,
+        "result_schema_checked": true,
+        "verification_strength": "complete_reflected_schema",
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.profiler.startCapture",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "required_cleanup",
+            "companion_request": {
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "args": {},
+              "options": {}
+            },
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "opener",
+            "lifecycle_strategy": "paired_follow_up_required",
+            "spec_sha256": "7c33e9735ce6061be39caef4a76803999000f73da1510c9b755e8685f2bec37e",
+            "warnings": []
+          },
+          "status": "pending",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "7c33e9735ce6061be39caef4a76803999000f73da1510c9b755e8685f2bec37e",
+            "api": "ak.wwise.core.profiler.startCapture",
+            "phase": "verified",
+            "lifecycle_action": "opener",
+            "lifecycle_strategy": "paired_follow_up_required",
+            "cleanup_requirement": "required_cleanup",
+            "status": "pending",
+            "companion_request": {
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "args": {},
+              "options": {}
+            },
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "automatic_retry": false,
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-verify-success-summary/v1",
+          "detail_level": "digest-verification-evidence",
+          "fixed_projection_limit_bytes": 22528,
+          "stdout_budget_bytes": 24576,
+          "session_context_reserve_bytes": 2048,
+          "projected_payload_bytes": 6722,
+          "verification_canonical_sha256": "3a23ed80c3b5a7a5c4cdfdd75e8588946fecde7d54a3b501632bc42a5594c884",
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "readback_count": 0,
+          "full_verification_evidence_in_stdout": false,
+          "full_verification_evidence_persisted": true,
+          "journal_event": "verification_recorded",
+          "agent_result_exact": true,
+          "cleanup_exact": true,
+          "truncated": false
+        },
+        "recovery": {
+          "contract": "waapi-skill.recovery/v1",
+          "stage": "known_write_outcome",
+          "project_write_outcome": "executed_not_business_verified",
+          "modification_policy": "ask_before_changes",
+          "read_only_continuation_allowed": false,
+          "cleanup_complete": false,
+          "additional_read_permission_required": false,
+          "scope": "existing_authorized_task_only",
+          "actions": [
+            "report_cleanup_boundary"
+          ],
+          "max_reconnect_attempts": 0,
+          "service_start_requires_existing_task_authorization": true,
+          "original_write_replay_allowed": false,
+          "next_change": "preview_then_explicit_confirmation"
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "adapter_version": "2025.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "adapter_version": "2025.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "operation": "waapi.call",
+          "transaction_id": "tx1-hf23kg4mcq9kfmx32hn2",
+          "artifact_hash": "bb0a1ed48772592a2f11d1fe6a0787d088e8a8299ae1239488501ff0c00c05e4",
+          "state": "result_schema_checked",
+          "executed": true,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.profiler.startCapture",
+              "args": {},
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "verified": false,
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.profiler.startCapture",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "required_cleanup",
+              "companion_request": {
+                "api": "ak.wwise.core.profiler.stopCapture",
+                "args": {},
+                "options": {}
+              },
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "opener",
+              "lifecycle_strategy": "paired_follow_up_required",
+              "spec_sha256": "7c33e9735ce6061be39caef4a76803999000f73da1510c9b755e8685f2bec37e",
+              "warnings": []
+            },
+            "status": "pending",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "7c33e9735ce6061be39caef4a76803999000f73da1510c9b755e8685f2bec37e",
+              "api": "ak.wwise.core.profiler.startCapture",
+              "phase": "verified",
+              "lifecycle_action": "opener",
+              "lifecycle_strategy": "paired_follow_up_required",
+              "cleanup_requirement": "required_cleanup",
+              "status": "pending",
+              "companion_request": {
+                "api": "ak.wwise.core.profiler.stopCapture",
+                "args": {},
+                "options": {}
+              },
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "result": {
+            "return": 17013
+          }
+        }
+      }
+    },
+    {
+      "create_transport": {
+        "ok": true,
+        "status": "verified",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "verify",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "detected_version": "2025.1",
+        "is_command_line": false,
+        "transaction_id": "tx1-hr65s3y6n0dxb0vt9289",
+        "state": "verified",
+        "artifact_hash": "a1642a2bf01b4eb619da564f6f33475ba45eb7e42b903c92dd42c0f23e0e69bc",
+        "verification": {
+          "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+          "contract": "waapi-skill.operation-verification/v1",
+          "operation": "waapi.call",
+          "status": "verified",
+          "ok": true,
+          "verification_strength": "operation_specific_readback",
+          "business_state_verified": true,
+          "assertion_count": 8,
+          "passed_assertion_count": 8,
+          "failed_assertion_count": 0,
+          "assertions_canonical_sha256": "9b9e069706c9df258a39c5cd3e62f60edf7b577fb4adf45fcf9c62df755f4d2f",
+          "readback_count": 2,
+          "readbacks_canonical_sha256": "c154c4d48f5db5b5c3e23e679ff2a46f43f2a07be9fd8ba15a85bf4dff0d2944",
+          "canonical_sha256": "ac7c31c527f214d2c4eb784ae2dd9d43bd4083baaa8374883a8d7dfecd7c0169",
+          "full_evidence_in_stdout": false
+        },
+        "guard_validation": {
+          "ok": true,
+          "status": "valid",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "post_verification",
+          "project_transition": null,
+          "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+          "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+          "expires_at": "2026-10-23T22:08:27.466382Z"
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "item_type": "function",
+          "category": "core",
+          "version": "2025.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791509743124000-c07e5aa7874542d896c319c71f89b078-ak_wwise_core_getProjectInfo.json",
+          "timeout": 29.950811374990735
+        },
+        "executed": true,
+        "verified": true,
+        "result_schema_checked": false,
+        "verification_strength": "operation_specific_readback",
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.transport.create",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "execution_result",
+              "materialized": false,
+              "source": "execution_result.result.transport",
+              "target": "args.transport"
+            },
+            "cleanup_requirement": "required_cleanup",
+            "companion_request": {
+              "api": "ak.wwise.core.transport.destroy",
+              "args": {},
+              "options": {}
+            },
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "opener",
+            "lifecycle_strategy": "paired_follow_up_required",
+            "spec_sha256": "019cefa304012704dd0be53469c432ea9ee6c7f9eb1e3bcb3a03b255bad5dc0f",
+            "warnings": []
+          },
+          "status": "pending",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "019cefa304012704dd0be53469c432ea9ee6c7f9eb1e3bcb3a03b255bad5dc0f",
+            "api": "ak.wwise.core.transport.create",
+            "phase": "verified",
+            "lifecycle_action": "opener",
+            "lifecycle_strategy": "paired_follow_up_required",
+            "cleanup_requirement": "required_cleanup",
+            "status": "pending",
+            "companion_request": {
+              "api": "ak.wwise.core.transport.destroy",
+              "args": {
+                "transport": 0
+              },
+              "options": {}
+            },
+            "binding": {
+              "kind": "execution_result",
+              "materialized": true,
+              "source": "execution_result.result.transport",
+              "target": "args.transport"
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "automatic_retry": false,
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-verify-success-summary/v1",
+          "detail_level": "digest-verification-evidence",
+          "fixed_projection_limit_bytes": 22528,
+          "stdout_budget_bytes": 24576,
+          "session_context_reserve_bytes": 2048,
+          "projected_payload_bytes": 7355,
+          "verification_canonical_sha256": "ac7c31c527f214d2c4eb784ae2dd9d43bd4083baaa8374883a8d7dfecd7c0169",
+          "assertion_count": 8,
+          "passed_assertion_count": 8,
+          "readback_count": 2,
+          "full_verification_evidence_in_stdout": false,
+          "full_verification_evidence_persisted": true,
+          "journal_event": "verification_recorded",
+          "agent_result_exact": true,
+          "cleanup_exact": true,
+          "truncated": false
+        },
+        "recovery": {
+          "contract": "waapi-skill.recovery/v1",
+          "stage": "known_write_outcome",
+          "project_write_outcome": "verified",
+          "modification_policy": "ask_before_changes",
+          "read_only_continuation_allowed": false,
+          "cleanup_complete": false,
+          "additional_read_permission_required": false,
+          "scope": "existing_authorized_task_only",
+          "actions": [
+            "report_cleanup_boundary"
+          ],
+          "max_reconnect_attempts": 0,
+          "service_start_requires_existing_task_authorization": true,
+          "original_write_replay_allowed": false,
+          "next_change": "preview_then_explicit_confirmation"
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "adapter_version": "2025.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "adapter_version": "2025.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "operation": "waapi.call",
+          "transaction_id": "tx1-hr65s3y6n0dxb0vt9289",
+          "artifact_hash": "a1642a2bf01b4eb619da564f6f33475ba45eb7e42b903c92dd42c0f23e0e69bc",
+          "state": "verified",
+          "executed": true,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.transport.create",
+              "args": {
+                "object": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}"
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "verified": true,
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.transport.create",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "execution_result",
+                "materialized": false,
+                "source": "execution_result.result.transport",
+                "target": "args.transport"
+              },
+              "cleanup_requirement": "required_cleanup",
+              "companion_request": {
+                "api": "ak.wwise.core.transport.destroy",
+                "args": {},
+                "options": {}
+              },
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "opener",
+              "lifecycle_strategy": "paired_follow_up_required",
+              "spec_sha256": "019cefa304012704dd0be53469c432ea9ee6c7f9eb1e3bcb3a03b255bad5dc0f",
+              "warnings": []
+            },
+            "status": "pending",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "019cefa304012704dd0be53469c432ea9ee6c7f9eb1e3bcb3a03b255bad5dc0f",
+              "api": "ak.wwise.core.transport.create",
+              "phase": "verified",
+              "lifecycle_action": "opener",
+              "lifecycle_strategy": "paired_follow_up_required",
+              "cleanup_requirement": "required_cleanup",
+              "status": "pending",
+              "companion_request": {
+                "api": "ak.wwise.core.transport.destroy",
+                "args": {
+                  "transport": 0
+                },
+                "options": {}
+              },
+              "binding": {
+                "kind": "execution_result",
+                "materialized": true,
+                "source": "execution_result.result.transport",
+                "target": "args.transport"
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "business_result": {
+            "contract": "waapi-skill.runtime-control-result/v1",
+            "transport_handle": "trh1-45b1c613ee0a3e03d59f526de9d90566"
+          },
+          "result": {
+            "transport": 0
+          }
+        }
+      }
+    },
+    {
+      "play": {
+        "ok": true,
+        "status": "verified",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "verify",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "detected_version": "2025.1",
+        "is_command_line": false,
+        "transaction_id": "tx1-k42wnsa7eg3q1bn3zp41",
+        "state": "verified",
+        "artifact_hash": "d93519a4211b96859bd0a607fdeb66e8afd09855de159592e035e705d760403c",
+        "verification": {
+          "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+          "contract": "waapi-skill.operation-verification/v1",
+          "operation": "waapi.call",
+          "status": "verified",
+          "ok": true,
+          "verification_strength": "bounded_transport_state_observation",
+          "business_state_verified": true,
+          "assertion_count": 5,
+          "passed_assertion_count": 5,
+          "failed_assertion_count": 0,
+          "assertions_canonical_sha256": "0c3a82bb7568e52f5c4fbf520e57c98449abe0f9b58ac2fad4c6ec5094198a63",
+          "readback_count": 3,
+          "readbacks_canonical_sha256": "9bb1b6b3f7031d9b7300d6b18421da139fbf7c784d8e86c805c778bda7ee321c",
+          "canonical_sha256": "f44b244ec8f4ac1d8e62d7a20a32cdc09ae8b1b809e74bfba75410e809e3eb71",
+          "full_evidence_in_stdout": false,
+          "verification_scope": {
+            "comparison": "one_state_read_per_preview_target",
+            "continuous_state_verified": false,
+            "atomic_scope_verified": false,
+            "causality_verified": false,
+            "observation": {
+              "kind": "transport-action-observation",
+              "action": "play",
+              "scope": "one-transport",
+              "membership_matches": true,
+              "targets": [
+                {
+                  "transport": 0,
+                  "before_state": null,
+                  "expected_state": "playing",
+                  "observed_state": "playing",
+                  "outcome": "matched"
+                }
+              ]
+            }
+          }
+        },
+        "guard_validation": {
+          "ok": true,
+          "status": "valid",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "post_verification",
+          "project_transition": null,
+          "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+          "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+          "expires_at": "2026-10-23T22:08:32.342117Z"
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "item_type": "function",
+          "category": "core",
+          "version": "2025.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791514726020000-f4fecaf1140e48bb9ced2cddee9c57ba-ak_wwise_core_getProjectInfo.json",
+          "timeout": 29.95105033298023
+        },
+        "executed": true,
+        "verified": true,
+        "result_schema_checked": false,
+        "verification_strength": "bounded_transport_state_observation",
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.transport.executeAction",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+            "api": "ak.wwise.core.transport.executeAction",
+            "phase": "verified",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "automatic_retry": false,
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-verify-success-summary/v1",
+          "detail_level": "digest-verification-evidence",
+          "fixed_projection_limit_bytes": 22528,
+          "stdout_budget_bytes": 24576,
+          "session_context_reserve_bytes": 2048,
+          "projected_payload_bytes": 6874,
+          "verification_canonical_sha256": "f44b244ec8f4ac1d8e62d7a20a32cdc09ae8b1b809e74bfba75410e809e3eb71",
+          "assertion_count": 5,
+          "passed_assertion_count": 5,
+          "readback_count": 3,
+          "full_verification_evidence_in_stdout": false,
+          "full_verification_evidence_persisted": true,
+          "journal_event": "verification_recorded",
+          "agent_result_exact": true,
+          "cleanup_exact": true,
+          "truncated": false
+        },
+        "recovery": {
+          "contract": "waapi-skill.recovery/v1",
+          "stage": "known_write_outcome",
+          "project_write_outcome": "verified",
+          "modification_policy": "ask_before_changes",
+          "read_only_continuation_allowed": true,
+          "cleanup_complete": true,
+          "additional_read_permission_required": false,
+          "scope": "existing_authorized_task_only",
+          "actions": [
+            "inspect_transaction",
+            "independent_read_only_diagnosis"
+          ],
+          "max_reconnect_attempts": 1,
+          "service_start_requires_existing_task_authorization": true,
+          "original_write_replay_allowed": false,
+          "next_change": "preview_then_explicit_confirmation"
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "adapter_version": "2025.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "adapter_version": "2025.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "operation": "waapi.call",
+          "transaction_id": "tx1-k42wnsa7eg3q1bn3zp41",
+          "artifact_hash": "d93519a4211b96859bd0a607fdeb66e8afd09855de159592e035e705d760403c",
+          "state": "verified",
+          "executed": true,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.transport.executeAction",
+              "args": {
+                "action": "play",
+                "transport": 0
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "verified": true,
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.transport.executeAction",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+              "api": "ak.wwise.core.transport.executeAction",
+              "phase": "verified",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "result": {}
+        }
+      }
+    },
+    {
+      "stop_capture": {
+        "ok": true,
+        "status": "result_schema_checked",
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "verify",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 8080,
+          "url": "ws://127.0.0.1:8080/waapi"
+        },
+        "detected_version": "2025.1",
+        "is_command_line": false,
+        "transaction_id": "tx1-fh3fr18awfzchmgmw8jp",
+        "state": "result_schema_checked",
+        "artifact_hash": "2393e2a5e30155265a077078d56b1aa726405131786b7b769e376e1e432a9ffa",
+        "verification": {
+          "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+          "contract": "waapi-skill.operation-verification/v1",
+          "operation": "waapi.call",
+          "status": "result_schema_checked",
+          "ok": true,
+          "verification_strength": "complete_reflected_schema",
+          "business_state_verified": false,
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "failed_assertion_count": 0,
+          "assertions_canonical_sha256": "1a6e05cf1d27afc4c5b47c8ae45bb1c85a6fa3acdce681516bfcc6e9638a7e9f",
+          "readback_count": 0,
+          "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "canonical_sha256": "ef71119327af4944fd919bc0d10959225f92881b5a509d0813c64778df7852c3",
+          "full_evidence_in_stdout": false
+        },
+        "guard_validation": {
+          "ok": true,
+          "status": "valid",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "post_verification",
+          "project_transition": null,
+          "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+          "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+          "expires_at": "2026-10-23T22:08:41.731412Z"
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "item_type": "function",
+          "category": "core",
+          "version": "2025.1",
+          "ok": true,
+          "dry_run": false,
+          "risk_level": "low",
+          "error_code": null,
+          "message": "ok",
+          "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791524024801000-c73b02b50c6a413c8613455ddefc1b9c-ak_wwise_core_getProjectInfo.json",
+          "timeout": 29.952235708013177
+        },
+        "executed": true,
+        "verified": false,
+        "result_schema_checked": true,
+        "verification_strength": "complete_reflected_schema",
+        "cleanup": {
+          "spec": {
+            "api": "ak.wwise.core.profiler.stopCapture",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "closer",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+            "warnings": []
+          },
+          "status": "not_required",
+          "projection": {
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "cleanup_spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+            "api": "ak.wwise.core.profiler.stopCapture",
+            "phase": "verified",
+            "lifecycle_action": "closer",
+            "lifecycle_strategy": "not_required",
+            "cleanup_requirement": "not_required",
+            "status": "not_required",
+            "companion_request": null,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "warnings": [],
+            "automatic_cleanup": false,
+            "automatic_retry": false
+          }
+        },
+        "automatic_retry": false,
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-verify-success-summary/v1",
+          "detail_level": "digest-verification-evidence",
+          "fixed_projection_limit_bytes": 22528,
+          "stdout_budget_bytes": 24576,
+          "session_context_reserve_bytes": 2048,
+          "projected_payload_bytes": 6253,
+          "verification_canonical_sha256": "ef71119327af4944fd919bc0d10959225f92881b5a509d0813c64778df7852c3",
+          "assertion_count": 1,
+          "passed_assertion_count": 1,
+          "readback_count": 0,
+          "full_verification_evidence_in_stdout": false,
+          "full_verification_evidence_persisted": true,
+          "journal_event": "verification_recorded",
+          "agent_result_exact": true,
+          "cleanup_exact": true,
+          "truncated": false
+        },
+        "recovery": {
+          "contract": "waapi-skill.recovery/v1",
+          "stage": "known_write_outcome",
+          "project_write_outcome": "executed_not_business_verified",
+          "modification_policy": "ask_before_changes",
+          "read_only_continuation_allowed": true,
+          "cleanup_complete": true,
+          "additional_read_permission_required": false,
+          "scope": "existing_authorized_task_only",
+          "actions": [
+            "inspect_transaction",
+            "independent_read_only_diagnosis"
+          ],
+          "max_reconnect_attempts": 1,
+          "service_start_requires_existing_task_authorization": true,
+          "original_write_replay_allowed": false,
+          "next_change": "preview_then_explicit_confirmation"
+        },
+        "session_context": {
+          "contract": "waapi-skill.session-context/v2",
+          "available": true,
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "adapter_version": "2025.1",
+          "adapter_version_source": "live_detection",
+          "project_modification_policy": "ask_before_changes",
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "one_time_introduction": {
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "atomic": true,
+            "style": "natural_prose_in_user_language",
+            "facts": {
+              "skill_name": "waapi-skill",
+              "endpoint_url": "ws://127.0.0.1:8080/waapi",
+              "adapter_version": "2025.1",
+              "project_modification_policy": "ask_before_changes",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ]
+            },
+            "machine_readable_result_policy": "separate_progress_message"
+          }
+        },
+        "agent_result": {
+          "operation": "waapi.call",
+          "transaction_id": "tx1-fh3fr18awfzchmgmw8jp",
+          "artifact_hash": "2393e2a5e30155265a077078d56b1aa726405131786b7b769e376e1e432a9ffa",
+          "state": "result_schema_checked",
+          "executed": true,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "args": {},
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "verified": false,
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "closer",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "phase": "verified",
+              "lifecycle_action": "closer",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "result": {
+            "return": 36448
+          }
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "outcomes": {
+    "profiler-rtpcs-observation": {
+      "outcome": "PASS",
+      "evidence": {
+        "position_ms": 30837,
+        "observation_status": "PASS",
+        "owned_identity_observed": true,
+        "attribution_scope": "owned-rtpc-read",
+        "agent_result": {
+          "profiler_position": "30837",
+          "return": [
+            {
+              "gameObjectId": 18446744073709551615,
+              "id": "{B618CC3F-04FA-4149-A36B-37B8A1F2B642}",
+              "name": "MIDI pitch bend",
+              "value": 64.0
+            },
+            {
+              "gameObjectId": 18446744073709551615,
+              "id": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+              "name": "Engine_Load",
+              "value": 1.0
+            },
+            {
+              "gameObjectId": 18446744073709551615,
+              "id": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+              "name": "RPM",
+              "value": 1000.0
+            },
+            {
+              "gameObjectId": 18446744073709551614,
+              "id": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+              "name": "Engine_Load",
+              "value": 1.0
+            },
+            {
+              "gameObjectId": 18446744073709551614,
+              "id": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+              "name": "RPM",
+              "value": 1000.0
+            }
+          ],
+          "returned_count": 5,
+          "total_count": 5,
+          "truncated": false,
+          "complete": true,
+          "observation": "retained_profiler_capture_snapshot",
+          "instantaneous_native_resource_authority": false,
+          "snapshot_sha256": "190c892f5826632bad9c5492704942850347a4eb63afd65c65e0fd66df77a52f",
+          "expires_at": 1792792419,
+          "page": {
+            "offset_from_end": 0,
+            "next_offset_from_end": 5,
+            "order": "newest_range_first_native_order_within_range"
+          }
+        },
+        "nonempty": true,
+        "complete": true,
+        "owned_game_object_row_indexes": [
+          3,
+          4
+        ],
+        "rpm_read_row_indexes": [
+          2,
+          4
+        ],
+        "setter_effect_verified": false,
+        "association_boundary": "Actual owned/global RPM read with observed Car voice/committed curve; no setter effect or per-row Sound identity"
+      }
+    },
+    "profiler-contributions-bus-observation": {
+      "outcome": "PASS",
+      "evidence": {
+        "position_ms": 30837,
+        "observation_status": "PASS",
+        "owned_identity_observed": true,
+        "attribution_scope": "owned-voice-path",
+        "agent_result": {
+          "contribution_reported": true,
+          "volume": -9.0,
+          "lpf": 0.0,
+          "hpf": 0.0,
+          "dsf": {
+            "feature_available": true,
+            "reported": true,
+            "value": 0.0
+          },
+          "objects": [
+            {
+              "name": "Main Audio Bus",
+              "children": [],
+              "parameters": [],
+              "volume": 0.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            },
+            {
+              "name": "Environmental",
+              "children": [],
+              "parameters": [],
+              "volume": 0.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            },
+            {
+              "name": "SFX",
+              "children": [],
+              "parameters": [],
+              "volume": 0.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            },
+            {
+              "name": "Cars",
+              "children": [],
+              "parameters": [],
+              "volume": 0.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            },
+            {
+              "name": "Porsche 911 - Blend Container",
+              "children": [],
+              "parameters": [
+                {
+                  "value": -3.0,
+                  "propertyType": "Volume",
+                  "driver": "SoundBankValue",
+                  "driverValue": -3.0,
+                  "reason": "SoundBankValue"
+                }
+              ],
+              "volume": -3.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            },
+            {
+              "name": "On-Load",
+              "children": [],
+              "parameters": [
+                {
+                  "value": -0.0,
+                  "propertyType": "Volume",
+                  "driver": "{EB92D28A-BB63-4332-8166-0AC95BAD9EFE}",
+                  "driverValue": 1.0,
+                  "reason": "RTPC"
+                },
+                {
+                  "value": 0.0,
+                  "propertyType": "MuteRatio",
+                  "driver": "{63D15B0F-16E7-4B8A-B9CA-7BF10AD315B4}",
+                  "driverValue": 1000.0,
+                  "reason": "RTPC"
+                }
+              ],
+              "volume": 0.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            },
+            {
+              "name": "Outside_Idle_1000",
+              "children": [],
+              "parameters": [
+                {
+                  "value": -6.0,
+                  "propertyType": "Volume",
+                  "driver": "SoundBankValue",
+                  "driverValue": -6.0,
+                  "reason": "SoundBankValue"
+                }
+              ],
+              "volume": -6.0,
+              "LPF": 0.0,
+              "HPF": 0.0,
+              "DSF": 0.0
+            }
+          ]
+        },
+        "nonempty": true,
+        "tree_nonempty": true,
+        "complete": true,
+        "owned_game_object_row_indexes": []
+      }
+    }
+  },
+  "cleanup": {
+    "complete": true,
+    "receipts": [
+      {
+        "action": "stop-capture",
+        "result": {
+          "ok": true,
+          "status": "result_schema_checked",
+          "contract": "waapi-skill.gateway-result/v1",
+          "command": "verify",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "detected_version": "2025.1",
+          "is_command_line": false,
+          "transaction_id": "tx1-fh3fr18awfzchmgmw8jp",
+          "state": "result_schema_checked",
+          "artifact_hash": "2393e2a5e30155265a077078d56b1aa726405131786b7b769e376e1e432a9ffa",
+          "verification": {
+            "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+            "contract": "waapi-skill.operation-verification/v1",
+            "operation": "waapi.call",
+            "status": "result_schema_checked",
+            "ok": true,
+            "verification_strength": "complete_reflected_schema",
+            "business_state_verified": false,
+            "assertion_count": 1,
+            "passed_assertion_count": 1,
+            "failed_assertion_count": 0,
+            "assertions_canonical_sha256": "1a6e05cf1d27afc4c5b47c8ae45bb1c85a6fa3acdce681516bfcc6e9638a7e9f",
+            "readback_count": 0,
+            "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "canonical_sha256": "ef71119327af4944fd919bc0d10959225f92881b5a509d0813c64778df7852c3",
+            "full_evidence_in_stdout": false
+          },
+          "guard_validation": {
+            "ok": true,
+            "status": "valid",
+            "project_guard_mode": "invariant",
+            "project_guard_phase": "post_verification",
+            "project_transition": null,
+            "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+            "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+            "expires_at": "2026-10-23T22:08:41.731412Z"
+          },
+          "project_call": {
+            "api": "ak.wwise.core.getProjectInfo",
+            "item_type": "function",
+            "category": "core",
+            "version": "2025.1",
+            "ok": true,
+            "dry_run": false,
+            "risk_level": "low",
+            "error_code": null,
+            "message": "ok",
+            "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791524024801000-c73b02b50c6a413c8613455ddefc1b9c-ak_wwise_core_getProjectInfo.json",
+            "timeout": 29.952235708013177
+          },
+          "executed": true,
+          "verified": false,
+          "result_schema_checked": true,
+          "verification_strength": "complete_reflected_schema",
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "closer",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+              "api": "ak.wwise.core.profiler.stopCapture",
+              "phase": "verified",
+              "lifecycle_action": "closer",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "automatic_retry": false,
+          "stdout_projection": {
+            "contract": "waapi-skill.transaction-verify-success-summary/v1",
+            "detail_level": "digest-verification-evidence",
+            "fixed_projection_limit_bytes": 22528,
+            "stdout_budget_bytes": 24576,
+            "session_context_reserve_bytes": 2048,
+            "projected_payload_bytes": 6253,
+            "verification_canonical_sha256": "ef71119327af4944fd919bc0d10959225f92881b5a509d0813c64778df7852c3",
+            "assertion_count": 1,
+            "passed_assertion_count": 1,
+            "readback_count": 0,
+            "full_verification_evidence_in_stdout": false,
+            "full_verification_evidence_persisted": true,
+            "journal_event": "verification_recorded",
+            "agent_result_exact": true,
+            "cleanup_exact": true,
+            "truncated": false
+          },
+          "recovery": {
+            "contract": "waapi-skill.recovery/v1",
+            "stage": "known_write_outcome",
+            "project_write_outcome": "executed_not_business_verified",
+            "modification_policy": "ask_before_changes",
+            "read_only_continuation_allowed": true,
+            "cleanup_complete": true,
+            "additional_read_permission_required": false,
+            "scope": "existing_authorized_task_only",
+            "actions": [
+              "inspect_transaction",
+              "independent_read_only_diagnosis"
+            ],
+            "max_reconnect_attempts": 1,
+            "service_start_requires_existing_task_authorization": true,
+            "original_write_replay_allowed": false,
+            "next_change": "preview_then_explicit_confirmation"
+          },
+          "session_context": {
+            "contract": "waapi-skill.session-context/v2",
+            "available": true,
+            "endpoint": {
+              "host": "127.0.0.1",
+              "port": 8080,
+              "url": "ws://127.0.0.1:8080/waapi"
+            },
+            "adapter_version": "2025.1",
+            "adapter_version_source": "live_detection",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ],
+            "one_time_introduction": {
+              "contract": "waapi-skill.session-introduction/v2",
+              "emit_condition": "visible_conversation_intro_absent",
+              "emit_timing": "first_agent_message_after_gateway_result",
+              "atomic": true,
+              "style": "natural_prose_in_user_language",
+              "facts": {
+                "skill_name": "waapi-skill",
+                "endpoint_url": "ws://127.0.0.1:8080/waapi",
+                "adapter_version": "2025.1",
+                "project_modification_policy": "ask_before_changes",
+                "available_project_modification_policies": [
+                  "read_only",
+                  "ask_before_changes",
+                  "allow_changes"
+                ]
+              },
+              "machine_readable_result_policy": "separate_progress_message"
+            }
+          },
+          "agent_result": {
+            "operation": "waapi.call",
+            "transaction_id": "tx1-fh3fr18awfzchmgmw8jp",
+            "artifact_hash": "2393e2a5e30155265a077078d56b1aa726405131786b7b769e376e1e432a9ffa",
+            "state": "result_schema_checked",
+            "executed": true,
+            "request": {
+              "arguments": {
+                "api": "ak.wwise.core.profiler.stopCapture",
+                "args": {},
+                "options": {}
+              },
+              "contract": "waapi-skill.operation-request/v1",
+              "operation": "waapi.call",
+              "version": "2025.1"
+            },
+            "verified": false,
+            "cleanup": {
+              "spec": {
+                "api": "ak.wwise.core.profiler.stopCapture",
+                "automatic_cleanup": false,
+                "automatic_retry": false,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "cleanup_requirement": "not_required",
+                "companion_request": null,
+                "contract": "waapi-skill.transaction-cleanup-spec/v1",
+                "lifecycle_action": "closer",
+                "lifecycle_strategy": "not_required",
+                "spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+                "warnings": []
+              },
+              "status": "not_required",
+              "projection": {
+                "contract": "waapi-skill.transaction-cleanup-projection/v1",
+                "cleanup_spec_sha256": "194eb83ab9bd9a75206ceaca7bbf4d41a3bec535854180ca5262f0d750684d0a",
+                "api": "ak.wwise.core.profiler.stopCapture",
+                "phase": "verified",
+                "lifecycle_action": "closer",
+                "lifecycle_strategy": "not_required",
+                "cleanup_requirement": "not_required",
+                "status": "not_required",
+                "companion_request": null,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "warnings": [],
+                "automatic_cleanup": false,
+                "automatic_retry": false
+              }
+            },
+            "result": {
+              "return": 36448
+            }
+          }
+        }
+      },
+      {
+        "action": "stop-transport",
+        "result": {
+          "ok": true,
+          "status": "verified",
+          "contract": "waapi-skill.gateway-result/v1",
+          "command": "verify",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "detected_version": "2025.1",
+          "is_command_line": false,
+          "transaction_id": "tx1-4ze67z0ms8807p80fsgk",
+          "state": "verified",
+          "artifact_hash": "368a360b7cd37a81e8a81316d4136818b61bc5e5fc48ca090f243ddafff9ebec",
+          "verification": {
+            "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+            "contract": "waapi-skill.operation-verification/v1",
+            "operation": "waapi.call",
+            "status": "verified",
+            "ok": true,
+            "verification_strength": "bounded_transport_state_observation",
+            "business_state_verified": true,
+            "assertion_count": 5,
+            "passed_assertion_count": 5,
+            "failed_assertion_count": 0,
+            "assertions_canonical_sha256": "9001dd2886dbd9b91e3c451d40901004116ba6eab2c47d485546babcb7ad3762",
+            "readback_count": 3,
+            "readbacks_canonical_sha256": "b95a2ea1e58d0832def96f9406e24886172944ab710c133554584478b47f7b06",
+            "canonical_sha256": "4425194d2e838cd22604f204c718c956fb6357565403525d605495468b364c75",
+            "full_evidence_in_stdout": false,
+            "verification_scope": {
+              "comparison": "one_state_read_per_preview_target",
+              "continuous_state_verified": false,
+              "atomic_scope_verified": false,
+              "causality_verified": false,
+              "observation": {
+                "kind": "transport-action-observation",
+                "action": "stop",
+                "scope": "one-transport",
+                "membership_matches": true,
+                "targets": [
+                  {
+                    "transport": 0,
+                    "before_state": null,
+                    "expected_state": "stopped",
+                    "observed_state": "stopped",
+                    "outcome": "matched"
+                  }
+                ]
+              }
+            }
+          },
+          "guard_validation": {
+            "ok": true,
+            "status": "valid",
+            "project_guard_mode": "invariant",
+            "project_guard_phase": "post_verification",
+            "project_transition": null,
+            "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+            "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+            "expires_at": "2026-10-23T22:08:46.536346Z"
+          },
+          "project_call": {
+            "api": "ak.wwise.core.getProjectInfo",
+            "item_type": "function",
+            "category": "core",
+            "version": "2025.1",
+            "ok": true,
+            "dry_run": false,
+            "risk_level": "low",
+            "error_code": null,
+            "message": "ok",
+            "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791528905135000-a9bbdd2aa13846caaec2038646bc2437-ak_wwise_core_getProjectInfo.json",
+            "timeout": 29.952904624980874
+          },
+          "executed": true,
+          "verified": true,
+          "result_schema_checked": false,
+          "verification_strength": "bounded_transport_state_observation",
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.transport.executeAction",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+              "api": "ak.wwise.core.transport.executeAction",
+              "phase": "verified",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "automatic_retry": false,
+          "stdout_projection": {
+            "contract": "waapi-skill.transaction-verify-success-summary/v1",
+            "detail_level": "digest-verification-evidence",
+            "fixed_projection_limit_bytes": 22528,
+            "stdout_budget_bytes": 24576,
+            "session_context_reserve_bytes": 2048,
+            "projected_payload_bytes": 6875,
+            "verification_canonical_sha256": "4425194d2e838cd22604f204c718c956fb6357565403525d605495468b364c75",
+            "assertion_count": 5,
+            "passed_assertion_count": 5,
+            "readback_count": 3,
+            "full_verification_evidence_in_stdout": false,
+            "full_verification_evidence_persisted": true,
+            "journal_event": "verification_recorded",
+            "agent_result_exact": true,
+            "cleanup_exact": true,
+            "truncated": false
+          },
+          "recovery": {
+            "contract": "waapi-skill.recovery/v1",
+            "stage": "known_write_outcome",
+            "project_write_outcome": "verified",
+            "modification_policy": "ask_before_changes",
+            "read_only_continuation_allowed": true,
+            "cleanup_complete": true,
+            "additional_read_permission_required": false,
+            "scope": "existing_authorized_task_only",
+            "actions": [
+              "inspect_transaction",
+              "independent_read_only_diagnosis"
+            ],
+            "max_reconnect_attempts": 1,
+            "service_start_requires_existing_task_authorization": true,
+            "original_write_replay_allowed": false,
+            "next_change": "preview_then_explicit_confirmation"
+          },
+          "session_context": {
+            "contract": "waapi-skill.session-context/v2",
+            "available": true,
+            "endpoint": {
+              "host": "127.0.0.1",
+              "port": 8080,
+              "url": "ws://127.0.0.1:8080/waapi"
+            },
+            "adapter_version": "2025.1",
+            "adapter_version_source": "live_detection",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ],
+            "one_time_introduction": {
+              "contract": "waapi-skill.session-introduction/v2",
+              "emit_condition": "visible_conversation_intro_absent",
+              "emit_timing": "first_agent_message_after_gateway_result",
+              "atomic": true,
+              "style": "natural_prose_in_user_language",
+              "facts": {
+                "skill_name": "waapi-skill",
+                "endpoint_url": "ws://127.0.0.1:8080/waapi",
+                "adapter_version": "2025.1",
+                "project_modification_policy": "ask_before_changes",
+                "available_project_modification_policies": [
+                  "read_only",
+                  "ask_before_changes",
+                  "allow_changes"
+                ]
+              },
+              "machine_readable_result_policy": "separate_progress_message"
+            }
+          },
+          "agent_result": {
+            "operation": "waapi.call",
+            "transaction_id": "tx1-4ze67z0ms8807p80fsgk",
+            "artifact_hash": "368a360b7cd37a81e8a81316d4136818b61bc5e5fc48ca090f243ddafff9ebec",
+            "state": "verified",
+            "executed": true,
+            "request": {
+              "arguments": {
+                "api": "ak.wwise.core.transport.executeAction",
+                "args": {
+                  "action": "stop",
+                  "transport": 0
+                },
+                "options": {}
+              },
+              "contract": "waapi-skill.operation-request/v1",
+              "operation": "waapi.call",
+              "version": "2025.1"
+            },
+            "verified": true,
+            "cleanup": {
+              "spec": {
+                "api": "ak.wwise.core.transport.executeAction",
+                "automatic_cleanup": false,
+                "automatic_retry": false,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "cleanup_requirement": "not_required",
+                "companion_request": null,
+                "contract": "waapi-skill.transaction-cleanup-spec/v1",
+                "lifecycle_action": "none",
+                "lifecycle_strategy": "not_required",
+                "spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+                "warnings": []
+              },
+              "status": "not_required",
+              "projection": {
+                "contract": "waapi-skill.transaction-cleanup-projection/v1",
+                "cleanup_spec_sha256": "dc4ab6826de0b20d624179cb29d6feec74bc435580df0fd691f1ffdf501bed3d",
+                "api": "ak.wwise.core.transport.executeAction",
+                "phase": "verified",
+                "lifecycle_action": "none",
+                "lifecycle_strategy": "not_required",
+                "cleanup_requirement": "not_required",
+                "status": "not_required",
+                "companion_request": null,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "warnings": [],
+                "automatic_cleanup": false,
+                "automatic_retry": false
+              }
+            },
+            "result": {}
+          }
+        }
+      },
+      {
+        "action": "destroy-transport",
+        "result": {
+          "ok": true,
+          "status": "verified",
+          "contract": "waapi-skill.gateway-result/v1",
+          "command": "verify",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "detected_version": "2025.1",
+          "is_command_line": false,
+          "transaction_id": "tx1-rmbvwm1yh8psk8r3dwnx",
+          "state": "verified",
+          "artifact_hash": "581e9625243b1ff93b4900325cef34b8b514c3dc608b9613093c09d2ccaa45f4",
+          "verification": {
+            "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+            "contract": "waapi-skill.operation-verification/v1",
+            "operation": "waapi.call",
+            "status": "verified",
+            "ok": true,
+            "verification_strength": "operation_specific_readback",
+            "business_state_verified": true,
+            "assertion_count": 4,
+            "passed_assertion_count": 4,
+            "failed_assertion_count": 0,
+            "assertions_canonical_sha256": "80ca81f9771dddd7c32885b9a300d76eacf198d7bafc1bb4564e73c7addd8ca6",
+            "readback_count": 1,
+            "readbacks_canonical_sha256": "937e73f9e4e48cc39b5169374fdf1119722ef5f71ec7728b59b8fb8d00dab7bc",
+            "canonical_sha256": "825e191eafd1dd97d5fbdbed23da7ac68c45522d80311c6316a35363f14d953e",
+            "full_evidence_in_stdout": false
+          },
+          "guard_validation": {
+            "ok": true,
+            "status": "valid",
+            "project_guard_mode": "invariant",
+            "project_guard_phase": "post_verification",
+            "project_transition": null,
+            "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+            "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+            "expires_at": "2026-10-23T22:08:52.268413Z"
+          },
+          "project_call": {
+            "api": "ak.wwise.core.getProjectInfo",
+            "item_type": "function",
+            "category": "core",
+            "version": "2025.1",
+            "ok": true,
+            "dry_run": false,
+            "risk_level": "low",
+            "error_code": null,
+            "message": "ok",
+            "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791534596410000-3c9f9ca42a4b4ab6ade81068c8d601ef-ak_wwise_core_getProjectInfo.json",
+            "timeout": 29.952565209008753
+          },
+          "executed": true,
+          "verified": true,
+          "result_schema_checked": false,
+          "verification_strength": "operation_specific_readback",
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.transport.destroy",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "closer",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "fb7bd3d2c4e4aa356a514c1c88d0217fb3d514cdda4dff4e83149cab9224fc1e",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "fb7bd3d2c4e4aa356a514c1c88d0217fb3d514cdda4dff4e83149cab9224fc1e",
+              "api": "ak.wwise.core.transport.destroy",
+              "phase": "verified",
+              "lifecycle_action": "closer",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "automatic_retry": false,
+          "stdout_projection": {
+            "contract": "waapi-skill.transaction-verify-success-summary/v1",
+            "detail_level": "digest-verification-evidence",
+            "fixed_projection_limit_bytes": 22528,
+            "stdout_budget_bytes": 24576,
+            "session_context_reserve_bytes": 2048,
+            "projected_payload_bytes": 6328,
+            "verification_canonical_sha256": "825e191eafd1dd97d5fbdbed23da7ac68c45522d80311c6316a35363f14d953e",
+            "assertion_count": 4,
+            "passed_assertion_count": 4,
+            "readback_count": 1,
+            "full_verification_evidence_in_stdout": false,
+            "full_verification_evidence_persisted": true,
+            "journal_event": "verification_recorded",
+            "agent_result_exact": true,
+            "cleanup_exact": true,
+            "truncated": false
+          },
+          "recovery": {
+            "contract": "waapi-skill.recovery/v1",
+            "stage": "known_write_outcome",
+            "project_write_outcome": "verified",
+            "modification_policy": "ask_before_changes",
+            "read_only_continuation_allowed": true,
+            "cleanup_complete": true,
+            "additional_read_permission_required": false,
+            "scope": "existing_authorized_task_only",
+            "actions": [
+              "inspect_transaction",
+              "independent_read_only_diagnosis"
+            ],
+            "max_reconnect_attempts": 1,
+            "service_start_requires_existing_task_authorization": true,
+            "original_write_replay_allowed": false,
+            "next_change": "preview_then_explicit_confirmation"
+          },
+          "session_context": {
+            "contract": "waapi-skill.session-context/v2",
+            "available": true,
+            "endpoint": {
+              "host": "127.0.0.1",
+              "port": 8080,
+              "url": "ws://127.0.0.1:8080/waapi"
+            },
+            "adapter_version": "2025.1",
+            "adapter_version_source": "live_detection",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ],
+            "one_time_introduction": {
+              "contract": "waapi-skill.session-introduction/v2",
+              "emit_condition": "visible_conversation_intro_absent",
+              "emit_timing": "first_agent_message_after_gateway_result",
+              "atomic": true,
+              "style": "natural_prose_in_user_language",
+              "facts": {
+                "skill_name": "waapi-skill",
+                "endpoint_url": "ws://127.0.0.1:8080/waapi",
+                "adapter_version": "2025.1",
+                "project_modification_policy": "ask_before_changes",
+                "available_project_modification_policies": [
+                  "read_only",
+                  "ask_before_changes",
+                  "allow_changes"
+                ]
+              },
+              "machine_readable_result_policy": "separate_progress_message"
+            }
+          },
+          "agent_result": {
+            "operation": "waapi.call",
+            "transaction_id": "tx1-rmbvwm1yh8psk8r3dwnx",
+            "artifact_hash": "581e9625243b1ff93b4900325cef34b8b514c3dc608b9613093c09d2ccaa45f4",
+            "state": "verified",
+            "executed": true,
+            "request": {
+              "arguments": {
+                "api": "ak.wwise.core.transport.destroy",
+                "args": {
+                  "transport": 0
+                },
+                "options": {}
+              },
+              "contract": "waapi-skill.operation-request/v1",
+              "operation": "waapi.call",
+              "version": "2025.1"
+            },
+            "verified": true,
+            "cleanup": {
+              "spec": {
+                "api": "ak.wwise.core.transport.destroy",
+                "automatic_cleanup": false,
+                "automatic_retry": false,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "cleanup_requirement": "not_required",
+                "companion_request": null,
+                "contract": "waapi-skill.transaction-cleanup-spec/v1",
+                "lifecycle_action": "closer",
+                "lifecycle_strategy": "not_required",
+                "spec_sha256": "fb7bd3d2c4e4aa356a514c1c88d0217fb3d514cdda4dff4e83149cab9224fc1e",
+                "warnings": []
+              },
+              "status": "not_required",
+              "projection": {
+                "contract": "waapi-skill.transaction-cleanup-projection/v1",
+                "cleanup_spec_sha256": "fb7bd3d2c4e4aa356a514c1c88d0217fb3d514cdda4dff4e83149cab9224fc1e",
+                "api": "ak.wwise.core.transport.destroy",
+                "phase": "verified",
+                "lifecycle_action": "closer",
+                "lifecycle_strategy": "not_required",
+                "cleanup_requirement": "not_required",
+                "status": "not_required",
+                "companion_request": null,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "warnings": [],
+                "automatic_cleanup": false,
+                "automatic_retry": false
+              }
+            },
+            "business_result": {
+              "contract": "waapi-skill.runtime-control-result/v1",
+              "retired_transport_handle_count": 1
+            },
+            "result": {}
+          }
+        }
+      },
+      {
+        "action": "disable-capture-read-data",
+        "result": {
+          "ok": true,
+          "status": "result_schema_checked",
+          "contract": "waapi-skill.gateway-result/v1",
+          "command": "verify",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 8080,
+            "url": "ws://127.0.0.1:8080/waapi"
+          },
+          "detected_version": "2025.1",
+          "is_command_line": false,
+          "transaction_id": "tx1-q8tx8v7z00hmyy9jmryv",
+          "state": "result_schema_checked",
+          "artifact_hash": "5250da8a30544280d3460aed0d0651b7b5861ab262d8fee8131e54caa40cb20d",
+          "verification": {
+            "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+            "contract": "waapi-skill.operation-verification/v1",
+            "operation": "waapi.call",
+            "status": "result_schema_checked",
+            "ok": true,
+            "verification_strength": "complete_reflected_schema",
+            "business_state_verified": false,
+            "assertion_count": 1,
+            "passed_assertion_count": 1,
+            "failed_assertion_count": 0,
+            "assertions_canonical_sha256": "0cea22610e58139bf2098c21c6e866f7c641430515dc2dde25531a5efe47f8dd",
+            "readback_count": 0,
+            "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "canonical_sha256": "d5b357d2c9e6f3993fadaa9040c63e34a4db67ac001976afbdb3fe7326a058fa",
+            "full_evidence_in_stdout": false,
+            "verification_scope": {
+              "strategy": "native_result_schema_only",
+              "enabled_settings_verified": false,
+              "empty_effect_verified": false,
+              "repeated_data_set_resolution_verified": false,
+              "prior_settings_restoration_verified": false,
+              "boundary": "Native acknowledgment does not establish final enabled settings, empty-list effects, repeated-data-set resolution, or prior-setting restoration."
+            }
+          },
+          "guard_validation": {
+            "ok": true,
+            "status": "valid",
+            "project_guard_mode": "invariant",
+            "project_guard_phase": "post_verification",
+            "project_transition": null,
+            "project_guard_fingerprint": "068442c2c60f493e46a0e50883ddc5725c92e042e3d8b792fa38f3de59f3a21f",
+            "runtime_guard_fingerprint": "3891e5debc1182e05cd72ad706d5d3b6a3bc68f3b03d4784ae9463b0856359db",
+            "expires_at": "2026-10-23T22:08:57.036013Z"
+          },
+          "project_call": {
+            "api": "ak.wwise.core.getProjectInfo",
+            "item_type": "function",
+            "category": "core",
+            "version": "2025.1",
+            "ok": true,
+            "dry_run": false,
+            "risk_level": "low",
+            "error_code": null,
+            "message": "ok",
+            "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/authoring-nodes/d6e9da42fb2f751cbc535eeb/native-evidence/1792791539386218000-41e7f9994ace455c858df157c3ca4ddf-ak_wwise_core_getProjectInfo.json",
+            "timeout": 29.952640084025916
+          },
+          "executed": true,
+          "verified": false,
+          "result_schema_checked": true,
+          "verification_strength": "complete_reflected_schema",
+          "cleanup": {
+            "spec": {
+              "api": "ak.wwise.core.profiler.enableProfilerData",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+              "warnings": []
+            },
+            "status": "not_required",
+            "projection": {
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "cleanup_spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+              "api": "ak.wwise.core.profiler.enableProfilerData",
+              "phase": "verified",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "cleanup_requirement": "not_required",
+              "status": "not_required",
+              "companion_request": null,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "warnings": [],
+              "automatic_cleanup": false,
+              "automatic_retry": false
+            }
+          },
+          "automatic_retry": false,
+          "stdout_projection": {
+            "contract": "waapi-skill.transaction-verify-success-summary/v1",
+            "detail_level": "digest-verification-evidence",
+            "fixed_projection_limit_bytes": 22528,
+            "stdout_budget_bytes": 24576,
+            "session_context_reserve_bytes": 2048,
+            "projected_payload_bytes": 7027,
+            "verification_canonical_sha256": "d5b357d2c9e6f3993fadaa9040c63e34a4db67ac001976afbdb3fe7326a058fa",
+            "assertion_count": 1,
+            "passed_assertion_count": 1,
+            "readback_count": 0,
+            "full_verification_evidence_in_stdout": false,
+            "full_verification_evidence_persisted": true,
+            "journal_event": "verification_recorded",
+            "agent_result_exact": true,
+            "cleanup_exact": true,
+            "truncated": false
+          },
+          "recovery": {
+            "contract": "waapi-skill.recovery/v1",
+            "stage": "known_write_outcome",
+            "project_write_outcome": "executed_not_business_verified",
+            "modification_policy": "ask_before_changes",
+            "read_only_continuation_allowed": true,
+            "cleanup_complete": true,
+            "additional_read_permission_required": false,
+            "scope": "existing_authorized_task_only",
+            "actions": [
+              "inspect_transaction",
+              "independent_read_only_diagnosis"
+            ],
+            "max_reconnect_attempts": 1,
+            "service_start_requires_existing_task_authorization": true,
+            "original_write_replay_allowed": false,
+            "next_change": "preview_then_explicit_confirmation"
+          },
+          "session_context": {
+            "contract": "waapi-skill.session-context/v2",
+            "available": true,
+            "endpoint": {
+              "host": "127.0.0.1",
+              "port": 8080,
+              "url": "ws://127.0.0.1:8080/waapi"
+            },
+            "adapter_version": "2025.1",
+            "adapter_version_source": "live_detection",
+            "project_modification_policy": "ask_before_changes",
+            "available_project_modification_policies": [
+              "read_only",
+              "ask_before_changes",
+              "allow_changes"
+            ],
+            "one_time_introduction": {
+              "contract": "waapi-skill.session-introduction/v2",
+              "emit_condition": "visible_conversation_intro_absent",
+              "emit_timing": "first_agent_message_after_gateway_result",
+              "atomic": true,
+              "style": "natural_prose_in_user_language",
+              "facts": {
+                "skill_name": "waapi-skill",
+                "endpoint_url": "ws://127.0.0.1:8080/waapi",
+                "adapter_version": "2025.1",
+                "project_modification_policy": "ask_before_changes",
+                "available_project_modification_policies": [
+                  "read_only",
+                  "ask_before_changes",
+                  "allow_changes"
+                ]
+              },
+              "machine_readable_result_policy": "separate_progress_message"
+            }
+          },
+          "agent_result": {
+            "operation": "waapi.call",
+            "transaction_id": "tx1-q8tx8v7z00hmyy9jmryv",
+            "artifact_hash": "5250da8a30544280d3460aed0d0651b7b5861ab262d8fee8131e54caa40cb20d",
+            "state": "result_schema_checked",
+            "executed": true,
+            "request": {
+              "arguments": {
+                "api": "ak.wwise.core.profiler.enableProfilerData",
+                "args": {
+                  "dataTypes": [
+                    {
+                      "dataType": "voices",
+                      "enable": false
+                    },
+                    {
+                      "dataType": "voiceInspector",
+                      "enable": false
+                    },
+                    {
+                      "dataType": "gameSyncs",
+                      "enable": false
+                    }
+                  ]
+                },
+                "options": {}
+              },
+              "contract": "waapi-skill.operation-request/v1",
+              "operation": "waapi.call",
+              "version": "2025.1"
+            },
+            "verified": false,
+            "cleanup": {
+              "spec": {
+                "api": "ak.wwise.core.profiler.enableProfilerData",
+                "automatic_cleanup": false,
+                "automatic_retry": false,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "cleanup_requirement": "not_required",
+                "companion_request": null,
+                "contract": "waapi-skill.transaction-cleanup-spec/v1",
+                "lifecycle_action": "none",
+                "lifecycle_strategy": "not_required",
+                "spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+                "warnings": []
+              },
+              "status": "not_required",
+              "projection": {
+                "contract": "waapi-skill.transaction-cleanup-projection/v1",
+                "cleanup_spec_sha256": "1efc439353a6f420d1683a44bf4ed2935401c6cbd5cff073face324b4f9c58fc",
+                "api": "ak.wwise.core.profiler.enableProfilerData",
+                "phase": "verified",
+                "lifecycle_action": "none",
+                "lifecycle_strategy": "not_required",
+                "cleanup_requirement": "not_required",
+                "status": "not_required",
+                "companion_request": null,
+                "binding": {
+                  "kind": "none",
+                  "materialized": true
+                },
+                "warnings": [],
+                "automatic_cleanup": false,
+                "automatic_retry": false
+              }
+            },
+            "result": {}
+          }
+        }
+      }
+    ],
+    "errors": [],
+    "capture_settings_prior_state_restored": false,
+    "audition_media_prior_state_restored": false,
+    "capture_settings_scope": "Explicit enable/disable pair only; no prior global settings getter",
+    "transport_stopped_observation": {
+      "transport_handle": "trh1-45b1c613ee0a3e03d59f526de9d90566",
+      "state": "stopped"
+    }
+  },
+  "limits": {
+    "public_calls": 192,
+    "total_reply_bytes": 8388608,
+    "reply_bytes": 1048576,
+    "meter_pages": 8,
+    "reader_calls": 4,
+    "reader_rows": 64,
+    "retained_cpu_pages": 8
+  },
+  "public_call_count": 86,
+  "total_reply_bytes": 685372,
+  "scope": "Only selected missing reads at this new capture; historical native facts are separate and #186 remains incomplete",
+  "capture_read_batch": true,
+  "missing_only": true,
+  "reused_capture_evidence": {
+    "candidate": "a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8",
+    "root": "r104-capture-reads-native-2025-r1",
+    "capture_time_ms": 46869,
+    "original_verdict": "FAIL",
+    "boundary": "Separate retained facts; not measurements at this new capture time"
+  },
+  "remaining_same_parent_obligations": {
+    "profiler-loaded-media-observation": [
+      "2023.1",
+      "2024.1",
+      "2025.1"
+    ]
+  },
+  "fixture_media": {
+    "proof": {
+      "contract": "waapi-skill.regular-file-proof/v1",
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/sandbox-root/sample-project-e890497370194ec8a73e33ed1253691e/Originals/SFX/Car Engine/Porsche_Outside_Idle_1000_01.wav",
+      "size": 536764,
+      "sha256": "939e2d62dd820cb10ba571d769f7dbc0b5a3f170efaed94014e46df6f1e4038e",
+      "mtime_ns": 1792791460281192437,
+      "device": 16777232,
+      "inode": 333477605,
+      "proof_sha256": "7dd08214620063fc48cf46d13dba04e6d4ceadaa976d038330be7b30ec67ee8e"
+    },
+    "duration_seconds": 5.5488333333333335,
+    "source_scope": "matching installed original; existing committed source binding",
+    "staging": {
+      "source": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Applications/Audiokinetic/SampleProject2025.1.7.9143/SampleProject/Originals/SFX/Car Engine/Porsche_Outside_Idle_1000_01.wav",
+        "size": 536764,
+        "sha256": "939e2d62dd820cb10ba571d769f7dbc0b5a3f170efaed94014e46df6f1e4038e",
+        "mtime_ns": 1777575649553839738,
+        "device": 16777232,
+        "inode": 60546739,
+        "proof_sha256": "f9da5b0ce970da38da9a0f97b84a22517870dc641018547dc904f09eff575cc0"
+      },
+      "staged": {
+        "contract": "waapi-skill.regular-file-proof/v1",
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r105-missing-profiler-native-2025-r1/owned/sandbox-root/sample-project-e890497370194ec8a73e33ed1253691e/Originals/SFX/Car Engine/Porsche_Outside_Idle_1000_01.wav",
+        "size": 536764,
+        "sha256": "939e2d62dd820cb10ba571d769f7dbc0b5a3f170efaed94014e46df6f1e4038e",
+        "mtime_ns": 1792791460281192437,
+        "device": 16777232,
+        "inode": 333477605,
+        "proof_sha256": "7dd08214620063fc48cf46d13dba04e6d4ceadaa976d038330be7b30ec67ee8e"
+      },
+      "version": "2025.1",
+      "source_build": "2025.1.7.9143",
+      "authored_xml_changed": false,
+      "provenance": "matching installed original; existing committed source binding"
+    },
+    "media_id": 416741917
+  },
+  "fixture_before": {
+    "sound": {
+      "id": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+      "name": "Outside_Idle_1000",
+      "type": "Sound",
+      "path": "\\Containers\\Car Engine\\Porsche 911 - Blend Container\\Outside_Idle_1000",
+      "output_bus": {
+        "id": "{33329D23-BCDD-4D1A-9734-2403A3428FAE}",
+        "name": "Cars"
+      },
+      "parent": {
+        "id": "{97A58685-6231-4227-9BAB-451E089615A8}",
+        "name": "Porsche 911 - Blend Container"
+      },
+      "override_output": false,
+      "active_source": {
+        "id": "{48770A4D-B8C3-41CF-AE3E-FB8651347736}",
+        "name": "Porsche_Outside_Idle_1000_01"
+      },
+      "properties": {
+        "IsLoopingEnabled": true,
+        "IsLoopingInfinite": true,
+        "IsStreamingEnabled": false
+      }
+    },
+    "bus": {
+      "id": "{33329D23-BCDD-4D1A-9734-2403A3428FAE}",
+      "name": "Cars",
+      "type": "Bus",
+      "path": "\\Busses\\Default Work Unit\\Main Audio Bus\\Environmental\\SFX\\Cars",
+      "volume_db": 0.0,
+      "parent": {
+        "id": "{ED2BCAC8-D7B6-4448-8900-439B557894F4}",
+        "name": "SFX"
+      }
+    },
+    "parent": {
+      "id": "{97A58685-6231-4227-9BAB-451E089615A8}",
+      "name": "Porsche 911 - Blend Container",
+      "type": "BlendContainer",
+      "path": "\\Containers\\Car Engine\\Porsche 911 - Blend Container"
+    },
+    "source": {
+      "id": "{48770A4D-B8C3-41CF-AE3E-FB8651347736}",
+      "name": "Porsche_Outside_Idle_1000_01",
+      "type": "AudioFileSource",
+      "path": "\\Containers\\Car Engine\\Porsche 911 - Blend Container\\Outside_Idle_1000\\Porsche_Outside_Idle_1000_01"
+    }
+  },
+  "transport_playing_observation": {
+    "transport_handle": "trh1-45b1c613ee0a3e03d59f526de9d90566",
+    "state": "playing"
+  },
+  "transport_association": {
+    "object": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+    "gameObject": 18446744073709551614,
+    "transport": 0
+  },
+  "capture_position": {
+    "profiler_cursor": "capture-latest",
+    "available": true,
+    "position_ms": 30837
+  },
+  "reader_call_count": 4,
+  "seed_observations": {
+    "profiler-voices-observation": {
+      "outcome": "PASS",
+      "evidence": {
+        "position_ms": 30837,
+        "observation_status": "PASS",
+        "owned_identity_observed": true,
+        "agent_result": {
+          "profiler_position": "30837",
+          "return": [
+            {
+              "baseVolume": -8.989571571350098,
+              "envelope": 0.0,
+              "gameAuxSendVolume": 0.0,
+              "gameObjectID": 18446744073709551614,
+              "gameObjectName": "Transport/Soundcaster",
+              "highPassFilter": 0.0,
+              "isForcedVirtual": false,
+              "isStarted": true,
+              "isVirtual": false,
+              "lowPassFilter": 0.0,
+              "normalizationGain": 0.0,
+              "objectGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+              "objectName": "Outside_Idle_1000",
+              "pipelineID": 1,
+              "playTargetGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+              "playTargetID": 564536357,
+              "playTargetName": "Outside_Idle_1000",
+              "playingID": 1,
+              "priority": 50,
+              "soundID": 564536357,
+              "voice_instance_handle": "rph1-34dde8b3fa49a678f080933dbc017979-602daa42c93780b1"
+            }
+          ],
+          "returned_count": 1,
+          "total_count": 1,
+          "truncated": false,
+          "complete": true,
+          "observation": "retained_profiler_capture_snapshot",
+          "instantaneous_native_resource_authority": false,
+          "snapshot_sha256": "bc6e677873f8995ba184f8283c0d1146c288666d241b9f9b13899b751f3f5433",
+          "expires_at": 1792792418,
+          "page": {
+            "offset_from_end": 0,
+            "next_offset_from_end": 1,
+            "order": "newest_range_first_native_order_within_range"
+          }
+        },
+        "identity_ties": {
+          "sound_row_indexes": [
+            0
+          ],
+          "bus_row_indexes": [],
+          "transport_game_object_row_indexes": [
+            0
+          ]
+        },
+        "nonempty": true,
+        "complete": true
+      }
+    },
+    "profiler-busses-observation": {
+      "outcome": "PASS",
+      "evidence": {
+        "position_ms": 30837,
+        "observation_status": "PASS",
+        "owned_identity_observed": true,
+        "agent_result": {
+          "profiler_position": "30837",
+          "return": [
+            {
+              "depth": 0,
+              "deviceID": 11103295323711287626,
+              "downstreamGain": 0.0,
+              "effectCount": 1,
+              "gameObjectID": 18446744073709551614,
+              "gameObjectName": "Transport/Soundcaster",
+              "mixBusID": 2246998526,
+              "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "objectName": "Main Audio Bus",
+              "pipelineID": 2,
+              "voiceCount": 1,
+              "volume": 0.0,
+              "bus_instance_handle": "rph1-b72695d75a899d955b01f4e3c0abf38f-b6919dee59d73443"
+            }
+          ],
+          "returned_count": 1,
+          "total_count": 1,
+          "truncated": false,
+          "complete": true,
+          "observation": "retained_profiler_capture_snapshot",
+          "instantaneous_native_resource_authority": false,
+          "snapshot_sha256": "eca2582ce211afadfbcf9270a1e0e4507726642c1c049a7f9e1729204869a53f",
+          "expires_at": 1792792419,
+          "page": {
+            "offset_from_end": 0,
+            "next_offset_from_end": 1,
+            "order": "newest_range_first_native_order_within_range"
+          }
+        },
+        "identity_ties": {
+          "sound_row_indexes": [],
+          "bus_row_indexes": [],
+          "transport_game_object_row_indexes": [
+            0
+          ],
+          "mixing_bus_candidate_row_indexes": [
+            0
+          ],
+          "unique_owned_mixing_bus_row_indexes": [
+            0
+          ]
+        },
+        "nonempty": true,
+        "complete": true
+      }
+    }
+  },
+  "runtime_mixing_bus": {
+    "logical_output_bus_id": "{33329D23-BCDD-4D1A-9734-2403A3428FAE}",
+    "selected_observed_instance": {
+      "depth": 0,
+      "deviceID": 11103295323711287626,
+      "downstreamGain": 0.0,
+      "effectCount": 1,
+      "gameObjectID": 18446744073709551614,
+      "gameObjectName": "Transport/Soundcaster",
+      "mixBusID": 2246998526,
+      "objectGUID": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+      "objectName": "Main Audio Bus",
+      "pipelineID": 2,
+      "voiceCount": 1,
+      "volume": 0.0,
+      "bus_instance_handle": "rph1-b72695d75a899d955b01f4e3c0abf38f-b6919dee59d73443"
+    },
+    "logical_output_equals_runtime_bus": false,
+    "association_boundary": "Unique observed mixing pipeline on owned transport with isolated Car voice; no inferred logical-bus GUID equivalence or arbitrary path-order proof"
+  },
+  "fixture_after": {
+    "sound": {
+      "id": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+      "name": "Outside_Idle_1000",
+      "type": "Sound",
+      "path": "\\Containers\\Car Engine\\Porsche 911 - Blend Container\\Outside_Idle_1000",
+      "output_bus": {
+        "id": "{33329D23-BCDD-4D1A-9734-2403A3428FAE}",
+        "name": "Cars"
+      },
+      "parent": {
+        "id": "{97A58685-6231-4227-9BAB-451E089615A8}",
+        "name": "Porsche 911 - Blend Container"
+      },
+      "override_output": false,
+      "active_source": {
+        "id": "{48770A4D-B8C3-41CF-AE3E-FB8651347736}",
+        "name": "Porsche_Outside_Idle_1000_01"
+      },
+      "properties": {
+        "IsLoopingEnabled": true,
+        "IsLoopingInfinite": true,
+        "IsStreamingEnabled": false
+      }
+    },
+    "bus": {
+      "id": "{33329D23-BCDD-4D1A-9734-2403A3428FAE}",
+      "name": "Cars",
+      "type": "Bus",
+      "path": "\\Busses\\Default Work Unit\\Main Audio Bus\\Environmental\\SFX\\Cars",
+      "volume_db": 0.0,
+      "parent": {
+        "id": "{ED2BCAC8-D7B6-4448-8900-439B557894F4}",
+        "name": "SFX"
+      }
+    },
+    "parent": {
+      "id": "{97A58685-6231-4227-9BAB-451E089615A8}",
+      "name": "Porsche 911 - Blend Container",
+      "type": "BlendContainer",
+      "path": "\\Containers\\Car Engine\\Porsche 911 - Blend Container"
+    },
+    "source": {
+      "id": "{48770A4D-B8C3-41CF-AE3E-FB8651347736}",
+      "name": "Porsche_Outside_Idle_1000_01",
+      "type": "AudioFileSource",
+      "path": "\\Containers\\Car Engine\\Porsche 911 - Blend Container\\Outside_Idle_1000\\Porsche_Outside_Idle_1000_01"
+    }
+  }
+}

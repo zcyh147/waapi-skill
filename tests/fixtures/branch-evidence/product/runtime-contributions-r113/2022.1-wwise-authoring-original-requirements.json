@@ -1,0 +1,524 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema": {
+      "native_shape_sha256": "e0e16fc7da81d61753c4fc24e89ffa8ced04ffefa509d243fefd5403a159446e",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/bussesPipelineID/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/bussesPipelineID": {
+      "native_shape_sha256": "ccac4536dcfca098716b053665dd6b3ec502bd6ab1770b09968cd23062bb3614",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/bussesPipelineID/items": {
+      "native_shape_sha256": "8c07e37ce7b1b9922a43572eba7af1a34c07fbed304864c6dc92c28845e1c0cf",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/bussesPipelineID/items/$ref": {
+      "native_shape_sha256": "a7c33b767f3a046cc03145968e139ab49b4fb2f83327e040b58e342fd12f8b35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/@definition/waapi_definitions.json/definitions/pipelineID": {
+      "native_shape_sha256": "461047070d773fd9ceb5d3c0afee95f4000f45e429db54e3cbc1b923696e3001",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/bussesPipelineID/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/time": {
+      "native_shape_sha256": "7f480df1dc0d9d99fb572775dcede94faa5eea8df41fea527888cf65b814c873",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/time/$ref": {
+      "native_shape_sha256": "21c519ff0ebb2d6a94efdc2c7baeb5d9b18fca7526ca007f52c1a529de4c4413",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "native_shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "native_shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/voicePipelineID": {
+      "native_shape_sha256": "9008bc079652622749341d60acb17dcaf612c946eab3b93f9947a66a385b2f2f",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/properties/voicePipelineID/$ref": {
+      "native_shape_sha256": "a7c33b767f3a046cc03145968e139ab49b4fb2f83327e040b58e342fd12f8b35",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/argsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/optionsSchema": {
+      "native_shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/optionsSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/optionsSchema/@empty/object": {
+      "native_shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema": {
+      "native_shape_sha256": "e7a1754881184d8df7c15129da72ce2a96ffbb7a8ec60b88403873f255b29322",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return": {
+      "native_shape_sha256": "2edcecc22de7bd32391cce17a61187c68fea01ab5f0ada265d63bd990487d28b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/HPF": {
+      "native_shape_sha256": "de0a3696449399d7e476cf5017fc2706f1a3c7dec7a1997a4230713846fdc120",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/LPF": {
+      "native_shape_sha256": "7623f14dcde9b9cac6870c46c968800f1c804614cf58ffa54646180e6fd3f143",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/objects/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/objects": {
+      "native_shape_sha256": "dd6dcb7052c89794948efd8c966885b2d5fe38c1b0c384ed825095de5444e9a9",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/objects/items": {
+      "native_shape_sha256": "a7538f4fbef6d1023130c7125b2816b89a234ab1564a12cf007dad1eec4ac906",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/objects/items/$ref": {
+      "native_shape_sha256": "6a9b5fadc500490c8b335081b17a85839779678e0aad257723d06ccf883c982f",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject": {
+      "native_shape_sha256": "65a31a502cc581aebc372d674d16d60e772329b957474418d10aec3fa70f02f7",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/HPF/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/HPF": {
+      "native_shape_sha256": "16c7d1330491c9c0d57be9377198b943a8618e6eceb999fe4ea4e7a1f6d814a1",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/LPF/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/LPF": {
+      "native_shape_sha256": "b494e407de4c157cb9431b5a54d45709c44e8cff6abe2e07756f07cd61deddf6",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/children/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/children": {
+      "native_shape_sha256": "0b93f52bcb869adb6e57af32b4f949660b4948f08ae743406947ca1e27ba4555",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/children/@cardinality/empty": {
+      "native_shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/name/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/name": {
+      "native_shape_sha256": "4ec41ec866e472d4fc9a93b7bd9bc8d80a15ba7b70cbe23bbb04d456b527d2e1",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters": {
+      "native_shape_sha256": "1d2f0016795a2ed3ec8c2e15506d4767045bab9cd7329884d6740328f5824d2b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items": {
+      "native_shape_sha256": "28cc9789734b6656d4ecebcae07979710a37600efeccf359e7cb6be4b31113ab",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver": {
+      "native_shape_sha256": "fbcfeef2bcb8cf6d99c3c3377dc7751a3fa05149e94e897d26cc85db3b9243b6",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver/oneOf/0": {
+      "native_shape_sha256": "516f00be1aa88fb18253d512c7796068c845f46559d4dd3088bf36f08e5c78fd",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver/oneOf/0/$ref": {
+      "native_shape_sha256": "5b9617fb35d1bc6af57822cc6345f1ad1534fbdaf6a62b590cf1a0d837182ca2",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/guid": {
+      "native_shape_sha256": "5a3447bd06c164cb4662830b8cfc431068f428852ce10dc22d3621e0bb92b38b",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/guid/pattern": {
+      "native_shape_sha256": "013e52f4729bb581d4d79ab88bc00b2fd8a06520895a0758d8e915fddffb021b",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driver/oneOf/1": {
+      "native_shape_sha256": "a447367522635d326fba1c0c5d7921b7eb68b389f4e589c8cd90b3aa7836c313",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue": {
+      "native_shape_sha256": "4c2c9654b595b93018270b653e24c92310ee78d763581253b55ffe94a209974b",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/driverValue/oneOf/0": {
+      "native_shape_sha256": "eb7b98a5e774aa63d87ca9e1f84123190362c56da874419cb8e993b45101808e",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/propertyType/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/propertyType": {
+      "native_shape_sha256": "4d63e7d73346f39d469789392a625115e1825d8cbcc0fea7913d4c8a70f65d06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/reason/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/reason": {
+      "native_shape_sha256": "88d74d3177adbb0ec901f9d422c30de5c635aaf5c55dc3af0be74c12e5ae653d",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/properties/value": {
+      "native_shape_sha256": "6d16b344f1bb09b3750d37b8810e7fc8a66e43121e6a278d8a18984b8101b46e",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/items/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/@cardinality/empty": {
+      "native_shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/@cardinality/single": {
+      "native_shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/parameters/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/volume/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/properties/volume": {
+      "native_shape_sha256": "d2f29894ec7bd7426a1d93afb309f07683974689424b3ccbc54047d8d330bacf",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/@definition/waapi_definitions.json/definitions/voiceContributionsObject/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/objects/@cardinality/multiple": {
+      "native_shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume/@presence/present": {
+      "native_shape_sha256": "94332144d941eb1212c9af7f968e215a7042bf94925c9c10b21de97a2f0cea06",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/properties/volume": {
+      "native_shape_sha256": "c81019ae978f8dca2a5900b411d26decee118aad8501b0f2e6fd718e7d84fc5f",
+      "categories": [
+        "program",
+        "native"
+      ],
+      "reason": "Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/properties/return/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    },
+    "2022.1|wwise-authoring|2022.1.19.8584|function|ak.wwise.core.profiler.getVoiceContributions|/resultSchema/additionalProperties": {
+      "native_shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim"
+    }
+  }
+}
