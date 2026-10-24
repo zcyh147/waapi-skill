@@ -7,6 +7,20 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-24 R132 diagnostic readers, cursor compatibility and bounded collector
 
+The subsequent single native diagnostic at `fc28985c` ran on isolated macOS
+Authoring 2025.1.7.9143 in Automation Mode. It failed in 100.35s: the literal
+`states` and `suppportsRandomizer` projections returned empty objects, losing
+the requested identity fields. The omitted-options baseline and correctly
+spelled `supportsRandomizer` returned the owned Bus identity; the latter was
+false. All four native responses passed their schemas. These observations do
+not establish aliases or meaningful values for the two anomalous selectors.
+The final four category records remain BLOCKED, and the original failed sandbox
+is quarantined. All six capture cleanup steps succeeded; source files and
+project mtime were unchanged, and no owned Wwise/Wine process remained.
+Independent review checked packet seals, launch provenance, source preservation
+and final outcomes. No retry or regrade was performed. The local evidence root
+is `.waapi-skill-state/full-coverage/r132-meter-anomalies-native-2025-r1`.
+
 Reviewed integration `c8498cb3` adds the three diagnostic-reader and cursor
 evidence adapters. The 654 CPU/performance/streaming IDs use 18 retained
 same-host/build native observations and six grouped public program flows.
@@ -34,7 +48,8 @@ two unresolved 2025 spellings `states` and `suppportsRandomizer`. Eleven distinc
 fake-host checks exercise its actual final category writer, request outcomes,
 packet integrity/bounds, session loss, cleanup and single-node Automation Mode
 admission. It allows four fixed reads in one owned session; diagnostic completion
-never grants alias or business coverage. No native diagnostic has run yet.
+never grants alias or business coverage. Its later native outcome is recorded
+above separately from these fake-host checks.
 
 The merge's sole manifest check passed in 0.30s; the fixed Program roster has
 354 entries. Reviewed source-compatibility successor `33ef8cf8` preserves all
