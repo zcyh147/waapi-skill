@@ -137,7 +137,7 @@ def policy(entry):
 
 
 def counterexample_policy(branch,root=audit.ROOT):
-    """Closed four-ID compiler counterexamples retain their native business gate."""
+    """Closed log/cursor compiler counterexamples retain their native business gate."""
     if branch['id']not in review(root)['schema_counterexample_ids']:
         if branch['route'].endswith('|ak.wwise.core.profiler.moveCursor'):
             from tests.support.runtime_owned_control_evidence import cursor_counterexample_policy

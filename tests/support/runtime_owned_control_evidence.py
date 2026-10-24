@@ -15,7 +15,7 @@ PREFIX='ak.wwise.core.profiler.'
 METER_URIS=frozenset(PREFIX+n for n in ('registerMeter','unregisterMeter'))
 URIS=METER_URIS|{PREFIX+n for n in ('saveCapture','moveCursor','setCursorTime')}
 SUPPORT='tests/fixtures/runtime-owned-controls/support-review.json'
-SUPPORT_SHA='8fd6711d144a3bf2e30bee630adaaab2492ad8c376d29266e79168c1369f83f3'
+SUPPORT_SHA='78748bfeb8c2805009f48dd74c43f60f8f87c3cc77cf83119a8819ea5bfecfa7'
 CONTRACT='waapi-skill.retained-owned-control-assessment/v1'
 
 
