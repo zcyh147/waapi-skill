@@ -19,15 +19,15 @@ MAX_METADATA_ROWS = 4096
 MAX_METER_OBSERVATIONS = 64
 MAX_METER_OBSERVATION_BYTES = MAX_METER_OBSERVATIONS * 1024 * 1024
 MAX_CLARIFICATION_BYTES = 16 * 1024
-# Root projections describe metered Bus/AuxBus/device objects. Sound/media,
-# Action, playlist and SoundBank outputs remain available only at applicable
-# related endpoints through the existing related grammar, not as meter promises.
+# Root projections describe metered Bus/AuxBus/device objects, including their
+# aggregate media size. Source-specific media, Action, playlist and SoundBank
+# outputs remain scoped to applicable related endpoints, not meter promises.
 METER_OUTPUT_NAMES = frozenset('''
 notes volume-db output-bus parent owner work-unit included playable
 explicitly-muted explicitly-soloed implicitly-muted implicitly-soloed child-count
 plugin-name category file-path override-output class-id short-id
 work-unit-is-default work-unit-is-dirty work-unit-type work-unit-is-loaded
-object-size-bytes structure-size-bytes total-size-bytes state-groups
+object-size-bytes structure-size-bytes total-size-bytes media-size-bytes state-groups
 state-properties custom-states supports-randomizer supports-states
 '''.split())
 METER_FIELD_MODES = (
