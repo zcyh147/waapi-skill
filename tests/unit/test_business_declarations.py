@@ -1381,3 +1381,17 @@ def test_blend_track_relative_identity_requires_the_observed_version_profile(ver
 def test_scope_display_identity_does_not_relax_unobserved_types_or_versions(version, object_type, name):
     with pytest.raises(ValueError, match="absolute Wwise path or a reviewed derived display identity"):
         normalize_live_object_identity({"id": OBJECT_ID, "name": name, "type": object_type, "path": name}, version=version)
+
+
+@pytest.mark.parametrize('version', SUPPORTED_WWISE_VERSIONS)
+def test_unicode_context_matches_exactly_and_rejects_normalization_drift(version):
+    context = _context(project_path='/项目/é-🚗/SampleProject.wproj', wwise_version=version)
+    registry = BusinessHandleRegistry(context, token_bytes=lambda size: b'u' * size)
+    bound = registry.bind_object(object_id=OBJECT_ID, name='天气', object_type='ActorMixer',
+        path=r'\Actor-Mixer Hierarchy\Default Work Unit\天气')
+    assert registry.resolve_object(bound.handle, context=context) == bound
+    changed = _context(project_path='/项目/e\u0301-🚗/SampleProject.wproj', wwise_version=version)
+    with pytest.raises(BusinessDeclarationError) as caught:
+        registry.resolve_object(bound.handle, context=changed)
+    assert caught.value.repair['error_code'] == 'HANDLE_PROJECT_MISMATCH'
+    assert caught.value.repair['draft_changed'] is False

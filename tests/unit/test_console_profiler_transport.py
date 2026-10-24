@@ -417,3 +417,87 @@ def test_console_native_path_limit_counts_utf16_and_preserves_posix(tmp_path, mo
         assert final['transactions'] == [] and report['setup'] == {}
         assert not any(uri.startswith(('ak.wwise.core.transport.', 'ak.wwise.core.profiler.'))
             for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('changed_binding', [False, True])
+def test_unicode_project_draft_preserves_exact_binding(tmp_path, monkeypatch, version, changed_binding):
+    owned = tmp_path / '项目-é-🚗'
+    owned.mkdir()
+    client = _TransportCreateAssociationClient(owned, version=version,
+        observed_object='{11111111-1111-1111-1111-111111111111}')
+    env = _env(owned, version=version)
+    state = owned / 'state'
+    def run(*argv):
+        return gateway.execute_gateway(['--state-dir', str(state), *argv], env=env,
+            client_factory=lambda _: client)
+    code, started = run('draft-start', 'ak.wwise.core.transport.create')
+    assert code == 0, started
+    draft, authority = started['draft']['draft_id'], started['task_authority']
+    code, bound = run('draft-bind-object', draft, '--task-authority', authority,
+        '--expected-revision', str(started['draft']['revision']), '--role', 'target', '--object-id', client.target_id)
+    assert code == 0, bound
+    revision = bound['draft']['revision']
+    if changed_binding:
+        # Visually equivalent but byte-distinct project path must not acquire
+        # the original Draft/handle authority through Unicode normalization.
+        if version == '2021.1':
+            # This version reports the Project hierarchy path (\), not its
+            # file path, in the business context; change its live GUID instead.
+            original = client.call
+            def changed_project(uri, args=None, options=None):
+                result = original(uri, args, options)
+                if uri.endswith('object.get') and args.get('waql') == 'from type Project take 1':
+                    result['return'][0]['id'] = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+                return result
+            client.call = changed_project
+        else:
+            client.project_file = Path(str(client.project_file).replace('é', 'e\u0301'))
+    code, declared = run('draft-declare-runtime-control-plan', draft, '--task-authority', authority,
+        '--expected-revision', str(revision), '--target-handle', bound['bound_object']['handle'])
+    if changed_binding:
+        assert code == 2 and declared['error_code'] == 'OPERATION_DRAFT_BINDING_DRIFT', declared
+        code, shown = run('draft-inspect', draft, '--task-authority', authority)
+        assert code == 0 and shown['draft']['revision'] == revision, shown
+        assert not client.created
+        return
+    assert code == 0, declared
+    for phase in ('draft-check', 'preview-from-draft'):
+        code, declared = run(phase, draft, '--task-authority', authority,
+            '--expected-revision', str(declared['draft']['revision']))
+        assert code == 0, declared
+    transaction = declared['transaction_id']
+    code, shown = run('transaction-show', transaction)
+    assert code == 0 and shown['confirmation']['token']
+    assert not client.created
+    code, confirmed = run('confirm', transaction, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = run('execute', transaction)
+    assert code == 0 and executed['state'] == 'executed_unverified', executed
+    code, verified = run('verify', transaction)
+    assert code == 0 and verified['agent_result']['business_result']['transport_handle'].startswith('trh1-'), verified
+    code, repeated = run('execute', transaction)
+    assert code == 2, repeated
+    assert sum(uri == 'ak.wwise.core.transport.create' for uri, _, _ in client.calls) == 1
+
+
+def test_unicode_260_unit_original_reaches_archived_console_result(tmp_path, monkeypatch):
+    from tests.destructive.support.console_profiler_probe import NODE_NAME
+    from tests.destructive.support.profiler_capture import CAPTURE_CAR_SOURCE_ID, CAPTURE_CAR_MEDIA
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    stem = '项目-é-🚗-'
+    base = 'Z:' + (tmp_path / stem / 'SampleProject' / CAPTURE_CAR_MEDIA).as_posix()
+    owned = tmp_path / (stem + 'x' * (260 - len(base) - 2))
+    owned.mkdir()
+    context = _console_context(owned, monkeypatch)
+    workflow, runtime, client, _, _ = context
+    native = 'Z:' + (runtime.sandbox.sandbox_path / CAPTURE_CAR_MEDIA).as_posix()
+    assert len(native) + 2 == 260  # One supplementary character plus NUL.
+    client.rows[CAPTURE_CAR_SOURCE_ID]['originalFilePath'] = native
+    getattr(workflow, NODE_NAME)(runtime)
+    final = _finish(context, owned, monkeypatch, [(NODE_NAME, None)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    assert final['invocation']['outcome'] == 'PASS' and report['complete']
+    assert report['cleanup']['complete'] and report['fixture_before'] == report['fixture_after']
+    assert final['residual_state']['sandbox'] == 'deleted'
+    assert [args['action'] for uri, args, _ in client.calls if uri.endswith('transport.executeAction')] == ['play', 'stop']
