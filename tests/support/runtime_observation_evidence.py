@@ -42,6 +42,11 @@ def program_source_context(root=audit.ROOT, *, flow=None):
         'tests/support/exact_evidence_finalization.py', 'tests/conftest.py',
         'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
         'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py']
+    if flow in {'ak.wwise.core.log.' + name for name in ('get','addItem','clear')}:
+        dependencies.extend(('tests/support/runtime_remaining_evidence.py',
+            'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
+            'tests/fixtures/runtime-log/r122-support.json',
+            'tests/unit/test_runtime_log_branch_evidence.py'))
     if flow in {'ak.wwise.core.profiler.' + name for name in ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects')}:
         dependencies.extend(('tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_fixed_runtime_read_branch_evidence.py'))
     if flow == 'ak.wwise.core.profiler.getLoadedMedia':
@@ -330,6 +335,9 @@ def _validate_rtpc_structure(record, binding, branch, root):
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
+    from tests.support.runtime_remaining_evidence import selected as remaining_selected, validate_evidence as validate_remaining
+    if remaining_selected(branch['id'], root):
+        return validate_remaining(record,binding,branch,category,base,root,reference_edges or {})
     from tests.support.console_runtime_read_evidence import selected, validate_evidence as validate_console_read
     if selected(branch['id'], root):
         return validate_console_read(record,binding,branch,category,base,root,reference_edges or {})
@@ -441,7 +449,8 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
         observation_hashes = {'capture': proof['capture']['sha256']}
         from tests.support.fixed_runtime_read_evidence import URIS
         from tests.support.console_runtime_read_evidence import selected as selected_console_read
-        if selected_console_read(identity) or identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions', 'ak.wwise.core.profiler.getLoadedMedia'}:
+        from tests.support.runtime_remaining_evidence import selected as remaining_selected
+        if remaining_selected(identity) or selected_console_read(identity) or identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions', 'ak.wwise.core.profiler.getLoadedMedia'}:
             raw = proof['mapping']['raw_observation']
             _portable_descriptor(raw, base)
             observation_hashes['raw'] = raw['sha256']

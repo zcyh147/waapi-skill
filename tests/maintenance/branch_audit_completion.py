@@ -172,6 +172,10 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/support/runtime_observation_evidence.py',
                  'tests/fixtures/runtime/runtime-risk-policy-r124.json',
                  'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
+                 'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
+                 'tests/support/runtime_remaining_evidence.py',
+                 'tests/fixtures/runtime-log/r122-support.json',
+                 'tests/unit/test_runtime_log_branch_evidence.py',
                  'tests/support/qualified_runtime_read_evidence.py',
                  'tests/support/fixed_runtime_read_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',
@@ -945,6 +949,10 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
         from tests.support.source_copy_native_evidence import validate_source_equivalence
         validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
         return
+    if proof.get('runtime_remaining_source_review'):
+        from tests.support.runtime_remaining_evidence import validate_source_equivalence
+        validate_source_equivalence(proof,sources,branch,binding,root,base)
+        return
     if proof.get('loaded_media_source_review'):
         from tests.support.loaded_media_runtime_evidence import validate_source_equivalence
         validate_source_equivalence(proof, sources, branch, binding, root, base)
@@ -1396,6 +1404,9 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                                          root, reference_edges or {}, historical_sources)
         record = read_sealed_artifact(descriptor, base)
         normalized_construction = None
+        from tests.support.runtime_remaining_evidence import selected as remaining_selected, validate_evidence as validate_remaining
+        if remaining_selected(branch['id'], root):
+            validate_remaining(record,binding or {},branch,category,base,root,reference_edges)
         if category == 'program':
             from wwise_waapi.runtime_inspection_business_contracts import PROFILER_GET_RTPS_URI
             # The source-owned exact read route determines capture eligibility;
@@ -1660,6 +1671,8 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
     from tests.support.runtime_observation_evidence import runtime_preservation_gates, apply_runtime_preservation_gates
     preservation_gates = runtime_preservation_gates(root, policies, native['obligations']) if scope is None else {}
     if scope is None:
+        from tests.support.runtime_remaining_evidence import preservation_gates as remaining_gates
+        preservation_gates.update(remaining_gates(root,policies,native['obligations']))
         from tests.support.loaded_media_runtime_evidence import preservation_gates as loaded_media_gates
         preservation_gates.update(loaded_media_gates(root, policies, native['obligations']))
         from tests.support.loaded_media_runtime_evidence import composite_preservation_gates
