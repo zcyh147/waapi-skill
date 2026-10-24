@@ -23,15 +23,21 @@ OLDER_NAME = 'test_console_owned_older_transport_profiler_diagnostic'
 OLDER_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + OLDER_NAME
 BATCH_NAME = 'test_console_owned_runtime_read_batch'
 BATCH_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + BATCH_NAME
+ADDITIONAL_NAME = 'test_console_owned_additional_runtime_read_batch'
+ADDITIONAL_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + ADDITIONAL_NAME
+ADDITIONAL_READERS = {'loaded_media':'getLoadedMedia', 'cpu':'getCpuUsage',
+    'performance':'getPerformanceMonitor', 'streamed_media':'getStreamedMedia'}
 PREFIX = 'ak.wwise.core.'
 
 
-def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads=False):
-    assert not (diagnostic and grouped_runtime_reads), 'Select one closed collector mode'
-    assert runtime.version in BUILDS and (grouped_runtime_reads or diagnostic or runtime.version == '2025.1'), 'Select one pinned Console lane'
-    report_path = runtime.state_dir / ('console-runtime-read-batch.json' if grouped_runtime_reads else 'console-profiler-probe.json')
+def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads=False, additional_runtime_reads=False):
+    assert sum(bool(v) for v in (diagnostic,grouped_runtime_reads,additional_runtime_reads)) <= 1, 'Select one closed collector mode'
+    if additional_runtime_reads:
+        assert runtime.version in ('2023.1','2024.1','2025.1'), 'Additional Console reader versions are exact2023/2024/2025'
+    assert runtime.version in BUILDS and (additional_runtime_reads or grouped_runtime_reads or diagnostic or runtime.version == '2025.1'), 'Select one pinned Console lane'
+    report_path = runtime.state_dir / ('console-additional-runtime-read-batch.json' if additional_runtime_reads else 'console-runtime-read-batch.json' if grouped_runtime_reads else 'console-profiler-probe.json')
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    category = {'category': 'console-runtime-read-batch' if grouped_runtime_reads else 'console-transport-profiler-probe', 'status': 'blocked',
+    category = {'category': 'console-additional-runtime-read-batch' if additional_runtime_reads else 'console-runtime-read-batch' if grouped_runtime_reads else 'console-transport-profiler-probe', 'status': 'blocked',
         'observation_task_status': 'BLOCKED', 'diagnostic_enabled': diagnostic, 'observation_path': str(report_path),
         'transaction_ids': [], 'verifier_strength': 'owned_playback_and_complete_same_time_voice',
         'native_host_support_inferred': False}
@@ -55,6 +61,12 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         if runtime.version == '2021.1':
             report['outcomes']['game_objects'] = {'outcome': 'UNAVAILABLE',
                 'reason': 'getGameObjects absent from matching 2021.1 Console catalog; no call or gameSyncs substitution'}
+    if additional_runtime_reads:
+        category['verifier_strength']='independent_complete_same_frame_read_availability_and_reported_diagnostics'
+        report['contract']='waapi-skill.console-additional-runtime-read-batch/v1'
+        report['outcomes']={name:{'outcome':'BLOCKED','reason':'Shared setup not completed'} for name in ADDITIONAL_READERS}
+        report['limits']['retained_pages_per_reader']=4
+        report['limits']['reader_rows']=256
     cleanup = []
     cleanup_active = False
     deadline = time.monotonic() + 120
@@ -220,7 +232,7 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
     try:
         status = call(['status'])
         report['host'] = info = status['wwise']
-        if grouped_runtime_reads:
+        if grouped_runtime_reads or additional_runtime_reads:
             report['endpoint'] = status['endpoint']
         assert info.get('isCommandLine') is True
         assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == BUILDS[runtime.version]
@@ -277,6 +289,9 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
             if runtime.version != '2021.1':
                 datasets += ['game-syncs']
             report['capture_datasets'] = datasets
+        if additional_runtime_reads:
+            datasets += ['cpu','loaded-media','streaming']
+            report['capture_datasets']=datasets
         def directives(mode):
             return [token for dataset in datasets for token in ('--capture-data', dataset, mode)]
         report['setup']['enable'] = effect('profiler.enableProfilerData', directives('enable'),
@@ -310,7 +325,9 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
         position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
         report['capture_position'] = position
         assert position['available'] is True and type(position['position_ms']) is int and position['position_ms'] >= 0
-        if grouped_runtime_reads:
+        if additional_runtime_reads:
+            _collect_additional_runtime_read_batch(call,report,persist,position_ms=position['position_ms'])
+        elif grouped_runtime_reads:
             _collect_runtime_read_batch(call, report, persist, position_ms=position['position_ms'])
         else:
             result = call(['core-call', PREFIX + 'profiler.getVoices', '--profiler-position', str(position['position_ms']),
@@ -348,7 +365,8 @@ def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads
             report['cleanup']['errors'].append({'action': 'create-transport',
                 'message': 'Creation attempted without a verified issued handle; owned host teardown required; no retry'})
         report['cleanup']['complete'] = not report['cleanup']['errors']
-        readers_complete = (all(row['outcome'] == ('UNAVAILABLE' if name == 'game_objects' and runtime.version == '2021.1' else 'PASS')
+        readers_complete = (all(row['outcome']=='PASS' for row in report['outcomes'].values()) if additional_runtime_reads else
+            all(row['outcome'] == ('UNAVAILABLE' if name == 'game_objects' and runtime.version == '2021.1' else 'PASS')
             for name, row in report['outcomes'].items()) if grouped_runtime_reads else report['outcomes'].get('voices', {}).get('outcome') == 'PASS')
         report['complete'] = not report['errors'] and report['cleanup']['complete'] and readers_complete
         category.update(status='PASS' if report['complete'] else 'blocked',
@@ -477,3 +495,89 @@ def _collect_runtime_read_batch(call, report, persist, *, position_ms):
     else:
         observe('contributions_dry', ['profiler-voice-contributions', '--capture-ms', fixed,
             '--voice-instance-handle', voice['voice_instance_handle']], row_field='objects')
+
+
+def _collect_additional_runtime_read_batch(call, report, persist, *, position_ms):
+    """One native read each; empty availability and data observations stay separate."""
+    fixed = str(position_ms)
+    for name, suffix in ADDITIONAL_READERS.items():
+        uri = PREFIX + 'profiler.' + suffix
+        evidence = {'position_ms': position_ms, 'available': False, 'complete': False, 'nonempty': False,
+            'control_effect_verified': False, 'owned_identity_claimed': False, 'retained_page_calls': 0}
+        observation = report['outcomes'][name] = {'outcome': 'BLOCKED', 'evidence': evidence}
+        payloads = evidence['gateway_results'] = []
+
+        def read(argv, *, retained=False):
+            payload = call(argv, strict=False)
+            payloads.append(payload)
+            if retained:
+                assert (payload.get('api_attempted') == uri and payload.get('native_read_dispatched') is False
+                    and payload.get('retained_observation') is True), 'Continuation repeated a native read or changed API'
+            else:
+                assert (payload.get('endpoint') == report['endpoint'] and payload.get('detected_version') == report['version']
+                    and payload.get('is_command_line') is True), 'Shared connection/version/Console host context changed; remaining readers not attempted'
+            if payload.get('ok') is not True:
+                code = payload.get('error_code') or payload.get('call', {}).get('error_code')
+                details = payload.get('details') or {}
+                attributable = (payload.get('api_attempted') == uri
+                    or (payload.get('semantic_preview', {}).get('uri') == uri and payload.get('call', {}).get('api') == uri)
+                    or (code in ('RUNTIME_INSPECTION_RESULT_INVALID', 'SemanticValidationError', 'SEMANTIC_SCHEMA_MISMATCH')
+                        and details.get('uri', details.get('api')) == uri))
+                fatal = code in ('TIMEOUT', 'ConnectionError', 'ConnectionRefusedError', 'ConnectionResetError',
+                    'ConnectionClosed', 'ConnectionClosedError', 'OSError', 'VERSION_MISMATCH')
+                observation.update(outcome='FAIL', reason='Exact reader failure retained; no retry or inferred native absence')
+                persist()
+                assert attributable and not fatal, 'Shared connection/context failure; remaining readers not attempted'
+                return None
+            return payload
+
+        payload = read(['core-call', uri, '--profiler-position', fixed, '--max-results', '64'])
+        if payload is None:
+            continue
+        evidence['gateway_result'] = payload
+        evidence['available'] = True
+        initial = payload['agent_result']
+        evidence['agent_result'] = initial
+        pages = evidence['agent_result_pages'] = [initial]
+        rows = list(initial['return'])
+        total = initial.get('total_count')
+        snapshot = initial.get('snapshot_sha256')
+        handle = None
+        assert all(isinstance(row, dict) for row in rows), 'Malformed public reader array'
+        while (pages[-1].get('complete') is not True and type(total) is int
+                and total <= report['limits']['reader_rows'] and 'row_fragment' not in pages[-1]
+                and len(pages) < report['limits']['retained_pages_per_reader']):
+            prior = pages[-1]
+            argv = prior.get('next_command', {}).get('gateway_argv')
+            assert (isinstance(argv, list) and len(argv) == 6 and all(isinstance(v, str) for v in argv)
+                and argv[:3] == ['core-call', uri, '--runtime-observation'] and argv[4] == '--runtime-page'), 'Malformed retained reader continuation'
+            handle = handle or argv[3]
+            assert argv[3] == handle, 'Retained reader observation changed'
+            retained = read(argv, retained=True)
+            if retained is None:
+                break
+            assert retained.get('native_read_dispatched') is False and retained.get('retained_observation') is True, 'Continuation repeated a native read'
+            page = retained['agent_result']
+            pages.append(page)
+            evidence['retained_page_calls'] += 1
+            valid_page = (page.get('snapshot_sha256') == snapshot and page.get('total_count') == total
+                and page.get('profiler_position') == fixed and 'row_fragment' not in page
+                and page['page']['offset_from_end'] == prior['page']['next_offset_from_end']
+                and page['page']['next_offset_from_end'] > page['page']['offset_from_end']
+                and page['page']['next_offset_from_end'] - page['page']['offset_from_end'] == len(page['return'])
+                and page.get('returned_count') == len(page['return']))
+            if not valid_page:
+                observation.update(outcome='FAIL', reason='Retained reader page changed or overlapped; exact packet retained')
+                break
+            rows = [*page['return'], *rows]
+        evidence['retained_rows'] = rows
+        evidence['complete'] = (pages[-1].get('complete') is True and type(total) is int and len(rows) == total
+            and pages[-1].get('truncated') is False and all('row_fragment' not in page for page in pages)
+            and observation['outcome'] != 'FAIL')
+        evidence['nonempty'] = bool(rows)
+        evidence['claim'] = 'actual_returned_diagnostics' if rows else 'availability_only'
+        if evidence['complete']:
+            observation['outcome'] = 'PASS'
+        elif observation['outcome'] != 'FAIL':
+            observation['reason'] = 'Complete bounded retained array unavailable; no native repeat, polling or absence claim'
+        persist()
