@@ -1122,8 +1122,8 @@ class BusinessHandleRegistry:
             ("wwise_build", "HANDLE_BUILD_MISMATCH"),
         )
         for field_name, error_code in comparisons:
-            expected_value = str(getattr(expected, field_name))
-            actual_value = str(getattr(actual, field_name))
+            expected_value = str(getattr(expected, field_name)).encode("utf-8")
+            actual_value = str(getattr(actual, field_name)).encode("utf-8")
             if not hmac.compare_digest(expected_value, actual_value):
                 raise _error(
                     error_code,
