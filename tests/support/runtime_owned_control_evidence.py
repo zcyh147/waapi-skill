@@ -99,6 +99,17 @@ def _capture(encoded,root):
     raise ValueError('Owned control family mapper not implemented')
 
 
+def _require_execute_mutations(calls,trace,expected):
+    uris={mutation['uri']for mutation in expected.values()}
+    for index,call in enumerate(calls):
+        actual=[{k:item[k]for k in ('uri','args','options','result')}
+            for item in trace[call['native_start']:call['native_end']]if item['uri']in uris]
+        wanted=[expected[index]]if index in expected else[]
+        if (audit.digest(actual)!=audit.digest(wanted)
+                or index in expected and call['gateway']['argv'][0]!='execute'):
+            raise ValueError('Mutation must occur only in its matching Execute native slice')
+
+
 @lru_cache(maxsize=128)
 def _meter_capture(encoded,root):
     from wwise_waapi.builders.schema import validate_resolved_semantic_result
@@ -122,6 +133,7 @@ def _meter_capture(encoded,root):
     mutations=[{k:x[k]for k in ('uri','args','options','result')}for x in trace if x['uri']in METER_URIS]
     if len(mutations)!=2 or [x['uri']for x in mutations]!=[PREFIX+'registerMeter',PREFIX+'unregisterMeter']or mutations[0]['args']!=mutations[1]['args']:
         raise ValueError('Exactly one balanced same-object native meter pair required')
+    _require_execute_mutations(calls,trace,{7:mutations[0],16:mutations[1]})
     target=0 if uri.endswith('.registerMeter')else 1
     if native!=mutations[target]or cap['gateway']!=calls[target*9+8]['gateway']:raise ValueError('Exact meter target receipt differs')
     rows=[row for x in trace if x['uri']=='ak.wwise.core.object.get'for row in x['result']['return']]
@@ -332,6 +344,7 @@ def _save_capture(encoded,root):
     if not contexts or any(x!=contexts[0]for x in contexts):raise ValueError('Saved-artifact host/version drift')
     context=contexts[0]
     if [{k:x[k]for k in ('uri','args','options','result')}for x in trace if x['uri']==uri]!=[native]:raise ValueError('Exactly one saved-capture dispatch required')
+    _require_execute_mutations(calls,trace,{6:native})
     started,declared,checked,preview,shown,confirmed,executed,verified,full=[x['gateway']for x in calls];payload=verified['payload'];tx=preview['payload']['transaction_id'];seal=preview['payload']['artifact_hash'];draft=started['payload']['draft']['draft_id'];authority=started['payload']['task_authority']
     decl_argv=declared['argv'];decl_directory=decl_argv[decl_argv.index('--capture-output-directory')+1]
     io_root=str(parse_absolute_host_path(decl_directory,allow_trailing_separator=True).pure_path)
@@ -487,6 +500,7 @@ def _cursor_capture(encoded,root):
     if not contexts or any(x!=contexts[0]for x in contexts)or contexts[0]['version']!='2025.1':raise ValueError('Cursor actual host/version drift')
     context=contexts[0];mutations=[{k:x[k]for k in ('uri','args','options','result')}for x in trace if x['uri']==uri];reads=[x for x in trace if x['uri']==getter]
     if mutations!=[native]or len(reads)!=1 or reads[0]['args']!={'cursor':'user'}or reads[0]['options']!={}:raise ValueError('Cursor needs one dispatch and one independent user observation')
+    _require_execute_mutations(calls,trace,{6:native})
     started,declared,checked,preview,shown,confirmed,executed,verified,full=[x['gateway']for x in calls];payload=verified['payload'];tx=preview['payload']['transaction_id'];seal=preview['payload']['artifact_hash'];draft=started['payload']['draft']['draft_id'];authority=started['payload']['task_authority']
     if (started['argv']!=['draft-start',uri]or any(draft not in x['argv']or authority not in x['argv']for x in (declared,checked,preview))
             or shown['argv']!=preview['payload']['next_command']['gateway_argv']or confirmed['argv']!=shown['payload']['next_command']['gateway_argv']

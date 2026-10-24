@@ -386,3 +386,49 @@ def test_r93_meter_roots_actual_teardown_and_ordinary_consumer(request,tmp_path)
             assert all(r['state']!='verified'for r in checked['obligations']if r['route']==route)
             assert all(r['state']==baseline[r['id']]for r in checked['obligations']if r['route']!=route)
     register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_owned_mutations_belong_to_their_matching_execute_phase(request,tmp_path):
+    from tests.support.runtime_owned_control_evidence import review,write_owned_control_bundle
+    host='wwise-authoring';version='2025.1';uris=sorted(METER_URIS)+[PREFIX+'saveCapture',PREFIX+'setCursorTime']
+    routes=[f'{version}|{host}|{BUILDS[version]}|function|{uri}'for uri in uris]
+    pointers={'/argsSchema','/resultSchema'};inventory=log_inventory(routes,pointers)
+    captures=meter_pair(tmp_path/'meter',version,host,'id',review()['program_objects'][version])
+    captures.extend([save_capture_flow(tmp_path/'save',version,host)[:5],cursor_control_flow(tmp_path/'cursor',host,PREFIX+'setCursorTime',38549,38549)[:5]])
+    def finalize(phases):
+        components=[]
+        for family,positions in (('meter',[0,1]),('save',[2]),('cursor',[3])):
+            paths=[]
+            for i in positions:
+                receipt,native,context,trace,calls=captures[i];path=tmp_path/f'phase-{i}.json'
+                runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
+            index=write_owned_control_bundle(tmp_path/('bundle-'+family),paths,inventory=log_inventory([routes[i]for i in positions],pointers),name_prefix='owned-controls-2025.1-'+family+'-')
+            components.append((index,json.loads((index.parent/'requirements.json').read_bytes())))
+        index,policies=runtime.write_runtime_composition(tmp_path/'combined',components);bindings,base,_=audit.portable_binding_inputs(index,policies)
+        def evaluate(doc):return completion.evaluate_coverage(audit.ROOT,inventory,doc,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        result=evaluate(bindings);runtime.write_json(tmp_path/'consumer-result.json',result);assert {r['state']for r in result['obligations']}=={'verified'}
+        for route in routes:
+            identity=route+'|/argsSchema'
+            for phase in ('draft-start','preview-from-draft','confirm','verify','sibling-execute'):
+                if phase=='sibling-execute'and route.split('|')[-1]not in METER_URIS:continue
+                changed=deepcopy(bindings);bound=changed['bindings'][identity];record=deepcopy(completion.read_sealed_artifact(bound['evidence']['program'],base));cap=record['runtime_read_program'];calls=cap['public_calls']
+                segments=[deepcopy(cap['native_reads'][c['native_start']:c['native_end']])for c in calls];uri=cap['native_call']['uri']
+                owner,= [i for i,segment in enumerate(segments)if any(x['uri']==uri for x in segment)]
+                mutation=next(x for x in segments[owner]if x['uri']==uri);segments[owner].remove(mutation)
+                group=0 if uri.endswith('.registerMeter')else 9 if uri.endswith('.unregisterMeter')else 0
+                if phase=='sibling-execute':target=16 if group==0 else 7
+                else:target=next(i for i in range(group,len(calls))if calls[i]['gateway']['argv'][0]==phase)
+                # Keep the global register→unregister order when corrupting a
+                # sibling's Execute slice, so only phase ownership rejects it.
+                if phase=='sibling-execute'and group==9:segments[target].append(mutation)
+                else:segments[target].insert(0,mutation)
+                trace=[]
+                for call,segment in zip(calls,segments,strict=True):
+                    call['native_start']=len(trace)
+                    for item in segment:item['ordinal']=len(trace);trace.append(item)
+                    call['native_end']=len(trace)
+                cap['native_reads']=trace
+                bound['evidence']['program']={**runtime.write_json(base/('wrong-phase-'+uri.rsplit('.',1)[-1]+'-'+phase+'.json'),record),'nodeid':request.node.nodeid}
+                row=next(r for r in evaluate(changed)['obligations']if r['id']==identity)
+                assert row['evidence_results']['program']['outcome']!='passed',(uri,phase)
+    register_exact_evidence_finalizer(request.node,finalize)
