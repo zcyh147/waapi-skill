@@ -16,15 +16,17 @@ from tests.destructive.support.profiler_capture import (
 
 NODE_NAME = 'test_console_owned_2025_transport_profiler_probe'
 NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + NODE_NAME
+DIAGNOSTIC_NAME = 'test_console_owned_2025_transport_profiler_diagnostic'
+DIAGNOSTIC_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + DIAGNOSTIC_NAME
 PREFIX = 'ak.wwise.core.'
 
 
-def collect_console_profiler(runtime):
+def collect_console_profiler(runtime, *, diagnostic=False):
     assert runtime.version == '2025.1', 'Console playback probe is pinned to2025.1'
     report_path = runtime.state_dir / 'console-profiler-probe.json'
     report_path.parent.mkdir(parents=True, exist_ok=True)
     category = {'category': 'console-transport-profiler-probe', 'status': 'blocked',
-        'observation_task_status': 'BLOCKED', 'observation_path': str(report_path),
+        'observation_task_status': 'BLOCKED', 'diagnostic_enabled': diagnostic, 'observation_path': str(report_path),
         'transaction_ids': [], 'verifier_strength': 'owned_playback_and_complete_same_time_voice',
         'native_host_support_inferred': False}
     runtime.category_results.append(category)
@@ -35,7 +37,7 @@ def collect_console_profiler(runtime):
             'prior_capture_settings_restored': False, 'prior_originals_mode_restored': False,
             'restoration_scope': 'Owned fresh host teardown; explicit capture disable is not prior-setting restoration'},
         'limits': {'public_calls': 128, 'reply_bytes': 1024 * 1024,
-            'total_reply_bytes': 8 * 1024 * 1024, 'report_bytes': 24 * 1024 * 1024,
+            'total_reply_bytes': 8 * 1024 * 1024, 'report_bytes': (40 if diagnostic else 24) * 1024 * 1024,
             'ordinary_seconds': 120, 'cleanup_seconds': 60, 'cleanup_reserve_calls': 36,
             'cleanup_reserve_bytes': 3 * 1024 * 1024}}
     cleanup = []
@@ -50,7 +52,7 @@ def collect_console_profiler(runtime):
         temporary.replace(report_path)
         category['observation_sha256'] = hashlib.sha256(raw).hexdigest()
 
-    def call(argv):
+    def call(argv, *, producer=False, stream_sink=None, strict=True):
         reserve = 0 if cleanup_active else report['limits']['cleanup_reserve_calls']
         assert report['public_call_count'] < 128 - reserve, 'Console public call budget exhausted'
         assert report['total_reply_bytes'] + 1024 * 1024 <= 8 * 1024 * 1024, 'Console total reply budget exhausted'
@@ -58,16 +60,19 @@ def collect_console_profiler(runtime):
             assert report['total_reply_bytes'] + 1024 * 1024 <= 5 * 1024 * 1024, 'Console cleanup byte reserve unavailable'
         remaining = deadline - time.monotonic()
         assert remaining > 0, 'Console elapsed-time budget exhausted'
-        entry = {'argv': list(argv), 'cleanup_phase': cleanup_active}
+        entry = {'argv': list(argv), 'cleanup_phase': cleanup_active,
+            'execution_context': 'separate_packaged_gateway_process' if producer else 'observer_process'}
         report['calls'].append(entry)
         report['public_call_count'] += 1
         try:
-            code, payload = runtime.raw_gateway(['--timeout', str(min(10, remaining)), *argv])
+            code, payload = (runtime.packaged_topic_producer(argv) if producer else
+                runtime.raw_gateway(['--timeout', str(min(10, remaining)), *argv], stream_sink=stream_sink))
             entry.update(exit_code=code, payload=payload)
             size = len(json.dumps(payload, ensure_ascii=False).encode('utf-8'))
             report['total_reply_bytes'] += size
             assert size <= 1024 * 1024 and report['total_reply_bytes'] <= 8 * 1024 * 1024, 'Console reply byte bound exceeded'
-            assert code == 0 and payload.get('ok') is True, payload
+            if strict:
+                assert code == 0 and payload.get('ok') is True, payload
             return payload
         except Exception as exc:
             entry['error'] = {'type': type(exc).__name__, 'message': str(exc)[:1024]}
@@ -110,11 +115,83 @@ def collect_console_profiler(runtime):
         call(['confirm', tx, '--confirmation-token', shown['confirmation']['token']])
         if before_execute:
             before_execute()
-        executed = call(['execute', tx])
-        assert executed.get('state') == 'executed_unverified', executed
-        verified = call(['verify', tx])
+        if diagnostic and suffix == 'transport.executeAction' and 'play' in fields:
+            verified = observe_play(tx)
+        else:
+            executed = call(['execute', tx])
+            assert executed.get('state') == 'executed_unverified', executed
+            verified = call(['verify', tx])
         assert verified.get('state') in ('verified', 'result_schema_checked'), verified
         assert verified.get('verification', {}).get('status') in ('verified', 'result_schema_checked'), verified
+        return verified
+
+    def observe_play(tx):
+        # Reuse the established single public stream + isolated packaged producer
+        # seam. Its started packet is emitted only after the native subscribe ACK.
+        from copy import deepcopy
+        from wwise_waapi.canonical import canonical_sha256
+        from wwise_waapi.native_catalog import load_native_catalog
+        topic = PREFIX + 'profiler.captureLog.itemAdded'
+        schema = call(['topic-schema', topic])
+        digest = schema['continuation']['contract_binding']['value']
+        cursor = lambda: call(['core-call', PREFIX + 'profiler.getCursorTime',
+            '--profiler-cursor', 'capture-latest'])['agent_result']
+        before = cursor()
+        observation = {'topic': topic, 'contract_digest': digest, 'records': [], 'events': [],
+            'started_before_execute': False, 'cause_proven': False,
+            'silence_meaning': 'inconclusive; no host absence inferred', 'cleanup': 'unknown',
+            'capture_before': before, 'limits': {'events': 8, 'total_seconds': 10,
+                'idle_seconds': 2, 'records': 10, 'record_bytes': 1024 * 1024},
+            'native_schema_sha256': canonical_sha256(load_native_catalog('2025.1', 'wwise-console')['schemas'][topic])}
+        report['play_diagnostic'] = observation
+        verified = None
+        endpoint = {'host': runtime.lifecycle.host, 'port': runtime.lifecycle.port, 'url': runtime.lifecycle.waapi_url}
+        def observe(record):
+            nonlocal verified
+            assert len(observation['records']) < 10, 'Console diagnostic stream record bound exceeded'
+            assert len(json.dumps(record).encode('utf-8')) <= 1024 * 1024, 'Console diagnostic record byte bound exceeded'
+            observation['records'].append(deepcopy(record))
+            persist()
+            if record.get('record_type') == 'started':
+                assert not observation['started_before_execute'], 'Duplicate ACK; never repeat play'
+                assert (record.get('contract') == 'waapi-skill.topic-stream/v1'
+                    and record.get('topic') == topic and record.get('topic_contract_digest') == digest
+                    and record.get('status') == 'streaming' and record.get('ok') is True
+                    and record.get('endpoint') == endpoint and record.get('detected_version') == '2025.1'
+                    and record.get('is_command_line') is True and record.get('event_count_limit') == 8), record
+                observation['started_before_execute'] = True
+                observation['effect_started_monotonic_ns'] = time.monotonic_ns()
+                persist()
+                executed = call(['execute', tx], producer=True)
+                assert executed.get('state') == 'executed_unverified', executed
+                verified = call(['verify', tx], producer=True)
+                observation['effect_finished_monotonic_ns'] = time.monotonic_ns()
+                persist()
+        terminal = call(['--timeout', '10', 'stream-topic', topic, '--topic-contract-digest', digest,
+            '--event-count', '8', '--idle-timeout', '2'], stream_sink=observe, strict=False)
+        observation.update(terminal=terminal, cleanup=terminal.get('cleanup', 'unknown'))
+        if observation['cleanup'] != 'unsubscribed':
+            report['cleanup']['errors'].append({'action': 'capture-log-unsubscribe',
+                'message': 'Public stream did not prove unsubscribe; owned teardown still required'})
+        after = cursor()
+        observation['capture_after'] = after
+        for record in observation['records']:
+            if record.get('record_type') != 'event':
+                continue
+            event = record['event']
+            identity_match = (event.get('objectId') == CAPTURE_CAR_ID
+                and event.get('gameObjectId') == report['transport_association']['gameObject'])
+            interval_match = (before.get('available') is True and after.get('available') is True
+                and type(event.get('time')) is int
+                and before['position_ms'] <= event['time'] <= after['position_ms'])
+            observation['events'].append({'event': deepcopy(event), 'schema_validation': 'accepted_by_gateway',
+                'correlation': 'matching_identity_and_capture_interval' if identity_match and interval_match
+                else 'identity_only_time_unresolved' if identity_match else 'unrelated_or_identity_unresolved',
+                'cause_proven': False})
+        persist()
+        assert observation['started_before_execute'] and verified is not None, 'No valid ACK; play not attempted'
+        assert observation['cleanup'] == 'unsubscribed', 'Console diagnostic unsubscribe unproven'
+        assert terminal.get('error_code') in (None, 'TIMEOUT'), terminal
         return verified
 
     def own(label, action):
@@ -164,6 +241,11 @@ def collect_console_profiler(runtime):
         own('destroy-transport', lambda: effect('transport.destroy', ['--transport-handle', handle]))
         own('stop-transport', lambda: effect('transport.executeAction', ['--audition-action', 'stop',
             '--transport-scope', 'one-transport', '--transport-handle', handle]))
+        if diagnostic:
+            schema = call(['request-schema', PREFIX + 'transport.getList'])
+            membership = call(schema['continuation']['gateway_argv'])['agent_result']['list']
+            association, = [row for row in membership if row['object'] == CAPTURE_CAR_ID]
+            report['transport_association'] = association
         report['setup']['play'] = effect('transport.executeAction', ['--audition-action', 'play',
             '--transport-scope', 'one-transport', '--transport-handle', handle])
         state = call(['core-call', PREFIX + 'transport.getState', '--transport-handle', handle])['agent_result']

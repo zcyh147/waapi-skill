@@ -10,6 +10,16 @@ from tests.unit.test_runtime_business_gateway import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _forbid_real_client_or_socket(monkeypatch):
+    import socket
+    import waapi
+    def forbidden(*_args, **_kwargs):
+        pytest.fail('Console program tests forbid real WAAPI client/socket construction', pytrace=False)
+    monkeypatch.setattr(waapi, 'WaapiClient', forbidden)
+    monkeypatch.setattr(socket, 'socket', forbidden)
+
+
 def test_2025_console_create_publishes_usable_zero_transport(tmp_path):
     client = _TransportCreateAssociationClient(tmp_path, version='2025.1',
         observed_object='{11111111-1111-1111-1111-111111111111}', observed_game_object=123)
@@ -176,3 +186,111 @@ def test_console_probe_retains_blocked_failure_and_finishes_owned_cleanup(tmp_pa
         assert uris.count('ak.wwise.core.profiler.enableProfilerData') == 2
     else:
         assert report['cleanup']['complete'] is True
+
+
+@pytest.mark.parametrize('fault', [None, 'playing', 'unrelated', 'stale-time', 'silence', 'malformed', 'cleanup', 'missing-ack', 'wrong-ack', 'duplicate-ack'])
+def test_console_capture_log_ack_gates_one_play_and_archives_correlated_diagnostic(tmp_path, monkeypatch, fault):
+    import subprocess
+    from types import SimpleNamespace
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    from tests.unit.test_profiler_input_native_fixture import _finish
+    from tests.destructive.support.profiler_capture import CAPTURE_CAR_ID
+    context = _console_context(tmp_path, monkeypatch, None if fault == 'playing' else 'nonplaying')
+    workflow, runtime, client, _, _ = context
+    topic = 'ak.wwise.core.profiler.captureLog.itemAdded'
+    packet = {'time': 1500, 'type': 'Message', 'description': 'controlled media-open failure',
+        'severity': 'Error', 'errorCodeName': 'FileNotFound', 'objectId': CAPTURE_CAR_ID,
+        'gameObjectId': 123, 'playingId': 42}
+    if fault == 'unrelated':
+        packet['objectId'] = '{11111111-1111-1111-1111-111111111111}'
+    if fault == 'playing':
+        packet.update(severity='Normal', description='controlled start')
+    if fault == 'stale-time':
+        packet['time'] = 1499
+    if fault == 'malformed':
+        packet.pop('time')
+    active, trace = [], []
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('transport.executeAction') and args['action'] == 'play':
+            assert active and trace[-1] == 'execute-peer'
+            trace.append('play')
+            if fault != 'silence':
+                active[0](deepcopy(packet))
+        return original(uri, args, options)
+    client.call = call
+    def subscribe(uri, callback, options=None):
+        assert uri == topic and not options
+        if fault == 'missing-ack':
+            raise RuntimeError('controlled native subscription rejection')
+        trace.append('subscribed'); active.append(callback)
+        def unsubscribe():
+            trace.append('unsubscribed'); active.clear(); return fault != 'cleanup'
+        return SimpleNamespace(unsubscribe=unsubscribe)
+    client.subscribe = subscribe
+    from tests.semantic.support import codex_expansion_reconciliation as processes
+    def producer(command, *, environment, timeout_seconds, cwd=None, text=True):
+        assert active and command[7] in ('execute', 'verify')
+        trace.append(command[7] + '-peer')
+        code, payload = workflow.waapi_gateway.execute_gateway(command[3:], env=environment)
+        return subprocess.CompletedProcess(command, code, json.dumps(payload), '')
+    monkeypatch.setattr(processes, 'run_owned_gateway', producer)
+    original_raw = type(runtime).raw_gateway
+    def raw(self, argv, *, stream_sink=None):
+        def sink(record):
+            if record.get('record_type') == 'started' and fault == 'wrong-ack':
+                record = {**record, 'topic_contract_digest': 'wrong'}
+            stream_sink(record)
+            if record.get('record_type') == 'started' and fault == 'duplicate-ack':
+                stream_sink(deepcopy(record))
+        return original_raw(self, argv, stream_sink=sink if stream_sink else None)
+    monkeypatch.setattr(type(runtime), 'raw_gateway', raw)
+    failure = None
+    if fault == 'playing':
+        workflow.test_console_owned_2025_transport_profiler_diagnostic(runtime)
+    else:
+        with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+            workflow.test_console_owned_2025_transport_profiler_diagnostic(runtime)
+        failure = caught.value
+    final = _finish(context, tmp_path, monkeypatch, [('test_console_owned_2025_transport_profiler_diagnostic', failure)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_text())
+    observed = report['play_diagnostic']
+    assert final['categories'][0]['status'] == ('PASS' if fault == 'playing' else 'blocked')
+    if fault == 'playing':
+        assert report['outcomes']['voices']['outcome'] == 'PASS' and report['complete']
+        assert final['invocation']['outcome'] == 'PASS'
+    else:
+        assert report['outcomes'] == {}
+    actions = [args['action'] for uri, args, _ in client.calls if uri.endswith('transport.executeAction')]
+    assert actions.count('play') == (0 if fault in ('missing-ack', 'wrong-ack') else 1)
+    assert actions.count('stop') == 1
+    assert observed['cause_proven'] is False
+    if fault in ('missing-ack', 'wrong-ack'):
+        assert not observed['started_before_execute']
+        assert not observed['events']
+    elif fault == 'duplicate-ack':
+        assert actions.count('play') == 1
+    else:
+        assert observed['started_before_execute']
+        assert trace[:4] == ['subscribed', 'execute-peer', 'play', 'verify-peer']
+        assert trace[4:] == ['unsubscribed'] * (2 if fault == 'cleanup' else 1)
+        if fault == 'cleanup':
+            assert observed['cleanup'] != 'unsubscribed'
+            assert report['cleanup']['complete'] is False
+        else:
+            assert observed['cleanup'] == 'unsubscribed'
+        if fault == 'malformed':
+            assert observed['terminal']['error_code'] == 'TOPIC_EVENT_SCHEMA_MISMATCH'
+            raw = observed['terminal']['details']['event_diagnostic']
+            assert raw['complete'] and json.loads(raw['json']) == packet
+        elif fault == 'silence':
+            assert not observed['events']
+            assert observed['silence_meaning'].startswith('inconclusive')
+        else:
+            event, = observed['events']
+            assert event['event'] == packet and event['cause_proven'] is False
+            assert event['correlation'] == ('unrelated_or_identity_unresolved' if fault == 'unrelated'
+                else 'identity_only_time_unresolved' if fault == 'stale-time'
+                else 'matching_identity_and_capture_interval')
+        if fault not in ('malformed', 'cleanup'):
+            assert report['playback']['state'] == ('playing' if fault == 'playing' else 'stopped')
