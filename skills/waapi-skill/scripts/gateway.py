@@ -143,6 +143,8 @@ from wwise_waapi.object_query_related import (  # noqa: E402
 )
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
+    MAX_GAME_OBJECT_ROWS,
+    MAX_STABLE_STRING_BYTES,
     STABLE_READ_RESULT_LIMIT_BYTES,
     build_profiler_game_objects_request,
     build_profiler_voice_contributions_request,
@@ -7454,6 +7456,35 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri == "ak.wwise.core.profiler.getGameObjects":
+        row_fields = ["id", "name", "register_time", "unregister_time"]
+        unsigned_ids = capability.version in {"2022.1", "2023.1"}
+        commands[0].update({
+            "required_inputs": ["capture"],
+            "input_forms": {
+                "capture": {"exactly_one_of": ["--capture-ms <nonnegative-milliseconds>", "--capture latest|user-cursor"]},
+            },
+            "result_contract": {
+                "collection": "game_objects",
+                "row_fields": row_fields,
+                "id": {
+                    "domain": "uint64" if unsigned_ids else "int64-or-uint64",
+                    "minimum": 0 if unsigned_ids else -(1 << 63),
+                    "maximum": (1 << 64) - 1,
+                },
+                "timestamps": {"domain": "int32", "minimum": -(1 << 31), "maximum": (1 << 31) - 1},
+                "unreported_fields": {
+                    "permitted": capability.version == "2022.1", "value": None,
+                    "listed_by": "unreported_fields", "list_present_only_when_unreported": True,
+                    "order": row_fields,
+                },
+                "limits": {
+                    "maximum_rows": MAX_GAME_OBJECT_ROWS,
+                    "maximum_name_utf8_bytes": MAX_STABLE_STRING_BYTES,
+                    "maximum_result_bytes": STABLE_READ_RESULT_LIMIT_BYTES,
+                },
+            },
+        })
     if capability.uri == "ak.wwise.core.profiler.getVoiceContributions":
         commands[0].update({
             "required_inputs": ["capture", "voice"], "optional_inputs": ["game_object", "bus_selection"],
