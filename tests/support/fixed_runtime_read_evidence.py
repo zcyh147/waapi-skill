@@ -103,6 +103,21 @@ R119_PROFILES = {'2021.1': {'name': 'r119-2021',
             'archive_file': 'r119-2024-originals.json.gz'}}
 
 
+
+R105_SEED_NODEID = 'tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_missing_profiler_reads'
+R105_SEED_CATEGORY_SHA = '46f35b09db3c1f298d4c29cc6869ce965db56eccf6a120c548e1e4aa0713626c'
+R105_SEED_ARCHIVE_SHA = '6f1c7f297bfad4ae0130b40d84d15c7bedd8208e6f45cbf3e236d94fb17f3b79'
+R105_SEED_PACKETS = {
+    'ak.wwise.core.profiler.getVoices': {
+        'packet_sha': '40fb0be8d36926860cf5127a0b8abd5b266993eb71d7bc433df8c46837117e22',
+        'packet_name': '1792791903159220000-782fe5d33901410490fa1dd332822376-ak_wwise_core_profiler_getVoices.json'},
+    'ak.wwise.core.profiler.getBusses': {
+        'packet_sha': '5df8e04334f736b31b6991d78be22b4a55c4371c351a3640bb4ae84c4c03cb61',
+        'packet_name': '1792791903758373000-1de386c7e0cc40fa9b7786c4b43757d5-ak_wwise_core_profiler_getBusses.json'}}
+R105_SEED_SOURCE_FILES = {'r105-2022-category.json': 'original-category.json',
+    'r105-2022-originals.json.gz': 'original-closure.json.gz'}
+
+
 def native_profile(branch):
     """Eligibility is owned by exact route identities, never optional markers."""
     version, host, build, kind, uri = branch['route'].split('|')
@@ -114,6 +129,16 @@ def native_profile(branch):
             map_file='r119-source-map.json', map_sha=R119_MAP_SHA, category=R118_CATEGORY,
             changes=R119_CHANGES, symbols=R119_SYMBOLS,
             reason='Exact original R119 Console version/build complete twenty-field Voices at its fixed T; exact five-file log-only observation policy and UTF-8 context comparator delta preserves original successful ASCII equality and Profiler behavior; 408 packaged paths unchanged; no native non-ASCII or other reader/data/effect/Topic credit')
+    if (version == '2022.1' and host == 'wwise-authoring' and build == '2022.1.19.8584'
+            and kind == 'function' and uri in R105_SEED_PACKETS):
+        return dict(R105_SEED_PACKETS[uri], name='r105-2022-seed', uri=uri,
+            candidate=runtime.RTPC_ORIGINAL_CANDIDATE, nodeid=R105_SEED_NODEID,
+            category_sha=R105_SEED_CATEGORY_SHA, archive_sha=R105_SEED_ARCHIVE_SHA,
+            capture_sha=runtime.RTPC_ORIGINALS['2022.1'][1], category='r105-seed-' + uri.rsplit('.',1)[1],
+            category_file='r105-2022-category.json', archive_file='r105-2022-originals.json.gz',
+            files=tuple(R105_SEED_SOURCE_FILES), source_files=R105_SEED_SOURCE_FILES,
+            changes=runtime.RTPC_REVIEWED_SOURCE_CHANGES, symbols=runtime.RTPC_REVIEWED_SOURCE_SYMBOLS,
+            reason='Exact finalized-PASS R1052022 Authoring node, original complete paired seed diagnostics at T23637; same reviewed R105 eight-file source delta/current complete original-array replay; independent result selectors only; no new category PASS or standalone contribution/lifecycle/effect claim')
     if version != '2025.1' or build != '2025.1.7.9143' or kind != 'function':
         raise ValueError('No qualified fixed-reader native profile for this exact route')
     if host == 'wwise-authoring' and uri in URIS:
@@ -488,8 +513,83 @@ def validate_program(record, binding, branch, root, reference_edges=None):
         raise ValueError('Fixed-row exact pinned branch predicate failed')
 
 
+def r105_seed_original_observation(originals, category, *, profile):
+    """Read successful seed packets inside the untouched finalized PASS node.
+
+    The original capture has RTPC/contribution outcome categories only. These
+    exact seed URI selectors never fabricate a Voices/Busses category verdict.
+    """
+    base = Path(originals)
+    if category != profile['category'] or profile['uri'] not in R105_SEED_PACKETS:
+        raise ValueError('Exact R105 seed URI/profile selector required')
+    archive = {'artifact':profile['archive_file'], 'sha256':runtime.sha((base/profile['archive_file']).read_bytes())}
+    descriptor = {'artifact':profile['category_file'], 'sha256':runtime.sha((base/profile['category_file']).read_bytes()), 'nodeid':profile['nodeid']}
+    if archive['sha256'] != R105_SEED_ARCHIVE_SHA or descriptor['sha256'] != R105_SEED_CATEGORY_SHA:
+        raise ValueError('Exact R105 seed original archive/category required')
+    read = runtime.archive_reader(archive,base)
+    context = completion.read_category_run(descriptor,base)
+    completion.validate_authoring_batch_finalization(context['record'],base,read_bytes=read)
+    if (context['candidate'] != runtime.RTPC_ORIGINAL_CANDIDATE or context['host'] != 'wwise-authoring'
+            or context['version'] != '2022.1' or context['build'] != '2022.1.19.8584'
+            or {r['category'] for r in context['record']['categories']} != {'profiler-rtpcs-observation','profiler-contributions-bus-observation'}):
+        raise ValueError('Exact R105 seed finalized context/real category roster differs')
+    seal = json.loads(read(context['record']['categories'][0]['batch_finalization']['artifact']))
+    node = json.loads(read(seal['observations'][R105_SEED_NODEID]['path']))
+    sources = node['source_context']['sources']
+    if (node['candidate'] != runtime.RTPC_ORIGINAL_CANDIDATE
+            or node['source_context']['candidate'] != runtime.RTPC_ORIGINAL_CANDIDATE
+            or len(sources) != 616 or audit.digest(sources) != '41d79c2ea620cb9b75859365e2f66346e1c57ec52485978898fbce421b215dca'):
+        raise ValueError('Exact R105 seed complete original source context differs')
+    archived = {PurePosixPath(g['path']).joinpath(f['path']).as_posix():f for g in node['artifacts'].values() for f in g['files']}
+    capture_path, = [name for name in archived if name.endswith('/profiler-capture.json')]
+    capture_raw = read(capture_path)
+    if runtime.sha(capture_raw) != profile['capture_sha']:
+        raise ValueError('Exact R105 seed original capture differs')
+    capture = json.loads(capture_raw)
+    if (capture['outcomes']['profiler-contributions-bus-observation']['outcome'] != 'PASS'
+            or capture['capture_position']['position_ms'] != 23637 or capture['errors']):
+        raise ValueError('Original R105 contribution context/time did not pass')
+    uri = profile['uri']
+    argv = ['core-call',uri,'--profiler-position','23637','--result-view','diagnostics','--max-results','64']
+    receipt, = [r for r in node['receipts'] if r['argv'] == argv]
+    raw_path, = [name for name in archived if name.endswith('/'+profile['packet_name'])]
+    raw_bytes = read(raw_path);raw=json.loads(raw_bytes)
+    public = receipt['payload']
+    if (runtime.sha(raw_bytes) != profile['packet_sha'] or raw['api'] != uri or raw['version'] != '2022.1'
+            or raw['ok'] is not True or raw['dry_run'] is not False or raw['error_code'] is not None
+            or receipt['exit_code'] != 0 or public['ok'] is not True or public['is_command_line'] is not False
+            or any(public['schema_validation'][section]['version'] != '2022.1' for section in ('request','result'))
+            or not public['call']['evidence_path'].endswith('/'+profile['packet_name'])
+            or public['agent_result']['complete'] is not True or public['agent_result']['truncated'] is not False
+            or len(raw['result']['return']) != 1
+            or audit.digest(raw['result']['return']) != audit.digest(row_data(public['agent_result']['return']))):
+        raise ValueError('Exact successful complete R105 seed native/public packet differs')
+    # The expired original handle is only an archive identity, never current
+    # authority. Current public replay issues and validates its own handles.
+    kind = 'voice' if uri.endswith('getVoices') else 'bus'
+    old_handle = public['agent_result']['return'][0][kind+'_instance_handle']
+    handle = 'rto1-'+old_handle[5:].rsplit('-',1)[0]
+    plan_path, = [name for name in archived if name.endswith('/runtime-inspection-observations-v1/'+handle+'.json')]
+    plan = json.loads(read(plan_path));request=plan['plan']['request']
+    if (plan['handle'] != handle or audit.digest(row_data(plan['plan']['result']['return'])) != audit.digest(raw['result']['return'])):
+        raise ValueError('Exact original R105 seed issuer/full array differs')
+    if (request['api'] != uri or request['args'] != {'time':23637}
+            or str(public['agent_result']['profiler_position']) != '23637'):
+        raise ValueError('Exact R105 seed stored original request/time differs')
+    contribution, = [r for r in node['receipts'] if r['argv'][0] == 'profiler-voice-contributions' and '--bus-instance-handle' in r['argv']]
+    args = contribution['payload']['semantic_preview']['args']
+    selected = [args['voicePipelineID']] if uri.endswith('getVoices') else args['bussesPipelineID']
+    if args['time'] != 23637 or [r['pipelineID'] for r in raw['result']['return']] != selected:
+        raise ValueError('Original R105 seed identity/contribution time relation differs')
+    return dict(context=context,read=read,node=node,capture=capture,capture_raw=capture_raw,capture_path=capture_path,
+        raw=raw,raw_path=raw_path,request=request,receipt=receipt,category_descriptor=descriptor,archive=archive,
+        historical_sources={p:h for p,h in sources.items() if p.startswith('skills/waapi-skill/')})
+
+
 def original_observation(originals, category, *, profile=None):
     """Use strict original PASS; all archive paths are inert logical identities."""
+    if profile is not None and profile['name'] == 'r105-2022-seed':
+        return r105_seed_original_observation(originals,category,profile=profile)
     if profile is not None and (profile['name'] == 'r118' or profile['name'].startswith('r119-')):
         return console_original_observation(originals, category, profile=profile)
     originals = Path(originals)
@@ -676,9 +776,9 @@ def write_fixed_bundle(output, program_path, originals, *, inventory, selected=N
         if '--voice-instance-handle' in captured['gateway']['argv']: category = 'profiler-voice-instance-filter'
         elif '--bus-instance-handle' in captured['gateway']['argv']:
             category = 'profiler-audio-objects-bus-filter' if uri.endswith('.getAudioObjects') else 'profiler-bus-instance-filter'
-        if profile['name'] == 'r118' or profile['name'].startswith('r119-'): category = profile['category']
+        if profile['name'] in {'r118','r105-2022-seed'} or profile['name'].startswith('r119-'): category = profile['category']
         for name in profile['files']:
-            source = (Path(originals) / name).read_bytes()
+            source = (Path(originals) / profile.get('source_files',{}).get(name,name)).read_bytes()
             if (output / name).exists():
                 if (output / name).read_bytes() != source: raise ValueError('Fixed stage original closure changed')
             else: (output / name).write_bytes(source)
