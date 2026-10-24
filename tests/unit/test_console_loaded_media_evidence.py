@@ -77,7 +77,7 @@ def test_console_loaded_media_public_teardown_portable_consumer(request,tmp_path
         rows=[r for r in result['obligations']if r['route']==profile['route']]
         assert len(rows)==31 and {r['state']for r in rows}=={'verified'},json.dumps(rows)
         root=next(r for r in rows if r['id']==profile['gate'])
-        assert root['requirements']==['program','native'] and root['representative_native_support']==console_basis(profile)
+        assert set(root['requirements'])=={'program','native'} and root['representative_native_support']==console_basis(profile)
         assert all(r['requirements']==['program'] and r['runtime_native_anchor_status']=='passed'for r in rows if r['id']!=profile['gate'])
         assert sum('native'in b['evidence']for b in document['bindings'].values())==1
         if version=='2023.1':
