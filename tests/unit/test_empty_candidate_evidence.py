@@ -221,14 +221,23 @@ def test_empty_public_severity_is_rejected_before_dispatch_with_valid_preview_co
     descriptor = _seal(tmp_path / 'argument-counterexample.json', record)
     result = evidence_result(descriptor, branch, 'controlled-current', 'program', 'controlled', tmp_path, binding, ROOT, edges)
     assert result == ('passed', None), result
-    for damage in ('wrong-flag', 'wrong-operation', 'wrong-declaration', 'target-dispatch', 'invalid-preview', 'wrong-host', 'successful-parser'):
-        changed = deepcopy(record)
+    for damage in ('wrong-flag', 'coherent-wrong-flag', 'wrong-operation', 'wrong-declaration', 'different-valid-severity', 'target-dispatch', 'invalid-preview', 'wrong-host', 'successful-parser'):
+        changed, changed_binding = deepcopy(record), deepcopy(binding)
         if damage == 'wrong-flag':
             changed['gateway']['stderr'] = changed['gateway']['stderr'].replace('argument --severity:', 'argument --log-channel:')
+        elif damage == 'coherent-wrong-flag':
+            # Reseal all caller-chosen attribution fields coherently, while
+            # the selected compiled severity remains the unrelated Message.
+            changed['gateway']['argv'][-2] = '--cursor-move'
+            changed['gateway']['stderr'] = changed['gateway']['stderr'].replace('argument --severity:', 'argument --cursor-move:')
+            changed['counterexample']['valid']['gateway']['argv'][-2:] = ['--cursor-move', 'first-frame']
+            changed_binding['input']['gateway_argv'] = deepcopy(changed['gateway']['argv'])
         elif damage == 'wrong-operation':
             changed['counterexample']['compiled']['gateway']['payload']['agent_result']['request']['arguments']['api'] = 'ak.wwise.core.log.clear'
         elif damage == 'wrong-declaration':
             changed['counterexample']['valid']['gateway']['payload']['draft']['binding']['operation'] = 'ak.wwise.core.log.clear'
+        elif damage == 'different-valid-severity':
+            changed['counterexample']['compiled']['gateway']['payload']['agent_result']['request']['arguments']['args']['severity'] = 'Warning'
         elif damage == 'target-dispatch':
             changed['native_calls'] = [{'uri': 'ak.wwise.core.log.addItem', 'args': {'severity': ''}, 'options': {}, 'result': {}}]
         elif damage == 'invalid-preview':
@@ -239,7 +248,7 @@ def test_empty_public_severity_is_rejected_before_dispatch_with_valid_preview_co
             changed['gateway']['exit_code'] = 0
         changed_descriptor = _seal(tmp_path / ('args-' + damage + '.json'), changed)
         assert evidence_result(changed_descriptor, branch, 'controlled-current', 'program', 'controlled', tmp_path,
-                               binding, ROOT, edges)[0] == 'missing', damage
+                               changed_binding, ROOT, edges)[0] == 'missing', damage
     from tests.support.empty_candidate_evidence import write_counterexample_bundle
     from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
     import os

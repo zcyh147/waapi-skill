@@ -208,7 +208,28 @@ def validate_counterexample(record, descriptor, branch, classification, candidat
                 or good_argv[good_argv.index('--task-authority') + 1] != compiled_argv[compiled_argv.index('--task-authority') + 1]
                 or good_argv[:good_argv.index('draft-declare-runtime-control-plan')] != compiled_argv[:compiled_argv.index('preview-from-draft')]):
             raise ValueError('counterpart changes durable public declaration context')
+        # The receipt cannot choose which public flag constructs this native
+        # field. Only this reviewed closed compiler mapping is admitted here;
+        # generic empty classification does not authorize other input seams.
+        from wwise_waapi.runtime_inspection_business_contracts import (
+            LOG_ADD_ITEM_URI, LOG_SEVERITY_MEANINGS, runtime_inspection_business_contract_data)
+        if uri != LOG_ADD_ITEM_URI or section != 'argsSchema':
+            raise ValueError('unsupported public flag to selected native field mapping')
+        declaration = runtime_inspection_business_contract_data(uri, version=version)['declaration']
+        expected_flag = declaration['input_forms']['severity']['flag']
+        source_edge = branch['route'] + '|/argsSchema/properties/severity/$ref'
+        if (flag != expected_flag or gateway['argv'].count(expected_flag) != 1
+                or observation != expected_dispatch + '/args/severity'
+                or binding.get('reference_chain') != [source_edge]
+                or reference_edges[source_edge]['reference']['target'] != branch['route'] + '|' + classification['parent_pointer']):
+            raise ValueError('public flag does not construct the selected native severity field')
+        public_value = good_argv[index]
+        if (public_value not in declaration['value_choices']['severity']
+                or public_value not in LOG_SEVERITY_MEANINGS):
+            raise ValueError('valid public severity counterpart is not a disclosed choice')
         good_value = pointer_value(record, observation)
+        if not _same(good_value, LOG_SEVERITY_MEANINGS[public_value]):
+            raise ValueError('compiled severity differs from its source-owned public meaning')
         expected_check = {'pointer': input_pointer, 'equals': classification['candidate']}
     parent = {**branch, 'pointer': classification['parent_pointer'], 'shape_sha256': classification['parent_schema_sha256']}
     validate_native_alternative(root, parent, good_value, require_known=True)
