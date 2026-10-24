@@ -5,6 +5,32 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R120–R121 Unicode Draft binding and fixture path checks
+
+Reviewed candidate `3694f194bb59204a81194faab84097ac815ba754`, integrated as
+`b6f41524018342f551fefbec83f3287508873e90`, repairs a real public Draft failure
+for non-ASCII project context: ASCII-only `hmac.compare_digest` string operands
+now use exact UTF-8 bytes. Context fields, mismatch errors, authorization and
+execute-once behavior are unchanged; no Unicode normalization is applied.
+
+Focused program evidence was collected in separate selections, not a unified
+full gate. All five version positives completed the public Draft/Preview/
+confirmation/execute/verify path and rejected a second execute. A subsequent
+15-case affected selection passed in 6.97s: public context-drift negatives,
+exact Unicode versus normalization drift, existing context mismatch checks,
+and the actual Unicode-path producer through final report/cleanup. After
+integration of the independent fixture path guard, five affected path/producer
+checks passed in 13.53s. Test-development failures are retained in the linked
+local handoff/logs; no native Unicode, Windows-native or Fresh result is claimed.
+
+The developer-only Console fixture guard checks actual Windows/UNC native paths
+against the matching 260 UTF-16-unit bound including NUL before runtime effects.
+It rejects the oversized case with zero transactions, admits the exact boundary,
+and leaves POSIX paths uncapped by this Windows rule. The guard's original
+Unicode-at-boundary failure exposed the Draft defect above. Existing native
+ASCII observations remain attributed to their original candidates; source-map
+reconciliation and current combined receipts are required before formal reuse.
+
 ## 2026-10-24 R119 four older Console playback and Voices observations
 
 Frozen candidate `301a2235f51b1721fb113a1e01311bc59ab67f87` ran
