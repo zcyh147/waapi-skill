@@ -5,6 +5,43 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R132 diagnostic readers, cursor compatibility and bounded collector
+
+Reviewed integration `c8498cb3` adds the three diagnostic-reader and cursor
+evidence adapters. The 654 CPU/performance/streaming IDs use 18 retained
+same-host/build native observations and six grouped public program flows.
+Independent review verified their exact scope, complete source maps and 1,613
+original archive files. It found an overly permissive truncation-flag check;
+the repair rejects null, numeric and string flags. Only the affected group
+reran (17.67s); the other five retain their 77.59s result and original candidate.
+
+Cursor queries now handle a native-admitted missing position in 2021/2022 as
+unavailable with `native-position-not-returned`. They preserve the distinct
+documented `-1` result; required-position versions and malformed present values
+still reject. Six focused public checks passed in 3.00s. The five paired-host
+evidence groups cover 142 IDs and ten roots: the first passed in 5.51s and the
+other four in 21.29s. A subsequent trace control repaired acceptance of an
+unrelated extra native call; only its affected check reran (1.15s). Independent
+review verified 2,574 original archive members and the exact scoped union.
+
+Both writers now forward closed version/host prefixes through the existing
+common-base composer. Two focused composition checks passed in 2.90s and 12.02s,
+including collision, duplicate-branch and wrong-prefix rejection. Existing
+semantic groups were not repeated for this packaging change.
+
+A separate developer-only meter diagnostic is implemented and reviewed for the
+two unresolved 2025 spellings `states` and `suppportsRandomizer`. Eleven distinct
+fake-host checks exercise its actual final category writer, request outcomes,
+packet integrity/bounds, session loss, cleanup and single-node Automation Mode
+admission. It allows four fixed reads in one owned session; diagnostic completion
+never grants alias or business coverage. No native diagnostic has run yet.
+
+The merge's sole manifest check passed in 0.30s; the fixed Program roster has
+354 entries. Source compatibility for the exact two product and two developer
+file changes remains a separate reviewed update. No full gate, Fresh or global
+coverage publication ran for this integration. #186 and the overall effort
+remain unfinished; all earlier failures and source attributions are retained.
+
 ## 2026-10-24 R130 log, Console LoadedMedia and empty-value integration
 
 Independent closure review of #176 at `40001e6f` found the reopened checker
