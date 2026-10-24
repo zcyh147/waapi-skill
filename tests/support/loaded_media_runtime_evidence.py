@@ -13,7 +13,7 @@ URI = 'ak.wwise.core.profiler.getLoadedMedia'
 ROUTE = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
 ANCHOR = ROUTE + '|/resultSchema/properties/return/@cardinality/single'
 FIXTURE = 'tests/fixtures/runtime-loaded-media'
-REVIEW_SHA = '26c435deb3f789be9e8d872541be834342fd280b95dc212b32ff20ae56a86e5d'
+REVIEW_SHA = 'b0c96141eb54a2ff058bde6e846a03d91f33def3a8ff010bdcd054fc2a8ae2c3'
 ORIGINAL_CANDIDATE = '7289081b552c5f428013ba0b6bacaf7d05843481'
 PREFIX = '/private/tmp/waapi-r122-demo-native-r4/evidence/'
 CATEGORY = 'profiler-loaded-media-observation'
@@ -145,8 +145,15 @@ def original_observation(originals=None, *, root=audit.ROOT):
     if read(PREFIX + 'categories.jsonl').splitlines()[-1] != (base / 'r124-category.json').read_bytes().strip():
         raise ValueError('LoadedMedia final category detached from prepared/final history')
     historical = {k:v for k,v in sources.items() if k.startswith('skills/waapi-skill/')}
-    if historical != runtime.program_source_context(root, flow=URI)['packaged']:
-        raise ValueError('LoadedMedia selected source compatibility requires unchanged full packaged bytes')
+    current = runtime.program_source_context(root, flow=URI)['packaged']
+    source_review = r['packaged_source_review']
+    differences = {name: {'before': historical.get(name), 'after': current.get(name)}
+                   for name in historical.keys() | current.keys() if historical.get(name) != current.get(name)}
+    if (len(historical) != source_review['packaged_source_count']
+            or len(current) != source_review['packaged_source_count']
+            or len(historical) - len(differences) != source_review['unchanged_source_count']
+            or differences != source_review['changes']):
+        raise ValueError('LoadedMedia exact reviewed packaged source delta differs')
     return dict(context=context, node=node, read=read, capture=capture, capture_raw=capture_raw, capture_path=capture_path,
                 raw=raw, raw_path=raw_path, request=request, receipt=receipt, historical_sources=historical,
                 archive=descriptor('r124-originals.json.gz'), category_descriptor=descriptor('r124-category.json'))
@@ -361,7 +368,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None):
                 eq=write('native-equivalence.json',{'contract':'waapi-skill.branch-evidence-equivalence/v1','from_candidate':ORIGINAL_CANDIDATE,
                     'to_candidate':candidate,'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'native_route':ROUTE,
                     'evidence_sha256':native_run['sha256'],'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),
-                    'reviewed_reason':'Exact reviewed actual9262 semantic support and complete current public replay; full packaged bytes unchanged; no9143 native execution',
+                    'reviewed_reason':'Exact reviewed actual9262 semantic support and complete current public replay; only reviewed Gateway exception-finish host-context delta; all other412 packaged sources exact; no9143 native execution',
                     'sources':sources})
                 attachment=write('attachment.json',{'contract':'waapi-skill.runtime-observation-attachment/v1','branch_id':identity,
                     'proof':proof,'evidence':nd,'native_equivalence':eq})

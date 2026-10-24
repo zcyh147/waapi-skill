@@ -82,6 +82,42 @@ def test_loaded_media_public_teardown_portable_consumer(request, tmp_path, inven
         assert all(row['requirements'] == ['program'] for identity, row in rows.items() if identity != ANCHOR)
         assert all(row['runtime_native_anchor_status'] == 'passed' for identity, row in rows.items() if identity != ANCHOR)
         assert len([b for b in document['bindings'].values() if 'native' in b['evidence']]) == 1
+        # Reuse this exact completed packet for source-admission damage. The
+        # original native archive and its620 source seals are never rewritten.
+        import shutil
+        import subprocess
+        isolated = tmp_path / 'source-controls'
+        isolated.mkdir()
+        git_dir = subprocess.check_output(['git', 'rev-parse', '--absolute-git-dir'],
+            cwd=audit.ROOT, text=True).strip()
+        (isolated / '.git').write_text('gitdir: ' + git_dir + '\n')
+        shutil.copytree(audit.ROOT / 'skills/waapi-skill', isolated / 'skills/waapi-skill',
+            ignore=shutil.ignore_patterns('.venv', '__pycache__', '.pytest_cache', '.coverage', '.DS_Store'))
+        dependencies = set(captures[0][2]['capture']) | {
+            'tests/fixtures/runtime/runtime-risk-policy-r124.json',
+            'docs/plans/full-waapi-coverage/SPEC.md', 'docs/branch-coverage-requirements.json'}
+        for name in dependencies:
+            target = isolated / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(audit.ROOT / name, target)
+        shutil.copytree(FIXTURE, isolated / 'tests/fixtures/runtime-loaded-media', dirs_exist_ok=True)
+        policy = json.loads((index.parent / 'requirements.json').read_bytes())
+        from tests.support.loaded_media_runtime_evidence import original_observation
+        for name in ('skills/waapi-skill/scripts/gateway.py', 'skills/waapi-skill/scripts/run.py'):
+            target = isolated / name
+            unchanged = target.read_bytes()
+            # Wrong approved after-hash, then an extra file alongside the exact
+            # approved Gateway change: both must fail the entire source delta.
+            target.write_bytes(unchanged + b'\n# unreviewed source-control change\n')
+            with pytest.raises(ValueError, match='LoadedMedia exact reviewed packaged source delta differs'):
+                original_observation(index.parent, root=isolated)
+            result = completion.evaluate_coverage(isolated, inventory, document,
+                digest=audit.digest, evidence_base=index.parent, requirements_document=policy)
+            damaged = {row['id']: row for row in result['obligations'] if row['route'] == ROUTE}
+            assert damaged[ANCHOR]['evidence_results']['native']['outcome'] == 'missing', json.dumps(damaged[ANCHOR])
+            assert 'LoadedMedia exact reviewed packaged source delta differs' in damaged[ANCHOR]['evidence_results']['native']['reason']
+            assert all(row['state'] != 'verified' for row in damaged.values())
+            target.write_bytes(unchanged)
     register_exact_evidence_finalizer(request.node, finalize)
 
 
