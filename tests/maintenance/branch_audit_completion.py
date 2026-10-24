@@ -1562,9 +1562,15 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         if (binding or {}).get('disposition') == 'schema_counterexample':
             raise ValueError('counterexample requires a conclusively rejected empty candidate')
         normalized_construction = None
+        transport_create_omission_preserved = False
         from tests.support.runtime_remaining_evidence import selected as remaining_selected, validate_evidence as validate_remaining
         if remaining_selected(branch['id'], root):
             normalized_construction=validate_remaining(record,binding or {},branch,category,base,root,reference_edges)
+            # A source-owned exact twenty-leaf validator checks the successful
+            # native ACK and uncertain public handling; no agent_result exists.
+            if normalized_construction == {'transport_create_omission_preserved':True}:
+                transport_create_omission_preserved = True
+                normalized_construction = None
         if category == 'program':
             from wwise_waapi.runtime_inspection_business_contracts import PROFILER_GET_RTPS_URI
             # The source-owned exact read route determines capture eligibility;
@@ -1722,10 +1728,11 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                 public_equals = True
             if public_pointer.startswith('/stream_records/'):
                 validate_created_topic_program(record, branch, binding, checks, root, reference_edges or {})
-            elif (not public_pointer.startswith('/gateway/payload/agent_result')
+            elif (not (public_pointer.startswith('/gateway/payload/agent_result')
+                    or transport_create_omission_preserved and public_pointer=='/gateway/payload/dispatch_result/result')
                     or not public_equals):
                 raise ValueError('exact public Gateway result assertion missing')
-            if gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True or not gateway['argv']:
+            if not transport_create_omission_preserved and (gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True or not gateway['argv']):
                 raise ValueError('successful public Gateway receipt missing')
         if category in ('native', 'live_metadata', 'native_absence'):
             expected_version = branch['route'].split('|')[0] if branch['route'] else branch['version']
