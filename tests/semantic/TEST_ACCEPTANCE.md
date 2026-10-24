@@ -48,6 +48,15 @@ votes on the same sealed notice is not a substitute for that diagnosis.
 
 ### Test selection and evidence reuse (approved 2026-10-23)
 
+Native acceptance is selected by business risk (reconfirmed 2026-10-24).
+Keep five-version program coverage for every in-scope API, parameter and
+branch. Real Wwise checks establish meaningful nonempty results, business
+effects, version/host differences and cleanup. Do not manufacture every
+true/false combination, multiple metadata rows or duplicate list entries on
+every version solely for cardinality coverage. Record and review each evidence
+reuse or test-selection rationale; preserve original failed outcomes. Missing
+business semantics or required native proof remains unresolved.
+
 Select tests from the changed implementation and its callers. Group independent
 cases into one affected run while retaining separate assertions, outcomes and
 isolated mutable state. Share expensive setup only when it cannot leak state

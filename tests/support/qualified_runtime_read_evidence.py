@@ -459,6 +459,9 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
     if assessment.get('contract') == 'waapi-skill.retained-transport-assessment/v1':
         from tests.support.runtime_transport_evidence import qualified_result
         return qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges)
+    if assessment.get('contract') == 'waapi-skill.retained-capture-control-assessment/v1':
+        from tests.support.runtime_capture_control_evidence import qualified_result
+        return qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges)
     if assessment.get('contract') == 'waapi-skill.retained-cursor-assessment/v1':
         from tests.support.runtime_cursor_evidence import qualified_result
         return qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges)

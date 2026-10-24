@@ -155,3 +155,21 @@ effects, unexplained native differences and incomplete cleanup remain unfinished
 Do not rewrite historical requirements, results or failures; record the successor
 policy and its current evaluation separately. This decision authorizes no Fresh
 attempt, native absence claim or capability exclusion.
+
+## User-approved explicit media choice — 2026-10-24
+
+The user approved one precise input boundary: for Wwise 2023.1
+`ak.wwise.core.transport.useOriginals`, the Agent must explicitly choose
+`originals` or `converted`. Both choices remain fully supported. The reflected
+2023 argument schema permits omitting `enable`, but the matching API, argument
+and example documentation does not define the omitted behavior. Do not guess a
+default or expose an opaque native-default choice.
+
+This exception covers exactly four existing branch IDs: Console and Authoring
+build 2023.1.19.8928, each with `/argsSchema/@empty/object` and
+`/argsSchema/properties/enable/@presence/absent`. Preserve their identities and
+schema-admitted classification. Verify explicit public rejection without target
+dispatch, the same-operation valid choice, and the existing native route gates.
+Record them as the approved explicit-choice boundary, not successful native
+omission, native absence or an invalid native schema. Historical failures remain
+unchanged. Every other version, branch and unresolved capability stays in scope.

@@ -5,7 +5,77 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R135 known meter output construction
+
+Reviewed product changes `d9a22dbc` and `967abf75` add 62 fixed business names
+to the meter-root output allowlist. Matching getMeters definitions establish
+the canonical choices or accessor grammar, result-property meanings and
+existing closed mappings for each supported version. Every explicitly named
+objectReturn property now has a fixed root construction in 2024/2025. Missing
+per-object values remain unavailable; this does not promise that a metered Bus
+has source-media or SoundBank data. The compiler, projection, limits and other
+production AST nodes are unchanged.
+
+The two focused groups passed nine checks in 2.23s and nine in 3.12s respectively.
+They cover both hosts in 2024/2025, older-version preconnection boundaries,
+exact requests, complete pages, selected values/absence, invalid off-page
+values and the existing output limit. Independent review checked primary
+definitions, mappings and source/log seals. No native or Fresh run was added.
+
+This establishes construction, not complete meter evidence admission. The
+unchanged 2,744-ID ledger contains 2,668 candidate program obligations, four
+native root gates, 60 unresolved literal spellings and 12 empty-input questions.
+Those unresolved items remain assigned; Console root evidence is still needed.
+Only profiler_meter_objects.py changed in the packaged tree. Exact source-reuse
+reconciliation is complete at `b120332a`: 27 full historical/current map
+comparisons, all 413 package paths and all 619 Source dependencies were checked.
+The existing focused compatibility guard passed in 0.64s; original maps and
+outcomes remain unchanged. No producer was repeated for the hash update.
+
+The shared R93 archive added at `9f1cf26a` preserves all 255 files of the
+original 2024 meter workflow byte-for-byte, including its actual 412-path
+package map. Both meter consumers reuse this single artifact. Archiving grants
+no new native or branch credit. The final combined gates remain outstanding.
+
+## 2026-10-24 R134 capture control evidence
+
+Reviewed feature `2e320baf`, integrated at `a03a7db5`, covers the exact 672
+existing enable/start/stop capture IDs and 30 native acknowledgement roots.
+Five grouped public Gateway program cases reached actual teardown and the
+ordinary portable consumer: the first version passed in 86.23s; the remaining
+four ran once and passed in 149.69s. Missing-root checks isolate each route,
+and reused packets exercise malformed outcomes, extra dispatch, source drift,
+cleanup and composition failures. Earlier assertion-encoding failures remain
+recorded; only affected development cases were repeated.
+
+The native facts reuse ten unchanged original workflows with matching
+host/build, exact public authorization and dispatcher receipts, source
+preservation and cleanup. Independent review checked all 30 control receipts,
+ten primary default descriptions and the exact five-report union. These are
+acknowledgements, not proof of enabled settings, current recording state or
+global restoration. Explicit enable is equivalent to the documented default;
+literal native omission is not claimed. No native or Fresh run was added.
+
+The sole merge manifest check passed in 0.31s; the fixed Program roster has
+355 entries. Packaged Skill code is unchanged. The remaining 298 control IDs,
+transport and meter work remain assigned to #186. This is component evidence,
+not a new full gate or global completion result.
+
 ## 2026-10-24 R132 diagnostic readers, cursor compatibility and bounded collector
+
+The subsequent single native diagnostic at `fc28985c` ran on isolated macOS
+Authoring 2025.1.7.9143 in Automation Mode. It failed in 100.35s: the literal
+`states` and `suppportsRandomizer` projections returned empty objects, losing
+the requested identity fields. The omitted-options baseline and correctly
+spelled `supportsRandomizer` returned the owned Bus identity; the latter was
+false. All four native responses passed their schemas. These observations do
+not establish aliases or meaningful values for the two anomalous selectors.
+The final four category records remain BLOCKED, and the original failed sandbox
+is quarantined. All six capture cleanup steps succeeded; source files and
+project mtime were unchanged, and no owned Wwise/Wine process remained.
+Independent review checked packet seals, launch provenance, source preservation
+and final outcomes. No retry or regrade was performed. The local evidence root
+is `.waapi-skill-state/full-coverage/r132-meter-anomalies-native-2025-r1`.
 
 Reviewed integration `c8498cb3` adds the three diagnostic-reader and cursor
 evidence adapters. The 654 CPU/performance/streaming IDs use 18 retained
@@ -34,11 +104,15 @@ two unresolved 2025 spellings `states` and `suppportsRandomizer`. Eleven distinc
 fake-host checks exercise its actual final category writer, request outcomes,
 packet integrity/bounds, session loss, cleanup and single-node Automation Mode
 admission. It allows four fixed reads in one owned session; diagnostic completion
-never grants alias or business coverage. No native diagnostic has run yet.
+never grants alias or business coverage. Its later native outcome is recorded
+above separately from these fake-host checks.
 
 The merge's sole manifest check passed in 0.30s; the fixed Program roster has
-354 entries. Source compatibility for the exact two product and two developer
-file changes remains a separate reviewed update. No full gate, Fresh or global
+354 entries. Reviewed source-compatibility successor `33ef8cf8` preserves all
+historical maps and advances only the exact two product and two developer-file
+changes. Its existing guard passed in 0.63s; independent review checked 27 full
+map comparisons and all 619 current Source hashes. No producer or native run
+was repeated for those hash changes. No full gate, Fresh or global
 coverage publication ran for this integration. #186 and the overall effort
 remain unfinished; all earlier failures and source attributions are retained.
 

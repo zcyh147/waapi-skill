@@ -12,7 +12,7 @@ from tests.support import runtime_remaining_evidence as remaining
 
 URI='ak.wwise.core.profiler.getCursorTime'
 SUPPORT='tests/fixtures/runtime-cursor/support-review.json'
-SUPPORT_SHA='fd4a459e767aadaceefcff3ef0dc996eb3b1277408dd4f821e45c7ed0e8e67fb'
+SUPPORT_SHA='45ef526e06b725b4e00fe42b1edfd4a1e26346deb0fe160be927272d05ea535d'
 CONTRACT='waapi-skill.retained-cursor-assessment/v1'
 
 

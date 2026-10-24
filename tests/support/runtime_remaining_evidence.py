@@ -18,7 +18,7 @@ from tests.support import fixed_runtime_read_evidence as fixed
 POLICY = 'tests/fixtures/runtime/runtime-remaining-policy-r127.json'
 POLICY_SHA = '994dc0ead6c3740a0d83512ed75af06ace2943c6477cafe6c6ce898a3c340408'
 FIXTURE = 'tests/fixtures/runtime-log'
-SUPPORT_SHA = '7951fcf3b4242c26e61e379becb37322ee4a751ec057681d0c13231d837f766f'
+SUPPORT_SHA = '70f8576ea140572ca40e3e3b3af669bc183e216fa89f19546136f6237fcc4be2'
 LOG_GET = 'ak.wwise.core.log.get'
 LOG_URIS = frozenset('ak.wwise.core.log.' + n for n in ('get','addItem','clear'))
 R122_CANDIDATE = '1f32f9f223cebe11076ca07f168f29fad99adfab'
@@ -439,6 +439,9 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
     if branch['route'].split('|')[-1] in {'ak.wwise.core.transport.'+n for n in ('create','destroy','executeAction','prepare','useOriginals','getList','getState')}:
         from tests.support.runtime_transport_evidence import validate_evidence as validate_transport
         return validate_transport(record,binding,branch,category,base,root,edges)
+    if branch['route'].split('|')[-1]in {'ak.wwise.core.profiler.'+n for n in ('enableProfilerData','startCapture','stopCapture')}:
+        from tests.support.runtime_capture_control_evidence import validate_evidence as validate_capture_control
+        return validate_capture_control(record,binding,branch,category,base,root,edges)
     if branch['route'].endswith('|ak.wwise.core.profiler.getCursorTime'):
         from tests.support.runtime_cursor_evidence import validate_evidence as validate_cursor
         return validate_cursor(record,binding,branch,category,base,root,edges)
