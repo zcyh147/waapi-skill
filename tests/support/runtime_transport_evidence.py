@@ -97,6 +97,53 @@ def _call(row):return {k:row[k]for k in ('uri','args','options','result')}
 def _choice(argv,flag,default=None):return argv[argv.index(flag)+1]if flag in argv else default
 
 
+def _verification_reads(payload,call,trace):
+    """Tie structured verification to its actual independent read span."""
+    reads=[_call(r)for r in trace[call['native_start']:call['native_end']]if r['uri']in URIS]
+    verification=payload['verification']
+    if (verification.get('ok')is not True or verification.get('business_state_verified')is not True
+            or verification.get('status')!='verified'or any(a.get('passed')is not True for a in verification['assertions'])
+            or [r for r in verification['readbacks']if 'uri'in r]!=reads):
+        raise ValueError('Actual independent transport verification reads differ')
+    return reads
+
+
+def _verified_action(args,preview,preview_call,verified_call,payload,trace,owned,version):
+    from wwise_waapi.transport_action import snapshot,expected_state
+    def reader(rows):
+        remaining=list(rows)
+        def read(uri,args,options):
+            if not remaining:raise ValueError('Independent transport observation missing')
+            row=remaining.pop(0)
+            if {k:row[k]for k in ('uri','args','options')}!={'uri':uri,'args':args,'options':options}:
+                raise ValueError('Independent transport observation target differs')
+            return row['result']
+        return read,remaining
+    before_reads=[_call(r)for r in trace[preview_call['native_start']:preview_call['native_end']]if r['uri']in URIS]
+    read,left=reader(before_reads);before=snapshot(args,version=version,read=read)
+    if left or preview['preview_summary']['pre_state']['transport_action_before']!=before:
+        raise ValueError('Transport action Preview prestate differs from actual reads')
+    wanted={args['transport']}if 'transport'in args else set(owned)
+    if ({r['transport']for r in before['targets']}!=wanted or not wanted
+            or any({k:r[k]for k in ('transport','object','gameObject')}!=owned.get(r['transport'])for r in before['targets'])):
+        raise ValueError('Transport action scope/owned association differs')
+    reads=_verification_reads(payload,verified_call,trace);read,left=reader(reads)
+    current=snapshot({'action':'stop',**({'transport':args['transport']}if 'transport'in args else{})},version=version,read=read)
+    targets=[{k:r[k]for k in ('transport','object','gameObject')}for r in before['targets']]
+    if current!={'scope':before['scope'],'targets':targets}:raise ValueError('Transport verification association differs')
+    observation={'kind':'transport-action-observation','action':args['action'],'scope':before['scope'],'membership_matches':True,'targets':[]}
+    for target in before['targets']:
+        state=read(PREFIX+'getState',{'transport':target['transport']},{})['state']
+        expected,unresolved=expected_state(args['action'],target)
+        if unresolved or state!=expected:raise ValueError('Transport action state not independently matched')
+        observation['targets'].append({'transport':target['transport'],'before_state':target.get('state'),
+            'expected_state':expected,'observed_state':state,'outcome':'matched'})
+    verification=payload['verification'];scope=verification['verification_scope']
+    if (left or verification['readbacks']!=reads+[observation]or scope.get('observation')!=observation
+            or any(scope.get(k)is not False for k in ('continuous_state_verified','atomic_scope_verified','causality_verified'))):
+        raise ValueError('Structured bounded transport observation differs')
+
+
 @lru_cache(maxsize=64)
 def _session(encoded):
     session=json.loads(encoded);trace=session['trace'];calls=session['calls'];stages=session['stages']
@@ -115,7 +162,7 @@ def _session(encoded):
                 or 'agent_result'in g['payload']and list(g['payload'])[-1]!='agent_result'):raise ValueError('Actual public transport phase/span differs')
         cursor=end
     if cursor!=len(trace):raise ValueError('Unattributed transport native trace')
-    lifetimes={};cursor=0;selected=[]
+    lifetimes={};owned={};cursor=0;selected=[]
     for stage in stages:
         start,end=stage['start'],stage['end'];uri=stage['uri'];part=calls[start:end]
         if any(type(stage[k])is not int for k in ('start','end','receipt_index'))or start!=cursor or end<=start or stage['receipt_index']!=end-1 or uri not in URIS:raise ValueError('Transport stage partition differs')
@@ -142,7 +189,8 @@ def _session(encoded):
                     or any(x.get('transaction_id')!=tx or x.get('artifact_hash')!=seal for x in (shown,executed,payload))
                     or payload.get('automatic_retry')is not False):raise ValueError('Sealed transport confirmation/continuation differs')
             mutation=[r for r in own if r['uri']in URIS-{PREFIX+'getList',PREFIX+'getState'}]
-            if len(mutation)!=1 or mutation[0]['uri']!=uri:raise ValueError('Transport mutation must execute exactly once')
+            if (len(mutation)!=1 or mutation[0]['uri']!=uri
+                    or not part[6+offset]['native_start']<=mutation[0]['ordinal']<part[6+offset]['native_end']):raise ValueError('Transport mutation must execute exactly once in its execute phase')
             native=_call(mutation[0]);result=payload['agent_result']
             if result['request']['arguments']!={'api':uri,'args':native['args'],'options':native['options']}or result['result']!=native['result']or result['executed']is not True:raise ValueError('Exact transport public request/result differs')
             args={}
@@ -169,10 +217,22 @@ def _session(encoded):
             if uri.endswith('.create'):
                 handle=result['business_result']['transport_handle'];native_id=native['result']['transport']
                 if type(native_id)is not int or not 0<=native_id<=0xffffffff or not handle.startswith('trh1-')or handle in lifetimes:raise ValueError('Usable transport ID/handle required')
-                rows=[x for r in own if r['uri']==PREFIX+'getList'for x in r['result'].get('list',[])if x.get('transport')==native_id and x.get('object')==args['object']]
-                if not rows or 'gameObject'in args and any(r['gameObject']!=args['gameObject']for r in rows):raise ValueError('Created transport association missing')
-                lifetimes[handle]=native_id
-            elif uri.endswith('.destroy'):lifetimes.pop(handle)
+                reads=_verification_reads(payload,part[-1],trace)
+                if (len(reads)!=2 or reads[0]['uri']!=PREFIX+'getList'or reads[0]['args']!={}or reads[0]['options']!={}
+                        or reads[1]['uri']!=PREFIX+'getState'or reads[1]['args']!={'transport':native_id}or reads[1]['options']!={}
+                        or reads[1]['result'].get('state')not in {'playing','paused','stopped'}):raise ValueError('Created transport independent list/state read missing')
+                rows=[x for x in reads[0]['result'].get('list',[])if x.get('transport')==native_id and x.get('object')==args['object']]
+                if len(rows)!=1 or 'gameObject'in args and any(r['gameObject']!=args['gameObject']for r in rows):raise ValueError('Created transport association missing')
+                lifetimes[handle]=native_id;owned[native_id]={k:rows[0][k]for k in ('transport','object','gameObject')}
+            elif uri.endswith('.executeAction'):
+                _verified_action(args,preview,part[3+offset],part[-1],payload,trace,owned,context['version'])
+            elif uri.endswith('.destroy'):
+                reads=_verification_reads(payload,part[-1],trace)
+                if (len(reads)!=1 or reads[0]['uri']!=PREFIX+'getList'or reads[0]['args']!={}or reads[0]['options']!={}
+                        or not isinstance(reads[0]['result'].get('list'),list)
+                        or any(type(r.get('transport'))is not int or not 0<=r['transport']<=0xffffffff or r['transport']==args['transport']for r in reads[0]['result']['list'])):
+                    raise ValueError('Destroyed transport is not independently absent')
+                lifetimes.pop(handle);owned.pop(args['transport'])
         selected.append(native)
     if cursor!=len(calls)or lifetimes:raise ValueError('Complete independent transport cleanup missing')
     return context,selected

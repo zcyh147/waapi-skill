@@ -452,3 +452,65 @@ def test_transport_namespace_composes_with_cursor_without_rewriting(request,tmp_
         with pytest.raises(ValueError,match='duplicates an exact branch'):
             runtime.write_runtime_composition(tmp_path/'duplicate',components+[components[0]])
     register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_transport_independent_readbacks_bind_action_scope_and_retirement(request,tmp_path):
+    from tests.support import runtime_transport_evidence as transport
+    version='2024.1';host='wwise-console'
+    routes=[f'{version}|{host}|{BUILDS[version]}|function|'+PREFIX+n for n in ('executeAction','destroy')]
+    inventory=log_inventory(routes,pointers={'/resultSchema'})
+    originals={u:transport.original_transport(f'{version}|{host}|{BUILDS[version]}|function|{u}')for u in transport.URIS}
+    sessions=[public_lifecycle(tmp_path/label,version,host,originals,rich=rich)for label,rich in (('actual',False),('owned-cohort',True))]
+    def finalize(phases):
+        paths=finalize_sessions(tmp_path,sessions,phases,request.node.nodeid)
+        selected=[p for p in paths if json.loads(p.read_bytes())['native_call']['uri']in {PREFIX+'executeAction',PREFIX+'destroy'}]
+        index=transport.write_transport_bundle(tmp_path/'bundle',selected,inventory=inventory,name_prefix='transport-2024.1-')
+        policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'}
+        controls=[]
+        for scope in ('one','all-active','destroy'):
+            identity=routes[int(scope=='destroy')]+'|/resultSchema';binding=deepcopy(bindings['bindings'][identity])
+            record=deepcopy(completion.read_sealed_artifact(binding['evidence']['program'],base))
+            if scope=='all-active':
+                cap=next(json.loads(p.read_bytes())for p in selected if (c:=json.loads(p.read_bytes()))['native_call']['uri']==PREFIX+'executeAction'and 'transport'not in c['native_call']['args'])
+                record.update(gateway=cap['gateway'],native_call=cap['native_call'],runtime_read_program=cap)
+                binding['input']['gateway_argv']=cap['gateway']['argv']
+                for check in record['branch_assertions'][identity]['checks']:
+                    if 'equals'in check:check['equals']=completion.pointer_value(record,check['pointer'])
+            branch={**transport.review()['entries'][identity],'id':identity};branch['shape_sha256']=branch['native_shape_sha256']
+            def evaluate(value,label):
+                desc={**runtime.write_json(base/('readback-'+scope+'-'+label+'.json'),value),'nodeid':request.node.nodeid}
+                return completion.evidence_result(desc,branch,value['candidate_sha256'],'program','product',base,binding=binding,source_root=audit.ROOT,reference_edges={})
+            assert evaluate(record,'baseline')[0]=='passed'
+            labels=('state','missing','wrong-target','association','structured')if scope!='destroy'else('still-present','missing','structured')
+            for label in labels:
+                damaged=deepcopy(record);cap=damaged['runtime_read_program'];stage=cap['transport_stage'];call=cap['public_calls'][stage['receipt_index']]
+                reads=[r for r in cap['native_reads'][call['native_start']:call['native_end']]if r['uri'].startswith(PREFIX)]
+                verification=call['gateway']['payload']['verification']
+                target=next(r for r in reads if r['uri']==PREFIX+('getList'if scope=='destroy'or label=='association'else'getState'))
+                if label=='state':target['result']['state']='playing'if scope=='all-active'else'stopped'
+                elif label=='wrong-target':target['args']['transport']=123
+                elif label=='association':target['result']['list'][0]['gameObject']+=1
+                elif label=='still-present':
+                    owned=next(r['result']['list'][0]for r in cap['native_reads']if r['uri']==PREFIX+'getList'and r['result'].get('list'))
+                    target['result']['list']=[deepcopy(owned)]
+                elif label=='missing':
+                    # Preserve exact span/ordinals; substitute a known harmless
+                    # getInfo read, not a malformed trace with a missing ordinal.
+                    info=next(r for r in cap['native_reads']if r['uri']=='ak.wwise.core.getInfo')
+                    target.update({k:deepcopy(info[k])for k in ('uri','args','options','result')})
+                else:
+                    verification['readbacks'][0]['result']={}
+                if label!='structured':
+                    # Coherently reseal the structured raw reads too, so the
+                    # causal guard must check actual intended state/identity.
+                    verification['readbacks'][:]=[transport._call(r)for r in reads if r['uri'].startswith(PREFIX)]+[r for r in verification['readbacks']if 'kind'in r]
+                cap['gateway']=call['gateway'];damaged['gateway']=cap['gateway']
+                for check in damaged['branch_assertions'][identity]['checks']:
+                    if 'equals'in check:check['equals']=completion.pointer_value(damaged,check['pointer'])
+                outcome=evaluate(damaged,label);assert outcome[0]!='passed',(scope,label,outcome)
+                controls.append({'scope':scope,'damage':label,'outcome':outcome})
+        runtime.write_json(tmp_path/'readback-negative-results.json',controls)
+    register_exact_evidence_finalizer(request.node,finalize)
