@@ -35,7 +35,9 @@ from tests.destructive.support.profiler_capture import (
 )
 from tests.destructive.support.loaded_media_probe import NODEID as LOADED_EVENT_NODEID, OUTCOME as LOADED_EVENT_OUTCOME
 
-CAPTURE_NODE_OUTCOMES = {**CAPTURE_NODE_OUTCOMES, LOADED_EVENT_NODEID: (LOADED_EVENT_OUTCOME,)}
+from tests.destructive.support.integration_demo import NODEID as DEMO_NODEID
+
+CAPTURE_NODE_OUTCOMES = {**CAPTURE_NODE_OUTCOMES, LOADED_EVENT_NODEID: (LOADED_EVENT_OUTCOME,), DEMO_NODEID: (LOADED_EVENT_OUTCOME,)}
 
 
 MEDIA_PRESERVATION_DIAGNOSTIC_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
@@ -106,7 +108,14 @@ class AuthoringBatchAdapter:
             raise ValueError('Batch owner must prove a matching Wwise Authoring host')
         version = info.get('version', {})
         build = '.'.join(str(version.get(key)) for key in ('year', 'major', 'minor', 'build'))
-        if build != load_native_catalog(owner.version, 'wwise-authoring')['provenance']['build']:
+        context = owner.developer_observation
+        if context is not None:
+            from tests.destructive.support.integration_demo import NODEID as DEMO_NODEID
+            if tuple(selected_nodeids) != (DEMO_NODEID,):
+                raise ValueError('Scoped Integration Demo context accepts only its named observation')
+            context.validate(version=owner.version, host_kind=owner.host_kind, console=runtime.lifecycle.console_path)
+        expected_build = context.build if context is not None else load_native_catalog(owner.version, 'wwise-authoring')['provenance']['build']
+        if build != expected_build:
             raise ValueError('Authoring owner build differs from the independently pinned native context')
         if owner.lock._handle is None or owner.lock._handle.closed:
             raise ValueError('Authoring ownership lock is not held')
@@ -301,13 +310,17 @@ class AuthoringBatchAdapter:
                     if (report.get('contract') != 'waapi-skill.owned-profiler-capture/v1'
                             or report.get('candidate') != self.candidate or report.get('version') != runtime.version):
                         raise ValueError('Profiler capture report context differs from its owned batch')
-            names = ((LOADED_EVENT_OUTCOME,) if capture_nodeid == LOADED_EVENT_NODEID
+            names = ((LOADED_EVENT_OUTCOME,) if capture_nodeid in (LOADED_EVENT_NODEID, DEMO_NODEID)
                 else capture_node_outcomes(capture_nodeid, runtime.version))
             for name in names:
                 observation = report.get('outcomes', {}).get(name, {'outcome': 'BLOCKED'})
                 business = observation.get('outcome', 'BLOCKED')
                 categories.append({'category': name, 'nodeid': capture_nodeid,
                     'status': 'PASS' if outcome == 'PASS' and business == 'PASS' else 'FAIL' if business == 'FAIL' else 'blocked',
+                    **({'observation_build': report.get('reflection', {}).get('build'),
+                        'scoped_reflection_identity': report.get('reflection', {}).get('identity'),
+                        'coverage_credit': 'separate exact-build observation; no pinned 9143, 2023/2024 or R106 replacement'}
+                        if capture_nodeid == DEMO_NODEID else {}),
                     'business_outcome': business, 'cleanup_complete': report.get('cleanup', {}).get('complete', False),
                     'verifier_strength': 'independent_public_capture_outcome_and_owned_post_teardown_proofs',
                     **({'reader_observation_status': observation.get('evidence', {}).get('observation_status', 'BLOCKED'),
@@ -317,8 +330,8 @@ class AuthoringBatchAdapter:
                             'attribution_boundary': 'Attribution follows the reader scope; capture-level data does not establish Sound/control effects; no acoustic proof',
                             **({'preparation_or_streaming_control_effect_verified': False}
                                 if name in ('profiler-loaded-media-observation', 'profiler-streamed-media-observation') else {})}
-                            if capture_nodeid in (CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, LOADED_EVENT_NODEID) else {})}
-                        if (capture_nodeid in (READERS_2025_NODEID, LOADED_EVENT_NODEID) or capture_nodeid in (CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID)
+                            if capture_nodeid in (CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID, LOADED_EVENT_NODEID, DEMO_NODEID) else {})}
+                        if (capture_nodeid in (READERS_2025_NODEID, LOADED_EVENT_NODEID, DEMO_NODEID) or capture_nodeid in (CAPTURE_READS_NODEID, CAPTURE_MISSING_NODEID)
                             and name in (*READER_OUTCOMES, *CAPTURE_READ_OUTCOMES)) else {}),
                     **({'coverage_scope': 'selected_missing_runtime_reads', 'parent_workflow_complete': False,
                         'remaining_same_parent_obligations': report.get('remaining_same_parent_obligations', {})}
@@ -521,6 +534,7 @@ OWNED_AUTHORING_NODEIDS = (
     READERS_2025_NODEID,
     CAPTURE_READS_NODEID,
     LOADED_EVENT_NODEID,
+    DEMO_NODEID,
     CAPTURE_MISSING_NODEID,
     METER_2024_NODEID,
     'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
@@ -539,6 +553,7 @@ OWNED_AUTHORING_NODE_VERSIONS = {
     READERS_2025_NODEID: ('2025.1',),
     CAPTURE_READS_NODEID: SUPPORTED_WWISE_VERSION_KEYS,
     LOADED_EVENT_NODEID: ('2025.1',),
+    DEMO_NODEID: ('2025.1',),
     CAPTURE_MISSING_NODEID: SUPPORTED_WWISE_VERSION_KEYS,
     TRANSPORT_SEMANTICS_NODEID: ('2025.1',),
     TRANSPORT_MIXED_NODEID: ('2025.1',),
@@ -567,6 +582,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
     if any(os.getenv('WWISE_VERSION') not in OWNED_AUTHORING_NODE_VERSIONS[nodeid] for nodeid in selected):
         raise pytest.UsageError('Selected owned Authoring node is not available on the requested version')
+    if DEMO_NODEID in selected:
+        raise pytest.UsageError('Integration Demo requires its explicit developer observation lifecycle owner')
     if (set(selected).intersection(DIAGNOSTIC_NODEIDS)
             and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1')):
         raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')

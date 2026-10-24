@@ -207,6 +207,7 @@ class ScenarioLifecycle:
         owned_wine_prefix: Path | None = None,
         host_kind: str = 'wwise-console',
         lock_root: Path = GLOBAL_LIVE_LIFECYCLE_LOCK_ROOT,
+        developer_observation=None,
     ) -> None:
         if not scenario_id or not scenario_id.strip():
             raise ValueError("scenario_id must be non-empty")
@@ -221,6 +222,14 @@ class ScenarioLifecycle:
             raise ValueError('unsupported scenario host kind')
         self.host_kind = host_kind
         self.authoring_build = None
+        self.developer_observation = developer_observation
+        if developer_observation is not None:
+            from tests.destructive.support.integration_demo import IntegrationDemoObservation
+            if type(developer_observation) is not IntegrationDemoObservation:
+                raise ValueError('Expected private Integration Demo observation context')
+            developer_observation.validate(version=version, host_kind=host_kind, console=self.live_environment.get('WWISE_CONSOLE', ''))
+            if self.live_environment.get('AK_AUTOMATION_MODE') != '1':
+                raise ValueError('Integration Demo observation requires Authoring AutomationMode')
         self.launch_environment_overrides = _validate_launch_environment_overrides(
             launch_environment_overrides or {},
             scenario_root=self.scenario_root,
@@ -233,7 +242,8 @@ class ScenarioLifecycle:
             if owned_wine_prefix is not None and Path(owned_wine_prefix) != default_prefix:
                 raise ValueError('owned Authoring lifecycle requires the default private HOME bottle')
             owned_wine_prefix = default_prefix
-            self.authoring_build = load_native_catalog(version, 'wwise-authoring')['provenance']['build']
+            self.authoring_build = (developer_observation.build if developer_observation is not None else
+                load_native_catalog(version, 'wwise-authoring')['provenance']['build'])
         self.owned_wine_prefix = _validate_owned_wine_prefix(
             owned_wine_prefix,
             overrides=self.launch_environment_overrides,
@@ -313,7 +323,8 @@ class ScenarioLifecycle:
                     env,
                     wine_prefix_path=self.owned_wine_prefix,
                     case_owned_root=owned_root,
-                    **({'host_kind': self.host_kind} if self.host_kind == 'wwise-authoring' else {}),
+                    **({'host_kind': self.host_kind, **({'developer_observation': self.developer_observation}
+                        if self.developer_observation is not None else {})} if self.host_kind == 'wwise-authoring' else {}),
                 )
             stage = "wwise-launch-identity"
             if self.host_kind == 'wwise-authoring':

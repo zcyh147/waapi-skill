@@ -15,7 +15,7 @@ from tests.unit.test_runtime_business_gateway import _RuntimeControlDraftClient,
 from tests.support.gateway_config import set_gateway_config
 
 
-def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1):
+def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1, demo_context=None):
     from tests.destructive.support import authoring_batch, loaded_media_probe as probe
     from tests.destructive.support.sandbox_fixture import hash_project
     runtime = owner.runtime
@@ -68,13 +68,53 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1):
         with (runtime.sandbox.sandbox_path / files[-1]).open('ab') as changed:
             changed.write(b'changed owned media')
 
+    if demo_context is not None:
+        from tests.destructive.support.integration_demo import NODEID as DEMO_NODEID
+        source = demo_context.bundle.parent / 'SDK/samples/IntegrationDemo/WwiseProject'
+        source.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(runtime.sandbox.source_root, source)
+        (source / 'SampleProject.wproj').rename(source / 'IntegrationDemo.wproj')
+        runtime.sandbox.source_root = source
+        runtime.sandbox.source_project = source / 'IntegrationDemo.wproj'
+        runtime.sandbox.metadata.source_path = str(runtime.sandbox.source_project)
+        runtime.sandbox.metadata.source_root = str(source)
+        proof = hash_project(source, preferred_strategy='full')
+        runtime.sandbox.metadata.source_hash = proof
+        owner.runtime = runtime = replace(runtime, source_hash_before=proof,
+            source_mtime_before_ns=runtime.sandbox.source_project.stat().st_mtime_ns)
+        owner.developer_observation = demo_context
+        owner.host_kind = 'wwise-authoring'
+        owner.authoring_build = demo_context.build
+        runtime.lifecycle.console_path = demo_context.bundle / 'Contents/Tools/WwiseConsole.sh'
+        runtime.lifecycle.ready_result['version'] = {'year': 2025, 'major': 1, 'minor': 11,
+            'build': 9262, 'displayName': 'v2025.1.11.9262'}
+    connected = False
+
     class Client(_RuntimeControlDraftClient):
         def __init__(self):
             super().__init__(tmp_path, version='2025.1')
             self.calls = []
 
         def call(self, uri, args=None, options=None):
+            nonlocal connected
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if demo_context is not None:
+                console = {'host': '127.0.0.1', 'appName': 'Integration Demo', 'commandPort': 32123,
+                    'name': 'Fake owned Demo', 'platform': 'Mac', 'customPlatform': 'Mac'}
+                if uri == 'ak.wwise.waapi.getSchema':
+                    result = deepcopy(json.loads(demo_context.schema_bytes)[args['uri']])
+                    return {} if failure == 'schema-mismatch' else result
+                if uri.endswith('remote.getAvailableConsoles'):
+                    return {'consoles': [console]}
+                if uri.endswith('remote.getConnectionStatus'):
+                    return {'isConnected': connected, 'status': 'Connected' if connected else 'Not connected',
+                        **({'console': console} if connected else {})}
+                if uri.endswith('remote.connect'):
+                    connected = True
+                    return {}
+                if uri.endswith('remote.disconnect'):
+                    connected = False
+                    return {}
             if uri.endswith('getInfo'):
                 return {**super().call(uri, args, options), **deepcopy(runtime.lifecycle.ready_result)}
             if uri.endswith('getProjectInfo'):
@@ -99,7 +139,7 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1):
             if uri.endswith('profiler.getLoadedMedia'):
                 # Deliberately unrelated identity: this is a capture-level READ,
                 # not a claim that Event preparation loaded our selected Sound.
-                return {'return': [] if failure == 'empty' else [{'mediaId': index + 17,
+                return {'return': [] if failure == 'empty' else [{'mediaId': (124871431 if demo_context is not None and failure != 'unrelated' else index + 17),
                     'fileName': 'unrelated-media-' + str(index) + '.wem', 'format': 'PCM',
                     'size': 1024, 'soundBank': 'Some Bank'} for index in range(count)]}
             return super().call(uri, args, options)
@@ -118,8 +158,8 @@ def _host(owner, tmp_path, monkeypatch, *, failure=None, count=1):
         return call
     monkeypatch.setattr(authoring_batch, 'fixture_gateway', factory)
     monkeypatch.setattr(probe.time, 'sleep', lambda _: None)
-    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[probe.NODEID])
-    return batch, batch.node_gateway(probe.NODEID), client, probe
+    batch = authoring_batch.AuthoringBatchAdapter(owner=owner, repo_root=tmp_path, selected_nodeids=[DEMO_NODEID if demo_context is not None else probe.NODEID])
+    return batch, batch.node_gateway(batch.selected_nodeids[0]), client, probe
 
 
 def _archived(batch):

@@ -812,7 +812,8 @@ def test_prepared_receipt_failure_consumes_finish_without_repeating_shutdown(mon
 
 
 @pytest.mark.parametrize('version,build', [('2021.1', '2021.1.14.8108'), ('2022.1', '2022.1.19.8584'),
-    ('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143')])
+    ('2023.1', '2023.1.19.8928'), ('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143'),
+    ('2025.1', '2025.1.11.9262')])
 @pytest.mark.parametrize('broken', [None, 'roundtrip', 'native-argv', 'host', 'build', 'bottle-environment', 'bottle-proof'])
 def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proof(monkeypatch, tmp_path, version, build, broken):
     _install_fakes(monkeypatch, tmp_path, version=version)
@@ -847,9 +848,16 @@ def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proo
                      native if broken != 'native-argv' else 'Z:\\user-project.wproj'],
             launch_cwd=sandbox.sandbox_root, launch_env=environment, launch_project_attestation=proof, launch_preparation=[])
     monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    private = {}
+    live = {'WWISE_TEST_CONFIG': 'unused'}
+    if build == '2025.1.11.9262':
+        from tests.unit.test_integration_demo_observation import _installed
+        context = _installed(tmp_path)
+        private = {'developer_observation': context}
+        live.update(WWISE_CONSOLE=str(context.bundle / 'Contents/Tools/WwiseConsole.sh'), AK_AUTOMATION_MODE='1')
     owner = lifecycle_v3.ScenarioLifecycle(scenario_id='authoring-layout-batch', version=version,
-        scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, host_kind='wwise-authoring',
-        launch_environment_overrides={'HOME': str(home)}, lock_root=tmp_path / 'lock')
+        scenario_root=root, live_environment=live, host_kind='wwise-authoring',
+        launch_environment_overrides={'HOME': str(home)}, lock_root=tmp_path / 'lock', **private)
     if broken:
         with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError, match='Authoring'):
             owner.start()
@@ -858,7 +866,7 @@ def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proo
         return
     runtime = owner.start()
     assert captured == {'host_kind': 'wwise-authoring', 'wine_prefix_path': home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64',
-                        'case_owned_root': root / 'owned'}
+                        'case_owned_root': root / 'owned', **private}
     start = json.loads((runtime.evidence_root / 'start.json').read_text())
     assert start['host_kind'] == 'wwise-authoring'
     assert start['authoring_build'] == build
