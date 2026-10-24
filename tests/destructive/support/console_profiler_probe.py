@@ -7,7 +7,7 @@ import time
 import wave
 from pathlib import Path
 
-from wwise_waapi.host_paths import localize_waapi_host_path
+from wwise_waapi.host_paths import localize_waapi_host_path, parse_absolute_host_path
 from wwise_waapi.operation_soundbank import capture_file_proof
 from tests.destructive.support.profiler_input_shapes import BUILDS
 from tests.destructive.support.profiler_capture import (
@@ -236,6 +236,15 @@ def collect_console_profiler(runtime, *, diagnostic=False):
         bus = exact(sound['output_bus']['id'])
         assert bus['type'] == 'Bus'
         report['fixture_before'] = {'sound': sound, 'source': source, 'bus': bus}
+        native_path = source['original_file_path']
+        parsed = parse_absolute_host_path(native_path)
+        if parsed.flavor in ('drive', 'unc'):
+            # Matching pinned Windows AkTypes.h headers define AK_MAX_PATH=260.
+            # Measure the original native spelling, not the localized POSIX path.
+            units = len(native_path.encode('utf-16-le')) // 2 + 1
+            report['native_source_path_limit'] = {'flavor': parsed.flavor,
+                'utf16_units_including_nul': units, 'allowed_units_including_nul': 260}
+            assert units <= 260, f'Console original path {units} UTF-16 units including NUL exceeds allowed 260'
         report['media_resolution'] = {
             'originals_selection_available': runtime.version in ('2023.1', '2024.1', '2025.1'),
             'prepare_available': runtime.version != '2021.1',
