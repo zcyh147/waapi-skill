@@ -40,6 +40,75 @@ def test_source_capture_rejects_omitted_runtime_or_current_producer_dependencies
             load_source_capture(path, node)
 
 
+def test_source_successor_current_review_admits_exact_dependencies_and_preserves_r92(tmp_path):
+    """Admit a current context without recapturing a native or program observation."""
+    import hashlib
+    from tests.maintenance import branch_audit_completion as completion
+    from tests.support.source_copy_branch_evidence import write_json
+    from tests.support.source_copy_native_evidence import (
+        SUCCESSOR_REVIEW_PATH, SUCCESSOR_REVIEW_SHA256,
+        successor_dependency_review, validate_successor_context,
+    )
+    product = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    historical_path = audit.ROOT / 'tests/fixtures/source-copy/branch-successor-review-r92.json'
+    historical_bytes = historical_path.read_bytes()
+    assert hashlib.sha256(historical_bytes).hexdigest() == '278fcf8f3f404aba71d12995a6e42cc447bdabb2606800f6456a2751f9bd032f'
+    historical = json.loads(historical_bytes)
+    review = successor_dependency_review()
+    assert review['selected_native_shapes'] == historical['selected_native_shapes']
+    assert len(review['selected_native_shapes']) == 26
+    assert review['predecessor_attachments'] == historical['predecessor_attachments']
+    assert len(review['predecessor_attachments']) == 5
+    predecessor = next(row for row in review['predecessor_attachments'] if '2022.1' in row['artifact'])
+    native = completion.read_sealed_artifact(predecessor, product)
+    record = completion.read_sealed_artifact(native['evidence'], product)
+    # Copy only the exact existing metadata read by context admission. These
+    # are immutable native descriptors, not a new native/program capture.
+    for descriptor in (predecessor, native['evidence'], record['source_context']):
+        source = product / descriptor['artifact']
+        destination = tmp_path / descriptor['artifact']
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+    review_bytes = (audit.ROOT / SUCCESSOR_REVIEW_PATH).read_bytes()
+    (tmp_path / 'review.json').write_bytes(review_bytes)
+    context = {
+        'contract': 'waapi-skill.source-copy-successor-context/v1',
+        'review': {'artifact': 'review.json', 'sha256': SUCCESSOR_REVIEW_SHA256},
+        'predecessor': predecessor,
+        'original_source_context': record['source_context'],
+        'current_candidate_sha256': 'a' * 64,
+        'current_sources': review['current_sources'],
+    }
+    descriptor = write_json(tmp_path / 'context.json', context)
+    assert validate_successor_context(descriptor, tmp_path, candidate='a' * 64) == (context, native)
+    # Re-sign the outer descriptor to exercise the complete current map rather
+    # than merely detecting stale JSON bytes. The new dependency is mandatory.
+    observer = 'skills/waapi-skill/wwise_waapi/runtime_log_observer.py'
+    altered = {**context, 'current_sources': {key: value for key, value in context['current_sources'].items() if key != observer}}
+    omitted = write_json(tmp_path / 'omitted-observer.json', altered)
+    with pytest.raises(ValueError, match='Complete reviewed Source successor context differs'):
+        validate_successor_context(omitted, tmp_path, candidate='a' * 64)
+    # A reviewed map never exempts future changed bytes from the real reader.
+    from unittest.mock import patch
+    original_read = Path.read_bytes
+    target = audit.ROOT / observer
+    with patch.object(Path, 'read_bytes', lambda path: original_read(path) + b' ' if path == target else original_read(path)):
+        with pytest.raises(ValueError, match='^Source successor current dependency changed$'):
+            validate_successor_context(descriptor, tmp_path, candidate='a' * 64)
+    assert historical_path.read_bytes() == historical_bytes
+
+
+def test_source_capture_seals_both_successor_reviews_and_new_log_dependency():
+    from tests.support.source_copy_branch_evidence import capture_sources, relevant_sources
+    from tests.support.source_copy_native_evidence import SUCCESSOR_REVIEW_PATH, successor_dependency_review
+    assert {'tests/fixtures/source-copy/branch-successor-review-r92.json', SUCCESSOR_REVIEW_PATH} <= capture_sources().keys()
+    observer = 'skills/waapi-skill/wwise_waapi/runtime_log_observer.py'
+    review = successor_dependency_review()
+    assert observer in relevant_sources()
+    assert review['added_dependencies'][observer]['historical'] is None
+    assert review['added_dependencies'][observer]['current_sha256'] == review['current_sources'][observer]
+
+
 def test_2021_portable_source_keeps_seven_roles_and_untyped_control_input(tmp_path, inventory):
     from pathlib import Path
     from tests.unit.test_source_copy_repeated_fixture import repeated_collector_runtime
@@ -317,7 +386,7 @@ def source_successor_case(tmp_path_factory, inventory):
             path = bundle / name
             import hashlib
             return {'artifact':path.relative_to(product).as_posix(),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()}
-        from tests.support.source_copy_native_evidence import successor_dependency_review
+        from tests.support.source_copy_native_evidence import successor_dependency_review, SUCCESSOR_REVIEW_PATH
         predecessor=next(x for x in successor_dependency_review()['predecessor_attachments'] if '2022.1' in x['artifact'])
         native=completion.read_sealed_artifact(predecessor,product)
         original_binding=json.loads((bundle/'bindings.json').read_bytes())
@@ -328,10 +397,10 @@ def source_successor_case(tmp_path_factory, inventory):
         attachment=json.loads((bundle/'attachment.json').read_bytes());attachment['proof']=emit('program-proof.json',proof)
         program_attachment=emit('program-attachment.json',attachment)
         program_projection=emit('bindings.json',projected)
-        successor_review=json.loads((audit.ROOT/'tests/fixtures/source-copy/branch-successor-review-r92.json').read_bytes())
+        successor_review=json.loads((audit.ROOT/SUCCESSOR_REVIEW_PATH).read_bytes())
         native_record=completion.read_sealed_artifact({k:native['evidence'][k] for k in ('artifact','sha256')},product)
         import hashlib
-        review_raw=(audit.ROOT/'tests/fixtures/source-copy/branch-successor-review-r92.json').read_bytes()
+        review_raw=(audit.ROOT/SUCCESSOR_REVIEW_PATH).read_bytes()
         (output/'review.json').write_bytes(review_raw)
         review_descriptor={'artifact':(output/'review.json').relative_to(product).as_posix(),
             'sha256':hashlib.sha256(review_raw).hexdigest()}
