@@ -43,6 +43,11 @@ class ConsoleLogClient(_LogControlClient):
         return True
 
     def call(self, uri, args=None, options=None):
+        if uri == 'ak.wwise.core.getInfo':
+            result = super().call(uri, args, options)
+            minor, build = {'2023.1': (19, 8928), '2024.1': (13, 9056), '2025.1': (7, 9143)}[self.version]
+            result['version'].update(minor=minor, build=build)
+            return result
         if uri == ADD:
             self.order.append('add')
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -64,7 +69,7 @@ class ConsoleLogClient(_LogControlClient):
         return super().call(uri, args, options)
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ('2025.1',))
 def test_console_add_observes_before_once_execution_and_verifies_from_durable_event(tmp_path: Path, version):
     client = ConsoleLogClient(tmp_path, version=version)
     state = tmp_path / 'state'
@@ -96,7 +101,7 @@ def test_console_add_observes_before_once_execution_and_verifies_from_durable_ev
     assert client.order == ['subscribed', 'add', 'unsubscribed']
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ('2025.1',))
 def test_log_schema_and_console_preview_disclose_add_observer_and_clear_limit(tmp_path, version):
     code, schema = gateway.execute_gateway(['request-schema', ADD], env=_env(tmp_path, version=version),
         client_factory=lambda _: pytest.fail('Schema discovery must be offline'))
@@ -118,10 +123,10 @@ def test_log_schema_and_console_preview_disclose_add_observer_and_clear_limit(tm
     code, schema = gateway.execute_gateway(['request-schema', clear], env=_env(tmp_path, version=version),
         client_factory=lambda _: pytest.fail('Schema discovery must be offline'))
     assert code == 0
-    assert 'addition-only' in schema['business_adapter']['declaration']['verification']['console_clear_boundary']
+    assert schema['business_adapter']['declaration']['verification']['native_log_observation_policy']['console_minimum_version'] == '2025.1.4'
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ('2025.1',))
 @pytest.mark.parametrize('scenario,outcome', [('close-false', 'console_event_cleanup_failed'),
     ('close-error', 'console_event_cleanup_failed'), ('malformed', 'malformed_event'),
     ('overflow', 'overflow'), ('too-large', 'invalid_event_ingress'), ('not-json', 'invalid_event_ingress')])
@@ -147,7 +152,7 @@ def test_console_add_invalid_observation_or_cleanup_fails_without_replaying(tmp_
     assert code == 2 and client.order == order, replay
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ('2025.1',))
 def test_console_add_overflow_before_unsubscribe_finishes_cannot_verify_matching_event(tmp_path, version):
     client = ConsoleLogClient(tmp_path, version=version, scenario='overflow-during-close')
     state = tmp_path / 'state'
@@ -163,7 +168,7 @@ def test_console_add_overflow_before_unsubscribe_finishes_cannot_verify_matching
     assert client.order == ['subscribed', 'add', 'unsubscribed']
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ('2025.1',))
 @pytest.mark.parametrize('scenario,outcome', [('missing', 'timeout'),
     ('wrong-channel', 'no_matching_event'), ('wrong-message', 'no_matching_event'),
     ('wrong-severity', 'no_matching_event'), ('event-limit', 'event_limit')])
@@ -189,7 +194,7 @@ def test_console_add_missing_exact_event_stays_acknowledged_unverified(tmp_path,
     assert code == 2 and client.order == ['subscribed', 'add', 'unsubscribed'], replay
 
 
-@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('version', ('2025.1',))
 @pytest.mark.parametrize('scenario', ('native-error', 'subscribe-error', 'malformed-ack'))
 def test_console_add_native_or_subscription_failure_retains_once_attempt_and_original_result(tmp_path, version, scenario):
     client = ConsoleLogClient(tmp_path, version=version, scenario=scenario)
@@ -216,3 +221,167 @@ def test_console_add_native_or_subscription_failure_retains_once_attempt_and_ori
     code, replay = gateway.execute_gateway(['--state-dir', str(state), 'execute', preview['transaction_id']],
         env=_env(tmp_path, version=version), client_factory=lambda _: client)
     assert code == 2 and client.order == order, replay
+
+
+def test_known_old_console_log_topic_refuses_before_subscription(tmp_path):
+    client = ConsoleLogClient(tmp_path, version='2023.1')
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo':
+            result['version'].update(minor=19, build=8928)
+        return result
+    client.call = call
+    code, schema = gateway.execute_gateway(['topic-schema', TOPIC], env=_env(tmp_path, version='2023.1'),
+        client_factory=lambda _: pytest.fail('offline schema connected'))
+    assert code == 0, schema
+    digest = schema['continuation']['contract_binding']['value']
+    code, result = gateway.execute_gateway(['--timeout', '0.05', 'wait-topic', TOPIC,
+        '--event-count', '1', '--topic-contract-digest', digest], env=_env(tmp_path, version='2023.1'),
+        client_factory=lambda _: client)
+    assert code == 2 and result['error_code'] == 'NATIVE_LOG_OBSERVATION_UNAVAILABLE', result
+    assert client.order == []
+
+
+def test_supported_console_clear_verifies_actual_nonempty_getter_removal(tmp_path):
+    client = _LogControlClient(tmp_path, version='2025.1')
+    client.console = True
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo':
+            result['version'].update(minor=7, build=9143)
+        return result
+    client.call = call
+    assert client.rows
+    client.after = []
+    preview, invoke = _public_runtime_preview(tmp_path, client, tmp_path / 'state',
+        'ak.wwise.core.log.clear', ('--log-channel', 'general'))
+    executed = invoke(['execute', preview['transaction_id']])
+    verified = invoke(executed['next_command']['gateway_argv'])
+    assert verified['verified'] is True, verified
+    observation = verified['verification']['verification_scope']['log_observation']
+    assert observation['outcome'] == 'prior_contents_absent' and observation['post_channel_empty']
+    assert sum(uri == 'ak.wwise.core.log.clear' for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('command', ['wait-topic', 'stream-topic'])
+@pytest.mark.parametrize('version,minor,build,console,state', [
+    ('2021.1', 14, 8108, True, 'unavailable'), ('2022.1', 19, 8584, True, 'unavailable'),
+    ('2023.1', 19, 8928, True, 'unavailable'), ('2024.1', 13, 9056, True, 'unavailable'),
+    ('2025.1', 3, 9000, True, 'unavailable'), ('2025.1', 4, 9000, True, 'supported'),
+    ('2025.1', None, 9143, True, 'unknown'), ('2023.1', 19, 8928, False, 'supported')])
+def test_log_topic_public_host_build_policy(tmp_path, command, version, minor, build, console, state):
+    client = _LogControlClient(tmp_path, version=version)
+    client.console = console
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo':
+            result['version'].update(minor=minor, build=build)
+            if minor is None: result['version'].pop('minor')
+        return result
+    client.call = call
+    subscriptions = []
+    def subscribe(uri, callback, options=None):
+        subscriptions.append(uri)
+        callback(channel='general', item={'message': 'owned', 'severity': 'Message', 'time': 1, 'messageId': ''})
+        class Handle:
+            def unsubscribe(self): return True
+        return Handle()
+    client.subscribe = subscribe
+    env = _env(tmp_path, version=version)
+    code, schema = gateway.execute_gateway(['topic-schema', TOPIC], env=env,
+        client_factory=lambda _: pytest.fail('offline disclosure connected'))
+    assert code == 0 and schema['native_log_observation_policy']['native_change'] == 'WG-80630'
+    digest = schema['continuation']['contract_binding']['value']
+    code, result = gateway.execute_gateway(['--timeout', '1', command, TOPIC, '--event-count', '1',
+        '--topic-contract-digest', digest], env=env, client_factory=lambda _: client, stream_sink=lambda _: None)
+    if state == 'supported':
+        assert code == 0, result
+        assert subscriptions == [TOPIC]
+    else:
+        assert code == 2 and result['native_observation_support']['state'] == state, result
+        assert subscriptions == []
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1'])
+@pytest.mark.parametrize('operation,declaration', [(ADD, ('--message', 'one owned marker')),
+    ('ak.wwise.core.log.clear', ('--log-channel', 'general'))])
+def test_old_console_log_commands_execute_once_without_observer(tmp_path, version, operation, declaration):
+    client = ConsoleLogClient(tmp_path, version=version)
+    state = tmp_path / 'state'
+    preview, invoke = _public_runtime_preview(tmp_path, client, state, operation, declaration)
+    executed = invoke(['execute', preview['transaction_id']])
+    verified = invoke(executed['next_command']['gateway_argv'])
+    assert verified['state'] == 'result_schema_checked' and not verified['verified']
+    scope = verified['verification']['verification_scope']['log_observation']
+    assert scope['outcome'] == 'console_log_unobservable'
+    assert scope['native_observation_support']['state'] == 'unavailable'
+    assert 'subscribed' not in client.order
+    assert sum(uri == operation for uri, _, _ in client.calls) == 1
+    code, replay = gateway.execute_gateway(['--state-dir', str(state), 'execute', preview['transaction_id']],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2 and sum(uri == operation for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('remaining', ['competing', 'unchanged', 'already-empty', 'malformed', 'drift'])
+def test_supported_console_clear_retains_readback_and_drift_boundaries(tmp_path, remaining):
+    client = _LogControlClient(tmp_path, version='2025.1')
+    client.console = True
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo': result['version'].update(minor=7, build=9143)
+        return result
+    client.call = call
+    old = dict(client.rows[0])
+    if remaining == 'already-empty': client.rows = []
+    client.after = ([old] if remaining == 'unchanged' else [{'message': 'other', 'severity': 'Warning',
+        'messageId': '', 'time': 2}] if remaining == 'competing' else [{'message': 42}] if remaining == 'malformed' else [])
+    state = tmp_path / 'state'
+    preview, invoke = _public_runtime_preview(tmp_path, client, state, 'ak.wwise.core.log.clear', ('--log-channel', 'general'))
+    if remaining == 'drift': client.rows = []
+    code, executed = gateway.execute_gateway(['--state-dir', str(state), 'execute', preview['transaction_id']],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    if remaining == 'drift':
+        assert code == 2 and not any(uri.endswith('log.clear') for uri, _, _ in client.calls), executed
+        return
+    assert code == 0, executed
+    code, verified = gateway.execute_gateway(['--state-dir', str(state), 'verify', preview['transaction_id']],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    if remaining == 'malformed':
+        assert code == 2 and not verified['verified'], verified
+    else:
+        assert code == 0 and verified['verified'] is (remaining != 'unchanged'), verified
+        observed = verified['verification']['verification_scope']['log_observation']
+        assert observed['continuing_channel_state_verified'] is False
+    assert sum(uri.endswith('log.clear') for uri, _, _ in client.calls) == 1
+
+
+def test_console_log_host_patch_drift_requires_repreview_before_effect(tmp_path):
+    client = ConsoleLogClient(tmp_path, version='2025.1')
+    state = tmp_path / 'state'
+    preview, invoke = _public_runtime_preview(tmp_path, client, state, ADD, ('--message', 'owned'))
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo': result['version']['minor'] = 3
+        return result
+    client.call = call
+    code, result = gateway.execute_gateway(['--state-dir', str(state), 'execute', preview['transaction_id']],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and result['state'] == 'repreview_required', result
+    assert not client.order and not any(uri == ADD for uri, _, _ in client.calls)
+
+
+def test_supported_console_get_keeps_real_nonempty_rows_and_partial_bounds(tmp_path):
+    client = ConsoleLogClient(tmp_path, version='2025.1')
+    client.rows = [{'message': text, 'severity': 'Message', 'time': 1, 'messageId': ''} for text in ['one', 'two']]
+    code, result = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), 'core-call', 'ak.wwise.core.log.get', '--log-channel', 'general',
+        '--max-results', '1'], env=_env(tmp_path), client_factory=lambda _: client)
+    import json
+    assert code == 0, json.dumps(result, ensure_ascii=False)
+    assert result['native_observation_support']['state'] == 'supported'
+    assert result['agent_result']['items'][0]['message'] == 'two'
+    assert result['agent_result']['complete'] is False and result['agent_result']['total_count'] == 2

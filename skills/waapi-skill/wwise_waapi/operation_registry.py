@@ -32,7 +32,7 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect, prepare_console_project_open, validate_console_project_open
 from .canonical import canonical_json_bytes, canonical_sha256
 from .runtime_inspection_business_contracts import (
-    LOG_ADD_ITEM_URI, LOG_CLEAR_URI, LOG_GET_URI,
+    LOG_ADD_ITEM_URI, LOG_CLEAR_URI, LOG_GET_URI, runtime_log_observation_support,
     PROFILER_ENABLE_DATA_URI,
     PROFILER_CAPTURE_DATA_VERIFICATION,
     PROFILER_GET_CURSOR_TIME_URI,
@@ -11604,12 +11604,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall, history
             if before["outcome"] != "complete":
                 raise OperationContractError("LOG_OBSERVATION_TOO_LARGE", "Log prestate exceeds the bounded complete-channel observation policy.", details=before)
             verification["console"] = host["isCommandLine"]
-            if host['isCommandLine'] and api == LOG_ADD_ITEM_URI:
+            verification['native_observation_support'] = runtime_log_observation_support(host)
+            if host['isCommandLine'] and verification['native_observation_support']['state'] == 'supported' and api == LOG_ADD_ITEM_URI:
                 from .runtime_inspection_business_contracts import CONSOLE_LOG_ADD_OBSERVER
                 verification['console_add_observer'] = dict(CONSOLE_LOG_ADD_OBSERVER)
                 warnings.append('Console add subscribes before one execution, waits at most 5 seconds for an exact matching addition event (64 events, 64 KiB per event), then unsubscribes. No exclusive writer or continuing contents proof.')
-            elif host['isCommandLine']:
-                warnings.append('Console clear is acknowledged only: its getter is documented empty and the addition-only Topic cannot prove clearing.')
+            elif host['isCommandLine'] and verification['native_observation_support']['state'] != 'supported':
+                warnings.append('This Console build has no established log observation support; native acknowledgment does not prove an addition or removal (WG-80630, available from2025.1.4).')
             metadata["log_channel_before"] = before
             warnings.append("Log verification compares one bounded channel observation; concurrent identical messages cannot be attributed, and continuing channel state is unverified.")
         if blend_plan is not None:
@@ -20223,7 +20224,7 @@ def verify_prepared_operation(
         business_state_verified = False
         verification_strength = "bounded_log_channel_observation"
         check_result_schema(uri, version)
-        if all(item["passed"] for item in assertions) and plan['console'] and uri == LOG_ADD_ITEM_URI:
+        if all(item["passed"] for item in assertions) and plan['console'] and plan.get('native_observation_support', {}).get('state') == 'supported' and uri == LOG_ADD_ITEM_URI:
             from .runtime_log_observer import event_observation
             verification_strength = 'bounded_execute_time_log_event'
             try:
@@ -24798,7 +24799,7 @@ def verify_prepared_operation(
     if kind == "log-channel-effect":
         observation = next((dict(row) for row in outcome.readbacks if row.get("kind") == "log-channel-observation"), {"outcome": "malformed_control_result"})
         message = ("The requested log addition was delivered in one bounded execute-time event. Exclusive writer causation, individual entry identity and continuing channel contents are unverified."
-            if outcome.business_state_verified and plan['console'] else
+            if outcome.business_state_verified and plan['console'] and plan.get('uri') == LOG_ADD_ITEM_URI else
             "The requested log effect was observed in one bounded channel comparison. Concurrent identical writers, individual entry identity and continuing channel state are unverified."
             if outcome.business_state_verified else
             "The log effect remains unverified; inspect the bounded channel observation. Missing or indistinguishable content does not prove the call never took effect. Do not replay the executed control.")
