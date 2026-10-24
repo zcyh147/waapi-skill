@@ -5,6 +5,40 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R113 contribution contracts and standalone evidence
+
+Reviewed mechanism `9ad5cc2f`, integrated at `a51e0c35`, preserves legal
+partial 2021/2022 contribution results, discloses omitted versus explicit dry
+Bus paths, and accepts the versioned Game Object ID domain. Moving cursors
+are resolved once before voice/Bus selection and contribution reads. Mixed
+object-ID/issued-handle selections retain the selected ordered Bus path.
+Later required fields, handle lifetime, ownership and malformed-value checks
+remain enforced. Causal failures and affected follow-ups verified the fixes;
+review also caught and repaired an integral-float cursor proof loophole.
+
+Artifact `fe36087b`, integrated at `cb602d4d`, adds
+`tests/fixtures/branch-evidence/product/runtime-contributions-r113/index.json`.
+On frozen source `a51e0c35`, **76 actual setup/call/teardown receipts passed
+once in 10.09s**. One publication/import/final evaluation persisted its results
+before reporting assertions: **1,080 program PASS, 761 verified (694
+program-only plus 67 original native-backed), 319 native-missing and zero
+unselected/extra branches**. Scope covers all five versions and both host
+contracts; native credit is only 36 exact 2022 Authoring branches and 31 exact
+2025 Authoring branches from the original finalized observations.
+
+Independent review checked the 599-file package, portable seals, all 76
+phase-complete receipts, exact branch bindings, original native archives and
+the reviewed four-file source transition (409 other packaged files unchanged).
+The final evaluator took 64.67s; neither it nor successful tests were repeated
+for review. Targeted repairs reused earlier passing results rather than
+repeating the 1,080-branch unit selection after each change.
+
+This is standalone evidence, not a global ledger update or ticket completion.
+The 319 native requirements remain open. Historical RTPC packages retain their
+original source seals and need explicit reconciliation before current global
+acceptance; they were not silently resealed. No new native/Fresh run or full
+Program/Non-live gate is claimed.
+
 ## 2026-10-24 R112 complete RTPC program branch publication
 
 Reviewed mechanism `d87f5125`, integrated at `7bc03a2`, adds exact scalar
