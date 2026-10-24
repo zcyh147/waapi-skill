@@ -229,6 +229,21 @@ No universal prior-state restoration or waveform requirement is added here.
   earlier failed attempts remain unchanged; neither establishes native absence.
   The SDK producer observation does not verify Authoring `transport.prepare`.
 
+## Transport development evidence — 2026-10-24
+
+The transport evidence implementation was reviewed at `fe1b13f8` and integrated
+with its Program roster entry at `15661690`. The final 2023 paired-host program
+case passed in 75.54 seconds: all 320 rows reached the ordinary evidence
+consumer after successful teardown, including the four user-approved explicit
+media-choice boundaries. A focused boundary case also passed with 14 corrupted
+evidence controls rejected. Earlier 2021, 2022, 2024 and 2025 development groups
+retain their original source attribution (1,166 rows); their producers were not
+repeated for this 2023-only change.
+
+This completes the transport component's development evidence, not the current
+global coverage publication or ticket #186. The packaged Skill was unchanged by
+this integration. The final combined Program/Nonlive gates remain pending.
+
 ## Authoritative sources and accounting
 
 Use matching `skills/waapi-skill/resources/native-catalog/<version>/`
