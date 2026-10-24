@@ -5,6 +5,52 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R116 Console playback prerequisite observation
+
+Unmerged candidate `e9f54e881a42a8a4c0698b191586a27df9aae88a` ran only
+`test_console_owned_2025_transport_profiler_probe` against owned Mac Console
+2025.1.7.9143. The attempt failed in **14.67s**: preparation and Play were
+acknowledged, but the independent transport-state read returned `stopped`.
+No Voices query was dispatched. This does not prove that Console playback or
+Profiler data is unavailable; the missing observation remains under #186.
+
+The collector made 86 bounded public calls through normal closed transactions.
+Cleanup completed, source content/hash/mtime/tree receipts matched, exact object
+readbacks were unchanged, the actual allocated port 31183 was released, and
+no native processes remained. The failed sandbox is retained in quarantine.
+The final category is BLOCKED and the selected node is FAIL, not a partial
+acceptance. Retained decision, report, category and root review are under
+`.waapi-skill-state/full-coverage/r116-console-profiler-native-2025-r1`.
+No unchanged retry, Fresh run, broad matrix or production host-support claim
+is made. The candidate transport admission change remains unmerged pending
+diagnosis of the retained records.
+
+## 2026-10-24 R116 explicit Profiler field selection
+
+Reviewed product `2cc69b5d`, integrated at `cf8187a9`, adds repeatable
+`--result-field` choices to Voices, Busses and AudioObjects reads. The closed
+versioned vocabulary matches all 15 native version/URI profiles on both hosts.
+Requests preserve selected list order/repetition without appending identity
+fields; public data retains only requested reported fields. Actual returned
+identity still governs handle issuance. Presets, omission/empty selection,
+complete-result validation and immutable cached continuations remain intact.
+The 64-choice limit is disclosed as a Gateway resource ceiling.
+
+The public two-field case failed before repair and passed afterward. New
+controls initially recorded 87 passes and 14 fixture failures: scalar RMS
+fixtures contradicted the native array definition, and two assertions demanded
+unpromised result-object key order. Those failures are retained; only the
+failed/affected 24-case selection was rerun and passed. Compatibility/default
+checks passed 98 cases; immediate retention/reference neighbors passed 45.
+Independent review checked matching definitions, exact field dispatch/data,
+authority and caller preservation without rerunning tests.
+
+This closes the chosen-field implementation gap, not all reader evidence.
+R105 source reuse now needs an exact five-file/408-unchanged transition;
+R103 remains seven-file/406-unchanged. Current original-array replays and
+combined formal publication remain required. No new native/Fresh run or full
+gate is claimed by this increment.
+
 ## 2026-10-24 R114 qualified retained runtime reads
 
 Reviewed mechanism `265730db`, integrated at `792b8683`, admits exactly four
