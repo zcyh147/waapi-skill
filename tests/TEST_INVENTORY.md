@@ -7,6 +7,16 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## 2026-10-24 R130 log, Console LoadedMedia and empty-value integration
 
+Independent closure review of #176 at `40001e6f` found the reopened checker
+regression resolved. All 272,313 original branch identities, shapes and owners
+remain; the 29,413-row empty-candidate audit still covers the exact current set.
+The six original invalid log/cursor candidates are rejected. Four severity
+counterexamples have public receipts; the two cursor adapters remain unverified
+product work under #186. Thirty integration seals and the affected reviewed
+functions/test blobs match. No extra regression was needed for the unchanged
+combined checker behavior. Original tool acceptance is historical evidence;
+this review does not claim a new full run or complete product coverage.
+
 Reviewed integration `40001e6f` adds ordinary-consumer evidence for 4,888 log
 branches and 93 Console LoadedMedia branches. These are candidate-scoped
 component results; the current global evaluation has not been regenerated and

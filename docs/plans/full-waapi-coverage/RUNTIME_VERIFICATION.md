@@ -145,8 +145,13 @@ Reuse retained facts first. Exact representative/composite support requires
 reviewed meaning, source and host/version relationships; no same-URI fallback
 is authorized. Optional diagnostic field values and collection combinations
 use bounded whole-result program checks without manufacturing native values.
-Console LoadedMedia support and the complete public mapping of meter return
-choices remain unresolved implementation work, not exclusions or passing rows.
+Reviewed integration `40001e6f` adds Console LoadedMedia admission for the three
+applicable builds: matching empty Console observations establish availability,
+while separately attributed Authoring data establishes nonempty meaning.
+Current target-version program replay and both native components are mandatory;
+this does not claim nonempty Console execution. Combined current publication
+remains pending. The complete public mapping of meter return choices remains
+unresolved implementation work, not an exclusion or passing coverage.
 
 The finite meter audit confirmed one concrete omission: the existing
 `media-size-bytes` business output was filtered out at the meter root.
