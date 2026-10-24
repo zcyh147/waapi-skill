@@ -1,4 +1,4 @@
-"""Four exact retained R105 read facts; never a successful lifecycle wrapper.
+"""Exact retained R105 read facts; never a successful lifecycle wrapper.
 
 Eligibility is source owned, including the complete immutable original closure.
 The ordinary finalized-PASS reader is deliberately not involved in this path.
@@ -16,20 +16,33 @@ NODE = 'd6e9da42fb2f751cbc535eeb'
 CANDIDATE = runtime.RTPC_ORIGINAL_CANDIDATE
 ORIGINAL_BASE = '/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage'
 PROFILES = {
+    '2021.1': {'build': '2021.1.14.8108', 'time': 24202, 'manifest_count': 172,
+        'archive': 'd3fd223608b347e205e9151aeae8ba6820ce478825bcb384b19c426979b53105'},
     '2023.1': {'build': '2023.1.19.8928', 'time': 28746,
         'archive': '74a6e9ad14e924d41d60e75b780daa577752adb8c505a047deba9b0ee69a97aa'},
     '2024.1': {'build': '2024.1.13.9056', 'time': 30069,
         'archive': '91cb35808f25dc24e20e25d1453654bffa0c72450d3449470d117fa2d36147ea'},
 }
 CATEGORIES = {'profiler-rtpcs-observation': runtime.RTPC_URI,
-              'profiler-contributions-bus-observation': runtime.CONTRIBUTION_URI}
+              'profiler-contributions-bus-observation': runtime.CONTRIBUTION_URI,
+              'profiler-voices-seed': 'ak.wwise.core.profiler.getVoices',
+              'profiler-busses-seed': 'ak.wwise.core.profiler.getBusses'}
+ANCHOR_SELECTORS = 'tests/fixtures/runtime-qualified-reads/r124-native-anchor-selectors.json'
+ANCHOR_SELECTORS_SHA = '2d78aef3d8cc69e7acf519004edbf1ac7f542fa4809b21ff745bc4ad3e81bf4d'
+
+
+def anchor_profile(version, category):
+    raw = (audit.ROOT / ANCHOR_SELECTORS).read_bytes()
+    if runtime.sha(raw) != ANCHOR_SELECTORS_SHA:
+        raise ValueError('Exact43 retained native anchor scope differs')
+    return json.loads(raw)['profiles'].get(version + '|' + category)
 ERROR = 'post-teardown:SandboxFixtureError:Wwise WAAPI port 0.0.0.0:8080 remained occupied after the 15-second release wait'
 
 
-def lifecycle_obligations():
+def lifecycle_obligations(version=None):
     return [{'issue': 186, 'version': version, 'original_root': original_root(version),
              'obligation': 'owned-Authoring post-teardown port-release/lifecycle', 'status': 'BLOCKED'}
-            for version in PROFILES]
+            for version in (('2021.1', '2023.1', '2024.1') if version == '2021.1' else ('2023.1', '2024.1'))]
 
 
 def original_root(version):
@@ -43,8 +56,9 @@ def fixture_path(version, root=audit.ROOT):
 def retained_read(version, category, descriptor=None, base=None):
     """Read exactly one immutable closure, resolving only archived manifest paths."""
     profile = PROFILES[version]
-    if category not in CATEGORIES:
-        raise ValueError('Only the two retained read categories are eligible')
+    selected_profile = anchor_profile(version, category)
+    if category not in CATEGORIES or (version == '2021.1' and selected_profile is None):
+        raise ValueError('Only exact retained read categories are eligible')
     if descriptor is None:
         path = fixture_path(version)
         base, descriptor = path.parent, {'artifact': path.name, 'sha256': runtime.sha(path.read_bytes())}
@@ -74,8 +88,8 @@ def retained_read(version, category, descriptor=None, base=None):
             if len(raw) != item['bytes'] or runtime.sha(raw) != item['sha256']:
                 raise ValueError('Original manifest artifact differs')
             manifest[path] = raw
-    if len(manifest) != 168:
-        raise ValueError('Complete 168-file original manifest required')
+    if len(manifest) != profile.get('manifest_count', 168):
+        raise ValueError('Complete original native manifest required')
     capture = json.loads(manifest[root + f'/evidence/authoring-node-observations/{NODE}-native-evidence/profiler-capture.json'])
     failure, release = load('evidence/authoring-batch-finalization-error.json'), load('evidence/lifecycle-release-error.json')
     lifecycle, quarantine, start = (load('evidence/' + name + '.json') for name in ('lifecycle', 'quarantine', 'start'))
@@ -98,7 +112,8 @@ def retained_read(version, category, descriptor=None, base=None):
             or capture['cleanup']['complete'] is not True or capture['cleanup']['errors'] != []
             or capture['cleanup']['transport_stopped_observation']['state'] != 'stopped'):
         raise ValueError('Original read context/completeness differs')
-    outcome = capture['outcomes'][category]
+    outcome = (capture['seed_observations'][category.replace('-seed', '-observation')]
+        if category.endswith('-seed') else capture['outcomes'][category])
     evidence = outcome['evidence']
     if (outcome['outcome'] != 'PASS' or evidence['observation_status'] != 'PASS'
             or evidence['owned_identity_observed'] is not True or evidence['complete'] is not True):
@@ -106,6 +121,7 @@ def retained_read(version, category, descriptor=None, base=None):
     uri = CATEGORIES[category]
     receipts = [row for row in node['receipts'] if
         (row['argv'][:2] == ['core-call', uri] if uri == runtime.RTPC_URI else
+         row['argv'][:2] == ['core-call', uri] if category.endswith('-seed') else
          row['argv'][0] == 'profiler-voice-contributions' and '--bus-instance-handle' in row['argv'])]
     receipt, = receipts
     logical = receipt['payload']['call']['evidence_path']
@@ -118,8 +134,34 @@ def retained_read(version, category, descriptor=None, base=None):
             or raw['dry_run'] is not False or raw['error_code'] is not None
             or receipt['exit_code'] != 0 or receipt['payload']['ok'] is not True):
         raise ValueError('Successful original public/native read required')
+    request = None
+    if selected_profile is not None:
+        if (raw_path != selected_profile['raw_path'] or runtime.sha(manifest[raw_path]) != selected_profile['raw_sha256']
+                or receipt['argv'] != selected_profile['public_argv']
+                or receipt['payload']['is_command_line'] is not False
+                or receipt['payload']['agent_result'] != evidence['agent_result']):
+            raise ValueError('Exact assessed native anchor packet/public receipt differs')
+    if category.endswith('-seed'):
+        from tests.support.fixed_runtime_read_evidence import row_data
+        public = receipt['payload']['agent_result']
+        kind = 'voice' if uri.endswith('getVoices') else 'bus'
+        if (public['complete'] is not True or public['truncated'] is not False
+                or len(raw['result']['return']) != 1
+                or audit.digest(raw['result']['return']) != audit.digest(row_data(public['return']))
+                or evidence['nonempty'] is not True):
+            raise ValueError('Complete nonempty original seed native/public array required')
+        handle = 'rto1-' + public['return'][0][kind + '_instance_handle'][5:].rsplit('-', 1)[0]
+        plan_path, = [name for name in manifest if name.endswith('/runtime-inspection-observations-v1/' + handle + '.json')]
+        plan = json.loads(manifest[plan_path]); request = plan['plan']['request']
+        contribution, = [r for r in node['receipts'] if r['argv'][0] == 'profiler-voice-contributions' and '--bus-instance-handle' in r['argv']]
+        args = contribution['payload']['semantic_preview']['args']
+        selected = [args['voicePipelineID']] if kind == 'voice' else args['bussesPipelineID']
+        if (plan['handle'] != handle or request['api'] != uri or request['args'] != {'time': profile['time']}
+                or args['time'] != profile['time'] or [r['pipelineID'] for r in raw['result']['return']] != selected
+                or audit.digest(row_data(plan['plan']['result']['return'])) != audit.digest(raw['result']['return'])):
+            raise ValueError('Original seed issuer/owned contribution identity/time differs')
     return {'node': node, 'capture': capture, 'receipt': receipt, 'raw': raw,
-            'manifest': manifest, 'sources': sources, 'profile': profile}
+            'manifest': manifest, 'sources': sources, 'profile': profile, 'request': request}
 
 
 def retained_contribution_inputs(version):
@@ -145,7 +187,11 @@ def retained_contribution_inputs(version):
 
 
 def selected_mappings(inventory, captured, version, category):
-    if category == 'profiler-rtpcs-observation':
+    if category.endswith('-seed'):
+        from tests.support.fixed_runtime_read_evidence import mappings as fixed_mappings
+        route = next(r for r in inventory['native_coverage']['routes'] if r['id'] == anchor_profile(version, category)['route'])
+        mappings = fixed_mappings(inventory, captured, route)
+    elif category == 'profiler-rtpcs-observation':
         route, mappings = runtime.rtpc_field_mappings(inventory, version=version, host='wwise-authoring', mode='data')
         for mapping in mappings:
             mapping['program_pointer'] = mapping['program_pointer'].replace('/return/1/', '/return/7/')
@@ -153,6 +199,10 @@ def selected_mappings(inventory, captured, version, category):
         route, mappings = runtime.contribution_field_mappings(inventory, captured, version=version, host='wwise-authoring')
         mappings = [row for row in mappings if row['categories'] == ['program', 'native']
                     and row['branch']['pointer'].startswith('/resultSchema')]
+    profile = anchor_profile(version, category)
+    if profile is not None:
+        allowed = {r['id']: r['shape_sha256'] for r in profile['selectors']}
+        mappings = [r for r in mappings if r['branch']['id'] in allowed and r['branch']['shape_sha256'] == allowed[r['branch']['id']]]
     return route, mappings
 
 
@@ -170,7 +220,10 @@ def write_qualified_read_bundle(output, program_path, original, *, inventory, ve
     if not mappings:
         raise ValueError('No qualified result mappings')
     output = Path(output)
-    if category == 'profiler-rtpcs-observation':
+    if category.endswith('-seed'):
+        from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
+        index_path = write_fixed_bundle(output, program_path, None, inventory=inventory, selected={r['branch']['id'] for r in mappings})
+    elif category == 'profiler-rtpcs-observation':
         index_path = runtime.write_field_bundle(output, program_path, None, inventory=inventory,
             version=version, host='wwise-authoring', mode='data', mappings=mappings)
     else:
@@ -182,7 +235,7 @@ def write_qualified_read_bundle(output, program_path, original, *, inventory, ve
         'version': version, 'category': category, 'original_candidate': CANDIDATE,
         'original_workflow_outcome': 'BLOCKED', 'original_finalization': 'BLOCKED',
         'successful_finalization': False, 'qualified_read_fact': 'PASS',
-        'lifecycle_obligations': lifecycle_obligations(),
+        'lifecycle_obligations': lifecycle_obligations(version),
         'archive': {'artifact': 'qualified-original.json.gz', 'sha256': retained['profile']['archive']},
         'program_capture': index['entries'][0]['origin']['capture'],
         'source_changes': runtime.RTPC_REVIEWED_SOURCE_CHANGES,
@@ -227,14 +280,17 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
 
 def qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding, root, edges, historical_sources):
     assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
-    if assessment['lifecycle_obligations'] != lifecycle_obligations():
-        raise ValueError('Both lifecycle obligations remain BLOCKED on #186')
+    if assessment['lifecycle_obligations'] != lifecycle_obligations(assessment['version']):
+        raise ValueError('All exact lifecycle obligations remain BLOCKED on #186')
     version, host, build, kind, uri = branch['route'].split('|')
     if (scope_kind != 'product' or version not in PROFILES or host != 'wwise-authoring'
             or build != PROFILES[version]['build'] or kind != 'function'
             or CATEGORIES.get(assessment['category']) != uri or assessment['version'] != version
             or not branch['pointer'].startswith('/resultSchema')):
         raise ValueError('Qualified retained read exact route/result scope differs')
+    selected_profile = anchor_profile(version, assessment['category'])
+    if selected_profile is not None and not any(r['id'] == branch['id'] and r['shape_sha256'] == branch['shape_sha256'] for r in selected_profile['selectors']):
+        raise ValueError('Only exact43 approved native anchor selectors are eligible')
     expected = {'contract', 'version', 'category', 'original_candidate', 'original_workflow_outcome',
         'original_finalization', 'successful_finalization', 'qualified_read_fact', 'lifecycle_obligations',
         'archive', 'program_capture', 'source_changes', 'changed_symbols'}
@@ -284,6 +340,12 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
             raise ValueError('Complete original RTPC array must survive current public replay')
         if capture['gateway']['argv'] != retained['receipt']['argv']:
             raise ValueError('Original RTPC request/time differs')
+    elif assessment['category'].endswith('-seed'):
+        from tests.support.fixed_runtime_read_evidence import validate_program
+        validate_program(program, binding, branch, root, edges)
+        expected = {'uri': uri, 'args': retained['request']['args'], 'options': retained['request']['options'], 'result': retained['raw']['result']}
+        if (audit.digest(capture['native_call']) != audit.digest(expected) or capture['gateway']['argv'] != retained['receipt']['argv']):
+            raise ValueError('Complete original seed request/array must survive current public replay')
     else:
         node = runtime._contribution_node(branch, root)
         if runtime._contribution_categories(branch, node) != ['program', 'native']:
