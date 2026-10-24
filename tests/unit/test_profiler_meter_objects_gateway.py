@@ -503,3 +503,64 @@ def test_enriched_meter_preserves_nullable_selection_while_validating_base_field
         assert all(row["object"]["local_references"] == {"OutputBus": None} for row in result["agent_result"]["meters"])
         rules = result["schema_validation"]["result"]["compatibility_rules"]
         assert any(rule["rule_id"] == "meter-selected-dynamic-values-preserved/v1" and "@OutputBus" in rule["fields"] for rule in rules)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("console", [False, True], ids=["authoring", "console"])
+def test_meter_media_size_root_selection_preserves_complete_pages_and_rejects_bad_values(tmp_path, version, console):
+    client, run = task(tmp_path, version)
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            minor, build = (13, 9056) if version == "2024.1" else (7, 9143)
+            result.update(isCommandLine=console, displayName="WwiseConsole" if console else "Wwise")
+            result["version"].update(minor=minor, build=build, displayName=f"v{version}.{minor}.{build}")
+        return result
+    client.call = call
+    client.rows[0]["object"]["mediaSize"] = 160821
+    client.rows[1]["object"]["mediaSize"] = 0
+    absent = deepcopy(client.rows[0])
+    absent["configurationName"] = "Zulu"
+    del absent["object"]["mediaSize"]
+    client.rows.append(absent)
+
+    code, schema = run("request-schema", METERS, offline=True)
+    assert code == 0, schema
+    choices = schema["business_adapter"]["declaration"]["meter_object_projection"]["fields"]["meter_object_outputs"]["choices"]
+    assert "media-size-bytes" in choices
+    argv = ("core-call", METERS, "--profiler-position", "123", "--max-results", "1",
+        "--meter-object-include", "media-size-bytes")
+    code, result = run(*argv)
+    assert code == 0 and result["status"] == "partial", result
+    native = [entry for entry in client.calls if entry[0] == METERS]
+    assert native == [(METERS, {"time": 123}, {"return": ["id", "name", "type", "path", "mediaSize"]})]
+    pages = [result["agent_result"]]
+    native_count = len(client.calls)
+    while pages[-1]["complete"] is False:
+        code, result = run(*pages[-1]["next_command"]["gateway_argv"], offline=True)
+        assert code == 0, result
+        assert list(result)[-1] == "agent_result"
+        pages.append(result["agent_result"])
+    rows = [row for page in pages for row in page["meters"]]
+    assert len(pages) == len(rows) == 3
+    assert [row["configurationName"] for row in rows] == ["Zulu", "Mono", "Stereo"]
+    assert [row["object"].get("media_size_bytes") for row in rows] == [None, 0, 160821]
+    assert "media_size_bytes" not in rows[0]["object"]
+    assert rows[0]["object"]["unavailable_fields"] == ["media_size_bytes"]
+    assert [row["channels"] for row in rows] == [[{"name": "L", "value": -12.0}],
+        [{"name": "L", "value": -20.0}], [{"name": "L", "value": -12.0}]]
+    assert len(client.calls) == native_count
+
+    # Damage the same off-page row: whole-result validation must fail before
+    # retaining even the first valid page, not hide a bad later media size.
+    client.rows[0]["object"]["mediaSize"] = "not-an-integer"
+    code, failure = run(*argv)
+    assert code == 2 and "agent_result" not in failure, failure
+    assert "mediaSize" in str(failure)
+    client.rows[0]["object"]["mediaSize"] = 160821
+    reads = len(client.calls)
+    code, failure = run("core-call", METERS, "--profiler-position", "123",
+        "--meter-object-include", "unknown-meter-output", offline=True)
+    assert code == 2 and "agent_result" not in failure, failure
+    assert len(client.calls) == reads

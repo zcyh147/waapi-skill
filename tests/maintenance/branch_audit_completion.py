@@ -174,9 +174,10 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
                  'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
                  'tests/support/runtime_remaining_evidence.py', 'tests/support/runtime_log_retained_evidence.py',
-        'tests/fixtures/runtime-log/retained-log-support.json',
+                 'tests/fixtures/runtime-log/retained-log-support.json',
                  'tests/fixtures/runtime-log/r122-support.json',
                  'tests/unit/test_runtime_log_branch_evidence.py',
+                 'tests/support/empty_candidate_evidence.py', 'tests/unit/test_empty_candidate_evidence.py',
                  'tests/support/qualified_runtime_read_evidence.py',
                  'tests/support/fixed_runtime_read_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',
@@ -961,7 +962,11 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
     if proof.get('runtime_read_review'):
         from tests.support.runtime_observation_evidence import validate_runtime_source_review, RTPC_ORIGINAL_CANDIDATE
         from tests.support.fixed_runtime_read_evidence import URIS, native_profile
-        expected_original = native_profile(branch)['candidate'] if (branch.get('route') or '').split('|')[-1] in URIS else RTPC_ORIGINAL_CANDIDATE
+        from tests.support import console_runtime_read_evidence as console
+        if console.selected(branch['id'], root):
+            expected_original = console.CANDIDATE
+        else:
+            expected_original = native_profile(branch)['candidate'] if (branch.get('route') or '').split('|')[-1] in URIS else RTPC_ORIGINAL_CANDIDATE
         if proof['from_candidate'] != expected_original or not binding.get('runtime_observation_attachment'):
             raise ValueError('RTPC guard review requires its exact original runtime producer')
         validate_runtime_source_review(proof['runtime_read_review'], sources, branch, root, base)
@@ -1080,7 +1085,7 @@ def exact_observation_pointer(branch, binding, dispatch, section, reference_edge
     return observed
 
 
-def validate_native_alternative(root, branch, value):
+def validate_native_alternative(root, branch, value, *, catalog=None, require_known=False):
     """Resolve native child semantics and reuse the existing bounded validator."""
     import hashlib
     import json
@@ -1089,7 +1094,7 @@ def validate_native_alternative(root, branch, value):
     from wwise_waapi.builders.schema import _SchemaWalker
     from wwise_waapi.builders.common import SemanticValidationError
     version, host, build, _, uri = branch['route'].split('|')
-    catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+    catalog = catalog if catalog is not None else load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
     if catalog['provenance']['build'] != build:
         raise ValueError('alternative native build changed')
     definitions = catalog['definitions']
@@ -1097,7 +1102,7 @@ def validate_native_alternative(root, branch, value):
     if '/@definition/' in branch['pointer']:
         section, rest = branch['pointer'].split('/@definition/', 1)
         name, separator, suffix = rest.partition('/')
-        context = graph.documents[name]
+        context = catalog['schemas'][uri][section.strip('/')] if name == '<schema>' else graph.documents[name]
         schema = pointer_value(context, '/' + suffix if separator else '')
     else:
         context = catalog['schemas'][uri][branch['pointer'].split('/')[1]]
@@ -1105,6 +1110,37 @@ def validate_native_alternative(root, branch, value):
     digest = hashlib.sha256(json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     if digest != branch['shape_sha256']:
         raise ValueError('selected native alternative shape changed')
+    known = {'type','properties','patternProperties','additionalProperties','required','items','minItems','maxItems','uniqueItems',
+                'enum','const','oneOf','anyOf','allOf','minLength','maxLength','pattern','minimum','maximum','exclusiveMinimum','exclusiveMaximum',
+                'multipleOf','minProperties','maxProperties','description','descriptions','title','default','examples','definitions','localDefinitions','synopsis'}
+    if require_known:
+        # Unknown restrictions must not be hidden by an earlier type/enum failure.
+        # This inspects a finite resolved schema closure, not satisfiability.
+        visited = set()
+        def check_known(node, context, depth=0):
+            if not isinstance(node, dict) or depth > 64 or len(visited) > 20000:
+                raise ValueError('unrecognized alternative schema or closure budget exceeded')
+            identity = (id(context), id(node))
+            if identity in visited:
+                return
+            visited.add(identity)
+            if set(node) - known - {'$ref', '#ref'}:
+                raise ValueError('unrecognized native alternative semantics remain unverified')
+            reference = node.get('$ref', node.get('#ref'))
+            if reference is not None:
+                resolved = resolve_schema_reference(reference, root_schema=context, graph=graph)
+                target_context = context if resolved.document_name == '<schema>' else graph.documents[resolved.document_name]
+                check_known(resolved.target, target_context, depth + 1)
+            for key in ('properties', 'patternProperties', 'definitions', 'localDefinitions'):
+                for child in node.get(key, {}).values():
+                    check_known(child, context, depth + 1)
+            for key in ('oneOf', 'anyOf', 'allOf', 'items', 'additionalProperties'):
+                children = node.get(key)
+                if children is None or isinstance(children, bool):
+                    continue
+                for child in children if isinstance(children, list) else [children]:
+                    check_known(child, context, depth + 1)
+        check_known(schema, context)
     class NativeWalker(_SchemaWalker):
         def validate(self, schema, value, *, path, depth=0):
             if depth > 32:
@@ -1121,9 +1157,6 @@ def validate_native_alternative(root, branch, value):
                 finally:
                     self.context = old
                 schema = {k:v for k,v in schema.items() if k not in ('$ref','#ref')}
-            known = {'type','properties','patternProperties','additionalProperties','required','items','minItems','maxItems','uniqueItems',
-                'enum','const','oneOf','anyOf','allOf','minLength','maxLength','pattern','minimum','maximum','exclusiveMinimum','exclusiveMaximum',
-                'multipleOf','minProperties','maxProperties','description','descriptions','title','default','examples','definitions','localDefinitions','synopsis'}
             if set(schema) - known:
                 raise ValueError('unrecognized native alternative semantics remain unverified')
             super().validate(schema, value, path=path, depth=depth)
@@ -1132,6 +1165,9 @@ def validate_native_alternative(root, branch, value):
     try:
         walker.validate(schema, value, path='exact-native-alternative')
     except SemanticValidationError as exc:
+        from wwise_waapi.builders.schema import _schema_budget_error
+        if require_known and _schema_budget_error(exc):
+            raise ValueError('alternative validation budget remains unverified') from exc
         raise ValueError('observation does not satisfy selected native alternative') from exc
     if walker.unresolved_refs:
         raise ValueError('unresolved native alternative reference')
@@ -1404,6 +1440,14 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             return qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding,
                                          root, reference_edges or {}, historical_sources)
         record = read_sealed_artifact(descriptor, base)
+        from tests.support.empty_candidate_evidence import classify_empty_candidate, validate_counterexample
+        empty = classify_empty_candidate(root, branch)
+        if empty is not None and empty['status'] == 'rejected':
+            validate_counterexample(record, descriptor, branch, empty, candidate, category, scope_kind,
+                                    binding or {}, root, reference_edges or {})
+            return 'passed', None
+        if (binding or {}).get('disposition') == 'schema_counterexample':
+            raise ValueError('counterexample requires a conclusively rejected empty candidate')
         normalized_construction = None
         from tests.support.runtime_remaining_evidence import selected as remaining_selected, validate_evidence as validate_remaining
         if remaining_selected(branch['id'], root):
@@ -1701,7 +1745,12 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
     condition_reuse_reviews, condition_reuse_runs = set(), set()
     definition_contexts, definition_proofs = {}, {}
     historical_sources = {}  # Immutable Git objects only; never shared across evaluations.
+    from tests.support.empty_candidate_evidence import classify_empty_candidate
+    empty_cache = {}  # Frozen catalog/shape cache, local to this evaluation.
     for branch in native['obligations']:
+        classification = classify_empty_candidate(root, branch, cache=empty_cache)
+        if classification is not None:
+            branch['empty_candidate'] = classification
         branch['requirements'] = []
         route = routes.get(branch['route'])
         binding = bindings.get(branch['id'])
@@ -1756,7 +1805,10 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                  and binding.get('public_route_sha256') == digest(public[binding['public_route']])
                  and (route is None or binding['public_route'] == route['public_route'])
                  and all(exact_source(binding.get(key, {})) and binding[key]['selector'] == branch['pointer'] for key in ('construction', 'validation', 'verifier'))
-                 and binding.get('disposition', 'implemented') in ('implemented', 'approved_boundary'))
+                 and binding.get('disposition', 'implemented') in ('implemented', 'approved_boundary', 'schema_counterexample'))
+        if valid and binding.get('disposition') == 'schema_counterexample':
+            valid = (classification is not None and classification['status'] == 'rejected'
+                     and binding.get('empty_candidate') == classification)
         if valid and binding.get('disposition') == 'approved_boundary':
             boundary = approved_boundary(root, branch, binding, route, public[binding['public_route']], digest)
             valid = boundary is not None
@@ -1774,6 +1826,11 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 or any(c not in ('program', 'native', 'live_metadata', 'fresh') for c in categories)):
             branch['state'] = 'unresolved'
             branch['reasons'] = ['reviewed exact branch evidence requirements missing or stale']
+            continue
+        if binding.get('disposition') == 'schema_counterexample' and (
+                categories != ['program'] or policy.get('empty_candidate') != classification):
+            branch['state'] = 'unresolved'
+            branch['reasons'] = ['reviewed exact rejected-candidate program requirement missing or stale']
             continue
         branch['requirements'] = categories[:]
         branch['requirements_sha256'] = digest(policy)

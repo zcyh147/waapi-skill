@@ -5,6 +5,71 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R127 additional Console runtime observations
+
+Frozen `2dc0ee57` ran one owned Console test on each pinned 2023.1–2025.1
+build, sequentially. Each session reused one capture frame for LoadedMedia,
+CPU usage, PerformanceMonitor and StreamedMedia, with separate complete
+results and bounded retained-page reads. No initial native read was repeated.
+
+| Console build | Test seconds | Capture T (ms) | LoadedMedia rows | CPU rows | Performance rows | StreamedMedia rows |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2023.1.19.8928 | 17.70 | 2698 | 0 | 32 | 42 | 1 |
+| 2024.1.13.9056 | 14.66 | 2581 | 0 | 34 | 45 | 1 |
+| 2025.1.7.9143 | 15.04 | 2634 | 0 | 32 | 46 | 1 |
+
+All 12 independent reader outcomes and all three selected category/final
+invocation records passed; total test time was 47.40s. Each source tree hash
+and project mtime stayed unchanged; owned cleanup completed, process groups
+were empty and sandboxes were deleted. Roots are
+`.waapi-skill-state/full-coverage/r127-console-additional-native-{2023,2024,2025}-r1`.
+Their original reports retain all raw/native/public pages and exact attribution.
+
+Empty LoadedMedia establishes Console availability only. Nonempty diagnostic
+and streaming rows retain their actual context; no SDK preparation, selected
+Sound ownership or control effect is inferred. Exact branch/composite admission
+and global publication remain separate pending work. This is Mac evidence,
+not Windows execution. No SDK installation, GUI startup or Fresh run was used.
+
+The collector's ten focused fake-client cases passed before native execution,
+covering complete retained arrays, independent reader failures, connection loss,
+cleanup failure, changed pages, result bounds and older-version rejection.
+They reside in an already registered Program module; no duplicate sweep was
+added. Existing six-reader behavior and its original evidence remain intact.
+
+## 2026-10-24 R127 meter media-size output
+
+Reviewed integration `e6cef72e` exposes the existing closed `media-size-bytes`
+output on meter objects. It reuses the reflected `mediaSize` integer field,
+existing projection, whole-result validation and retained paging. The focused
+public test covers 2024.1/2025.1 on both Console and Authoring: exact same-API
+construction, zero/nonzero/absent values, complete pages, malformed off-page
+rejection and unknown-name rejection. Together with the three existing older
+unavailable-version checks, seven cases passed in 1.60s.
+
+This is fake-client program evidence, not native media-size population. The
+production diff only extends the named-output allowlist and its comment.
+Historical evidence remains unchanged; exact source compatibility reconciliation
+is pending before current evidence reuse. Fourteen legacy option spellings and
+two 2025 source inconsistencies remain separate #186 work. No native, Fresh or
+full-gate run was added for this deterministic output change.
+
+## 2026-10-24 R126 runtime publication readiness
+
+Reviewed integration `a3eabbef` adds collision-checked composition, exact native
+ownership selection and optional actual post-teardown output to the existing
+runtime tests. Four focused composition/ownership/finalizer controls passed
+in 5.04s; four affected producer probes passed in 33.19s. Independent review
+verified exact ownership and preserved artifact bytes without rerunning them.
+The probes retain their original source basis and are not final publication
+inputs. Existing module-level Program registration includes the new controls.
+
+The prepared roster collects 588 nodes; collection is not execution evidence.
+No formal capture batch, global evaluation, native rerun or full gate ran.
+Final publication remains deferred while the remaining #186 families are
+integrated. Neither the 6,292-row selection nor the separate 93 LoadedMedia
+rows establishes whole-ticket completion.
+
 ## 2026-10-24 R126 older Authoring LoadedMedia evidence
 
 Reviewed integration `0f0fd614` adds exact 2023.1/2024.1 Authoring support
@@ -970,6 +1035,10 @@ parent. Its complete success flow and wrong-parent rejection passed in 26.39s.
 The fresh owned native run on `3368fd48` then passed in 122.47s: meter object
 and related output, snapped cursor readback, exact saved capture artifact,
 owned log addition and log clearing each have separate passing observations.
+Its retained root is
+`.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3`; the final record
+is `evidence/authoring-batch-finalization.json`. The R91 heading records the
+implementation stage; the successful native attempt uses the R92 root name.
 Finalization confirms unchanged source hash/mtime, no residual processes and
 released port 8080. This is Mac Authoring 2025.1.7.9143 evidence; it does not
 prove other versions, capture-content completeness or whole-ticket completion.

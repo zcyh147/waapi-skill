@@ -3324,3 +3324,177 @@ def test_profiler_signed_cursor_unavailable_or_changed_result_remains_unverified
         env=_env(tmp_path), client_factory=lambda _: client)
     assert code == 2, replay
     assert sum(uri == PROFILER_SET_CURSOR_TIME_URI for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+@pytest.mark.parametrize('console', (False, True), ids=('authoring', 'console'))
+def test_log_add_preserves_empty_and_edge_whitespace_through_once_public_transaction(tmp_path, version, console):
+    from tests.unit.test_console_log_observer_gateway import ConsoleLogClient
+    messages = ('', ' \tmessage\n ', '\t \n')
+    for ordinal, message in enumerate(messages):
+        client_root = tmp_path / ('client-' + str(ordinal))
+        client_root.mkdir()
+        client = ConsoleLogClient(client_root, version=version) if console else _LogControlClient(client_root, version=version)
+        state = tmp_path / ('exact-message-' + str(ordinal))
+        preview, invoke = _public_runtime_preview(tmp_path, client, state, 'ak.wwise.core.log.addItem',
+            ('--message', message, '--severity', 'warning'))
+        shown = invoke(['transaction-show', preview['transaction_id']])
+        assert shown['artifact']['request']['arguments']['args'] == {
+            'message': message, 'channel': 'general', 'severity': 'Warning'}
+        executed = invoke(['execute', preview['transaction_id']])
+        verified = invoke(executed['next_command']['gateway_argv'])
+        assert verified['verified'] is (not console or version == '2025.1'), verified
+        assert [(args, options) for uri, args, options in client.calls if uri == 'ak.wwise.core.log.addItem'] == [
+            ({'message': message, 'channel': 'general', 'severity': 'Warning'}, {})]
+        code, rejected = gateway.execute_gateway(['--state-dir', str(state), 'execute', preview['transaction_id']],
+            env=_env(tmp_path, version=version), client_factory=lambda _: client)
+        assert code == 2, rejected
+        assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
+        if console:
+            assert client.order == (['subscribed', 'add', 'unsubscribed'] if version == '2025.1' else ['add'])
+            if version != '2025.1':
+                assert verified['state'] == 'result_schema_checked'
+                observed = verified['verification']['verification_scope']['log_observation']
+                assert observed['outcome'] == 'console_log_unobservable'
+                assert observed['native_observation_support']['state'] == 'unavailable'
+        else:
+            observation = verified['verification']['verification_scope']['log_observation']
+            assert observation['outcome'] == 'new_matching_item'
+            assert observation['post_channel']['items'][-1]['message'] == message
+        assert list(verified)[-1] == 'agent_result'
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_schema_discloses_exact_string_resource_bounds(tmp_path, version):
+    code, schema = gateway.execute_gateway(['request-schema', 'ak.wwise.core.log.addItem'],
+        env=_env(tmp_path, version=version), client_factory=lambda _: pytest.fail('Offline schema'))
+    assert code == 0, schema
+    form = schema['business_adapter']['declaration']['input_forms']['message']
+    assert form == {'flag': '--message', 'repeatable': False, 'maximum_input_bytes': 16384,
+        'empty_string_allowed': True, 'whitespace': 'preserve_exactly', 'nul_allowed': False}
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_missing_oversized_or_nul_is_rejected_before_preview(tmp_path, version):
+    for ordinal, declaration in enumerate(((), ('--message', '界' * 5462), ('--message', 'a\x00b'))):
+        client_root = tmp_path / ('client-' + str(ordinal))
+        client_root.mkdir()
+        client = _LogControlClient(client_root, version=version)
+        state = tmp_path / ('rejected-' + str(ordinal))
+        env = _env(tmp_path, version=version)
+        code, started = gateway.execute_gateway(['--state-dir', str(state), 'draft-start', 'ak.wwise.core.log.addItem'],
+            env=env, client_factory=lambda _: client)
+        assert code == 0, started
+        code, rejected = gateway.execute_gateway(['--state-dir', str(state), 'draft-declare-runtime-control-plan',
+            started['draft']['draft_id'], '--task-authority', started['task_authority'],
+            '--expected-revision', str(started['draft']['revision']), *declaration], env=env, client_factory=lambda _: client)
+        assert code == 2, rejected
+        assert rejected['error_code'] == ('RUNTIME_CONTROL_PLAN_FIELDS_INVALID' if ordinal == 0 else 'BUSINESS_VALUE_INVALID')
+        assert not any(uri in ('ak.wwise.core.log.addItem', LOG_GET_URI) for uri, _, _ in client.calls)
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_closed_log_declaration_rejects_nonstring_messages_without_relaxing_other_text(version):
+    from tests.unit.test_core_business_adapter import _session
+    from wwise_waapi.business_declarations import BusinessDeclarationError
+    from wwise_waapi.runtime_inspection_business import materialize_runtime_control_business_request
+    session, _, _ = _session(version)
+    # CLI message tokens are always strings; the closed compiler also rejects
+    # invalid structured declaration state before materializing a native request.
+    for message in (None, True, 42, [], {}):
+        with pytest.raises(BusinessDeclarationError, match='BUSINESS_VALUE_INVALID'):
+            materialize_runtime_control_business_request('ak.wwise.core.log.addItem',
+                session.with_settings({'runtime_control_plan': {'message': message}}))
+    for host in ('', ' host '):
+        with pytest.raises(BusinessDeclarationError, match='BUSINESS_VALUE_INVALID'):
+            materialize_runtime_control_business_request('ak.wwise.core.remote.connect',
+                session.with_settings({'runtime_control_plan': {'remote_host': host}}))
+
+
+def test_log_add_edge_whitespace_does_not_verify_a_trimmed_readback(tmp_path):
+    client = _LogControlClient(tmp_path)
+    client.after = [*client.rows, {'message': 'message', 'severity': 'Message', 'time': 1, 'messageId': 'Custom'}]
+    preview, invoke = _public_runtime_preview(tmp_path, client, tmp_path / 'state',
+        'ak.wwise.core.log.addItem', ('--message', ' message '))
+    executed = invoke(['execute', preview['transaction_id']])
+    verified = invoke(executed['next_command']['gateway_argv'])
+    assert verified['state'] == 'result_schema_checked' and verified['verified'] is False, verified
+    assert verified['verification']['verification_scope']['log_observation']['outcome'] == 'no_matching_increase'
+    assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_terminal_allowance_requires_resolved_channel_and_severity(version):
+    from copy import deepcopy
+    request = {'contract': 'waapi-skill.operation-request/v1', 'version': version,
+        'operation': 'waapi.call', 'arguments': {'api': 'ak.wwise.core.log.addItem',
+            'args': {'channel': 'general', 'message': '界' * 5461 + 'a', 'severity': 'Message'}, 'options': {}}}
+    assert gateway.transaction_verify_terminal_budget(request) == 41338
+    for field in ('channel', 'severity'):
+        for invalid in ('', 'Unknown', 42):
+            malformed = deepcopy(request)
+            malformed['arguments']['args'][field] = invalid
+            assert gateway.transaction_verify_terminal_budget(malformed) == 24576, (field, invalid)
+
+
+@pytest.mark.parametrize('console', (False, True), ids=('authoring', 'console'))
+@pytest.mark.parametrize('message', ('界' * 5461 + 'a', '\t' * 16384), ids=('utf8', 'escaped'))
+def test_log_message_maximum_transaction_keeps_exact_agent_result_and_journal(tmp_path, monkeypatch, console, message):
+    from copy import deepcopy
+    from tests.unit.test_console_log_observer_gateway import ConsoleLogClient
+    client = ConsoleLogClient(tmp_path) if console else _LogControlClient(tmp_path)
+    state = tmp_path / 'state'
+    original_payloads = []
+    project = gateway.project_successful_transaction_verify_payload
+    def record_projection_input(payload, **kwargs):
+        original_payloads.append(deepcopy(payload))
+        return project(payload, **kwargs)
+    monkeypatch.setattr(gateway, 'project_successful_transaction_verify_payload', record_projection_input)
+    preview, invoke = _public_runtime_preview(tmp_path, client, state, 'ak.wwise.core.log.addItem', ('--message', message))
+    executed = invoke(['execute', preview['transaction_id']])
+    try:
+        verified = invoke(executed['next_command']['gateway_argv'])
+    finally:
+        if original_payloads:
+            (tmp_path / 'unprojected-verification.json').write_text(json.dumps(original_payloads[-1], ensure_ascii=False))
+    original, = original_payloads
+    assert verified['verified'] is True and verified['state'] == 'verified', verified
+    assert verified['agent_result'] == original['agent_result'] and list(verified)[-1] == 'agent_result'
+    assert gateway.gateway_json_document_size(verified) <= verified['stdout_projection']['stdout_budget_bytes']
+    assert gateway.TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES == 24576
+    assert verified['stdout_projection']['stdout_budget_bytes'] <= 123904
+    event = next(e for e in TransactionStore(state).read_events(preview['transaction_id']) if e['event_type'] == 'verification_recorded')
+    assert event['details']['verification'] == original['verification']
+    assert verified['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(original['verification'])
+    assert verified['stdout_projection']['full_verification_evidence_persisted'] is True
+    if console:
+        assert event['details']['verification']['verification_scope']['log_observation']['execution_observation']['event']['item']['message'] == message
+        assert client.order == ['subscribed', 'add', 'unsubscribed']
+    else:
+        assert event['details']['verification']['verification_scope']['log_observation']['post_channel']['items'][-1]['message'] == message
+    assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
+    assert verified['verification']['canonical_sha256'] == canonical_sha256(original['verification'])
+    request = deepcopy(original['agent_result']['request'])
+    rendered = gateway.gateway_json_document_size({'agent_result': {'request': request}})
+    assert verified['stdout_projection']['stdout_budget_bytes'] == rendered + 24576
+    for damage in ('another-api', 'oversized', 'nul', 'extra-field', 'older-version'):
+        changed = deepcopy(request)
+        if damage == 'another-api': changed['arguments']['api'] = 'ak.wwise.core.log.clear'
+        elif damage == 'oversized': changed['arguments']['args']['message'] = '界' * 5462
+        elif damage == 'nul': changed['arguments']['args']['message'] = '\t' * 16383 + '\x00'
+        elif damage == 'extra-field': changed['arguments']['io_root'] = str(tmp_path)
+        else: changed['version'] = '2022.1'
+        assert gateway.transaction_verify_terminal_budget(changed) == 24576
+    for field in ('ok', 'status', 'project_guard_fingerprint', 'runtime_guard_fingerprint'):
+        assert verified['guard_validation'][field] == original['guard_validation'][field]
+    worst_escaped = deepcopy(request)
+    worst_escaped['arguments']['args']['message'] = '\x01' * 16384
+    worst_rendered = gateway.gateway_json_document_size({'agent_result': {'request': worst_escaped}})
+    assert gateway.transaction_verify_terminal_budget(worst_escaped) == worst_rendered + 24576 <= 123904
+    for damage in ('failed-assertion', 'agent-result-state'):
+        changed = deepcopy(original)
+        if damage == 'failed-assertion': changed['verification']['assertions'][0]['passed'] = False
+        else: changed['agent_result']['state'] = 'executed_unverified'
+        with pytest.raises(gateway.GatewayResultShapeError) as caught:
+            gateway.project_successful_transaction_verify_payload(changed)
+        assert caught.value.error_code == 'INVALID_VERIFY_SUCCESS_PROJECTION'

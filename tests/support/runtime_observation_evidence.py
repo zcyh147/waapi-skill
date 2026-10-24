@@ -572,7 +572,12 @@ RTPC_GUARD_CHANGE = {
     'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}
 UNICODE_CONTEXT_SOURCE = 'skills/waapi-skill/wwise_waapi/business_declarations.py'
 UNICODE_CONTEXT_SOURCE_CHANGE = {'before': 'aee2a6cc97e5ccb0340a0f99f520969571e5e2dcf4d48695a396fca29dbeb7b3', 'after': '9f196a80ac7e2d82daf7fe0cb452735c9f50b2da825ba7ac2dafae02da700070'}
+METER_SOURCE = 'skills/waapi-skill/wwise_waapi/profiler_meter_objects.py'
+METER_SOURCE_CHANGE = {'before': '33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b', 'after': '980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63'}
+METER_SOURCE_SYMBOLS = ['METER_OUTPUT_NAMES: admit existing media-size-bytes -> mediaSize binding; meter-root only; nearby comment']
+METER_SOURCE_REASON = 'Reviewed e6cef72e meter-root allowlist admits existing media-size-bytes binding only; comment updated. No imports, functions, classes or other assignments change; retained nonmeter reader request/result/cleanup semantics are unchanged.'
 RTPC_REVIEWED_SOURCE_CHANGES = {
+    METER_SOURCE: METER_SOURCE_CHANGE,
     UNICODE_CONTEXT_SOURCE: UNICODE_CONTEXT_SOURCE_CHANGE,
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
@@ -592,6 +597,7 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': {
         'before': '62c28fc9bb92ccd8e8efb3ccbfe5b187d6df1d3086c2def79e1d11dbc81ddfe8', 'after': '1f03a038ba77a0ab62fba014329eeeb6962de86902f14fcb60cbfb4de19dea00'}}
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
+    METER_SOURCE: METER_SOURCE_SYMBOLS,
     UNICODE_CONTEXT_SOURCE: ['BusinessHandleRegistry._require_context: exact UTF-8 byte comparison; no normalization'],
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': [
         'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data',
@@ -618,8 +624,8 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
     'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': [
         'compare_channel: exact Console log observation guard only']}
 RTPC_REVIEWED_SOURCE_REASON = (
-    'Reviewed already-attested host finish metadata only; no additional call or successful Profiler request/result change. '
-    'Exact reviewed eight-file RTPC guard and closed non-RTPC result-validation source delta; '
+    METER_SOURCE_REASON + ' Reviewed already-attested host finish metadata only; no additional call or successful Profiler request/result change. '
+    'Exact reviewed nine-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
     'Exact registered-version Console transport predicate/catalog admission and error-message/catalog-docstring finalization does not change these non-transport read paths; '
@@ -630,7 +636,7 @@ RTPC_ORIGINALS = {
 
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
-    """Accept only the pinned reviewed eight-file delta for original RTPC reads."""
+    """Accept only the pinned reviewed nine-file delta for original RTPC reads."""
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
@@ -1208,6 +1214,9 @@ def _validate_contribution_capture(record, argv, route, root):
 
 def validate_runtime_source_review(descriptor, sources, branch, root, base):
     from tests.support.fixed_runtime_read_evidence import URIS, validate_source_review
+    from tests.support import console_runtime_read_evidence as console
+    if console.selected(branch['id'], root):
+        return console.validate_source_review(descriptor, sources, branch, root, base)
     if branch['route'].split('|')[4] in URIS:
         return validate_source_review(descriptor, sources, branch, root, base)
     if branch['route'].endswith('|function|' + CONTRIBUTION_URI):

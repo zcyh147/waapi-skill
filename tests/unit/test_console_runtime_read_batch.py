@@ -290,3 +290,123 @@ def test_older_partial_contribution_preserves_unreported_optional_scalars(tmp_pa
     assert report['cleanup']['complete'] and final['invocation']['outcome'] == 'PASS'
     assert final['residual_state']['sandbox'] == 'deleted'
     assert sum(uri == PREFIX + 'getVoiceContributions' for uri, _, _ in client.calls) == 1
+
+
+ADDITIONAL_NODE = 'test_console_owned_additional_runtime_read_batch'
+ADDITIONAL_READERS = {'loaded_media': 'getLoadedMedia', 'cpu': 'getCpuUsage',
+    'performance': 'getPerformanceMonitor', 'streamed_media': 'getStreamedMedia'}
+
+
+def _additional_context(tmp_path, monkeypatch, *, version='2024.1', fault=None):
+    context = _console_context(tmp_path, monkeypatch, 'cleanup' if fault == 'cleanup' else None, version=version)
+    _, runtime, client, _, _ = context
+    rows = {'getCpuUsage': [dict(id=i, type='', elementName='CAkAudioMgr::Perform', instances=2,
+        millisecondsExclusive=0.014, millisecondsInclusive=0.2167, percentExclusive=0.13, percentInclusive=2.03) for i in range(257 if fault == 'row-bound' else 65)],
+        'getPerformanceMonitor': [{'id':'ActiveTransitions','name':'Number of Transitions/Interpolations','value':0}],
+        'getLoadedMedia': ([{'mediaId':124871431,'fileName':'Ambience_40.wav','format':'VORBIS','size':160821,'soundBank':'Prepared'}]
+            if version == '2025.1' else []), 'getStreamedMedia': []}
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri in {PREFIX + suffix for suffix in ADDITIONAL_READERS.values()}:
+            client.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if uri.endswith('getCpuUsage') and fault == 'reader': return {'return':[{'millisecondsExclusive':'invalid'}]}
+            if uri.endswith('getCpuUsage') and fault == 'connection': raise ConnectionResetError('controlled extra-reader connection failure')
+            return {'return':deepcopy(rows[uri.rsplit('.',1)[-1]])}
+        return original(uri,args,options)
+    client.call = call
+    if fault == 'page-drift':
+        raw_gateway = type(runtime).raw_gateway
+        def changed_page(self, argv, **kwargs):
+            code, payload = raw_gateway(self, argv, **kwargs)
+            if '--runtime-page' in argv and payload.get('ok'):
+                payload['agent_result']['snapshot_sha256'] = '0' * 64
+            return code, payload
+        monkeypatch.setattr(type(runtime), 'raw_gateway', changed_page)
+    return context, rows
+
+
+@pytest.mark.parametrize('version', ['2023.1','2024.1','2025.1'])
+def test_additional_console_readers_keep_complete_paged_arrays_and_empty_availability(tmp_path, monkeypatch, version):
+    context, rows = _additional_context(tmp_path, monkeypatch, version=version)
+    workflow, runtime, client, _, _ = context
+    getattr(workflow, ADDITIONAL_NODE)(runtime)
+    final = _finish(context,tmp_path,monkeypatch,[(ADDITIONAL_NODE,None)])[-1]
+    category, = final['categories'];report = json.loads(Path(category['observation_path']).read_bytes())
+    assert final['invocation']['outcome']=='PASS' and final['residual_state']['sandbox']=='deleted'
+    assert category['category']=='console-additional-runtime-read-batch'
+    assert set(report['outcomes'])==set(ADDITIONAL_READERS) and report['complete'] and report['cleanup']['complete']
+    assert report['fixture_before']==report['fixture_after']
+    for key,suffix in ADDITIONAL_READERS.items():
+        entry=report['outcomes'][key];evidence=entry['evidence']
+        assert entry['outcome']=='PASS' and evidence['available'] and evidence['complete']
+        assert evidence['retained_rows']==rows[suffix] and evidence['nonempty']==bool(rows[suffix])
+        assert evidence['position_ms']==1500 and evidence['control_effect_verified'] is False
+        calls=[args for uri,args,_ in client.calls if uri==PREFIX+suffix]
+        assert calls==[{'time':1500}]
+    cpu=report['outcomes']['cpu']['evidence']
+    assert len(cpu['agent_result_pages'])==3 and cpu['agent_result_pages'][0]['truncated']
+    assert cpu['retained_page_calls']==2
+    assert report['outcomes']['streamed_media']['evidence']['claim']=='availability_only'
+    assert report['outcomes']['loaded_media']['evidence']['claim']==('actual_returned_diagnostics' if version=='2025.1' else 'availability_only')
+    enable=[args['dataTypes'] for uri,args,_ in client.calls if uri==PREFIX+'enableProfilerData']
+    assert enable==[[{'dataType':token,'enable':mode} for token in ('voices','cpu','loadedMedia','stream')] for mode in (True,False)]
+    assert report['limits']['public_calls']==128 and report['limits']['cleanup_reserve_calls']==36
+    assert report['public_call_count']==len(report['calls'])<=128
+    assert not any(uri.endswith('getMeters') or uri.endswith('setCursorTime') for uri,_,_ in client.calls)
+
+
+@pytest.mark.parametrize('fault', ['reader', 'connection', 'cleanup'])
+def test_additional_reader_failure_and_cleanup_remain_independent(tmp_path, monkeypatch, fault):
+    context, _ = _additional_context(tmp_path, monkeypatch, fault=fault)
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, ADDITIONAL_NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(ADDITIONAL_NODE, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_bytes())
+    assert final['invocation']['outcome'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+    assert not report['complete'] and report['fixture_before'] == report['fixture_after']
+    assert report['outcomes']['loaded_media']['outcome'] == 'PASS'
+    assert sum(uri.endswith('transport.destroy') for uri, _, _ in client.calls) == 1
+    assert sum(uri == PREFIX + 'stopCapture' for uri, _, _ in client.calls) == 1
+    assert sum(uri == PREFIX + 'getCpuUsage' for uri, _, _ in client.calls) == 1
+    if fault == 'cleanup':
+        assert {row['outcome'] for row in report['outcomes'].values()} == {'PASS'}
+        assert not report['cleanup']['complete'] and report['cleanup']['errors'][0]['action'] == 'stop-transport'
+    else:
+        assert report['cleanup']['complete']
+        cpu = report['outcomes']['cpu']
+        assert cpu['outcome'] == 'FAIL' and cpu['evidence']['gateway_results'][0]['ok'] is False
+        for name, suffix in (('performance', 'getPerformanceMonitor'), ('streamed_media', 'getStreamedMedia')):
+            assert report['outcomes'][name]['outcome'] == ('BLOCKED' if fault == 'connection' else 'PASS')
+            assert sum(uri == PREFIX + suffix for uri, _, _ in client.calls) == (0 if fault == 'connection' else 1)
+    executed = [call['argv'][1] for call in report['calls'] if call['argv'][0] == 'execute']
+    assert len(executed) == len(set(executed))
+
+
+@pytest.mark.parametrize('fault', ['row-bound', 'page-drift'])
+def test_additional_incomplete_or_changed_retained_array_never_claims_complete(tmp_path, monkeypatch, fault):
+    context, _ = _additional_context(tmp_path, monkeypatch, fault=fault)
+    workflow, runtime, client, _, _ = context
+    with pytest.raises(AssertionError, match='Console playback/data probe incomplete') as caught:
+        getattr(workflow, ADDITIONAL_NODE)(runtime)
+    final = _finish(context, tmp_path, monkeypatch, [(ADDITIONAL_NODE, caught.value)])[-1]
+    report = json.loads(Path(final['categories'][0]['observation_path']).read_bytes())
+    assert final['invocation']['outcome'] == 'FAIL' and report['cleanup']['complete']
+    assert report['fixture_before'] == report['fixture_after']
+    cpu = report['outcomes']['cpu']
+    assert cpu['outcome'] == ('BLOCKED' if fault == 'row-bound' else 'FAIL')
+    assert cpu['evidence']['complete'] is False
+    assert cpu['evidence']['retained_page_calls'] == (0 if fault == 'row-bound' else 1)
+    assert report['outcomes']['performance']['outcome'] == report['outcomes']['streamed_media']['outcome'] == 'PASS'
+    assert sum(uri == PREFIX + 'getCpuUsage' for uri, _, _ in client.calls) == 1
+    assert sum(uri.endswith('transport.destroy') for uri, _, _ in client.calls) == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1'])
+def test_additional_console_reader_node_rejects_older_versions_before_dispatch(tmp_path, monkeypatch, version):
+    workflow, runtime, client, _, _ = _console_context(tmp_path, monkeypatch, version=version)
+    before = deepcopy(client.calls)
+    with pytest.raises(AssertionError, match='Additional Console reader versions'):
+        getattr(workflow, ADDITIONAL_NODE)(runtime)
+    assert client.calls == before and runtime.category_results == []
+    assert not (runtime.state_dir / 'console-additional-runtime-read-batch.json').exists()

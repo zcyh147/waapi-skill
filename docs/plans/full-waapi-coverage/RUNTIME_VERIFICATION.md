@@ -124,6 +124,46 @@ publication are still required before this mapping grants acceptance.
 
 ## Standalone controls and workflow observations
 
+### Remaining runtime families — R127 implementation decision
+
+The same risk-based method applies to the remaining 10,977 schema obligations
+owned by #186, outside the six-reader 6,292 and Authoring LoadedMedia 93.
+These span 169 host/version routes. Retain every identity, shape and owner:
+3,003 input/construction obligations and 7,974 result obligations. These are
+scope counts, not missing-feature counts or a native test quota.
+
+Use each route's existing result root as its explicit business-evidence gate;
+other rows require that gate plus their own current public program proof.
+The gate must check the family's actual semantics and may require several
+observations. A valid result schema alone is insufficient. Input choices need
+actual public construction coverage; they cannot be reclassified as opaque
+output preservation. Log addition/removal, transport authority/state, meter
+metadata/frame identity, cursor interpretation and file effects retain their
+specific native requirements and the standalone limits below.
+
+Reuse retained facts first. Exact representative/composite support requires
+reviewed meaning, source and host/version relationships; no same-URI fallback
+is authorized. Optional diagnostic field values and collection combinations
+use bounded whole-result program checks without manufacturing native values.
+Console LoadedMedia support and the complete public mapping of meter return
+choices remain unresolved implementation work, not exclusions or passing rows.
+
+The finite meter audit confirmed one concrete omission: the existing
+`media-size-bytes` business output was filtered out at the meter root.
+Reviewed `e6cef72e` restores that same-API choice for 2024/2025 and preserves
+zero, nonzero and absent results through the existing bounded path. This fixes
+that omission only. Fourteen legacy namespace spellings and the 2025 `states`
+and `suppportsRandomizer` source rows still need exact reconciliation; a similar
+canonical name or related-object result does not by itself prove equivalence.
+
+Implement the log family first through existing public tests, actual teardown
+receipts, portable evidence and the ordinary completion consumer. The first
+tracer must reject removal of its native witness. Extend shared mechanisms
+instead of adding one test per schema row. Preserve all earlier policies and
+FAIL/BLOCKED outcomes; this decision grants no coverage until implementation,
+independent review and current publication. Final captures remain deferred
+until the shared source batch is settled.
+
 | Control / versions | Supported standalone proof | Why the available observation is different |
 | --- | --- | --- |
 | `enableProfilerData`, 2021–2025 | Accepted ordered directives and native result schema; enabled-state, empty-list effect, repetition precedence and restoration remain unclaimed. | Dataset readers return captured data, not the current enablement map. Neither empty nor nonempty data establishes the final settings. |
