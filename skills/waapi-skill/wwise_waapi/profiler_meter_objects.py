@@ -37,6 +37,19 @@ largest-radius-attenuation audio-source-language switch-container-child-context
 curve-points blend-tracks source-language-included original-state
 switch-group-game-parameter has-empty-switch-state-assignment
 extracted-events extracted-structures extracted-media soundbanks-referencing-event
+active-source converted-anonymous-channel-count converted-bit-depth
+converted-channel-configuration converted-channel-mask converted-codec
+converted-data-size-bytes converted-duration converted-file-size-bytes
+converted-height-channel-count converted-lfe-channel-count
+converted-normal-channel-count converted-sample-count converted-sample-rate
+converted-total-channel-count original-anonymous-channel-count original-bit-depth
+original-channel-configuration original-channel-mask original-codec
+original-data-size-bytes original-duration original-file-size-bytes
+original-height-channel-count original-lfe-channel-count
+original-normal-channel-count original-sample-count original-sample-rate
+original-total-channel-count conversion-format converted-ambisonics-channel-count
+converted-non-lfe-channel-count converted-sample-rate-setting
+converted-trimmed-duration original-ambisonics-channel-count original-non-lfe-channel-count
 '''.split())
 METER_FIELD_MODES = (
     ('meter_object_fields','meter_object_include_field',QUERY_FIELD_MODES[0]),
