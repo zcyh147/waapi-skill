@@ -527,23 +527,24 @@ FIXED_PROGRAM_CASES += [(version,'wwise-console','getVoices','r119-original')
 def test_fixed_reader_program_emits_after_actual_teardown(tmp_path, request, version, host, name, mode):
     import os
     from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+    public_root = tmp_path / 'public'
     if mode == 'r119-original':
         _, raw = r119_original_read(version)
         from tests.support.fixed_runtime_read_evidence import R119_PROFILES
         calls = []
-        receipt, native, context, trace = public_fixed_read(tmp_path, version=version, host='wwise-console',
+        receipt, native, context, trace = public_fixed_read(public_root, version=version, host='wwise-console',
             rows=raw['result']['return'], position=str(R119_PROFILES[version]['time']), public_calls=calls)
     elif mode == 'r118-original':
         _, raw = r118_original_read()
         calls = []
-        receipt, native, context, trace = public_fixed_read(tmp_path, host='wwise-console',
+        receipt, native, context, trace = public_fixed_read(public_root, host='wwise-console',
             rows=raw['result']['return'], view='identity', position='6016', public_calls=calls)
     elif mode.startswith('original-'):
         calls = []
-        receipt, native, context, trace = public_fixed_read(tmp_path, version=version, host=host,
+        receipt, native, context, trace = public_fixed_read(public_root, version=version, host=host,
             uri='ak.wwise.core.profiler.' + name, filtered='filter' in mode, public_calls=calls)
     else:
-        receipt, native, context, trace, calls = fixed_program_case(tmp_path, version, host, name, mode)
+        receipt, native, context, trace, calls = fixed_program_case(public_root, version, host, name, mode)
     destination = Path(os.environ.get('WAAPI_FIXED_READER_CAPTURE_DIR', tmp_path)) / f'{version}-{host}-{name}-{mode}.json'
     register_exact_evidence_finalizer(request.node, lambda phases: write_program_receipt(
         destination, receipt, native, nodeid=request.node.nodeid, phase_reports=phases,
