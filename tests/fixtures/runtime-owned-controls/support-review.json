@@ -7120,6 +7120,60 @@
           "getter_raw_sha256": "bf2e04ead28c085aa3141e104231496f8cea74871c1b66e70e727d340f936c74"
         }
       ]
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.registerMeter": {
+      "provider": "r93",
+      "request": {
+        "api": "ak.wwise.core.profiler.registerMeter",
+        "args": {
+          "object": "{06362E8D-5A32-497A-B063-3DA95963CE47}"
+        },
+        "options": {}
+      },
+      "result": {},
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r93-runtime-native-2024-r2/evidence/authoring-node-observations/b7a415443063cf5fe14766cf-native-evidence/1792760629650156000-8d5269831e7d45c58b76b57aaf7ac74f-ak_wwise_core_profiler_registerMeter.json",
+      "raw_sha256": "628c8bbc3efd36e14461c81fccc5d8e87edbdb05cb40babe642f9cc67acb6c6d",
+      "receipt_indices": [
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "receipt_sha256": "a07271f2337ae030c527cde7e75b141fe1ca34724aa22b3c921eef0d3d6dccb0",
+      "object": {
+        "id": "{06362E8D-5A32-497A-B063-3DA95963CE47}",
+        "name": "Guns",
+        "type": "Bus",
+        "path": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\Environmental\\SFX\\Guns"
+      }
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.unregisterMeter": {
+      "provider": "r93",
+      "request": {
+        "api": "ak.wwise.core.profiler.unregisterMeter",
+        "args": {
+          "object": "{06362E8D-5A32-497A-B063-3DA95963CE47}"
+        },
+        "options": {}
+      },
+      "result": {},
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r93-runtime-native-2024-r2/evidence/authoring-node-observations/b7a415443063cf5fe14766cf-native-evidence/1792760662498219000-d941a823d3af435bbc9ed06fc95de981-ak_wwise_core_profiler_unregisterMeter.json",
+      "raw_sha256": "e6548f2ed2e52dd8db12ace20d522e44936a3c665321fc4a766dd22ec4074fe1",
+      "receipt_indices": [
+        92,
+        93,
+        94,
+        95,
+        96
+      ],
+      "receipt_sha256": "d908bd0452966031df85e2f59ce426955b90a27b7d241b7a3917b54dc676327e",
+      "object": {
+        "id": "{06362E8D-5A32-497A-B063-3DA95963CE47}",
+        "name": "Guns",
+        "type": "Bus",
+        "path": "\\Master-Mixer Hierarchy\\Default Work Unit\\Master Audio Bus\\Environmental\\SFX\\Guns"
+      }
     }
   },
   "program_objects": {
@@ -8226,5 +8280,6 @@
         "current_selected_AST_sha256": "b37c5c1c9ade73a88230ee2b088659cc99f74f42387b05a739d7345f035574b6"
       }
     }
-  }
+  },
+  "meter_support_sha256": "cc0b702a4ea40a1aada871256a78a0c8d33708cce3fe521a29c5c31c69a332a9"
 }

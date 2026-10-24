@@ -15,7 +15,7 @@ PREFIX='ak.wwise.core.profiler.'
 METER_URIS=frozenset(PREFIX+n for n in ('registerMeter','unregisterMeter'))
 URIS=METER_URIS|{PREFIX+n for n in ('saveCapture','moveCursor','setCursorTime')}
 SUPPORT='tests/fixtures/runtime-owned-controls/support-review.json'
-SUPPORT_SHA='ca33fb91252bd198d83e363f070b8ebc0219902df6b78018864061d0adcdb86f'
+SUPPORT_SHA='3baf25bc05531e013c03c7523986461bd79220929e77d8ea97ec67c42c98f198'
 CONTRACT='waapi-skill.retained-owned-control-assessment/v1'
 
 
@@ -25,6 +25,9 @@ def review(root=audit.ROOT):
     if (len(expected)!=298 or data['entries']!=expected or data['policy_sha256']!=remaining.POLICY_SHA
             or data['cursor_support_sha256']!=cursor.SUPPORT_SHA or len(data['meter_normalized_inputs'])!=64):
         raise ValueError('Exact298 owned controls/source policy differs')
+    if 'meter_support_sha256'in data:
+        from tests.support import meter_runtime_read_evidence as meter
+        if data['meter_support_sha256']!=meter.SUPPORT_SHA:raise ValueError('Exact shared meter original provider differs')
     return data
 
 
@@ -36,8 +39,24 @@ def exact_entry(branch,root=audit.ROOT):
 
 def original_meter(route,base=None,*,root=audit.ROOT):
     p=review(root)['profiles'].get(route)
-    if p is None or p['provider']!='r92':raise ValueError('No exact retained native meter ACK for this route')
-    original=cursor.original_cursor(p['cursor_route'],base,root=root);cp=original['profile'];read=original['read']
+    if p is None or p['provider']not in {'r92','r93'}:raise ValueError('No exact retained native meter ACK for this route')
+    if p['provider']=='r93':
+        if route.rsplit('|',1)[0]!='2024.1|wwise-authoring|2024.1.13.9056|function':raise ValueError('Only exact Authoring2024 registration pair uses R93')
+        from tests.support.meter_runtime_read_evidence import original_profile
+        shared=original_profile('2024.1',base,root=root);d=shared['descriptor'];cp={'node_path':d['node_path'],'version':'2024.1'};read=shared['read']
+        original={'profile':cp,'read':read,'archive':{'artifact':shared['label']+'-original.json.gz','sha256':d['archive_sha256']},
+            'sources':shared['sources'],'archive_source':d['archive_source'],'archive_name':shared['label']+'-original.json.gz',
+            'facts':{'original_candidate':d['candidate'],'original_context':{k:d[k]for k in ('version','host','build')},
+                'original_finalization':'PASS','physical_cleanup_complete':True,'global_pass_transferred':False}}
+        rows=[]
+        for group in shared['node']['artifacts'].values():
+            for item in group['files']:
+                if item['path'].endswith('-ak_wwise_core_object_get.json'):
+                    raw=json.loads(read(group['path']+'/'+item['path']))
+                    rows.extend(row for row in raw['result'].get('return',[])if row.get('id')==p['object']['id']and all(k in row for k in p['object']))
+        if not rows or any(any(row[k]!=v for k,v in p['object'].items())for row in rows):raise ValueError('R93 actual owned object identity/type/path differs')
+    else:
+        original=cursor.original_cursor(p['cursor_route'],base,root=root);cp=original['profile'];read=original['read']
     node=json.loads(read(cp['node_path']));calls=node['receipts'];chain=[calls[i]for i in p['receipt_indices']]
     preview,shown,confirmed,executed,verified=chain;payload=verified['payload'];native=json.loads(read(p['raw_path']));request=p['request'];uri=route.split('|')[-1]
     if (audit.digest(chain)!=p['receipt_sha256']or runtime.sha(read(p['raw_path']))!=p['raw_sha256']
@@ -58,9 +77,9 @@ def original_meter(route,base=None,*,root=audit.ROOT):
     other=PREFIX+('unregisterMeter'if uri.endswith('.registerMeter')else'registerMeter')
     paired=review(root)['profiles'][route.rsplit('|',1)[0]+'|'+other]
     last=calls[paired['receipt_indices'][-1]]['payload']
-    if paired['cursor_route']!=p['cursor_route']or paired['object']!=p['object']or last['state']!='result_schema_checked'or last['verified']is not False:
+    if paired.get('cursor_route')!=p.get('cursor_route')or paired['provider']!=p['provider']or paired['object']!=p['object']or last['state']!='result_schema_checked'or last['verified']is not False:
         raise ValueError('Same-object balanced native registration pair missing')
-    return {'object':p['object'],'profile':p,'archive':original['archive'],'read':read,
+    return {**{k:original[k]for k in ('sources','archive_source','archive_name')if k in original},'object':p['object'],'profile':p,'archive':original['archive'],'read':read,
         'facts':{**original['facts'],'actual_control':uri,'bound_object':p['object'],'verification':'result_schema_checked',
             'business_state_verified':False,'registration_membership_verified':False,'reference_count_verified':False,'prior_settings_restoration_verified':False}}
 
@@ -578,6 +597,6 @@ def _original_sources(original,root):
 
 
 def _original_transport(original,root):
-    if 'archive_source'in original:return Path(original['archive_source']).name,original['archive_source']
+    if 'archive_source'in original:return original.get('archive_name',Path(original['archive_source']).name),original['archive_source']
     p=cursor.review(root)['profiles'][original['profile']['cursor_route']]
     return 'cursor-'+p['version']+'-'+p['host']+'-original.json.gz',p['archive_source']

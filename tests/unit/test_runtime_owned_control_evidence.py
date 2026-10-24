@@ -357,3 +357,32 @@ def test_retained_move_modes_keep_whole_original_closure():
         {'position':'previous','returned_time_ms':13589,'observed_time_ms':13589}]
     assert original['facts']['original_context']=={'version':'2025.1','host':'wwise-authoring','build':'2025.1.7.9143'}
     assert original['facts']['physical_cleanup_complete']is True and original['facts']['capture_completeness_verified']is False
+
+
+def test_r93_owned_registration_facts_keep_ack_strength():
+    from tests.support.runtime_owned_control_evidence import original_meter
+    for uri in sorted(METER_URIS):
+        original=original_meter('2024.1|wwise-authoring|2024.1.13.9056|function|'+uri)
+        assert original['facts']['business_state_verified']is False
+        assert original['facts']['registration_membership_verified']is False
+        assert original['facts']['original_context']=={'version':'2024.1','host':'wwise-authoring','build':'2024.1.13.9056'}
+
+
+def test_r93_meter_roots_actual_teardown_and_ordinary_consumer(request,tmp_path):
+    from tests.support.runtime_owned_control_evidence import review,write_owned_control_bundle
+    routes=['2024.1|wwise-authoring|2024.1.13.9056|function|'+u for u in sorted(METER_URIS)]
+    inventory=log_inventory(routes,{'/argsSchema','/optionsSchema','/resultSchema','/resultSchema/additionalProperties'})
+    captures=meter_pair(tmp_path/'public','2024.1','wwise-authoring','id',review()['program_objects']['2024.1'])
+    def finalize(phases):
+        paths=[]
+        for i,(receipt,native,context,trace,calls)in enumerate(captures):
+            path=tmp_path/f'r93-{i}.json';runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
+        index=write_owned_control_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='owned-controls-2024.1-meter-');policies=json.loads((index.parent/'requirements.json').read_bytes());bindings,base,_=audit.portable_binding_inputs(index,policies)
+        def evaluate(doc):return completion.evaluate_coverage(audit.ROOT,inventory,doc,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        result=evaluate(bindings);runtime.write_json(tmp_path/'consumer-result.json',result);assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+        baseline={r['id']:r['state']for r in result['obligations']}
+        for route in routes:
+            missing=deepcopy(bindings);missing['bindings'][route+'|/resultSchema']['evidence'].pop('native');checked=evaluate(missing)
+            assert all(r['state']!='verified'for r in checked['obligations']if r['route']==route)
+            assert all(r['state']==baseline[r['id']]for r in checked['obligations']if r['route']!=route)
+    register_exact_evidence_finalizer(request.node,finalize)

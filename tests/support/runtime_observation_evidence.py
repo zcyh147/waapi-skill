@@ -59,6 +59,9 @@ def program_source_context(root=audit.ROOT, *, flow=None):
             'tests/unit/test_runtime_cursor_branch_evidence.py',
             'tests/support/runtime_remaining_evidence.py','tests/support/fixed_runtime_read_evidence.py',
             'tests/unit/test_runtime_log_branch_evidence.py','tests/fixtures/runtime/runtime-remaining-policy-r127.json'))
+    if flow in {'ak.wwise.core.profiler.registerMeter','ak.wwise.core.profiler.unregisterMeter'}:
+        dependencies.extend(('tests/support/meter_runtime_read_evidence.py','tests/fixtures/runtime-meter/support-review.json',
+            'tests/support/extra_runtime_read_evidence.py'))
     if flow in {'ak.wwise.core.profiler.'+n for n in ('enableProfilerData','startCapture','stopCapture')}:
         dependencies.extend(('tests/support/runtime_capture_control_evidence.py',
             'tests/unit/test_runtime_capture_control_evidence.py',
