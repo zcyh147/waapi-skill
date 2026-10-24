@@ -5,6 +5,48 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R119 four older Console playback and Voices observations
+
+Frozen candidate `301a2235f51b1721fb113a1e01311bc59ab67f87` ran
+`test_console_owned_older_transport_profiler_diagnostic` once per version,
+sequentially on owned macOS Console. All four attempts passed:
+
+| Console build | Available setup used | Duration | Fixed capture T (ms) | Public calls |
+| --- | --- | --- | --- | --- |
+| 2021.1.14.8108 | Neither `useOriginals` nor `prepare` exists | 15.25s | 5077 | 80 |
+| 2022.1.19.8584 | `prepare`; `useOriginals` does not exist | 14.69s | 5280 | 88 |
+| 2023.1.19.8928 | `useOriginals` and `prepare` | 15.95s | 6005 | 96 |
+| 2024.1.13.9056 | `useOriginals` and `prepare` | 15.38s | 5781 | 96 |
+
+Each independently reported `playing` and returned one complete, nontruncated
+Voices page for the owned Car GUID and actual transport gameObject, using the
+matching version's 20-field diagnostics view. Absent setup APIs were not
+called or credited. The 2022 lane used the attested common 2025 PCM original
+(SHA-256 `939e2d62dd820cb10ba571d769f7dbc0b5a3f170efaed94014e46df6f1e4038e`)
+with the unchanged 2022 authored source binding; it is not matching-build media
+provenance. The other lanes used their matching installed originals. Every
+selected WAV native path was 221 UTF-16 units (222 including NUL), under the
+matching SDK's 260-unit bound, using short same-`Y:` owned sandbox roots
+`.waapi-skill-state/r119-owned-<year>`.
+
+All four retained source hash/mtime/tree attestations and exact fixture
+readbacks matched; cleanup completed, final sandboxes were deleted by the
+existing lifecycle, and no native processes remained. For 2024, an extra
+post-terminal bare-bind check initially returned errno48 after the fixture's
+final PASS; a later bounded observation found the port free with no native
+processes. Both observations are retained in
+`post-terminal-port-observation.json` and the root review; no native retry or
+regrade occurred. Each capture-log observer received 3 of 8 requested events
+and ended on idle timeout, not event-count completion or a Topic coverage pass.
+
+Evidence roots are `.waapi-skill-state/full-coverage/` plus
+`r119-console-profiler-native-{2021,2022,2023,2024}-r1`, retaining the original
+logs, reports, category evidence and `root-review.json`. These are four narrow
+owned Car playback/Voices observations, not all transport actions, other
+datasets, a broad matrix or Fresh evidence. The existing R118 Console2025
+identity observation was not rerun. Earlier evidence roots remain preserved;
+the subsequent inventory-only successor leaves native-tested source unchanged.
+
 ## 2026-10-24 R117→R118 controlled Console playback and Voices observation
 
 Frozen candidate `6e0fb16a53466ab9dd57ea647fc21fb02c0c22e1` ran the single
