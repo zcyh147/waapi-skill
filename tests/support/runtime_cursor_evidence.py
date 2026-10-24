@@ -200,7 +200,11 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     return 'passed',None
 
 
-def write_cursor_bundle(output,captures,*,inventory):
+def write_cursor_bundle(output,captures,*,inventory,name_prefix=''):
+    versions={r['version']for r in inventory['native_coverage']['routes']if r['uri']==URI}
+    if (not isinstance(name_prefix,str)or name_prefix and (len(versions)!=1
+            or name_prefix!='cursor-'+next(iter(versions))+'-')):
+        raise ValueError('Only the closed matching-version cursor prefix qualifies')
     output=Path(output);output.mkdir(parents=True,exist_ok=False)
     shutil.copyfile(audit.ROOT/SUPPORT,output/'cursor-support-review.json')
     candidate=inventory['native_coverage']['candidate_sha256'];seen=set()
@@ -222,7 +226,7 @@ def write_cursor_bundle(output,captures,*,inventory):
                     if fixed.predicate(branch,fixed.schema_node(branch),v)),None)
                 if hit:mappings.append((branch,chain,hit[0]));break
         if not mappings:continue
-        prefix='cursor-'+str(number)+'-';cp=write(prefix+'capture.json',cap)
+        prefix=(name_prefix or'cursor-')+str(number)+'-';cp=write(prefix+'capture.json',cap)
         program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':cap['source_context']['packaged'],
             'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
             'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':cap['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}

@@ -80,7 +80,7 @@ def test_cursor_paired_hosts_public_teardown_portable_consumer(request,tmp_path,
             runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,
                 native_reads=trace,public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
             paths.append(path)
-        index=write_cursor_bundle(tmp_path/'bundle',paths,inventory=inventory)
+        index=write_cursor_bundle(tmp_path/'bundle',paths,inventory=inventory,name_prefix='cursor-'+version+'-')
         policies=json.loads((index.parent/'requirements.json').read_bytes())
         bindings,base,_=audit.portable_binding_inputs(index,policies)
         def evaluate(document):
@@ -158,4 +158,46 @@ def test_cursor_public_capture_cannot_hide_an_unrelated_native_call(request,tmp_
         cap['public_calls'][0]['native_end']+=1
         bound['evidence']['program']={**runtime.write_json(base/'unrelated-call.json',record),'nodeid':request.node.nodeid}
         assert next(r for r in evaluate(bindings)['obligations']if r['id']==identity)['state']!='verified'
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_cursor_version_prefixes_compose_without_rewriting_original_packets(request,tmp_path):
+    from tests.support.runtime_cursor_evidence import original_cursor,write_cursor_bundle
+    versions=('2021.1','2025.1');routes=[f'{v}|wwise-console|{BUILDS[v]}|function|{URI}'for v in versions]
+    inventory=log_inventory(routes,pointers={'/argsSchema','/resultSchema'});captures=[]
+    for version,route in zip(versions,routes,strict=True):
+        original=original_cursor(route)
+        captures.append(cursor_read(tmp_path/version,version,'wwise-console','capture-latest',original['result']))
+    def finalize(phases):
+        components=[];defaults=[]
+        for number,(version,route,values)in enumerate(zip(versions,routes,captures,strict=True)):
+            receipt,native,context,trace=values;capture=tmp_path/('capture-'+version+'.json')
+            runtime.write_program_receipt(capture,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,
+                native_reads=trace,public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+            selected=log_inventory(route,pointers={'/argsSchema','/resultSchema'})
+            old=write_cursor_bundle(tmp_path/('default-'+version),[capture],inventory=selected)
+            defaults.append((old,json.loads((old.parent/'requirements.json').read_bytes())))
+            index=write_cursor_bundle(tmp_path/('named-'+version),[capture],inventory=selected,name_prefix='cursor-'+version+'-')
+            components.append((index,json.loads((index.parent/'requirements.json').read_bytes())))
+        # Historical defaults stay unchanged; their duplicate identities cannot
+        # silently overwrite a different version's program or native packet.
+        with pytest.raises(ValueError,match='duplicates an entry identity|common-base path collision'):
+            runtime.write_runtime_composition(tmp_path/'default-collision',defaults)
+        combined,policies=runtime.write_runtime_composition(tmp_path/'combined',components)
+        bindings,base,_=audit.portable_binding_inputs(combined,policies)
+        assert len(bindings['bindings'])==4
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'}
+        for version,route in zip(versions,routes,strict=True):
+            original=original_cursor(route);name='cursor-'+version+'-wwise-console-original.json.gz'
+            assert (base/name).read_bytes()==(audit.ROOT/original['profile']['archive_source']).read_bytes()
+        with pytest.raises(ValueError,match='duplicates an exact branch'):
+            runtime.write_runtime_composition(tmp_path/'duplicate',[*components,components[0]])
+        for prefix in ('../escape-','foreign-','cursor-2024.1-'):
+            target=tmp_path/('reject-'+str(len(prefix)))
+            with pytest.raises(ValueError,match='prefix'):
+                write_cursor_bundle(target,[tmp_path/'capture-2021.1.json'],
+                    inventory=log_inventory(routes[0],pointers={'/argsSchema','/resultSchema'}),name_prefix=prefix)
+            assert not target.exists()
     register_exact_evidence_finalizer(request.node,finalize)
