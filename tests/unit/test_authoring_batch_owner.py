@@ -30,7 +30,16 @@ def _fakes(monkeypatch, tmp_path):
             self.kwargs = kwargs
         def start(self):
             events.append(('start', None))
-            self.kwargs['prelaunch_hook'](None, None, None)
+            # Mirror the lifecycle's prelaunch file scope without copying a real
+            # SampleProject or crossing the native launch boundary.
+            owned = self.kwargs['scenario_root'] / 'owned'
+            sandbox = SimpleNamespace(
+                sandbox_path=owned / 'sandbox-root/sample-project',
+                source_root=tmp_path / 'source-project')
+            assets, io_root = owned / 'assets', owned / 'io'
+            for path in (sandbox.sandbox_path, sandbox.source_root, assets, io_root):
+                path.mkdir(parents=True)
+            self.kwargs['prelaunch_hook'](sandbox, assets, io_root)
         def finish(self, status, **kwargs):
             events.append(('finish', status))
             self._finished = True
@@ -206,7 +215,11 @@ def test_windows_owned_driver_has_an_explicit_unfinished_boundary_before_dispatc
 
 @pytest.mark.parametrize('version,nodeid', [
     *[(version, nodeid) for version in ('2021.1', '2022.1', '2023.1')
-        for nodeid in authoring_batch.OWNED_AUTHORING_NODEIDS if nodeid != authoring_batch.TRANSPORT_OLDER_NODEID],
+        # The two capture-read families were approved across all five pinned
+        # versions (3f320d53, 20915f87), unlike the later-only capture collectors.
+        for nodeid in authoring_batch.OWNED_AUTHORING_NODEIDS if nodeid not in (
+            authoring_batch.TRANSPORT_OLDER_NODEID,
+            authoring_batch.CAPTURE_READS_NODEID, authoring_batch.CAPTURE_MISSING_NODEID)],
     ('2024.1', authoring_batch.PROFILER_CAPTURE_NODEID),
     ('2024.1', authoring_batch.TRANSPORT_SEMANTICS_NODEID),
     ('2024.1', authoring_batch.TRANSPORT_MIXED_NODEID),
