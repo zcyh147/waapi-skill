@@ -819,7 +819,7 @@ def _positive_from_proof(proof, base, root):
     return original_observation(base,root=root,copied_prefix=artifact[:-len(suffix)])
 
 
-CONSOLE_REVIEW_SHA = '7b8ad9dcbce0eb40da657f0b18de85b1a552ccfd830b1f92a4f508425d5734e3'
+CONSOLE_REVIEW_SHA = '8ed867f9fd61bbb8c97ec7732fe758e3fb62db8aaf6ca4f8af0664c4b502272f'
 CONSOLE_CANDIDATE = '2dc0ee57718f41b2378d8d4415572366de322704'
 CONSOLE_ROUTES = {version: version+'|wwise-console|'+build+'|function|'+URI for version,build in (
     ('2023.1','2023.1.19.8928'),('2024.1','2024.1.13.9056'),('2025.1','2025.1.7.9143'))}

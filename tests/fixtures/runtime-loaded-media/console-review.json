@@ -3587,12 +3587,12 @@
         }
       },
       "documents": {
-        "console-2025.1-api.html": {
+        "composite-console-2025.1-api.html": {
           "chm": "/Applications/Audiokinetic/Wwise2025.1.7.9143/SDK/Help/WwiseSDK-Windows.chm",
           "page": "ak_wwise_core_profiler_getloadedmedia.html",
           "sha256": "e53edc621d24983a37cf13f64b848a90427fb4d7df57fd2ddb6e65ffb1c3f827"
         },
-        "console-2025.1-result.html": {
+        "composite-console-2025.1-result.html": {
           "chm": "/Applications/Audiokinetic/Wwise2025.1.7.9143/SDK/Help/WwiseSDK-Windows.chm",
           "page": "ak_wwise_core_profiler_getloadedmedia_result_schema.html",
           "sha256": "1d51b5b859afc6f50bedf118c82ee62f7a136859d8ca4c0357c812a0743acf28"
