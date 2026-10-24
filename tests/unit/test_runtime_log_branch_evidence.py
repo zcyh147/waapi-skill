@@ -21,17 +21,20 @@ ROW = {'severity':'Message','message':'WAAPI owned Console addition 2c3d53909345
 def log_inventory(route=ROUTE, pointers=None):
     stored = json.loads((audit.ROOT/'docs/branch-coverage-inventory.json').read_bytes())
     packed = json.loads(gzip.decompress((audit.ROOT/'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
-    native_route, = [r for r in stored['native_coverage']['routes'] if r['id'] == route]
-    obligations = []
+    route_ids={route}if isinstance(route,str)else set(route)
+    native_routes=[r for r in stored['native_coverage']['routes']if r['id']in route_ids]
+    assert {r['id']for r in native_routes}==route_ids
+    obligations=[]
     for encoded in packed['rows']:
-        if encoded.get('route') is None or packed['routes'][encoded['route']] != route:
-            continue
-        row = dict(encoded); row.update(packed['contexts'][row.pop('context')])
-        row.update(route=route,id=route+'|'+row['pointer'],shape_sha256=packed['shapes'][row.pop('shape')])
-        if pointers is None or row['pointer'] in pointers: obligations.append(row)
-    return {'routes':[r for r in stored['routes'] if r['id']==native_route['public_route']],
+        if encoded.get('route')is None or packed['routes'][encoded['route']]not in route_ids:continue
+        native_route=packed['routes'][encoded['route']]
+        row=dict(encoded);row.update(packed['contexts'][row.pop('context')])
+        row.update(route=native_route,id=native_route+'|'+row['pointer'],shape_sha256=packed['shapes'][row.pop('shape')])
+        if pointers is None or row['pointer']in pointers:obligations.append(row)
+    return {'routes':[r for r in stored['routes']if r['id']in {n['public_route']for n in native_routes}],
         'native_coverage':{'candidate_sha256':'f'*64,'catalogs':stored['native_coverage']['catalogs'],
-                          'routes':[native_route],'obligations':obligations}}
+            'routes':native_routes,'obligations':obligations}}
+
 
 
 def public_log_read(path, rows, *, version='2025.1', console=True, channel='general'):
@@ -116,6 +119,8 @@ def test_remaining_policy_is_exact_and_history_is_immutable():
                 'route':route,'native_shape_sha256':packed['shapes'][encoded['shape']]}
     assert len(original)==10977 and len({r['route']for r in original.values()})==169
     assert sum(e['categories']==['program','native']for e in reviewed['entries'].values())==169
+    assert len(reviewed['normalized_input_choices'])==24
+    assert {r['public_form']for r in reviewed['normalized_input_choices'].values()}=={'omitted','explicit-default'}
     assert sum(not e['pointer'].startswith('/resultSchema')for e in reviewed['entries'].values())==3003
     assert {p for p in original}==set(reviewed['entries'])
     published=json.loads((audit.ROOT/'docs/branch-coverage-requirements.json').read_bytes())['branches']
@@ -233,8 +238,10 @@ def public_log_control(path,uri,*,version='2025.1',console=False,channel='genera
         calls.append({'gateway':receipt,'native_start':start,'native_end':len(trace)})
         return payload
     started=invoke(['draft-start',uri]);draft=started['draft']['draft_id'];authority=started['task_authority']
-    declaration=['--log-channel',channel]
-    if uri.endswith('.addItem'):declaration+=['--message',message,'--severity',severity]
+    declaration=['--log-channel',channel]if channel is not None else[]
+    if uri.endswith('.addItem'):
+        declaration+=['--message',message]
+        if severity is not None:declaration+=['--severity',severity]
     current=invoke(['draft-declare-runtime-control-plan',draft,'--task-authority',authority,'--expected-revision',str(started['draft']['revision']),*declaration])
     current=invoke(['draft-check',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision'])])
     preview=invoke(['preview-from-draft',draft,'--task-authority',authority,'--expected-revision',str(current['draft']['revision'])])
@@ -243,7 +250,7 @@ def public_log_control(path,uri,*,version='2025.1',console=False,channel='genera
     native,=[x for x in trace if x['uri']==uri]
     assert verified['agent_result']['request']['arguments']=={'api':uri,'args':native['args'],'options':native['options']}
     assert verified['agent_result']['result']==native['result']
-    assert verified['verified']is True,verified
+    assert verified['verified']is (not console or version=='2025.1'),verified
     return calls[-1]['gateway'],{k:native[k]for k in ('uri','args','options','result')},context,trace,calls
 
 
@@ -252,8 +259,11 @@ def public_log_control(path,uri,*,version='2025.1',console=False,channel='genera
 def test_log_control_public_transaction_evidence(request,tmp_path,operation,console):
     uri='ak.wwise.core.log.'+operation
     route='2025.1|'+('wwise-console'if console else'wwise-authoring')+'|2025.1.7.9143|function|'+uri
-    inventory=log_inventory(route,pointers={'/argsSchema','/optionsSchema','/resultSchema'})
-    receipt,native,context,trace,calls=public_log_control(tmp_path/'public',uri,console=console,message=ROW['message'])
+    pointers={'/argsSchema','/optionsSchema','/resultSchema'}
+    if operation=='addItem':pointers|={'/argsSchema/properties/channel/@presence/absent','/argsSchema/properties/severity/@presence/absent'}
+    inventory=log_inventory(route,pointers=pointers)
+    receipt,native,context,trace,calls=public_log_control(tmp_path/'public',uri,console=console,message=ROW['message'],
+        channel=None if operation=='addItem'else'general',severity=None)
     def finalize(phases):
         from tests.support.runtime_remaining_evidence import write_log_bundle
         path=tmp_path/'capture.json'
@@ -268,4 +278,153 @@ def test_log_control_public_transaction_evidence(request,tmp_path,operation,cons
             damaged=deepcopy(bindings);damaged['bindings'][route+'|/resultSchema']['evidence'].pop('native')
             rejected=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
             assert all(r['state']!='verified'for r in rejected['obligations'])
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_retained_authoring_log_gate_through_ordinary_consumer(request,tmp_path):
+    from tests.support.runtime_log_retained_evidence import program_native_call
+    route='2023.1|wwise-authoring|2023.1.19.8928|function|'+GET
+    inventory=log_inventory(route,pointers={'/argsSchema','/optionsSchema','/resultSchema'})
+    original=program_native_call(route+'|/resultSchema')
+    receipt,native,context,trace=public_log_read(tmp_path/'public',original['result']['items'],version='2023.1',console=False)
+    assert native==original
+    def finalize(phases):
+        from tests.support.runtime_remaining_evidence import write_log_bundle
+        path=tmp_path/'capture.json';pages=receipt.pop('public_pages')
+        runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,
+            public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)},*[{'gateway':p,'native_start':len(trace),'native_end':len(trace)}for p in pages]])
+        index=write_log_bundle(tmp_path/'bundle',[path],inventory=inventory);policies=json.loads((index.parent/'requirements.json').read_bytes())
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+@pytest.mark.parametrize('version,console',[
+    pytest.param(v,c,id=('console-'if c else'authoring-')+v)
+    for c in (True,False)for v in ('2021.1','2022.1','2023.1','2024.1','2025.1')if not(c and v=='2025.1')])
+def test_retained_log_gate_relationships_by_version(request,tmp_path,version,console):
+    from tests.support import runtime_log_retained_evidence as retained
+    host='wwise-console'if console else'wwise-authoring'
+    profiles={identity:p for identity,p in retained.review()['profiles'].items()
+        if p['target_route'].split('|')[:2]==[version,host]}
+    assert profiles  # Original R122 has separate actual public causal tests.
+    inventory=log_inventory([p['target_route']for p in profiles.values()],pointers={'/argsSchema','/optionsSchema','/resultSchema'})
+    captures=[]
+    for i,identity in enumerate(profiles):
+        actual=retained.program_native_call(identity);uri=actual['uri']
+        if uri==GET:
+            receipt,native,context,trace=public_log_read(tmp_path/str(i),actual['result']['items'],version=version,console=console)
+            pages=receipt.pop('public_pages');calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)},
+                *[{'gateway':p,'native_start':len(trace),'native_end':len(trace)}for p in pages]]
+        else:
+            receipt,native,context,trace,calls=public_log_control(tmp_path/str(i),uri,version=version,console=console,
+                message=actual['args'].get('message','unused'))
+        assert native==actual
+        captures.append((receipt,native,context,trace,calls))
+    def finalize(phases):
+        from tests.support.runtime_remaining_evidence import write_log_bundle
+        paths=[]
+        for i,(receipt,native,context,trace,calls)in enumerate(captures):
+            path=tmp_path/f'capture-{i}.json';runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,
+                source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
+        index=write_log_bundle(tmp_path/'bundle',paths,inventory=inventory);policies=json.loads((index.parent/'requirements.json').read_bytes())
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+        for identity in profiles:
+            damaged=deepcopy(bindings);damaged['bindings'][identity]['evidence'].pop('native')
+            missing=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
+            assert all(r['state']!='verified'for r in missing['obligations']if r['route']==identity.rsplit('|',1)[0])
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+@pytest.mark.parametrize('version',['2023.1','2024.1','2025.1'])
+@pytest.mark.parametrize('console',[True,False],ids=['console','authoring'])
+@pytest.mark.parametrize('operation',['addItem','clear'])
+def test_log_control_all_public_input_branches(request,tmp_path,version,console,operation):
+    from tests.support import runtime_log_retained_evidence as retained
+    uri='ak.wwise.core.log.'+operation
+    build={'2023.1':'2023.1.19.8928','2024.1':'2024.1.13.9056','2025.1':'2025.1.7.9143'}[version]
+    route=f"{version}|{'wwise-console'if console else'wwise-authoring'}|{build}|function|{uri}"
+    inventory=log_inventory(route)
+    invalid=[b for b in inventory['native_coverage']['obligations']if b['pointer'].endswith('/logCentralSeverity/@empty/string')]
+    assert len(invalid)==(1 if version=='2025.1'and operation=='addItem'else 0)
+    inventory['native_coverage']['obligations']=[b for b in inventory['native_coverage']['obligations']if b not in invalid]
+    identity=route+'|/resultSchema'
+    if console and version=='2025.1':message=ROW['message']
+    elif identity in retained.review()['profiles']:
+        message=retained.program_native_call(identity)['args'].get('message','unused')
+    else:
+        assert console and operation=='clear'and version in {'2023.1','2024.1'}
+        message='unused'  # Two actual same-target native ACK gates remain missing.
+    captures=[public_log_control(tmp_path/'actual-replay',uri,version=version,console=console,message=message,
+        channel=None if operation=='addItem'else'general',severity=None)]
+    channels=['general','soundbank-generation','audio-conversion','platform-settings-copy','waapi','project-load','source-control','lua']
+    severities=['message','warning','error','fatal']
+    captures.extend(public_log_control(tmp_path/str(i),uri,version=version,console=console,channel=channel,
+        severity=severities[i%4],message='输入 '+channel+'\n$HOME')for i,channel in enumerate(channels))
+    if operation=='addItem':
+        captures.append(public_log_control(tmp_path/'empty-message',uri,version=version,console=console,message=''))
+        captures.append(public_log_control(tmp_path/'exact-whitespace',uri,version=version,console=console,message=' \tLog\n '))
+    assert len(captures)<12
+    def finalize(phases):
+        from tests.support.runtime_remaining_evidence import write_log_bundle
+        paths=[]
+        for i,(receipt,native,context,trace,calls)in enumerate(captures):
+            path=tmp_path/f'capture-{i}.json';runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,
+                source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
+        index=write_log_bundle(tmp_path/'bundle',paths,inventory=inventory);policies=json.loads((index.parent/'requirements.json').read_bytes())
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        if console and version!='2025.1'and operation=='clear':
+            assert all(r['state']!='verified'for r in result['obligations'])
+            assert all(r['evidence_results']['program']['outcome']=='passed'for r in result['obligations'])
+        else:
+            assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_clear_requires_explicit_public_channel_even_native_default_known(tmp_path):
+    env=_env(tmp_path)
+    client=_LogControlClient(tmp_path)
+    def offline(_):return client
+    code,started=gateway.execute_gateway(['--state-dir',str(tmp_path/'state'),'draft-start','ak.wwise.core.log.clear'],env=env,client_factory=offline)
+    assert code==0,started
+    code,rejected=gateway.execute_gateway(['--state-dir',str(tmp_path/'state'),'draft-declare-runtime-control-plan',started['draft']['draft_id'],
+        '--task-authority',started['task_authority'],'--expected-revision',str(started['draft']['revision'])],env=env,client_factory=offline)
+    assert code==2,rejected
+    assert rejected['ok']is False
+    assert 'log_channel'in json.dumps(rejected)
+    assert not any(uri=='ak.wwise.core.log.clear'for uri,_,_ in client.calls)
+
+
+def test_log_nested_open_objects_preserve_every_opaque_value(request,tmp_path):
+    inventory=log_inventory()
+    branches=[b for b in inventory['native_coverage']['obligations']if b['pointer']=='/resultSchema'or
+        b['pointer'].endswith(('/objectReturn/additionalProperties','/anyOf/6/additionalProperties','/anyOf/7/items/additionalProperties'))or
+        b['pointer']in {'/resultSchema/properties/items/items/$ref','/resultSchema/@definition/waapi_definitions.json/definitions/logCentralItem/properties/platform/$ref'}]
+    assert len(branches)==6
+    inventory['native_coverage']['obligations']=branches
+    opaque={'/key~':'值','array':[None,False,True,3.5,{'deep':['opaque']}],'empty':{}}
+    reference={'id':'{11111111-1111-1111-1111-111111111111}','name':'reference','/opaque~field':opaque}
+    platform={'id':'{22222222-2222-2222-2222-222222222222}','name':'platform',
+        '@Evidence':deepcopy(reference),'@@EvidenceList':[deepcopy(reference)],'/opaque~field':deepcopy(opaque)}
+    row={**ROW,'platform':platform}
+    captures=[public_log_read(tmp_path/'actual-replay',[ROW]),public_log_read(tmp_path/'opaque',[row])]
+    def finalize(phases):
+        from tests.support.runtime_remaining_evidence import write_log_bundle
+        paths=[]
+        for i,(receipt,native,context,trace)in enumerate(captures):
+            path=tmp_path/f'capture-{i}.json';pages=receipt.pop('public_pages')
+            runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,
+                public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)},*[{'gateway':p,'native_start':len(trace),'native_end':len(trace)}for p in pages]])
+            paths.append(path)
+        index=write_log_bundle(tmp_path/'bundle',paths,inventory=inventory);policies=json.loads((index.parent/'requirements.json').read_bytes())
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
     register_exact_evidence_finalizer(request.node,finalize)

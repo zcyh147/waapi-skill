@@ -252389,5 +252389,223 @@
         "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.transport.useOriginals|/resultSchema"
       ]
     }
+  },
+  "normalized_input_choices": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.log.addItem|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/channel",
+      "schema_sha256": "efdc2bd41c658770246bb41db394809893127cd665efb41434c50dd7f2efc47b",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.log.addItem|/argsSchema/properties/severity/@presence/absent": {
+      "public_flag": "--severity",
+      "native_default": "Message",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/severity",
+      "schema_sha256": "030404c3178cab29e7019ec960e655a4b5aa10e0bc567b9d5c161b7da4fd7b2d",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.addItem|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/channel",
+      "schema_sha256": "efdc2bd41c658770246bb41db394809893127cd665efb41434c50dd7f2efc47b",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.addItem|/argsSchema/properties/severity/@presence/absent": {
+      "public_flag": "--severity",
+      "native_default": "Message",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/severity",
+      "schema_sha256": "030404c3178cab29e7019ec960e655a4b5aa10e0bc567b9d5c161b7da4fd7b2d",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.log.addItem|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/channel",
+      "schema_sha256": "476f972635674e21ab6b28cce4f705ded39848a66c6ac10f5a99d992ac2d36a8",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.log.addItem|/argsSchema/properties/severity/@presence/absent": {
+      "public_flag": "--severity",
+      "native_default": "Message",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/severity",
+      "schema_sha256": "39d7ec1187340b1013a67dea3f68c851574719fc3c80c863f9eaf77dde5a28be",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.log.addItem|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/channel",
+      "schema_sha256": "476f972635674e21ab6b28cce4f705ded39848a66c6ac10f5a99d992ac2d36a8",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.log.addItem|/argsSchema/properties/severity/@presence/absent": {
+      "public_flag": "--severity",
+      "native_default": "Message",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/severity",
+      "schema_sha256": "39d7ec1187340b1013a67dea3f68c851574719fc3c80c863f9eaf77dde5a28be",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/channel",
+      "schema_sha256": "476f972635674e21ab6b28cce4f705ded39848a66c6ac10f5a99d992ac2d36a8",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/properties/severity/@presence/absent": {
+      "public_flag": "--severity",
+      "native_default": "Message",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/severity",
+      "schema_sha256": "39d7ec1187340b1013a67dea3f68c851574719fc3c80c863f9eaf77dde5a28be",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/channel",
+      "schema_sha256": "476f972635674e21ab6b28cce4f705ded39848a66c6ac10f5a99d992ac2d36a8",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/properties/severity/@presence/absent": {
+      "public_flag": "--severity",
+      "native_default": "Message",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.addItem/argsSchema/properties/severity",
+      "schema_sha256": "39d7ec1187340b1013a67dea3f68c851574719fc3c80c863f9eaf77dde5a28be",
+      "reason": "Actual omitted public choice compiles documented default explicitly; no native field-absence claim",
+      "public_form": "omitted"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "078aa43c159d2486cc6808cc0872856b50acfd32723f4c1e55b4c975a5cde71a",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "078aa43c159d2486cc6808cc0872856b50acfd32723f4c1e55b4c975a5cde71a",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "078aa43c159d2486cc6808cc0872856b50acfd32723f4c1e55b4c975a5cde71a",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2023.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "078aa43c159d2486cc6808cc0872856b50acfd32723f4c1e55b4c975a5cde71a",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2024.1|wwise-console|2024.1.13.9056|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2024.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-authoring.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/@empty/object": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    },
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.clear|/argsSchema/properties/channel/@presence/absent": {
+      "public_flag": "--log-channel",
+      "native_default": "general",
+      "source": "skills/waapi-skill/resources/native-catalog/2025.1/wwise-console.json",
+      "pointer": "/schemas/ak.wwise.core.log.clear/argsSchema/properties/channel",
+      "schema_sha256": "e2e8a97ef62ea8634f4e4d53cd075850c151c5c0878005d3926238b4bf7cc9e8",
+      "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
+      "public_form": "explicit-default"
+    }
   }
 }

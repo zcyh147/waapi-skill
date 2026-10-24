@@ -173,7 +173,8 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/fixtures/runtime/runtime-risk-policy-r124.json',
                  'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
                  'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
-                 'tests/support/runtime_remaining_evidence.py',
+                 'tests/support/runtime_remaining_evidence.py', 'tests/support/runtime_log_retained_evidence.py',
+        'tests/fixtures/runtime-log/retained-log-support.json',
                  'tests/fixtures/runtime-log/r122-support.json',
                  'tests/unit/test_runtime_log_branch_evidence.py',
                  'tests/support/qualified_runtime_read_evidence.py',
@@ -1406,7 +1407,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         normalized_construction = None
         from tests.support.runtime_remaining_evidence import selected as remaining_selected, validate_evidence as validate_remaining
         if remaining_selected(branch['id'], root):
-            validate_remaining(record,binding or {},branch,category,base,root,reference_edges)
+            normalized_construction=validate_remaining(record,binding or {},branch,category,base,root,reference_edges)
         if category == 'program':
             from wwise_waapi.runtime_inspection_business_contracts import PROFILER_GET_RTPS_URI
             # The source-owned exact read route determines capture eligibility;

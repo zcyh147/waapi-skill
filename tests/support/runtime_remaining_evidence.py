@@ -16,7 +16,7 @@ from tests.support import runtime_observation_evidence as runtime
 from tests.support import fixed_runtime_read_evidence as fixed
 
 POLICY = 'tests/fixtures/runtime/runtime-remaining-policy-r127.json'
-POLICY_SHA = '1e32ccb5f3aaf51dcb84121278e2bea0100c7db02eaeed98b0cbacb531a0eedb'
+POLICY_SHA = 'a73a443ff450aa42cae6bc7cdf75daae6eaaddd7ead91322767dbd638ec5d140'
 FIXTURE = 'tests/fixtures/runtime-log'
 SUPPORT_SHA = '414768e5c6db8efd936f74e8367640a9c87f609ca755d27d9b96714b17bf1d18'
 LOG_GET = 'ak.wwise.core.log.get'
@@ -286,6 +286,10 @@ def _validate_control_capture(captured_json,root):
         raise ValueError('Log effect read changed selected channel')
     if observed['channel']!=expected['channel']or observed['exclusive_causation_verified']is not False or observed['continuing_channel_state_verified']is not False:
         raise ValueError('Log effect must retain channel and concurrency limits')
+    mode=('console_log_unobservable'if context['host']=='wwise-console'and version!='2025.1'else
+        'matching_item_event'if context['host']=='wwise-console'and native['uri'].endswith('.addItem')else
+        'new_matching_item'if native['uri'].endswith('.addItem')else'prior_contents_absent')
+    if observed['outcome']!=mode:raise ValueError('Exact host/version log business verification mode differs')
     if observed['outcome']=='new_matching_item':
         before,after=reads[-2]['items'],reads[-1]['items'];matches=lambda row:row['message']==expected['message']and row['severity']==expected['severity']
         old,new=sum(map(matches,before)),sum(map(matches,after))
@@ -323,8 +327,21 @@ def _occurrence_value(record,pointer,branch):
         raise
 
 
+def _code_bindings(branch):
+    uri=branch['route'].split('|')[-1];reading=uri==LOG_GET
+    construction='materialize_runtime_inspection_business_request'if reading else'materialize_runtime_control_business_request'
+    verifier=('skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result'if reading else
+        'skills/waapi-skill/wwise_waapi/runtime_log_observer.py#event_observation'if branch['route'].split('|')[:2]==['2025.1','wwise-console']and uri.endswith('.addItem')else
+        'skills/waapi-skill/wwise_waapi/runtime_log_effects.py#compare_channel')
+    validation='validate_resolved_semantic_result'if branch['pointer'].startswith('/resultSchema')else'validate_semantic_payload'
+    return {key:{'source':source,'selector':branch['pointer']}for key,source in (
+        ('construction','skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#'+construction),
+        ('validation','skills/waapi-skill/wwise_waapi/builders/schema.py#'+validation),('verifier',verifier))}
+
+
 def validate_program(record,binding,branch,root,edges=None):
     exact_entry(branch,root);uri=branch['route'].split('|')[-1]
+    if any(binding.get(k)!=v for k,v in _code_bindings(branch).items()):raise ValueError('Exact log compiler/validator/business verifier binding differs')
     if uri not in LOG_URIS:raise ValueError('Remaining runtime family public mapper is not implemented yet')
     captured=record.get('runtime_read_program',{});gateway=record['gateway'];native=record['native_call']
     if (captured.get('source_context')!=_current_context(root,uri,captured.get('source_context',{}))
@@ -337,6 +354,11 @@ def validate_program(record,binding,branch,root,edges=None):
         raise ValueError('Log exact public/native host/version/build differs')
     pointer=binding.get('program_observation_pointer',binding['observation_pointer'])
     completion.exact_observation_pointer(branch,{**binding,'observation_pointer':pointer},'/native_call',branch['pointer'].split('/')[1].removesuffix('Schema'),edges or {})
+    normalized=binding.get('normalized_input_choice')
+    if normalized is not None:
+        if normalized!=_normalized_log_input(branch,captured)or pointer!=normalized['native_pointer']:
+            raise ValueError('Only exact actual public omission/native default normalization qualifies')
+        return {'observation_pointer':pointer}
     value=_occurrence_value(record,pointer,branch)
     if not _log_predicate(branch,_log_node(branch,root),value,root):
         raise ValueError('Exact log branch occurrence failed its pinned predicate')
@@ -469,10 +491,35 @@ def _log_occurrences(record,tokens,prefix=''):
         elif not rest:yield prefix+'/'+token,runtime._CONTRIBUTION_ABSENT
 
 
+def _normalized_log_input(branch,captured):
+    """Exact public choices normalize documented defaults, without wire-absence claims."""
+    uri=branch['route'].split('|')[-1]
+    if uri not in LOG_URIS-{LOG_GET}:return None
+    source=review()['normalized_input_choices'].get(branch['id'])
+    if source is None:return None
+    flag,default=source['public_flag'],source['native_default']
+    field='severity'if flag=='--severity'else'channel'
+    version,host,_,_,_=branch['route'].split('|');schema=_log_catalog(audit.ROOT,version,host)['schemas'][uri]['argsSchema']['properties'][field]
+    if audit.digest(schema)!=source['schema_sha256']or "Default is '"+default+"'"not in schema['description']:
+        raise ValueError('Exact matching native default semantics differ')
+    declaration=captured['public_calls'][1]['gateway']['argv']
+    form=source['public_form']
+    valid=(flag not in declaration if form=='omitted'else flag in declaration and declaration[declaration.index(flag)+1]=='general')
+    if valid and captured['native_call']['args'].get(field)==default:
+        return {'public_flag':flag,'public_form':form,'native_default':default,
+            'native_pointer':'/native_call/args'if branch['pointer']=='/argsSchema/@empty/object'else'/native_call/args/'+field}
+    return None
+
+
 def _log_mappings(inventory,captured,route):
     branches=[b for b in inventory['native_coverage']['obligations']if b['route']==route['id']]
     edges={b['id']:b for b in branches if b['kind']=='reference'};found=[]
     for branch in branches:
+        normalized=_normalized_log_input(branch,captured)
+        if normalized:
+            found.append({'branch':branch,'program_pointer':normalized['native_pointer'],'reference_chain':[],
+                'normalized_input_choice':normalized})
+            continue
         node=_log_node(branch,audit.ROOT)
         for chain in runtime._contribution_chains(branch,edges):
             hit=next(((p,v)for p,v in _log_occurrences(captured,runtime._contribution_pattern(branch,chain,edges))
@@ -496,7 +543,9 @@ def write_log_bundle(output,captures,*,inventory):
     seen=set()
     for number,path in enumerate(captures):
         captured=json.loads(Path(path).read_bytes());native=captured['native_call'];gateway=captured['gateway']
-        route,=[x for x in inventory['native_coverage']['routes']if x['uri']==native['uri']]
+        info=next(x['result']for x in captured['native_reads']if x['uri']=='ak.wwise.core.getInfo')
+        context=completion.native_host_context(info,'isCommandLine')
+        route,=[x for x in inventory['native_coverage']['routes']if x['uri']==native['uri']and all(x[k]==v for k,v in context.items())]
         public,=[x for x in inventory['routes']if x['id']==route['public_route']]
         mappings=_log_mappings(inventory,captured,route)
         mappings=[x for x in mappings if x['branch']['id']not in seen]
@@ -510,16 +559,14 @@ def write_log_bundle(output,captures,*,inventory):
             branch=m['branch'];identity=branch['id'];entry=exact_entry(branch);pointer=m['program_pointer']
             pp='/gateway/payload/agent_result'
             assertion={'native_shape_sha256':branch['shape_sha256'],'native_route':route['id']}
-            check=({'pointer':pointer,'absent':True} if branch['kind']=='optional_presence'and branch['value']=='absent' else
+            check=({'pointer':pointer,'absent':True} if branch['kind']=='optional_presence'and branch['value']=='absent'and not m.get('normalized_input_choice') else
                 {'pointer':pointer,'cardinality':branch['value']}if branch['kind']=='collection_cardinality'else{'pointer':pointer,'equals':completion.pointer_value(program,pointer)})
             program['branch_assertions'][identity]={**assertion,'checks':[check,{'pointer':pp,'equals':completion.pointer_value(program,pp)}]}
             binding={'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'public_route':public['id'],'public_route_sha256':audit.digest(public),
+                **({'normalized_input_choice':m['normalized_input_choice']}if m.get('normalized_input_choice')else{}),
                 'input':{'gateway_argv':gateway['argv'],'selector':pointer},'dispatch_pointer':'/native_call','observation_pointer':pointer,'gateway_observation_pointer':pp,
                 'reference_chain':m['reference_chain'],'relevant_sources':sorted(captured['source_context']['packaged']),'evidence':{},
-                **{key:{'source':source,'selector':branch['pointer']}for key,source in (
-                ('construction','skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request'),
-                ('validation','skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result'),
-                ('verifier','skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result'))}}
+                **_code_bindings(branch)}
             validate_program(program,binding,branch,audit.ROOT,{b['id']:b for b in inventory['native_coverage']['obligations']if b['kind']=='reference'})
             bindings['bindings'][identity]=binding;policies['branches'][identity]=policy(entry);seen.add(identity)
             if entry['role']=='native_business_anchor'and route['id']in {R122_ROUTE+uri for uri in LOG_URIS}:
@@ -545,6 +592,9 @@ def write_log_bundle(output,captures,*,inventory):
                     'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),'reviewed_reason':'Exact retained R122 log business facts/current full public replay; only reviewed existing Gateway host-bit finish delta; no generic host/version reuse',
                     'sources':original['sources'],'runtime_remaining_source_review':desc('r122-support.json')})
                 index['runtime_observation_attachments'].append(write(prefix+'attachment.json',{'contract':'waapi-skill.runtime-observation-attachment/v1','branch_id':identity,'proof':proof,'evidence':nd,'native_equivalence':eq}))
+            elif entry['role']=='native_business_anchor':
+                from tests.support.runtime_log_retained_evidence import attach_gate
+                attach_gate(output,index,candidate,branch,binding,cp,prefix)
         pd={**write(prefix+'program.json',program),'nodeid':captured['nodeid']}
         for binding in bindings['bindings'].values():binding['evidence']['program']=pd
         bd=write(prefix+'bindings.json',bindings);rd=write(prefix+'requirements.json',policies)

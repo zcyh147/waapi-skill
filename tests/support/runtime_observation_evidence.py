@@ -44,6 +44,8 @@ def program_source_context(root=audit.ROOT, *, flow=None):
         'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py']
     if flow in {'ak.wwise.core.log.' + name for name in ('get','addItem','clear')}:
         dependencies.extend(('tests/support/runtime_remaining_evidence.py',
+            'tests/support/runtime_log_retained_evidence.py',
+            'tests/fixtures/runtime-log/retained-log-support.json',
             'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
             'tests/fixtures/runtime-log/r122-support.json',
             'tests/unit/test_runtime_log_branch_evidence.py'))
