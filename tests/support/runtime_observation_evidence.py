@@ -26,7 +26,7 @@ def write_json(path, value):
     return {'artifact': path.name, 'sha256': sha(path.read_bytes())}
 
 
-def program_source_context(root=audit.ROOT):
+def program_source_context(root=audit.ROOT, *, flow=None):
     import subprocess
     names = subprocess.check_output(['git', 'ls-files', '--', 'skills/waapi-skill'],
         cwd=root, text=True).splitlines()
@@ -36,22 +36,25 @@ def program_source_context(root=audit.ROOT):
         'tests/unit/test_runtime_business_gateway.py', 'tests/support/gateway_config.py',
         'tests/support/exact_evidence_finalization.py', 'tests/conftest.py',
         'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py']
+    if flow == 'ak.wwise.core.profiler.getVoiceContributions':
+        dependencies.append('tests/unit/test_contribution_branch_evidence.py')
     return {group: {name: sha((root / name).read_bytes()) for name in sorted(paths)}
             for group, paths in (('packaged', names), ('capture', dependencies))}
 
 
-def write_program_receipt(path, gateway, native_call, *, nodeid, phase_reports, source_context, native_reads=None):
+def write_program_receipt(path, gateway, native_call, *, nodeid, phase_reports, source_context, native_reads=None, public_calls=None):
     if phase_reports != {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}:
         raise ValueError('Runtime program proof requires successful setup/call/teardown')
     if gateway['exit_code'] != 0 or gateway['payload'].get('ok') is not True:
         raise ValueError('Runtime program proof requires successful public Gateway read')
-    if source_context != program_source_context():
+    if source_context != program_source_context(flow=native_call['uri']):
         raise ValueError('Runtime program source changed during public read')
     return write_json(path, {'contract': 'waapi-skill.runtime-read-program/v1',
         'phase_reports': phase_reports, 'nodeid': nodeid,
         'source_context': source_context, 'source_unchanged': True,
         'gateway': gateway, 'native_call': native_call,
-        **({'native_reads': native_reads} if native_reads is not None else {})})
+        **({'native_reads': native_reads} if native_reads is not None else {}),
+        **({'public_calls': public_calls} if public_calls is not None else {})})
 
 
 def archive_reader(descriptor, base):
@@ -305,6 +308,8 @@ def _validate_rtpc_structure(record, binding, branch, root):
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
+    if branch['route'].endswith('|function|ak.wwise.core.profiler.getVoiceContributions'):
+        return validate_contribution_evidence(record, binding, branch, category, base, root, reference_edges or {})
     from wwise_waapi.runtime_inspection_business_contracts import runtime_inspection_business_read_operations
     # This adapter cannot accept mutation, absence, or qualified-failure credit.
     if category not in {'program', 'native'} or branch['route'].split('|')[4] not in runtime_inspection_business_read_operations():
@@ -402,10 +407,15 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
                 or set(binding['evidence']) != {'program'}
                 or captures[identity] != read(proof['program_capture'])):
             raise ValueError('Runtime observation requires exact reviewed program/native policy')
+        observation_hashes = {'capture': proof['capture']['sha256']}
+        if identity.split('|')[4] == 'ak.wwise.core.profiler.getVoiceContributions':
+            raw = proof['mapping']['raw_observation']
+            _portable_descriptor(raw, base)
+            observation_hashes['raw'] = raw['sha256']
         binding.update(runtime_observation_attachment=attachment['proof'],
             program_observation_pointer=proof['mapping']['program_pointer'],
             observation_pointer=proof['mapping']['native_pointer'],
-            native_observations_sha256={'capture': proof['capture']['sha256']},
+            native_observations_sha256=observation_hashes,
             native_equivalence=attachment['native_equivalence'])
         binding['evidence']['native'] = attachment['evidence']
 
@@ -520,7 +530,10 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': '1851ed071402d562a1f64eba386bb600be7c4defbaace1ec8ed1ec49c65fc0ee'},
+        'after': '85b32438fc9395f377af0338e33991edeef11c49a0d4c890f0db8b526f10169f'},
+    'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
+        'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
+        'after': 'db81794ea4f995e5385257cf507540c580f9474cd3848b1714c02c9387398633'},
     'skills/waapi-skill/wwise_waapi/builders/schema.py': {
         'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
         'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
@@ -529,21 +542,22 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility'],
     'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
         'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
-        'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
-        'dispatch_runtime_inspection_business_read'],
+        'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
+        'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload'],
+    'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request', 'normalize_profiler_voice_contributions_result'],
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
         '_validate_resolved_sections', '_runtime_result_reference_schema']}
 RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
     'post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
-    'arrays unchanged through current public Gateway; original finalized PASS retained')
+    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
 
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
-    """Accept only the pinned reviewed three-file delta for original RTPC reads."""
+    """Accept only the pinned reviewed four-file delta for original RTPC reads."""
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
@@ -899,4 +913,712 @@ def write_field_stage(output, captures, originals, *, inventory, guard_replays=N
         index['runtime_observation_attachments'] = attachments
     write_json(output / 'requirements.json', policy)
     write_json(output / 'index.json', index)
+    return output / 'index.json'
+
+
+CONTRIBUTION_URI = 'ak.wwise.core.profiler.getVoiceContributions'
+CONTRIBUTION_PARENT = '/outcomes/profiler-contributions-bus-observation/evidence'
+CONTRIBUTION_CURSOR_TIME = '/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime'
+CONTRIBUTION_CURSOR = '/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor'
+CONTRIBUTION_CURSOR_POINTERS = frozenset((CONTRIBUTION_CURSOR_TIME + '/oneOf/1',
+    CONTRIBUTION_CURSOR_TIME + '/oneOf/1/$ref', CONTRIBUTION_CURSOR,
+    CONTRIBUTION_CURSOR + '/enum/0', CONTRIBUTION_CURSOR + '/enum/1'))
+CONTRIBUTION_ORIGINALS = {
+    '2022.1': {'args': '9abe0fa40c8494ef2f2ad15e6ac6ec52f1dbf0ac893698538a066e092a9129c5',
+        'result': 'b2bee9592e16fb4af107ed33b144d3b239a43992aa314e81e139c698ee622f1d',
+        'projection': '5bf6fcc09670728d193e282b077068db2976171c12f06f98889b1ae523b776e5'},
+    '2025.1': {'args': '6d641abaf0d3b10ebb4d348657e124277746ce703bb845d4e5bb0513d11a58b8',
+        'result': '64ef5da195a57284e0f7ea003ec51485a3120c25f7679dc2e21e07ff7789e355',
+        'projection': '38e500923e7345eb5422f3e749bd8ff4d6c2995ede40557bf3a5f8b7349e178a'},
+}
+
+
+def contribution_public_pointer(pointer):
+    """Only the existing contribution projection renames these native fields."""
+    if pointer == '/native_call/result':
+        return '/gateway/payload/agent_result'
+    parent = '/native_call/result/return'
+    if pointer == parent:
+        return '/gateway/payload/agent_result'
+    if pointer.startswith(parent + '/'):
+        field, _, rest = pointer[len(parent) + 1:].partition('/')
+        field = {'LPF': 'lpf', 'HPF': 'hpf', 'DSF': 'dsf/value'}.get(field, field)
+        return '/gateway/payload/agent_result/' + field + ('/' + rest if rest else '')
+    return pointer.replace('/native_call/', '/gateway/payload/semantic_preview/', 1)
+
+
+def validate_contribution_program(record, binding, branch, root, reference_edges=None):
+    """Validate one exact branch within the dedicated captured public flow."""
+    _validate_contribution_capture(record, binding['input']['gateway_argv'], branch['route'], root)
+    pointer = binding.get('program_observation_pointer') if binding.get('runtime_observation_attachment') else binding['observation_pointer']
+    if binding['gateway_observation_pointer'] != contribution_branch_public_pointer(branch, pointer):
+        raise ValueError('Contribution needs the corresponding exact public projection occurrence')
+    if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS:
+        return _validate_contribution_cursor(record, binding, branch, root, reference_edges or {})
+    _validate_contribution_branch(record, binding, branch, root)
+
+
+def _validate_contribution_cursor(record, binding, branch, root, reference_edges):
+    """Bind only five reflected contribution cursor leaves to their snapshot."""
+    node = _contribution_node(branch, root)
+    first = branch['route'] + '|/argsSchema/properties/time/$ref'
+    second = branch['route'] + '|' + CONTRIBUTION_CURSOR_TIME + '/oneOf/1/$ref'
+    chain = [first] if branch['pointer'].startswith(CONTRIBUTION_CURSOR_TIME) else [first, second]
+    completion.exact_observation_pointer(branch,
+        {**binding, 'observation_pointer': '/native_call/args/time'}, '/native_call', 'args', reference_edges)
+    if (audit.digest(node) != branch['shape_sha256'] or binding.get('reference_chain') != chain
+            or reference_edges[first]['reference']['target'] != branch['route'] + '|' + CONTRIBUTION_CURSOR_TIME
+            or reference_edges[second]['reference']['target'] != branch['route'] + '|' + CONTRIBUTION_CURSOR):
+        raise ValueError('Contribution exact cursor normalization branch/reflection differs')
+    captured = record['runtime_read_program']
+    final_call = captured['public_calls'][-1]
+    cursor, = [row for row in captured['native_reads'][final_call['native_start']:]
+        if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
+    expected = f"/runtime_read_program/native_reads/{cursor['ordinal']}/args/cursor"
+    if (binding['observation_pointer'] != expected
+            or not _contribution_predicate(branch, node, cursor['args']['cursor'], root=root)):
+        raise ValueError('Contribution exact cursor normalization occurrence/choice differs')
+    return {'branch_id': branch['id'], 'observation_pointer': expected}
+
+
+def _validate_contribution_capture(record, argv, route, root):
+    """Check the complete projection and typed handle/request relations."""
+    from wwise_waapi.builders.schema import validate_resolved_semantic_result
+    from wwise_waapi.builders.stable_reads import normalize_profiler_voice_contributions_result
+    version, host, _, kind, uri = route.split('|')
+    captured = record.get('runtime_read_program')
+    if not isinstance(captured, dict):
+        raise ValueError('Contribution needs exact current public read capture')
+    gateway, native = captured['gateway'], captured['native_call']
+    payload = gateway['payload']
+    if (uri != CONTRIBUTION_URI or kind != 'function'
+            or captured.get('contract') != 'waapi-skill.runtime-read-program/v1'
+            or captured.get('phase_reports') != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
+            or captured.get('source_unchanged') is not True
+            or captured.get('source_context') != program_source_context(root, flow=uri)
+            or record.get('relevant_sources') != captured['source_context']['packaged']
+            or gateway != record['gateway'] or native != record['native_call']
+            or gateway['argv'] != argv or gateway['argv'][0] != 'profiler-voice-contributions'
+            or gateway['exit_code'] != 0 or payload.get('ok') is not True
+            or payload.get('is_command_line') != (host == 'wwise-console')
+            or any(payload['schema_validation'][section]['version'] != version for section in ('request', 'result'))
+            or native['uri'] != uri or native['options'] != {}
+            or audit.digest(payload['semantic_preview']['args']) != audit.digest(native['args'])):
+        raise ValueError('Contribution needs exact current public read capture')
+    validate_resolved_semantic_result(uri, native['result'], version=version)
+    projected = normalize_profiler_voice_contributions_result(version=version, result=native['result'])
+    if audit.digest(projected) != audit.digest(payload['agent_result']):
+        raise ValueError('Program must preserve complete contribution projection')
+    trace, calls = captured.get('native_reads'), captured.get('public_calls')
+    if (not isinstance(trace, list) or not 1 <= len(trace) <= 128 or not isinstance(calls, list) or not 1 <= len(calls) <= 8
+            or any(set(row) != {'ordinal', 'uri', 'args', 'options', 'result'} or row['ordinal'] != index
+                or type(row['ordinal']) is not int for index, row in enumerate(trace))):
+        raise ValueError('Contribution ordered public/native trace is incomplete')
+    end = 0
+    for call in calls:
+        if (set(call) != {'gateway', 'native_start', 'native_end'} or type(call['native_start']) is not int
+                or type(call['native_end']) is not int or call['native_start'] != end
+                or not end < call['native_end'] <= len(trace)
+                or call['gateway']['exit_code'] != 0 or call['gateway']['payload'].get('ok') is not True):
+            raise ValueError('Contribution ordered public/native trace is incomplete')
+        end = call['native_end']
+    if end != len(trace) or calls[-1]['gateway'] != gateway:
+        raise ValueError('Contribution final public/native trace differs')
+    final_trace = trace[calls[-1]['native_start']:]
+    final, = [row for row in final_trace if row['uri'] == uri]
+    if final['ordinal'] != len(trace) - 1 or audit.digest({key: final[key] for key in native}) != audit.digest(native):
+        raise ValueError('Contribution final native request/result differs')
+    argv = gateway['argv']
+    def values(flag):
+        return [argv[index + 1] for index, value in enumerate(argv[:-1]) if value == flag]
+    time = native['args']['time']
+    if '--capture-ms' in argv:
+        position, = values('--capture-ms')
+        if not position.isascii() or not position.isdecimal() or type(time) is not int or int(position) != time:
+            raise ValueError('Contribution selected capture time differs')
+    else:
+        choice, = values('--capture')
+        cursor = {'latest': 'capture', 'user-cursor': 'user'}[choice]
+        cursors = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
+        dependent = [row for row in final_trace if row['uri'] in {
+            'ak.wwise.core.profiler.getVoices', 'ak.wwise.core.profiler.getBusses', CONTRIBUTION_URI}]
+        source_time = (cursors[0]['result'].get('return')
+            if len(cursors) == 1 and type(cursors[0]['result']) is dict else None)
+        if (len(cursors) != 1 or cursors[0]['args'] != {'cursor': cursor} or cursors[0]['options'] != {}
+                or type(source_time) is not int or source_time < 0
+                or type(time) is not int or time < 0 or cursors[0]['result'] != {'return': time}
+                or any(row['ordinal'] <= cursors[0]['ordinal'] or type(row['args'].get('time')) is not int
+                    or row['args']['time'] != time for row in dependent)):
+            raise ValueError('Contribution fixed cursor construction trace differs')
+    voice_rows = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getVoices']
+    bus_rows = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getBusses']
+    if len(voice_rows) != 1 or voice_rows[0]['args'] != {'time': time}:
+        raise ValueError('Contribution requires same-time unique voice revalidation')
+    voices = voice_rows[0]['result']['return']
+    voice, = [row for row in voices if row['pipelineID'] == native['args']['voicePipelineID']]
+    pipeline_ids = native['args'].get('bussesPipelineID')
+    if pipeline_ids:
+        if len(bus_rows) != 1 or bus_rows[0]['args'] != {'time': time}:
+            raise ValueError('Contribution requires same-time unique Bus revalidation')
+        selected_busses = []
+        for identity in pipeline_ids:
+            bus, = [row for row in bus_rows[0]['result']['return'] if row['pipelineID'] == identity
+                and row['gameObjectID'] == voice['gameObjectID']]
+            selected_busses.append(bus)
+    else:
+        selected_busses = []
+    if '--bus-path' in argv:
+        mode, = values('--bus-path')
+        if (values('--bus-object-id') or values('--bus-instance-handle')
+                or mode == 'wwise-default' and 'bussesPipelineID' in native['args']
+                or mode == 'dry-path' and pipeline_ids != []):
+            raise ValueError('Contribution explicit bus path construction differs')
+    elif not values('--bus-object-id') and not values('--bus-instance-handle') and pipeline_ids != []:
+        raise ValueError('Contribution default dry path construction differs')
+    def issued_row(handle, kind, revalidated):
+        field = kind + '_instance_handle'
+        uri = 'ak.wwise.core.profiler.' + ('getVoices' if kind == 'voice' else 'getBusses')
+        matches = []
+        for call in calls[:-1]:
+            public = call['gateway']
+            if public['argv'][:2] != ['core-call', uri]:
+                continue
+            reads = [row for row in trace[call['native_start']:call['native_end']] if row['uri'] == uri]
+            if len(reads) != 1 or reads[0]['args'] != {'time': time}:
+                raise ValueError('Contribution handle seed capture time differs')
+            for raw in reads[0]['result']['return']:
+                for row in public['payload']['agent_result']['return']:
+                    if row.get(field) == handle and raw['pipelineID'] == revalidated['pipelineID']:
+                        expected = {key: value for key, value in raw.items() if key != 'pipelineID'}
+                        expected[field] = handle
+                        if (audit.digest(row) != audit.digest(expected)
+                                or any(raw.get(key) != revalidated.get(key) for key in ('objectGUID', 'gameObjectID'))):
+                            raise ValueError('Contribution issued handle identity differs from same-time revalidation')
+                        matches.append(row)
+        if len(matches) != 1:
+            raise ValueError('Contribution issued handle relation is missing or ambiguous')
+    if '--voice-object-id' in argv:
+        requested, = values('--voice-object-id')
+        game = values('--game-object-id')
+        matches = [row for row in voices if row['objectGUID'].casefold() == requested.casefold()
+            and (not game or row['gameObjectID'] == int(game[0]))]
+        if len(matches) != 1 or matches[0] != voice:
+            raise ValueError('Contribution exact object/game-object selection differs')
+    else:
+        handle, = values('--voice-instance-handle')
+        issued_row(handle, 'voice', voice)
+    if values('--bus-object-id'):
+        if [row['objectGUID'].casefold() for row in selected_busses] != [value.casefold() for value in values('--bus-object-id')]:
+            raise ValueError('Contribution ordered Bus object selection differs')
+    else:
+        handles = values('--bus-instance-handle')
+        if len(handles) != len(selected_busses):
+            raise ValueError('Contribution selected Bus handle count differs')
+        for handle, row in zip(handles, selected_busses):
+            issued_row(handle, 'bus', row)
+
+
+def validate_runtime_source_review(descriptor, sources, branch, root, base):
+    if branch['route'].endswith('|function|' + CONTRIBUTION_URI):
+        return validate_contribution_source_review(descriptor, sources, branch, root, base)
+    return validate_rtpc_source_review(descriptor, sources, branch, root, base)
+
+
+def validate_contribution_source_review(descriptor, historical_sources, branch, root, base):
+    review = completion.read_sealed_artifact(descriptor, base)
+    version, host, build, kind, uri = branch['route'].split('|')
+    if (version not in CONTRIBUTION_ORIGINALS or host != 'wwise-authoring' or kind != 'function'
+            or uri != CONTRIBUTION_URI or not branch['pointer'].startswith('/resultSchema/')):
+        raise ValueError('Contribution source review is limited to exact witnessed Authoring result branches')
+    current = program_source_context(root, flow=uri)['packaged']
+    changes = {name: {'before': historical_sources.get(name), 'after': current.get(name)}
+        for name in historical_sources.keys() | current.keys() if historical_sources.get(name) != current.get(name)}
+    expected = {'contract', 'historical_candidate', 'historical_sources', 'current_sources', 'changed_files',
+        'changed_symbols', 'scope', 'original_capture', 'program_replay'}
+    scope = {'version': version, 'host': host, 'build': RTPC_ORIGINALS[version][0], 'uri': uri,
+        'original_capture_sha256': RTPC_ORIGINALS[version][1], **CONTRIBUTION_ORIGINALS[version]}
+    if (set(review) != expected or review['contract'] != 'waapi-skill.runtime-read-source-review/v1'
+            or review['historical_candidate'] != RTPC_ORIGINAL_CANDIDATE or build != scope['build']
+            or len(historical_sources) != 413 or review['historical_sources'] != historical_sources
+            or review['current_sources'] != current or review['changed_files'] != changes
+            or changes != RTPC_REVIEWED_SOURCE_CHANGES or review['changed_symbols'] != RTPC_REVIEWED_SOURCE_SYMBOLS
+            or review['scope'] != scope or review['original_capture']['sha256'] != scope['original_capture_sha256']):
+        raise ValueError('Contribution exact reviewed source/branch closure differs')
+    for key in ('original_capture', 'program_replay'):
+        _portable_descriptor(review[key], base)
+    original = completion.read_sealed_artifact(review['original_capture'], base)
+    if audit.digest(completion.pointer_value(original, CONTRIBUTION_PARENT + '/agent_result')) != scope['projection']:
+        raise ValueError('Contribution original complete projection differs')
+    replay = completion.read_sealed_artifact(review['program_replay'], base)
+    if (replay.get('phase_reports') != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
+            or replay.get('source_unchanged') is not True or replay.get('source_context') != program_source_context(root, flow=uri)
+            or audit.digest(replay['native_call']['args']) != scope['args']
+            or audit.digest(replay['native_call']['result']) != scope['result']
+            or audit.digest(replay['gateway']['payload']['agent_result']) != scope['projection']):
+        raise ValueError('Contribution complete original public replay differs')
+    provisional = {'gateway': replay['gateway'], 'native_call': replay['native_call'], 'runtime_read_program': replay,
+        'relevant_sources': current}
+    _validate_contribution_capture(provisional, replay['gateway']['argv'], branch['route'], root)
+
+
+def validate_contribution_evidence(record, binding, branch, category, base, root, reference_edges):
+    if category not in {'program', 'native'}:
+        raise ValueError('Contribution attachment permits only program/native read observations')
+    proof = _proof(binding, base)
+    mapping = proof['mapping']
+    chain = mapping.get('reference_chain', [])
+    if (proof['branch_id'] != branch['id'] or proof['native_shape_sha256'] != branch['shape_sha256']
+            or mapping['branch_id'] != branch['id'] or mapping['native_shape_sha256'] != branch['shape_sha256']
+            or binding.get('reference_chain', []) != chain or not branch['pointer'].startswith('/resultSchema/')
+            or binding['observation_pointer'] != mapping['native_pointer']
+            or binding['program_observation_pointer'] != mapping['program_pointer']):
+        raise ValueError('Contribution exact result branch/ref mapping differs')
+    completion.exact_observation_pointer(branch, {'observation_pointer': mapping['program_pointer'], 'reference_chain': chain},
+        '/native_call', 'result', reference_edges)
+    completion.exact_observation_pointer(branch, {'observation_pointer': mapping['native_pointer'], 'reference_chain': chain},
+        '/observations/raw', 'result', reference_edges)
+    captured = completion.read_sealed_artifact(proof['program_capture'], base)
+    if category == 'program':
+        validate_contribution_program({**record, 'runtime_read_program': captured}, binding, branch, root, reference_edges)
+        return
+    read = archive_reader(proof['archive'], base)
+    context = completion.read_category_run(proof['native_run'], base)
+    completion.validate_authoring_batch_finalization(context['record'], base, read_bytes=read)
+    _portable_descriptor(mapping['raw_observation'], base)
+    expected_artifacts = {'capture': proof['capture'], 'raw': mapping['raw_observation']}
+    if (record['native_runs'] != [proof['native_run']] or record['observation_artifacts'] != expected_artifacts
+            or read(proof['capture_original_path']) != (base / proof['capture']['artifact']).read_bytes()
+            or read(mapping['raw_original_path']) != (base / mapping['raw_observation']['artifact']).read_bytes()):
+        raise ValueError('Contribution must retain exact original finalized artifacts')
+    capture = completion.read_sealed_artifact(proof['capture'], base)
+    raw = completion.read_sealed_artifact(mapping['raw_observation'], base)
+    outcome = completion.pointer_value(capture, CONTRIBUTION_PARENT.rsplit('/', 1)[0])
+    if (capture.get('complete') is not True or capture['candidate'] != context['candidate']
+            or outcome.get('outcome') != 'PASS' or outcome['evidence'].get('complete') is not True
+            or raw.get('ok') is not True or raw['api'] != CONTRIBUTION_URI):
+        raise ValueError('Contribution original exact observation must be complete PASS')
+    seal = json.loads(read(context['record']['categories'][0]['batch_finalization']['artifact']))
+    node = json.loads(read(seal['observations'][proof['native_run']['nodeid']]['path']))
+    receipts = [row for row in node['receipts'] if row['argv'] == mapping['original_gateway_argv']]
+    if len(receipts) != 1 or receipts[0]['exit_code'] != 0 or receipts[0]['payload'].get('ok') is not True:
+        raise ValueError('Contribution original exact public receipt missing')
+    original = receipts[0]['payload']
+    if (audit.digest(original['agent_result']) != audit.digest(outcome['evidence']['agent_result'])
+            or audit.digest(original['semantic_preview']['args']) != audit.digest(captured['native_call']['args'])
+            or audit.digest(raw['result']) != audit.digest(captured['native_call']['result'])
+            or not mapping['raw_original_path'].endswith('/' + original['call']['evidence_path'].rsplit('/', 1)[1])):
+        raise ValueError('Contribution original receipt/raw/current replay relation differs')
+    historical = {key: value for key, value in node['source_context']['sources'].items() if key.startswith('skills/waapi-skill/')}
+    if proof['relevant_sources'] != historical or binding['relevant_sources'] != sorted(historical):
+        raise ValueError('Contribution historical source map differs')
+    validate_contribution_source_review(proof['source_review'], historical, branch, root, base)
+    if record['branch_assertions'][branch['id']]['checks'] != mapping['native_checks']:
+        raise ValueError('Contribution exact native assertion policy differs')
+
+
+def write_read_bundle(output, program_path, originals, *, inventory, version, host, mode, mappings=None, name_prefix=""):
+    """Publish independent branches from one dedicated captured read flow."""
+    import gzip
+    import shutil
+    captured = json.loads(Path(program_path).read_bytes())
+    if (captured.get('phase_reports') != dict.fromkeys(('setup', 'call', 'teardown'), 'passed')
+            or captured.get('source_context') != program_source_context(flow=CONTRIBUTION_URI)):
+        raise ValueError('Dedicated read publication needs exact successful current phases/sources')
+    route = next(row for row in inventory['native_coverage']['routes']
+        if row['version'] == version and row['host'] == host and row['uri'] == CONTRIBUTION_URI)
+    public = next(row for row in inventory['routes'] if row['id'] == route['public_route'])
+    if mappings is None:
+        if mode == 'top-data':
+            fields = ('volume', 'LPF', 'HPF', 'DSF') if version == '2025.1' else ('volume', 'LPF', 'HPF')
+            selected = {route['id'] + '|/resultSchema/properties/return/properties/' + field for field in fields}
+        elif mode in {'cursor-capture', 'cursor-user'}:
+            selected = {route['id'] + '|' + pointer for pointer in CONTRIBUTION_CURSOR_POINTERS}
+        else:
+            raise ValueError('Dedicated contribution mapping mode requires an exact branch selection')
+        _, mappings = contribution_field_mappings(inventory, captured, version=version, host=host, selected=selected)
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=bool(name_prefix))
+    if name_prefix and (not name_prefix.endswith('-') or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789.-' for c in name_prefix)):
+        raise ValueError('Closed contribution file prefix required')
+    def destination(name):
+        return output / (name_prefix + name)
+    def descriptor(name):
+        return {'artifact': name_prefix + name, 'sha256': sha(destination(name).read_bytes())}
+    shutil.copyfile(program_path, destination('program-capture.json'))
+    candidate = inventory['native_coverage']['candidate_sha256']
+    sources = captured['source_context']['packaged']
+    program = {'candidate_sha256': candidate, 'scope_kind': 'product', 'relevant_sources': sources,
+        'gateway': captured['gateway'], 'native_call': captured['native_call'], 'runtime_read_program': captured,
+        'invocation': {'phase': 'final', 'outcome': 'PASS', 'node_outcomes': [{'nodeid': captured['nodeid'], 'outcome': 'PASS'}]},
+        'branch_assertions': {}}
+    native = context = source_review = original_gateway_argv = raw_path = capture_path = None
+    historical = None
+    if originals is not None:
+        if host != 'wwise-authoring' or version not in CONTRIBUTION_ORIGINALS:
+            raise ValueError('Only qualified original contribution Authoring producers may attach')
+        for name in ('original-category.json', 'original-capture.json', 'original-closure.json.gz'):
+            shutil.copyfile(originals / name, destination(name))
+        native_run = {**descriptor('original-category.json'),
+            'nodeid': 'tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_missing_profiler_reads'}
+        context = completion.read_category_run(native_run, output)
+        read = archive_reader(descriptor('original-closure.json.gz'), output)
+        completion.validate_authoring_batch_finalization(context['record'], output, read_bytes=read)
+        seal = json.loads(read(context['record']['categories'][0]['batch_finalization']['artifact']))
+        node = json.loads(read(seal['observations'][native_run['nodeid']]['path']))
+        original_receipt, = [row for row in node['receipts'] if row['argv'][0] == 'profiler-voice-contributions'
+            and '--bus-instance-handle' in row['argv']]
+        original_gateway_argv = original_receipt['argv']
+        files = json.loads(gzip.decompress((destination('original-closure.json.gz')).read_bytes()))['files']
+        capture_path, = [name for name in files if name.endswith('/profiler-capture.json')]
+        raw_path, = [name for name in files if name.endswith('/' + original_receipt['payload']['call']['evidence_path'].rsplit('/', 1)[1])]
+        (destination('original-native-result.json')).write_bytes(read(raw_path))
+        native_run['observation_sha256'] = [descriptor('original-capture.json')['sha256'], descriptor('original-native-result.json')['sha256']]
+        historical = {key: value for key, value in node['source_context']['sources'].items() if key.startswith('skills/waapi-skill/')}
+        source_review = write_json(destination('source-review.json'), {
+            'contract': 'waapi-skill.runtime-read-source-review/v1', 'historical_candidate': RTPC_ORIGINAL_CANDIDATE,
+            'historical_sources': historical, 'current_sources': sources, 'changed_files': RTPC_REVIEWED_SOURCE_CHANGES,
+            'changed_symbols': RTPC_REVIEWED_SOURCE_SYMBOLS,
+            'scope': {'version': version, 'host': host, 'build': route['build'], 'uri': CONTRIBUTION_URI,
+                'original_capture_sha256': RTPC_ORIGINALS[version][1], **CONTRIBUTION_ORIGINALS[version]},
+            'original_capture': descriptor('original-capture.json'), 'program_replay': descriptor('program-capture.json')})
+        native = {'candidate_sha256': candidate, 'scope_kind': 'product', 'evidence_kind': 'native_execution',
+            'relevant_sources': historical, 'invocation': context['record']['invocation'], 'native_runs': [native_run],
+            'observation_artifacts': {'capture': descriptor('original-capture.json'), 'raw': descriptor('original-native-result.json')},
+            'branch_assertions': {}}
+    document = {'contract': 'waapi-skill.branch-bindings/v1', 'bindings': {}}
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    for mapping in mappings:
+        branch, pointer = mapping['branch'], mapping['program_pointer']
+        identity = branch['id']
+        public_pointer = contribution_branch_public_pointer(branch, pointer)
+        program['branch_assertions'][identity] = {'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
+            'checks': [({'pointer': pointer, 'absent': True} if branch['kind'] == 'optional_presence' and branch['value'] == 'absent'
+                else {'pointer': pointer, 'cardinality': branch['value']} if branch['kind'] == 'collection_cardinality'
+                else {'pointer': pointer, 'equals': completion.pointer_value(program, pointer)}),
+                {'pointer': public_pointer, 'equals': completion.pointer_value(captured, public_pointer)}]}
+        if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS:
+            choice = '/gateway/argv/' + str(captured['gateway']['argv'].index('--capture') + 1)
+            program['branch_assertions'][identity]['checks'].extend([
+                {'pointer': choice, 'equals': completion.pointer_value(captured, choice)},
+                {'pointer': '/native_call/args/time', 'equals': captured['native_call']['args']['time']}])
+        elif not branch['pointer'].startswith('/resultSchema'):
+            semantic = contribution_public_pointer(pointer)
+            semantic_check = ({'pointer': semantic, 'absent': True}
+                if branch['kind'] == 'optional_presence' and branch['value'] == 'absent'
+                else {'pointer': semantic, 'equals': completion.pointer_value(captured, semantic)})
+            program['branch_assertions'][identity]['checks'].append(semantic_check)
+        binding = {'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'],
+            'public_route': public['id'], 'public_route_sha256': audit.digest(public),
+            'input': {'gateway_argv': captured['gateway']['argv'], 'selector': pointer},
+            'dispatch_pointer': '/native_call', 'observation_pointer': pointer,
+            'gateway_observation_pointer': public_pointer, 'reference_chain': mapping['reference_chain'],
+            'relevant_sources': sorted(sources), 'evidence': {},
+            'construction': {'source': 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py#build_profiler_voice_contributions_request', 'selector': branch['pointer']},
+            'validation': {'source': 'skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result', 'selector': branch['pointer']},
+            'verifier': {'source': 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py#normalize_profiler_voice_contributions_result', 'selector': branch['pointer']}}
+        document['bindings'][identity] = binding
+        policy['branches'][identity] = {'native_shape_sha256': branch['shape_sha256'], 'categories': mapping['categories'],
+            'reason': ('Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required'
+                if mapping['categories'] == ['program', 'native'] else
+                'SPEC section 5 exact public choice to one cursor snapshot to same-time identity/final numeric construction; no actual native occurrence/data/effect claim'
+                if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS else
+                'SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim')}
+        if native is not None and mapping['categories'] == ['program', 'native']:
+            native_pointer = pointer.replace('/native_call', '/observations/raw', 1)
+            raw_record = {'observations': {'raw': json.loads((destination('original-native-result.json')).read_bytes())}}
+            checks = [({'pointer': native_pointer, 'cardinality': branch['value']}
+                if branch['kind'] == 'collection_cardinality'
+                else {'pointer': native_pointer, 'equals': completion.pointer_value(raw_record, native_pointer)}),
+                {'pointer': '/observations/capture/complete', 'equals': True}]
+            native['branch_assertions'][identity] = {'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'], 'checks': checks}
+            mapping.update(branch_id=identity, native_shape_sha256=branch['shape_sha256'], native_pointer=native_pointer,
+                native_result_parent='/observations/raw', native_checks=checks, original_gateway_argv=original_gateway_argv,
+                raw_observation=descriptor('original-native-result.json'), raw_original_path=raw_path)
+    program_descriptor = {**write_json(destination('program.json'), program), 'nodeid': captured['nodeid']}
+    for binding in document['bindings'].values():
+        binding['evidence']['program'] = deepcopy(program_descriptor)
+    bindings_descriptor = write_json(destination('bindings.json'), document)
+    requirements_descriptor = write_json(destination('requirements.json'), policy)
+    attachments = []
+    if native is not None:
+        native_descriptor = {**write_json(destination('native.json'), native), 'nodeid': native_run['nodeid']}
+        for index, mapping in enumerate(mappings):
+            if mapping['categories'] != ['program', 'native']:
+                continue
+            branch = mapping['branch']; identity = branch['id']; binding = deepcopy(document['bindings'][identity])
+            proof = {'contract': 'waapi-skill.runtime-observation-proof/v1', 'branch_id': identity,
+                'native_shape_sha256': branch['shape_sha256'], 'mapping': {key: value for key, value in mapping.items() if key != 'branch'},
+                'native_run': native_run, 'archive': descriptor('original-closure.json.gz'), 'capture': descriptor('original-capture.json'),
+                'capture_original_path': capture_path, 'program_capture': descriptor('program-capture.json'),
+                'relevant_sources': historical, 'source_review': source_review}
+            proof_descriptor = write_json(destination(f'proof-{index}.json'), proof)
+            binding.update(runtime_observation_attachment=proof_descriptor, program_observation_pointer=mapping['program_pointer'],
+                observation_pointer=mapping['native_pointer'], native_observations_sha256={
+                    'capture': descriptor('original-capture.json')['sha256'], 'raw': descriptor('original-native-result.json')['sha256']})
+            equivalence = {'contract': 'waapi-skill.branch-evidence-equivalence/v1', 'from_candidate': context['candidate'],
+                'to_candidate': candidate, 'branch_id': identity, 'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
+                'evidence_sha256': native_run['sha256'], 'binding_semantics_sha256': audit.digest(completion.binding_semantics(binding)),
+                'reviewed_reason': 'Exact reviewed contribution result/identity guard and disclosed business choice/optional decoder delta; complete original native request/result and public projection preserved',
+                'sources': historical, 'runtime_read_review': source_review}
+            equivalence_descriptor = write_json(destination(f'native-equivalence-{index}.json'), equivalence)
+            attachments.append(write_json(destination(f'attachment-{index}.json'), {'contract': 'waapi-skill.runtime-observation-attachment/v1',
+                'branch_id': identity, 'proof': proof_descriptor, 'evidence': native_descriptor, 'native_equivalence': equivalence_descriptor}))
+    write_json(destination('index.json'), {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.',
+        'entries': [{'id': f'contribution-{version}-{host}-{mode}', 'bindings': bindings_descriptor,
+            'origin': {'bindings': bindings_descriptor, 'program': descriptor('program.json'),
+                'requirements': requirements_descriptor, 'capture': descriptor('program-capture.json')}}],
+        **({'runtime_observation_attachments': attachments} if attachments else {})})
+    return destination('index.json')
+
+
+def _contribution_node(branch, root=audit.ROOT):
+    from wwise_waapi.native_catalog import load_native_catalog
+    version, host, _, _, uri = branch['route'].split('|')
+    catalog = load_native_catalog(version, host, root=root / 'skills/waapi-skill/resources/native-catalog')
+    pointer = branch['pointer'].split('/@presence/')[0].split('/@cardinality/')[0].split('/@empty/')[0]
+    if '/@definition/' in pointer:
+        _, rest = pointer.split('/@definition/', 1)
+        name, suffix = rest.split('/', 1)
+        return completion.pointer_value(catalog['definitions']['documents'][name], '/' + suffix)
+    return completion.pointer_value(catalog['schemas'][uri], pointer)
+
+
+def _contribution_categories(branch, node):
+    if not branch['pointer'].startswith('/resultSchema'):
+        return ['program']
+    if (branch['kind'] in {'constraint', 'empty_object', 'empty_string'}
+            or branch['kind'] == 'optional_presence' and branch['value'] == 'absent'
+            or branch['kind'] == 'collection_cardinality' and branch['value'] in {'empty', 'single'}):
+        return ['program']
+    if branch['kind'] == 'schema' and (node is False or isinstance(node, dict) and (
+            node.get('type') in {'object', 'array'} or 'voiceContributionsObject' in node.get('$ref', ''))):
+        return ['program']
+    return ['program', 'native']
+
+
+def _contribution_predicate(branch, node, value, *, root=audit.ROOT):
+    import re
+    kind = branch['kind']
+    if kind == 'optional_presence':
+        return value is _CONTRIBUTION_ABSENT if branch['value'] == 'absent' else value is not _CONTRIBUTION_ABSENT
+    if value is _CONTRIBUTION_ABSENT:
+        return False
+    if kind == 'collection_cardinality':
+        return isinstance(value, list) and branch['value'] == ('empty' if not value else 'single' if len(value) == 1 else 'multiple')
+    if kind in {'empty_object', 'empty_string', 'enum_value'}:
+        return type(value) is type(branch['value']) and value == branch['value']
+    if kind == 'constraint':
+        predicate = branch['pointer'].rsplit('/', 1)[1]
+        return (type(value) is str and re.search(node, value) is not None if predicate == 'pattern'
+            else type(value) is int and value == node if predicate in {'minimum', 'maximum'} else False)
+    if kind == 'reference':
+        parent = {**branch, 'kind': 'schema', 'pointer': branch['pointer'].rsplit('/', 1)[0]}
+        parent_node = _contribution_node(parent, root)
+        # The pinned recursive contribution object uses the already mandatory
+        # resolved result guard, including its disclosed legacy driver rule.
+        if 'voiceContributionsObject' in node:
+            return type(value) is dict
+        try:
+            completion.validate_native_alternative(root, {**parent, 'shape_sha256': audit.digest(parent_node)}, value)
+        except (ValueError, TypeError):
+            return False
+        return True
+    if kind != 'schema':
+        return False
+    if node is False:
+        parent = _contribution_node({**branch, 'pointer': branch['pointer'].rsplit('/', 1)[0]}, root)
+        return type(value) is dict and set(value) <= set(parent.get('properties', {}))
+    if not isinstance(node, dict):
+        return False
+    if re.search(r'/oneOf/[0-9]+$', branch['pointer']):
+        try:
+            completion.validate_native_alternative(root, branch, value)
+        except (ValueError, TypeError):
+            return False
+        if branch['pointer'].endswith('/properties/driver/oneOf/1'):
+            return type(value) is str and not re.fullmatch(r'\{[a-fA-F0-9-]{36}\}', value)
+        return True
+    types = {'object': (dict,), 'array': (list,), 'string': (str,), 'integer': (int,), 'number': (int, float)}
+    if 'type' in node and type(value) not in types.get(node['type'], ()):
+        return False
+    if node.get('type') == 'object':
+        return (set(node.get('required', ())) <= value.keys()
+            and (node.get('additionalProperties') is not False or value.keys() <= node.get('properties', {}).keys()))
+    if 'pattern' in node and (type(value) is not str or re.search(node['pattern'], value) is None):
+        return False
+    if 'enum' in node and not any(type(value) is type(choice) and value == choice for choice in node['enum']):
+        return False
+    if '$ref' in node and 'voiceContributionsObject' not in node['$ref']:
+        try:
+            completion.validate_native_alternative(root, branch, value)
+        except (ValueError, TypeError):
+            return False
+    return True
+
+
+_CONTRIBUTION_ABSENT = object()
+
+
+def _contribution_chains(branch, edges):
+    if '/@definition/' not in branch['pointer']:
+        return [[]]
+    candidates = []
+    def visit(chain, target, seen):
+        if branch['pointer'] == target or branch['pointer'].startswith(target + '/'):
+            candidates.append(chain)
+        if len(chain) >= 4:
+            return
+        for edge in edges.values():
+            if edge['route'] != branch['route'] or not edge['pointer'].startswith(target + '/'):
+                continue
+            reached = edge['reference']['target'].split('|', 5)[5]
+            if reached in seen:
+                continue
+            visit(chain + [edge['id']], reached, seen | {reached})
+    section = '/' + branch['pointer'].split('/')[1]
+    for edge in edges.values():
+        if edge['route'] == branch['route'] and edge['pointer'].startswith(section + '/') and '/@definition/' not in edge['pointer']:
+            target = edge['reference']['target'].split('|', 5)[5]
+            visit([edge['id']], target, {target})
+    return candidates
+
+
+def _contribution_pattern(branch, chain, edges):
+    previous, pattern = None, []
+    for identity in chain:
+        edge = edges[identity]
+        source = edge['pointer'] if previous is None else edge['pointer'][len(previous):]
+        pattern += completion.native_observation_pattern(source)
+        previous = edge['reference']['target'].split('|', 5)[5]
+    pattern += completion.native_observation_pattern(branch['pointer'] if previous is None else branch['pointer'][len(previous):])
+    section = {'argsSchema': 'args', 'optionsSchema': 'options', 'resultSchema': 'result'}[branch['pointer'].split('/')[1]]
+    return ['native_call', section, *pattern]
+
+
+def _contribution_occurrences(record, tokens, prefix=''):
+    if not tokens:
+        yield prefix, record
+        return
+    token, rest = tokens[0], tokens[1:]
+    if token == '*':
+        if type(record) is list:
+            for index, value in enumerate(record):
+                yield from _contribution_occurrences(value, rest, prefix + '/' + str(index))
+    elif type(record) is dict:
+        if token in record:
+            yield from _contribution_occurrences(record[token], rest, prefix + '/' + token)
+        elif not rest:
+            yield prefix + '/' + token, _CONTRIBUTION_ABSENT
+
+
+def contribution_field_mappings(inventory, captured, *, version, host, selected=None):
+    route = next(row for row in inventory['native_coverage']['routes']
+        if row['version'] == version and row['host'] == host and row['uri'] == CONTRIBUTION_URI)
+    rows = [row for row in inventory['native_coverage']['obligations'] if row['route'] == route['id']]
+    edges = {row['id']: row for row in rows if row['kind'] == 'reference'}
+    mappings = []
+    for branch in rows:
+        if selected is not None and branch['id'] not in selected:
+            continue
+        node = _contribution_node(branch)
+        if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS:
+            argv = captured['gateway']['argv']
+            cursors = [row for row in captured.get('native_reads', [])
+                if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
+            if '--capture' in argv and len(cursors) == 1 and _contribution_predicate(branch, node, cursors[0]['args']['cursor']):
+                mappings.append({'branch': branch,
+                    'program_pointer': f"/runtime_read_program/native_reads/{cursors[0]['ordinal']}/args/cursor",
+                    'reference_chain': _contribution_chains(branch, edges)[0], 'categories': ['program']})
+            continue
+        for chain in _contribution_chains(branch, edges):
+            match = next(((pointer, value) for pointer, value in _contribution_occurrences(captured,
+                _contribution_pattern(branch, chain, edges)) if _contribution_predicate(branch, node, value)), None)
+            if match is not None:
+                mappings.append({'branch': branch, 'program_pointer': match[0], 'reference_chain': chain,
+                    'categories': _contribution_categories(branch, node)})
+                break
+    return route, mappings
+
+
+def contribution_branch_public_pointer(branch, pointer):
+    if not branch['pointer'].startswith('/resultSchema'):
+        return '/gateway/payload/agent_result'
+    public = contribution_public_pointer(pointer)
+    if (branch['kind'] == 'optional_presence' and branch['value'] == 'absent'
+            and (pointer.startswith('/native_call/args/') or pointer.startswith('/native_call/result/return/objects/'))):
+        return public.rsplit('/', 1)[0]
+    return public
+
+
+def _validate_contribution_branch(record, binding, branch, root):
+    node = _contribution_node(branch, root)
+    if branch['kind'] in {'schema', 'reference', 'constraint'} and audit.digest(node) != branch['shape_sha256']:
+        raise ValueError('Contribution exact pinned predicate shape differs')
+    pointer = binding.get('program_observation_pointer') if binding.get('runtime_observation_attachment') else binding['observation_pointer']
+    if branch['kind'] == 'optional_presence' and branch['value'] == 'absent':
+        parent = completion.pointer_value(record, pointer.rsplit('/', 1)[0])
+        if type(parent) is not dict or pointer.rsplit('/', 1)[1] in parent:
+            raise ValueError('Contribution absence requires the existing exact parent and missing field')
+        value = _CONTRIBUTION_ABSENT
+    else:
+        value = completion.pointer_value(record, pointer)
+    if not _contribution_predicate(branch, node, value, root=root):
+        raise ValueError('Contribution exact pinned branch predicate failed')
+    version = branch['route'].split('|')[0]
+    if version in {'2021.1', '2022.1', '2023.1'} and '/properties/driver' in branch['pointer']:
+        rules = record['gateway']['payload']['schema_validation']['result'].get('compatibility_rules', [])
+        if not any(rule.get('rule_id') == 'profiler-contribution-driver-reason-or-guid/v1'
+                and rule.get('version') == version and rule.get('uri') == CONTRIBUTION_URI
+                and rule.get('reflected_definition_sha256') == '65a31a502cc581aebc372d674d16d60e772329b957474418d10aec3fa70f02f7' for rule in rules):
+            raise ValueError('Contribution legacy driver preservation requires its explicit pinned compatibility disclosure')
+
+
+def write_read_stage(output, captures, originals, *, inventory):
+    """Join independently selected contribution branches in one portable index."""
+    versions = ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1')
+    expected = {(version, host, mode) for version in versions for host in ('wwise-console', 'wwise-authoring')
+        for mode in ('rich', 'single', 'empty', 'absent', 'omit', 'cursor-capture', 'cursor-user')}
+    expected |= {(version, host, 'partial') for version in versions[:2] for host in ('wwise-console', 'wwise-authoring')}
+    expected |= {(version, 'wwise-authoring', 'original') for version in ('2022.1', '2025.1')}
+    cursor_only = {(version, host, mode) for version in versions for host in ('wwise-console', 'wwise-authoring')
+        for mode in ('cursor-capture', 'cursor-user')}
+    cursor_scope = set(captures) == cursor_only and not originals
+    if not cursor_scope and (set(captures) != expected or set(originals) != {'2022.1', '2025.1'}):
+        raise ValueError('Contribution stage requires the complete exact five-version public flow set')
+    if cursor_scope:
+        expected = cursor_only
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=False)
+    policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
+    index = {'contract': 'waapi-skill.branch-evidence-index/v1', 'base': '.', 'entries': []}
+    attachments, selected = [], set()
+    for version, host, mode in sorted(expected, key=lambda key: (key[2] != 'original', key)):
+        captured = json.loads(Path(captures[version, host, mode]).read_bytes())
+        route_ids = {row['id'] for row in inventory['native_coverage']['obligations']
+            if row['route'] is not None and row['route'].split('|')[:2] == [version, host]
+            and row['route'].endswith('|function|' + CONTRIBUTION_URI)
+            and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
+        _, mappings = contribution_field_mappings(inventory, captured, version=version, host=host, selected=route_ids - selected)
+        if not mappings:
+            continue
+        flow = write_read_bundle(output, captures[version, host, mode], originals.get(version) if mode == 'original' else None,
+            inventory=inventory, version=version, host=host, mode=mode, mappings=mappings,
+            name_prefix=f'{version}-{host}-{mode}-')
+        document = json.loads(flow.read_bytes())
+        index['entries'].extend(document['entries'])
+        attachments.extend(document.get('runtime_observation_attachments', []))
+        flow_policy = completion.read_sealed_artifact(document['entries'][0]['origin']['requirements'], output)
+        if selected & flow_policy['branches'].keys():
+            raise ValueError('Contribution batch repeats an exact branch')
+        selected |= flow_policy['branches'].keys()
+        policy['branches'].update(flow_policy['branches'])
+    all_ids = {row['id'] for row in inventory['native_coverage']['obligations']
+        if (row.get('route') or '').endswith('|function|' + CONTRIBUTION_URI)
+        and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
+    if selected != all_ids:
+        raise ValueError('Contribution batch has unproved exact branches: ' + repr(sorted(all_ids - selected)))
+    if attachments:
+        index['runtime_observation_attachments'] = attachments
+    write_json(output / 'index.json', index)
+    write_json(output / 'requirements.json', policy)
     return output / 'index.json'

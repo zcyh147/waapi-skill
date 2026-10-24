@@ -1642,6 +1642,10 @@ def build_parser() -> argparse.ArgumentParser:
             "requested voice-path order; omit for the dry path"
         ),
     )
+    profiler_voice_contributions.add_argument(
+        "--bus-path", choices=("dry-path", "wwise-default"),
+        help="Choose the dry voice path or leave path selection to Wwise; conflicts with Bus selectors",
+    )
     profiler_voice_contributions.set_defaults(
         time=None,
         voice_pipeline_id=None,
@@ -6418,6 +6422,8 @@ def preflight_stable_read_input(
         )
     bus_object_ids = tuple(args.bus_object_id)
     bus_instance_handles = tuple(args.bus_instance_handle)
+    if args.bus_path is not None and (bus_object_ids or bus_instance_handles):
+        raise GatewayInputError("--bus-path conflicts with explicit Bus object identities or instance handles")
     if bus_object_ids and bus_instance_handles:
         raise GatewayInputError(
             "profiler-voice-contributions accepts either Bus object identities or "
@@ -6449,16 +6455,17 @@ def preflight_stable_read_input(
                 "profiler-voice-contributions Bus instance handles must be unique"
             )
     if args.game_object_id is not None:
-        if re.fullmatch(r"[0-9]+", args.game_object_id) is None:
+        minimum_game_object_id = -(1 << 63) if version in {"2024.1", "2025.1"} else 0
+        if re.fullmatch(r"-?[0-9]+", args.game_object_id) is None:
             raise GatewayInputError(
-                "profiler-voice-contributions --game-object-id must be an "
-                "unsigned 64-bit integer"
+                "profiler-voice-contributions --game-object-id must be an integer "
+                f"in [{minimum_game_object_id}, {(1 << 64) - 1}] for Wwise {version}"
             )
         game_object_id = int(args.game_object_id)
-        if not 0 <= game_object_id <= (1 << 64) - 1:
+        if not minimum_game_object_id <= game_object_id <= (1 << 64) - 1:
             raise GatewayInputError(
-                "profiler-voice-contributions --game-object-id must be an "
-                "unsigned 64-bit integer"
+                "profiler-voice-contributions --game-object-id must be an integer "
+                f"in [{minimum_game_object_id}, {(1 << 64) - 1}] for Wwise {version}"
             )
         args.game_object_id = game_object_id
     # Validate the shared capture value now; pipeline IDs are derived from the
@@ -7447,6 +7454,23 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri == "ak.wwise.core.profiler.getVoiceContributions":
+        commands[0].update({
+            "required_inputs": ["capture", "voice"], "optional_inputs": ["game_object", "bus_selection"],
+            "input_forms": {
+                "capture": {"exactly_one_of": ["--capture-ms <nonnegative-milliseconds>", "--capture latest|user-cursor"]},
+                "voice": {"exactly_one_of": ["--voice-object-id <canonical-guid>", "--voice-instance-handle <issued-handle>"]},
+                "game_object": {"arguments": ["--game-object-id", "<integer>"], "only_with": "--voice-object-id",
+                    "domain": "int64-or-uint64" if capability.version in {"2024.1", "2025.1"} else "uint64",
+                    "minimum": -(1 << 63) if capability.version in {"2024.1", "2025.1"} else 0,
+                    "maximum": (1 << 64) - 1, "version": capability.version},
+                "bus_selection": {"at_most_one_of": ["--bus-object-id <canonical-guid> (repeat in path order)",
+                    "--bus-instance-handle <issued-handle> (repeat in path order)", "--bus-path dry-path|wwise-default"],
+                    "choices": {"dry-path": "Explicit empty dry path", "wwise-default": "Leave path selection to Wwise; no dry-path equivalence claim"},
+                    "unspecified": "Selected Bus identities retain their order; no Bus selectors means the dry path"},
+            },
+            "observation_authority": "Reported contribution values at the selected capture position; no prospective effect authority",
+        })
     if capability.uri == "ak.wwise.core.object.isPropertyEnabled":
         commands[0].update({
             "required_inputs": ["object", "field_choice", "platform"],
@@ -11639,15 +11663,21 @@ def resolve_profiler_voice_path(
 ) -> tuple[int, tuple[int, ...]] | dict[str, Any]:
     """Resolve semantic voice/Bus identities to one live pipeline path."""
 
+    if isinstance(args.time, str):
+        choice = args.time
+        cursor = dispatch(dispatcher, PROFILER_GET_CURSOR_TIME_URI, connection=connection, version=detected_version,
+            args={"cursor": choice}, options={}, allow_destructive=True, result_limit_bytes=4096)
+        raw_cursor = cursor.get("result")
+        args.time = raw_cursor.get("return") if cursor.get("ok") and isinstance(raw_cursor, Mapping) else None
+        if type(args.time) is not int or args.time < 0:
+            raise GatewayResultShapeError("Profiler cursor did not return an available fixed capture position",
+                details={"api": PROFILER_GET_CURSOR_TIME_URI, "cursor": choice, "result": repr(raw_cursor)[:160]},
+                error_code="INVALID_STABLE_READ_RESULT")
     if args.profiler_pipeline_bindings:
         project, _project_call = current_project(dispatcher, connection=connection, version=detected_version)
         context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
             "project": {key: project.get(key) for key in ("id", "path", "filePath")},
             "live": {key: live_info.get(key) for key in ("version", "sessionId", "processId")}}
-        if isinstance(args.time, str):
-            cursor = dispatch(dispatcher, PROFILER_GET_CURSOR_TIME_URI, connection=connection, version=detected_version,
-                args={"cursor": args.time}, options={}, allow_destructive=True, result_limit_bytes=4096)
-            args.time = cursor.get("result", {}).get("return") if cursor.get("ok") else None
         if type(args.time) is not int or args.time < 0 or any(binding["context"] != context or binding["time"] != args.time
                 for binding in args.profiler_pipeline_bindings.values()):
             raise GatewayInputError("Profiler instance observation belongs to another capture position, project or host context; refresh the read")
@@ -11737,13 +11767,11 @@ def resolve_profiler_voice_path(
                     raise GatewayInputError("Profiler capture instance identity changed or is unavailable; refresh the original read")
         return normalized, result
 
+    voices, voice_result = read_rows("ak.wwise.core.profiler.getVoices")
+    if not voice_result.get("ok", True):
+        return dict(voice_result)
     if args.voice_pipeline_id is not None:
-        voices, voice_result = read_rows("ak.wwise.core.profiler.getVoices")
-        if not voice_result.get("ok", True):
-            return dict(voice_result)
-        voice_matches = [
-            row for row in voices if row["pipelineID"] == args.voice_pipeline_id
-        ]
+        voice_matches = [row for row in voices if row["pipelineID"] == args.voice_pipeline_id]
         if len(voice_matches) != 1:
             return {
                 "ok": True,
@@ -11756,85 +11784,42 @@ def resolve_profiler_voice_path(
                     "repair": "refresh the bounded Profiler voice result and copy its current handle",
                 },
             }
-        if args.bus_pipeline_id:
-            busses, bus_result = read_rows("ak.wwise.core.profiler.getBusses")
-            if not bus_result.get("ok", True):
-                return dict(bus_result)
-            voice_game_object = voice_matches[0]["gameObjectID"]
-            for handle, pipeline_id in zip(
-                args.bus_instance_handle,
-                args.bus_pipeline_id,
-                strict=True,
-            ):
-                matches = [
-                    row
-                    for row in busses
-                    if row["pipelineID"] == pipeline_id
-                    and row["gameObjectID"] == voice_game_object
-                ]
-                if len(matches) != 1:
-                    return {
-                        "ok": True,
-                        "status": "needs_clarification",
-                        **dict(common),
-                        "operation": "profiler-voice-contributions",
-                        "agent_result": {
-                            "bus_instance_handle": handle,
-                            "matching_bus_count": len(matches),
-                            "repair": (
-                                "refresh the bounded Profiler bus result for the "
-                                "selected voice and copy its current handle"
-                            ),
-                        },
-                    }
-        return int(args.voice_pipeline_id), tuple(args.bus_pipeline_id)
-
-    voices_or_rows = read_rows("ak.wwise.core.profiler.getVoices")
-    voices, voice_result = voices_or_rows
-    if not voice_result.get("ok", True):
-        return dict(voice_result)
-    voice_matches = [
-        row
-        for row in voices
-        if str(row["objectGUID"]).casefold() == args.voice_object_id.casefold()
-        and (
-            args.game_object_id is None
-            or row["gameObjectID"] == args.game_object_id
-        )
-    ]
-    if len(voice_matches) != 1:
-        return {
-            "ok": True,
-            "status": "needs_clarification",
-            **dict(common),
-            "operation": "profiler-voice-contributions",
-            "agent_result": {
-                "requested_voice_object_id": args.voice_object_id,
-                "matching_voice_count": len(voice_matches),
-                "candidates": [
-                    {
-                        "object_name": row["objectName"],
-                        "game_object_id": row["gameObjectID"],
-                        "game_object_name": row["gameObjectName"],
-                    }
-                    for row in voice_matches
-                ],
-                "repair": (
-                    "provide --game-object-id when more than one active voice matches"
-                ),
-            },
-        }
+    else:
+        voice_matches = [
+            row for row in voices
+            if str(row["objectGUID"]).casefold() == args.voice_object_id.casefold()
+            and (args.game_object_id is None or row["gameObjectID"] == args.game_object_id)
+        ]
+        if len(voice_matches) != 1:
+            return {
+                "ok": True,
+                "status": "needs_clarification",
+                **dict(common),
+                "operation": "profiler-voice-contributions",
+                "agent_result": {
+                    "requested_voice_object_id": args.voice_object_id,
+                    "matching_voice_count": len(voice_matches),
+                    "candidates": [
+                        {"object_name": row["objectName"], "game_object_id": row["gameObjectID"],
+                         "game_object_name": row["gameObjectName"]}
+                        for row in voice_matches
+                    ],
+                    "repair": "provide --game-object-id when more than one active voice matches",
+                },
+            }
     voice = voice_matches[0]
     bus_pipeline_ids: list[int] = []
-    if args.bus_object_id:
+    if args.bus_pipeline_id or args.bus_object_id:
         busses, bus_result = read_rows("ak.wwise.core.profiler.getBusses")
         if not bus_result.get("ok", True):
             return dict(bus_result)
-        for requested in args.bus_object_id:
+        requested_busses = (list(zip(args.bus_instance_handle, args.bus_pipeline_id, strict=True))
+            if args.bus_pipeline_id else [(identity, None) for identity in args.bus_object_id])
+        for requested, pipeline_id in requested_busses:
             matches = [
-                row
-                for row in busses
-                if str(row["objectGUID"]).casefold() == requested.casefold()
+                row for row in busses
+                if (row["pipelineID"] == pipeline_id if pipeline_id is not None
+                    else str(row["objectGUID"]).casefold() == requested.casefold())
                 and row["gameObjectID"] == voice["gameObjectID"]
             ]
             if len(matches) != 1:
@@ -11844,11 +11829,10 @@ def resolve_profiler_voice_path(
                     **dict(common),
                     "operation": "profiler-voice-contributions",
                     "agent_result": {
-                        "requested_bus_object_id": requested,
+                        ("bus_instance_handle" if pipeline_id is not None else "requested_bus_object_id"): requested,
                         "matching_bus_count": len(matches),
-                        "repair": (
-                            "choose one Bus identity active for the selected game object"
-                        ),
+                        "repair": ("refresh the bounded Profiler bus result for the selected voice and copy its current handle"
+                            if pipeline_id is not None else "choose one Bus identity active for the selected game object"),
                     },
                 }
             bus_pipeline_ids.append(int(matches[0]["pipelineID"]))
@@ -15246,7 +15230,7 @@ def dispatch_command(
             version=detected_version,
             time=args.time,
             voice_pipeline_id=voice_pipeline_id,
-            bus_pipeline_ids=bus_pipeline_ids,
+            bus_pipeline_ids=None if args.bus_path == "wwise-default" else bus_pipeline_ids,
         )
         return dispatch_profiler_voice_contributions_request(
             request,
