@@ -5,6 +5,30 @@ native acknowledgement and independently observed effect. It neither excludes
 operations nor converts failed evidence to PASS. Exact branch bindings and
 required program/native receipts remain necessary for ticket acceptance.
 
+## User-approved risk-based evidence method
+
+Reviewed successor `ac6ea4c1` implements the 2026-10-24 decision in SPEC.
+The exact source-owned map is
+`tests/fixtures/runtime/runtime-risk-policy-r124.json`. It preserves all 6,292
+existing six-reader branch identities and 58 host/version routes. Of the original
+native requirements, 2,076 return-shape/value-preservation leaves use conditional
+program proof; 316 actual identity, state, measured-data and semantic anchors
+retain native proof. These are requirement counts, not passing coverage.
+
+The existing portable importer validates original packages under their original
+policies before admitting an exact approved successor. Product completion then
+requires the listed same-route native anchors; missing, stale, empty or unrelated
+native evidence cannot be replaced by synthetic program rows. Historical strict
+policies and failures remain unchanged. No caller-selected downgrade or generic
+cross-build equivalence was added. Current source reconciliation and successor
+publication are still required before this method yields current coverage.
+
+Use retained facts first and collect only missing business-risk evidence. Do not
+create another native run just to force every boolean value, two metadata entries
+or repeated result rows. Actual metadata association, recursive-child meaning,
+driver alternatives, applicable ray identifiers and host/version differences
+still need their listed native evidence.
+
 ## Standalone controls and workflow observations
 
 | Control / versions | Supported standalone proof | Why the available observation is different |

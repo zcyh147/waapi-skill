@@ -36,7 +36,16 @@ The user separately approved risk-based native acceptance in
 remains five-version, while native work targets actual business semantics,
 nonempty attribution, host/version differences and cleanup rather than forcing
 every return-value combination. Its scoped evidence-policy implementation and
-review are still in progress; this entry grants no resulting coverage credit.
+review completed in successor `ac6ea4c1`; current publication remains pending.
+The exact 6,292-ID roster is unchanged, 2,076 preservation leaves require conditional
+program proof, and 316 semantic anchors remain native. Focused causal
+Gateway→portable importer→consumer checks passed, including nine removal/tamper
+variants and immutable historical-policy checks (2 tests, 60.09s), 25 existing
+five-version malformed-result controls (4.35s), and the final positive/scope
+isolation selection (2 tests, 8.04s). Earlier causal RED and development failures
+are preserved in the implementation handoff. These are focused mechanism checks,
+not a current 6,292-branch evaluation or full Program/Nonlive gate. No native rerun
+or Fresh test was used for this evidence-policy change.
 
 ## 2026-10-24 R123 source compatibility and IntegrationDemo checkpoint
 
