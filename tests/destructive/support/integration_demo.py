@@ -17,6 +17,8 @@ from wwise_waapi.capabilities import CapabilityCatalog
 
 BUILD = '2025.1.11.9262'
 SCOPE = 'integration-demo-prepare-area1-loaded-media'
+INSTALLED_BUNDLE = Path('/Applications/Audiokinetic/Wwise_2025.1.11.9262/Wwise.app')
+INSTALLED_SCHEMAS = Path('/Library/Application Support/Audiokinetic/Wwise 2025.1.11.9262/Authoring/Data/Schemas')
 URIS = tuple('ak.wwise.' + suffix for suffix in (
     'core.getInfo', 'core.getProjectInfo', 'waapi.getSchema',
     'core.remote.getAvailableConsoles', 'core.remote.getConnectionStatus',
@@ -141,6 +143,25 @@ class IntegrationDemoObservation:
         return {'build': self.build, 'scope': self.scope, 'identity': self.identity,
             'source_files': self.source_files, 'schemas': receipts,
             'boundary': '12 selected schemas and 6 source definitions only; not a full native catalog'}
+
+def installed_demo_fixture_context(environment, *, root):
+    """Closed one-case factory for the existing batch driver, before allocation."""
+    config = Path(environment.get('WWISE_TEST_CONFIG', ''))
+    raw = _read(config)
+    expected = {'wwise_console': str(INSTALLED_BUNDLE / 'Contents/Tools/WwiseConsole.sh'),
+        'sample_project': str(INSTALLED_BUNDLE.parent / 'SDK/samples/IntegrationDemo/WwiseProject/IntegrationDemo.wproj'),
+        'sandbox_root': str(root / 'owned/sandbox-root')}
+    if json.loads(raw) != {'versions': {'2025.1': expected}}:
+        raise ValueError('Integration Demo requires its explicit isolated exact-build source/root config')
+    for key, field in (('WWISE_CONSOLE', 'wwise_console'),
+            ('WWISE_SAMPLE_PROJECT_PATH', 'sample_project'), ('WWISE_SANDBOX_ROOT', 'sandbox_root')):
+        if environment.get(key) != expected[field]:
+            raise ValueError('Integration Demo environment differs from its isolated config: ' + key)
+    _read(Path(expected['sample_project']))
+    context = IntegrationDemoObservation.from_installed(bundle=INSTALLED_BUNDLE, schemas=INSTALLED_SCHEMAS)
+    context.validate(version='2025.1', host_kind='wwise-authoring', console=expected['wwise_console'])
+    return context, (str(config), sha256(raw).hexdigest(), config.stat().st_mtime_ns)
+
 
 NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_integration_demo_loaded_media')

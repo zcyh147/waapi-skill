@@ -582,8 +582,8 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
         raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
     if any(os.getenv('WWISE_VERSION') not in OWNED_AUTHORING_NODE_VERSIONS[nodeid] for nodeid in selected):
         raise pytest.UsageError('Selected owned Authoring node is not available on the requested version')
-    if DEMO_NODEID in selected:
-        raise pytest.UsageError('Integration Demo requires its explicit developer observation lifecycle owner')
+    if DEMO_NODEID in selected and selected != (DEMO_NODEID,):
+        raise pytest.UsageError('Integration Demo requires its exact single named node')
     if (set(selected).intersection(DIAGNOSTIC_NODEIDS)
             and (len(selected) != 1 or os.getenv('WWISE_VERSION') != '2024.1')):
         raise pytest.UsageError('Media preservation diagnosis requires only its one matching 2024 Authoring node')
@@ -609,22 +609,39 @@ def configure_authoring_batch_owner(config, items, *, repo_root: Path):
             or root != root.resolve(strict=False)):
         raise ValueError('Owned Authoring batch root must be a fresh absolute path without aliases')
     source_context = candidate_source_context(repo_root)
+    live_environment = dict(os.environ)
+    private_arguments = {}
+    if selected == (DEMO_NODEID,):
+        from tests.destructive.support.integration_demo import installed_demo_fixture_context
+        developer_context, config_proof = installed_demo_fixture_context(live_environment, root=root)
+        private_arguments = {'developer_observation': developer_context}
     def check_frozen_source(_sandbox, _assets, _io):
         if candidate_source_context(repo_root) != source_context:
             raise ValueError('Owned Authoring source candidate changed before launch')
+        if selected == (DEMO_NODEID,):
+            if installed_demo_fixture_context(live_environment, root=root) != (developer_context, config_proof):
+                raise ValueError('Integration Demo source/config changed before launch')
+            receipt = {'contract': 'waapi-skill.integration-demo-fixture-context/v1',
+                'nodeid': DEMO_NODEID, 'build': developer_context.build,
+                'context_identity': developer_context.identity,
+                'source_config': dict(zip(('path', 'sha256', 'mtime_ns'), config_proof)),
+                'source_project': live_environment['WWISE_SAMPLE_PROJECT_PATH'], 'owned_root': str(root / 'owned')}
+            destination = root / 'evidence/integration-demo-fixture-context.json'
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with destination.open('x', encoding='utf-8') as stream:
+                json.dump(receipt, stream, ensure_ascii=False, indent=2)
         if selected == (METER_2024_NODEID,):
             stage_owned_2024_meter_media(_sandbox, _io)
         if selected == (TRANSPORT_OLDER_NODEID,):
             stage_owned_older_transport_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
         if selected in ((CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,)):
             stage_owned_capture_read_media(_sandbox, _io, version=os.environ['WWISE_VERSION'])
-    live_environment = dict(os.environ)
-    if selected in ((PROFILER_CAPTURE_NODEID,), (CURSOR_MOVES_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
+    if selected in ((PROFILER_CAPTURE_NODEID,), (CURSOR_MOVES_NODEID,), (READERS_2025_NODEID,), (CAPTURE_READS_NODEID,), (CAPTURE_MISSING_NODEID,), (LOADED_EVENT_NODEID,), (DEMO_NODEID,), (METER_2024_NODEID,), (TRANSPORT_SEMANTICS_NODEID,), (TRANSPORT_MIXED_NODEID,), (TRANSPORT_OLDER_NODEID,)):
         live_environment['AK_AUTOMATION_MODE'] = '1'
     owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
         scenario_root=root, live_environment=live_environment, host_kind='wwise-authoring',
         launch_environment_overrides={'HOME': str(root / 'owned/private-home')},
-        prelaunch_hook=check_frozen_source)
+        prelaunch_hook=check_frozen_source, **private_arguments)
     owner.start()
     try:
         return install_authoring_batch(config, owner=owner, repo_root=repo_root, selected_nodeids=selected)
