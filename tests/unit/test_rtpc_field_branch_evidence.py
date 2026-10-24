@@ -299,11 +299,29 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
     candidate = 'current-focused-consumer'
     branch = {'id': 'exact-branch', 'shape_sha256': 'exact-shape', 'route': 'exact-route'}
     descriptor = {'sha256': 'original-run'}
-    # This synthetic unchanged-source control uses the immutable current-product
-    # candidate; 50368844 now needs the separately reviewed four-file bridge.
-    context = {'candidate': 'a51e0c3526f513716b52412e46cf2ee0ec867eb6'}
     files = ['skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py',
         'skills/waapi-skill/wwise_waapi/dispatcher.py']
+    root = tmp_path / 'fixture-repo'
+    root.mkdir()
+    hooks = tmp_path / 'empty-hooks'
+    hooks.mkdir()
+    def fixture_git(*args):
+        return subprocess.check_output(['git', '-c', 'user.name=Fixture',
+            '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false',
+            '-c', 'core.hooksPath=' + str(hooks), *args], cwd=root, text=True).strip()
+    fixture_git('init', '--quiet')
+    original_gateway = b"def execute_gateway():\n    return 'original'\n"
+    for name, raw in zip(files, (b'# fixture launcher\n', original_gateway, b'# fixture dispatcher\n')):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+    fixture_git('add', '--', *files)
+    fixture_git('commit', '--quiet', '-m', 'Original fixture sources')
+    original_candidate = fixture_git('rev-parse', 'HEAD')
+    (root / files[1]).write_bytes(b"def execute_gateway():\n    return 'current'\n")
+    fixture_git('add', '--', files[1])
+    fixture_git('commit', '--quiet', '-m', 'Different fixture Gateway')
+    context = {'candidate': fixture_git('rev-parse', 'HEAD')}
     actual = subprocess.run
     calls = []
     def observed(command, *args, **kwargs):
@@ -313,7 +331,7 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
     monkeypatch.setattr(subprocess, 'run', observed)
     cache = {}
     for selected, expected in [(files[:2], 2), (files[:2], 2), (files, 5)]:
-        sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in selected}
+        sources = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in selected}
         binding = {'relevant_sources': selected, **{key: {'source': files[1] + '#execute_gateway'}
             for key in ('construction', 'validation', 'verifier')}}
         proof = {'contract': 'waapi-skill.branch-evidence-equivalence/v1',
@@ -324,17 +342,20 @@ def test_historical_git_map_key_keeps_exact_source_selection(tmp_path, monkeypat
             'reviewed_reason': 'Focused unchanged historical source selection', 'sources': sources}
         binding['native_equivalence'] = write_json(tmp_path / f'proof-{len(selected)}.json', proof)
         completion.validate_native_source(context, descriptor, branch, candidate, binding,
-            tmp_path, audit.ROOT, historical_sources=cache)
+            tmp_path, root, historical_sources=cache)
         assert len(calls) == expected
 
-    original = completion.historical_source_seals(audit.ROOT,
-        '503688449ba9f9db964a5fb7116ac6be2fb07198', files[:2], cache)
+    original = completion.historical_source_seals(root, original_candidate, files[:2], cache)
     assert len(calls) == 7
-    assert original[files[1]] == '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03'
+    assert original[files[1]] == hashlib.sha256(original_gateway).hexdigest()
     assert original[files[1]] != sources[files[1]]
-    assert completion.historical_source_seals(audit.ROOT,
-        '503688449ba9f9db964a5fb7116ac6be2fb07198', files[:2], cache) == original
+    assert completion.historical_source_seals(root, original_candidate, files[:2], cache) == original
     assert len(calls) == 7
+    other_root = tmp_path / 'not-the-fixture-repo'
+    other_root.mkdir()
+    with pytest.raises(ValueError, match='original native source candidate unavailable'):
+        completion.historical_source_seals(other_root, context['candidate'], files[:2], cache)
+    assert len(calls) == 8
 
 
 @pytest.mark.parametrize('damage,reason', [
