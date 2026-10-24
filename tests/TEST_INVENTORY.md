@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R126 older Authoring LoadedMedia evidence
+
+Reviewed integration `0f0fd614` adds exact 2023.1/2024.1 Authoring support
+through separately attributed evidence: successful older empty native calls,
+the retained 2025.1.11.9262 nonempty SDK observation, matching documented
+semantics and resolved schemas, and current per-version public replay. It does
+not claim older nonempty native execution. Original BLOCKED parent workflows,
+archives and source maps remain unchanged. Console routes are not included.
+
+Eight focused checks passed in 356.87s, including three actual post-teardown
+public consumer packets, collision-safe composition of all 93 Authoring rows,
+and reused-packet corruption and boundary controls. Independent review found no
+remaining scoped issue. The new module is registered in the Program manifest;
+its manifest check passed in 0.31s. Verbatim documentation fixture bytes are
+preserved through scoped Git attributes. No SDK installation, native rerun,
+Fresh run or broad gate was performed. Global publication and whole-ticket
+acceptance remain pending.
+
 ## 2026-10-24 R126 retained-read admission and opaque-result policy
 
 Reviewed integration `a7414f3b` admits the exact106 newly needed Console
