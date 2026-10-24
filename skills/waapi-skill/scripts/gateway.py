@@ -12687,7 +12687,7 @@ def dispatch_runtime_inspection_business_read(
             or len(matches) != 1
         ):
             raise GatewayResultShapeError(
-                "Transport handle does not resolve to exactly one live Authoring transport.",
+                "Transport handle does not resolve to exactly one live transport.",
                 details={
                     "transport_handle": args.runtime_inspection_business_request.get(
                         "transport_handle"
@@ -13754,7 +13754,7 @@ def dispatch_business_runtime_control_plan(
             or len(matches) != 1
         ):
             raise GatewayResultShapeError(
-                "Transport handle does not resolve to exactly one live Authoring transport.",
+                "Transport handle does not resolve to exactly one live transport.",
                 details={
                     "transport_handle": plan.get("transport_handle"),
                     "match_count": len(matches),

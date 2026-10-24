@@ -95,11 +95,16 @@ def _console_context(tmp_path, monkeypatch, fault=None):
             client.calls.append((uri, deepcopy(args), deepcopy(options)))
             row = {'pipelineID': 0, 'playingID': 42, 'objectGUID': car, 'objectName': 'Outside_Idle_1000',
                 'gameObjectID': 123, 'gameObjectName': 'Transport/Soundcaster', 'isStarted': True}
-            return {'return': [] if fault == 'empty' else [row]}
+            return {'return': [] if fault == 'empty' else
+                [dict(row, pipelineID=index, playingID=42 + index) for index in range(65)]
+                if fault == 'partial' else [row]}
         return original(uri, args, options)
     client.call = call
     if fault == 'missing-media':
         (runtime.sandbox.sandbox_path / profiler_capture.CAPTURE_CAR_MEDIA).rename(runtime.state_dir / 'removed.wav')
+    if fault == 'changed-media':
+        with (runtime.sandbox.sandbox_path / profiler_capture.CAPTURE_CAR_MEDIA).open('ab') as stream:
+            stream.write(b'changed')
     return context
 
 
@@ -108,7 +113,7 @@ def test_console_car_capture_reaches_actual_archived_final_category(tmp_path, mo
     context = _console_context(tmp_path, monkeypatch)
     workflow, runtime, client, _, _ = context
     from tests.destructive.support.console_profiler_probe import collect_console_profiler, NODE_NAME
-    collect_console_profiler(runtime)
+    getattr(workflow, NODE_NAME)(runtime)
     pending, final = _finish(context, tmp_path, monkeypatch, [(NODE_NAME, None)])
     assert final['invocation']['outcome'] == 'PASS'
     category, = final['categories']
@@ -127,7 +132,7 @@ def test_console_car_capture_reaches_actual_archived_final_category(tmp_path, mo
     assert final['residual_state']['sandbox'] == 'deleted'
 
 
-@pytest.mark.parametrize('fault', ['missing-media', 'nonplaying', 'empty', 'cleanup'])
+@pytest.mark.parametrize('fault', ['missing-media', 'changed-media', 'nonplaying', 'empty', 'partial', 'cleanup'])
 def test_console_probe_retains_blocked_failure_and_finishes_owned_cleanup(tmp_path, monkeypatch, fault):
     from tests.unit.test_profiler_input_native_fixture import _finish
     from tests.destructive.support.console_profiler_probe import collect_console_profiler, NODE_NAME
@@ -145,7 +150,7 @@ def test_console_probe_retains_blocked_failure_and_finishes_owned_cleanup(tmp_pa
     assert report['public_call_count'] <= 128
     assert Path(category['observation_path']).stat().st_size <= report['limits']['report_bytes']
     uris = [uri for uri, _, _ in client.calls]
-    if fault == 'missing-media':
+    if fault in ('missing-media', 'changed-media'):
         assert not any(uri.startswith('ak.wwise.core.transport.') for uri in uris)
     else:
         assert uris.count('ak.wwise.core.transport.create') == uris.count('ak.wwise.core.transport.destroy') == 1
@@ -158,10 +163,16 @@ def test_console_probe_retains_blocked_failure_and_finishes_owned_cleanup(tmp_pa
         assert voices['outcome'] == 'BLOCKED'
         assert voices['evidence']['complete'] is True and voices['evidence']['nonempty'] is False
         assert uris.count('ak.wwise.core.profiler.getVoices') == 1
+    if fault == 'partial':
+        voices = report['outcomes']['voices']
+        assert voices['outcome'] == 'BLOCKED' and voices['evidence']['complete'] is False
+        assert voices['evidence']['nonempty'] is True
+        assert uris.count('ak.wwise.core.profiler.getVoices') == 1
     if fault == 'cleanup':
         assert report['outcomes']['voices']['outcome'] == 'PASS'
         assert report['cleanup']['complete'] is False
         assert report['cleanup']['errors'][0]['action'] == 'stop-transport'
         assert uris.count('ak.wwise.core.profiler.stopCapture') == 1
+        assert uris.count('ak.wwise.core.profiler.enableProfilerData') == 2
     else:
         assert report['cleanup']['complete'] is True
