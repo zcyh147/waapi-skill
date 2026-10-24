@@ -567,7 +567,7 @@ successful startup under that invocation across the five installed builds,
 not a universal dialog-suppression guarantee. No Fresh or native Windows run,
 broad Program/Non-live gate, or whole-#186 acceptance is claimed here.
 
-## 2026-10-24 R122 primary-source Console log version boundary
+## 2026-10-24 R122 Console log version boundary and 2025 getter/clear proof
 
 Matching build9143 SDK release note `whatsnew_2025_1_4.html`, WG-80630,
 states that Console waapi-server now publishes `log.itemAdded` and returns
@@ -578,10 +578,18 @@ the generic API-page blanket-empty wording for Console 2025.1.4 onward.
 Pinned older Console Topic monitoring is a documented native feature boundary;
 valid reflected add/clear routes remain available with schema-only verification.
 R98/R121 original FAILs, receipts, transactions and quarantines remain unchanged.
-2025 getter/clear effect evidence is pending one separately reviewed owned
-add → post-get → clear → retained verifier-get workflow, not an older retry.
-Program fakes cover this final-writer chain and truthful partial failures; no
-new native run is claimed here. Authoring behavior and catalog counts are unchanged.
+Frozen candidate `1f32f9f223cebe11076ca07f168f29fad99adfab` then passed one
+separately reviewed Mac Console 2025.1.7.9143 owned add → post-get → clear →
+retained verifier-get workflow in **9.49s**, exit 0. The exact General/Message
+marker appeared in the complete post-add getter and complete nonempty clear
+Preview prestate (one row each); the retained complete post-clear getter had
+zero rows. Both separately previewed, once-only transactions verified. Source
+content, tree metadata and project mtime were unchanged; the sandbox was deleted,
+owned processes cleaned up and port32743 was free. Evidence is
+`.waapi-skill-state/full-coverage/r122-console-log-getter-native-2025-r1/`
+(`root-review.json`, `result.json` and final `evidence/category.jsonl`). This
+proves the selected 2025 getter/clear workflow; older FAILs retain their original
+verdicts and no other host/runtime or whole-#186 acceptance is claimed.
 
 ## 2026-10-24 R98 Console log and R99 Authoring startup observations
 
@@ -619,7 +627,7 @@ Source content/mtime/tree matched, the failed sandbox remains quarantined,
 no native processes remained, and port32343 was free after teardown. Evidence
 is `.waapi-skill-state/full-coverage/r121-console-log-peer-native-2023-r1/`
 with `root-review.json`, category evidence and the partial/final receipt.
-No 2024/2025 retry, new diagnostic or native repeat followed this attempt.
+That diagnostic performed no 2024/2025 retry.
 
 Separately, candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` launched owned
 Authoring 2021.1.14.8108 with the documented `-AutomationMode` argument and
