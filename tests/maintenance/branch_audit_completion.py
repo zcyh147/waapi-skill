@@ -175,6 +175,8 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/fixtures/runtime-loaded-media/console-review.json',
                  'tests/unit/test_console_loaded_media_evidence.py',
                  'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
+                 'tests/support/extra_runtime_read_evidence.py', 'tests/unit/test_extra_runtime_read_evidence.py',
+                 'tests/fixtures/runtime-extra-reads/support-review.json',
                  'tests/support/runtime_remaining_evidence.py', 'tests/support/runtime_log_retained_evidence.py',
                  'tests/fixtures/runtime-log/retained-log-support.json',
                  'tests/fixtures/runtime-log/r122-support.json',

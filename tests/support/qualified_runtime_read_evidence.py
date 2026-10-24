@@ -456,6 +456,9 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
 
 def qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding, root, edges, historical_sources):
     assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
+    if assessment.get('contract') == 'waapi-skill.extra-runtime-read-assessment/v1':
+        from tests.support.extra_runtime_read_evidence import qualified_result
+        return qualified_result(descriptor, assessment, branch, candidate, scope_kind, base, binding, root, edges)
     if assessment.get('contract') == 'waapi-skill.retained-log-assessment/v1':
         from tests.support.runtime_log_retained_evidence import qualified_result
         return qualified_result(descriptor, assessment, branch, candidate, scope_kind, base, binding, root, edges)
