@@ -904,3 +904,63 @@ def test_current_source_review_preserves_complete_original_public_reads(tmp_path
     bad_review = {**review, 'program_capture' if category == 'qualified' else 'program_replay':bad_replay}
     with pytest.raises(ValueError, match='complete|Complete|preserve'):
         validate(bad_review)
+
+
+@pytest.fixture(scope='module')
+def r105_seed_inventory():
+    # Slice committed rows, not a second inventory generator. Include exact
+    # reference edges so the ordinary final consumer retains its context rules.
+    stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    expected_path = FIXTURE / 'r105-2022-seed-selectors.json'
+    assert sha(expected_path.read_bytes()) == '0af89b4294b789f910a876fbe2d8debf9944ea0a128f6521bd2207a03c08e626'
+    expected = json.loads(expected_path.read_bytes())['profiles']
+    route_ids = {p['route'] for p in expected.values()}
+    native = deepcopy(stored['native_coverage'])
+    native['routes'] = [r for r in native['routes'] if r['id'] in route_ids]
+    selected = {i for p in expected.values() for i in p['matching_missing_ids']}
+    serialized = json.loads((audit.ROOT / 'tests/fixtures/branch-evidence/product/runtime-fixed-reads-r121/selected-results.json').read_bytes())
+    native['obligations'] = [r for r in serialized if r['id'] in selected or r['route'] in route_ids and r['kind'] == 'reference']
+    result = {'sources':stored['sources'], 'routes':[r for r in stored['routes'] if r['id'] in {n['public_route'] for n in native['routes']}],
+        'native_coverage':native}
+    native['candidate_sha256'] = completion.candidate_identity(audit.ROOT, result, native['catalogs'], digest=audit.digest)
+    return result, expected
+
+
+@pytest.mark.parametrize('name', ('getVoices','getBusses'))
+def test_r105_2022_strict_seed_packets_reach_existing_final_consumer(tmp_path, r105_seed_inventory, name):
+    from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
+    from tests.support.runtime_observation_evidence import archive_reader
+    inventory, expected = r105_seed_inventory
+    profile = expected[name]
+    originals = audit.ROOT / 'tests/fixtures/branch-evidence/product/runtime-rtpc-fields-r109/originals/2022.1'
+    read = archive_reader({'artifact':'original-closure.json.gz', 'sha256':sha((originals/'original-closure.json.gz').read_bytes())},originals)
+    raw = read(profile['locator']);assert sha(raw) == profile['sha256']
+    packet = json.loads(raw)
+    calls = []
+    receipt, native, context, trace = public_fixed_read(tmp_path/'public',version='2022.1',
+        uri=profile['uri'],position='23637',rows=packet['result']['return'],public_calls=calls)
+    assert receipt['argv'] == profile['public_argv'] and native['result'] == packet['result']
+    capture = tmp_path/'capture.json'
+    write_program_receipt(capture,receipt,native,nodeid='r105-seed-'+name,
+        phase_reports=dict.fromkeys(('setup','call','teardown'),'passed'),source_context=context,native_reads=trace,public_calls=calls)
+    selected = set(profile['matching_missing_ids'])
+    index = write_fixed_bundle(tmp_path/'bundle',capture,originals,inventory=inventory,selected=selected)
+    policy = json.loads((index.parent/'requirements.json').read_bytes())
+    published = json.loads((audit.ROOT/'tests/fixtures/branch-evidence/product/runtime-fixed-reads-r121/requirements.json').read_bytes())['branches']
+    assert policy['branches'] == {i:published[i] for i in selected}
+    document,base,_ = audit.portable_binding_inputs(index,policy)
+    def observed(bindings):
+        result = completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policy)
+        return {r['id']:r for r in result['obligations'] if r['id'] in selected}
+    result = observed(document)
+    assert set(result) == selected and len(selected) == (57 if name=='getVoices' else 36)
+    assert all(r['state']=='verified' for r in result.values()),json.dumps(result)
+    identity = next(i for i in selected if i.endswith('/properties/objectGUID'))
+    binding = document['bindings'][identity]
+    proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'],base)
+    # A re-sealed sibling packet/category cannot become this exact seed URI.
+    proof['mapping']['category'] = 'r105-seed-'+('getBusses' if name=='getVoices' else 'getVoices')
+    binding['runtime_observation_attachment'] = write_json(base/'foreign-seed-proof.json',proof)
+    bad = observed(document)[identity]
+    assert bad['evidence_results']['native']['outcome']=='missing',json.dumps(bad)
+    assert any(token in bad['evidence_results']['native']['reason'] for token in ('seed','profile','original')),json.dumps(bad)
