@@ -2039,7 +2039,7 @@ def test_log_controls_disclose_bounded_observation_and_concurrency_limits(tmp_pa
     assert verification["maximum_channel_bytes"] == 65536
     assert verification["row_identity"] == "none; messageId and time are not treated as unique or ordered"
     assert verification["console_add_observer"]["topic"] == "ak.wwise.core.log.itemAdded"
-    assert "addition-only" in verification["console_clear_boundary"]
+    assert verification["native_log_observation_policy"]["console_minimum_version"] == "2025.1.4"
 
 
 class _LogControlClient(_RuntimeControlDraftClient):

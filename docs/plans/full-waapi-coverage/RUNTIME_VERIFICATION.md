@@ -14,7 +14,7 @@ required program/native receipts remain necessary for ticket acceptance.
 | `registerMeter` / `unregisterMeter`, 2024–2025 | Native result and balanced cleanup; registration membership is not independently verified. | `getMeters` is the documented data observer and the owned flows prove attributable meter data. Its requested capture time can refer to retained/pre-existing data; it does not establish current membership, reference counts or unregister timing. |
 | `transport.prepare`, 2022–2025 | Acknowledged preparation of the bound object. | Transport state is playback state. LoadedMedia describes SDK preparation and is not a documented postcondition of this Authoring command. Capture-log Prepare activity has no established attributable completion field for this call. |
 | `transport.useOriginals`, 2023–2025 | Accepted Original/Converted selection; actual global mode/restoration unverified. | File paths describe available assets. Playback state, voice/streaming data and the reflected state Topics do not establish this toggle. |
-| Console `log.clear`, 2023–2025 | Acknowledged channel clear; disappearance of prior entries unverified. | The matching SDK documents empty Console `log.get` results. `log.itemAdded` observes additions, not removals or clear completion. Silence cannot establish clearing. |
+| Console `log.clear` | Known pre-fix builds remain acknowledgment/schema-only. On 2025.1.4 or newer, bounded getter comparison can verify the effect; native removal evidence is still pending. | WG-80630 introduced Console getter contents and Topic publication in 2025.1.4. A native removal proof requires an owned nonempty prestate and retained post-clear getter; valid idempotent empty clearing stays available. |
 
 These are truthful result-schema boundaries for the current standalone
 contracts. A conditional read of already available meter/capture data may
@@ -30,16 +30,18 @@ No universal prior-state restoration or waveform requirement is added here.
 
 ## Suitable observers and remaining evidence
 
-- Console `log.addItem` has a suitable `log.itemAdded` observer, already used by
-  the Gateway around its single dispatch. The retained 2025 event proves that
-  exact effect. The 2023/2024 bounded waits received no event; they remain
-  unresolved observations, not native absence or an inherent Console limit.
-  R121's one distinct 2023 two-session diagnostic also observed zero events
-  after independent ACK and one acknowledged addition; both unsubscribed and
-  the original schema-only verification/FAIL remains unchanged. This narrows
-  the retained observation without establishing native absence or the cause.
-  An unchanged retry is not the next step without a distinct source-backed
-  diagnosis. Authoring getter-based add/clear facts remain separate.
+- WG-80630, in the matching 2025.1.7.9143 SDK release note
+  `whatsnew_2025_1_4.html`, establishes Console `log.itemAdded` publication and
+  `log.get` contents from 2025.1.4. The pinned 2021–2024 builds predate this
+  native feature. Their reflected Topic remains in the catalog, while public
+  monitoring returns the documented native build boundary before subscription.
+  Valid older `addItem`/`clear` commands remain execute-once, schema-only controls.
+  Unknown build facts do not imply observation capability; Authoring is unchanged.
+  R98 and R121 zero-event failures remain unchanged historical failures, now
+  explained by this primary source rather than timeout inference. R98's 2025
+  empty getter was pre-add state, not a post-add observation. Its exact event
+  remains valid addition evidence. The next distinct native fact is one owned
+  2025 addition, nonempty post-add getter, clear and retained verifier getter.
 - The 2025 `moveCursor` returned time has a suitable independent user-cursor
   getter. R108 observed all four alternatives on Mac Authoring 2025.1.7.9143:
   first, next, last and previous each matched that getter. The retained PASS

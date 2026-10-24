@@ -567,6 +567,22 @@ successful startup under that invocation across the five installed builds,
 not a universal dialog-suppression guarantee. No Fresh or native Windows run,
 broad Program/Non-live gate, or whole-#186 acceptance is claimed here.
 
+## 2026-10-24 R122 primary-source Console log version boundary
+
+Matching build9143 SDK release note `whatsnew_2025_1_4.html`, WG-80630,
+states that Console waapi-server now publishes `log.itemAdded` and returns
+results with `log.get`. Member SHA-256 is
+`52e90027565b93b27f36af7a872f5f225ff686da6f880f6f1c8e41f4749cb150`;
+the same entry is present in installed build9262 documentation. This supersedes
+the generic API-page blanket-empty wording for Console 2025.1.4 onward.
+Pinned older Console Topic monitoring is a documented native feature boundary;
+valid reflected add/clear routes remain available with schema-only verification.
+R98/R121 original FAILs, receipts, transactions and quarantines remain unchanged.
+2025 getter/clear effect evidence is pending one separately reviewed owned
+add → post-get → clear → retained verifier-get workflow, not an older retry.
+Program fakes cover this final-writer chain and truthful partial failures; no
+new native run is claimed here. Authoring behavior and catalog counts are unchanged.
+
 ## 2026-10-24 R98 Console log and R99 Authoring startup observations
 
 Three separate Mac Console runs on candidate
@@ -578,9 +594,10 @@ Three separate Mac Console runs on candidate
 | 2024.1.13.9056 | FAIL, 18.27s | Acknowledged subscription and addition; zero observed events, schema-only verification. |
 | 2025.1.7.9143 | PASS, 8.65s | Exact unique General/Message event persisted at execution and reused by later verification; transaction verified. |
 
-All three observers unsubscribed. All three Console `log.get` snapshots were
-empty, including the successful event case; empty snapshots do not establish
-whether addition occurred. Timeouts prove neither native Topic absence nor a
+All three observers unsubscribed. All three Console `log.get` prestate snapshots were
+empty, including the successful event case. The 2025 snapshot preceded the
+addition; no post-add getter was collected by that run. Empty prestate does
+not contradict later addition delivery. Timeouts prove neither native Topic absence nor a
 callback defect. Source hash/mtime/tree and process/port cleanup were checked;
 failed sandboxes remain quarantined. Evidence roots below
 `.waapi-skill-state/full-coverage/` are
