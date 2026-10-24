@@ -37,8 +37,11 @@ admission. It allows four fixed reads in one owned session; diagnostic completio
 never grants alias or business coverage. No native diagnostic has run yet.
 
 The merge's sole manifest check passed in 0.30s; the fixed Program roster has
-354 entries. Source compatibility for the exact two product and two developer
-file changes remains a separate reviewed update. No full gate, Fresh or global
+354 entries. Reviewed source-compatibility successor `33ef8cf8` preserves all
+historical maps and advances only the exact two product and two developer-file
+changes. Its existing guard passed in 0.63s; independent review checked 27 full
+map comparisons and all 619 current Source hashes. No producer or native run
+was repeated for those hash changes. No full gate, Fresh or global
 coverage publication ran for this integration. #186 and the overall effort
 remain unfinished; all earlier failures and source attributions are retained.
 
