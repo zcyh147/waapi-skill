@@ -595,7 +595,7 @@ def runtime_inspection_business_versions(operation: str) -> tuple[str, ...]:
 
 
 def runtime_transport_requires_authoring(operation: str, version: str) -> bool:
-    """Keep older transport boundaries; 2025 Console behavior awaits owned proof."""
+    """Require Authoring for transport outside the packaged 2025.1 Console scope."""
     return operation.startswith("ak.wwise.core.transport.") and version != "2025.1"
 
 
