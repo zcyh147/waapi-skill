@@ -31,12 +31,12 @@ R118_CHANGES = {
         'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'},
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': 'c66426240e65d05559c1266ca32b52b3fd2caad08cf0309b37a892373747291d',
-        'after': '79ad5e85c651766af6caf9044f85edf373a133c732c770d1e7f26d286024dc5b'}}
+        'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'}}
 R118_SYMBOLS = {
     'scripts/gateway.py': ['runtime_authoring_host_required_payload: message only'],
     'wwise_waapi/runtime_inspection_business_contracts.py': [
-        'runtime_inspection_business_catalog_rows: remove pending development status only',
-        'runtime_transport_requires_authoring: docstring only']}
+        'runtime_inspection_business_catalog_rows: remove pending development status and expose matching registered Console transport versions',
+        'runtime_transport_requires_authoring: docstring and matching registered Console transport admission only']}
 
 
 def native_profile(branch):
@@ -49,13 +49,13 @@ def native_profile(branch):
             category_sha=CATEGORY_SHA, archive_sha=ARCHIVE_SHA, capture_sha=CAPTURE_SHA,
             category_file='r103-category.json', archive_file='r103-originals.json.gz',
             files=('r103-category.json','r103-originals.json.gz'), changes=REVIEWED_CHANGES, symbols=REVIEWED_SYMBOLS,
-            reason='Exact reviewed R103 seven-file read scope; full original request/array/current projection; no lifecycle or mutation effect credit')
+            reason='Exact reviewed R103 seven-file read scope; registered-version Console transport predicate/catalog delta leaves fixed reads unchanged; full original request/array/current projection; no lifecycle or mutation effect credit')
     if host == 'wwise-console' and uri == 'ak.wwise.core.profiler.getVoices':
         return dict(name='r118', candidate=R118_CANDIDATE, nodeid=R118_NODEID,
             category_sha=R118_CATEGORY_SHA, archive_sha=R118_ARCHIVE_SHA, capture_sha=R118_CAPTURE_SHA,
             category_file='r118-category.json', archive_file='r118-originals.json.gz',
             files=('r118-category.json','r118-originals.json.gz','r118-source-map.json'), changes=R118_CHANGES, symbols=R118_SYMBOLS,
-            reason='Exact reviewed R118 two-file presentation-only source transition; original Console2025 complete identity Voices at T6016; current issued observation/handle; no other native data/effect/Topic credit')
+            reason='Exact reviewed R118 two-file presentation and registered-version Console transport predicate/catalog source transition; fixed reads and Console2025 transport unchanged; original Console2025 complete identity Voices at T6016; current issued observation/handle; no other native data/effect/Topic credit')
     raise ValueError('No qualified fixed-reader native profile for this exact route')
 
 
@@ -491,7 +491,7 @@ def mappings(inventory, captured, route, selected=None):
     return found
 
 
-REVIEWED_CHANGES = {'skills/waapi-skill/scripts/gateway.py': {'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03', 'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'}, 'skills/waapi-skill/wwise_waapi/builders/schema.py': {'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d', 'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}, 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {'before': '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d', 'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'}, 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '691d93149f80e619539c40db64d1b9d34b86771b0660740eb948356c92a034e1', 'after': 'f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c', 'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'd3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12', 'after': '79ad5e85c651766af6caf9044f85edf373a133c732c770d1e7f26d286024dc5b'}, 'skills/waapi-skill/wwise_waapi/transport_action.py': {'before': '3f9828a964b75ce04cc683b8cf0479d4d82b4eddd05c7d26bb4cde6e0b096ec4', 'after': 'f1dfed2fc9e2697d37e022262d440a7d3ace7005d4f5e57b939d7550d7efa2a5'}}
+REVIEWED_CHANGES = {'skills/waapi-skill/scripts/gateway.py': {'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03', 'after': 'cd8367bee13c94d59e4880994468fd2cfd7cc1119969f65c881cfd7739785388'}, 'skills/waapi-skill/wwise_waapi/builders/schema.py': {'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d', 'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}, 'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {'before': '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d', 'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'}, 'skills/waapi-skill/wwise_waapi/operation_registry.py': {'before': '691d93149f80e619539c40db64d1b9d34b86771b0660740eb948356c92a034e1', 'after': 'f96a2233a98e03dd62de261a24b3f81876284af28f0973758cf1f8a805b5dd5a'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business.py': {'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c', 'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}, 'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {'before': 'd3ebc12976ef6d8976cf8d136ded7dbcd08cc0728ed365b4a0d70e9420fe2c12', 'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'}, 'skills/waapi-skill/wwise_waapi/transport_action.py': {'before': '3f9828a964b75ce04cc683b8cf0479d4d82b4eddd05c7d26bb4cde6e0b096ec4', 'after': 'f1dfed2fc9e2697d37e022262d440a7d3ace7005d4f5e57b939d7550d7efa2a5'}}
 REVIEWED_SYMBOLS = {
     'scripts/gateway.py': ['dispatch_runtime_inspection_business_read', 'dispatch_command:profiler-game-objects', 'fixed_command_route_payload', 'stable-read constant imports', 'build_parser', 'preflight_core_business_input', 'runtime_authoring_host_required_payload', 'dispatch_offline_command',
         'dispatch_business_runtime_control_plan', 'transport-host helper import; fixed readers unaffected'],
@@ -499,7 +499,7 @@ REVIEWED_SYMBOLS = {
     'wwise_waapi/builders/stable_reads.py': ['normalize_profiler_game_objects_result'],
     'wwise_waapi/runtime_inspection_business.py': ['RTPC-only guard/disclosure', 'Sequence/field-contract imports', 'materialize_runtime_inspection_business_request', 'normalize_runtime_inspection_result'],
     'wwise_waapi/runtime_inspection_business_contracts.py': ['transport-only earlier delta', 'field ceiling', 'profiler_result_field_choices', 'three row declarations', 'runtime_inspection_business_contract_data', 'runtime_transport_requires_authoring',
-        'runtime_inspection_business_catalog_rows: exact Console2025 admission and metadata-only finalization'],
+        'runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization'],
     'wwise_waapi/transport_action.py': ['expected_state; unrelated to fixed reads'],
     'wwise_waapi/operation_registry.py': ['verify_prepared_operation transport message; unrelated to fixed reads'],
 }

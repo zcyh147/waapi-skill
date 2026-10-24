@@ -537,7 +537,7 @@ RTPC_GUARD_CHANGE = {
 RTPC_REVIEWED_SOURCE_CHANGES = {
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
         'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
-        'after': '79ad5e85c651766af6caf9044f85edf373a133c732c770d1e7f26d286024dc5b'},
+        'after': '8f8aa5ce579dc9a0c895341b9c835e4e93060ea4c30f1525f0d2a31fc28883c1'},
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
@@ -551,7 +551,7 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
     'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': [
         'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data',
-        'runtime_transport_requires_authoring', 'runtime_inspection_business_catalog_rows: exact Console2025 transport admission and metadata-only finalization'],
+        'runtime_transport_requires_authoring', 'runtime_inspection_business_catalog_rows: exact registered-version Console transport admission and metadata-only finalization'],
     RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility',
         'Sequence/field-contract imports', 'materialize_runtime_inspection_business_request'],
@@ -569,7 +569,7 @@ RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed five-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
-    'Exact Console2025 transport admission/error-message/catalog-docstring finalization does not change these non-transport read paths; '
+    'Exact registered-version Console transport predicate/catalog admission and error-message/catalog-docstring finalization does not change these non-transport read paths; '
     'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
