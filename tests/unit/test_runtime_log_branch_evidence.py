@@ -130,6 +130,24 @@ def test_remaining_policy_is_exact_and_history_is_immutable():
         anchors=entry['required_native_anchor_ids']
         assert anchors==([]if entry['pointer']=='/resultSchema'else[entry['route']+'|/resultSchema'])
         assert policy(entry)['categories']==entry['categories']
+    from tests.support.runtime_remaining_evidence import counterexample_policy,preservation_gates
+    selected=[{**row,'id':identity,'shape_sha256':row['native_shape_sha256']}for identity,row in original.items()]
+    counters=set(reviewed['schema_counterexample_ids'])
+    assert len(counters)==4 and counters=={identity for identity in original if identity.endswith('/logCentralSeverity/@empty/string')}
+    policies={identity:policy(entry)for identity,entry in reviewed['entries'].items()}
+    for branch in selected:
+        if branch['id']in counters:policies[branch['id']]=counterexample_policy(branch)
+    gates=preservation_gates(audit.ROOT,policies,selected)
+    assert set(gates)==set(original)
+    assert all(gates[identity]==entry['required_native_anchor_ids']for identity,entry in reviewed['entries'].items())
+    counter=next(b for b in selected if b['id']in counters)
+    wrong=deepcopy(policies);wrong[counter['id']]['reason']='caller downgrade'
+    assert preservation_gates(audit.ROOT,wrong,[counter])[counter['id']] is None
+    stale={**counter,'shape_sha256':'0'*64}
+    with pytest.raises(ValueError,match='exact remaining'):
+        preservation_gates(audit.ROOT,policies,[stale])
+    unrelated={'id':'unrelated', 'route':'unrelated'}
+    assert preservation_gates(audit.ROOT,{'unrelated':{'categories':['program']}},[unrelated])=={}
 
 
 def native_log_rows(version):
@@ -359,7 +377,7 @@ def test_log_control_all_public_input_branches(request,tmp_path,version,console,
         message=retained.program_native_call(identity)['args'].get('message','unused')
     else:
         assert console and operation=='clear'and version in {'2023.1','2024.1'}
-        message='unused'  # Two actual same-target native ACK gates remain missing.
+        message='unused'  # Unimplemented native providers remain blocking.
     captures=[public_log_control(tmp_path/'actual-replay',uri,version=version,console=console,message=message,
         channel=None if operation=='addItem'else'general',severity=None)]
     channels=['general','soundbank-generation','audio-conversion','platform-settings-copy','waapi','project-load','source-control','lua']
@@ -478,7 +496,7 @@ def _severity_counterexample(path,branch,*,console):
     from tests.support.runtime_remaining_evidence import _code_bindings
     public_id='2025.1|function|'+uri
     binding={'branch_id':branch['id'],'native_shape_sha256':branch['shape_sha256'],'public_route':public_id,
-        'disposition':'schema_counterexample','empty_candidate':classification,'input':{'gateway_argv':argv},'dispatch_pointer':dispatch,
+        'disposition':'schema_counterexample','empty_candidate':classification,'input':{'gateway_argv':argv,'selector':observation},'dispatch_pointer':dispatch,
         'observation_pointer':observation,'reference_chain':chain,**_code_bindings(branch)}
     return record,binding
 

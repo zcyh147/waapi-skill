@@ -1,7 +1,8 @@
 """Closed R127 runtime policies and log adapters behind the ordinary evidence reader.
 
-Only exact source-owned rows qualify. Other remaining families retain their
-business gates but have no adapter here yet; generic evidence cannot unlock them.
+Only exact source-owned rows qualify. Log evidence is checked here; the closed
+Console LoadedMedia family delegates to its existing evidence helper. Other
+families retain business gates without an adapter; generic evidence cannot unlock them.
 """
 from copy import deepcopy
 from functools import lru_cache
@@ -605,7 +606,7 @@ def write_log_bundle(output,captures,*,inventory):
                     native_observations_sha256={'capture':capture['sha256'],'raw':raw['sha256']})
                 eq=write(prefix+'equivalence.json',{'contract':'waapi-skill.branch-evidence-equivalence/v1','from_candidate':R122_CANDIDATE,'to_candidate':candidate,
                     'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'native_route':route['id'],'evidence_sha256':native_run['sha256'],
-                    'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),'reviewed_reason':'Exact retained R122 log business facts/current full public replay; only reviewed existing Gateway host-bit finish delta; no generic host/version reuse',
+                    'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),'reviewed_reason':'Exact retained R122 log business facts/current full public replay and pinned complete reviewed packaged-source delta; no generic host/version reuse',
                     'sources':original['sources'],'runtime_remaining_source_review':desc('r122-support.json')})
                 index['runtime_observation_attachments'].append(write(prefix+'attachment.json',{'contract':'waapi-skill.runtime-observation-attachment/v1','branch_id':identity,'proof':proof,'evidence':nd,'native_equivalence':eq}))
             elif entry['role']=='native_business_anchor':
