@@ -5,6 +5,32 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R116 explicit Profiler field selection
+
+Reviewed product `2cc69b5d`, integrated at `cf8187a9`, adds repeatable
+`--result-field` choices to Voices, Busses and AudioObjects reads. The closed
+versioned vocabulary matches all 15 native version/URI profiles on both hosts.
+Requests preserve selected list order/repetition without appending identity
+fields; public data retains only requested reported fields. Actual returned
+identity still governs handle issuance. Presets, omission/empty selection,
+complete-result validation and immutable cached continuations remain intact.
+The 64-choice limit is disclosed as a Gateway resource ceiling.
+
+The public two-field case failed before repair and passed afterward. New
+controls initially recorded 87 passes and 14 fixture failures: scalar RMS
+fixtures contradicted the native array definition, and two assertions demanded
+unpromised result-object key order. Those failures are retained; only the
+failed/affected 24-case selection was rerun and passed. Compatibility/default
+checks passed 98 cases; immediate retention/reference neighbors passed 45.
+Independent review checked matching definitions, exact field dispatch/data,
+authority and caller preservation without rerunning tests.
+
+This closes the chosen-field implementation gap, not all reader evidence.
+R105 source reuse now needs an exact five-file/408-unchanged transition;
+R103 remains seven-file/406-unchanged. Current original-array replays and
+combined formal publication remain required. No new native/Fresh run or full
+gate is claimed by this increment.
+
 ## 2026-10-24 R114 qualified retained runtime reads
 
 Reviewed mechanism `265730db`, integrated at `792b8683`, admits exactly four
