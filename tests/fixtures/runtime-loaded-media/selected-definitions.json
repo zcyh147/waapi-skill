@@ -1,0 +1,25 @@
+{
+  "source": "/Library/Application Support/Audiokinetic/Wwise 2025.1.11.9262/Authoring/Data/Schemas/Definitions/waapi_definitions.json",
+  "source_sha256": "10ddde6eb15b41a9ca35ed1499b77bb4c9c4f0280a9f2927bd34be56e38f7316",
+  "definitions": {
+    "cursorTime": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "$ref": "#/definitions/profilerCursor"
+        }
+      ]
+    },
+    "profilerCursor": {
+      "type": "string",
+      "description": "Identify one of the global profiler cursors.",
+      "enum": [
+        "user",
+        "capture"
+      ]
+    }
+  }
+}
