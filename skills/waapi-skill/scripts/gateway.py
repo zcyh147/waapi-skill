@@ -392,6 +392,7 @@ from wwise_waapi.runtime_inspection_business import (  # noqa: E402  # pyright: 
     RuntimeInspectionBusinessError,
     materialize_runtime_inspection_business_request,
     normalize_runtime_inspection_result,
+    rtpc_validated_name_compatibility,
     profiler_pipeline_id_from_handle,
 )
 from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -12741,6 +12742,14 @@ def dispatch_runtime_inspection_business_read(
             },
             error_code="RUNTIME_INSPECTION_RESULT_INVALID",
         ) from exc
+    if normalized is not None and args.api == "ak.wwise.core.profiler.getRTPCs" and result_validation is not None:
+        # Only the successful normalizer establishes the present-name string
+        # guard; conservative schema traversal alone must not claim that check.
+        compatibility = rtpc_validated_name_compatibility(detected_version)
+        if compatibility is not None:
+            from dataclasses import replace
+            result_validation = replace(result_validation,
+                compatibility_rules=(*result_validation.compatibility_rules, compatibility))
     if normalized is not None and any(field in normalized for field in ("return", "meters", "items")):
         import time
         from wwise_waapi.runtime_inspection_observations import RuntimeInspectionObservationStore, observation_pipeline_handle, pipeline_key
