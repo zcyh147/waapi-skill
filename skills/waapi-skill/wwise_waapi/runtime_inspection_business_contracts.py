@@ -100,6 +100,8 @@ AUDITION_ACTION_MEANINGS = {
     "play-directly": "playDirectly",
 }
 
+MAX_PROFILER_RESULT_FIELDS = 64
+
 PROFILER_RETURN_VIEWS = {
     PROFILER_GET_AUDIO_OBJECTS_URI: {
         "summary": (
@@ -232,6 +234,12 @@ def profiler_return_views(operation: str, version: str) -> dict[str, tuple[str, 
     views["capture-defaults"] = None
     views["empty-selection"] = ()
     return views
+
+
+def profiler_result_field_choices(operation: str, version: str) -> tuple[str, ...]:
+    """Closed choices matching the version's complete pinned return vocabulary."""
+    return profiler_return_views(operation, version)["diagnostics"]
+
 
 PROFILER_CAPTURE_DATA_CHOICES = {
     "2021.1": (
@@ -512,7 +520,7 @@ for _operation, _versions in _PROFILER_ROW_READS.items():
         PROFILER_GET_BUSSES_URI,
         PROFILER_GET_VOICES_URI,
     }:
-        _optional.append("result_view")
+        _optional.extend(("result_view", "result_fields"))
     if _operation in {PROFILER_GET_AUDIO_OBJECTS_URI, PROFILER_GET_BUSSES_URI}:
         _optional.append("bus_instance_handle")
     if _operation == PROFILER_GET_VOICES_URI:
@@ -524,6 +532,7 @@ for _operation, _versions in _PROFILER_ROW_READS.items():
         "field_types": {
             "profiler_position": "capture_latest_user_cursor_or_milliseconds",
             **({"result_view": "summary_identity_or_diagnostics"} if "result_view" in _optional else {}),
+            **({"result_fields": "ordered_disclosed_profiler_field_choices"} if "result_fields" in _optional else {}),
             **({"bus_instance_handle": "gateway_profiler_bus_handle"} if "bus_instance_handle" in _optional else {}),
             **({"voice_instance_handle": "gateway_profiler_voice_handle"} if "voice_instance_handle" in _optional else {}),
             "max_results": "bounded_result_limit",
@@ -531,6 +540,11 @@ for _operation, _versions in _PROFILER_ROW_READS.items():
         "input_forms": {
             "profiler_position": {"flag": "--profiler-position", "repeatable": False},
             **({"result_view": {"flag": "--result-view", "repeatable": False}} if "result_view" in _optional else {}),
+            **({"result_fields": {"flag": "--result-field", "repeatable": True,
+                "minimum_items": 1, "maximum_items": MAX_PROFILER_RESULT_FIELDS,
+                "bound_owner": "Gateway request resource policy",
+                "order_preserved": True, "repetitions_preserved": True,
+                "mutually_exclusive_with": ["result_view"]}} if "result_fields" in _optional else {}),
             **({"bus_instance_handle": {"flag": "--bus-instance-handle", "repeatable": False}} if "bus_instance_handle" in _optional else {}),
             **({"voice_instance_handle": {"flag": "--voice-instance-handle", "repeatable": False}} if "voice_instance_handle" in _optional else {}),
             "max_results": {"flag": "--max-results", "repeatable": False},
@@ -669,6 +683,7 @@ def runtime_inspection_business_contract_data(
             value_choices[field] = list(meanings)
     if "result_view" in exposed_fields:
         value_choices["result_view"] = list(profiler_return_views(operation, version))
+        value_choices["result_fields"] = list(profiler_result_field_choices(operation, version))
     if "profiler_cursor" in exposed_fields:
         value_choices["profiler_cursor"] = list(PROFILER_CURSOR_MEANINGS)
     if operation == PROFILER_ENABLE_DATA_URI:
@@ -849,6 +864,12 @@ def runtime_inspection_business_contract_data(
                 "capture-defaults": "Use Wwise's default projection by omitting field selection",
                 "empty-selection": "Submit an explicit empty field selection",
             }} if "result_view" in exposed_fields else {}),
+            **({"result_fields_meaning": {
+                "selection": "Repeat one disclosed field choice per flag; preserve requested order and repetitions",
+                "projection": "Only requested fields actually reported by Wwise; missing fields remain omitted and no identity fields are appended",
+                "instance_handles": "Issued only when the native observation reports the complete valid instance identity basis",
+                "no_selection": "Omitting both selection forms retains the summary preset; capture-defaults omits selection and empty-selection submits an empty list",
+            }} if "result_fields" in exposed_fields else {}),
         },
         **(
             {}

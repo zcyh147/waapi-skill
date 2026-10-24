@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from .builders.query import STRUCTURED_GUID_PATTERN
 from .business_declaration_state import BusinessDeclarationSession
@@ -19,6 +19,8 @@ from .runtime_inspection_business_contracts import (
     AUDITION_ACTION_MEANINGS as _AUDITION_ACTIONS,
     PROFILER_RETURN_VIEWS as _PROFILER_RETURN_VIEWS,
     profiler_return_views,
+    profiler_result_field_choices,
+    MAX_PROFILER_RESULT_FIELDS,
     LOG_GET_URI,
     LOG_ADD_ITEM_URI,
     LOG_CLEAR_URI,
@@ -229,6 +231,7 @@ def materialize_runtime_inspection_business_request(
     profiler_position: str | None = None,
     profiler_cursor: str | None = None,
     result_view: str | None = None,
+    result_fields: Sequence[str] | None = None,
     bus_instance_handle: str | None = None,
     voice_instance_handle: str | None = None,
     transport_handle: str | None = None,
@@ -243,6 +246,7 @@ def materialize_runtime_inspection_business_request(
                 profiler_position,
                 profiler_cursor,
                 result_view,
+                result_fields,
                 bus_instance_handle,
                 voice_instance_handle,
                 transport_handle,
@@ -275,6 +279,7 @@ def materialize_runtime_inspection_business_request(
                 max_results,
                 profiler_position,
                 result_view,
+                result_fields,
                 bus_instance_handle,
                 voice_instance_handle,
                 transport_handle,
@@ -302,6 +307,7 @@ def materialize_runtime_inspection_business_request(
                 profiler_position,
                 profiler_cursor,
                 result_view,
+                result_fields,
                 bus_instance_handle,
                 voice_instance_handle,
             )
@@ -335,17 +341,34 @@ def materialize_runtime_inspection_business_request(
     args: dict[str, Any] = {"time": native_time}
     options: dict[str, Any] = {}
     if operation in _PROFILER_RETURN_VIEWS:
-        view = "summary" if result_view is None else result_view
-        views = profiler_return_views(operation, version)
-        if view not in views:
-            raise RuntimeInspectionBusinessError(
-                "result_view must be one of: " + ", ".join(views)
-            )
-        if views[view] is not None:
-            options["return"] = list(views[view])
-    elif result_view is not None:
+        if result_fields is not None:
+            if result_view is not None:
+                raise RuntimeInspectionBusinessError("result_fields and result_view are mutually exclusive")
+            if (isinstance(result_fields, (str, bytes)) or not isinstance(result_fields, Sequence)
+                    or not 1 <= len(result_fields) <= MAX_PROFILER_RESULT_FIELDS):
+                raise RuntimeInspectionBusinessError(
+                    f"result_fields must contain 1 to {MAX_PROFILER_RESULT_FIELDS} disclosed field choices (Gateway request resource limit)"
+                )
+            choices = profiler_result_field_choices(operation, version)
+            for field in result_fields:
+                if not isinstance(field, str) or field not in choices:
+                    raise RuntimeInspectionBusinessError(
+                        f"result_fields choice {field!r} is unavailable for {operation} in Wwise {version}; permitted choices: "
+                        + ", ".join(choices)
+                    )
+            options["return"] = list(result_fields)
+        else:
+            view = "summary" if result_view is None else result_view
+            views = profiler_return_views(operation, version)
+            if view not in views:
+                raise RuntimeInspectionBusinessError(
+                    "result_view must be one of: " + ", ".join(views)
+                )
+            if views[view] is not None:
+                options["return"] = list(views[view])
+    elif result_view is not None or result_fields is not None:
         raise RuntimeInspectionBusinessError(
-            "result_view is not accepted by this fixed-shape Profiler read"
+            "result_view and result_fields are not accepted by this fixed-shape Profiler read"
         )
     if operation in {PROFILER_GET_AUDIO_OBJECTS_URI, PROFILER_GET_BUSSES_URI}:
         bus_pipeline_id = _pipeline_id(bus_instance_handle, kind="bus", binding=(pipeline_bindings or {}).get(bus_instance_handle))
@@ -368,7 +391,8 @@ def materialize_runtime_inspection_business_request(
         limit,
         {
             "profiler_position": str(profiler_position),
-            **({"result_view": "summary" if result_view is None else result_view} if operation in _PROFILER_RETURN_VIEWS else {}),
+            **({"result_fields": list(result_fields)} if result_fields is not None else
+               {"result_view": "summary" if result_view is None else result_view} if operation in _PROFILER_RETURN_VIEWS else {}),
             **({"bus_instance_handle": bus_instance_handle} if bus_instance_handle is not None else {}),
             **({"voice_instance_handle": voice_instance_handle} if voice_instance_handle is not None else {}),
         },
@@ -467,7 +491,10 @@ def normalize_runtime_inspection_result(
     if operation == "ak.wwise.core.profiler.getRTPCs":
         _validate_rtpc_rows(rows)
     selected = [dict(item) for item in rows[-max_results:]]
-    if business_request.get("result_view") != "diagnostics":
+    if "result_fields" in business_request:
+        selected = [{field: item[field] for field in business_request["result_fields"] if field in item}
+                    for item in selected]
+    elif business_request.get("result_view") != "diagnostics":
         field = "busPipelineID" if operation == PROFILER_GET_AUDIO_OBJECTS_URI else "pipelineID"
         if operation in {PROFILER_GET_AUDIO_OBJECTS_URI, PROFILER_GET_BUSSES_URI, PROFILER_GET_VOICES_URI}:
             for item in selected:
