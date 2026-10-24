@@ -4,7 +4,7 @@
   "availability_candidate": "2dc0ee57718f41b2378d8d4415572366de322704",
   "positive_candidate": "7289081b552c5f428013ba0b6bacaf7d05843481",
   "positive_review_sha256": "5a3a7dd27e424e6d60e748d6f6c0aac59901ba6eb18014b84e02202ad041ae43",
-  "policy_sha256": "a73a443ff450aa42cae6bc7cdf75daae6eaaddd7ead91322767dbd638ec5d140",
+  "policy_sha256": "994dc0ead6c3740a0d83512ed75af06ace2943c6477cafe6c6ce898a3c340408",
   "entries": {
     "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
       "pointer": "/argsSchema",

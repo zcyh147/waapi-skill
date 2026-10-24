@@ -155,6 +155,14 @@ def test_console_loaded_media_exact_scope_and_canonical_parent_policy(inventory)
             assert entry['categories']==['program','native'] and entry['required_native_anchor_ids']==[];roots.append(branch['id'])
         else:assert entry['categories']==['program'] and entry['required_native_anchor_ids']==[profile['gate']]
     assert len(roots)==3 and len(review['entries'])==93
+    from tests.support.loaded_media_runtime_evidence import console_availability,original_observation
+    for version in BUILDS:
+        original=console_availability(version)
+        assert original['raw']['result']=={'return':[]}
+        assert original['context']['host']=='wwise-console' and original['profile']['build']==BUILDS[version]
+    positive=original_observation()
+    assert positive['raw']['result']=={'return':[ROW]}
+    assert positive['context']['host']=='wwise-authoring' and positive['context']['build']=='2025.1.11.9262'
     branch=inventory['native_coverage']['obligations'][0]
     for damaged in ({**branch,'route':branch['route'].replace('wwise-console','wwise-authoring')},
                     {**branch,'id':branch['id']+'/unlisted'}, {**branch,'shape_sha256':'0'*64},
