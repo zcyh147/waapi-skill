@@ -284,6 +284,28 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
         raise ValueError('LoadedMedia strict original request/result/current replay differs')
 
 
+def validate_source_equivalence(proof, sources, branch, binding, root, base):
+    """Only the exact original anchor may use its pinned one-file source review."""
+    r, _ = exact_branch(branch, root)
+    if (branch['id'] != ANCHOR or proof['from_candidate'] != ORIGINAL_CANDIDATE
+            or not binding.get('runtime_observation_attachment')):
+        raise ValueError('LoadedMedia source bridge requires exact original anchor/attachment')
+    attached = runtime._proof(binding, base)
+    if (proof['loaded_media_source_review'] != attached['source_review']
+            or attached['source_review']['sha256'] != REVIEW_SHA
+            or completion.read_sealed_artifact(attached['source_review'], base) != r):
+        raise ValueError('LoadedMedia source bridge requires pinned source-owned review')
+    original = original_observation(base, root=root)
+    captured = completion.read_sealed_artifact(attached['program_capture'], base)
+    if (sources != original['historical_sources'] or attached['relevant_sources'] != sources
+            or audit.digest(captured['native_call']) != audit.digest({'uri': URI,
+                'args': original['request']['args'], 'options': {}, 'result': original['raw']['result']})):
+        raise ValueError('LoadedMedia source bridge requires original sources and complete current replay')
+    validate_program({'gateway': captured['gateway'], 'native_call': captured['native_call'],
+        'runtime_read_program': captured, 'relevant_sources': captured['source_context']['packaged']},
+        binding, branch, root)
+
+
 def accepts_native_context(context,branch,binding,record,base,root):
     """No generic patch fallback: this original profile and anchor alone qualify."""
     exact_branch(branch,root)
@@ -369,7 +391,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None):
                     'to_candidate':candidate,'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'native_route':ROUTE,
                     'evidence_sha256':native_run['sha256'],'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),
                     'reviewed_reason':'Exact reviewed actual9262 semantic support and complete current public replay; only reviewed Gateway exception-finish host-context delta; all other412 packaged sources exact; no9143 native execution',
-                    'sources':sources})
+                    'sources':sources,'loaded_media_source_review':desc('support-review.json')})
                 attachment=write('attachment.json',{'contract':'waapi-skill.runtime-observation-attachment/v1','branch_id':identity,
                     'proof':proof,'evidence':nd,'native_equivalence':eq})
         pd={**write(prefix+'program.json',program),'nodeid':captured['nodeid']}

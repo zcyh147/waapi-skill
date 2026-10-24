@@ -944,6 +944,10 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
         from tests.support.source_copy_native_evidence import validate_source_equivalence
         validate_source_equivalence(proof, branch, binding, root, evidence_base=base)
         return
+    if proof.get('loaded_media_source_review'):
+        from tests.support.loaded_media_runtime_evidence import validate_source_equivalence
+        validate_source_equivalence(proof, sources, branch, binding, root, base)
+        return
     if proof.get('runtime_read_review'):
         from tests.support.runtime_observation_evidence import validate_runtime_source_review, RTPC_ORIGINAL_CANDIDATE
         from tests.support.fixed_runtime_read_evidence import URIS, native_profile

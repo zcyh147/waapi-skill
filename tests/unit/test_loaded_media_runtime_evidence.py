@@ -82,6 +82,23 @@ def test_loaded_media_public_teardown_portable_consumer(request, tmp_path, inven
         assert all(row['requirements'] == ['program'] for identity, row in rows.items() if identity != ANCHOR)
         assert all(row['runtime_native_anchor_status'] == 'passed' for identity, row in rows.items() if identity != ANCHOR)
         assert len([b for b in document['bindings'].values() if 'native' in b['evidence']]) == 1
+        # A genuine disjoint catalog branch cannot inherit this source bridge,
+        # even with a resealed equivalence naming that branch and its shape.
+        alternate = next(row for row in inventory['native_coverage']['obligations']
+            if row['route'].split('|')[:2] == ['2024.1', 'wwise-authoring']
+            and row['route'].endswith('|function|' + URI)
+            and row['pointer'] == '/resultSchema/properties/return/@cardinality/single')
+        binding = deepcopy(document['bindings'][ANCHOR])
+        native_record = completion.read_sealed_artifact(binding['evidence']['native'], index.parent)
+        equivalence = completion.read_sealed_artifact(binding['native_equivalence'], index.parent)
+        binding.update(branch_id=alternate['id'], native_shape_sha256=alternate['shape_sha256'])
+        equivalence.update(branch_id=alternate['id'], native_shape_sha256=alternate['shape_sha256'],
+            native_route=alternate['route'], binding_semantics_sha256=audit.digest(completion.binding_semantics(binding)))
+        descriptor = runtime.write_json(index.parent / 'unrelated-equivalence.json', equivalence)
+        with pytest.raises(ValueError, match='LoadedMedia requires one exact reviewed catalog branch/shape'):
+            completion.validate_equivalence(descriptor, native_record['native_runs'][0],
+                {'candidate_sha256': equivalence['from_candidate'], 'relevant_sources': native_record['relevant_sources']},
+                alternate, equivalence['to_candidate'], binding, index.parent, audit.ROOT)
         # Reuse this exact completed packet for source-admission damage. The
         # original native archive and its620 source seals are never rewritten.
         import shutil
