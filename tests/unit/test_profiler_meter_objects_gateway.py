@@ -564,3 +564,109 @@ def test_meter_media_size_root_selection_preserves_complete_pages_and_rejects_ba
         "--meter-object-include", "unknown-meter-output", offline=True)
     assert code == 2 and "agent_result" not in failure, failure
     assert len(client.calls) == reads
+
+
+# Literal pairs and conditional values from matching getMeters returnExpression /
+# objectReturn definitions. These injected replies test projection and availability;
+# they do not claim that a real metered Bus has every object-specific field.
+_CANONICAL_METER_OUTPUTS = (
+    ("converted-wem-file-path", "convertedWemFilePath", "converted_wem_file_path", "/cache/a.wem"),
+    ("original-file-path", "originalFilePath", "original_file_path", "/original/a.wav"),
+    ("original-relative-file-path", "originalRelativeFilePath", "original_relative_file_path", "SFX/a.wav"),
+    ("converted-file-path", "convertedFilePath", "converted_file_path", "/cache/a.wem"),
+    ("original-wav-file-path", "originalWavFilePath", "original_wav_file_path", "/original/a.wav"),
+    ("soundbank-file-path", "soundbankBnkFilePath", "soundbank_file_path", "/banks/Main.bnk"),
+    ("music-transition-root", "musicTransitionRoot", "music_transition_root", {"id": BUS}),
+    ("music-playlist-root", "musicPlaylistRoot", "music_playlist_root", {"id": BUS}),
+    ("playback-duration", "playbackDuration", "playback_duration",
+        {"playbackDurationMin": 1.0, "playbackDurationMax": 2.0, "playbackDurationType": "OneShot"}),
+    ("duration", "duration", "duration", {"min": 1.0, "max": 2.0, "type": "OneShot"}),
+    ("longest-duration-source", "maxDurationSource", "longest_duration_source", {"id": BUS, "trimmedDuration": 2.0}),
+    ("audio-source-trim-values", "audioSourceTrimValues", "audio_source_trim_values", {"trimBegin": 0.1, "trimEnd": 1.1}),
+    ("largest-radius-attenuation", "maxRadiusAttenuation", "largest_radius_attenuation", {"id": BUS, "radius": 40.0}),
+    ("audio-source-language", "audioSourceLanguage", "audio_source_language", {"id": BUS, "name": "SFX"}),
+    ("switch-container-child-context", "switchContainerChildContext", "switch_container_child_context", {"id": BUS}),
+    ("curve-points", "points", "curve_points", [{"x": 0.0, "y": 1.0, "shape": "Linear"}]),
+    ("blend-tracks", "blendTracks", "blend_tracks", [{"id": BUS, "name": "Conditional track"}]),
+)
+_CANONICAL_METER_2025_OUTPUTS = (
+    ("music-transition-object", "musicTransitionObject", "music_transition_object", {"id": BUS}),
+    ("source-language-included", "isLanguageIncluded", "source_language_included", False),
+    ("original-state", "originalState", "original_state", {"id": BUS, "name": "Idle"}),
+    ("switch-group-game-parameter", "switchGroupGameParameter", "switch_group_game_parameter", {"id": BUS, "name": "Speed"}),
+    ("has-empty-switch-state-assignment", "hasEmptySwitchStateAssignment", "has_empty_switch_state_assignment", False),
+    ("extracted-events", "extractEvents", "extracted_events", [{"id": BUS, "name": "Play"}]),
+    ("extracted-structures", "extractStructures", "extracted_structures", [{"id": BUS, "name": "Container"}]),
+    ("extracted-media", "extractMedia", "extracted_media", ["/banks/a.wem"]),
+    ("soundbanks-referencing-event", "soundbanksReferencingEvent", "soundbanks_referencing_event", [{"id": BUS, "name": "Main"}]),
+)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("console", [False, True], ids=["authoring", "console"])
+def test_canonical_meter_root_outputs_reach_exact_request_and_complete_pages(tmp_path, version, console):
+    client, run = task(tmp_path, version)
+    original = client.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            minor, build = (13, 9056) if version == "2024.1" else (7, 9143)
+            result.update(isCommandLine=console, displayName="WwiseConsole" if console else "Wwise")
+            result["version"].update(minor=minor, build=build, displayName=f"v{version}.{minor}.{build}")
+        return result
+    client.call = call
+    outputs = _CANONICAL_METER_OUTPUTS + (_CANONICAL_METER_2025_OUTPUTS if version == "2025.1" else ())
+    code, schema = run("request-schema", METERS, offline=True)
+    assert code == 0, schema
+    choices = schema["business_adapter"]["declaration"]["meter_object_projection"]["fields"]["meter_object_outputs"]["choices"]
+    assert {name for name, _, _, _ in outputs} <= set(choices)
+    if version == "2024.1":
+        assert not {name for name, _, _, _ in _CANONICAL_METER_2025_OUTPUTS} & set(choices)
+    client.rows[0]["object"].update({native: deepcopy(value) for _, native, _, value in outputs})
+    argv = ["core-call", METERS, "--profiler-position", "123", "--max-results", "1"]
+    for name, _, _, _ in outputs:
+        argv.extend(("--meter-object-include", name))
+    code, result = run(*argv)
+    assert code == 0 and result["status"] == "partial", result
+    native = [entry for entry in client.calls if entry[0] == METERS]
+    assert native == [(METERS, {"time": 123}, {"return": ["id", "name", "type", "path", *[native for _, native, _, _ in outputs]]})]
+    pages = [result["agent_result"]]
+    reads = len(client.calls)
+    while pages[-1]["complete"] is False:
+        code, result = run(*pages[-1]["next_command"]["gateway_argv"], offline=True)
+        assert code == 0 and list(result)[-1] == "agent_result", result
+        pages.append(result["agent_result"])
+    assert len(client.calls) == reads and len(pages) == 2
+    rows = [row for page in pages for row in page["meters"]]
+    assert [row["configurationName"] for row in rows] == ["Mono", "Stereo"]
+    unavailable, present = [row["object"] for row in rows]
+    assert unavailable["unavailable_fields"] == [output for _, _, output, _ in outputs]
+    for _, _, output, value in outputs:
+        assert output not in unavailable
+        assert present[output] == value
+    assert "unavailable_fields" not in present
+    assert all(page["meter_object_projection"]["root_api"] == METERS for page in pages)
+    assert all(page["meter_object_projection"]["mutation_authority"] is False for page in pages)
+
+    # A selected null is not an absent value or a valid path. Damage the later
+    # page's raw field; whole-result validation must reject before publishing it.
+    client.rows[0]["object"]["originalFilePath"] = None
+    code, failure = run(*argv)
+    assert code == 2 and "agent_result" not in failure and "originalFilePath" in str(failure), failure
+    client.rows[0]["object"]["originalFilePath"] = "/original/a.wav"
+    rejected = ("sound:originalWavFilePath", "states", "suppportsRandomizer", "unknown-meter-output")
+    if version == "2024.1":
+        rejected += tuple(name for name, _, _, _ in _CANONICAL_METER_2025_OUTPUTS)
+    for name in rejected:
+        reads = len(client.calls)
+        code, failure = run("core-call", METERS, "--profiler-position", "123", "--meter-object-include", name, offline=True)
+        assert code == 2 and "agent_result" not in failure and len(client.calls) == reads, failure
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1"])
+def test_canonical_meter_root_outputs_keep_older_api_boundary_before_connection(tmp_path, version):
+    client, run = task(tmp_path, version)
+    code, failure = run("core-call", METERS, "--profiler-position", "123",
+        "--meter-object-include", "original-file-path", offline=True)
+    assert code == 2 and "agent_result" not in failure, failure
+    assert not client.calls
