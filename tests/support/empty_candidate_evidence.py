@@ -63,17 +63,20 @@ def classify_empty_candidate(root, branch, *, cache=None):
         validations = cache.setdefault('validations', {})
         if validation_key not in validations:
             try:
-                validate_native_alternative(root, {**branch, 'pointer': parent, 'shape_sha256': _digest(schema)},
+                validation_provenance = validate_native_alternative(root, {**branch, 'pointer': parent, 'shape_sha256': _digest(schema)},
                                             candidate, catalog=catalog, require_known=True)
             except ValueError as exc:
                 from wwise_waapi.builders.common import SemanticValidationError
                 rejected = (str(exc) == 'observation does not satisfy selected native alternative'
                             and isinstance(exc.__cause__, SemanticValidationError))
                 validations[validation_key] = ('rejected' if rejected else 'unknown',
-                    'resolved schema rejects concrete candidate' if rejected else str(exc))
+                    'resolved schema rejects concrete candidate' if rejected else str(exc),
+                    getattr(exc, 'validation_provenance', None))
             else:
-                validations[validation_key] = ('accepted', 'resolved schema accepts concrete candidate')
-        result['status'], result['reason'] = validations[validation_key]
+                validations[validation_key] = ('accepted', 'resolved schema accepts concrete candidate', validation_provenance)
+        result['status'], result['reason'], provenance = validations[validation_key]
+        if provenance is not None:
+            result['validation_provenance'] = deepcopy(provenance)
     except (KeyError, ValueError, TypeError, IndexError, OSError) as exc:
         result['reason'] = str(exc)
     return result

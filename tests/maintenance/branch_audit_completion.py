@@ -1080,8 +1080,10 @@ def validate_native_alternative(root, branch, value, *, catalog=None, require_kn
     """Resolve native child semantics and reuse the existing bounded validator."""
     import hashlib
     import json
+    import math
     from wwise_waapi.native_catalog import load_native_catalog
-    from wwise_waapi.schema_inventory import DefinitionGraph, resolve_schema_reference, SCHEMA_ANNOTATION_KEYWORDS
+    from wwise_waapi.schema_inventory import (DefinitionGraph, resolve_schema_reference, SCHEMA_ANNOTATION_KEYWORDS,
+        topic_publish_schema, LEGACY_2021_SOUNDBANK_IMPLICIT_PROPERTY_PATHS)
     from wwise_waapi.builders.schema import _SchemaWalker
     from wwise_waapi.builders.common import SemanticValidationError
     version, host, build, _, uri = branch['route'].split('|')
@@ -1101,43 +1103,140 @@ def validate_native_alternative(root, branch, value, *, catalog=None, require_kn
     digest = hashlib.sha256(json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     if digest != branch['shape_sha256']:
         raise ValueError('selected native alternative shape changed')
+    provenance = {'original_parent_schema_sha256': digest}
+    def alternative_error(message):
+        error = ValueError(message)
+        if len(provenance) > 1:
+            from copy import deepcopy
+            error.validation_provenance = deepcopy(provenance)
+        return error
+    concrete_empty = require_known and isinstance(value, (dict, list)) and not value
+    legacy_topic = (version == '2021.1' and branch['route'].split('|')[3] == 'topic'
+                    and uri == 'ak.wwise.core.soundbank.generated')
+    native_pointer = branch['pointer'].replace('/@definition/<schema>', '', 1)
+    # Only the existing source-owned Topic projection may interpret these keys.
+    # Original pointer/schema/context hashes have already been checked above.
+    if concrete_empty and legacy_topic and isinstance(value, dict) and isinstance(schema, dict):
+        implicit = {native_pointer + '/' + key for key in schema
+                    if native_pointer + '/' + key in LEGACY_2021_SOUNDBANK_IMPLICIT_PROPERTY_PATHS}
+        if implicit:
+            original_context = context
+            context = topic_publish_schema(version, uri, catalog['schemas'][uri])
+            schema = pointer_value({'publishSchema': context}, native_pointer)
+            provenance.update(rule='legacy-2021-soundbank-implicit-properties/v1',
+                original_context_sha256=hashlib.sha256(json.dumps(original_context, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+                projected_parent_schema_sha256=hashlib.sha256(json.dumps(schema, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+                projected_context_sha256=hashlib.sha256(json.dumps(context, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+                implicit_source_paths=sorted(implicit))
+    id_proofs = {}
+    def prove_id(node, context):
+        marker = node.get('id')
+        if not concrete_empty or not legacy_topic or not isinstance(marker, str) or not marker:
+            raise alternative_error('unrecognized native alternative schema id')
+        resolved = resolve_schema_reference(marker, root_schema=context, graph=graph)
+        if resolved.document_name != '<schema>' or resolved.target is not node:
+            raise alternative_error('unrecognized native alternative schema id target')
+        # Same-node lookup alone cannot establish that the marker is unique.
+        pending = [(context, 0)]; count = 0; visited_ids = 0
+        while pending:
+            current, depth = pending.pop(); visited_ids += 1
+            if depth > 64 or visited_ids > 20000:
+                raise alternative_error('alternative schema id closure budget exceeded')
+            if isinstance(current, dict):
+                count += current.get('id') == marker
+                pending.extend((child, depth + 1) for child in current.values())
+            elif isinstance(current, list):
+                pending.extend((child, depth + 1) for child in current)
+        if count != 1:
+            raise alternative_error('unrecognized ambiguous native alternative schema id')
+        id_proofs[(marker, resolved.pointer)] = {'id':marker, 'document':resolved.document_name,
+            'pointer':resolved.pointer, 'target_schema_sha256':hashlib.sha256(json.dumps(node, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
     known = {'type','properties','patternProperties','additionalProperties','required','items','minItems','maxItems','uniqueItems',
                 'enum','const','oneOf','anyOf','allOf','minLength','maxLength','pattern','minimum','maximum','exclusiveMinimum','exclusiveMaximum',
                 'multipleOf','minProperties','maxProperties','title','default','definitions','localDefinitions'} | SCHEMA_ANNOTATION_KEYWORDS
     if require_known:
-        # Unknown restrictions must not be hidden by an earlier type/enum failure.
-        # This inspects a finite resolved schema closure, not satisfiability.
+        # This proves only this concrete value, not unused descendant semantics.
+        # Own constraints/refs/unions stay strict before any ordinary failure.
         visited = set()
         def check_known(node, context, depth=0):
             if not isinstance(node, dict) or depth > 64 or len(visited) > 20000:
-                raise ValueError('unrecognized alternative schema or closure budget exceeded')
-            identity = (id(context), id(node))
+                raise alternative_error('unrecognized alternative schema or closure budget exceeded')
+            identity = (id(context), id(node), id(value))
             if identity in visited:
                 return
             visited.add(identity)
-            if set(node) - known - {'$ref', '#ref'}:
-                raise ValueError('unrecognized native alternative semantics remain unverified')
+            if 'id' in node:
+                prove_id(node, context)
+            if set(node) - known - {'$ref', '#ref', 'id'}:
+                raise alternative_error('unrecognized native alternative semantics remain unverified')
+            for key in ('properties', 'patternProperties', 'definitions', 'localDefinitions'):
+                if key in node and (not isinstance(node[key], dict)
+                        or any(not isinstance(name, str) for name in node[key])):
+                    raise alternative_error('unrecognized native alternative keyword shape')
+            for key in ('oneOf', 'anyOf', 'allOf'):
+                if key in node and (not isinstance(node[key], list) or not node[key]
+                        or any(not isinstance(child, dict) for child in node[key])):
+                    raise alternative_error('unrecognized native alternative keyword shape')
+            if 'additionalProperties' in node and not isinstance(node['additionalProperties'], (dict, bool)):
+                raise alternative_error('unrecognized native alternative keyword shape')
+            if 'items' in node and not (isinstance(node['items'], dict)
+                    or isinstance(node['items'], list) and all(isinstance(child, dict) for child in node['items'])):
+                raise alternative_error('unrecognized native alternative keyword shape')
+            for key in ('minItems', 'maxItems', 'minLength', 'maxLength'):
+                if key in node and (type(node[key]) is not int or node[key] < 0):
+                    raise alternative_error('unrecognized native alternative keyword shape')
+            if 'required' in node and (not isinstance(node['required'], list)
+                    or any(not isinstance(name, str) for name in node['required'])):
+                raise alternative_error('unrecognized native alternative keyword shape')
+            # These keywords have no implementation in the reused validator.
+            # Recognition must not silently turn them into a successful proof.
+            if set(node) & {'uniqueItems','exclusiveMinimum','exclusiveMaximum',
+                            'multipleOf','minProperties','maxProperties'}:
+                raise alternative_error('unrecognized active native alternative constraint')
+            for key in ('minimum', 'maximum'):
+                if key in node and (type(node[key]) not in (int, float)
+                        or isinstance(node[key], float) and not math.isfinite(node[key])):
+                    raise alternative_error('unrecognized native alternative keyword shape')
+            if 'enum' in node and (not isinstance(node['enum'], list) or not node['enum']):
+                raise alternative_error('unrecognized native alternative keyword shape')
+            if 'pattern' in node and not isinstance(node['pattern'], str):
+                raise alternative_error('unrecognized native alternative keyword shape')
+            if 'type' in node:
+                types = node['type'] if isinstance(node['type'], list) else [node['type']]
+                if not types or any(not isinstance(t, str) or t not in
+                        {'object','array','string','integer','number','boolean','null'} for t in types):
+                    raise alternative_error('unrecognized native alternative keyword shape')
             reference = node.get('$ref', node.get('#ref'))
-            if reference is not None:
+            if '$ref' in node or '#ref' in node:
+                if (not isinstance(reference, str) or not reference
+                        or '$ref' in node and '#ref' in node and node['$ref'] != node['#ref']):
+                    raise alternative_error('unrecognized native alternative reference')
                 resolved = resolve_schema_reference(reference, root_schema=context, graph=graph)
                 target_context = context if resolved.document_name == '<schema>' else graph.documents[resolved.document_name]
                 check_known(resolved.target, target_context, depth + 1)
-            for key in ('properties', 'patternProperties', 'definitions', 'localDefinitions'):
-                for child in node.get(key, {}).values():
-                    check_known(child, context, depth + 1)
-            for key in ('oneOf', 'anyOf', 'allOf', 'items', 'additionalProperties'):
-                children = node.get(key)
-                if children is None or isinstance(children, bool):
-                    continue
-                for child in children if isinstance(children, list) else [children]:
+            if not concrete_empty:
+                for key in ('properties', 'patternProperties', 'definitions', 'localDefinitions'):
+                    for child in node.get(key, {}).values():
+                        check_known(child, context, depth + 1)
+                for key in ('items', 'additionalProperties'):
+                    children = node.get(key)
+                    if children is None or isinstance(children, bool):
+                        continue
+                    for child in children if isinstance(children, list) else [children]:
+                        check_known(child, context, depth + 1)
+            for key in ('oneOf', 'anyOf', 'allOf'):
+                for child in node.get(key, []):
                     check_known(child, context, depth + 1)
         check_known(schema, context)
     class NativeWalker(_SchemaWalker):
         def validate(self, schema, value, *, path, depth=0):
             if depth > 32:
-                raise ValueError('alternative reference budget exceeded')
+                raise alternative_error('alternative reference budget exceeded')
             if not isinstance(schema, dict):
-                raise ValueError('unrecognized alternative schema')
+                raise alternative_error('unrecognized alternative schema')
+            if 'id' in schema:
+                prove_id(schema, self.context)
+                schema = {key: child for key, child in schema.items() if key != 'id'}
             reference = schema.get('$ref', schema.get('#ref'))
             if reference is not None:
                 resolved = resolve_schema_reference(reference, root_schema=self.context, graph=graph)
@@ -1149,7 +1248,7 @@ def validate_native_alternative(root, branch, value, *, catalog=None, require_kn
                     self.context = old
                 schema = {k:v for k,v in schema.items() if k not in ('$ref','#ref')}
             if set(schema) - known:
-                raise ValueError('unrecognized native alternative semantics remain unverified')
+                raise alternative_error('unrecognized native alternative semantics remain unverified')
             super().validate(schema, value, path=path, depth=depth)
     walker = NativeWalker(uri=uri, version=version)
     walker.context = context
@@ -1158,10 +1257,14 @@ def validate_native_alternative(root, branch, value, *, catalog=None, require_kn
     except SemanticValidationError as exc:
         from wwise_waapi.builders.schema import _schema_budget_error
         if require_known and _schema_budget_error(exc):
-            raise ValueError('alternative validation budget remains unverified') from exc
-        raise ValueError('observation does not satisfy selected native alternative') from exc
+            raise alternative_error('alternative validation budget remains unverified') from exc
+        raise alternative_error('observation does not satisfy selected native alternative') from exc
     if walker.unresolved_refs:
-        raise ValueError('unresolved native alternative reference')
+        raise alternative_error('unresolved native alternative reference')
+
+    if id_proofs:
+        provenance['legacy_id_resolutions'] = [id_proofs[key] for key in sorted(id_proofs)]
+    return provenance if len(provenance) > 1 else None
 
 
 def approved_boundary(root, branch, binding, route, public, digest):
