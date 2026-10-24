@@ -5,6 +5,22 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R126 runtime publication readiness
+
+Reviewed integration `a3eabbef` adds collision-checked composition, exact native
+ownership selection and optional actual post-teardown output to the existing
+runtime tests. Four focused composition/ownership/finalizer controls passed
+in 5.04s; four affected producer probes passed in 33.19s. Independent review
+verified exact ownership and preserved artifact bytes without rerunning them.
+The probes retain their original source basis and are not final publication
+inputs. Existing module-level Program registration includes the new controls.
+
+The prepared roster collects 588 nodes; collection is not execution evidence.
+No formal capture batch, global evaluation, native rerun or full gate ran.
+Final publication remains deferred while the remaining #186 families are
+integrated. Neither the 6,292-row selection nor the separate 93 LoadedMedia
+rows establishes whole-ticket completion.
+
 ## 2026-10-24 R126 older Authoring LoadedMedia evidence
 
 Reviewed integration `0f0fd614` adds exact 2023.1/2024.1 Authoring support
