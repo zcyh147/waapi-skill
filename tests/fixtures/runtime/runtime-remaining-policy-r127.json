@@ -252607,5 +252607,12 @@
       "reason": "Actual explicit public General compiles native General, semantically equal to documented native omission; public omission remains missing required named choice, no native empty-args dispatch claim",
       "public_form": "explicit-default"
     }
-  }
+  },
+  "schema_counterexample_ids": [
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.log.get|/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.addItem|/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string",
+    "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.log.get|/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string"
+  ],
+  "schema_counterexample_reason": "Exact four2025 log severity synthetic empty strings conflict with pinned oneOf; public rejection and causal valid counterpart program proof required, retaining each same-route native business gate. No native absence or parent credit."
 }

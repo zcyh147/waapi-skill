@@ -16,9 +16,9 @@ from tests.support import runtime_observation_evidence as runtime
 from tests.support import fixed_runtime_read_evidence as fixed
 
 POLICY = 'tests/fixtures/runtime/runtime-remaining-policy-r127.json'
-POLICY_SHA = 'a73a443ff450aa42cae6bc7cdf75daae6eaaddd7ead91322767dbd638ec5d140'
+POLICY_SHA = '994dc0ead6c3740a0d83512ed75af06ace2943c6477cafe6c6ce898a3c340408'
 FIXTURE = 'tests/fixtures/runtime-log'
-SUPPORT_SHA = '414768e5c6db8efd936f74e8367640a9c87f609ca755d27d9b96714b17bf1d18'
+SUPPORT_SHA = 'eff70a4100be8eb88b4e4e58b2792bbb1607a5e307c536c3d407c9af5767a13a'
 LOG_GET = 'ak.wwise.core.log.get'
 LOG_URIS = frozenset('ak.wwise.core.log.' + n for n in ('get','addItem','clear'))
 R122_CANDIDATE = '1f32f9f223cebe11076ca07f168f29fad99adfab'
@@ -80,13 +80,26 @@ def policy(entry):
         'reason':'R127 exact remaining runtime '+entry['family']+': '+entry['role']+'; same-route business/native gate required; no native optional-value occurrence claim'}
 
 
+def counterexample_policy(branch,root=audit.ROOT):
+    """Closed four-ID compiler counterexamples retain their native business gate."""
+    if branch['id']not in review(root)['schema_counterexample_ids']:
+        raise ValueError('Only exact four source-owned log counterexamples qualify')
+    from tests.support.empty_candidate_evidence import classify_empty_candidate
+    classification=classify_empty_candidate(root,branch)
+    if classification is None or classification['status']!='rejected':
+        raise ValueError('Exact source-invalid log severity candidate no longer rejects')
+    return {'native_shape_sha256':branch['shape_sha256'],'categories':['program'],'empty_candidate':classification,
+        'reason':'Resolved reflected schema rejects this concrete synthetic candidate; exact public counterexample program proof required. No native absence/effect or parent credit.'}
+
+
 def preservation_gates(root,policies,obligations):
     roster=review(root)['entries'];gates={}
     for branch in obligations:
         identity=branch['id']
         if identity not in roster or identity not in policies:continue
         entry=exact_entry(branch,root)
-        gates[identity]=entry['required_native_anchor_ids'] if policies[identity]==policy(entry) else None
+        expected=counterexample_policy(branch,root) if identity in review(root)['schema_counterexample_ids'] else policy(entry)
+        gates[identity]=entry['required_native_anchor_ids'] if policies[identity]==expected else None
     return gates
 
 
@@ -132,7 +145,7 @@ def original_log(artifact_base=None,*,root=audit.ROOT):
     current=runtime.program_source_context(root,flow=LOG_GET)['packaged']
     differences={k:{'before':sources.get(k),'after':current.get(k)}for k in sources.keys()|current.keys()if sources.get(k)!=current.get(k)}
     if len(sources)!=413 or len(current)!=413 or differences!=r['packaged_source_changes']:
-        raise ValueError('R122 exact one-Gateway source bridge differs')
+        raise ValueError('R122 exact reviewed packaged source bridge differs')
     return dict(review=r,read=read,archive=descriptor,category=category,context=context,receipt=receipt,receipt_raw=receipt_raw,sources=sources)
 
 
@@ -366,6 +379,9 @@ def validate_program(record,binding,branch,root,edges=None):
 
 def validate_evidence(record,binding,branch,category,base,root,edges=None):
     entry=exact_entry(branch,root)
+    if entry['family']=='console_loaded_media':
+        from tests.support.loaded_media_runtime_evidence import validate_console_evidence
+        return validate_console_evidence(record,binding,branch,category,base,root,edges)
     if category=='program':
         return validate_program(record,binding,branch,root,edges)
     if category!='native' or entry['role']!='native_business_anchor' or not binding.get('runtime_observation_attachment') or branch['route']not in {R122_ROUTE+uri for uri in LOG_URIS}:

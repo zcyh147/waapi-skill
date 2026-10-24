@@ -1,8 +1,8 @@
 """Closed retained log facts behind the existing qualified-evidence attachment.
 
-Original FAIL/BLOCKED outcomes stay original. Only seventeen pinned log roots
+Original FAIL/BLOCKED outcomes stay original. Only nineteen pinned log roots
 qualify here; three R122 roots use their original finalized-PASS path instead.
-The two older Console clear gates deliberately have no native provider.
+Two older Console clear roots retain ACK/schema-only native facts, without effect credit.
 """
 from functools import lru_cache
 import json
@@ -15,7 +15,7 @@ from tests.maintenance import branch_audit_completion as completion
 from tests.support import runtime_observation_evidence as runtime
 
 SUPPORT='tests/fixtures/runtime-log/retained-log-support.json'
-SUPPORT_SHA='55a7cfd442c19fa11e157e3856051a03d09233e6f0b96e3b30034b31d7688a44'
+SUPPORT_SHA = 'd1d86d7269434d9d9cba3a8f65acf1c4b5800bea864ee9361a527d02020cfdc9'
 CONTRACT='waapi-skill.retained-log-assessment/v1'
 
 
@@ -27,7 +27,7 @@ def _catalog_seal(path,seal,signature):
 def review(root=audit.ROOT):
     from tests.support.runtime_remaining_evidence import _read_pin,review as remaining
     result=_read_pin(root/SUPPORT,SUPPORT_SHA)
-    if len(result['profiles'])!=17 or len(result['pending_native_business_anchor_ids'])!=2:
+    if len(result['profiles'])!=19 or result['pending_native_business_anchor_ids']!=[]:
         raise ValueError('Exact retained log roster differs')
     entries=remaining(root)['entries']
     for identity,profile in result['profiles'].items():
@@ -69,6 +69,8 @@ def retained(label,base=None,*,root=audit.ROOT):
     changes={p:{'before':sources.get(p),'after':current.get(p)}for p in sources.keys()|current.keys()if sources.get(p)!=current.get(p)}
     if len(current)!=413 or changes!=descriptor['source_changes']:
         raise ValueError('Exact retained log source bridge differs')
+    if descriptor.get('kind')=='console-clear-schema-ack':
+        return _console_clear_ack(descriptor,archive,read,capture,raw)
     root_name=descriptor['original_root']
     root_review=json.loads(read(root_name+'/root-review.json'))
     if root_review['candidate']!=descriptor['candidate']or root_review['source_unchanged']is not True:
@@ -185,3 +187,39 @@ def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,bind
     remaining.validate_program({'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,
         'relevant_sources':captured['source_context']['packaged']},binding,branch,root,edges)
     return 'passed',None
+
+
+def _console_clear_ack(descriptor,archive,read,capture,capture_raw):
+    """Exactly two reviewed same-host/build ACKs; no effect observation inferred."""
+    base=descriptor['original_root'];tx=capture['transaction'];uri='ak.wwise.core.log.clear'
+    category=json.loads(read(base+'/evidence/category.jsonl').splitlines()[-1]);result=json.loads(read(base+'/result.json'))
+    verification=tx['verify'];scope=capture['observation_boundary'];request=verification['agent_result']['request']['arguments']
+    journal_path=descriptor['capture_path'].rsplit('/state/',1)[0]+'/state/transactions/'+tx['transaction_id']+'/events.jsonl'
+    events=[json.loads(line)for line in read(journal_path).splitlines()]
+    invocation=category['invocation'];nodes={x['nodeid']:x['outcome']for x in invocation['node_outcomes']}
+    status=next(x for x in category['categories']if x['category']=='console-log-clear-schema-acknowledgement')
+    if (descriptor['version']not in {'2023.1','2024.1'}or descriptor['host']!='wwise-console'
+            or invocation['phase']!='final'or invocation['outcome']!='PASS'or nodes.get(descriptor['nodeid'])!='PASS'
+            or category['candidate']!=descriptor['candidate']or status['status']!='PASS'or status['effect_observed']is not False
+            or completion.native_host_context(category['host'],'is_command_line')!={k:descriptor[k]for k in ('version','host','build')}
+            or result['exit_code']!=0 or result['timed_out']is not False or result['remaining_owned_group']!=[]
+            or category['source']['hash_before']!=category['source']['hash_after']or category['source']['mtime_before_ns']!=category['source']['mtime_after_ns']
+            or category['residual_state']['process_cleanup']!='cleaned'or category['residual_state']['sandbox']!='deleted'or category['residual_state']['residual_processes']!=[]
+            or verification['state']!='result_schema_checked'or verification['verified']is not False
+            or verification['verification']['business_state_verified']is not False
+            or verification['verification']['verification_scope']['log_observation']!=scope
+            or scope['outcome']!='console_log_unobservable'or scope['effect_observed']is not False
+            or request!={'api':uri,'args':{'channel':'general'},'options':{}}
+            or len(events)!=6 or sum(x['event_type']=='execution_started'for x in events)!=1
+            or sum(x['event_type']=='execution_completed'for x in events)!=1
+            or events[-1]['details']['verification']!=verification['verification']):
+        raise ValueError('Exact older Console finalized once-only weak ACK/source/cleanup differs')
+    call,=descriptor['calls'];body=read(call['path']);native=json.loads(body)
+    if (runtime.sha(body)!=call['sha256']or native['api']!=uri or native['version']!=descriptor['version']
+            or native['ok']is not True or native['dry_run']is not False or native['result']!={}
+            or verification['agent_result']['result']!={}):
+        raise ValueError('Exact older Console successful clear ACK differs')
+    facts={'original_workflow_outcome':'PASS','original_finalization':'PASS','qualified_log_fact':'same-host-build-native-clear-schema-ack-only',
+        'effect_observed':False,'business_state_verified':False,'physical_cleanup_complete':True,'global_pass_transferred':False}
+    return dict(descriptor=descriptor,archive={'artifact':Path(archive['artifact']).name,'sha256':descriptor['archive_sha256']},read=read,
+        capture=capture,capture_raw=capture_raw,requests={uri:request},results={uri:{}},calls={uri:call},facts=facts)

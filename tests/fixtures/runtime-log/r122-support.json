@@ -427,7 +427,19 @@
   "packaged_source_changes": {
     "skills/waapi-skill/scripts/gateway.py": {
       "before": "0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827",
-      "after": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4"
+      "after": "27b53029238e27b59edc83fa2f1c65c4a50ff125a222d9ce71099a9cd69c64fb"
+    },
+    "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+      "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+      "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business.py": {
+      "before": "06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d",
+      "after": "dba2653f3583ab5cfd9a5ffce02fe711cdad19fea6e1b0c9216cd8611811ffc3"
+    },
+    "skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py": {
+      "before": "f93e41345477d0e3346230c12ebc056511b4c348ee253cb3df33c91d8bd4658d",
+      "after": "14fb6f062baf80566961b9304eff1d13b89fdab5afaa731910261bfcfbf02594"
     }
   },
   "calls": [
@@ -535,5 +547,10 @@
         "items": []
       }
     }
-  ]
+  ],
+  "current_source_review": {
+    "candidate": "9ba83f9a513c178fab69c2d4e4104a540b8b2279",
+    "packaged_tree": "de35205b5023aed23bc5f37feee66340c1280c08",
+    "reviewed_delta": "Exact meter output allowlist plus operation-local exact log-message acceptance and bounded successful log summary; existing ordinary nonempty log request/result/observer/cleanup semantics retained. Historical maps and outcomes unchanged."
+  }
 }

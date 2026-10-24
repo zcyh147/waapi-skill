@@ -380,11 +380,12 @@ def test_log_control_all_public_input_branches(request,tmp_path,version,console,
         bindings,base,_=audit.portable_binding_inputs(index,policies)
         result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
         runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
         if console and version!='2025.1'and operation=='clear':
-            assert all(r['state']!='verified'for r in result['obligations'])
-            assert all(r['evidence_results']['program']['outcome']=='passed'for r in result['obligations'])
-        else:
-            assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+            missing_bindings=deepcopy(bindings)
+            for bound in missing_bindings['bindings'].values():bound['evidence'].pop('native',None)
+            missing=completion.evaluate_coverage(audit.ROOT,inventory,missing_bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+            assert all(r['state']!='verified'for r in missing['obligations'])
     register_exact_evidence_finalizer(request.node,finalize)
 
 
@@ -427,4 +428,110 @@ def test_log_nested_open_objects_preserve_every_opaque_value(request,tmp_path):
         bindings,base,_=audit.portable_binding_inputs(index,policies)
         result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
         assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+    register_exact_evidence_finalizer(request.node,finalize)
+
+
+def _severity_counterexample(path,branch,*,console):
+    """Actual public rejection and causal successful counterpart; external transport only."""
+    import contextlib
+    import io
+    from tests.support.empty_candidate_evidence import classify_empty_candidate
+    path.mkdir(parents=True)
+    uri=branch['route'].split('|')[-1];client=ConsoleLogClient(path);client.console=console
+    trace=[];original=client.call
+    def call(api,args=None,options=None):
+        result=original(api,args,options)
+        trace.append({'uri':api,'args':deepcopy(args or {}),'options':deepcopy(options or {}),'result':deepcopy(result)})
+        return result
+    client.call=call
+    def invoke(argv):
+        trace.clear();out,err=io.StringIO(),io.StringIO()
+        with contextlib.redirect_stdout(out),contextlib.redirect_stderr(err):
+            try:code,payload=gateway.execute_gateway(argv,env=_env(path),client_factory=lambda _:client)
+            except SystemExit as exc:code,payload=exc.code,None
+        return {'gateway':{'argv':argv,'exit_code':code,'payload':payload,'stdout':out.getvalue(),'stderr':err.getvalue()},'native_calls':deepcopy(trace)}
+    prefix=['--state-dir',str(path/'state')];classification=classify_empty_candidate(audit.ROOT,branch)
+    route=branch['route']
+    if uri==GET:
+        argv=[*prefix,'core-call',GET,'--log-channel','general']
+        client.rows=[deepcopy(ROW)];valid=invoke(argv)
+        client.rows[0]['severity']='';invalid=invoke(argv)
+        i=next(i for i,c in enumerate(invalid['native_calls'])if c['uri']==GET)
+        dispatch=f'/native_calls/{i}';observation=dispatch+'/result/items/0/severity'
+        proof={'classification':classification,'valid':valid}
+        chain=[route+'|/resultSchema/properties/items/items/$ref',route+'|/resultSchema/@definition/waapi_definitions.json/definitions/logCentralItem/properties/severity/$ref']
+        check={'pointer':observation,'equals':''}
+    else:
+        started=invoke([*prefix,'draft-start',uri])['gateway']['payload']
+        argv=[*prefix,'draft-declare-runtime-control-plan',started['draft']['draft_id'],'--task-authority',started['task_authority'],
+            '--expected-revision',str(started['draft']['revision']),'--message','owned counterexample','--severity','']
+        invalid=invoke(argv);valid=invoke([*argv[:-1],'message']);current=valid['gateway']['payload']
+        checked=invoke([*prefix,'draft-check',current['draft']['draft_id'],'--task-authority',started['task_authority'],
+            '--expected-revision',str(current['draft']['revision'])])['gateway']['payload']
+        compiled=invoke([*prefix,'preview-from-draft',checked['draft']['draft_id'],'--task-authority',started['task_authority'],
+            '--expected-revision',str(checked['draft']['revision'])])
+        dispatch='/counterexample/compiled/gateway/payload/agent_result/request/arguments';observation=dispatch+'/args/severity'
+        proof={'classification':classification,'valid':valid,'compiled':compiled,'public_input_pointer':'/gateway/argv/'+str(len(argv)-1)}
+        chain=[route+'|/argsSchema/properties/severity/$ref'];check={'pointer':proof['public_input_pointer'],'equals':''}
+    assert valid['gateway']['exit_code']==0 and invalid['gateway']['exit_code']==2
+    record={**invalid,'scope_kind':'product','counterexample':proof,'branch_assertions':{branch['id']:{'native_route':route,'native_shape_sha256':branch['shape_sha256'],'checks':[check]}}}
+    from tests.support.runtime_remaining_evidence import _code_bindings
+    public_id='2025.1|function|'+uri
+    binding={'branch_id':branch['id'],'native_shape_sha256':branch['shape_sha256'],'public_route':public_id,
+        'disposition':'schema_counterexample','empty_candidate':classification,'input':{'gateway_argv':argv},'dispatch_pointer':dispatch,
+        'observation_pointer':observation,'reference_chain':chain,**_code_bindings(branch)}
+    return record,binding
+
+
+@pytest.mark.parametrize('console',[True,False],ids=['console','authoring'])
+def test_log_invalid_severity_counterexamples_keep_native_gates(request,tmp_path,console):
+    from tests.support import runtime_remaining_evidence as remaining
+    from tests.support import runtime_log_retained_evidence as retained
+    from tests.support.empty_candidate_evidence import counterexample_source_context,write_counterexample_bundle
+    host='wwise-console'if console else'wwise-authoring';prefix=f'2025.1|{host}|2025.1.7.9143|function|'
+    routes=[prefix+uri for uri in (GET,'ak.wwise.core.log.addItem')]
+    pointers={'/resultSchema','/argsSchema/properties/severity/$ref','/resultSchema/properties/items/items/$ref',
+        '/resultSchema/@definition/waapi_definitions.json/definitions/logCentralItem/properties/severity/$ref',
+        '/resultSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string',
+        '/argsSchema/@definition/waapi_definitions.json/definitions/logCentralSeverity/@empty/string'}
+    inventory=log_inventory(routes,pointers);source_context=counterexample_source_context(audit.ROOT)
+    invalid=[b for b in inventory['native_coverage']['obligations']if b['pointer'].endswith('/logCentralSeverity/@empty/string')]
+    assert len(invalid)==2
+    counter=[(b,*_severity_counterexample(tmp_path/('counter-'+str(i)),b,console=console))for i,b in enumerate(invalid)]
+    positive=deepcopy(inventory);positive['native_coverage']['obligations']=[b for b in positive['native_coverage']['obligations']if b not in invalid]
+    if console:rows=[ROW];message=ROW['message']
+    else:
+        rows=retained.program_native_call(routes[0]+'|/resultSchema')['result']['items']
+        message=retained.program_native_call(routes[1]+'|/resultSchema')['args']['message']
+    read=public_log_read(tmp_path/'root-read',rows,console=console)
+    control=public_log_control(tmp_path/'root-add',routes[1].split('|')[-1],console=console,message=message,channel='general',severity='message')
+    def finalize(phases):
+        paths=[]
+        for i,values in enumerate((read,control)):
+            if i==0:
+                receipt,native,context,trace=values;calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)},
+                    *({'gateway':page,'native_start':len(trace),'native_end':len(trace)}for page in receipt.pop('public_pages'))]
+            else:receipt,native,context,trace,calls=values
+            path=tmp_path/f'root-capture-{i}.json';runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,
+                source_context=context,native_reads=trace,public_calls=calls);paths.append(path)
+        index=remaining.write_log_bundle(tmp_path/'bundle',paths,inventory=positive);doc=json.loads(index.read_bytes());policies=json.loads((index.parent/'requirements.json').read_bytes())
+        for branch,record,binding in counter:
+            public=next(r for r in inventory['routes']if r['id']==binding['public_route']);binding['public_route_sha256']=audit.digest(public)
+            part=write_counterexample_bundle(index.parent,record,branch=branch,binding=binding,inventory=inventory,root=audit.ROOT,
+                nodeid=request.node.nodeid,phase_reports=phases,source_context=source_context)
+            fragment=json.loads(part.read_bytes());doc['entries'].extend(fragment['entries'])
+            req=fragment['entries'][0]['origin']['requirements'];policies['branches'].update(completion.read_sealed_artifact(req,index.parent)['branches'])
+        runtime.write_json(index,doc);runtime.write_json(index.parent/'requirements.json',policies)
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']]
+        missing=deepcopy(bindings)
+        for bound in missing['bindings'].values():bound['evidence'].pop('native',None)
+        blocked=completion.evaluate_coverage(audit.ROOT,inventory,missing,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        assert all(r['state']!='verified'for r in blocked['obligations'])
+        for branch,_,_ in counter:
+            damaged=deepcopy(policies);damaged['branches'][branch['id']]['reason']='caller downgrade'
+            rejected=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=damaged)
+            assert next(r for r in rejected['obligations']if r['id']==branch['id'])['state']!='verified'
     register_exact_evidence_finalizer(request.node,finalize)
