@@ -5,6 +5,30 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R134 capture control evidence
+
+Reviewed feature `2e320baf`, integrated at `a03a7db5`, covers the exact 672
+existing enable/start/stop capture IDs and 30 native acknowledgement roots.
+Five grouped public Gateway program cases reached actual teardown and the
+ordinary portable consumer: the first version passed in 86.23s; the remaining
+four ran once and passed in 149.69s. Missing-root checks isolate each route,
+and reused packets exercise malformed outcomes, extra dispatch, source drift,
+cleanup and composition failures. Earlier assertion-encoding failures remain
+recorded; only affected development cases were repeated.
+
+The native facts reuse ten unchanged original workflows with matching
+host/build, exact public authorization and dispatcher receipts, source
+preservation and cleanup. Independent review checked all 30 control receipts,
+ten primary default descriptions and the exact five-report union. These are
+acknowledgements, not proof of enabled settings, current recording state or
+global restoration. Explicit enable is equivalent to the documented default;
+literal native omission is not claimed. No native or Fresh run was added.
+
+The sole merge manifest check passed in 0.31s; the fixed Program roster has
+355 entries. Packaged Skill code is unchanged. The remaining 298 control IDs,
+transport and meter work remain assigned to #186. This is component evidence,
+not a new full gate or global completion result.
+
 ## 2026-10-24 R132 diagnostic readers, cursor compatibility and bounded collector
 
 The subsequent single native diagnostic at `fc28985c` ran on isolated macOS
