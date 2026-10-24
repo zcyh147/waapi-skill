@@ -164,7 +164,7 @@ def retained_contribution(version):
     return originals, receipt, raw, rows
 
 
-def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, cursor=None):
+def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, cursor=None, identity_forms='handles'):
     from tests.support.runtime_observation_evidence import program_source_context
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
     context = program_source_context(flow=URI)
@@ -205,9 +205,13 @@ def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, 
     voice = run(['core-call', PREFIX + 'getVoices', '--profiler-position', position, '--max-results', '64'])
     busses = run(['core-call', PREFIX + 'getBusses', '--profiler-position', position, '--max-results', '64'])
     capture = ['--capture-ms', position] if cursor is None else ['--capture', cursor]
-    argv = ['profiler-voice-contributions', *capture, '--voice-instance-handle',
-        voice['payload']['agent_result']['return'][0]['voice_instance_handle']]
-    argv += [value for row in busses['payload']['agent_result']['return'] for value in ('--bus-instance-handle', row['bus_instance_handle'])]
+    selected_voice = (['--voice-object-id', rows['getVoices'][0]['objectGUID']]
+        if identity_forms == 'object-voice' else ['--voice-instance-handle',
+            voice['payload']['agent_result']['return'][0]['voice_instance_handle']])
+    selected_busses = ([value for row in rows['getBusses'] for value in ('--bus-object-id', row['objectGUID'])]
+        if identity_forms == 'object-bus' else [value for row in busses['payload']['agent_result']['return']
+            for value in ('--bus-instance-handle', row['bus_instance_handle'])])
+    argv = ['profiler-voice-contributions', *capture, *selected_voice, *selected_busses]
     receipt = run(argv)
     assert receipt['payload']['semantic_preview']['args'] == source_args
     assert receipt['payload']['agent_result'] == original_receipt['payload']['agent_result']
@@ -536,3 +540,123 @@ def test_shared_contribution_cursor_batch_proves_exact_fifty_normalized_branches
     write_json(tmp_path / 'cursor-final-consumer.json', selected)
     assert len(selected) == 50
     assert all(row['requirements'] == ['program'] and row['state'] == 'verified' for row in selected), json.dumps(selected)
+
+
+
+@pytest.mark.parametrize('identity_forms', ('object-voice', 'object-bus'))
+def test_contribution_mixed_identity_forms_preserve_selected_bus_path(tmp_path, identity_forms):
+    receipt, native, _, trace, calls, _ = public_contribution_flow(tmp_path, identity_forms=identity_forms)
+    final = trace[calls[-1]['native_start']:]
+    assert [row['uri'] for row in final if row['uri'] in {PREFIX + 'getVoices', PREFIX + 'getBusses', URI}] == [
+        PREFIX + 'getVoices', PREFIX + 'getBusses', URI]
+    assert native['args'] == {'bussesPipelineID': [2], 'time': 30837, 'voicePipelineID': 1}
+    assert receipt['payload']['agent_result']['volume'] == -9.0
+
+
+@pytest.mark.parametrize('identity_forms', ('object-voice', 'object-bus'))
+def test_mixed_contribution_program_binds_each_selected_bus_form(tmp_path, inventory, identity_forms):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.maintenance import branch_audit_completion as completion
+    receipt, native, context, trace, calls, _ = public_contribution_flow(tmp_path / 'public', identity_forms=identity_forms)
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, native, nodeid='mixed-contribution', source_context=context,
+        native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
+    index = write_read_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2025.1', host='wwise-authoring', mode='top-data')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    identity = next(key for key in document['bindings'] if key.endswith('/properties/volume'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def outcome():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row['evidence_results']['program'] for row in result['obligations'] if row['id'] == identity)
+    assert outcome()['outcome'] == 'passed'
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    for target in (program, program['runtime_read_program']):
+        target['native_call']['args']['bussesPipelineID'] = []
+        target['gateway']['payload']['semantic_preview']['args']['bussesPipelineID'] = []
+    program['runtime_read_program']['public_calls'][-1]['gateway'] = deepcopy(program['gateway'])
+    program['runtime_read_program']['native_reads'][-1]['args']['bussesPipelineID'] = []
+    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
+    assert outcome()['outcome'] == 'missing'
+
+
+def test_contribution_cursor_proof_rejects_resealed_integral_float_snapshot(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.maintenance import branch_audit_completion as completion
+    receipt, native, context, trace, calls = public_contribution_case(tmp_path / 'public', '2025.1', 'wwise-authoring', 'cursor-capture')
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, native, nodeid='typed-contribution-cursor', source_context=context,
+        native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
+    index = write_read_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2025.1', host='wwise-authoring', mode='cursor-capture')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    identity = next(key for key in document['bindings'] if key.endswith('/profilerCursor/enum/1'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def outcome():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row['evidence_results']['program'] for row in result['obligations'] if row['id'] == identity)
+    assert outcome()['outcome'] == 'passed'
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    cursor = next(row for row in program['runtime_read_program']['native_reads'] if row['uri'] == PREFIX + 'getCursorTime')
+    cursor['result']['return'] = float(cursor['result']['return'])
+    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
+    rejected = outcome()
+    assert rejected['outcome'] == 'missing', json.dumps(rejected)
+    assert 'fixed cursor construction trace' in rejected['reason']
+
+
+@pytest.mark.parametrize(('identity_forms', 'damage'), (
+    ('object-voice', 'cross-game'), ('object-bus', 'cross-game'), ('object-voice', 'stale-handle')))
+def test_contribution_shared_bus_tail_rejects_cross_game_or_stale_bus(tmp_path, identity_forms, damage):
+    from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
+    from tests.unit.test_runtime_result_reference_gateway import profiler_row
+    voice = profiler_row('getVoices', '2025.1')
+    voice.update(gameObjectID=1)
+    bus = profiler_row('getBusses', '2025.1')
+    bus.update(pipelineID=43, objectGUID='{22222222-2222-2222-2222-222222222222}',
+        gameObjectID=2 if damage == 'cross-game' else 1)
+    client = _RuntimeControlDraftClient(tmp_path, version='2025.1')
+    original, calls, final = client.call, [], False
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        if uri == PREFIX + 'getVoices':
+            return {'return': [deepcopy(voice)]}
+        if uri == PREFIX + 'getBusses':
+            row = deepcopy(bus)
+            if final and damage == 'stale-handle':
+                row['objectGUID'] = '{33333333-3333-3333-3333-333333333333}'
+            return {'return': [row]}
+        return original(uri, args, options)
+    client.call = call
+    env = _env(tmp_path, version='2025.1')
+    def run(argv):
+        return gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'), *argv], env=env, client_factory=lambda _: client)
+    seed_uri = PREFIX + ('getBusses' if identity_forms == 'object-voice' else 'getVoices')
+    code, seed = run(['core-call', seed_uri, '--profiler-position', '123'])
+    assert code == 0, seed
+    if identity_forms == 'object-voice':
+        selectors = ['--voice-object-id', GUID, '--bus-instance-handle', seed['agent_result']['return'][0]['bus_instance_handle']]
+    else:
+        selectors = ['--voice-instance-handle', seed['agent_result']['return'][0]['voice_instance_handle'], '--bus-object-id', bus['objectGUID']]
+    final = True
+    start = len(calls)
+    code, payload = run(['profiler-voice-contributions', '--capture-ms', '123', *selectors])
+    assert URI not in calls[start:], payload
+    if damage == 'cross-game':
+        assert code == 0 and payload['status'] == 'needs_clarification', payload
+        assert payload['agent_result']['matching_bus_count'] == 0
+    else:
+        assert code == 2 and 'identity changed' in payload['message'], payload
+
+
+def test_contribution_shared_bus_tail_preserves_homogeneous_object_order(tmp_path):
+    _, native, _, _, _ = public_contribution_case(tmp_path, '2025.1', 'wwise-authoring', 'rich')
+    assert native['args'] == {'voicePipelineID': 0, 'bussesPipelineID': [1, (1 << 32) - 1], 'time': 123}

@@ -530,7 +530,7 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': '3ce27d569f4fe972911d04f16a2b6f7943a05f3785a9ac9b75c319628c393c8a'},
+        'after': '85b32438fc9395f377af0338e33991edeef11c49a0d4c890f0db8b526f10169f'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'db81794ea4f995e5385257cf507540c580f9474cd3848b1714c02c9387398633'},
@@ -550,7 +550,7 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
 RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
     'post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
-    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot delta irrelevant to RTPC; original finalized PASS retained')
+    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
@@ -1042,7 +1042,10 @@ def _validate_contribution_capture(record, argv, route, root):
         cursors = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
         dependent = [row for row in final_trace if row['uri'] in {
             'ak.wwise.core.profiler.getVoices', 'ak.wwise.core.profiler.getBusses', CONTRIBUTION_URI}]
+        source_time = (cursors[0]['result'].get('return')
+            if len(cursors) == 1 and type(cursors[0]['result']) is dict else None)
         if (len(cursors) != 1 or cursors[0]['args'] != {'cursor': cursor} or cursors[0]['options'] != {}
+                or type(source_time) is not int or source_time < 0
                 or type(time) is not int or time < 0 or cursors[0]['result'] != {'return': time}
                 or any(row['ordinal'] <= cursors[0]['ordinal'] or type(row['args'].get('time')) is not int
                     or row['args']['time'] != time for row in dependent)):
@@ -1072,6 +1075,28 @@ def _validate_contribution_capture(record, argv, route, root):
             raise ValueError('Contribution explicit bus path construction differs')
     elif not values('--bus-object-id') and not values('--bus-instance-handle') and pipeline_ids != []:
         raise ValueError('Contribution default dry path construction differs')
+    def issued_row(handle, kind, revalidated):
+        field = kind + '_instance_handle'
+        uri = 'ak.wwise.core.profiler.' + ('getVoices' if kind == 'voice' else 'getBusses')
+        matches = []
+        for call in calls[:-1]:
+            public = call['gateway']
+            if public['argv'][:2] != ['core-call', uri]:
+                continue
+            reads = [row for row in trace[call['native_start']:call['native_end']] if row['uri'] == uri]
+            if len(reads) != 1 or reads[0]['args'] != {'time': time}:
+                raise ValueError('Contribution handle seed capture time differs')
+            for raw in reads[0]['result']['return']:
+                for row in public['payload']['agent_result']['return']:
+                    if row.get(field) == handle and raw['pipelineID'] == revalidated['pipelineID']:
+                        expected = {key: value for key, value in raw.items() if key != 'pipelineID'}
+                        expected[field] = handle
+                        if (audit.digest(row) != audit.digest(expected)
+                                or any(raw.get(key) != revalidated.get(key) for key in ('objectGUID', 'gameObjectID'))):
+                            raise ValueError('Contribution issued handle identity differs from same-time revalidation')
+                        matches.append(row)
+        if len(matches) != 1:
+            raise ValueError('Contribution issued handle relation is missing or ambiguous')
     if '--voice-object-id' in argv:
         requested, = values('--voice-object-id')
         game = values('--game-object-id')
@@ -1079,33 +1104,13 @@ def _validate_contribution_capture(record, argv, route, root):
             and (not game or row['gameObjectID'] == int(game[0]))]
         if len(matches) != 1 or matches[0] != voice:
             raise ValueError('Contribution exact object/game-object selection differs')
+    else:
+        handle, = values('--voice-instance-handle')
+        issued_row(handle, 'voice', voice)
+    if values('--bus-object-id'):
         if [row['objectGUID'].casefold() for row in selected_busses] != [value.casefold() for value in values('--bus-object-id')]:
             raise ValueError('Contribution ordered Bus object selection differs')
     else:
-        def issued_row(handle, kind, revalidated):
-            field = kind + '_instance_handle'
-            uri = 'ak.wwise.core.profiler.' + ('getVoices' if kind == 'voice' else 'getBusses')
-            matches = []
-            for call in calls[:-1]:
-                public = call['gateway']
-                if public['argv'][:2] != ['core-call', uri]:
-                    continue
-                reads = [row for row in trace[call['native_start']:call['native_end']] if row['uri'] == uri]
-                if len(reads) != 1 or reads[0]['args'] != {'time': time}:
-                    raise ValueError('Contribution handle seed capture time differs')
-                for raw in reads[0]['result']['return']:
-                    for row in public['payload']['agent_result']['return']:
-                        if row.get(field) == handle and raw['pipelineID'] == revalidated['pipelineID']:
-                            expected = {key: value for key, value in raw.items() if key != 'pipelineID'}
-                            expected[field] = handle
-                            if (audit.digest(row) != audit.digest(expected)
-                                    or any(raw.get(key) != revalidated.get(key) for key in ('objectGUID', 'gameObjectID'))):
-                                raise ValueError('Contribution issued handle identity differs from same-time revalidation')
-                            matches.append(row)
-            if len(matches) != 1:
-                raise ValueError('Contribution issued handle relation is missing or ambiguous')
-        handle, = values('--voice-instance-handle')
-        issued_row(handle, 'voice', voice)
         handles = values('--bus-instance-handle')
         if len(handles) != len(selected_busses):
             raise ValueError('Contribution selected Bus handle count differs')
