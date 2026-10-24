@@ -1,0 +1,12 @@
+{
+  "contract": "waapi-skill.branch-evidence-requirements/v1",
+  "branches": {
+    "2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getVoices|/optionsSchema/@definition/waapi_definitions.json/definitions/voiceReturnOptions/@cardinality/empty": {
+      "native_shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "categories": [
+        "program"
+      ],
+      "reason": "SPEC section5 exact deterministic fixed-reader construction/predicate/shape preservation; no actual native occurrence/data/effect claim"
+    }
+  }
+}

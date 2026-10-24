@@ -1,0 +1,273 @@
+{
+  "contract": "waapi-skill.branch-evidence-index/v1",
+  "base": ".",
+  "entries": [
+    {
+      "id": "original-profiler-voices-observation-fixed-2025.1-wwise-authoring",
+      "bindings": {
+        "artifact": "original-profiler-voices-observation-bindings.json",
+        "sha256": "e4ac095e71ca56cddec5c57d15f883ef8f9d982323b86e6494524b9c25fa15f7"
+      },
+      "origin": {
+        "bindings": {
+          "artifact": "original-profiler-voices-observation-bindings.json",
+          "sha256": "e4ac095e71ca56cddec5c57d15f883ef8f9d982323b86e6494524b9c25fa15f7"
+        },
+        "program": {
+          "artifact": "original-profiler-voices-observation-program.json",
+          "sha256": "5ec0c4d41073155e671778103214a7fe3712fc057931f56f282a521fde112903"
+        },
+        "requirements": {
+          "artifact": "original-profiler-voices-observation-requirements.json",
+          "sha256": "7602fd515552d073a9a0608e4e365c167b7ab6030081656885d1dd1a02505bff"
+        },
+        "capture": {
+          "artifact": "original-profiler-voices-observation-program-capture.json",
+          "sha256": "14dd798f60b340f885c3154b01c3669f11eacbaee4c0db8ad5844c8b4c36a100"
+        }
+      }
+    }
+  ],
+  "runtime_observation_attachments": [
+    {
+      "artifact": "original-profiler-voices-observation-attachment-0.json",
+      "sha256": "cda270a46b24b7157e0015e11aef6372dd2a391673ce9b8ed8a38f13cd0dc467"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-1.json",
+      "sha256": "ad6d8bef1bb213292c9f531e3bf8c250ddd720556c611ff1e748fc421e8fa8a1"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-2.json",
+      "sha256": "30dfef9b8401e2be01512326b36da68a721a3378712fc3144b63913a2ca28b6f"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-3.json",
+      "sha256": "0cb7849f41b56f3e756a5be11934e90a8ab7b3f4f92dd31eeffffbac8dbc9138"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-4.json",
+      "sha256": "170024d6c3366ef9fc5ac9ddb2f2a07f4f6a2c7df264c4626fa13628cfbee7fa"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-5.json",
+      "sha256": "dd55346da71c23104dbd260177695b67523a0607ada1142bf13c7dfefdd40721"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-6.json",
+      "sha256": "b96cf23d5c1eb65d8b2309f05afca8deaa0a1ee2b1ca7ce6af5f8864317f66a2"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-7.json",
+      "sha256": "a45a49d02fe016b29111f904c98a44ec39c77b715412031b8a8520527ea8e431"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-8.json",
+      "sha256": "9b930d3b9ec61b69e39c32680107e3ff63904849d5f66aff427fc0238df330cc"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-9.json",
+      "sha256": "6ec485e5fcc672500656739d16a28b748aa2b61c872402a4ba6155bb8b3d6de5"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-10.json",
+      "sha256": "e8c8057dd688cb43a422bca4bf14dea5b72bf8eaa44f9e75ad2eb4a4140276c8"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-11.json",
+      "sha256": "ec4fa4a8a3e5b7daf92a19956d7963574c488f9004584611e954520cf871d1f1"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-12.json",
+      "sha256": "24a7a34b740fe57eef022cb3b3a7329408743d26f3992f4cf2ee7e115ec7bc36"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-13.json",
+      "sha256": "f3bccc9b99767ddcd5143e4c6671f190f8fd904d7b9ec00bc76610c8c49c9760"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-14.json",
+      "sha256": "7501c2673cd34ad00ef3da497b34a9aefb52550f30af30c671a41a869989c2b8"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-15.json",
+      "sha256": "24610c624fd15e48a10bc7fb6df34af43594315ac0686eca6e018b7c8b6142cf"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-16.json",
+      "sha256": "884d30e81e5dc9bc384f0c274811fab90b171977e19d7945ff528d237d8cfff5"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-17.json",
+      "sha256": "982bdea0fe90de16de2713cd71a77ba6f6f86ccd5063234422af8a1f77175be7"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-18.json",
+      "sha256": "26c801f170b8961cc8ccca78324d53d7ba4ce85df1396a51bc7789303074d8de"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-19.json",
+      "sha256": "17094f8edf419b386786b13985fb86e0096410566474c919066873c16344fe05"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-20.json",
+      "sha256": "df8e2fb33b93d63d0d0d878dc5d21541a015828aef51b1c813267e3ebce08131"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-21.json",
+      "sha256": "179e4df83ab7028e35732273f37e2c3c80aeb6fc9be0a0bb73b380aebb5ca80c"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-22.json",
+      "sha256": "4472b8819bc62fa6040b950de25a5acfab315768278c32b4a28fc4f434c01730"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-23.json",
+      "sha256": "4b12e72d5c53a86668aa22eb705e659b13ba22206c63511c37ae40911e670d79"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-24.json",
+      "sha256": "d1d1f3ced4b39afec669d5ac5e9cc1be108f1f2d404b168fb7d992f2d7f3b66b"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-25.json",
+      "sha256": "c006969e986fe4ca25596baf96c084d0cfa4584cf1dccd342a3f70e0218493c7"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-26.json",
+      "sha256": "274fe8dbe33cd321474887988c995217b59e3c3ddb4fe096d4bf93096f4bef0c"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-27.json",
+      "sha256": "a9159c681ea193b582adfeba7bfe00edcedd23d70c8b48ce3388cd29d3ceb135"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-28.json",
+      "sha256": "7e2eaebd7a6b17275aeecda1366d84cebfaddad21b1a05922eaea2c93e087e59"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-29.json",
+      "sha256": "5d4852be1463b2f0af986d3001ce6abc086ac19bd59f128d1de3dcc031278ebf"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-30.json",
+      "sha256": "60846f93c4660e22483c16d059f237dc2edbc65ea713c2ed88f55bb46df8bc7b"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-31.json",
+      "sha256": "e274b3999216cc2bc897b458f9c15c60221a22a469fc61c539126612d4369ad7"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-32.json",
+      "sha256": "b82f034ee0466164ef2f2aa9630edb23757a0eec818f1e842a3526bead0b008e"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-33.json",
+      "sha256": "76d9045e030217e6587ad1ed75c0ca0ba74a62878d08ebd4f40c4a1500331213"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-34.json",
+      "sha256": "9a41b2c80b0c364ba9fbfa9c43d4f486ca67fea77a871c7b108cae07c55a11ed"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-35.json",
+      "sha256": "93657e7a7ef4f55edb7ece141f839c7e6bc86c40d78a4e251d660aa510ea8809"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-36.json",
+      "sha256": "153608ae7ad4160513cbe2c523856d9e2e67488a1c9bd7b8f7a6c31612a25309"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-37.json",
+      "sha256": "27b2a575d82ae56ab592751df928fc9953e4141179201666f3a0a4c996fac08b"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-38.json",
+      "sha256": "abc2c4753cb2f9a6f2d95a6e21051b5cbf47cfe104509e26e54e0d8580e38388"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-39.json",
+      "sha256": "d95b6e9db143efa71620873a21b31e95a79534937db7b8f9f9b88c1091ca796f"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-40.json",
+      "sha256": "4d521580a6455da2daaabd68f1ca118d712b89df21edfcb43a63030971cdfcb1"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-41.json",
+      "sha256": "07e683c345a8695223ffdbe7e2fb5e374206505caef26e7455153ec1f2ba8124"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-42.json",
+      "sha256": "29d7fd90060f35c1ee49a8a4978a2c6451548e2a0ebcf05b2e2f65763fcd8655"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-43.json",
+      "sha256": "45ea2b43f49cad11a0abd40838589bb51b7e24be4d9e4d8a5c3cb562a09b4939"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-44.json",
+      "sha256": "d843bc24bbfaf38f74219408b72a8a5d0750b8bada89ab9274d49d041138e9e3"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-45.json",
+      "sha256": "b71f9b4fc6c6905c3df45be77584aae67745b98b4a14a052dd04244a190af54a"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-46.json",
+      "sha256": "1796fd8db7c86d2dd7bc4f0cf229ba8be11a97e0eb9346112778b06d27f8865e"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-47.json",
+      "sha256": "12f5add54f12806f35fb2385e4f983c847ac9bc1b8241d7b61f26204fd2ff610"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-48.json",
+      "sha256": "66e96bd54657e1436074a1c3dc3059ddfbf3211c707a0c6c47facc01308a9316"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-49.json",
+      "sha256": "fc7c9352846b4ca5107d5f54c9526cfc345d7f49823099ae740aef22148496ae"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-50.json",
+      "sha256": "7aa46ac470ec1bdfac6f8b138625d64683a9a1d40e7563aafcb2bc3cca79d8ad"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-51.json",
+      "sha256": "56d87aaceb00bd2cc53c6cb05c507e2f1aa2c8fb306373b3f60f78e1539195cc"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-52.json",
+      "sha256": "ba5535104ec8992dbe5858316e93866eae49118f4315daea56c1cf5eedd07950"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-53.json",
+      "sha256": "72eb18c7c589d1652fc1278a641ba2e51d6d83c803f816f1172db6e31acb0b58"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-54.json",
+      "sha256": "80a0de6790ea3520ec27779a4579e010ec557e454fd065bc3c9606a6de6d9b06"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-55.json",
+      "sha256": "fc8e6cf6838540695c3de72cd6b999cae77cd65b48bc30416ebcbcb8cab566bd"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-56.json",
+      "sha256": "810c5209ec12d6f447d6e18d02bdad5040689366c2a5a6aed49b32afa24d9e8e"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-57.json",
+      "sha256": "b2c9e079c4221c7c9a185cc134d9205af351467fcbc4e40fe8f83427b2f28a46"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-58.json",
+      "sha256": "4650a41a6d41c7f4d9fc0a0c6dd157c5a8f8106d8be91fe1254824de9bbed546"
+    },
+    {
+      "artifact": "original-profiler-voices-observation-attachment-59.json",
+      "sha256": "2a946dace786ebff038d7b6ba44a6acdd1cb61af64bde77f3079893c6b1cd977"
+    }
+  ]
+}
