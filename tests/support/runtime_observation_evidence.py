@@ -49,7 +49,9 @@ def program_source_context(root=audit.ROOT, *, flow=None):
             'tests/unit/test_loaded_media_runtime_evidence.py', 'tests/support/fixed_runtime_read_evidence.py',
             'tests/fixtures/runtime-loaded-media/support-review.json',
             'tests/unit/test_loaded_media_composite_evidence.py',
-            'tests/fixtures/runtime-loaded-media/composite-review.json'))
+            'tests/fixtures/runtime-loaded-media/composite-review.json',
+            'tests/unit/test_console_loaded_media_evidence.py',
+            'tests/fixtures/runtime-loaded-media/console-review.json'))
     if flow == 'ak.wwise.core.profiler.getVoiceContributions':
         dependencies.append('tests/unit/test_contribution_branch_evidence.py')
     return {group: {name: sha((root / name).read_bytes()) for name in sorted(paths)}
