@@ -38,6 +38,16 @@ def profile_for_branch(branch, root=audit.ROOT):
     raise ValueError('Only exact106 new R125 selectors are eligible')
 
 
+def reviewed_source_context(sources, root=audit.ROOT):
+    current = runtime.program_source_context(root)['packaged']
+    changes = {name:{'before':sources.get(name),'after':current.get(name)}
+        for name in sources.keys() | current.keys() if sources.get(name) != current.get(name)}
+    if (len(sources) != 413 or len(current) != 413
+            or changes != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE}):
+        raise ValueError('R125 exact reviewed source delta differs')
+    return current
+
+
 def original_observation(version, key, originals=None, root=audit.ROOT):
     scope = profiles(root); profile = scope['profiles'][version]; reader = profile['readers'][key]
     if not reader['selectors']:
@@ -79,9 +89,9 @@ def original_observation(version, key, originals=None, root=audit.ROOT):
     if runtime.sha(source_raw) != scope['source_map_sha256']:
         raise ValueError('R125 original source map differs')
     source = json.loads(source_raw); sources = source['sources']
-    if (source['candidate'] != CANDIDATE or len(sources) != 413
-            or sources != runtime.program_source_context(root)['packaged']):
-        raise ValueError('R125 original full413 packaged source equality required')
+    if source['candidate'] != CANDIDATE:
+        raise ValueError('R125 original full413 source candidate differs')
+    reviewed_source_context(sources, root)
     outcome = capture['outcomes'][key]; evidence = outcome['evidence']; gateway = evidence['gateway_result']
     receipt, = [r for r in capture['calls'] if r['payload'] == gateway]
     raw = json.loads(read(reader['raw_path']))
@@ -174,6 +184,14 @@ def write_bundle(output, program_path, *, inventory, version, key, name_prefix="
         'evidence_kind':'native_execution','relevant_sources':original['sources'],'native_runs':[native_run],
         'invocation':original['context']['record']['invocation'],
         'observation_artifacts':{'capture':capture_descriptor,'raw':raw_descriptor},'branch_assertions':{}}
+    source_review = emit('r127-source-review.json', {
+        'contract':'waapi-skill.runtime-read-source-review/v1', 'historical_candidate':CANDIDATE,
+        'historical_sources':original['sources'], 'current_sources':captured['source_context']['packaged'],
+        'changed_files':{runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE},
+        'changed_symbols':{runtime.METER_SOURCE:runtime.METER_SOURCE_SYMBOLS},
+        'scope':{'version':version,'key':key,'route':route['id']},
+        'archive':original['archive'],'original_capture':capture_descriptor,
+        'program_replay':index_doc['entries'][0]['origin']['capture']})
     attachments=[]
     for n,mapping in enumerate(mappings):
         branch=mapping['branch']; identity=branch['id'];binding=deepcopy(bindings[identity])
@@ -187,7 +205,7 @@ def write_bundle(output, program_path, *, inventory, version, key, name_prefix="
                 'raw_observation':raw_descriptor,'raw_original_path':original['raw_path']},
             'native_run':native_run,'archive':original['archive'],'capture':capture_descriptor,
             'capture_original_path':original['profile']['report'],'program_capture':index_doc['entries'][0]['origin']['capture'],
-            'relevant_sources':original['sources']}
+            'relevant_sources':original['sources'],'source_review':source_review}
         proof_descriptor=emit(f'r125-proof-{n}.json',proof)
         binding.update(runtime_observation_attachment=proof_descriptor,program_observation_pointer=mapping['program_pointer'],
             observation_pointer=native_pointer,native_observations_sha256={'capture':capture_descriptor['sha256'],'raw':raw_descriptor['sha256']})
@@ -195,8 +213,8 @@ def write_bundle(output, program_path, *, inventory, version, key, name_prefix="
             'to_candidate':inventory['native_coverage']['candidate_sha256'],'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],
             'native_route':branch['route'],'evidence_sha256':native_run['sha256'],
             'binding_semantics_sha256':audit.digest(completion.binding_semantics(binding)),
-            'reviewed_reason':'Exact finalized R125 Console read; complete current public replay and unchanged full413 packaged sources; no control effect or rich44 claim',
-            'sources':original['sources']}
+            'reviewed_reason':'Exact finalized R125 Console read; complete current public replay and exact meter-only reviewed source delta;412 packaged paths unchanged; no control effect or rich44 claim',
+            'sources':original['sources'],'runtime_read_review':source_review}
         attachments.append({'identity':identity,'proof':proof_descriptor,'equivalence':emit(f'r125-equivalence-{n}.json',equivalence)})
     nd={**emit('r125-native.json',native),'nodeid':native_run['nodeid']}
     index_doc['runtime_observation_attachments']=[emit(f'r125-attachment-{n}.json',{
@@ -224,6 +242,7 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
         else: runtime.validate_contribution_program(record,binding,branch,root,edges)
         return
     original=original_observation(version,key,base,root)
+    validate_source_review(proof.get('source_review', {}), original['sources'], branch, root, base)
     pointer=reader['selectors'][branch['id']]['native_pointer'];expected_native='/observations/raw'+pointer
     if (proof['archive']!=original['archive'] or proof['native_run']!=record['native_runs'][0] or len(record['native_runs'])!=1
             or proof['capture_original_path']!=profile['report'] or proof['relevant_sources']!=original['sources']
@@ -244,3 +263,36 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
         original_argv=original['receipt']['argv'];argv=captured['gateway']['argv'];position=argv.index('--voice-instance-handle')+1
         if argv[:position]!=original_argv[:position] or argv[position+1:]!=original_argv[position+1:] or argv[position]==original_argv[position]:
             raise ValueError('R125 dry path must reissue current same-frame Gateway voice authority')
+
+
+def validate_source_review(descriptor, sources, branch, root, base):
+    """Only exact106 R125 identities may bridge the one reviewed meter delta."""
+    version,key,profile,reader = profile_for_branch(branch,root)
+    runtime._portable_descriptor(descriptor,base)
+    review = completion.read_sealed_artifact(descriptor,base)
+    current = reviewed_source_context(sources,root)
+    expected = {'contract','historical_candidate','historical_sources','current_sources',
+        'changed_files','changed_symbols','scope','archive','original_capture','program_replay'}
+    if (set(review) != expected or review['contract'] != 'waapi-skill.runtime-read-source-review/v1'
+            or review['historical_candidate'] != CANDIDATE or review['historical_sources'] != sources
+            or review['current_sources'] != current
+            or review['changed_files'] != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE}
+            or review['changed_symbols'] != {runtime.METER_SOURCE:runtime.METER_SOURCE_SYMBOLS}
+            or review['scope'] != {'version':version,'key':key,'route':branch['route']}):
+        raise ValueError('R125 exact reviewed source/branch closure differs')
+    original = original_observation(version,key,base,root)
+    for name in ('archive','original_capture','program_replay'):
+        runtime._portable_descriptor(review[name],base)
+    replay = completion.read_sealed_artifact(review['program_replay'],base)
+    if (sources != original['sources'] or review['archive'] != original['archive']
+            or (base/review['original_capture']['artifact']).read_bytes() != original['capture_raw']
+            or runtime.sha(original['capture_raw']) != review['original_capture']['sha256']
+            or replay.get('contract') != 'waapi-skill.runtime-read-program/v1'
+            or replay.get('phase_reports') != dict.fromkeys(('setup','call','teardown'),'passed')
+            or replay.get('source_unchanged') is not True
+            or replay.get('source_context') != runtime.program_source_context(root,flow=reader['uri'])
+            or replay['gateway']['exit_code'] != 0 or replay['gateway']['payload'].get('ok') is not True
+            or replay['gateway']['payload'].get('is_command_line') is not True
+            or audit.digest(replay['native_call']) != audit.digest({'uri':reader['uri'],
+                'args':original['request']['args'],'options':original['request']['options'],'result':original['raw']['result']})):
+        raise ValueError('R125 exact reviewed source complete current/original replay differs')

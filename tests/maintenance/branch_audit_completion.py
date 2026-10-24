@@ -952,7 +952,11 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
     if proof.get('runtime_read_review'):
         from tests.support.runtime_observation_evidence import validate_runtime_source_review, RTPC_ORIGINAL_CANDIDATE
         from tests.support.fixed_runtime_read_evidence import URIS, native_profile
-        expected_original = native_profile(branch)['candidate'] if (branch.get('route') or '').split('|')[-1] in URIS else RTPC_ORIGINAL_CANDIDATE
+        from tests.support import console_runtime_read_evidence as console
+        if console.selected(branch['id'], root):
+            expected_original = console.CANDIDATE
+        else:
+            expected_original = native_profile(branch)['candidate'] if (branch.get('route') or '').split('|')[-1] in URIS else RTPC_ORIGINAL_CANDIDATE
         if proof['from_candidate'] != expected_original or not binding.get('runtime_observation_attachment'):
             raise ValueError('RTPC guard review requires its exact original runtime producer')
         validate_runtime_source_review(proof['runtime_read_review'], sources, branch, root, base)

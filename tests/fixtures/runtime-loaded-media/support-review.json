@@ -514,20 +514,27 @@
     "candidate": "8b600cfaa45f6670da76187db2dd76e27b613ae3"
   },
   "packaged_source_review": {
-    "reviewed_candidate": "bb24bee9ab01cd9b16e6c5549bbbe3d90a86366a",
+    "reviewed_candidate": "e6cef72e1162ef76329b27b231a60d5fcef2e53c",
     "packaged_source_count": 413,
-    "unchanged_source_count": 412,
+    "unchanged_source_count": 411,
     "changes": {
       "skills/waapi-skill/scripts/gateway.py": {
         "before": "0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827",
         "after": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4"
+      },
+      "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": {
+        "before": "33b8f0571516710b76f68943e797ff46c95588e70965f1be2fb8c2d15094cd7b",
+        "after": "980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63"
       }
     },
     "symbols": {
       "skills/waapi-skill/scripts/gateway.py": [
         "_execute_gateway_unconstrained"
+      ],
+      "skills/waapi-skill/wwise_waapi/profiler_meter_objects.py": [
+        "METER_OUTPUT_NAMES: admit existing media-size-bytes -> mediaSize binding; meter-root only; nearby comment"
       ]
     },
-    "reason": "Only reviewed Gateway exception-finish context changes: preserve the already-attested boolean getInfo.isCommandLine without a new live call, then reinsert the same agent_result last. Successful native request/args/options/result and LoadedMedia replay remain unchanged; all other412 packaged sources remain exact. No9143 native execution or generic patch compatibility."
+    "reason": "Reviewed Gateway exception-finish context changes preserve the already-attested boolean getInfo.isCommandLine without another live call and reinsert the same agent_result last. Separately, reviewed e6cef72e only admits the existing media-size-bytes binding in the getMeters root allowlist and updates its nearby comment; functions/imports/classes and other assignments are unchanged. Successful native request/args/options/result and LoadedMedia replay remain unchanged; all other411 packaged sources remain exact. No9143 native execution or generic patch compatibility."
   }
 }

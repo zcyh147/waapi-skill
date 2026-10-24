@@ -13,7 +13,7 @@ URI = 'ak.wwise.core.profiler.getLoadedMedia'
 ROUTE = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
 ANCHOR = ROUTE + '|/resultSchema/properties/return/@cardinality/single'
 FIXTURE = 'tests/fixtures/runtime-loaded-media'
-REVIEW_SHA = 'b0c96141eb54a2ff058bde6e846a03d91f33def3a8ff010bdcd054fc2a8ae2c3'
+REVIEW_SHA = '6d01288485ea78648bfaf65b48ee39697280828629257f72a1ff1e25dcf7044c'
 ORIGINAL_CANDIDATE = '7289081b552c5f428013ba0b6bacaf7d05843481'
 PREFIX = '/private/tmp/waapi-r122-demo-native-r4/evidence/'
 CATEGORY = 'profiler-loaded-media-observation'
@@ -408,7 +408,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None,name_pr
                 eq=write('native-equivalence.json',{'contract':'waapi-skill.branch-evidence-equivalence/v1','from_candidate':ORIGINAL_CANDIDATE,
                     'to_candidate':candidate,'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'native_route':ROUTE,
                     'evidence_sha256':native_run['sha256'],'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),
-                    'reviewed_reason':'Exact reviewed actual9262 semantic support and complete current public replay; only reviewed Gateway exception-finish host-context delta; all other412 packaged sources exact; no9143 native execution',
+                    'reviewed_reason':'Exact reviewed actual9262 semantic support and complete current public replay; exact reviewed Gateway host-context and meter-only allowlist deltas; all other411 packaged sources exact; no9143 native execution',
                     'sources':sources,'loaded_media_source_review':desc('support-review.json')})
                 attachment=write('attachment.json',{'contract':'waapi-skill.runtime-observation-attachment/v1','branch_id':identity,
                     'proof':proof,'evidence':nd,'native_equivalence':eq})
@@ -424,7 +424,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None,name_pr
     return output/(name_prefix+'index.json')
 
 
-COMPOSITE_REVIEW_SHA = '20749b68c2bf05b89e2344002be17aff09f3c13a2015a4f592ed91071964bd69'
+COMPOSITE_REVIEW_SHA = 'c778e6dbd69b56de353c5d79d2ff4797cbce1e844e295f6642465aa429f9e613'
 COMPOSITE_ROUTES = {
     '2023.1': '2023.1|wwise-authoring|2023.1.19.8928|function|' + URI,
     '2024.1': '2024.1|wwise-authoring|2024.1.13.9056|function|' + URI,

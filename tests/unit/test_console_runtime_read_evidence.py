@@ -96,6 +96,33 @@ def test_r125_new106_anchors_use_25_complete_original_public_packets(packet_cach
     assert len(observed)==len(ids)
     assert all(r['state']=='verified' and r['requirements']==['native','program'] for r in observed),json.dumps(observed)
     print('R125_CONSOLE_NATIVE',version,key,len(observed))
+    if (version, key) == ('2021.1', 'busses'):
+        from tests.support import console_runtime_read_evidence as console
+        identity = sorted(ids)[0]; binding = document['bindings'][identity]
+        branch = next(row for row in inventory['native_coverage']['obligations'] if row['id'] == identity)
+        proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'], base)
+        review = completion.read_sealed_artifact(proof['source_review'], base)
+        for damage in ('wrong-pair', 'extra-file'):
+            changed = deepcopy(review)
+            if damage == 'wrong-pair':
+                changed['changed_files']['skills/waapi-skill/wwise_waapi/profiler_meter_objects.py']['after'] = '0' * 64
+            else:
+                changed['changed_files']['skills/waapi-skill/scripts/run.py'] = {'before':'0' * 64, 'after':'1' * 64}
+            descriptor = write_json(base / (damage + '-review.json'), changed)
+            with pytest.raises(ValueError, match='R125 exact reviewed source'):
+                console.validate_source_review(descriptor, review['historical_sources'], branch, audit.ROOT, base)
+        native = completion.read_sealed_artifact(binding['evidence']['native'], base)
+        equivalence = completion.read_sealed_artifact(binding['native_equivalence'], base)
+        del equivalence['runtime_read_review']
+        with pytest.raises(ValueError, match='equivalence relevant source changed'):
+            completion.validate_equivalence(write_json(base / 'missing-review-marker.json', equivalence),
+                native['native_runs'][0], {'candidate_sha256':equivalence['from_candidate'],
+                    'relevant_sources':native['relevant_sources']}, branch,
+                inventory['native_coverage']['candidate_sha256'], binding, base, audit.ROOT)
+        unrelated = {**branch, 'route':branch['route'].replace('getBusses','getMeters'),
+            'id':branch['id'].replace('getBusses','getMeters')}
+        with pytest.raises(ValueError, match='exact106'):
+            console.validate_source_review(proof['source_review'], review['historical_sources'], unrelated, audit.ROOT, base)
 
 
 def test_r125_resealed_corruption_reuses_complete_packets(packet_cache):
