@@ -2372,7 +2372,7 @@
     "skills/waapi-skill/resources/waql/2025.1/object-get-examples.json": "6d3e7a06a1efb259fea2d16a8fdd6a79a84d52c53012fb6a5de57302b9e69d28",
     "skills/waapi-skill/scripts/__init__.py": "2caa9cc1a34eab6d11cc1c89c21fdd0f80a442909e72f64fb7964db38a0dc1de",
     "skills/waapi-skill/scripts/config.py": "d5384a25d6d7d8fe0886ce67d362b21cd331911b0c6441d7d224d538a4a78909",
-    "skills/waapi-skill/scripts/gateway.py": "0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827",
+    "skills/waapi-skill/scripts/gateway.py": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4",
     "skills/waapi-skill/scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
     "skills/waapi-skill/scripts/setup_environment.py": "b42b182f55f0c199ceff3d695bfcba9644c750c1f1f10b858cd6d9819ba35f2e",
     "skills/waapi-skill/wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
@@ -2621,7 +2621,7 @@
     "tests/destructive/test_expansion_gateway_goals.py": "7f89f7fa98153cbc131ef2e36dc6b2d15bafaf7c0def306ed44dec781b5b7773",
     "tests/destructive/test_gameparameter_creation_feasibility.py": "e991f64bce8300813a1e4ec9e2ef8faa31342ca1ed3b826d6d758b127ba710a5",
     "tests/destructive/test_gateway_transaction_matrix.py": "f694a0f545badec8f9fb1c0ddae933ee0e60437240071d96684805ad7188b318",
-    "tests/destructive/test_gateway_workflow_transaction_matrix.py": "163e2e6b9a80b8eda29abec5ab2ccada16551dd9b800102c1f8157f0bb9818ac",
+    "tests/destructive/test_gateway_workflow_transaction_matrix.py": "2515d07c94886176b18839d83386ec3e6be562f1f21f9d2d68f489a86084dd20",
     "tests/destructive/test_object_deferred_sandbox.py": "bc45b526fa7bdf8e9406192a2ecbc9ea835d043dba5199b5c722a7a989484d14",
     "tests/destructive/test_project_mutation_sandbox.py": "d87e11577aa8bc99b1d7dafd47496bf95d8328fc3ca65034f2ced377b6e88c95",
     "tests/destructive/test_repair_metadata_preflight.py": "355ea3916567b441029127447983c502bc16c51e3edc81d98478f981c22f97a1",
@@ -3422,6 +3422,29 @@
         "source_relevance": "Removes the Authoring2024/25-only restriction, retaining native-catalog build/private-HOME/ownership checks. Selected Source Console lifecycle never enters that removed Authoring guard. No new native Source lifecycle evidence implied."
       }
     ],
+    "console_host_context_successor_review": {
+      "changed_dependencies": [
+        {
+          "after_sha256": "c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4",
+          "before_sha256": "0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827",
+          "path": "skills/waapi-skill/scripts/gateway.py",
+          "source_relevance": "_execute_gateway_unconstrained: retain only already-attested getInfo bool in missing finish host context; preserve exact agent_result last; no additional call or successful read request/result change; Source saved-graph/copy/Save requests and readback verification unchanged."
+        },
+        {
+          "after_sha256": "2515d07c94886176b18839d83386ec3e6be562f1f21f9d2d68f489a86084dd20",
+          "before_sha256": "163e2e6b9a80b8eda29abec5ab2ccada16551dd9b800102c1f8157f0bb9818ac",
+          "path": "tests/destructive/test_gateway_workflow_transaction_matrix.py",
+          "source_relevance": "Adds only the exact test_console_owned_runtime_read_batch node and its closed media-staging fixture selection/version roster.149 existing named AST nodes, including Source collectors/nodes/default helper bodies, are unchanged. Selected Source nodes cannot satisfy the added Console batch node condition; default Source launch/copy/saved-graph/Save protocol unchanged."
+        }
+      ],
+      "frozen_source_comparison": "/tmp/waapi-r125-console-source-compatibility-frozen-proof.json",
+      "independent_review": "/tmp/waapi-r125-console-read-repair-review.md",
+      "pending": "Final five-case current captures/successor publication remain withheld until coordinated source freeze. No original native/requirements/result package changed.",
+      "previous_source_basis": "51d3c4eadfc67fba978bf8aa38be6cc28b9457c1",
+      "reviewed_console_candidate": "bb24bee9ab01cd9b16e6c5549bbbe3d90a86366a",
+      "scope": "Exactly two previously reviewed dependency transitions; same619 current-source membership, five native predecessors/26 selected shapes and untouched historical maps. No Source native rerun or whole-workflow regrade.",
+      "source_basis": "0d56a083da7a7965d734df3e02c0fb5681a75c70"
+    },
     "demo_successor_review": {
       "changed_dependencies": [
         {
@@ -3525,5 +3548,5 @@
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059"
   },
-  "source_basis": "51d3c4eadfc67fba978bf8aa38be6cc28b9457c1"
+  "source_basis": "0d56a083da7a7965d734df3e02c0fb5681a75c70"
 }

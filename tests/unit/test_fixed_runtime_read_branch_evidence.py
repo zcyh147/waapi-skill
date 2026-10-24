@@ -1136,3 +1136,50 @@ def test_runtime_risk_policy_does_not_add_dependencies_to_unrelated_consumers(tm
         requirements_document={'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}})
     assert result['completion']['complete'] is False
     assert result['obligations'] == []
+
+
+def test_console_host_metadata_source_successor_keeps_retained_read_and_exact_pair_guard(tmp_path):
+    """One complete original public replay reaches the consumer; wrong reviewed pairs fail."""
+    import gzip
+    from tests.support import fixed_runtime_read_evidence as fixed
+    route_id = '2025.1|wwise-authoring|2025.1.7.9143|function|' + URI
+    identity = route_id + '|/resultSchema/@definition/waapi_definitions.json/definitions/voiceReturn/properties/objectGUID'
+    stored = json.loads((audit.ROOT / 'docs/branch-coverage-inventory.json').read_bytes())
+    packed = json.loads(gzip.decompress((audit.ROOT / 'docs/branch-coverage-inventory.native-obligations.json.gz').read_bytes()))
+    rows = []
+    for encoded in packed['rows']:
+        if encoded.get('route') is None or packed['routes'][encoded['route']] != route_id: continue
+        row = dict(encoded); row.update(packed['contexts'][row.pop('context')])
+        row.update(route=route_id, id=route_id + '|' + row['pointer'], shape_sha256=packed['shapes'][row.pop('shape')])
+        rows.append(row)
+    route, = [r for r in stored['native_coverage']['routes'] if r['id'] == route_id]
+    inventory = {'routes': [r for r in stored['routes'] if r['id'] == route['public_route']],
+        'native_coverage': {'candidate_sha256': 'd' * 64, 'catalogs': stored['native_coverage']['catalogs'],
+            'routes': [route], 'obligations': rows}}
+    original_receipt, original = original_read()
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public',
+        position=original_receipt['argv'][3], rows=original['result']['return'])
+    assert native['result'] == original['result']
+    assert receipt['argv'] == original_receipt['argv']
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, native, nodeid='r125-console-host-source-successor',
+        phase_reports=dict.fromkeys(('setup','call','teardown'), 'passed'), source_context=context,
+        native_reads=trace, public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+    index = fixed.write_fixed_bundle(tmp_path / 'bundle', capture, FIXTURE, inventory=inventory, selected={identity})
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document, digest=audit.digest,
+        evidence_base=base, requirements_document=policy)
+    observed = next(r for r in result['obligations'] if r['id'] == identity)
+    assert observed['state'] == 'verified', json.dumps(observed)
+    assert observed['requirements'] == ['native','program']
+    # Refresh the descriptor after changing the claimed current Gateway pair.
+    # The real original/public replay is reused; this must hit the strict map guard.
+    binding = document['bindings'][identity]
+    proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'], base)
+    review = completion.read_sealed_artifact(proof['source_review'], base)
+    review['changed_files']['skills/waapi-skill/scripts/gateway.py']['after'] = '0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827'
+    resealed = write_json(base / 'unreviewed-source-pair.json', review)
+    branch = next(r for r in rows if r['id'] == identity)
+    with pytest.raises(ValueError, match='exact reviewed native-profile source/branch closure'):
+        fixed.validate_source_review(resealed, review['historical_sources'], branch, audit.ROOT, base)

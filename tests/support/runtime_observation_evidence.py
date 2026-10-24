@@ -551,7 +551,7 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': '0affca686b01dada6262345aa42cb0aadc7062257d2a050435c1aa7c9752a827'},
+        'after': 'c8dfcff8ae13c9e5b192f4ca7f1e1cd7b52a9f20e5327b33bec15e8a1ecb0bc4'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'},
@@ -571,7 +571,7 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
     RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility',
         'Sequence/field-contract imports', 'materialize_runtime_inspection_business_request'],
-    'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
+    'skills/waapi-skill/scripts/gateway.py': ['_execute_gateway_unconstrained: retain only already-attested getInfo bool in missing finish host context; preserve exact agent_result last; no additional call or successful read request/result change', 'module import: builders.schema.validate_resolved_semantic_result',
         'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
         'module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES',
         'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
@@ -589,6 +589,7 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
     'skills/waapi-skill/wwise_waapi/runtime_log_effects.py': [
         'compare_channel: exact Console log observation guard only']}
 RTPC_REVIEWED_SOURCE_REASON = (
+    'Reviewed already-attested host finish metadata only; no additional call or successful Profiler request/result change. '
     'Exact reviewed eight-file RTPC guard and closed non-RTPC result-validation source delta; '
     'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
