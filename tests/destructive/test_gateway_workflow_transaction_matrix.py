@@ -372,10 +372,18 @@ def _complete_core_result_schema_draft(
     draft: _BusinessDraft,
     *,
     allow_verified_setup: bool = False,
+    phase_receipt: dict[str, Any] | None = None,
 ) -> dict[str, Mapping[str, Any]]:
     """Execute one Core business Draft and retain its explicit weak boundary."""
 
-    _update_business_draft(runtime, draft, "draft-check", live=True)
+    def phase(command, *, live):
+        if phase_receipt is None:
+            return runtime.gateway(command, live=live)
+        phase_receipt['phase'] = command[0]
+        return _WorkflowSandboxRuntime.gateway(runtime, command, live=live, receipt_sink=phase_receipt)
+    checked = _update_business_draft(runtime, draft, "draft-check", live=True)
+    if phase_receipt is not None:
+        phase_receipt.update({'draft-check': checked, 'phase': 'preview-from-draft'})
     preview = _update_business_draft(
         runtime,
         draft,
@@ -383,13 +391,15 @@ def _complete_core_result_schema_draft(
         live=True,
     )
     transaction_id = _required_string(preview, "transaction_id")
-    shown = runtime.gateway(
+    if phase_receipt is not None:
+        phase_receipt.update(preview=preview, transaction_id=transaction_id)
+    shown = phase(
         ["transaction-show", transaction_id, "--summary-only"],
         live=False,
     )
     confirmation = shown.get("confirmation")
     assert isinstance(confirmation, Mapping), shown
-    runtime.gateway(
+    phase(
         [
             "confirm",
             transaction_id,
@@ -398,8 +408,8 @@ def _complete_core_result_schema_draft(
         ],
         live=False,
     )
-    executed = runtime.gateway(["execute", transaction_id], live=True)
-    verified = runtime.gateway(["verify", transaction_id], live=True)
+    executed = phase(["execute", transaction_id], live=True)
+    verified = phase(["verify", transaction_id], live=True)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
     if allow_verified_setup and verified["state"] == TransactionState.VERIFIED.value:
         assert verified["verification"]["business_state_verified"] is True, verified
@@ -2024,6 +2034,99 @@ def test_profiler_enablement_input_shape_native_observations(
 ) -> None:
     from tests.destructive.support.profiler_input_shapes import collect_enablement_inputs
     collect_enablement_inputs(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_log_clear_schema_acknowledgement(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Old Console clear proves availability and ACK, never a removal effect."""
+    runtime = workflow_sandbox_runtime
+    builds = {'2023.1': (2023, 1, 19, 8928), '2024.1': (2024, 1, 13, 9056)}
+    if runtime.version not in builds:
+        pytest.skip('This ACK-only observation targets Console2023/24')
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    output = runtime.state_dir / 'console-log-clear-schema-acknowledgement.json'
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'transaction': {}}
+    category = {'category': 'console-log-clear-schema-acknowledgement', 'status': 'FAIL',
+        'verifier_strength': 'result_schema_only', 'effect_observed': False,
+        'receipt_path': str(output), 'transaction_ids': []}
+    runtime.category_results.append(category)
+    try:
+        status = runtime.gateway(['status'], live=True)
+        receipt['host'] = status['wwise']
+        assert status['wwise']['isCommandLine'] is True, status
+        assert tuple(status['wwise']['version'][key] for key in ('year', 'major', 'minor', 'build')) == builds[runtime.version], status
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        draft = _start_business_draft(runtime, 'ak.wwise.core.log.clear')
+        _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
+            ['--log-channel', 'general'], live=True)
+        result = _complete_core_result_schema_draft(runtime, draft, phase_receipt=receipt['transaction'])
+        dispatch = result['execute']['dispatch_result']
+        assert dispatch['ok'] is True and dispatch['result'] == {}, dispatch
+        assert 'log_item_observation' not in dispatch, dispatch
+        scope = result['verify']['verification']['verification_scope']['log_observation']
+        assert scope['effect_observed'] is False and scope['outcome'] == 'console_log_unobservable', scope
+        receipt['observation_boundary'] = scope
+        category['status'] = 'PASS'
+    finally:
+        if receipt['transaction'].get('transaction_id'):
+            category['transaction_ids'] = [receipt['transaction']['transaction_id']]
+        output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize('message_kind', ('empty', 'edge-whitespace'))
+def test_console_log_exact_message_addition(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime, message_kind: str,
+) -> None:
+    """Observe each exact message once in the shared owned2025 Console host."""
+    runtime = workflow_sandbox_runtime
+    if runtime.version != '2025.1':
+        pytest.skip('Exact message effect observation requires Console2025')
+    assert message_kind in {'empty', 'edge-whitespace'}
+    message = '' if message_kind == 'empty' else ' \tWAAPI owned exact message ' + uuid.uuid4().hex + '\n '
+    runtime.state_dir.mkdir(parents=True, exist_ok=True)
+    output = runtime.state_dir / ('console-log-exact-message-' + message_kind + '.json')
+    receipt = {'candidate': runtime.candidate, 'version': runtime.version, 'message_kind': message_kind,
+        'expected': {'channel': 'general', 'message': message, 'severity': 'Message'}, 'transaction': {}}
+    category = {'category': 'console-log-exact-message-addition:' + message_kind, 'status': 'FAIL',
+        'verifier_strength': 'same_execute_process_bounded_addition_event_then_durable_verification',
+        'receipt_path': str(output), 'transaction_ids': []}
+    runtime.category_results.append(category)
+    try:
+        status = runtime.gateway(['status'], live=True)
+        receipt['host'] = status['wwise']
+        assert status['wwise']['isCommandLine'] is True, status
+        assert tuple(status['wwise']['version'][key] for key in ('year', 'major', 'minor', 'build')) == (2025, 1, 7, 9143), status
+        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve(), status
+        draft = _start_business_draft(runtime, 'ak.wwise.core.log.addItem')
+        _update_business_draft(runtime, draft, 'draft-declare-runtime-control-plan',
+            ['--message', message, '--log-channel', 'general', '--severity', 'message'], live=True)
+        result = _complete_business_draft(runtime, draft, phase_receipt=receipt['transaction'])
+        shown = runtime.gateway(['transaction-show', result['preview']['transaction_id']], live=False)
+        execution, = [event['details']['dispatch_result'] for event in shown['events']
+            if event['event_type'] == 'execution_completed']
+        assert execution == result['execute']['dispatch_result'], shown
+        assert execution['ok'] is True and execution['result'] == {}, execution
+        observation = execution['log_item_observation']
+        receipt['durable_observation'] = observation
+        assert observation['subscribed'] is True and observation['outcome'] == 'matched', observation
+        assert observation['cleanup']['status'] == 'unsubscribed', observation
+        assert 1 <= observation['events_observed'] <= 64, observation
+        event = observation['event']
+        assert event['channel'] == 'general' and event['item']['message'] == message and event['item']['severity'] == 'Message', event
+        scope = result['verify']['verification']['verification_scope']['log_observation']
+        assert scope['outcome'] == 'matching_item_event' and scope['effect_observed'] is True, scope
+        assert scope['execution_observation'] == observation, scope
+        assert scope['exclusive_causation_verified'] is False and scope['continuing_channel_state_verified'] is False, scope
+        category['status'] = 'PASS'
+    finally:
+        if receipt['transaction'].get('transaction_id'):
+            category['transaction_ids'] = [receipt['transaction']['transaction_id']]
+        output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
 @pytest.mark.live

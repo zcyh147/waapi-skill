@@ -14,11 +14,11 @@ from tests.unit.test_runtime_business_gateway import _env
 
 @pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
 @pytest.mark.parametrize('scenario', ('matched', 'native-error'))
-def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_path, monkeypatch, version, scenario, peer=False, getter=False):
+def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_path, monkeypatch, version, scenario, peer=False, getter=False, node_name='test_console_log_addition_observer', message_kind=None):
     monkeypatch.setenv('WWISE_LIVE', '1')
     monkeypatch.setenv('WWISE_DESTRUCTIVE', '1')
     workflow = importlib.import_module('tests.destructive.test_gateway_workflow_transaction_matrix')
-    node = workflow.test_console_log_addition_observer
+    node = getattr(workflow, node_name)
     client = ConsoleLogClient(tmp_path, version=version, scenario=scenario)
     env = _env(tmp_path, version=version)
     native = client.call
@@ -53,11 +53,13 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
     endpoint = SimpleNamespace(host='127.0.0.1', port=31337, waapi_url='ws://127.0.0.1:31337/waapi')
     runtime = workflow._WorkflowSandboxRuntime(version, sandbox, endpoint, tmp_path / 'state', env,
         workflow.exact_git_candidate(workflow.REPO_ROOT), [])
-    nodeid = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::test_console_log_addition_observer'
+    nodeid = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + node_name
+    if message_kind is not None:
+        nodeid += '[' + message_kind + ']'
     item = SimpleNamespace(path=workflow.__file__, nodeid=nodeid, _waapi_phase_reports={'setup': 'passed'})
     error = None
     try:
-        node(runtime)
+        node(runtime) if message_kind is None else node(runtime, message_kind)
     except AssertionError as exc:
         error = exc
     item._waapi_phase_reports['call'] = 'passed' if error is None else 'failed'
@@ -76,8 +78,10 @@ def test_console_log_native_node_persists_final_outcome_and_partial_failure(tmp_
     assert final['contract'] == 'waapi-skill.host-category-evidence/v3'
     assert final['invocation']['phase'] == 'final'
     category, = final['categories']
-    assert category['category'] == 'console-log-addition-observer'
     receipt = json.loads(Path(category['receipt_path']).read_text())
+    if node_name != 'test_console_log_addition_observer':
+        return client, connections, receipt, final, error, records
+    assert category['category'] == 'console-log-addition-observer'
     if getter:
         return client, connections, receipt, final, error, records
     transaction, = final['transactions']
@@ -317,3 +321,75 @@ def test_owned_console_getter_clear_workflow_reaches_final_writer(tmp_path, monk
         assert final['residual_state']['sandbox'] == 'quarantined'
         if fault == 'empty-getter': assert 'clear_transaction' not in receipt
         else: assert receipt['clear_transaction']['verify']['state'] == 'result_schema_checked'
+
+
+@pytest.mark.parametrize('version', ('2023.1', '2024.1'))
+@pytest.mark.parametrize('fault', ('ack', 'native-error'))
+def test_old_console_clear_ack_node_retains_schema_only_and_failed_transaction(tmp_path, monkeypatch, version, fault):
+    import sys
+    class ClearClient(ConsoleLogClient):
+        def call(self, uri, args=None, options=None):
+            if uri == 'ak.wwise.core.log.clear' and fault == 'native-error':
+                self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                raise RuntimeError('clear outcome unavailable')
+            return super().call(uri, args, options)
+    monkeypatch.setattr(sys.modules[__name__], 'ConsoleLogClient', ClearClient)
+    client, connections, receipt, final, error, records = test_console_log_native_node_persists_final_outcome_and_partial_failure(
+        tmp_path, monkeypatch, version, 'matched', node_name='test_console_log_clear_schema_acknowledgement')
+    assert sum(uri == 'ak.wwise.core.log.clear' for uri, _, _ in client.calls) == 1
+    assert not any(uri == ADD for uri, _, _ in client.calls) and client.order == []
+    assert all('subscribe' not in vars(connection) for connection in connections)
+    category, = final['categories']
+    transaction, = final['transactions']
+    assert transaction['transaction_id'] == receipt['transaction']['transaction_id']
+    assert category['verifier_strength'] == 'result_schema_only' and category['effect_observed'] is False
+    assert final['source']['hash_before'] == final['source']['hash_after']
+    if fault == 'ack':
+        assert error is None and final['invocation']['outcome'] == 'PASS'
+        assert transaction['state'] == 'result_schema_checked' and category['status'] == 'PASS'
+        assert receipt['transaction']['execute']['dispatch_result']['result'] == {}
+        assert receipt['transaction']['verify']['verification']['business_state_verified'] is False
+        assert final['residual_state']['sandbox'] == 'deleted'
+    else:
+        assert error is not None and final['invocation']['outcome'] == 'FAIL'
+        assert transaction['state'] == 'indeterminate' and category['status'] == 'FAIL'
+        assert 'execute' in receipt['transaction'] and 'verify' not in receipt['transaction']
+        assert final['residual_state']['sandbox'] == 'quarantined'
+
+
+@pytest.mark.parametrize('message_kind', ('empty', 'edge-whitespace'))
+@pytest.mark.parametrize('fault', ('matched', 'wrong-message', 'close-error'))
+def test_console_exact_message_node_retains_independent_effect_and_cleanup(tmp_path, monkeypatch, message_kind, fault):
+    if fault == 'wrong-message':
+        from wwise_waapi import runtime_log_observer
+        ticks = iter((0, 6))
+        monkeypatch.setattr(runtime_log_observer, 'monotonic', lambda: next(ticks, 6))
+    client, connections, receipt, final, error, records = test_console_log_native_node_persists_final_outcome_and_partial_failure(
+        tmp_path, monkeypatch, '2025.1', fault, node_name='test_console_log_exact_message_addition', message_kind=message_kind)
+    expected = receipt['expected']['message']
+    assert expected == '' if message_kind == 'empty' else expected.startswith(' \t') and expected.endswith('\n ')
+    additions = [(args, options) for uri, args, options in client.calls if uri == ADD]
+    assert additions == [({'channel': 'general', 'message': expected, 'severity': 'Message'}, {})]
+    assert not any(uri == 'ak.wwise.core.log.clear' for uri, _, _ in client.calls)
+    if fault == 'close-error':
+        assert client.order[:2] == ['subscribed', 'add']
+        assert client.order[2:] and set(client.order[2:]) == {'unsubscribed'}
+    else:
+        assert client.order == ['subscribed', 'add', 'unsubscribed']
+    category, = final['categories']
+    transaction, = final['transactions']
+    assert transaction['transaction_id'] == receipt['transaction']['transaction_id']
+    assert final['source']['hash_before'] == final['source']['hash_after']
+    if fault == 'matched':
+        assert error is None and final['invocation']['outcome'] == 'PASS'
+        assert category['status'] == 'PASS' and transaction['state'] == 'verified'
+        observation = receipt['durable_observation']
+        assert observation['event']['item']['message'] == expected
+        assert observation['cleanup']['status'] == 'unsubscribed'
+        scope = receipt['transaction']['verify']['verification']['verification_scope']['log_observation']
+        assert scope['effect_observed'] is True and scope['execution_observation'] == observation
+        assert final['residual_state']['sandbox'] == 'deleted'
+    else:
+        assert error is not None and final['invocation']['outcome'] == 'FAIL'
+        assert category['status'] == 'FAIL' and final['residual_state']['sandbox'] == 'quarantined'
+        assert 'execute' in receipt['transaction']
