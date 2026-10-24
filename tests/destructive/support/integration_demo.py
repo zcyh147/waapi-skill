@@ -42,8 +42,8 @@ def _read(path):
     return path.read_bytes()
 
 
-def _triple(value):
-    return {key: value[key] for key in ('argsSchema', 'optionsSchema', 'resultSchema')}
+def _function_schema(value):
+    return {key: value[key] for key in ('argsSchema', 'description', 'optionsSchema', 'resultSchema')}
 
 
 @dataclass(frozen=True)
@@ -70,9 +70,9 @@ class IntegrationDemoObservation:
             for uri in URIS:
                 functions = json.loads(read(schemas / 'WAAPI' / (uri + '.json')))['functions']
                 matches = [row for row in functions if row['id'] == uri]
-                if len(matches) != 1 or _triple(matches[0]) != _triple(controls[uri]):
+                if len(matches) != 1 or _function_schema(matches[0]) != _function_schema(controls[uri]):
                     raise ValueError('Scoped schema differs from packaged business control: ' + uri)
-                selected[uri] = _triple(matches[0])
+                selected[uri] = _function_schema(matches[0])
             definitions = json.loads((SKILL / 'resources/manifest/2025.1/definitions.json').read_bytes())['documents']
             documents = {name: json.loads(read(schemas / 'Definitions' / name)) for name in sorted({name for name, _ in DEFINITIONS})}
             for name, key in DEFINITIONS:
