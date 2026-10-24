@@ -1,0 +1,39 @@
+{
+  "api": "ak.wwise.core.profiler.getVoices",
+  "category": "core.profiler",
+  "dry_run": false,
+  "error_code": null,
+  "evidence_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r119-console-profiler-native-2022-r1/pytest/gateway-workflows-2022-10/dispatcher-evidence/1792815335452025000-cc136a8ee5f746beafc228fdbef5f396-ak_wwise_core_profiler_getVoices.json",
+  "item_type": "function",
+  "message": "ok",
+  "ok": true,
+  "result": {
+    "return": [
+      {
+        "baseVolume": -8.989571571350098,
+        "envelope": 0.0,
+        "gameAuxSendVolume": 0.0,
+        "gameObjectID": 18446744073709551614,
+        "gameObjectName": "Transport/Soundcaster",
+        "highPassFilter": 0.0,
+        "isForcedVirtual": false,
+        "isStarted": true,
+        "isVirtual": false,
+        "lowPassFilter": 0.0,
+        "normalizationGain": -0.023791193962097168,
+        "objectGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+        "objectName": "Outside_Idle_1000",
+        "pipelineID": 1,
+        "playTargetGUID": "{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}",
+        "playTargetID": 564536357,
+        "playTargetName": "Outside_Idle_1000",
+        "playingID": 1,
+        "priority": 50,
+        "soundID": 564536357
+      }
+    ]
+  },
+  "risk_level": "low",
+  "timeout": 9.990141125046648,
+  "version": "2022.1"
+}

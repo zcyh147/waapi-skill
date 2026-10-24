@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.runtime-observation-attachment/v1",
+  "branch_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getGameObjects|/resultSchema/properties/return/items/properties/registerTime",
+  "proof": {
+    "artifact": "original-profiler-game-objects-observation-proof-8.json",
+    "sha256": "4bc65734ee3903d2ec61bc5df5a960b4d408c7be40cfcdae9169027df1e3e85f"
+  },
+  "evidence": {
+    "artifact": "original-profiler-game-objects-observation-native.json",
+    "sha256": "8564a50600a84315e28a03f462160b3c6365307799eb829e509cd3f381d24531",
+    "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_profiler_readers"
+  },
+  "native_equivalence": {
+    "artifact": "original-profiler-game-objects-observation-equivalence-8.json",
+    "sha256": "ba66b98b2a3ddf66c111b25c7f36784f1896564d1e495d8993ed65b0b5512598"
+  }
+}
