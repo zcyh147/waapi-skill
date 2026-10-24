@@ -164,11 +164,11 @@ def retained_contribution(version):
     return originals, receipt, raw, rows
 
 
-def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, cursor=None, identity_forms='handles'):
+def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, cursor=None, identity_forms='handles', retained=None):
     from tests.support.runtime_observation_evidence import program_source_context
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
     context = program_source_context(flow=URI)
-    originals, original_receipt, raw, rows = retained_contribution(version)
+    originals, original_receipt, raw, rows = retained if retained is not None else retained_contribution(version)
     source_args = original_receipt['payload']['semantic_preview']['args']
     root.mkdir(parents=True, exist_ok=True)
     client = _RuntimeControlDraftClient(root, version=version)

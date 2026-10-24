@@ -170,6 +170,7 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_source_copy_branch_evidence.py', 'tests/support/source_copy_native_evidence.py',
                  'tests/unit/test_source_copy_capture.py',
                  'tests/support/runtime_observation_evidence.py',
+                 'tests/support/qualified_runtime_read_evidence.py',
                  'tests/unit/test_runtime_observation_branch_evidence.py',
                  'tests/unit/test_rtpc_field_branch_evidence.py',
                  'tests/support/condition_mechanism_reuse.py', 'tests/support/condition_source_resolution.py',
@@ -953,6 +954,25 @@ def validate_equivalence(proof_descriptor, descriptor, record, branch, candidate
             raise ValueError('equivalence relevant source changed')
 
 
+def historical_source_seals(root, candidate, selected, cache=None):
+    """Read immutable historical Git bytes, with evaluation-local reuse only."""
+    import hashlib
+    import subprocess
+    key = (str(root.resolve()), candidate, tuple(sorted(selected)))
+    if cache is not None and key in cache:
+        return dict(cache[key])
+    sources = {}
+    for name in selected:
+        completed = subprocess.run(['git', 'show', candidate + ':' + name], cwd=root,
+                                   check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if completed.returncode:
+            raise ValueError('original native source candidate unavailable')
+        sources[name] = hashlib.sha256(completed.stdout).hexdigest()
+    if cache is not None:
+        cache[key] = tuple(sorted(sources.items()))
+    return sources
+
+
 def validate_native_source(context, descriptor, branch, candidate, binding, base, root, historical_sources=None):
     """Bridge an original producer's Git identity to the reviewed branch candidate."""
     import hashlib
@@ -967,19 +987,7 @@ def validate_native_source(context, descriptor, branch, candidate, binding, base
         sources = context.get('relevant_sources')
         selected = binding.get('relevant_sources', [])
         if sources is None:
-            key = (str(root.resolve()), context['candidate'], tuple(sorted(selected)))
-            if historical_sources is not None and key in historical_sources:
-                sources = dict(historical_sources[key])
-            else:
-                sources = {}
-                for name in selected:
-                    completed = subprocess.run(['git', 'show', context['candidate'] + ':' + name], cwd=root,
-                                               check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    if completed.returncode:
-                        raise ValueError('original native source candidate unavailable')
-                    sources[name] = hashlib.sha256(completed.stdout).hexdigest()
-                if historical_sources is not None:
-                    historical_sources[key] = tuple(sorted(sources.items()))
+            sources = historical_source_seals(root, context['candidate'], selected, historical_sources)
         else:
             sources = {name: sources[name] for name in selected}
     proof = binding.get('native_equivalence', {})
@@ -1373,6 +1381,10 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         if category == 'live_metadata' and (binding or {}).get('condition_metadata_mechanism_attachment'):
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {}, category=category)
+        if category == 'native' and (binding or {}).get('qualified_runtime_read_attachment'):
+            from tests.support.qualified_runtime_read_evidence import qualified_read_result
+            return qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding,
+                                         root, reference_edges or {}, historical_sources)
         record = read_sealed_artifact(descriptor, base)
         normalized_construction = None
         if category == 'program':
