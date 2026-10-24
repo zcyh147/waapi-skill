@@ -4895,9 +4895,7 @@ def runtime_authoring_host_required_payload(
         operation=api,
     )
     payload["message"] = (
-        "This Remote or versioned transport route requires a live Wwise Authoring host. "
-        "Console transport admission is limited to the 2025.1 candidate; "
-        "native playback/data are not established by catalog presence."
+        "This route requires a live Wwise Authoring host for the detected version."
     )
     return payload
 
