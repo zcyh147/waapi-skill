@@ -214,7 +214,9 @@ def test_log_get_versioned_public_result_branches(request,tmp_path,version,conso
     inventory['native_coverage']['obligations']=[b for b in inventory['native_coverage']['obligations']if b not in contradictions]
     rows=native_log_rows(version)
     assert rows
-    captures=[public_log_read(tmp_path/'actual-replay',[ROW],version=version,console=console),
+    from tests.support.runtime_log_retained_evidence import program_native_call
+    actual_rows=[ROW]if console and version=='2025.1'else program_native_call(route+'|/resultSchema')['result']['items']
+    captures=[public_log_read(tmp_path/'actual-replay',actual_rows,version=version,console=console),
         *[public_log_read(tmp_path/str(i),[row],version=version,console=console)for i,row in enumerate(rows)]]
     channels=['soundbank-generation','audio-conversion','platform-settings-copy','waapi','project-load']
     if version in {'2023.1','2024.1','2025.1'}:channels+=['source-control','lua']
@@ -231,7 +233,16 @@ def test_log_get_versioned_public_result_branches(request,tmp_path,version,conso
                 source_context=context,native_reads=trace,public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)},
                     *[{'gateway':page,'native_start':len(trace),'native_end':len(trace)}for page in pages]])
             paths.append(path)
-        write_log_bundle(tmp_path/'bundle',paths,inventory=inventory)
+        index=write_log_bundle(tmp_path/'bundle',paths,inventory=inventory)
+        policies=json.loads((index.parent/'requirements.json').read_bytes())
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        runtime.write_json(tmp_path/'consumer-result.json',result)
+        assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
+        damaged=deepcopy(bindings)
+        damaged['bindings'][route+'|/resultSchema']['evidence'].pop('native',None)
+        missing=completion.evaluate_coverage(audit.ROOT,inventory,damaged,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        assert all(r['state']!='verified'for r in missing['obligations'])
     register_exact_evidence_finalizer(request.node,finalize)
 
 
