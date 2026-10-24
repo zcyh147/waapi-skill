@@ -306,3 +306,139 @@ def test_cli_preserves_all_native_rows_in_a_sealed_companion(tmp_path, capsys):
     artifact.write_bytes(artifact.read_bytes()[:-1])
     assert main(['--output', str(target), '--check']) == 1
     assert 'digest mismatch' in capsys.readouterr().out
+
+
+def _copy_runtime_common_base_file(source, destination):
+    """Stage exact existing bytes; a shared filename never authorizes overwrite."""
+    raw = source.read_bytes()
+    if destination.exists():
+        if destination.read_bytes() != raw:
+            raise ValueError('Runtime common-base path collision')
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(raw)
+
+
+@pytest.fixture(scope='module')
+def runtime_common_base_stage(tmp_path_factory):
+    import hashlib
+    import json
+    from pathlib import Path
+    from tests.maintenance import branch_coverage_audit as audit
+    source = audit.ROOT / 'tests/fixtures/branch-evidence/product'
+    component = source / 'runtime-fixed-reads-r121'
+    global_index = json.loads((audit.ROOT / 'docs/branch-coverage-evidence-index.json').read_bytes())
+    fixed_index = json.loads((component / 'index.json').read_bytes())
+    assert not ({e['id'] for e in global_index['entries']} & {e['id'] for e in fixed_index['entries']})
+    stage = tmp_path_factory.mktemp('runtime-common-base')
+    base = stage / 'evidence'
+    seen = {}
+    def retain(value):
+        if isinstance(value, dict):
+            # The existing importer projects original program locators from
+            # each entry's origin; local provenance locators are not reads.
+            if value.get('contract') == 'waapi-skill.branch-bindings/v1': return
+            if value.get('contract') == 'waapi-skill.class-metadata-read/v1':
+                # This existing archive owns a root-relative sealed file list,
+                # rather than ordinary nested artifact descriptors.
+                seal = json.loads((source / value['seal']['artifact']).read_bytes())
+                for item in seal['files']:
+                    retain({'artifact':str(Path(value['root']) / item['path']),
+                        'sha256':item['sha256']})
+            if isinstance(value.get('artifact'), str) and isinstance(value.get('sha256'), str):
+                name = value['artifact']
+                if not Path(name).is_absolute():
+                    original = source / name
+                    assert original.resolve().is_relative_to(source.resolve())
+                    raw = original.read_bytes()
+                    assert hashlib.sha256(raw).hexdigest() == value['sha256']
+                    assert name not in seen or seen[name] == value['sha256']
+                    if name not in seen:
+                        seen[name] = value['sha256']
+                        _copy_runtime_common_base_file(original, base / name)
+                        if original.suffix in {'.json', '.jsonl'}:
+                            try:
+                                records = [json.loads(raw)]
+                            except json.JSONDecodeError as error:
+                                if error.msg != 'Extra data': raise
+                                records = [json.loads(line) for line in raw.splitlines() if line.strip()]
+                            for row in records: retain(row)
+            for child in value.values(): retain(child)
+        elif isinstance(value, list):
+            for child in value: retain(child)
+    retain(global_index)
+    for path in component.rglob('*'):
+        if path.is_file():
+            # Every local locator remains unchanged, including profile-owned
+            # category/archive/map names and nested proof/source-review edges.
+            _copy_runtime_common_base_file(path, base / path.relative_to(component))
+    policy = json.loads((audit.ROOT / 'docs/branch-coverage-requirements.json').read_bytes())
+    fixed_policy = json.loads((component / 'requirements.json').read_bytes())
+    assert not policy['branches'].keys() & fixed_policy['branches'].keys()
+    policy['branches'].update(fixed_policy['branches'])
+    combined = {**global_index, 'base':'evidence', 'entries':global_index['entries']+fixed_index['entries'],
+        'runtime_observation_attachments':fixed_index['runtime_observation_attachments']}
+    index = stage / 'index.json';index.write_text(json.dumps(combined,indent=2)+'\n')
+    (stage / 'requirements.json').write_text(json.dumps(policy,indent=2)+'\n')
+    fixed_only = stage / 'fixed-index.json'
+    fixed_only.write_text(json.dumps({**fixed_index, 'base':'evidence'},indent=2)+'\n')
+    return {'index':index,'fixed_only':fixed_only,'policy':policy,'fixed_policy':fixed_policy,
+        'component':component,'base':base,'old_index':global_index,
+        'fixed_index':fixed_index,'existing_closure':seen}
+
+
+def test_runtime_fixed_component_imports_from_unchanged_common_base(runtime_common_base_stage):
+    import hashlib
+    import json
+    from tests.maintenance import branch_coverage_audit as audit
+    stage = runtime_common_base_stage
+    document, base, inputs = audit.portable_binding_inputs(stage['fixed_only'], stage['fixed_policy'])
+    expected = set(stage['fixed_policy']['branches'])
+    assert set(document['bindings']) == expected
+    assert len(stage['old_index']['entries']) == 41
+    assert len(stage['fixed_index']['entries']) == 334
+    assert len({entry['id'] for entry in json.loads(stage['index'].read_bytes())['entries']}) == 375
+    native = {identity for identity,binding in document['bindings'].items() if binding.get('runtime_observation_attachment')}
+    assert len(native) == 445
+    closure = {}
+    for path in stage['component'].rglob('*'):
+        if path.is_file():
+            relative = path.relative_to(stage['component'])
+            actual = (base / relative).read_bytes()
+            assert actual == path.read_bytes()
+            closure[str(relative)] = {'bytes':len(actual),'sha256':hashlib.sha256(actual).hexdigest()}
+    assert len(closure) == 3127
+    (stage['index'].parent / 'import-proof.json').write_text(json.dumps({
+        'consumer':'branch_coverage_audit.portable_binding_inputs','selected_ids':sorted(expected),
+        'selected_count':len(expected),'imported_entries':334,'composed_entries':375,
+        'runtime_native_attachments':len(native),
+        'original_component_relative_closure':closure,'existing_closure':stage['existing_closure'],
+        'inventory_or_final_evaluator_run':False,'inputs':inputs},indent=2)+'\n')
+
+
+def test_runtime_common_base_refuses_different_bytes_at_an_existing_profile_path(tmp_path, runtime_common_base_stage):
+    stage = runtime_common_base_stage
+    target = stage['base'] / 'r119-2021-category.json'
+    original = target.read_bytes()
+    foreign = tmp_path / 'foreign-category.json'
+    foreign.write_bytes((stage['component'] / 'r119-2022-category.json').read_bytes())
+    with pytest.raises(ValueError,match='Runtime common-base path collision'):
+        _copy_runtime_common_base_file(foreign,target)
+    assert target.read_bytes() == original
+
+
+def test_runtime_common_base_preserves_existing_global_source_freshness(runtime_common_base_stage):
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.source_copy_native_evidence import successor_dependency_review
+    from tests.support.source_copy_branch_evidence import source_seals
+    stage = runtime_common_base_stage
+    reviewed = successor_dependency_review()['current_sources']
+    current = source_seals(reviewed)
+    if current != reviewed:
+        # Existing global seals remain authoritative after locator transport.
+        # This composition must not turn unrelated source drift into credit.
+        with pytest.raises(ValueError, match='^Source successor current dependency changed$'):
+            audit.portable_binding_inputs(stage['index'], stage['policy'])
+    else:
+        document, _, _ = audit.portable_binding_inputs(stage['index'], stage['policy'])
+        assert set(document['bindings']) == set(stage['policy']['branches'])
