@@ -13,3 +13,12 @@ tests/semantic/data/** -text
 # Portable branch evidence includes hash-named native payloads without extensions.
 # Preserve their sealed bytes on hosts with core.autocrlf enabled.
 tests/fixtures/branch-evidence/** -text
+
+# Runtime source witnesses also retain their original hash-bound bytes.
+tests/fixtures/runtime/** -text
+tests/fixtures/runtime-console-reads/** -text
+tests/fixtures/runtime-fixed-reads/** -text
+tests/fixtures/runtime-qualified-reads/** -text
+tests/fixtures/runtime-loaded-media/** -text
+# Verbatim CHM pages retain source whitespace as part of their provenance.
+tests/fixtures/runtime-loaded-media/composite-*.html -whitespace
