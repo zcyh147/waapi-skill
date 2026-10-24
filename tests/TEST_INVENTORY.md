@@ -1035,6 +1035,10 @@ parent. Its complete success flow and wrong-parent rejection passed in 26.39s.
 The fresh owned native run on `3368fd48` then passed in 122.47s: meter object
 and related output, snapped cursor readback, exact saved capture artifact,
 owned log addition and log clearing each have separate passing observations.
+Its retained root is
+`.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3`; the final record
+is `evidence/authoring-batch-finalization.json`. The R91 heading records the
+implementation stage; the successful native attempt uses the R92 root name.
 Finalization confirms unchanged source hash/mtime, no residual processes and
 released port 8080. This is Mac Authoring 2025.1.7.9143 evidence; it does not
 prove other versions, capture-content completeness or whole-ticket completion.
