@@ -1081,7 +1081,7 @@ def validate_native_alternative(root, branch, value, *, catalog=None, require_kn
     import hashlib
     import json
     from wwise_waapi.native_catalog import load_native_catalog
-    from wwise_waapi.schema_inventory import DefinitionGraph, resolve_schema_reference
+    from wwise_waapi.schema_inventory import DefinitionGraph, resolve_schema_reference, SCHEMA_ANNOTATION_KEYWORDS
     from wwise_waapi.builders.schema import _SchemaWalker
     from wwise_waapi.builders.common import SemanticValidationError
     version, host, build, _, uri = branch['route'].split('|')
@@ -1103,7 +1103,7 @@ def validate_native_alternative(root, branch, value, *, catalog=None, require_kn
         raise ValueError('selected native alternative shape changed')
     known = {'type','properties','patternProperties','additionalProperties','required','items','minItems','maxItems','uniqueItems',
                 'enum','const','oneOf','anyOf','allOf','minLength','maxLength','pattern','minimum','maximum','exclusiveMinimum','exclusiveMaximum',
-                'multipleOf','minProperties','maxProperties','description','descriptions','title','default','examples','definitions','localDefinitions','synopsis'}
+                'multipleOf','minProperties','maxProperties','title','default','definitions','localDefinitions'} | SCHEMA_ANNOTATION_KEYWORDS
     if require_known:
         # Unknown restrictions must not be hidden by an earlier type/enum failure.
         # This inspects a finite resolved schema closure, not satisfiability.
