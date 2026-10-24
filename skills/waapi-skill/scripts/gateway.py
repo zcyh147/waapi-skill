@@ -26710,7 +26710,8 @@ def transaction_verify_terminal_budget(request: Any) -> int:
         native = arguments['args']
         try:
             parse_operation_request(request, expected_version=request['version'])
-            validate_semantic_payload(LOG_ADD_ITEM_URI, native, {}, version=request['version'])
+            from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+            validate_resolved_semantic_payload(LOG_ADD_ITEM_URI, native, {}, version=request['version'])
             message = native.get('message')
             if (set(native) != {'message', 'channel', 'severity'} or not isinstance(message, str)
                     or len(message.encode('utf-8')) > MAX_LOG_MESSAGE_BYTES or '\x00' in message):

@@ -3423,6 +3423,20 @@ def test_log_add_edge_whitespace_does_not_verify_a_trimmed_readback(tmp_path):
     assert sum(uri == 'ak.wwise.core.log.addItem' for uri, _, _ in client.calls) == 1
 
 
+@pytest.mark.parametrize('version', ('2023.1', '2024.1', '2025.1'))
+def test_log_message_terminal_allowance_requires_resolved_channel_and_severity(version):
+    from copy import deepcopy
+    request = {'contract': 'waapi-skill.operation-request/v1', 'version': version,
+        'operation': 'waapi.call', 'arguments': {'api': 'ak.wwise.core.log.addItem',
+            'args': {'channel': 'general', 'message': '界' * 5461 + 'a', 'severity': 'Message'}, 'options': {}}}
+    assert gateway.transaction_verify_terminal_budget(request) == 41338
+    for field in ('channel', 'severity'):
+        for invalid in ('', 'Unknown', 42):
+            malformed = deepcopy(request)
+            malformed['arguments']['args'][field] = invalid
+            assert gateway.transaction_verify_terminal_budget(malformed) == 24576, (field, invalid)
+
+
 @pytest.mark.parametrize('console', (False, True), ids=('authoring', 'console'))
 @pytest.mark.parametrize('message', ('界' * 5461 + 'a', '\t' * 16384), ids=('utf8', 'escaped'))
 def test_log_message_maximum_transaction_keeps_exact_agent_result_and_journal(tmp_path, monkeypatch, console, message):
