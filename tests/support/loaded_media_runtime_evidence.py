@@ -75,10 +75,12 @@ def preservation_gates(root, policies, obligations):
             for b in selected}
 
 
-def original_observation(originals=None, *, root=audit.ROOT):
+def original_observation(originals=None, *, root=audit.ROOT, copied_prefix=''):
     """Recheck the complete strict-PASS archive, not a manufactured native row."""
+    if copied_prefix not in ('','lm-2025-','lm-composite-2023-','lm-composite-2024-'):
+        raise ValueError('LoadedMedia copied closure requires its closed family/version namespace')
     r = review(root); base = Path(originals) if originals is not None else root / FIXTURE
-    def descriptor(name): return {'artifact': name, 'sha256': r['files'][name]}
+    def descriptor(name): return {'artifact': copied_prefix + name, 'sha256': r['files'][name]}
     read = runtime.archive_reader(descriptor('r124-originals.json.gz'), base)
     context = completion.read_category_run({**descriptor('r124-category.json'), 'nodeid': r['nodeid']}, base)
     if {key: context[key] for key in ('version', 'host', 'build', 'candidate')} != {
@@ -142,7 +144,7 @@ def original_observation(originals=None, *, root=audit.ROOT):
     # matching source definition hashes and ready/action/PNG/lifecycle history.
     if len([i for i in node['receipts'] if i['argv'][0] == 'waapi-schema']) != 12:
         raise ValueError('LoadedMedia complete twelve-schema gate missing')
-    if read(PREFIX + 'categories.jsonl').splitlines()[-1] != (base / 'r124-category.json').read_bytes().strip():
+    if read(PREFIX + 'categories.jsonl').splitlines()[-1] != (base / (copied_prefix + 'r124-category.json')).read_bytes().strip():
         raise ValueError('LoadedMedia final category detached from prepared/final history')
     historical = {k:v for k,v in sources.items() if k.startswith('skills/waapi-skill/')}
     current = runtime.program_source_context(root, flow=URI)['packaged']
@@ -274,7 +276,7 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
         if audit.digest(record.get('runtime_read_program')) != audit.digest(captured):
             raise ValueError('LoadedMedia attached program capture differs')
         return validate_program(record,binding,branch,root,edges)
-    original = original_observation(base,root=root)
+    original = _positive_from_proof(proof,base,root)
     if (proof['native_run'] != record['native_runs'][0] or len(record['native_runs']) != 1
             or proof['archive'] != original['archive'] or proof['capture_original_path'] != original['capture_path']
             or original['capture_raw'] != (base/proof['capture']['artifact']).read_bytes()
@@ -301,7 +303,7 @@ def validate_source_equivalence(proof, sources, branch, binding, root, base):
             or attached['source_review']['sha256'] != REVIEW_SHA
             or completion.read_sealed_artifact(attached['source_review'], base) != r):
         raise ValueError('LoadedMedia source bridge requires pinned source-owned review')
-    original = original_observation(base, root=root)
+    original = _positive_from_proof(attached,base,root)
     captured = completion.read_sealed_artifact(attached['program_capture'], base)
     if (sources != original['historical_sources'] or attached['relevant_sources'] != sources
             or audit.digest(captured['native_call']) != audit.digest({'uri': URI,
@@ -334,16 +336,18 @@ def accepts_native_context(context,branch,binding,record,base,root):
     return True
 
 
-def write_loaded_media_bundle(output,captures,*,inventory,originals=None):
+def write_loaded_media_bundle(output,captures,*,inventory,originals=None,name_prefix=''):
     """Publish the closed31-branch slice through the existing portable importer."""
+    if name_prefix not in ('','lm-2025-'):
+        raise ValueError('LoadedMedia publisher accepts only its closed2025 namespace')
     r=review(); original=original_observation(originals); output=Path(output);output.mkdir(parents=True,exist_ok=False)
     original_base=Path(originals) if originals is not None else audit.ROOT/FIXTURE
     for name in ('r124-originals.json.gz','r124-category.json','support-review.json'):
-        shutil.copyfile(original_base/name,output/name)
-    def write(name,value):return runtime.write_json(output/name,value)
-    def desc(name):return {'artifact':name,'sha256':runtime.sha((output/name).read_bytes())}
-    (output/'original-capture.json').write_bytes(original['capture_raw'])
-    (output/'original-raw.json').write_bytes(original['read'](original['raw_path']))
+        shutil.copyfile(original_base/name,output/(name_prefix+name))
+    def write(name,value):return runtime.write_json(output/(name_prefix+name),value)
+    def desc(name):return {'artifact':name_prefix+name,'sha256':runtime.sha((output/(name_prefix+name)).read_bytes())}
+    (output/(name_prefix+'original-capture.json')).write_bytes(original['capture_raw'])
+    (output/(name_prefix+'original-raw.json')).write_bytes(original['read'](original['raw_path']))
     route,=[row for row in inventory['native_coverage']['routes'] if row['id']==ROUTE]
     public,=[row for row in inventory['routes'] if row['id']==route['public_route']]
     candidate=inventory['native_coverage']['candidate_sha256']; sources=original['historical_sources']
@@ -396,7 +400,7 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None):
                     category=CATEGORY,native_pointer='/observations/raw/result/return',native_result_parent='/observations/raw',
                     native_checks=native['branch_assertions'][identity]['checks'],raw_observation=desc('original-raw.json'),raw_original_path=original['raw_path'])
                 proof=write('proof.json',{'contract':'waapi-skill.runtime-observation-proof/v1','branch_id':identity,
-                    'native_shape_sha256':branch['shape_sha256'],'mapping':mapping,'native_run':native_run,'archive':original['archive'],
+                    'native_shape_sha256':branch['shape_sha256'],'mapping':mapping,'native_run':native_run,'archive':desc('r124-originals.json.gz'),
                     'capture':desc('original-capture.json'),'capture_original_path':original['capture_path'],'program_capture':cp,
                     'relevant_sources':sources,'source_review':desc('support-review.json')})
                 attached=deepcopy(binding);attached.update(runtime_observation_attachment=proof,program_observation_pointer=pointer,
@@ -411,13 +415,13 @@ def write_loaded_media_bundle(output,captures,*,inventory,originals=None):
         pd={**write(prefix+'program.json',program),'nodeid':captured['nodeid']}
         for binding in document['bindings'].values():binding['evidence']['program']=deepcopy(pd)
         bd=write(prefix+'bindings.json',document);rd=write(prefix+'requirements.json',policies)
-        index['entries'].append({'id':'loaded-media-'+str(number),'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
+        index['entries'].append({'id':name_prefix+'loaded-media-'+str(number),'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
         requirements['branches'].update(policies['branches'])
     if selected!=set(r['entries']) or attachment is None:
         raise ValueError('LoadedMedia bundle requires every exact31 branch plus complete semantic anchor')
     index['runtime_observation_attachments']=[attachment]
     write('requirements.json',requirements);write('index.json',index)
-    return output/'index.json'
+    return output/(name_prefix+'index.json')
 
 
 COMPOSITE_REVIEW_SHA = '20749b68c2bf05b89e2344002be17aff09f3c13a2015a4f592ed91071964bd69'
@@ -597,7 +601,7 @@ def validate_composite_evidence(record,binding,branch,category,base,root,edges):
     if category != 'native' or branch['id'] != profile['anchor']:
         raise ValueError('Only exact older composite anchor accepts representative native support')
     _composite_bridge(proof,branch,root,base)
-    original = original_observation(base,root=root)
+    original = _positive_from_proof(proof,base,root)
     if (proof['archive'] != original['archive'] or proof['native_run'] != record['native_runs'][0] or len(record['native_runs']) != 1
             or proof['capture_original_path'] != original['capture_path'] or proof['relevant_sources'] != original['historical_sources']
             or (base/proof['capture']['artifact']).read_bytes() != original['capture_raw']
@@ -622,7 +626,7 @@ def validate_composite_source(proof,sources,branch,binding,root,base):
     if proof['loaded_media_source_review'] != attached['source_review']:
         raise ValueError('LoadedMedia composite source bridge differs')
     _composite_bridge(attached,branch,root,base)
-    if sources != original_observation(base,root=root)['historical_sources'] or attached['relevant_sources'] != sources:
+    if sources != _positive_from_proof(attached,base,root)['historical_sources'] or attached['relevant_sources'] != sources:
         raise ValueError('LoadedMedia composite original9262 source map differs')
 
 
@@ -691,17 +695,18 @@ def validate_composite_program(record, binding, branch, root, edges=None):
 
 def write_composite_bundle(output,captures,*,inventory,version):
     """Publish the closed31-branch slice through the existing portable importer."""
+    name_prefix='lm-composite-'+version[:4]+'-'
     reviewed=composite_review(); profile=availability_observation(version); r=review(); original=original_observation()
     output=Path(output);output.mkdir(parents=True,exist_ok=False)
     original_base=audit.ROOT/FIXTURE
     for name in ('r124-originals.json.gz','r124-category.json','support-review.json'):
-        shutil.copyfile(original_base/name,output/name)
-    shutil.copyfile(audit.ROOT/profile['archive_path'],output/Path(profile['archive_path']).name)
-    shutil.copyfile(audit.ROOT/FIXTURE/'composite-review.json',output/'composite-review.json')
-    def write(name,value):return runtime.write_json(output/name,value)
-    def desc(name):return {'artifact':name,'sha256':runtime.sha((output/name).read_bytes())}
-    (output/'original-capture.json').write_bytes(original['capture_raw'])
-    (output/'original-raw.json').write_bytes(original['read'](original['raw_path']))
+        shutil.copyfile(original_base/name,output/(name_prefix+name))
+    shutil.copyfile(audit.ROOT/profile['archive_path'],output/(name_prefix+Path(profile['archive_path']).name))
+    shutil.copyfile(audit.ROOT/FIXTURE/'composite-review.json',output/(name_prefix+'composite-review.json'))
+    def write(name,value):return runtime.write_json(output/(name_prefix+name),value)
+    def desc(name):return {'artifact':name_prefix+name,'sha256':runtime.sha((output/(name_prefix+name)).read_bytes())}
+    (output/(name_prefix+'original-capture.json')).write_bytes(original['capture_raw'])
+    (output/(name_prefix+'original-raw.json')).write_bytes(original['read'](original['raw_path']))
     route,=[row for row in inventory['native_coverage']['routes'] if row['id']==profile['route']]
     public,=[row for row in inventory['routes'] if row['id']==route['public_route']]
     candidate=inventory['native_coverage']['candidate_sha256']; sources=original['historical_sources']
@@ -754,7 +759,7 @@ def write_composite_bundle(output,captures,*,inventory,version):
                     category=CATEGORY,native_pointer='/observations/raw/result/return',native_result_parent='/observations/raw',
                     native_checks=native['branch_assertions'][identity]['checks'],raw_observation=desc('original-raw.json'),raw_original_path=original['raw_path'])
                 proof=write('proof.json',{'contract':'waapi-skill.runtime-observation-proof/v1','branch_id':identity,
-                    'native_shape_sha256':branch['shape_sha256'],'mapping':mapping,'native_run':native_run,'archive':original['archive'],
+                    'native_shape_sha256':branch['shape_sha256'],'mapping':mapping,'native_run':native_run,'archive':desc('r124-originals.json.gz'),
                     'capture':desc('original-capture.json'),'capture_original_path':original['capture_path'],'program_capture':cp,
                     'relevant_sources':sources,'source_review':write('composite-source-review.json',
                         {'contract':'waapi-skill.loaded-media-composite-source/v1','version':version,
@@ -772,13 +777,13 @@ def write_composite_bundle(output,captures,*,inventory,version):
         pd={**write(prefix+'program.json',program),'nodeid':captured['nodeid']}
         for binding in document['bindings'].values():binding['evidence']['program']=deepcopy(pd)
         bd=write(prefix+'bindings.json',document);rd=write(prefix+'requirements.json',policies)
-        index['entries'].append({'id':'loaded-media-'+str(number),'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
+        index['entries'].append({'id':name_prefix+'loaded-media-'+str(number),'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
         requirements['branches'].update(policies['branches'])
     if selected!={i for i,e in reviewed['entries'].items() if e['route']==profile['route']} or attachment is None:
         raise ValueError('LoadedMedia bundle requires every exact31 branch plus complete semantic anchor')
     index['runtime_observation_attachments']=[attachment]
     write('requirements.json',requirements);write('index.json',index)
-    return output/'index.json'
+    return output/(name_prefix+'index.json')
 
 
 
@@ -793,3 +798,11 @@ def composite_preservation_gates(root, policies, obligations):
         gates[branch['id']] = ([] if branch['id'] == profile['anchor'] else [profile['anchor']]) if (
             entry and entry['shape_sha256'] == branch['shape_sha256'] and policies[branch['id']] == composite_policy(entry)) else None
     return gates
+
+
+def _positive_from_proof(proof, base, root):
+    artifact = proof['archive']['artifact']
+    suffix = 'r124-originals.json.gz'
+    if not artifact.endswith(suffix):
+        raise ValueError('LoadedMedia exact positive archive locator differs')
+    return original_observation(base,root=root,copied_prefix=artifact[:-len(suffix)])
