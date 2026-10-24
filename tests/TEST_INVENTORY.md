@@ -5,6 +5,33 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R114 qualified retained runtime reads
+
+Reviewed mechanism `265730db`, integrated at `792b8683`, admits exactly four
+retained R105 Authoring observations: RTPC and observed Bus contributions on
+2023/2024. It uses the existing program producer, portable importer and final
+consumer. Original workflow/finalization BLOCKED verdicts, quarantines and
+two open lifecycle obligations remain explicit; the strict finalized-PASS
+reader is unchanged. This path cannot establish lifecycle or mutation success.
+
+On source `c17450c8`, four public replay-to-final-consumer cases passed in
+**77.22s**, independently checking **82 exact retained result selectors**:
+11 RTPC selectors per version, 32 contribution selectors on 2023 and 28 on
+2024. Thirteen unwitnessed contribution selectors remain unproved. Eight of
+eleven subsequent controls passed initially; three fixture corrections then
+passed in a failed-only 39.03s run. Final roster/cache checks passed twice in
+0.43s. Strict-PASS compatibility, BLOCKED rejection, exact source selection,
+changed native data/host/time/failure/archive and lifecycle-credit rejection
+remain covered. No successful business selection was repeated for review.
+
+Independent review checked both immutable original closures and retained logs.
+The four positive temporary bundles were pruned by pytest's shared temporary
+retention; no rehash of those missing bundles is claimed. Formal current-source
+receipt/publication is held until the shared reader implementation settles,
+using a durable explicit output root. The later R115 product delta needs exact
+source reconciliation. This is reviewed mechanism evidence, not a new global
+coverage result, native execution, Fresh run or completed ticket.
+
 ## 2026-10-24 R115 versioned Game Object result handling
 
 Reviewed product `0ff025eb`, integrated at `a71f438d`, repairs the dedicated
