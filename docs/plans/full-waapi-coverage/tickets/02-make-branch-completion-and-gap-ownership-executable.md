@@ -1,6 +1,8 @@
 # 02: Make branch completion and gap ownership executable
 
-Status: completed and integrated on 2026-10-17 (merge `cd9ccae07`). Published as [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176).
+Status: reopened on 2026-10-24 for the synthetic-empty regression below.
+The 2026-10-17 integration (`cd9ccae07`) and its original evidence remain
+historical completed work. Published as [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176).
 
 ## Parent
 
@@ -12,8 +14,8 @@ The coverage checker explains exactly which native-supported uses are unavailabl
 
 ## Acceptance criteria
 
-- [x] Independently enumerate inputs, results, enums, unions, collections, optional/default distinctions and reachable shared definitions across all native hosts and versions; add meaningful target, placement and operation-mode distinctions.
-- [x] Map each branch to a public contract and route, exact construction/validation behavior, appropriate verifier and candidate-scoped required evidence. Whole-family attribution, parent mappings and test-definition filenames do not establish descendant completion.
+- [ ] Independently enumerate inputs, results, enums, unions, collections, optional/default distinctions and reachable shared definitions across all native hosts and versions; add meaningful target, placement and operation-mode distinctions.
+- [ ] Map each branch to a public contract and route, exact construction/validation behavior, appropriate verifier and candidate-scoped required evidence. Whole-family attribution, parent mappings and test-definition filenames do not establish descendant completion.
 - [x] Evaluate actual projected read and multi-call business/transaction observations, not only a zero-input ping envelope. Tie each alternative, presence/default and collection assertion to the exact observed field; an unrelated field or parent PASS cannot satisfy it.
 - [x] Use reviewed per-branch evidence requirements and sealed relevant-source/native-shape/host/behavior equivalence for reusable evidence. Consume the established native category and ScenarioLifecycle metadata producer formats with positive compatibility and tampering tests. Missing formal Fresh archive integration stays unverified and is implemented under #194; no label-only Fresh credit or automatic rerun budget is allowed.
 - [x] Assign every in-scope record to a functional ticket in this specification. Any new or oversized gap must produce a bounded same-parent implementation child and a blocking edge to final acceptance before its discovery work is considered resolved. Final acceptance is not a catch-all implementation owner.
@@ -33,6 +35,30 @@ The coverage checker explains exactly which native-supported uses are unavailabl
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
 
 ## Maintainer delivery
+
+### Reopened regression — 2026-10-24
+
+The synthetic-empty generator checks direct restrictions but overlooks nested
+constraints. Six exact 2025 runtime rows incorrectly require a successful empty
+string: four log-severity rows and two cursor-movement rows. Their matching
+native `oneOf` definitions reject that value. This is an accounting defect,
+not missing Wwise support or a reason to manufacture native invalid results.
+
+Repair the shared classification using the exact parent schema and resolved
+references. Preserve IDs, owners, shapes and history; conclusively invalid
+synthetic candidates need field-attributed public rejection evidence through
+the existing consumer, while valid candidates retain normal positive evidence.
+Unknown references or unsupported validation semantics stay unresolved. Audit
+the same empty-candidate rule across all in-scope owners, and include causal
+controls against wrong-field, wrong-route, changed-schema and missing-failure
+credit. Existing native business requirements remain independent. Native-valid
+empty log messages are a separate product omission owned by #186.
+
+The existing dependency on this shared checker now blocks final acceptance
+again. Unaffected implementation work may continue; this ticket cannot close
+until the repair and its focused verification are complete.
+
+### Original delivery
 
 See [LEDGER.md](../LEDGER.md) for the existing audit CLI, exact binding and evidence requirements, original-producer readers, reviewed reuse, and controlled proof scope. The generated product inventory retains 272,313 obligations across 1,683 native host/build routes: 268,559 unresolved, 3,638 missing implementation and 116 exact approved exclusions; none has received verified execution credit. Every functional obligation is owned by #177–#193. #194 owns the formal Fresh archive bridge; #195 remains acceptance only.
 
