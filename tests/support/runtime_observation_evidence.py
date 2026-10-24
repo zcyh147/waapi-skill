@@ -38,6 +38,8 @@ def program_source_context(root=audit.ROOT, *, flow=None):
         'tests/unit/test_runtime_business_gateway.py', 'tests/support/gateway_config.py',
         'tests/support/exact_evidence_finalization.py', 'tests/conftest.py',
         'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py']
+    if flow in {'ak.wwise.core.profiler.' + name for name in ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects')}:
+        dependencies.extend(('tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_fixed_runtime_read_branch_evidence.py'))
     if flow == 'ak.wwise.core.profiler.getVoiceContributions':
         dependencies.append('tests/unit/test_contribution_branch_evidence.py')
     return {group: {name: sha((root / name).read_bytes()) for name in sorted(paths)}
@@ -310,6 +312,9 @@ def _validate_rtpc_structure(record, binding, branch, root):
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
+    from tests.support.fixed_runtime_read_evidence import URIS, validate_evidence
+    if branch['route'].split('|')[4] in URIS:
+        return validate_evidence(record, binding, branch, category, base, root, reference_edges or {})
     if branch['route'].endswith('|function|ak.wwise.core.profiler.getVoiceContributions'):
         return validate_contribution_evidence(record, binding, branch, category, base, root, reference_edges or {})
     from wwise_waapi.runtime_inspection_business_contracts import runtime_inspection_business_read_operations
@@ -410,7 +415,8 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
                 or captures[identity] != read(proof['program_capture'])):
             raise ValueError('Runtime observation requires exact reviewed program/native policy')
         observation_hashes = {'capture': proof['capture']['sha256']}
-        if identity.split('|')[4] == 'ak.wwise.core.profiler.getVoiceContributions':
+        from tests.support.fixed_runtime_read_evidence import URIS
+        if identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions'}:
             raw = proof['mapping']['raw_observation']
             _portable_descriptor(raw, base)
             observation_hashes['raw'] = raw['sha256']
@@ -527,12 +533,15 @@ RTPC_ORIGINAL_CANDIDATE = '503688449ba9f9db964a5fb7116ac6be2fb07198'
 RTPC_GUARD_FILE = RTPC_SOURCE.split('#')[0]
 RTPC_GUARD_CHANGE = {
     'before': '62e4ed3eca63a62637e7b8e1ab4c5c55c18ceffb49d91d4e318cecec44ce116c',
-    'after': 'd8b0609ab8233f9b43924491900ee62fe52e721d7e5cf20baee6f40a5bb49b17'}
+    'after': '06442176e0aa4f5862feb0c66ef9878221494145755d700c02029353641e9f4d'}
 RTPC_REVIEWED_SOURCE_CHANGES = {
+    'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': {
+        'before': '69b33beb785880102003179f943d3cdb90c2229bd9adeacfb81993a39d8a85c4',
+        'after': '2a8bb6ef98e2ec59ff802a80309aa4554cf78c37014e28f9c30123df2ed810ca'},
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': 'a50be58acdca7231e7bb72a5eb90cd52781e6221e9c6aa8cd035e1c8140983a3'},
+        'after': '0736194eecf13361bd35b1db8c31d614f6f93c4cf2d14b82e34061490cc05fce'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'ea1c39a5480afc5720f99a0acb85015c7c7d028d8ee53eb1937ff079fce9d7d8'},
@@ -540,20 +549,23 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
         'before': '4a1ac5146edc65eb8e58defd689051f79a198bafb2d5d2134d912bd9a862fd6d',
         'after': 'cd11309c557b68ea7bcb7d82c2bcbc1a448d08f8e283fab50a0424555fc4f8f2'}}
 RTPC_REVIEWED_SOURCE_SYMBOLS = {
+    'skills/waapi-skill/wwise_waapi/runtime_inspection_business_contracts.py': [
+        'field ceiling', 'profiler_result_field_choices', 'three fixed row declarations', 'runtime_inspection_business_contract_data'],
     RTPC_GUARD_FILE: ['module import: builders.query.STRUCTURED_GUID_PATTERN',
-        '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility'],
+        '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility',
+        'Sequence/field-contract imports', 'materialize_runtime_inspection_business_request'],
     'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
         'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
         'module import: builders.stable_reads.MAX_GAME_OBJECT_ROWS/MAX_STABLE_STRING_BYTES',
         'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
-        'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload'],
+        'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload', 'preflight_core_business_input'],
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request',
         'normalize_profiler_voice_contributions_result', 'normalize_profiler_game_objects_result'],
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
         '_validate_resolved_sections', '_runtime_result_reference_schema']}
 RTPC_REVIEWED_SOURCE_REASON = (
-    'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
-    'post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
+    'Exact reviewed five-file RTPC guard and closed non-RTPC result-validation source delta; '
+    'three fixed-reader-only closed result-field selection delta leaves absent result_fields requests unchanged; post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
     'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot/mixed identity Bus selection delta irrelevant to RTPC; '
     'GameObjects-only optional row fields/versioned ID domains/timestamp aliases and fixed request-schema disclosure do not change RTPC or contribution behavior; original finalized PASS retained')
 RTPC_ORIGINALS = {
@@ -562,7 +574,7 @@ RTPC_ORIGINALS = {
 
 
 def validate_rtpc_source_review(descriptor, historical_sources, branch, root, base):
-    """Accept only the pinned reviewed four-file delta for original RTPC reads."""
+    """Accept only the pinned reviewed five-file delta for original RTPC reads."""
     review = completion.read_sealed_artifact(descriptor, base)
     version, host, build, kind, uri = branch['route'].split('|')
     if version not in RTPC_ORIGINALS or host != 'wwise-authoring' or kind != 'function' or uri != RTPC_URI:
@@ -1125,6 +1137,9 @@ def _validate_contribution_capture(record, argv, route, root):
 
 
 def validate_runtime_source_review(descriptor, sources, branch, root, base):
+    from tests.support.fixed_runtime_read_evidence import URIS, validate_source_review
+    if branch['route'].split('|')[4] in URIS:
+        return validate_source_review(descriptor, sources, branch, root, base)
     if branch['route'].endswith('|function|' + CONTRIBUTION_URI):
         return validate_contribution_source_review(descriptor, sources, branch, root, base)
     return validate_rtpc_source_review(descriptor, sources, branch, root, base)
