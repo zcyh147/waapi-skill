@@ -1,6 +1,7 @@
 """Owned 2024 meters and bounded 2025 capture/read observations.
 
-This collector uses only the public Gateway. The existing Authoring batch owns
+Setup and business reads use the public Gateway; one exact developer-only node
+adds four fixed native spelling observations. The existing Authoring batch owns
 launch, source integrity, process cleanup, archival and final acceptance.
 """
 from __future__ import annotations
@@ -14,9 +15,13 @@ import wave
 import uuid
 
 from tests.semantic.support.typed_gateway_input import discovered_business_field_handle
+from tests.destructive.support.meter_spelling_diagnostic import OUTCOMES as METER_SPELLING_OUTCOMES
 
 NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2025_meter_cursor_capture')
+METER_SPELLING_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
+    'test_runtime_owned_2025_meter_spelling_diagnostic')
+
 METER_2024_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
     'test_runtime_owned_2024_meter_projection')
 READERS_2025_NODEID = ('tests/destructive/test_authoring_ui_business_live.py::'
@@ -52,6 +57,7 @@ CAPTURE_READ_OUTCOMES = ('profiler-rtpcs-observation', 'profiler-contributions-d
 CAPTURE_NODE_OUTCOMES[CAPTURE_READS_NODEID] = CAPTURE_READ_OUTCOMES
 CAPTURE_NODE_OUTCOMES[CAPTURE_MISSING_NODEID] = (CAPTURE_READ_OUTCOMES[0], CAPTURE_READ_OUTCOMES[2])
 CAPTURE_NODE_OUTCOMES[CURSOR_MOVES_NODEID] = CURSOR_MOVE_OUTCOMES
+CAPTURE_NODE_OUTCOMES[METER_SPELLING_NODEID] = METER_SPELLING_OUTCOMES
 CAPTURE_CAR_ID = '{9EEFCC8E-7FC2-4CDC-8BE9-C682F2CA77CC}'
 CAPTURE_CAR_SOURCE_ID = '{48770A4D-B8C3-41CF-AE3E-FB8651347736}'
 CAPTURE_CAR_PARENT_ID = '{97A58685-6231-4227-9BAB-451E089615A8}'
@@ -472,6 +478,9 @@ def _collect_cursor_moves(call, report, persist, *, effect, zero, own, clean_one
 
 def collect_owned_capture(batch, public_call):
     version = batch.runtime.version
+    meter_spellings = batch.selected_nodeids == (METER_SPELLING_NODEID,)
+    if meter_spellings:
+        assert version == '2025.1', 'Meter spelling diagnostic requires matching 2025 Authoring'
     cursor_moves = batch.selected_nodeids == (CURSOR_MOVES_NODEID,)
     if cursor_moves:
         assert version == '2025.1', 'Cursor moves require the matching 2025 Authoring host'
@@ -480,7 +489,7 @@ def collect_owned_capture(batch, public_call):
     assert version in (('2021.1', '2022.1', '2023.1', '2024.1', '2025.1') if capture_reads
         else ('2024.1', '2025.1')), 'Capture version is not admitted for this node'
     readers = capture_reads or batch.selected_nodeids == (READERS_2025_NODEID,)
-    nodeid = CURSOR_MOVES_NODEID if cursor_moves else CAPTURE_MISSING_NODEID if missing_only else CAPTURE_READS_NODEID if capture_reads else READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
+    nodeid = METER_SPELLING_NODEID if meter_spellings else CURSOR_MOVES_NODEID if cursor_moves else CAPTURE_MISSING_NODEID if missing_only else CAPTURE_READS_NODEID if capture_reads else READERS_2025_NODEID if readers and version == '2025.1' else METER_2024_NODEID if version == '2024.1' else NODEID
     assert batch.selected_nodeids == (nodeid,), 'Capture requires its exact matching node'
     sound_id, bus_id, parent_id = (METER_2024_SOUND_ID, METER_2024_BUS_ID, METER_2024_PARENT_ID) if version == '2024.1' else (SOUND_ID, BUS_ID, PARENT_ID)
     parent_output, parent_key = ('volume-db', 'volume_db') if version == '2024.1' else ('work-unit-is-default', 'work_unit_is_default')
@@ -502,6 +511,8 @@ def collect_owned_capture(batch, public_call):
             'capture_settings_scope': 'Explicit enable/disable pair only; no prior global settings getter'},
         'limits': {'public_calls': 192, 'total_reply_bytes': 8 * 1024 * 1024,
             'reply_bytes': 1024 * 1024, 'meter_pages': 8}, 'public_call_count': 0, 'total_reply_bytes': 0}
+    if meter_spellings:
+        report['scope'] = 'Two 2025 spelling observations and fixed comparators only; no alias or business coverage credit'
     if readers:
         report['limits'].update(reader_calls=7, reader_rows=64)
         report['scope'] = 'One owned 2025.1 capture; no 2021.1–2024.1 reader evidence or acoustic proof'
@@ -874,6 +885,9 @@ def collect_owned_capture(batch, public_call):
             _collect_capture_reads(call, report, persist, fixed_time=fixed_time, sound_id=sound_id, bus_id=bus_id)
         elif readers:
             _collect_readers(call, report, persist, fixed_time=fixed_time, sound_id=sound_id, bus_id=bus_id)
+        elif meter_spellings:
+            from tests.destructive.support.meter_spelling_diagnostic import collect_meter_spellings
+            collect_meter_spellings(batch, report, destination, persist, time_ms=position['position_ms'], owned_bus=before_bus)
         else:
             outcome(OUTCOMES[0], meters)
         # Freeze capture before independent cursor/file assertions. Each control
@@ -889,7 +903,7 @@ def collect_owned_capture(batch, public_call):
                     report['outcomes'][name] = {'outcome': 'BLOCKED', 'reason': 'Optional file/log effects exceed owned cleanup call reserve'}
             persist()
 
-        if version == '2025.1' and not readers:
+        if version == '2025.1' and not readers and not meter_spellings:
             def cursor():
                 verified = effect('profiler.setCursorTime', ['--cursor-target-ms', fixed_time])
                 scope = verified['verification']['verification_scope']['cursor_observation']
@@ -900,7 +914,7 @@ def collect_owned_capture(batch, public_call):
                     'user_cursor': read, 'transaction': verified, 'capture_data_completeness_verified': False}
             outcome(OUTCOMES[1], cursor)
 
-        if (version == '2025.1' and not readers) or optional_effects:
+        if (version == '2025.1' and not readers and not meter_spellings) or optional_effects:
             def saved():
                 output = destination / 'saved-capture'; output.mkdir()
                 sibling = output / 'preserve.txt'; sibling.write_bytes(b'owned sibling preservation sentinel\n')
@@ -919,7 +933,7 @@ def collect_owned_capture(batch, public_call):
         report['cleanup']['transport_stopped_observation'] = state
         clean_one('destroy-transport')
 
-        if (version == '2025.1' and not readers) or optional_effects:
+        if (version == '2025.1' and not readers and not meter_spellings) or optional_effects:
             # General log belongs to this isolated host. Other-channel contents are
             # observed separately; no continuous/exclusive log-state promise is made.
             def log(channel):
