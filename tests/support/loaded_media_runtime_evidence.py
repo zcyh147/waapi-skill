@@ -819,7 +819,7 @@ def _positive_from_proof(proof, base, root):
     return original_observation(base,root=root,copied_prefix=artifact[:-len(suffix)])
 
 
-CONSOLE_REVIEW_SHA = '8ed867f9fd61bbb8c97ec7732fe758e3fb62db8aaf6ca4f8af0664c4b502272f'
+CONSOLE_REVIEW_SHA = '672de26758b352475bf2da3eaffec62ad0860bd29c4bf2afa52c2f9d2b45343b'
 CONSOLE_CANDIDATE = '2dc0ee57718f41b2378d8d4415572366de322704'
 CONSOLE_ROUTES = {version: version+'|wwise-console|'+build+'|function|'+URI for version,build in (
     ('2023.1','2023.1.19.8928'),('2024.1','2024.1.13.9056'),('2025.1','2025.1.7.9143'))}
@@ -947,7 +947,7 @@ def validate_console_program(record,binding,branch,root,edges=None):
 def _console_bridge(proof,branch,root,base):
     reviewed,profile,_=console_branch(branch,root)
     bridge=completion.read_sealed_artifact(proof['source_review'],base)
-    if (set(bridge)!={'contract','version','review','availability_archive','availability_category','availability_context','positive_review'}
+    if (set(bridge)!={'contract','version','review','availability_archive','availability_category','availability_context','positive_review','positive_archive','availability_program_capture'}
             or bridge['contract']!='waapi-skill.console-loaded-media-source/v1'
             or bridge['version']!=branch['route'].split('|')[0] or bridge['review']['sha256']!=CONSOLE_REVIEW_SHA
             or completion.read_sealed_artifact(bridge['review'],base)!=reviewed
@@ -968,13 +968,14 @@ def validate_console_evidence(record,binding,branch,category,base,root,edges=Non
     if category!='native' or branch['id']!=profile['gate'] or not binding.get('runtime_observation_attachment'):
         raise ValueError('Only exact Console LoadedMedia result root accepts composite native support')
     proof=runtime._proof(binding,base);mapping=proof['mapping'];original=_console_bridge(proof,branch,root,base)
+    bridge=completion.read_sealed_artifact(proof['source_review'],base)
     prefix='lm-console-'+branch['route'][:4]+'-'
     positive=original_observation(base,root=root,copied_prefix=prefix)
     captured=completion.read_sealed_artifact(proof['program_capture'],base)
-    available=completion.read_sealed_artifact(proof['availability_program_capture'],base)
+    available=completion.read_sealed_artifact(bridge['availability_program_capture'],base)
     if (proof['branch_id']!=branch['id'] or proof['native_shape_sha256']!=branch['shape_sha256']
             or proof['native_run']!=record['native_runs'][0] or len(record['native_runs'])!=1
-            or proof['archive']!=original['archive'] or proof['positive_archive']!=positive['archive']
+            or proof['archive']!=original['archive'] or bridge['positive_archive']!=positive['archive']
             or proof['capture_original_path']!=profile['report']['path'] or (base/proof['capture']['artifact']).read_bytes()!=original['report_raw']
             or (base/mapping['raw_observation']['artifact']).read_bytes()!=original['raw_bytes'] or mapping['raw_original_path']!=profile['raw']['path']
             or proof['relevant_sources']!=original['sources'] or record['observation_artifacts']!={'capture':proof['capture'],'raw':mapping['raw_observation']}
@@ -1066,11 +1067,12 @@ def write_console_bundle(output,captures,*,inventory,version):
                 bridge=write('console-source-review.json',{'contract':'waapi-skill.console-loaded-media-source/v1','version':version,
                     'review':desc('console-review.json'),'availability_archive':desc(profile['archive']['artifact']),
                     'availability_category':desc(profile['category']['artifact']),'availability_context':profile['availability_context'],
-                    'positive_review':desc('support-review.json')})
+                    'positive_review':desc('support-review.json'),'positive_archive':desc('r124-originals.json.gz'),
+                    'availability_program_capture':availability_capture})
                 proof=write('proof.json',{'contract':'waapi-skill.runtime-observation-proof/v1','branch_id':identity,
                     'native_shape_sha256':branch['shape_sha256'],'mapping':mapping,'native_run':native_run,
                     'archive':desc(profile['archive']['artifact']),'capture':desc('original-capture.json'),'capture_original_path':profile['report']['path'],
-                    'positive_archive':desc('r124-originals.json.gz'),'program_capture':cp,'availability_program_capture':availability_capture,
+                    'program_capture':cp,
                     'relevant_sources':sources,'source_review':bridge})
                 attached=deepcopy(binding);attached.update(runtime_observation_attachment=proof,program_observation_pointer=pointer,
                     observation_pointer=mapping['native_pointer'],native_observations_sha256={k:v['sha256']for k,v in native['observation_artifacts'].items()})

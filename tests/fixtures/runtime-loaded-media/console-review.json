@@ -3,7 +3,7 @@
   "authority": "docs/plans/full-waapi-coverage/RUNTIME_VERIFICATION.md",
   "availability_candidate": "2dc0ee57718f41b2378d8d4415572366de322704",
   "positive_candidate": "7289081b552c5f428013ba0b6bacaf7d05843481",
-  "positive_review_sha256": "6d01288485ea78648bfaf65b48ee39697280828629257f72a1ff1e25dcf7044c",
+  "positive_review_sha256": "5a3a7dd27e424e6d60e748d6f6c0aac59901ba6eb18014b84e02202ad041ae43",
   "policy_sha256": "a73a443ff450aa42cae6bc7cdf75daae6eaaddd7ead91322767dbd638ec5d140",
   "entries": {
     "2023.1|wwise-console|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
@@ -2581,7 +2581,7 @@
       "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2023-r1",
       "archive": {
         "artifact": "r127-console-2023.1-original.json.gz",
-        "sha256": "a9d05320a2d878977eb9904e2e383eb8108b6de3a63576707fa45ea751cacb7b"
+        "sha256": "d51b569909dc8cba4c3679820970a7a47e2ec65d425d2ff1ef6eff630fad04e1"
       },
       "archive_files": 184,
       "archive_map_sha256": "8ab7bc42ee82512f3a2eb8388011b7c52d50cbe4017f1e6fba1f2e75c32d559d",
@@ -2929,7 +2929,7 @@
       "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2024-r1",
       "archive": {
         "artifact": "r127-console-2024.1-original.json.gz",
-        "sha256": "48f3619f1f2ee2fe7db895720d3483921334a818ee84badca357a7d74bd5cf86"
+        "sha256": "97d366a9dec97aa947c1029f41422d76fd425ae612b2043f77dc2ba1a302c6e5"
       },
       "archive_files": 184,
       "archive_map_sha256": "dae5b01f931359dcdb2a1e2a1207e345f923fdef35a063a7bea7cd52f5b37b32",
@@ -3278,7 +3278,7 @@
       "original_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r127-console-additional-native-2025-r1",
       "archive": {
         "artifact": "r127-console-2025.1-original.json.gz",
-        "sha256": "e9870c83abd5c25211f1be81adea0855d3a9f51bdc6e7aafa49c9eecbc8bb5d3"
+        "sha256": "2fe5352618b0701ff1d16617c0891ae3deaca3a414f6b0a97313a6d22e2d65a5"
       },
       "archive_files": 184,
       "archive_map_sha256": "db762c2ab275aa6e60228f6455c8163f377d66dccad4d05d84ec69eda572ce03",

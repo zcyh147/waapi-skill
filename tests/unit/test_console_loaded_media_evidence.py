@@ -119,7 +119,7 @@ def damage_controls(tmp_path,inventory,document,base,policies,profile):
         bridge=completion.read_sealed_artifact(proof['source_review'],base)
         if damage=='availability':bridge['availability_archive']['artifact']='missing-availability.json.gz'
         elif damage=='session':bridge['availability_context']['live']['sessionId']='{00000000-0000-0000-0000-000000000000}'
-        elif damage=='positive':proof['positive_archive']['artifact']='missing-positive.json.gz'
+        elif damage=='positive':bridge['positive_archive']['artifact']='missing-positive.json.gz'
         elif damage=='current-replay':proof['program_capture']['artifact']='missing-current.json'
         elif damage in {'current-source','current-host','duplicate-read','public-row','phase'}:
             captured=completion.read_sealed_artifact(proof['program_capture'],base)
