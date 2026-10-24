@@ -1412,7 +1412,10 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.fixed_runtime_read_evidence import URIS, validate_program
             if (branch.get('route') or '').split('|')[-1] in URIS:
                 normalized_construction = validate_program(record, binding or {}, branch, root, reference_edges)
-        if (category == 'program' and branch.get('route') == '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia'
+        if (category == 'program' and branch.get('route') in {
+                '2023.1|wwise-authoring|2023.1.19.8928|function|ak.wwise.core.profiler.getLoadedMedia',
+                '2024.1|wwise-authoring|2024.1.13.9056|function|ak.wwise.core.profiler.getLoadedMedia',
+                '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia'}
                 and not (binding or {}).get('runtime_observation_attachment')):
             from tests.support.loaded_media_runtime_evidence import validate_program
             normalized_construction = validate_program(record, binding or {}, branch, root, reference_edges)
@@ -1659,6 +1662,8 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
     if scope is None:
         from tests.support.loaded_media_runtime_evidence import preservation_gates as loaded_media_gates
         preservation_gates.update(loaded_media_gates(root, policies, native['obligations']))
+        from tests.support.loaded_media_runtime_evidence import composite_preservation_gates
+        preservation_gates.update(composite_preservation_gates(root, policies, native['obligations']))
     public = {r['id']: r for r in inventory['routes']}
     routes = {r['id']: r for r in native['routes']}
     symbols = {}
@@ -1786,6 +1791,13 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
                 and branch['id'] == '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single'):
             from tests.support.loaded_media_runtime_evidence import BASIS
             branch['representative_native_support'] = dict(BASIS)
+        elif (branch['evidence_results'].get('native', {}).get('outcome') == 'passed'
+                and bindings.get(branch['id'], {}).get('runtime_observation_attachment')):
+            from tests.support.loaded_media_runtime_evidence import COMPOSITE_ROUTES, composite_branch, composite_basis
+            if branch['route'] in COMPOSITE_ROUTES.values():
+                _, profile, _ = composite_branch(branch,root)
+                if branch['id'] == profile['anchor']:
+                    branch['representative_native_support'] = composite_basis(profile)
     complete_states = {'verified', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:
