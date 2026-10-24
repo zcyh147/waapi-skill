@@ -530,7 +530,7 @@ RTPC_REVIEWED_SOURCE_CHANGES = {
     RTPC_GUARD_FILE: RTPC_GUARD_CHANGE,
     'skills/waapi-skill/scripts/gateway.py': {
         'before': '9ea8d1c0c79c9323c8ee0e48b8cb9444c54c8d73f9f7330ed827563f31f42f03',
-        'after': 'b1822cf90efed288b2983c8a225c1ae68a0af22c389c8e6f78ef88bc2cc75909'},
+        'after': '3ce27d569f4fe972911d04f16a2b6f7943a05f3785a9ac9b75c319628c393c8a'},
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': {
         'before': '21108e298bc83cdf2eda6269db3d440a0865cacbab7c953d9ef57f84217fe62a',
         'after': 'db81794ea4f995e5385257cf507540c580f9474cd3848b1714c02c9387398633'},
@@ -542,7 +542,7 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
         '_validate_rtpc_rows', 'normalize_runtime_inspection_result', 'rtpc_validated_name_compatibility'],
     'skills/waapi-skill/scripts/gateway.py': ['module import: builders.schema.validate_resolved_semantic_result',
         'module import: runtime_inspection_business.rtpc_validated_name_compatibility',
-        'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
+        'build_parser', 'dispatch_command', 'resolve_profiler_voice_path', 'dispatch_profiler_voice_contributions_request',
         'dispatch_runtime_inspection_business_read', 'preflight_stable_read_input', 'fixed_command_route_payload'],
     'skills/waapi-skill/wwise_waapi/builders/stable_reads.py': ['build_profiler_voice_contributions_request', 'normalize_profiler_voice_contributions_result'],
     'skills/waapi-skill/wwise_waapi/builders/schema.py': ['validate_resolved_semantic_result',
@@ -550,7 +550,7 @@ RTPC_REVIEWED_SOURCE_SYMBOLS = {
 RTPC_REVIEWED_SOURCE_REASON = (
     'Exact reviewed RTPC guard and closed non-RTPC result-validation source delta; '
     'post-success legacy name compatibility disclosure; RTPC conservative validator/request/normalizer behavior retained and complete original '
-    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity delta irrelevant to RTPC; original finalized PASS retained')
+    'arrays unchanged through current public Gateway; contribution-only bus choice/partial projection/versioned identity/fixed cursor snapshot delta irrelevant to RTPC; original finalized PASS retained')
 RTPC_ORIGINALS = {
     '2022.1': ('2022.1.19.8584', 'e9d4b86aaccaccb9b1603d37ba5bc7255034c09d2c05b7685beb254e6642adfd', 17, 23637),
     '2025.1': ('2025.1.7.9143', 'e7ef187ef0ed855819cfa007375f3ca8c1d4cfc1e3697f8c5b9e870c1441690c', 5, 30837)}
@@ -918,6 +918,11 @@ def write_field_stage(output, captures, originals, *, inventory, guard_replays=N
 
 CONTRIBUTION_URI = 'ak.wwise.core.profiler.getVoiceContributions'
 CONTRIBUTION_PARENT = '/outcomes/profiler-contributions-bus-observation/evidence'
+CONTRIBUTION_CURSOR_TIME = '/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime'
+CONTRIBUTION_CURSOR = '/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor'
+CONTRIBUTION_CURSOR_POINTERS = frozenset((CONTRIBUTION_CURSOR_TIME + '/oneOf/1',
+    CONTRIBUTION_CURSOR_TIME + '/oneOf/1/$ref', CONTRIBUTION_CURSOR,
+    CONTRIBUTION_CURSOR + '/enum/0', CONTRIBUTION_CURSOR + '/enum/1'))
 CONTRIBUTION_ORIGINALS = {
     '2022.1': {'args': '9abe0fa40c8494ef2f2ad15e6ac6ec52f1dbf0ac893698538a066e092a9129c5',
         'result': 'b2bee9592e16fb4af107ed33b144d3b239a43992aa314e81e139c698ee622f1d',
@@ -942,13 +947,38 @@ def contribution_public_pointer(pointer):
     return pointer.replace('/native_call/', '/gateway/payload/semantic_preview/', 1)
 
 
-def validate_contribution_program(record, binding, branch, root):
+def validate_contribution_program(record, binding, branch, root, reference_edges=None):
     """Validate one exact branch within the dedicated captured public flow."""
     _validate_contribution_capture(record, binding['input']['gateway_argv'], branch['route'], root)
     pointer = binding.get('program_observation_pointer') if binding.get('runtime_observation_attachment') else binding['observation_pointer']
     if binding['gateway_observation_pointer'] != contribution_branch_public_pointer(branch, pointer):
         raise ValueError('Contribution needs the corresponding exact public projection occurrence')
+    if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS:
+        return _validate_contribution_cursor(record, binding, branch, root, reference_edges or {})
     _validate_contribution_branch(record, binding, branch, root)
+
+
+def _validate_contribution_cursor(record, binding, branch, root, reference_edges):
+    """Bind only five reflected contribution cursor leaves to their snapshot."""
+    node = _contribution_node(branch, root)
+    first = branch['route'] + '|/argsSchema/properties/time/$ref'
+    second = branch['route'] + '|' + CONTRIBUTION_CURSOR_TIME + '/oneOf/1/$ref'
+    chain = [first] if branch['pointer'].startswith(CONTRIBUTION_CURSOR_TIME) else [first, second]
+    completion.exact_observation_pointer(branch,
+        {**binding, 'observation_pointer': '/native_call/args/time'}, '/native_call', 'args', reference_edges)
+    if (audit.digest(node) != branch['shape_sha256'] or binding.get('reference_chain') != chain
+            or reference_edges[first]['reference']['target'] != branch['route'] + '|' + CONTRIBUTION_CURSOR_TIME
+            or reference_edges[second]['reference']['target'] != branch['route'] + '|' + CONTRIBUTION_CURSOR):
+        raise ValueError('Contribution exact cursor normalization branch/reflection differs')
+    captured = record['runtime_read_program']
+    final_call = captured['public_calls'][-1]
+    cursor, = [row for row in captured['native_reads'][final_call['native_start']:]
+        if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
+    expected = f"/runtime_read_program/native_reads/{cursor['ordinal']}/args/cursor"
+    if (binding['observation_pointer'] != expected
+            or not _contribution_predicate(branch, node, cursor['args']['cursor'], root=root)):
+        raise ValueError('Contribution exact cursor normalization occurrence/choice differs')
+    return {'branch_id': branch['id'], 'observation_pointer': expected}
 
 
 def _validate_contribution_capture(record, argv, route, root):
@@ -1009,13 +1039,14 @@ def _validate_contribution_capture(record, argv, route, root):
     else:
         choice, = values('--capture')
         cursor = {'latest': 'capture', 'user-cursor': 'user'}[choice]
-        if '--voice-instance-handle' not in argv and time != cursor:
-            raise ValueError('Contribution direct cursor construction differs')
-        if '--voice-instance-handle' in argv:
-            cursors = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
-            if (len(cursors) != 1 or cursors[0]['args'] != {'cursor': cursor} or cursors[0]['options'] != {}
-                    or type(time) is not int or time < 0 or cursors[0]['result'] != {'return': time}):
-                raise ValueError('Contribution handle cursor construction differs')
+        cursors = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
+        dependent = [row for row in final_trace if row['uri'] in {
+            'ak.wwise.core.profiler.getVoices', 'ak.wwise.core.profiler.getBusses', CONTRIBUTION_URI}]
+        if (len(cursors) != 1 or cursors[0]['args'] != {'cursor': cursor} or cursors[0]['options'] != {}
+                or type(time) is not int or time < 0 or cursors[0]['result'] != {'return': time}
+                or any(row['ordinal'] <= cursors[0]['ordinal'] or type(row['args'].get('time')) is not int
+                    or row['args']['time'] != time for row in dependent)):
+            raise ValueError('Contribution fixed cursor construction trace differs')
     voice_rows = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getVoices']
     bus_rows = [row for row in final_trace if row['uri'] == 'ak.wwise.core.profiler.getBusses']
     if len(voice_rows) != 1 or voice_rows[0]['args'] != {'time': time}:
@@ -1143,7 +1174,7 @@ def validate_contribution_evidence(record, binding, branch, category, base, root
         '/observations/raw', 'result', reference_edges)
     captured = completion.read_sealed_artifact(proof['program_capture'], base)
     if category == 'program':
-        validate_contribution_program({**record, 'runtime_read_program': captured}, binding, branch, root)
+        validate_contribution_program({**record, 'runtime_read_program': captured}, binding, branch, root, reference_edges)
         return
     read = archive_reader(proof['archive'], base)
     context = completion.read_category_run(proof['native_run'], base)
@@ -1192,10 +1223,13 @@ def write_read_bundle(output, program_path, originals, *, inventory, version, ho
         if row['version'] == version and row['host'] == host and row['uri'] == CONTRIBUTION_URI)
     public = next(row for row in inventory['routes'] if row['id'] == route['public_route'])
     if mappings is None:
-        if mode != 'top-data':
+        if mode == 'top-data':
+            fields = ('volume', 'LPF', 'HPF', 'DSF') if version == '2025.1' else ('volume', 'LPF', 'HPF')
+            selected = {route['id'] + '|/resultSchema/properties/return/properties/' + field for field in fields}
+        elif mode in {'cursor-capture', 'cursor-user'}:
+            selected = {route['id'] + '|' + pointer for pointer in CONTRIBUTION_CURSOR_POINTERS}
+        else:
             raise ValueError('Dedicated contribution mapping mode requires an exact branch selection')
-        fields = ('volume', 'LPF', 'HPF', 'DSF') if version == '2025.1' else ('volume', 'LPF', 'HPF')
-        selected = {route['id'] + '|/resultSchema/properties/return/properties/' + field for field in fields}
         _, mappings = contribution_field_mappings(inventory, captured, version=version, host=host, selected=selected)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=bool(name_prefix))
@@ -1255,9 +1289,14 @@ def write_read_bundle(output, program_path, originals, *, inventory, version, ho
         program['branch_assertions'][identity] = {'native_shape_sha256': branch['shape_sha256'], 'native_route': branch['route'],
             'checks': [({'pointer': pointer, 'absent': True} if branch['kind'] == 'optional_presence' and branch['value'] == 'absent'
                 else {'pointer': pointer, 'cardinality': branch['value']} if branch['kind'] == 'collection_cardinality'
-                else {'pointer': pointer, 'equals': completion.pointer_value(captured, pointer)}),
+                else {'pointer': pointer, 'equals': completion.pointer_value(program, pointer)}),
                 {'pointer': public_pointer, 'equals': completion.pointer_value(captured, public_pointer)}]}
-        if not branch['pointer'].startswith('/resultSchema'):
+        if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS:
+            choice = '/gateway/argv/' + str(captured['gateway']['argv'].index('--capture') + 1)
+            program['branch_assertions'][identity]['checks'].extend([
+                {'pointer': choice, 'equals': completion.pointer_value(captured, choice)},
+                {'pointer': '/native_call/args/time', 'equals': captured['native_call']['args']['time']}])
+        elif not branch['pointer'].startswith('/resultSchema'):
             semantic = contribution_public_pointer(pointer)
             semantic_check = ({'pointer': semantic, 'absent': True}
                 if branch['kind'] == 'optional_presence' and branch['value'] == 'absent'
@@ -1276,6 +1315,8 @@ def write_read_bundle(output, program_path, originals, *, inventory, version, ho
         policy['branches'][identity] = {'native_shape_sha256': branch['shape_sha256'], 'categories': mapping['categories'],
             'reason': ('Exact reported contribution data/reference/presence/multiple occurrence; independent native fact required'
                 if mapping['categories'] == ['program', 'native'] else
+                'SPEC section 5 exact public choice to one cursor snapshot to same-time identity/final numeric construction; no actual native occurrence/data/effect claim'
+                if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS else
                 'SPEC section 5 exact contribution construction/predicate/decoder preservation; no actual native occurrence/data/effect or descendant claim')}
         if native is not None and mapping['categories'] == ['program', 'native']:
             native_pointer = pointer.replace('/native_call', '/observations/raw', 1)
@@ -1475,6 +1516,15 @@ def contribution_field_mappings(inventory, captured, *, version, host, selected=
         if selected is not None and branch['id'] not in selected:
             continue
         node = _contribution_node(branch)
+        if branch['pointer'] in CONTRIBUTION_CURSOR_POINTERS:
+            argv = captured['gateway']['argv']
+            cursors = [row for row in captured.get('native_reads', [])
+                if row['uri'] == 'ak.wwise.core.profiler.getCursorTime']
+            if '--capture' in argv and len(cursors) == 1 and _contribution_predicate(branch, node, cursors[0]['args']['cursor']):
+                mappings.append({'branch': branch,
+                    'program_pointer': f"/runtime_read_program/native_reads/{cursors[0]['ordinal']}/args/cursor",
+                    'reference_chain': _contribution_chains(branch, edges)[0], 'categories': ['program']})
+            continue
         for chain in _contribution_chains(branch, edges):
             match = next(((pointer, value) for pointer, value in _contribution_occurrences(captured,
                 _contribution_pattern(branch, chain, edges)) if _contribution_predicate(branch, node, value)), None)
@@ -1525,8 +1575,13 @@ def write_read_stage(output, captures, originals, *, inventory):
         for mode in ('rich', 'single', 'empty', 'absent', 'omit', 'cursor-capture', 'cursor-user')}
     expected |= {(version, host, 'partial') for version in versions[:2] for host in ('wwise-console', 'wwise-authoring')}
     expected |= {(version, 'wwise-authoring', 'original') for version in ('2022.1', '2025.1')}
-    if set(captures) != expected or set(originals) != {'2022.1', '2025.1'}:
+    cursor_only = {(version, host, mode) for version in versions for host in ('wwise-console', 'wwise-authoring')
+        for mode in ('cursor-capture', 'cursor-user')}
+    cursor_scope = set(captures) == cursor_only and not originals
+    if not cursor_scope and (set(captures) != expected or set(originals) != {'2022.1', '2025.1'}):
         raise ValueError('Contribution stage requires the complete exact five-version public flow set')
+    if cursor_scope:
+        expected = cursor_only
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
     policy = {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {}}
@@ -1536,7 +1591,8 @@ def write_read_stage(output, captures, originals, *, inventory):
         captured = json.loads(Path(captures[version, host, mode]).read_bytes())
         route_ids = {row['id'] for row in inventory['native_coverage']['obligations']
             if row['route'] is not None and row['route'].split('|')[:2] == [version, host]
-            and row['route'].endswith('|function|' + CONTRIBUTION_URI)}
+            and row['route'].endswith('|function|' + CONTRIBUTION_URI)
+            and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
         _, mappings = contribution_field_mappings(inventory, captured, version=version, host=host, selected=route_ids - selected)
         if not mappings:
             continue
@@ -1552,7 +1608,8 @@ def write_read_stage(output, captures, originals, *, inventory):
         selected |= flow_policy['branches'].keys()
         policy['branches'].update(flow_policy['branches'])
     all_ids = {row['id'] for row in inventory['native_coverage']['obligations']
-        if (row.get('route') or '').endswith('|function|' + CONTRIBUTION_URI)}
+        if (row.get('route') or '').endswith('|function|' + CONTRIBUTION_URI)
+        and (not cursor_scope or row['pointer'] in CONTRIBUTION_CURSOR_POINTERS)}
     if selected != all_ids:
         raise ValueError('Contribution batch has unproved exact branches: ' + repr(sorted(all_ids - selected)))
     if attachments:

@@ -11663,15 +11663,21 @@ def resolve_profiler_voice_path(
 ) -> tuple[int, tuple[int, ...]] | dict[str, Any]:
     """Resolve semantic voice/Bus identities to one live pipeline path."""
 
+    if isinstance(args.time, str):
+        choice = args.time
+        cursor = dispatch(dispatcher, PROFILER_GET_CURSOR_TIME_URI, connection=connection, version=detected_version,
+            args={"cursor": choice}, options={}, allow_destructive=True, result_limit_bytes=4096)
+        raw_cursor = cursor.get("result")
+        args.time = raw_cursor.get("return") if cursor.get("ok") and isinstance(raw_cursor, Mapping) else None
+        if type(args.time) is not int or args.time < 0:
+            raise GatewayResultShapeError("Profiler cursor did not return an available fixed capture position",
+                details={"api": PROFILER_GET_CURSOR_TIME_URI, "cursor": choice, "result": repr(raw_cursor)[:160]},
+                error_code="INVALID_STABLE_READ_RESULT")
     if args.profiler_pipeline_bindings:
         project, _project_call = current_project(dispatcher, connection=connection, version=detected_version)
         context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
             "project": {key: project.get(key) for key in ("id", "path", "filePath")},
             "live": {key: live_info.get(key) for key in ("version", "sessionId", "processId")}}
-        if isinstance(args.time, str):
-            cursor = dispatch(dispatcher, PROFILER_GET_CURSOR_TIME_URI, connection=connection, version=detected_version,
-                args={"cursor": args.time}, options={}, allow_destructive=True, result_limit_bytes=4096)
-            args.time = cursor.get("result", {}).get("return") if cursor.get("ok") else None
         if type(args.time) is not int or args.time < 0 or any(binding["context"] != context or binding["time"] != args.time
                 for binding in args.profiler_pipeline_bindings.values()):
             raise GatewayInputError("Profiler instance observation belongs to another capture position, project or host context; refresh the read")

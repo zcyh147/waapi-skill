@@ -1374,7 +1374,7 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.condition_mechanism_reuse import condition_mechanism_result
             return condition_mechanism_result(descriptor, branch, candidate, scope_kind, base, binding, root, reference_edges or {}, category=category)
         record = read_sealed_artifact(descriptor, base)
-        rtpc_normalized = None
+        normalized_construction = None
         if category == 'program':
             from wwise_waapi.runtime_inspection_business_contracts import PROFILER_GET_RTPS_URI
             # The source-owned exact read route determines capture eligibility;
@@ -1382,11 +1382,11 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             if ((branch.get('route') or '').endswith('|function|' + PROFILER_GET_RTPS_URI)
                     and not (binding or {}).get('runtime_observation_attachment')):
                 from tests.support.runtime_observation_evidence import validate_rtpc_program
-                rtpc_normalized = validate_rtpc_program(record, binding or {}, branch, root, reference_edges)
+                normalized_construction = validate_rtpc_program(record, binding or {}, branch, root, reference_edges)
             if ((branch.get('route') or '').endswith('|function|ak.wwise.core.profiler.getVoiceContributions')
                     and not (binding or {}).get('runtime_observation_attachment')):
                 from tests.support.runtime_observation_evidence import validate_contribution_program
-                validate_contribution_program(record, binding or {}, branch, root)
+                normalized_construction = validate_contribution_program(record, binding or {}, branch, root, reference_edges)
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
@@ -1452,17 +1452,17 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
         prefix = metadata_pointer if category == 'live_metadata' else binding.get('observation_pointer')
         boundary = branch.get('approved_boundary')
         if boundary is None and category != 'native_absence':
-            if rtpc_normalized is not None:
-                prefix = rtpc_normalized['observation_pointer']
+            if normalized_construction is not None:
+                prefix = normalized_construction['observation_pointer']
             elif native_section is not None and category == 'program':
                 program_binding = ({**binding, 'observation_pointer': binding['program_observation_pointer']}
                     if binding.get('runtime_observation_attachment') else binding)
                 prefix = exact_observation_pointer(branch, program_binding, dispatch_pointer, native_section, reference_edges or {})
             relevant = [c for c in checks if c['pointer'] == prefix]
-            if not relevant or not any('equals' in c if rtpc_normalized is not None else proves_alternative(c, branch) for c in relevant):
+            if not relevant or not any('equals' in c if normalized_construction is not None else proves_alternative(c, branch) for c in relevant):
                 raise ValueError('same exact observation must prove the declared native branch semantics')
             import re
-            if rtpc_normalized is None and branch['kind'] == 'schema' and re.search(r'/(oneOf|OneOf|anyOf|allOf)/[0-9]+$', branch['pointer']):
+            if normalized_construction is None and branch['kind'] == 'schema' and re.search(r'/(oneOf|OneOf|anyOf|allOf)/[0-9]+$', branch['pointer']):
                 validate_native_alternative(root, branch, pointer_value(record, prefix))
             if branch['kind'] == 'default' and not any(c['pointer'] == binding.get('default_omission_pointer') and c.get('absent') is True for c in checks):
                 raise ValueError('default needs exact omitted public input as well as observed default value')

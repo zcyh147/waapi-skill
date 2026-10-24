@@ -164,7 +164,7 @@ def retained_contribution(version):
     return originals, receipt, raw, rows
 
 
-def public_contribution_flow(root, version='2025.1', host='wwise-authoring'):
+def public_contribution_flow(root, version='2025.1', host='wwise-authoring', *, cursor=None):
     from tests.support.runtime_observation_evidence import program_source_context
     from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
     context = program_source_context(flow=URI)
@@ -179,6 +179,8 @@ def public_contribution_flow(root, version='2025.1', host='wwise-authoring'):
             result = {'return': deepcopy(rows[uri.rsplit('.', 1)[1]])}
         elif uri == URI:
             result = deepcopy(raw['result'])
+        elif uri == PREFIX + 'getCursorTime':
+            result = {'return': source_args['time']}
         else:
             result = original(uri, args, options)
             if uri == 'ak.wwise.core.getInfo':
@@ -202,7 +204,8 @@ def public_contribution_flow(root, version='2025.1', host='wwise-authoring'):
     position = str(source_args['time'])
     voice = run(['core-call', PREFIX + 'getVoices', '--profiler-position', position, '--max-results', '64'])
     busses = run(['core-call', PREFIX + 'getBusses', '--profiler-position', position, '--max-results', '64'])
-    argv = ['profiler-voice-contributions', '--capture-ms', position, '--voice-instance-handle',
+    capture = ['--capture-ms', position] if cursor is None else ['--capture', cursor]
+    argv = ['profiler-voice-contributions', *capture, '--voice-instance-handle',
         voice['payload']['agent_result']['return'][0]['voice_instance_handle']]
     argv += [value for row in busses['payload']['agent_result']['return'] for value in ('--bus-instance-handle', row['bus_instance_handle'])]
     receipt = run(argv)
@@ -311,6 +314,8 @@ def public_contribution_case(root, version, host, mode):
             result = {'return': [identity(index, guid) for index, guid in zip((1, (1 << 32) - 1), bus_guids)]}
         elif uri == URI:
             result = contribution_result(version, mode)
+        elif uri == PREFIX + 'getCursorTime':
+            result = {'return': 123}
         else:
             result = original(uri, args, options)
             if uri == 'ak.wwise.core.getInfo':
@@ -407,3 +412,127 @@ def test_contribution_program_emits_after_actual_teardown(tmp_path, request, ver
     register_exact_evidence_finalizer(request.node, lambda phases: write_program_receipt(
         destination, receipt, native, nodeid=request.node.nodeid, phase_reports=phases,
         source_context=context, native_reads=trace, public_calls=calls))
+
+
+@pytest.mark.parametrize('returned', (777, -1, True, 1.5), ids=('fixed-time', 'negative', 'boolean', 'noninteger'))
+def test_contribution_cursor_snapshots_once_before_selecting_voice_and_bus(tmp_path, returned):
+    from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
+    client = _RuntimeControlDraftClient(tmp_path, version='2025.1')
+    original, calls = client.call, []
+    bus = '{22222222-2222-2222-2222-222222222222}'
+    def call(uri, args=None, options=None):
+        calls.append((uri, deepcopy(args), deepcopy(options)))
+        if uri == PREFIX + 'getCursorTime':
+            # A moving cursor would advance on every resolution; only the first
+            # fixed T is allowed to own the selected identities and final data.
+            count = sum(row[0] == uri for row in calls)
+            return {'return': returned if count == 1 else 778}
+        if uri in (PREFIX + 'getVoices', PREFIX + 'getBusses'):
+            return {'return': [{'pipelineID': 42 if uri.endswith('getVoices') else 43,
+                'gameObjectID': 1, 'objectGUID': GUID if uri.endswith('getVoices') else bus,
+                'objectName': 'selected at T', 'gameObjectName': 'Game'}]}
+        if uri == URI:
+            return {'return': {'volume': -9.0 if args['time'] == 777 else -99.0,
+                'LPF': 0.0, 'HPF': 0.0, 'DSF': 0.0, 'objects': []}}
+        return original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'),
+        'profiler-voice-contributions', '--capture', 'latest', '--voice-object-id', GUID,
+        '--bus-object-id', bus], env=_env(tmp_path, version='2025.1'), client_factory=lambda _: client)
+    assert sum(row[0] == PREFIX + 'getCursorTime' for row in calls) == 1, payload
+    dependent = [row for row in calls if row[0] in {PREFIX + 'getVoices', PREFIX + 'getBusses', URI}]
+    if type(returned) is int and returned >= 0:
+        assert code == 0, payload
+        assert payload['agent_result']['volume'] == -9.0
+        assert [row[1]['time'] for row in dependent] == [777, 777, 777]
+    else:
+        assert code != 0, payload
+        assert not dependent
+
+
+def test_one_contribution_cursor_proves_fixed_time_construction_and_rejects_resealed_trace(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_bundle, write_json
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.maintenance import branch_audit_completion as completion
+    receipt, native, context, trace, calls = public_contribution_case(tmp_path / 'public', '2025.1', 'wwise-authoring', 'cursor-capture')
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, native, nodeid='contribution-cursor', source_context=context,
+        native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
+    index = write_read_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2025.1', host='wwise-authoring', mode='cursor-capture')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    assert len(selected) == 4
+    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
+    identity = next(key for key in document['bindings'] if key.endswith('/profilerCursor/enum/1'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    cursor = next(row for row in program['runtime_read_program']['native_reads'] if row['uri'].endswith('getCursorTime'))
+    cursor['result']['return'] += 1
+    binding['evidence']['program'].update(write_json(base / 'damaged-program.json', program))
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    changed = next(row for row in result['obligations'] if row['id'] == identity)
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert 'fixed cursor construction trace' in changed['evidence_results']['program']['reason']
+
+
+def test_contribution_malformed_cursor_root_has_bounded_public_error_context(tmp_path):
+    from tests.unit.test_runtime_business_gateway import gateway, _env, _RuntimeControlDraftClient
+    client = _RuntimeControlDraftClient(tmp_path, version='2025.1')
+    original, calls = client.call, []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        return None if uri == PREFIX + 'getCursorTime' else original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(['--state-dir', str(tmp_path / 'state'),
+        'profiler-voice-contributions', '--capture', 'latest', '--voice-object-id', GUID],
+        env=_env(tmp_path, version='2025.1'), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert payload['error_code'] == 'INVALID_STABLE_READ_RESULT'
+    assert payload['details']['api'] == PREFIX + 'getCursorTime'
+    assert payload['details']['cursor'] == 'capture'
+    assert payload['details']['result'] == 'None'
+    assert PREFIX + 'getVoices' not in calls and URI not in calls
+
+
+
+def test_contribution_cursor_preserves_issued_handle_context_and_fixed_numeric_projection(tmp_path):
+    receipt, native, _, trace, calls, _ = public_contribution_flow(tmp_path, cursor='latest')
+    final = trace[calls[-1]['native_start']:]
+    cursor, = [row for row in final if row['uri'] == PREFIX + 'getCursorTime']
+    dependent = [row for row in final if row['uri'] in {PREFIX + 'getVoices', PREFIX + 'getBusses', URI}]
+    assert cursor['args'] == {'cursor': 'capture'}
+    assert cursor['result'] == {'return': 30837}
+    assert [row['args']['time'] for row in dependent] == [30837, 30837, 30837]
+    assert all(row['ordinal'] > cursor['ordinal'] for row in dependent)
+    assert native['args'] == {'bussesPipelineID': [2], 'time': 30837, 'voicePipelineID': 1}
+    assert receipt['payload']['agent_result']['volume'] == -9.0
+
+
+def test_shared_contribution_cursor_batch_proves_exact_fifty_normalized_branches(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_read_stage, write_json
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.maintenance import branch_audit_completion as completion
+    captures = {}
+    for version in VERSIONS:
+        for host in ('wwise-console', 'wwise-authoring'):
+            for mode in ('cursor-capture', 'cursor-user'):
+                receipt, native, context, trace, calls = public_contribution_case(tmp_path / f'{version}-{host}-{mode}', version, host, mode)
+                path = tmp_path / f'{version}-{host}-{mode}.json'
+                write_program_receipt(path, receipt, native, nodeid=f'{version}-{host}-{mode}', source_context=context,
+                    native_reads=trace, public_calls=calls, phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'))
+                captures[version, host, mode] = path
+    index = write_read_stage(tmp_path / 'bundle', captures, {}, inventory=inventory)
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    write_json(tmp_path / 'cursor-final-consumer.json', selected)
+    assert len(selected) == 50
+    assert all(row['requirements'] == ['program'] and row['state'] == 'verified' for row in selected), json.dumps(selected)
