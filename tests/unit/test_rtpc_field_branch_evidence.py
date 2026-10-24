@@ -481,3 +481,152 @@ def test_rtpc_capture_contract_cannot_be_bypassed_by_removing_markers(tmp_path, 
     changed = evaluate()
     assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
     assert 'exact current public read capture' in changed['evidence_results']['program']['reason']
+
+
+def test_rtpc_numeric_position_cannot_be_resealed_as_another_native_time(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_bundle, write_json
+    receipt, dispatch, context = public_rtpc_read(tmp_path, '2021.1')
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, dispatch, nodeid='same-numeric-time',
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+    index = write_field_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2021.1', host='wwise-authoring', mode='construction')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    identity = next(key for key in document['bindings'] if key.endswith('/argsSchema/properties/time'))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def evaluate():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row for row in result['obligations'] if row['id'] == identity)
+    assert evaluate()['state'] == 'verified'
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    program['native_call']['args']['time'] = 23638
+    program['runtime_read_program']['native_call'] = deepcopy(program['native_call'])
+    for check in program['branch_assertions'][identity]['checks']:
+        if check['pointer'] == '/native_call/args/time':
+            check['equals'] = 23638
+    binding['evidence']['program'].update(write_json(base / 'program.json', program))
+    changed = evaluate()
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    assert 'numeric profiler position' in changed['evidence_results']['program']['reason']
+
+
+def test_one_optional_rtpc_shape_flow_proves_only_six_exact_branches(tmp_path, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_bundle
+    receipt, dispatch, context = public_rtpc_read(tmp_path, '2021.1', rows=[{}])
+    capture = tmp_path / 'capture.json'
+    write_program_receipt(capture, receipt, dispatch, nodeid='optional-empty-single',
+        phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+    index = write_field_bundle(tmp_path / 'bundle', capture, None, inventory=inventory,
+        version='2021.1', host='wwise-authoring', mode='single')
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    assert len(selected) == 6
+    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
+    assert all(row['requirements'] == ['program'] for row in selected)
+    assert sum(row['kind'] == 'optional_presence' for row in selected) == 4
+
+
+def rtpc_shape_rows(version, mode):
+    if mode == 'structure':
+        return None  # The existing legal two-row program fixture.
+    if mode == 'empty':
+        return []
+    if version in ('2021.1', '2022.1'):
+        return [{}]
+    return [{'id': RPM, 'name': '' if version == '2025.1' else 'RPM',
+        'gameObjectId': 18446744073709551615, 'value': 1000.0}]
+
+
+@pytest.fixture(scope='module')
+def shape_bundle(tmp_path_factory, inventory):
+    from tests.support.runtime_observation_evidence import write_program_receipt, write_field_stage
+    root = tmp_path_factory.mktemp('rtpc-shapes')
+    captures = {}
+    for version in BUILDS:
+        for host in ('wwise-console', 'wwise-authoring'):
+            for mode in ('structure', 'empty', 'single'):
+                path = root / f'{version}-{host}-{mode}'
+                receipt, dispatch, context = public_rtpc_read(path, version, host,
+                    rows=rtpc_shape_rows(version, mode))
+                capture = path / 'capture.json'
+                write_program_receipt(capture, receipt, dispatch, nodeid=f'{version}-{host}-{mode}',
+                    phase_reports=dict.fromkeys(('setup', 'call', 'teardown'), 'passed'), source_context=context)
+                captures[version, host, mode] = capture
+    return write_field_stage(root / 'bundle', captures, {}, inventory=inventory)
+
+
+def test_five_version_rtpc_shapes_prove_exact_132_program_only_branches(shape_bundle, inventory):
+    policy = json.loads((shape_bundle.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(shape_bundle, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    selected = [row for row in result['obligations'] if row['id'] in document['bindings']]
+    assert len(selected) == 132
+    assert {row['state'] for row in selected} == {'verified'}, json.dumps(selected)
+    assert all(row['requirements'] == ['program'] for row in selected)
+    assert sum(row['pointer'].startswith('/argsSchema') or row['pointer'].startswith('/optionsSchema')
+        for row in selected) == 40
+    assert sum(row['kind'] == 'schema' and row['pointer'].startswith('/resultSchema') for row in selected) == 50
+
+
+@pytest.mark.parametrize('version', BUILDS)
+@pytest.mark.parametrize('host', ('wwise-console', 'wwise-authoring'))
+@pytest.mark.parametrize('mode', ('empty', 'single'))
+def test_rtpc_shape_program_emits_after_actual_teardown(tmp_path, request, version, host, mode):
+    import os
+    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+    from tests.support.runtime_observation_evidence import write_program_receipt
+    receipt, dispatch, context = public_rtpc_read(tmp_path, version, host, rows=rtpc_shape_rows(version, mode))
+    destination = Path(os.environ.get('WAAPI_RTPC_FIELD_CAPTURE_DIR', tmp_path)) / f'{version}-{host}-{mode}.json'
+    register_exact_evidence_finalizer(request.node, lambda phases: write_program_receipt(
+        destination, receipt, dispatch, nodeid=request.node.nodeid, phase_reports=phases, source_context=context))
+
+
+@pytest.mark.parametrize('damage', ('native-extra-key', 'absent-row', 'null-row'))
+def test_rtpc_structural_credit_rejects_resealed_wrong_container(shape_bundle, inventory, tmp_path, damage):
+    import shutil
+    from tests.support.runtime_observation_evidence import write_json
+    base = tmp_path / 'bundle'
+    shutil.copytree(shape_bundle.parent, base)
+    policy = json.loads((base / 'requirements.json').read_bytes())
+    document, _, _ = audit.portable_binding_inputs(base / 'index.json', policy)
+    suffix = '/resultSchema/additionalProperties' if damage == 'native-extra-key' else '/items/properties/id/@presence/absent'
+    identity = next(key for key in document['bindings'] if key.startswith('2021.1|wwise-authoring|') and key.endswith(suffix))
+    binding = document['bindings'][identity]
+    document['bindings'] = {identity: binding}
+    def evaluate():
+        result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        return next(row for row in result['obligations'] if row['id'] == identity)
+    assert evaluate()['state'] == 'verified'
+    program = completion.read_sealed_artifact(binding['evidence']['program'], base)
+    if damage == 'native-extra-key':
+        assert 'complete' in program['gateway']['payload']['agent_result']  # Intentional public metadata.
+        program['native_call']['result']['invented'] = True
+        for check in program['branch_assertions'][identity]['checks']:
+            if check['pointer'] == '/native_call/result':
+                check['equals'] = deepcopy(program['native_call']['result'])
+    else:
+        rows = [] if damage == 'absent-row' else [None]
+        program['native_call']['result']['return'] = deepcopy(rows)
+        result = program['gateway']['payload']['agent_result']
+        result.update({'return': deepcopy(rows), 'returned_count': len(rows), 'total_count': len(rows)})
+        checks = program['branch_assertions'][identity]['checks']
+        parent = binding['gateway_observation_pointer'].rsplit('/', 1)[0]
+        program['branch_assertions'][identity]['checks'] = [check for check in checks if check['pointer'] != parent]
+        if damage == 'null-row':
+            program['branch_assertions'][identity]['checks'].append({'pointer': parent, 'equals': None})
+    program['runtime_read_program']['native_call'] = deepcopy(program['native_call'])
+    program['runtime_read_program']['gateway'] = deepcopy(program['gateway'])
+    binding['evidence']['program'].update(write_json(base / 'forged-program.json', program))
+    changed = evaluate()
+    assert changed['evidence_results']['program']['outcome'] == 'missing', json.dumps(changed)
+    reason = changed['evidence_results']['program']['reason']
+    assert ('native object structure predicate' in reason if damage == 'native-extra-key' else
+        'existing native/public row' in reason or 'index out of range' in reason)
