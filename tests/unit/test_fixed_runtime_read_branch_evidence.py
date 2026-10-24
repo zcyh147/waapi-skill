@@ -518,6 +518,8 @@ FIXED_ORIGINAL_CASES = [
 ]
 FIXED_PROGRAM_CASES += [('2025.1', 'wwise-authoring', name, 'original-' + category) for name, category in FIXED_ORIGINAL_CASES]
 FIXED_PROGRAM_CASES.append(('2025.1','wwise-console','getVoices','r118-original'))
+FIXED_PROGRAM_CASES += [(version,'wwise-console','getVoices','r119-original')
+    for version in ('2021.1','2022.1','2023.1','2024.1')]
 
 
 @pytest.mark.parametrize('version,host,name,mode', FIXED_PROGRAM_CASES,
@@ -525,7 +527,13 @@ FIXED_PROGRAM_CASES.append(('2025.1','wwise-console','getVoices','r118-original'
 def test_fixed_reader_program_emits_after_actual_teardown(tmp_path, request, version, host, name, mode):
     import os
     from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
-    if mode == 'r118-original':
+    if mode == 'r119-original':
+        _, raw = r119_original_read(version)
+        from tests.support.fixed_runtime_read_evidence import R119_PROFILES
+        calls = []
+        receipt, native, context, trace = public_fixed_read(tmp_path, version=version, host='wwise-console',
+            rows=raw['result']['return'], position=str(R119_PROFILES[version]['time']), public_calls=calls)
+    elif mode == 'r118-original':
         _, raw = r118_original_read()
         calls = []
         receipt, native, context, trace = public_fixed_read(tmp_path, host='wwise-console',
@@ -664,3 +672,68 @@ def test_r118_native_and_program_selectors_join_without_r103_rebinding(tmp_path,
     observed = [r for r in result['obligations'] if r['id'] in selected]
     assert {r['id'] for r in observed} == selected
     assert {r['state'] for r in observed} == {'verified'}, json.dumps(observed)
+
+
+def r119_original_read(version):
+    import gzip
+    year = version.split('.')[0]
+    name = f'r119-{year}-originals.json.gz'
+    read = archive_reader({'artifact': name, 'sha256': sha((FIXTURE / name).read_bytes())}, FIXTURE)
+    files = json.loads(gzip.decompress((FIXTURE / name).read_bytes()))['files']
+    report_path, = [name for name in files if name.endswith('/state/console-profiler-probe.json')]
+    report = json.loads(read(report_path))
+    receipt, = [r for r in report['calls'] if r['argv'][:2] == ['core-call', URI]]
+    raw = json.loads(read(receipt['payload']['call']['evidence_path']))
+    return receipt, raw
+
+
+@pytest.mark.parametrize('version,position', (('2021.1',5077), ('2022.1',5280), ('2023.1',6005), ('2024.1',5781)))
+def test_r119_console_diagnostics_originals_reach_portable_final_consumer(tmp_path, inventory, version, position):
+    from tests.support.fixed_runtime_read_evidence import write_fixed_stage, mappings
+    original, raw = r119_original_read(version)
+    assert len(raw['result']['return']) == 1 and len(raw['result']['return'][0]) == 20
+    receipt, native, context, trace = public_fixed_read(tmp_path / 'public', version=version,
+        host='wwise-console', rows=raw['result']['return'], position=str(position))
+    assert audit.digest(native['result']) == audit.digest(raw['result'])
+    assert receipt['payload']['agent_result']['return'][0]['pipelineID'] == 1
+    path = tmp_path / 'capture.json'
+    write_program_receipt(path, receipt, native, nodeid='fixed-r119-' + version,
+        phase_reports=dict.fromkeys(('setup','call','teardown'), 'passed'), source_context=context,
+        native_reads=trace, public_calls=[{'gateway':receipt,'native_start':0,'native_end':len(trace)}])
+    route = next(r for r in inventory['native_coverage']['routes']
+        if r['version'] == version and r['host'] == 'wwise-console' and r['uri'] == URI)
+    selected = {m['branch']['id'] for m in mappings(inventory, json.loads(path.read_bytes()), route)
+        if m['categories'] == ['program','native']}
+    selected.add(route['id'] + '|/argsSchema')
+    index = write_fixed_stage(tmp_path / 'bundle', [path], inventory=inventory, selected_ids=selected,
+        r119_captures={version:path}, r119_originals=FIXTURE)
+    policy = json.loads((index.parent / 'requirements.json').read_bytes())
+    document, base, _ = audit.portable_binding_inputs(index, policy)
+    result = completion.evaluate_coverage(audit.ROOT, inventory, document,
+        digest=audit.digest, evidence_base=base, requirements_document=policy)
+    observed = [r for r in result['obligations'] if r['id'] in selected]
+    write_json(tmp_path / 'r119-native-selected.json', {'ids':sorted(selected),'count':len(selected),
+        'observed':observed})
+    assert {r['id'] for r in observed} == selected
+    assert {r['state'] for r in observed} == {'verified'}, json.dumps(observed)
+    if version == '2021.1':
+        # A valid foreign original shares candidate301a and all packaged hashes;
+        # refreshing descriptor seals must not allow its version to replace2021.
+        identity = next(i for i in selected if i.endswith('/properties/objectGUID'))
+        binding = document['bindings'][identity]
+        proof = completion.read_sealed_artifact(binding['runtime_observation_attachment'], base)
+        foreign_path = base / 'foreign-category.json'
+        foreign_path.write_bytes((FIXTURE / 'r119-2022-category.json').read_bytes())
+        foreign = {**proof['native_run'], 'artifact':foreign_path.name, 'sha256':sha(foreign_path.read_bytes())}
+        assert completion.read_category_run(foreign,base)['version'] == '2022.1'
+        native_record = completion.read_sealed_artifact(binding['evidence']['native'],base)
+        native_record['native_runs'] = [foreign]
+        proof['native_run'] = foreign
+        binding['evidence']['native'].update(write_json(base / 'foreign-native.json',native_record))
+        binding['runtime_observation_attachment'] = write_json(base / 'foreign-proof.json',proof)
+        damaged = completion.evaluate_coverage(audit.ROOT, inventory, document,
+            digest=audit.digest, evidence_base=base, requirements_document=policy)
+        row = next(r for r in damaged['obligations'] if r['id'] == identity)
+        write_json(tmp_path / 'r119-foreign-profile-result.json',row)
+        assert row['evidence_results']['native']['outcome'] == 'missing', json.dumps(row)
+        assert 'original strict-PASS observation/request/replay differs' in row['evidence_results']['native']['reason']
