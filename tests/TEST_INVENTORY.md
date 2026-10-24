@@ -604,7 +604,7 @@ is `.waapi-skill-state/full-coverage/r121-console-log-peer-native-2023-r1/`
 with `root-review.json`, category evidence and the partial/final receipt.
 No 2024/2025 retry, new diagnostic or native repeat followed this attempt.
 
-Candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` then launched owned
+Separately, candidate `664121e48fdf0bc788720f532413a6bfc641ab8d` launched owned
 Authoring 2021.1.14.8108 with the documented `-AutomationMode` argument and
 reached WAAPI readiness in 28.79s. The transport node failed in 32.85s before
 any transport case or transaction: the Gateway rejected the successful native
