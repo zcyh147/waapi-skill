@@ -83,6 +83,14 @@ def program_source_context(root=audit.ROOT, *, flow=None):
             'tests/support/runtime_remaining_evidence.py', 'tests/support/fixed_runtime_read_evidence.py',
             'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
             'tests/unit/test_runtime_log_branch_evidence.py'))
+    if flow == 'ak.wwise.core.profiler.getMeters':
+        dependencies.extend(('tests/support/meter_runtime_read_evidence.py',
+            'tests/unit/test_meter_runtime_read_evidence.py',
+            'tests/fixtures/runtime-meter/support-review.json',
+            'tests/support/extra_runtime_read_evidence.py', 'tests/support/runtime_remaining_evidence.py',
+            'tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_runtime_log_branch_evidence.py',
+            'tests/unit/test_profiler_meter_objects_gateway.py',
+            'tests/fixtures/runtime/runtime-remaining-policy-r127.json'))
     if flow == 'ak.wwise.core.profiler.getLoadedMedia':
         dependencies.extend(('tests/support/loaded_media_runtime_evidence.py',
             'tests/unit/test_loaded_media_runtime_evidence.py', 'tests/support/fixed_runtime_read_evidence.py',
