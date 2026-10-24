@@ -7,7 +7,7 @@ from tests.support.source_copy_branch_evidence import dependency_review
 
 
 SUCCESSOR_REVIEW_PATH = 'tests/fixtures/source-copy/branch-successor-review-r123.json'
-SUCCESSOR_REVIEW_SHA256 = 'e32b9f28d3e92bdc33af871300fb4870a842278c095bce1bd6aa21492bf599d2'
+SUCCESSOR_REVIEW_SHA256 = '4f2ccb1aad3e3826b0db88e484919dce06b909d6136a5a3794dc8fc469c2f714'
 
 
 def successor_dependency_review():

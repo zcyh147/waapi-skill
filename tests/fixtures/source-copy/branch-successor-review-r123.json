@@ -857,7 +857,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/business_declaration_state.py",
-      "retained_review_or_witness": "R59 owned inputs; R64 Playlist; R74 structural; R84\u2013R90 finite Inner reviews",
+      "retained_review_or_witness": "R59 owned inputs; R64 Playlist; R74 structural; R84–R90 finite Inner reviews",
       "source_relevance": "Session fields/target normalization gain RTPC owned inputs, structural property targets and constructor/list identity checks. Ordinary named Source + empty destination declaration is retained; exercise it through actual current Gateway."
     },
     {
@@ -1013,7 +1013,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/compound_undo_business_contracts.py",
-      "retained_review_or_witness": "R77\u2013R83 compound review/handoffs",
+      "retained_review_or_witness": "R77–R83 compound review/handoffs",
       "source_relevance": "Compound child disclosure changes; Source four transactions are separately previewed, not undoGroup."
     },
     {
@@ -1237,7 +1237,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/object_graph_business.py",
-      "retained_review_or_witness": "R64 Playlist; R84\u2013R90 finite constructor/references",
+      "retained_review_or_witness": "R64 Playlist; R84–R90 finite constructor/references",
       "source_relevance": "_compile_existing_set_fields extends protected constructor/field processing; original Source workflow does not object.set an existing retained Inner. Destination creation still gets current program flow."
     },
     {
@@ -1279,7 +1279,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/object_graph_paths.py",
-      "retained_review_or_witness": "R77\u2013R83 exact-name staged creation/history reviews",
+      "retained_review_or_witness": "R77–R83 exact-name staged creation/history reviews",
       "source_relevance": "Compound result/path context gains staged actual GUID/name graphs; no compound child or result-path reference in the selected Source copy."
     },
     {
@@ -1717,7 +1717,7 @@
         }
       ],
       "path": "skills/waapi-skill/wwise_waapi/planned_references.py",
-      "retained_review_or_witness": "R77\u2013R83 staged native-name reviews",
+      "retained_review_or_witness": "R77–R83 staged native-name reviews",
       "source_relevance": "apply_result_name_choices/graph_result_bindings/prepare_result_context change owned actual-name graph staging. No declared planned reference in selected simple Source copy/destination."
     },
     {
