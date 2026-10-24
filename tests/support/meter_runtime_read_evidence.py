@@ -165,10 +165,10 @@ def _capture(captured_json,root):
                 or out['instantaneous_native_resource_authority']is not False or out['observation']!='retained_profiler_capture_snapshot'
                 or out['page']!={'offset_from_end':offset,'next_offset_from_end':end,'order':'newest_range_first_native_order_within_range'}
                 or out['truncated']is not (i<len(calls)-1)or out['expires_at']!=p['agent_result']['expires_at']
-                or out.get('meter_object_projection')!=projected.get('meter_object_projection')):
+                or audit.digest(out.get('meter_object_projection'))!=audit.digest(projected.get('meter_object_projection'))):
             raise ValueError('Exact complete meter public pages/proof/spans/order differ')
         offset=end;previous=out
-    if fragment or rows!=projected['meters']:raise ValueError('Whole selected native meter array must survive public projection/pages/fragments')
+    if fragment or audit.digest(rows)!=audit.digest(projected['meters']):raise ValueError('Whole selected native meter array must survive public projection/pages/fragments')
     return context
 
 
@@ -234,7 +234,7 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
     normalized=_normalized_single(branch,c,root)
     if branch['id']in d['normalized_input_choices']:
         completion.exact_observation_pointer(branch,binding,'/native_call','options',edges or {})
-        if normalized is None or binding.get('normalized_input_choice')!=normalized or pointer!='/native_call/options/return':
+        if normalized is None or audit.digest(binding.get('normalized_input_choice'))!=audit.digest(normalized) or pointer!='/native_call/options/return':
             raise ValueError('Exact disclosed one-output identity normalization required; no literal native-single claim')
         return {'observation_pointer':pointer}
     if binding.get('normalized_input_choice')is not None:raise ValueError('Unlisted meter branch cannot borrow normalization')

@@ -61,6 +61,13 @@ def test_meter_first_vertical_cardinality_absence_teardown_and_native_gate(reque
         result=completion.evaluate_coverage(audit.ROOT,inventory,document,digest=audit.digest,evidence_base=base,requirements_document=policies)
         runtime.write_json(tmp_path/'consumer-result.json',result)
         assert {r['state']for r in result['obligations']}=={'verified'},[(r['pointer'],r['reasons'],r['evidence_results'])for r in result['obligations']if r['state']!='verified']
+        from tests.support.meter_runtime_read_evidence import _capture
+        corrupted=json.loads(paths[0].read_bytes())
+        assert corrupted['native_call']['result']['meters'][0]['configurationMask']==0
+        corrupted['gateway']['payload']['agent_result']['meters'][0]['configurationMask']=False
+        corrupted['public_calls'][0]['gateway']['payload']['agent_result']['meters'][0]['configurationMask']=False
+        with pytest.raises(ValueError,match='Whole selected native meter array'):
+            _capture(json.dumps(corrupted),audit.ROOT)
         missing=deepcopy(document);missing['bindings'][route+'|/resultSchema']['evidence'].pop('native')
         blocked=completion.evaluate_coverage(audit.ROOT,inventory,missing,digest=audit.digest,evidence_base=base,requirements_document=policies)
         assert all(r['state']!='verified'for r in blocked['obligations'])
