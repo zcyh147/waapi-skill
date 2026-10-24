@@ -137,3 +137,21 @@ Previous PR #173 remains a completed known-repair delivery. This specification r
 Execution follows the [shared test-selection and evidence-reuse rules](https://github.com/zcyh147/waapi-skill/blob/codex/full-waapi-coverage/tests/semantic/TEST_ACCEPTANCE.md). Scope and existing dependencies remain unchanged.
 
 Retain all 21 tickets, native dependency edges and the full 2021.1–2025.1 scope. Organize affected tests by shared implementation, with independent case outcomes and isolated state. Preserve valid historical evidence and distinguish business failures from report/evidence-tool failures. Required full gates run on settled integration batches; Fresh remains separately budgeted. Material increases in verification depth or cost require the user's decision before implementation. No unresolved omission is removed from this parent by these scheduling changes.
+
+## User-approved evidence method — 2026-10-24
+
+The user selected risk-based native validation. All in-scope APIs, parameters,
+branches and five-version public program coverage remain required. Real Wwise
+validation must establish relevant nonempty data, business meaning, version/host
+differences, source preservation and cleanup. It need not manufacture every
+boolean value or repeated collection shape on every lane merely to demonstrate
+deterministic result preservation already covered by public program tests.
+
+Apply this decision through an exact, independently reviewed requirement mapping.
+Keep every branch identity and owner visible, explain each changed evidence
+requirement, and retain the native availability and semantic obligations that
+support program-only preservation claims. Missing wrappers, unobserved business
+effects, unexplained native differences and incomplete cleanup remain unfinished.
+Do not rewrite historical requirements, results or failures; record the successor
+policy and its current evaluation separately. This decision authorizes no Fresh
+attempt, native absence claim or capability exclusion.
