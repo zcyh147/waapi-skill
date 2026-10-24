@@ -595,8 +595,8 @@ def runtime_inspection_business_versions(operation: str) -> tuple[str, ...]:
 
 
 def runtime_transport_requires_authoring(operation: str, version: str) -> bool:
-    """Require Authoring for transport outside the packaged 2025.1 Console scope."""
-    return operation.startswith("ak.wwise.core.transport.") and version != "2025.1"
+    """Keep transport admission within each registered version contract."""
+    return operation.startswith("ak.wwise.core.transport.") and version not in _CONTRACTS.get(operation, {}).get("versions", ())
 
 
 def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
@@ -620,7 +620,7 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
             "api": operation,
             "intent": intent(operation),
             "supported_versions": list(runtime_inspection_business_versions(operation)),
-            **({"console_versions": ["2025.1"]}
+            **({"console_versions": list(runtime_inspection_business_versions(operation))}
                 if operation.startswith("ak.wwise.core.transport.") else {}),
             "host_requirement": (
                 "wwise-authoring"

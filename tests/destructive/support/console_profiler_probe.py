@@ -1,4 +1,4 @@
-"""One owned 2025 Console playback/data experiment, never a host-capability claim."""
+"""One owned version-pinned Console playback/data observation."""
 from __future__ import annotations
 
 import hashlib
@@ -18,11 +18,13 @@ NODE_NAME = 'test_console_owned_2025_transport_profiler_probe'
 NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + NODE_NAME
 DIAGNOSTIC_NAME = 'test_console_owned_2025_transport_profiler_diagnostic'
 DIAGNOSTIC_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + DIAGNOSTIC_NAME
+OLDER_NAME = 'test_console_owned_older_transport_profiler_diagnostic'
+OLDER_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + OLDER_NAME
 PREFIX = 'ak.wwise.core.'
 
 
 def collect_console_profiler(runtime, *, diagnostic=False):
-    assert runtime.version == '2025.1', 'Console playback probe is pinned to2025.1'
+    assert runtime.version in BUILDS and (diagnostic or runtime.version == '2025.1'), 'Select one pinned Console lane'
     report_path = runtime.state_dir / 'console-profiler-probe.json'
     report_path.parent.mkdir(parents=True, exist_ok=True)
     category = {'category': 'console-transport-profiler-probe', 'status': 'blocked',
@@ -142,7 +144,7 @@ def collect_console_profiler(runtime, *, diagnostic=False):
             'silence_meaning': 'inconclusive; no host absence inferred', 'cleanup': 'unknown',
             'capture_before': before, 'limits': {'events': 8, 'total_seconds': 10,
                 'idle_seconds': 2, 'records': 10, 'record_bytes': 1024 * 1024},
-            'native_schema_sha256': canonical_sha256(load_native_catalog('2025.1', 'wwise-console')['schemas'][topic])}
+            'native_schema_sha256': canonical_sha256(load_native_catalog(runtime.version, 'wwise-console')['schemas'][topic])}
         report['play_diagnostic'] = observation
         verified = None
         endpoint = {'host': runtime.lifecycle.host, 'port': runtime.lifecycle.port, 'url': runtime.lifecycle.waapi_url}
@@ -157,7 +159,7 @@ def collect_console_profiler(runtime, *, diagnostic=False):
                 assert (record.get('contract') == 'waapi-skill.topic-stream/v1'
                     and record.get('topic') == topic and record.get('topic_contract_digest') == digest
                     and record.get('status') == 'streaming' and record.get('ok') is True
-                    and record.get('endpoint') == endpoint and record.get('detected_version') == '2025.1'
+                    and record.get('endpoint') == endpoint and record.get('detected_version') == runtime.version
                     and record.get('is_command_line') is True and record.get('event_count_limit') == 8), record
                 observation['started_before_execute'] = True
                 observation['effect_started_monotonic_ns'] = time.monotonic_ns()
@@ -199,13 +201,22 @@ def collect_console_profiler(runtime, *, diagnostic=False):
 
     query_fields = ['--include', 'parent', '--include', 'active-source', '--include', 'output-bus',
         '--include-field', 'IsLoopingEnabled', '--include-field', 'IsLoopingInfinite']
+    if runtime.version == '2021.1':
+        query_fields += ['--platform', 'Mac', '--language', 'SFX']
     persist()
     try:
         status = call(['status'])
         report['host'] = info = status['wwise']
         assert info.get('isCommandLine') is True
-        assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == BUILDS['2025.1']
-        assert Path(localize_waapi_host_path(status['project']['path'])).resolve() == runtime.sandbox.sandbox_project.resolve()
+        assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == BUILDS[runtime.version]
+        project = status['project']
+        if runtime.version == '2021.1':
+            observed = exact(project['id'], '--include', 'file-path')
+            assert all(observed[key] == project[key] for key in ('id', 'name', 'type', 'path'))
+            project_path = observed['file_path']
+        else:
+            project_path = project['path']
+        assert Path(localize_waapi_host_path(project_path)).resolve() == runtime.sandbox.sandbox_project.resolve()
         media = runtime.sandbox.sandbox_path / CAPTURE_CAR_MEDIA
         proof = capture_file_proof(media, field='owned existing Car original', io_root=runtime.sandbox.sandbox_path,
             max_bytes=16 * 1024 * 1024)
@@ -225,8 +236,14 @@ def collect_console_profiler(runtime, *, diagnostic=False):
         bus = exact(sound['output_bus']['id'])
         assert bus['type'] == 'Bus'
         report['fixture_before'] = {'sound': sound, 'source': source, 'bus': bus}
-        report['setup']['originals'] = effect('transport.useOriginals', ['--audition-media', 'originals'])
-        report['setup']['prepare'] = effect('transport.prepare', identity=CAPTURE_CAR_ID)
+        report['media_resolution'] = {
+            'originals_selection_available': runtime.version in ('2023.1', '2024.1', '2025.1'),
+            'prepare_available': runtime.version != '2021.1',
+            'boundary': 'Original file proof and preparation acknowledgment do not prove native media readiness; no conversion/cache workaround'}
+        if runtime.version in ('2023.1', '2024.1', '2025.1'):
+            report['setup']['originals'] = effect('transport.useOriginals', ['--audition-media', 'originals'])
+        if runtime.version != '2021.1':
+            report['setup']['prepare'] = effect('transport.prepare', identity=CAPTURE_CAR_ID)
         report['setup']['enable'] = effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'enable'],
             before_execute=lambda: own('disable-voices', lambda: effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'disable'])))
         report['setup']['capture'] = effect('profiler.startCapture', zero=True,
@@ -259,7 +276,7 @@ def collect_console_profiler(runtime, *, diagnostic=False):
         report['capture_position'] = position
         assert position['available'] is True and type(position['position_ms']) is int and position['position_ms'] >= 0
         result = call(['core-call', PREFIX + 'profiler.getVoices', '--profiler-position', str(position['position_ms']),
-            '--result-view', 'identity', '--max-results', '64'])['agent_result']
+            '--result-view', ('identity' if runtime.version == '2025.1' else 'diagnostics'), '--max-results', '64'])['agent_result']
         evidence = {'agent_result': result, 'nonempty': bool(result['return']), 'complete': result.get('complete'),
             'position_ms': position['position_ms'], 'owned_voice_observed': False}
         report['outcomes']['voices'] = {'outcome': 'BLOCKED', 'evidence': evidence}

@@ -279,7 +279,7 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
         TRANSPORT_GET_STATE_URI,
     ),
 )
-def test_remote_and_transport_contracts_disclose_authoring_host_requirement(
+def test_runtime_contracts_disclose_operation_host_requirement(
     tmp_path: Path,
     operation: str,
 ) -> None:
@@ -290,7 +290,8 @@ def test_remote_and_transport_contracts_disclose_authoring_host_requirement(
     )
 
     assert code == 0, payload
-    assert payload["business_adapter"]["host_requirement"] == "wwise-authoring"
+    assert payload["business_adapter"]["host_requirement"] == (
+        "wwise-authoring" if operation.startswith("ak.wwise.core.remote.") else "wwise-console-or-authoring")
 
 
 class FakeClient:
@@ -1502,46 +1503,22 @@ def test_transport_state_rejects_invented_native_id_before_connection(
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1"])
-def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
-    tmp_path: Path, version: str,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": [
-                {
-                    "displayName": "WwiseConsole",
-                    "isCommandLine": True,
-                    "apiVersion": 1,
-                    "platform": "macosx",
-                    "configuration": "release",
-                    "version": {
-                        "year": int(version[:4]),
-                        "major": 1,
-                        "minor": 0,
-                        "build": 1,
-                        "displayName": f"v{version}.0.1",
-                    },
-                }
-            ],
-        }
-    )
-
-    code, payload = gateway.execute_gateway(
-        [
-
-            "core-call",
-            TRANSPORT_GET_STATE_URI,
-            "--transport-handle",
-            "trh1-" + "61" * 16,
-        ],
-        env=set_gateway_config(_env(tmp_path), wwise_version=version),
-        client_factory=lambda _url: client,
-    )
-
-    assert code == 2
-    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
-    assert payload["executed"] is False
-    assert client.calls == [("ak.wwise.core.getInfo", None, None)]
+def test_console_transport_state_rejects_unknown_handle_before_native_state(tmp_path, version):
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            result.update(isCommandLine=True, displayName="WwiseConsole")
+        return result
+    client.call = call
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"),
+        "core-call", TRANSPORT_GET_STATE_URI, "--transport-handle", "trh1-" + "61" * 16],
+        env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 2 and payload["error_code"] == "TRANSPORT_HANDLE_UNKNOWN", payload
+    assert TRANSPORT_GET_STATE_URI not in calls
 
 
 def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_call(
@@ -1886,9 +1863,9 @@ def test_remote_disconnect_public_preview_preserves_connection_identity(tmp_path
 
 @pytest.mark.parametrize(
     "operation",
-    ("ak.wwise.core.remote.connect", "ak.wwise.core.transport.destroy"),
+    ("ak.wwise.core.remote.connect",),
 )
-def test_remote_and_transport_control_return_authoring_boundary_before_project_read(
+def test_remote_control_returns_authoring_boundary_before_project_read(
     tmp_path: Path,
     operation: str,
 ) -> None:
