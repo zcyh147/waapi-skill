@@ -1133,6 +1133,14 @@ def workflow_sandbox_runtime(
             custom_fixture_io = case_sandbox_root / 'namespaced-query-prelaunch-io'
             custom_fixture_io.mkdir(exist_ok=False)
             namespaced_query_prelaunch = prepare_namespaced_query_fixture(sandbox, owned_root=case_sandbox_root, io_root=custom_fixture_io)
+        from tests.destructive.support.console_profiler_probe import NODEID as console_probe_node, DIAGNOSTIC_NODEID
+        selected_console = [item.nodeid for item in request.session.items
+            if Path(item.path).resolve() == Path(__file__).resolve()]
+        if any(node in selected_console for node in (console_probe_node, DIAGNOSTIC_NODEID)):
+            assert len(selected_console) == 1 and version == '2025.1', 'Console probe requires one exact2025 node'
+            from tests.destructive.support.profiler_capture import stage_owned_capture_read_media
+            state_dir.mkdir(parents=True, exist_ok=True)
+            stage_owned_capture_read_media(sandbox, state_dir, version=version)
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
         assert sandbox.metadata.selected_port == lifecycle.port
@@ -11437,3 +11445,19 @@ def test_blend_assignment_negative_index_order_preservation(workflow_sandbox_run
                 category.update(fallback)
             if original_error is None:
                 raise
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_2025_transport_profiler_probe(workflow_sandbox_runtime):
+    """Candidate-only Console playback/data; no support inferred from reflection."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_console_owned_2025_transport_profiler_diagnostic(workflow_sandbox_runtime):
+    """One capture-log observer; silence cannot establish Console absence."""
+    from tests.destructive.support.console_profiler_probe import collect_console_profiler
+    collect_console_profiler(workflow_sandbox_runtime, diagnostic=True)

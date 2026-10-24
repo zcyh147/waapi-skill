@@ -594,6 +594,11 @@ def runtime_inspection_business_versions(operation: str) -> tuple[str, ...]:
         raise ValueError("unsupported runtime-inspection business operation") from exc
 
 
+def runtime_transport_requires_authoring(operation: str, version: str) -> bool:
+    """Require Authoring for transport outside the packaged 2025.1 Console scope."""
+    return operation.startswith("ak.wwise.core.transport.") and version != "2025.1"
+
+
 def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
     def intent(operation: str) -> str:
         if operation == LOG_GET_URI:
@@ -605,7 +610,7 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
         if operation.startswith("ak.wwise.core.remote."):
             return "connect Authoring to one exact remote runtime or Profiler capture"
         if operation.startswith("ak.wwise.core.transport."):
-            return "create, inspect, or control an Authoring audition transport"
+            return "create, inspect, or control a versioned audition transport"
         if operation in _CONTROL_OPERATIONS:
             return "configure or control one named Profiler capture, cursor, meter, or file outcome"
         return "read bounded Profiler state from a named time position and result view"
@@ -615,10 +620,11 @@ def runtime_inspection_business_catalog_rows() -> tuple[dict[str, Any], ...]:
             "api": operation,
             "intent": intent(operation),
             "supported_versions": list(runtime_inspection_business_versions(operation)),
+            **({"console_versions": ["2025.1"]}
+                if operation.startswith("ak.wwise.core.transport.") else {}),
             "host_requirement": (
                 "wwise-authoring"
                 if operation.startswith("ak.wwise.core.remote.")
-                or operation.startswith("ak.wwise.core.transport.")
                 else "wwise-console-or-authoring"
             ),
         }
@@ -753,7 +759,7 @@ def runtime_inspection_business_contract_data(
         "host_requirement": (
             "wwise-authoring"
             if operation.startswith("ak.wwise.core.remote.")
-            or operation.startswith("ak.wwise.core.transport.")
+            or runtime_transport_requires_authoring(operation, version)
             else "wwise-console-or-authoring"
         ),
         "start": start,

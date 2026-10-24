@@ -446,6 +446,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_profiler_capture_artifact_gateway.py",
         "tests/unit/test_profiler_capture_native_fixture.py",
         "tests/unit/test_profiler_input_native_fixture.py",
+        "tests/unit/test_console_profiler_transport.py",
         "tests/unit/test_query_blend_tracks.py",
         "tests/unit/test_query_field_conditions.py",
         "tests/unit/test_query_legacy_control_input.py",
