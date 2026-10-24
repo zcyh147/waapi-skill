@@ -181,6 +181,8 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/unit/test_runtime_cursor_branch_evidence.py',
                  'tests/fixtures/runtime-cursor/support-review.json',
                  'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
+                 'tests/support/meter_runtime_read_evidence.py', 'tests/unit/test_meter_runtime_read_evidence.py',
+                 'tests/fixtures/runtime-meter/support-review.json',
                  'tests/support/extra_runtime_read_evidence.py', 'tests/unit/test_extra_runtime_read_evidence.py',
                  'tests/fixtures/runtime-extra-reads/support-review.json',
                  'tests/support/runtime_remaining_evidence.py', 'tests/support/runtime_log_retained_evidence.py',

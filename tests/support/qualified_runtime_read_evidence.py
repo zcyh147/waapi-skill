@@ -462,6 +462,9 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
     if assessment.get('contract') == 'waapi-skill.retained-cursor-assessment/v1':
         from tests.support.runtime_cursor_evidence import qualified_result
         return qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges)
+    if assessment.get('contract') == 'waapi-skill.meter-runtime-read-assessment/v1':
+        from tests.support.meter_runtime_read_evidence import qualified_result
+        return qualified_result(descriptor, assessment, branch, candidate, scope_kind, base, binding, root, edges)
     if assessment.get('contract') == 'waapi-skill.extra-runtime-read-assessment/v1':
         from tests.support.extra_runtime_read_evidence import qualified_result
         return qualified_result(descriptor, assessment, branch, candidate, scope_kind, base, binding, root, edges)
