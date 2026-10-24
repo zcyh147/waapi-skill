@@ -83,6 +83,44 @@ This authorizes the narrow implementation and its independent review, not curren
 coverage credit. It avoids repeating native work solely to package the already
 observed 2025.1 business fact.
 
+### Older Authoring LoadedMedia composite support — R126 implementation decision
+
+Main authorizes a separately reviewed, exact2023.1.19.8928 and2024.1.13.9056
+Authoring mapping under SPEC's equivalence rule. This adds neither a generic
+cross-version permission nor a claim of nonempty native execution on those
+older builds. Admission must combine three independently attributed facts:
+
+- R104's complete successful empty LoadedMedia calls establish exact older
+  build/session API availability. Their incomplete parent workflows and
+  BLOCKED lifecycle verdicts remain unchanged.
+- R124's actual2025.1.11.9262 nonempty observation establishes the common
+  documented prepared-media meaning. Its original source, reflection,
+  producer, full result and cleanup remain attributed to9262.
+- Current public replay on each target version proves its request construction,
+  resolved result validation and complete field preservation, including cursor
+  selection, empty and nonempty arrays, bounds and relevant rejection cases.
+
+Matching catalogs and installed SDK documentation define the same time input,
+empty options and five result fields. Resolved structures agree; reference-file
+layout and descriptive punctuation differences must be recorded explicitly.
+The shared compiler has no LoadedMedia-specific version branch and its
+normalizer has no version argument. The three-/four-field reflection envelope
+difference affects collection provenance, not this business request/result.
+
+The implementation must pin exact target IDs/shapes, original older availability
+receipts, the positive9262 anchor, reviewed schema/meaning/source differences and
+current replay. Missing components, source drift, another URI/host or an unlisted
+branch must fail closed. Reuse existing full R104 archives where their closure
+is sufficient. The existing2025 support remains separately attributable.
+
+An older SDK installation or nonempty producer is warranted if a concrete
+semantic difference or contradictory trace defeats this reviewed reuse. Current
+evidence identifies none. Per-codec SDK behavior, older-engine nonempty output,
+acoustic effects and `transport.prepare` effects are not claims of this read
+contract. Older Console lanes are outside this specific evidence mapping and
+remain separately accounted. Implementation, independent review and current
+publication are still required before this mapping grants acceptance.
+
 ## Standalone controls and workflow observations
 
 | Control / versions | Supported standalone proof | Why the available observation is different |
