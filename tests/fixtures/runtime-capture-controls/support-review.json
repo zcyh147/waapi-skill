@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.capture-control-support/v1",
   "policy_sha256": "994dc0ead6c3740a0d83512ed75af06ace2943c6477cafe6c6ce898a3c340408",
-  "cursor_support_sha256": "fd4a459e767aadaceefcff3ef0dc996eb3b1277408dd4f821e45c7ed0e8e67fb",
+  "cursor_support_sha256": "45ef526e06b725b4e00fe42b1edfd4a1e26346deb0fe160be927272d05ea535d",
   "entries": {
     "2021.1|wwise-authoring|2021.1.14.8108|function|ak.wwise.core.profiler.enableProfilerData|/argsSchema": {
       "pointer": "/argsSchema",

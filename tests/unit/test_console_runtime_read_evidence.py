@@ -243,7 +243,9 @@ def test_reviewed_log_message_source_delta_keeps_original_map_and_rejects_unlist
     from tests.support import runtime_remaining_evidence as remaining
     from tests.support import runtime_log_retained_evidence as retained
     from tests.support import extra_runtime_read_evidence as extra
-    endpoints={gateway:current[gateway],business:current[business]}
+    meter=runtime.METER_SOURCE
+    assert current[meter]=='50192ce8dd71af490d1585b87cf0718f7a26987efeeaab837605dc96a324f851'
+    endpoints={gateway:current[gateway],business:current[business],meter:current[meter]}
     for changes in (runtime.RTPC_REVIEWED_SOURCE_CHANGES,fixed.REVIEWED_CHANGES,
                     fixed.R118_CHANGES,fixed.R119_CHANGES,qualified.r104_source_review()[0]):
         assert {name:changes[name]['after']for name in endpoints}==endpoints
@@ -257,9 +259,14 @@ def test_reviewed_log_message_source_delta_keeps_original_map_and_rejects_unlist
         assert {name:changes[name]['after']for name in endpoints}==endpoints
     for label in ('r128-2023','r128-2024'):
         provider=retained.review()['providers'][label]
-        assert provider['source_changes']==runtime.CURSOR_OMISSION_SOURCE_CHANGES
+        assert provider['source_changes']=={**runtime.CURSOR_OMISSION_SOURCE_CHANGES, meter:{'before':'980ecacb9f9048c44e95b8a240e2a4c02e1a308f0bbcd1e824004a91f7224a63','after':current[meter]}}
         assert {name:provider['sources'][name]for name in endpoints}=={
-            name:pair['before']for name,pair in runtime.CURSOR_OMISSION_SOURCE_CHANGES.items()}
+            name:provider['source_changes'][name]['before']for name in endpoints}
+    from tests.support import runtime_cursor_evidence as cursor
+    from tests.support import runtime_capture_control_evidence as capture
+    assert capture.review()['cursor_support_sha256']==cursor.SUPPORT_SHA
+    for source_map in cursor.review()['source_maps'].values():
+        assert source_map['changes'][meter]['after']==current[meter]
     successor = source.successor_dependency_review()
     assert len(successor['current_sources']) == 619
     assert all(runtime.sha((audit.ROOT / name).read_bytes()) == seal

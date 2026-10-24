@@ -19,9 +19,9 @@ MAX_METADATA_ROWS = 4096
 MAX_METER_OBSERVATIONS = 64
 MAX_METER_OBSERVATION_BYTES = MAX_METER_OBSERVATIONS * 1024 * 1024
 MAX_CLARIFICATION_BYTES = 16 * 1024
-# Root projections describe metered Bus/AuxBus/device objects, including their
-# aggregate media size. Source-specific media, Action, playlist and SoundBank
-# outputs remain scoped to applicable related endpoints, not meter promises.
+# Fixed object-return choices are legal root selections even when a particular
+# metered object has no applicable value. Preserve that absence as unavailable;
+# a related-object projection is a separate selection, never a substitute.
 METER_OUTPUT_NAMES = frozenset('''
 notes volume-db output-bus parent owner work-unit included playable
 explicitly-muted explicitly-soloed implicitly-muted implicitly-soloed child-count
@@ -29,6 +29,27 @@ plugin-name category file-path override-output class-id short-id
 work-unit-is-default work-unit-is-dirty work-unit-type work-unit-is-loaded
 object-size-bytes structure-size-bytes total-size-bytes media-size-bytes state-groups
 state-properties custom-states supports-randomizer supports-states
+converted-wem-file-path original-file-path original-relative-file-path
+converted-file-path original-wav-file-path soundbank-file-path
+music-transition-root music-playlist-root music-transition-object
+playback-duration duration longest-duration-source audio-source-trim-values
+largest-radius-attenuation audio-source-language switch-container-child-context
+curve-points blend-tracks source-language-included original-state
+switch-group-game-parameter has-empty-switch-state-assignment
+extracted-events extracted-structures extracted-media soundbanks-referencing-event
+active-source converted-anonymous-channel-count converted-bit-depth
+converted-channel-configuration converted-channel-mask converted-codec
+converted-data-size-bytes converted-duration converted-file-size-bytes
+converted-height-channel-count converted-lfe-channel-count
+converted-normal-channel-count converted-sample-count converted-sample-rate
+converted-total-channel-count original-anonymous-channel-count original-bit-depth
+original-channel-configuration original-channel-mask original-codec
+original-data-size-bytes original-duration original-file-size-bytes
+original-height-channel-count original-lfe-channel-count
+original-normal-channel-count original-sample-count original-sample-rate
+original-total-channel-count conversion-format converted-ambisonics-channel-count
+converted-non-lfe-channel-count converted-sample-rate-setting
+converted-trimmed-duration original-ambisonics-channel-count original-non-lfe-channel-count
 '''.split())
 METER_FIELD_MODES = (
     ('meter_object_fields','meter_object_include_field',QUERY_FIELD_MODES[0]),
