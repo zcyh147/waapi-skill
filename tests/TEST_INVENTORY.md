@@ -5,6 +5,30 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R135 known meter output construction
+
+Reviewed product changes `d9a22dbc` and `967abf75` add 62 fixed business names
+to the meter-root output allowlist. Matching getMeters definitions establish
+the canonical choices or accessor grammar, result-property meanings and
+existing closed mappings for each supported version. Every explicitly named
+objectReturn property now has a fixed root construction in 2024/2025. Missing
+per-object values remain unavailable; this does not promise that a metered Bus
+has source-media or SoundBank data. The compiler, projection, limits and other
+production AST nodes are unchanged.
+
+The two focused groups passed nine checks in 2.23s and nine in 3.12s respectively.
+They cover both hosts in 2024/2025, older-version preconnection boundaries,
+exact requests, complete pages, selected values/absence, invalid off-page
+values and the existing output limit. Independent review checked primary
+definitions, mappings and source/log seals. No native or Fresh run was added.
+
+This establishes construction, not complete meter evidence admission. The
+unchanged 2,744-ID ledger contains 2,668 candidate program obligations, four
+native root gates, 60 unresolved literal spellings and 12 empty-input questions.
+Those unresolved items remain assigned; Console root evidence is still needed.
+Only profiler_meter_objects.py changed in the packaged tree. Exact source-reuse
+reconciliation and the final combined gates remain outstanding.
+
 ## 2026-10-24 R134 capture control evidence
 
 Reviewed feature `2e320baf`, integrated at `a03a7db5`, covers the exact 672
