@@ -101,11 +101,12 @@ No universal prior-state restoration or waveform requirement is added here.
   contained Area1 media124871431 (`Ambience_40.wav`, VORBIS,160821 bytes,
   `soundBank=Prepared`). The source-preserving lifecycle and paired cleanup
   passed; Demo required SIGKILL before process-group absence was proved.
-  The existing evidence consumer still needs the narrow original profile and
-  current replay. Any representative mapping to a different pinned patch must
-  retain the actual9262 provenance and justify the selected schema/behavior
-  relationship; this is not a9143 execution claim. Older-version obligations
-  remain visible. R106's complete empty Event-preparation result and R124's
+  The narrow original profile and current replay were integrated as `9731b83d`,
+  with exact reviewed source compatibility in `8ec4e331`. Focused portable
+  consumption preserves actual9262 provenance and the selected schema/behavior
+  relationship; final global publication remains pending. This is not a9143
+  execution claim. Older-version obligations remain visible. R106's complete
+  empty Event-preparation result and R124's
   earlier failed attempts remain unchanged; neither establishes native absence.
   The SDK producer observation does not verify Authoring `transport.prepare`.
 

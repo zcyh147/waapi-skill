@@ -5,6 +5,44 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R125 grouped Console runtime reads and source compatibility
+
+Frozen candidate `0d56a083da7a7965d734df3e02c0fb5681a75c70` ran
+`test_console_owned_runtime_read_batch` once per version, sequentially on Mac.
+Each owned Console session reads Voices, Busses, AudioObjects, RTPCs, default
+dry-path voice contributions and, where reflected, GameObjects at one fixed
+capture position. Readers have independent outcomes; shared setup and cleanup
+remain mandatory.
+
+| Console build | Test duration | Fixed capture T (ms) | Reader outcomes |
+| --- | --- | --- | --- |
+| 2021.1.14.8108 | 11.70s | 1898 | 5 PASS; GameObjects absent from matching catalog |
+| 2022.1.19.8584 | 13.46s | 2282 | 6 PASS |
+| 2023.1.19.8928 | 13.02s | 2837 | 6 PASS |
+| 2024.1.13.9056 | 12.68s | 2656 | 6 PASS |
+| 2025.1.7.9143 | 15.40s | 3328 | 6 PASS |
+
+The five tests total 66.26s. All five final invocations and selected reader
+categories passed. Source hashes and project mtimes were unchanged, sandboxes were deleted by their lifecycle,
+and launcher process groups were empty. No attempt was repeated. Evidence roots
+are `.waapi-skill-state/full-coverage/r125-console-read-native-{2021,2022,2023,2024,2025}-r1`;
+each retains its isolated config, launch decision, full reader report and final
+category record. The 2022 fixture retains the previously attested common2025
+PCM source qualification. These observations do not prove arbitrary metadata,
+recursive children, driver alternatives, setter effects or all #186 branches.
+Exact branch attachment and current global publication remain pending.
+
+Reviewed successor `8ec4e331` reconciles retained runtime evidence with the
+seven-line Gateway exception-context correction. Historical source maps and
+native results remain original; exact reviewed source differences are checked
+against current code. Three affected runtime/Source checks passed in 6.46s.
+One LoadedMedia publication/consumer check passed in 101.99s, reusing its packet
+for wrong-source, extra-source and unrelated-route rejection. Its earlier
+teardown failures exposed separate current-program and historical-native map
+handling and remain recorded. These checks neither reran Wwise nor replaced
+the pending final gates. Both new unit modules are registered in the existing
+Program roster; its focused integrity check passed in 0.31s.
+
 ## 2026-10-24 R124 attributable IntegrationDemo LoadedMedia observation
 
 One named Mac Authoring/stock SDK test passed on matching **2025.1.11.9262**
@@ -62,8 +100,10 @@ independent review compared every decoded file with its retained original.
 The original 15-second port-release failure and separate BLOCKED lifecycle
 obligation remain unchanged. Existing 2023/2024 archives and the strict PASS
 reader are unchanged. This is reuse of actual read facts, not a new native run
-or whole-workflow acceptance. Separately reviewed R104 facts and the LoadedMedia
-consumer are still being implemented; final shared-source publication is held.
+or whole-workflow acceptance. The exact22 R104 facts were subsequently reviewed
+and integrated as `d22fa9b5`; the LoadedMedia consumer was integrated as
+`9731b83d` and its exact source transition as `8ec4e331`. Final shared-source
+publication remains pending.
 
 ## 2026-10-24 R123 source compatibility and IntegrationDemo checkpoint
 
