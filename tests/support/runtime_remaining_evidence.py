@@ -436,6 +436,9 @@ def validate_program(record,binding,branch,root,edges=None):
 
 def validate_evidence(record,binding,branch,category,base,root,edges=None):
     entry=exact_entry(branch,root)
+    if branch['route'].split('|')[-1] in {'ak.wwise.core.transport.'+n for n in ('create','destroy','executeAction','prepare','useOriginals','getList','getState')}:
+        from tests.support.runtime_transport_evidence import validate_evidence as validate_transport
+        return validate_transport(record,binding,branch,category,base,root,edges)
     if branch['route'].endswith('|ak.wwise.core.profiler.getCursorTime'):
         from tests.support.runtime_cursor_evidence import validate_evidence as validate_cursor
         return validate_cursor(record,binding,branch,category,base,root,edges)
