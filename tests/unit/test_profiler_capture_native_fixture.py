@@ -1060,8 +1060,13 @@ def test_missing_capture_owner_requires_its_exact_single_node(tmp_path, monkeypa
     from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
     events = _fakes(monkeypatch, tmp_path)
     staged = []
-    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media',
-        lambda sandbox, io_root, *, version: staged.append(version))
+    def stage(sandbox, io_root, *, version):
+        assert sandbox.sandbox_path.is_dir() and sandbox.source_root.is_dir()
+        assert sandbox.sandbox_path != sandbox.source_root
+        assert sandbox.sandbox_path.is_relative_to(tmp_path / 'batch/owned/sandbox-root')
+        assert io_root == tmp_path / 'batch/owned/io' and io_root.is_dir()
+        staged.append(version)
+    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media', stage)
     monkeypatch.setenv('WWISE_VERSION', version)
     config = _config(tmp_path)
     config.args = [CAPTURE_MISSING_NODEID, *([NODE] if extra else [])]
@@ -1074,6 +1079,7 @@ def test_missing_capture_owner_requires_its_exact_single_node(tmp_path, monkeypa
         authoring_batch.configure_authoring_batch_owner(config, items, repo_root=tmp_path)
         assert [row[0] for row in events] == ['construct', 'start', 'install']
         assert staged == [version] and events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
+        assert events[-1][1]['selected_nodeids'] == (CAPTURE_MISSING_NODEID,)
 
 
 @pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
@@ -1084,8 +1090,13 @@ def test_capture_read_owner_admits_only_one_node_on_each_pinned_version(tmp_path
     from tests.unit.test_authoring_batch_owner import _fakes, _config, NODE
     events = _fakes(monkeypatch, tmp_path)
     staged = []
-    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media',
-        lambda sandbox, io_root, *, version: staged.append(version))
+    def stage(sandbox, io_root, *, version):
+        assert sandbox.sandbox_path.is_dir() and sandbox.source_root.is_dir()
+        assert sandbox.sandbox_path != sandbox.source_root
+        assert sandbox.sandbox_path.is_relative_to(tmp_path / 'batch/owned/sandbox-root')
+        assert io_root == tmp_path / 'batch/owned/io' and io_root.is_dir()
+        staged.append(version)
+    monkeypatch.setattr(authoring_batch, 'stage_owned_capture_read_media', stage)
     monkeypatch.setenv('WWISE_VERSION', version)
     config = _config(tmp_path)
     config.args = [CAPTURE_READS_NODEID, *([NODE] if extra else [])]
@@ -1099,6 +1110,7 @@ def test_capture_read_owner_admits_only_one_node_on_each_pinned_version(tmp_path
         assert [row[0] for row in events] == ['construct', 'start', 'install']
         assert events[0][1]['live_environment']['AK_AUTOMATION_MODE'] == '1'
         assert staged == [version]
+        assert events[-1][1]['selected_nodeids'] == (CAPTURE_READS_NODEID,)
 
 
 def test_owned_2025_reader_flow_reaches_seven_independent_archived_categories(owned_authoring, tmp_path, monkeypatch):
