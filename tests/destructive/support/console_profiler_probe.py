@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import time
 import wave
 from pathlib import Path
@@ -11,7 +12,7 @@ from wwise_waapi.host_paths import localize_waapi_host_path, parse_absolute_host
 from wwise_waapi.operation_soundbank import capture_file_proof
 from tests.destructive.support.profiler_input_shapes import BUILDS
 from tests.destructive.support.profiler_capture import (
-    CAPTURE_CAR_ID, CAPTURE_CAR_SOURCE_ID, CAPTURE_CAR_PARENT_ID, CAPTURE_CAR_MEDIA,
+    CAPTURE_CAR_ID, CAPTURE_CAR_SOURCE_ID, CAPTURE_CAR_PARENT_ID, CAPTURE_CAR_MEDIA, CAPTURE_RPM_ID,
 )
 
 NODE_NAME = 'test_console_owned_2025_transport_profiler_probe'
@@ -20,17 +21,22 @@ DIAGNOSTIC_NAME = 'test_console_owned_2025_transport_profiler_diagnostic'
 DIAGNOSTIC_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + DIAGNOSTIC_NAME
 OLDER_NAME = 'test_console_owned_older_transport_profiler_diagnostic'
 OLDER_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + OLDER_NAME
+BATCH_NAME = 'test_console_owned_runtime_read_batch'
+BATCH_NODEID = 'tests/destructive/test_gateway_workflow_transaction_matrix.py::' + BATCH_NAME
 PREFIX = 'ak.wwise.core.'
 
 
-def collect_console_profiler(runtime, *, diagnostic=False):
-    assert runtime.version in BUILDS and (diagnostic or runtime.version == '2025.1'), 'Select one pinned Console lane'
-    report_path = runtime.state_dir / 'console-profiler-probe.json'
+def collect_console_profiler(runtime, *, diagnostic=False, grouped_runtime_reads=False):
+    assert not (diagnostic and grouped_runtime_reads), 'Select one closed collector mode'
+    assert runtime.version in BUILDS and (grouped_runtime_reads or diagnostic or runtime.version == '2025.1'), 'Select one pinned Console lane'
+    report_path = runtime.state_dir / ('console-runtime-read-batch.json' if grouped_runtime_reads else 'console-profiler-probe.json')
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    category = {'category': 'console-transport-profiler-probe', 'status': 'blocked',
+    category = {'category': 'console-runtime-read-batch' if grouped_runtime_reads else 'console-transport-profiler-probe', 'status': 'blocked',
         'observation_task_status': 'BLOCKED', 'diagnostic_enabled': diagnostic, 'observation_path': str(report_path),
         'transaction_ids': [], 'verifier_strength': 'owned_playback_and_complete_same_time_voice',
         'native_host_support_inferred': False}
+    if grouped_runtime_reads:
+        category['verifier_strength'] = 'independent_complete_same_frame_owned_runtime_reads'
     runtime.category_results.append(category)
     report = {'contract': 'waapi-skill.console-profiler-probe/v1', 'candidate': runtime.candidate,
         'version': runtime.version, 'complete': False, 'calls': [], 'public_call_count': 0,
@@ -42,6 +48,13 @@ def collect_console_profiler(runtime, *, diagnostic=False):
             'total_reply_bytes': 8 * 1024 * 1024, 'report_bytes': (40 if diagnostic else 24) * 1024 * 1024,
             'ordinary_seconds': 120, 'cleanup_seconds': 60, 'cleanup_reserve_calls': 36,
             'cleanup_reserve_bytes': 3 * 1024 * 1024}}
+    if grouped_runtime_reads:
+        report['contract'] = 'waapi-skill.console-runtime-read-batch/v1'
+        report['outcomes'] = {name: {'outcome': 'BLOCKED', 'reason': 'Shared setup not completed'}
+            for name in ('voices', 'busses', 'audio_objects', 'rtpcs', 'contributions_dry', 'game_objects')}
+        if runtime.version == '2021.1':
+            report['outcomes']['game_objects'] = {'outcome': 'UNAVAILABLE',
+                'reason': 'getGameObjects absent from matching 2021.1 Console catalog; no call or gameSyncs substitution'}
     cleanup = []
     cleanup_active = False
     deadline = time.monotonic() + 120
@@ -207,6 +220,8 @@ def collect_console_profiler(runtime, *, diagnostic=False):
     try:
         status = call(['status'])
         report['host'] = info = status['wwise']
+        if grouped_runtime_reads:
+            report['endpoint'] = status['endpoint']
         assert info.get('isCommandLine') is True
         assert tuple(info['version'][key] for key in ('year', 'major', 'minor', 'build')) == BUILDS[runtime.version]
         project = status['project']
@@ -253,8 +268,19 @@ def collect_console_profiler(runtime, *, diagnostic=False):
             report['setup']['originals'] = effect('transport.useOriginals', ['--audition-media', 'originals'])
         if runtime.version != '2021.1':
             report['setup']['prepare'] = effect('transport.prepare', identity=CAPTURE_CAR_ID)
-        report['setup']['enable'] = effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'enable'],
-            before_execute=lambda: own('disable-voices', lambda: effect('profiler.enableProfilerData', ['--capture-data', 'voices', 'disable'])))
+        datasets = ['voices']
+        if grouped_runtime_reads:
+            parameter = exact(CAPTURE_RPM_ID)
+            assert parameter['type'] == 'GameParameter' and parameter['name'] == 'RPM', parameter
+            report['game_parameter'] = parameter
+            datasets += ['voice-inspector', 'audio-objects']
+            if runtime.version != '2021.1':
+                datasets += ['game-syncs']
+            report['capture_datasets'] = datasets
+        def directives(mode):
+            return [token for dataset in datasets for token in ('--capture-data', dataset, mode)]
+        report['setup']['enable'] = effect('profiler.enableProfilerData', directives('enable'),
+            before_execute=lambda: own('disable-voices', lambda: effect('profiler.enableProfilerData', directives('disable'))))
         report['setup']['capture'] = effect('profiler.startCapture', zero=True,
             before_execute=lambda: own('stop-capture', lambda: effect('profiler.stopCapture', zero=True)))
         # Creation cleanup is Gateway-bound to its exact execution result. Never
@@ -284,16 +310,19 @@ def collect_console_profiler(runtime, *, diagnostic=False):
         position = call(['core-call', PREFIX + 'profiler.getCursorTime', '--profiler-cursor', 'capture-latest'])['agent_result']
         report['capture_position'] = position
         assert position['available'] is True and type(position['position_ms']) is int and position['position_ms'] >= 0
-        result = call(['core-call', PREFIX + 'profiler.getVoices', '--profiler-position', str(position['position_ms']),
-            '--result-view', ('identity' if runtime.version == '2025.1' else 'diagnostics'), '--max-results', '64'])['agent_result']
-        evidence = {'agent_result': result, 'nonempty': bool(result['return']), 'complete': result.get('complete'),
-            'position_ms': position['position_ms'], 'owned_voice_observed': False}
-        report['outcomes']['voices'] = {'outcome': 'BLOCKED', 'evidence': evidence}
-        owned = [row for row in result['return'] if row.get('objectGUID') == CAPTURE_CAR_ID
-            and row.get('gameObjectID') == association['gameObject']]
-        evidence['owned_voice_observed'] = bool(owned)
-        assert result.get('complete') is True and owned, 'Complete owned Console voice unavailable'
-        report['outcomes']['voices']['outcome'] = 'PASS'
+        if grouped_runtime_reads:
+            _collect_runtime_read_batch(call, report, persist, position_ms=position['position_ms'])
+        else:
+            result = call(['core-call', PREFIX + 'profiler.getVoices', '--profiler-position', str(position['position_ms']),
+                '--result-view', ('identity' if runtime.version == '2025.1' else 'diagnostics'), '--max-results', '64'])['agent_result']
+            evidence = {'agent_result': result, 'nonempty': bool(result['return']), 'complete': result.get('complete'),
+                'position_ms': position['position_ms'], 'owned_voice_observed': False}
+            report['outcomes']['voices'] = {'outcome': 'BLOCKED', 'evidence': evidence}
+            owned = [row for row in result['return'] if row.get('objectGUID') == CAPTURE_CAR_ID
+                and row.get('gameObjectID') == association['gameObject']]
+            evidence['owned_voice_observed'] = bool(owned)
+            assert result.get('complete') is True and owned, 'Complete owned Console voice unavailable'
+            report['outcomes']['voices']['outcome'] = 'PASS'
     except Exception as exc:
         report['errors'].append({'type': type(exc).__name__, 'message': str(exc)[:2048]})
     finally:
@@ -319,9 +348,123 @@ def collect_console_profiler(runtime, *, diagnostic=False):
             report['cleanup']['errors'].append({'action': 'create-transport',
                 'message': 'Creation attempted without a verified issued handle; owned host teardown required; no retry'})
         report['cleanup']['complete'] = not report['cleanup']['errors']
-        report['complete'] = not report['errors'] and report['cleanup']['complete'] and report['outcomes'].get('voices', {}).get('outcome') == 'PASS'
+        readers_complete = (all(row['outcome'] == ('UNAVAILABLE' if name == 'game_objects' and runtime.version == '2021.1' else 'PASS')
+            for name, row in report['outcomes'].items()) if grouped_runtime_reads else report['outcomes'].get('voices', {}).get('outcome') == 'PASS')
+        report['complete'] = not report['errors'] and report['cleanup']['complete'] and readers_complete
         category.update(status='PASS' if report['complete'] else 'blocked',
             observation_task_status='PASS' if report['complete'] else 'BLOCKED',
             cleanup_complete=report['cleanup']['complete'])
         persist()
     assert report['complete'], 'Console playback/data probe incomplete: ' + json.dumps(report['errors'])
+
+
+def _collect_runtime_read_batch(call, report, persist, *, position_ms):
+    """One snapshot per reader. Only contributions depend on a complete owned voice seed."""
+    game_object = report['transport_association']['gameObject']
+    assert type(game_object) is int and 0 <= game_object < 1 << 64, 'Malformed owned transport association'
+    fixed = str(position_ms)
+    voice = None
+    bus_rows = []
+
+    def observe(name, argv, *, row_field='return'):
+        evidence = {'position_ms': position_ms, 'owned_identity_observed': False}
+        observation = report['outcomes'][name] = {'outcome': 'BLOCKED', 'evidence': evidence}
+        # A failed native connection, elapsed/byte reserve or unknown Gateway context
+        # stops the group. Only a response attributable to this reader is independent.
+        payload = call(argv, strict=False)
+        evidence['gateway_result'] = payload
+        assert payload.get('endpoint') == report['endpoint'] and payload.get('detected_version') == report['version'], (
+            'Shared connection/version context changed; remaining readers not attempted')
+        if payload.get('ok') is not True:
+            code = payload.get('error_code') or payload.get('call', {}).get('error_code')
+            expected_api = PREFIX + 'profiler.' + {
+                'voices': 'getVoices', 'busses': 'getBusses', 'audio_objects': 'getAudioObjects',
+                'rtpcs': 'getRTPCs', 'game_objects': 'getGameObjects', 'contributions_dry': 'getVoiceContributions'}[name]
+            details = payload.get('details') or {}
+            result_failure = (code in ('RUNTIME_INSPECTION_RESULT_INVALID', 'INVALID_STABLE_READ_RESULT')
+                or (code in ('SemanticValidationError', 'SEMANTIC_SCHEMA_MISMATCH')
+                    and str(details.get('section', '')).startswith('result')))
+            attributable = (payload.get('api_attempted') == expected_api
+                or (result_failure and details.get('uri', details.get('api')) == expected_api))
+            fatal = code in ('TIMEOUT', 'ConnectionError', 'ConnectionRefusedError', 'ConnectionResetError',
+                'ConnectionClosed', 'ConnectionClosedError', 'OSError', 'VERSION_MISMATCH')
+            observation.update(outcome='FAIL', reason='Reader failed; exact Gateway failure retained')
+            persist()
+            assert attributable and not fatal, 'Shared connection/context failure; remaining readers not attempted'
+            return None
+        result = payload['agent_result']
+        evidence['agent_result'] = result  # Preserve the exact final public object.
+        rows = result.get(row_field)
+        if row_field == 'objects' and rows is None and result.get('contribution_reported') is False:
+            rows = []
+        assert isinstance(rows, list) and all(isinstance(row, dict) for row in rows), 'Malformed public reader array'
+        evidence['nonempty'] = bool(rows) or (name == 'contributions_dry' and result.get('contribution_reported') is True)
+        evidence['complete'] = result.get('complete', not result.get('truncated', False)) is True
+        owned = []
+        if name == 'voices':
+            owned = [i for i, row in enumerate(rows) if row.get('objectGUID') == CAPTURE_CAR_ID
+                and row.get('gameObjectID') == game_object]
+            evidence['older_diagnostics_role'] = 'same-frame seed only; no additional coverage claim'
+            if report['version'] == '2025.1':
+                owned = [i for i in owned if all(field in rows[i] for field in (
+                    'soundID', 'baseVolume', 'gameAuxSendVolume', 'envelope', 'normalizationGain',
+                    'lowPassFilter', 'highPassFilter', 'priority', 'isStarted', 'isVirtual', 'isForcedVirtual'))]
+        elif name == 'busses':
+            owned = [i for i, row in enumerate(rows) if row.get('gameObjectID') == game_object
+                and isinstance(row.get('objectGUID'), str) and isinstance(row.get('objectName'), str)
+                and type(row.get('volume')) in (int, float) and math.isfinite(row['volume'])]
+            evidence['logical_bus_equivalence_claimed'] = False
+        elif name == 'audio_objects':
+            owned = [i for i, row in enumerate(rows) if row.get('gameObjectID') == game_object
+                and type(row.get('audioObjectID')) is int and isinstance(row.get('busGUID'), str)
+                and type(row.get('busPipelineID')) is int]
+            evidence['same_frame_bus_matches'] = {str(i): [j for j, bus in enumerate(bus_rows)
+                if bus.get('gameObjectID') == row.get('gameObjectID') and bus.get('objectGUID') == row.get('busGUID')
+                and bus.get('pipelineID') == row.get('busPipelineID')] for i, row in enumerate(rows)}
+            evidence['metadata_population_claimed'] = False
+        elif name == 'game_objects':
+            owned = [i for i, row in enumerate(rows) if row.get('id') == game_object]
+        elif name == 'rtpcs':
+            owned = [i for i, row in enumerate(rows) if row.get('id') == report['game_parameter']['id']
+                and row.get('name') == report['game_parameter']['name']
+                and row.get('gameObjectId') in (game_object, (1 << 64) - 1)
+                and type(row.get('value')) in (int, float) and math.isfinite(row['value'])]
+            evidence['setter_effect_verified'] = False
+            evidence['global_scope_sentinel'] = (1 << 64) - 1
+        else:
+            evidence['selected_observed_voice'] = voice
+            evidence['path'] = 'default-dry-path; no selected Bus path or rich-tree claim'
+            evidence['owned_identity_observed'] = evidence['nonempty']
+        evidence['owned_row_indexes'] = owned
+        if name != 'contributions_dry':
+            evidence['owned_identity_observed'] = bool(owned)
+        if evidence['complete'] and evidence['nonempty'] and evidence['owned_identity_observed']:
+            observation['outcome'] = 'PASS'
+        else:
+            observation['reason'] = 'Complete nonempty attributable data unavailable; no repeat or inferred native absence'
+        persist()
+        return rows if observation['outcome'] == 'PASS' else None
+
+    def reader(name, suffix):
+        argv = ['core-call', PREFIX + 'profiler.' + suffix, '--profiler-position', fixed, '--max-results', '64']
+        if name in ('voices', 'busses', 'audio_objects'):
+            argv += ['--result-view', 'diagnostics']
+        return observe(name, argv)
+
+    voices = reader('voices', 'getVoices')
+    if voices:
+        owned = [row for row in voices if row.get('objectGUID') == CAPTURE_CAR_ID
+            and row.get('gameObjectID') == game_object and isinstance(row.get('voice_instance_handle'), str)]
+        # Do not choose arbitrarily if the complete frame contains multiple owned instances.
+        voice = owned[0] if len(owned) == 1 else None
+    bus_rows = reader('busses', 'getBusses') or []
+    reader('audio_objects', 'getAudioObjects')
+    if report['version'] != '2021.1':
+        observe('game_objects', ['profiler-game-objects', '--capture-ms', fixed], row_field='game_objects')
+    reader('rtpcs', 'getRTPCs')
+    if voice is None:
+        report['outcomes']['contributions_dry']['reason'] = 'No unique complete same-frame owned voice handle; no contribution call'
+        persist()
+    else:
+        observe('contributions_dry', ['profiler-voice-contributions', '--capture-ms', fixed,
+            '--voice-instance-handle', voice['voice_instance_handle']], row_field='objects')
