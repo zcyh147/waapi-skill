@@ -77,7 +77,8 @@ def preservation_gates(root, policies, obligations):
 
 def original_observation(originals=None, *, root=audit.ROOT, copied_prefix=''):
     """Recheck the complete strict-PASS archive, not a manufactured native row."""
-    if copied_prefix not in ('','lm-2025-','lm-composite-2023-','lm-composite-2024-'):
+    if copied_prefix not in ('','lm-2025-','lm-composite-2023-','lm-composite-2024-',
+            'lm-console-2023-','lm-console-2024-','lm-console-2025-'):
         raise ValueError('LoadedMedia copied closure requires its closed family/version namespace')
     r = review(root); base = Path(originals) if originals is not None else root / FIXTURE
     def descriptor(name): return {'artifact': copied_prefix + name, 'sha256': r['files'][name]}
@@ -196,6 +197,8 @@ def _mappings(inventory,captured,route):
 
 
 def validate_program(record, binding, branch, root, edges=None):
+    if branch['route'] in CONSOLE_ROUTES.values():
+        return validate_console_program(record,binding,branch,root,edges)
     if branch['route'] in COMPOSITE_ROUTES.values():
         return validate_composite_program(record,binding,branch,root,edges)
     exact_branch(branch, root)
@@ -259,6 +262,8 @@ def validate_program(record, binding, branch, root, edges=None):
 
 
 def validate_evidence(record,binding,branch,category,base,root,edges):
+    if branch['route'] in CONSOLE_ROUTES.values():
+        return validate_console_evidence(record,binding,branch,category,base,root,edges)
     if branch['route'] in COMPOSITE_ROUTES.values():
         return validate_composite_evidence(record,binding,branch,category,base,root,edges)
     r,_ = exact_branch(branch,root)
@@ -291,6 +296,8 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
 
 
 def validate_source_equivalence(proof, sources, branch, binding, root, base):
+    if branch['route'] in CONSOLE_ROUTES.values():
+        return validate_console_source(proof,sources,branch,binding,root,base)
     if branch['route'] in COMPOSITE_ROUTES.values():
         return validate_composite_source(proof,sources,branch,binding,root,base)
     """Only the exact original anchor may use its pinned one-file source review."""
@@ -632,6 +639,10 @@ def validate_composite_source(proof,sources,branch,binding,root,base):
 
 def validate_composite_program(record, binding, branch, root, edges=None):
     _, profile, _ = composite_branch(branch,root)
+    return _validate_loaded_program(record,binding,branch,root,edges,{**profile,'host':'wwise-authoring'})
+
+
+def _validate_loaded_program(record, binding, branch, root, edges, profile):
     version = branch['route'].split('|')[0]
     captured = record.get('runtime_read_program', {}); gateway = record['gateway']; native = record['native_call']
     payload = gateway['payload']; trace = captured.get('native_reads', [])
@@ -640,7 +651,7 @@ def validate_composite_program(record, binding, branch, root, edges=None):
             or captured.get('source_unchanged') is not True or captured.get('source_context') != runtime.program_source_context(root, flow=URI)
             or record.get('relevant_sources') != captured['source_context']['packaged']
             or audit.digest(captured.get('gateway')) != audit.digest(gateway) or audit.digest(captured.get('native_call')) != audit.digest(native)
-            or gateway['exit_code'] != 0 or payload.get('ok') is not True or payload.get('is_command_line') is not False
+            or gateway['exit_code'] != 0 or payload.get('ok') is not True or payload.get('is_command_line') is not (profile['host']=='wwise-console')
             or gateway['argv'] != binding['input']['gateway_argv'] or native['uri'] != URI
             or any(payload['schema_validation'][s]['version'] != version for s in ('request', 'result'))):
         raise ValueError('LoadedMedia exact public capture/phases/source/context differs')
@@ -651,7 +662,7 @@ def validate_composite_program(record, binding, branch, root, edges=None):
     if len([row for row in trace if row['uri'] == URI]) != 1:
         raise ValueError('LoadedMedia public span requires exactly one native reader call')
     info, = [row['result'] for row in trace if row['uri'] == 'ak.wwise.core.getInfo']
-    if completion.native_host_context(info, 'isCommandLine') != {'version':version,'host':'wwise-authoring','build':profile['build']}:
+    if completion.native_host_context(info, 'isCommandLine') != {'version':version,'host':profile['host'],'build':profile['build']}:
         raise ValueError('LoadedMedia public program must retain pinned9143 fake host identity')
     argv = gateway['argv']; position = argv[argv.index('--profiler-position') + 1]
     if argv != ['core-call',URI,'--profiler-position',position,'--max-results','64']:
@@ -806,3 +817,279 @@ def _positive_from_proof(proof, base, root):
     if not artifact.endswith(suffix):
         raise ValueError('LoadedMedia exact positive archive locator differs')
     return original_observation(base,root=root,copied_prefix=artifact[:-len(suffix)])
+
+
+CONSOLE_REVIEW_SHA = '28212e928267426880727329effbe50bbf718434a1e157e455a5840e7893487e'
+CONSOLE_CANDIDATE = '2dc0ee57718f41b2378d8d4415572366de322704'
+CONSOLE_ROUTES = {version: version+'|wwise-console|'+build+'|function|'+URI for version,build in (
+    ('2023.1','2023.1.19.8928'),('2024.1','2024.1.13.9056'),('2025.1','2025.1.7.9143'))}
+
+
+def console_review(root=audit.ROOT):
+    from tests.support import runtime_remaining_evidence as remaining
+    path=root/FIXTURE/'console-review.json'
+    if runtime.sha(path.read_bytes())!=CONSOLE_REVIEW_SHA:
+        raise ValueError('Exact Console LoadedMedia review differs')
+    result=json.loads(path.read_bytes())
+    if (result['availability_candidate']!=CONSOLE_CANDIDATE or result['positive_candidate']!=ORIGINAL_CANDIDATE
+            or result['positive_review_sha256']!=REVIEW_SHA or result['policy_sha256']!=remaining.POLICY_SHA
+            or len(result['entries'])!=93 or set(result['profiles'])!=set(CONSOLE_ROUTES)
+            or audit.digest(sorted(result['entries']))!='b022fe9298d34bd0ac8c1c7db52a9bd88f05e5141e325a3a9671d2e23a3a3e67'):
+        raise ValueError('Exact Console LoadedMedia93 scope/meaning/policy differs')
+    canonical=remaining.review(root)['entries']
+    if any(entry!=canonical.get(identity) or entry['family']!='console_loaded_media'
+           for identity,entry in result['entries'].items()):
+        raise ValueError('Console LoadedMedia must retain authoritative remaining policy')
+    from wwise_waapi.native_catalog import load_native_catalog
+    older=composite_review(root)
+    for version,profile in result['profiles'].items():
+        catalog=load_native_catalog(version,'wwise-console',root=root/'skills/waapi-skill/resources/native-catalog')
+        authoring=load_native_catalog(version,'wwise-authoring',root=root/'skills/waapi-skill/resources/native-catalog')
+        if (profile['route']!=CONSOLE_ROUTES[version] or profile['gate']!=profile['route']+'|/resultSchema'
+                or catalog['content_sha256']!=profile['catalog_sha256']
+                or catalog['schemas'][URI]!=profile['catalog_schema'] or catalog['schemas'][URI]!=authoring['schemas'][URI]
+                or profile['selected_definitions']!={k:catalog['definitions']['documents']['waapi_definitions.json']['definitions'][k]for k in ('cursorTime','profilerCursor')}
+                or profile['selected_definitions']!={k:authoring['definitions']['documents']['waapi_definitions.json']['definitions'][k]for k in ('cursorTime','profilerCursor')}):
+            raise ValueError('Exact Console LoadedMedia host/schema/definition parity differs')
+        # Existing older review keeps local-ref/punctuation differences explicit;
+        # native host availability below is independently mandatory.
+        if version!='2025.1' and profile['catalog_schema']!=older['profiles'][version]['catalog_schema']:
+            raise ValueError('Reviewed older LoadedMedia semantics differ')
+        for name,doc in profile['documents'].items():
+            if runtime.sha((root/FIXTURE/name).read_bytes())!=doc['sha256']:
+                raise ValueError('Console LoadedMedia primary documentation changed')
+        api=next(name for name in profile['documents']if name.endswith('-api.html'))
+        if not all(token in (root/FIXTURE/api).read_text()for token in ('PrepareEvent()', 'PrepareGameSyncs()', 'loaded media at a specific profiler capture time')):
+            raise ValueError('Console LoadedMedia documented prepared-media meaning differs')
+    return result
+
+
+def console_branch(branch,root=audit.ROOT):
+    reviewed=console_review(root);entry=reviewed['entries'].get(branch['id'])
+    if (not entry or branch['route'] not in CONSOLE_ROUTES.values()
+            or any(branch.get(k)!=entry[k]for k in ('route','pointer','kind','owner_issue','parent_issue','blocks_issue'))
+            or branch['shape_sha256']!=entry['native_shape_sha256']):
+        raise ValueError('Only exact reviewed Console LoadedMedia branch/shape/owner qualifies')
+    return reviewed,reviewed['profiles'][branch['route'].split('|')[0]],entry
+
+
+def console_basis(profile):
+    return {'catalog_host':'wwise-console','catalog_build':profile['build'],
+        'availability_host':'wwise-console','availability_build':profile['build'],'availability_candidate':CONSOLE_CANDIDATE,
+        'observed_host':'wwise-authoring','observed_build':BASIS['observed_build'],'observed_candidate':ORIGINAL_CANDIDATE,
+        'basis':'exact_reviewed_console_availability_and_prepared_media_composite','console_nonempty_native_execution':False}
+
+
+def console_availability(version,*,root=audit.ROOT,base=None,archive=None,category=None):
+    """Whole actual Console node, not a synthetic empty-response witness."""
+    import gzip
+    reviewed=console_review(root);profile=reviewed['profiles'][version]
+    base=Path(base)if base is not None else root/FIXTURE
+    archive=archive or profile['archive'];category=category or profile['category']
+    if archive['sha256']!=profile['archive']['sha256'] or category['sha256']!=profile['category']['sha256']:
+        raise ValueError('Console LoadedMedia original archive/category changed')
+    read=runtime.archive_reader(archive,base)
+    encoded=json.loads(gzip.decompress((base/archive['artifact']).read_bytes()))['files']
+    if len(encoded)!=profile['archive_files'] or audit.digest(encoded)!=profile['archive_map_sha256']:
+        raise ValueError('Console LoadedMedia complete original closure differs')
+    context=completion.read_category_run({**category,'nodeid':profile['category']['nodeid']},base)
+    final=context['record'];history=read(profile['history_path'])
+    if (runtime.sha(history)!=profile['history_sha256'] or json.loads(history.splitlines()[-1])!=final
+            or final!=profile['final_record'] or context['candidate']!=CONSOLE_CANDIDATE
+            or {k:context[k]for k in ('version','host','build')}!={'version':version,'host':'wwise-console','build':profile['build']}):
+        raise ValueError('Console LoadedMedia exact finalized actual context differs')
+    sources=reviewed['availability_sources']
+    if len(sources)!=413 or completion.historical_source_seals(root,CONSOLE_CANDIDATE,sources)!=sources:
+        raise ValueError('Console LoadedMedia original full413 source map differs')
+    current=runtime.program_source_context(root,flow=URI)['packaged']
+    differences={name:{'before':sources.get(name),'after':current.get(name)}for name in sources.keys()|current.keys()if sources.get(name)!=current.get(name)}
+    if len(current)!=413 or differences!=reviewed['packaged_source_changes']:
+        raise ValueError('Console LoadedMedia exact reviewed current source delta differs')
+    report_raw=read(profile['report']['path']);report=json.loads(report_raw)
+    raw_bytes=read(profile['raw']['path']);raw=json.loads(raw_bytes)
+    issuer_raw=read(profile['issuer']['path']);issuer=json.loads(issuer_raw)
+    load=lambda path:json.loads(read(path))
+    evidence=report['outcomes']['loaded_media']['evidence'];gateway=evidence['gateway_result']
+    receipt,=[call for call in report['calls']if call['payload']==gateway]
+    if (runtime.sha(report_raw)!=profile['report']['sha256'] or runtime.sha(raw_bytes)!=profile['raw']['sha256']
+            or runtime.sha(issuer_raw)!=profile['issuer']['sha256'] or report['candidate']!=CONSOLE_CANDIDATE
+            or report['version']!=version or report['complete']is not True or report['errors']!=[]
+            or report['cleanup']['complete']is not True or report['cleanup']['errors']!=[]
+            or report['fixture_before']!=report['fixture_after'] or report['capture_position']['position_ms']!=profile['time']
+            or completion.native_host_context(report['host'],'isCommandLine')!={'version':version,'host':'wwise-console','build':profile['build']}
+            or report['outcomes']['loaded_media']['outcome']!='PASS' or evidence['complete']is not True or evidence['nonempty']is not False
+            or receipt['argv']!=['core-call',URI,'--profiler-position',str(profile['time']),'--max-results','64']
+            or receipt['exit_code']!=0 or gateway['ok']is not True or gateway['is_command_line']is not True
+            or gateway['call']['evidence_path']!=profile['raw']['path'] or raw['api']!=URI or raw['version']!=version
+            or raw['ok']is not True or raw['dry_run']is not False or raw['error_code']is not None or raw['result']!={'return':[]}
+            or issuer['context']!=profile['availability_context'] or issuer['plan']['request']!=profile['request']
+            or issuer['context']['live']!={key:report['host'][key]for key in ('version','sessionId','processId')}
+            or audit.digest({k:v for k,v in issuer.items()if k!='sha256'})!=issuer['sha256']
+            or issuer['plan']['result']['return']!=[] or audit.digest(issuer['plan']['result'])!=gateway['agent_result']['snapshot_sha256']
+            or gateway['agent_result']['return']!=[] or gateway['agent_result']['complete']is not True or gateway['agent_result']['truncated']is not False
+            or final['source']!=profile['source'] or final['residual_state']['sandbox']!='deleted' or final['residual_state']['residual_processes']!=[]):
+        raise ValueError('Console LoadedMedia original availability/empty array/issuer/source/cleanup differs')
+    for key in ('decision','result','pre_teardown'):
+        if runtime.sha(read(profile[key]['path']))!=profile[key]['sha256']:
+            raise ValueError('Console LoadedMedia retained lifecycle closure differs')
+    decision=load(profile['decision']['path'])
+    if decision['candidate']!=CONSOLE_CANDIDATE or decision['attempts']!=1:
+        raise ValueError('Console LoadedMedia retained attempt identity differs')
+    return dict(profile=profile,read=read,context=context,report=report,report_raw=report_raw,raw=raw,raw_bytes=raw_bytes,
+        archive=archive,category=category,sources=sources,request=profile['request'])
+
+
+def validate_console_program(record,binding,branch,root,edges=None):
+    _,profile,_=console_branch(branch,root)
+    return _validate_loaded_program(record,binding,branch,root,edges,{**profile,'host':'wwise-console'})
+
+
+def _console_bridge(proof,branch,root,base):
+    reviewed,profile,_=console_branch(branch,root)
+    bridge=completion.read_sealed_artifact(proof['source_review'],base)
+    if (set(bridge)!={'contract','version','review','availability_archive','availability_category','availability_context','positive_review','positive_archive','availability_program_capture'}
+            or bridge['contract']!='waapi-skill.console-loaded-media-source/v1'
+            or bridge['version']!=branch['route'].split('|')[0] or bridge['review']['sha256']!=CONSOLE_REVIEW_SHA
+            or completion.read_sealed_artifact(bridge['review'],base)!=reviewed
+            or bridge['availability_context']!=profile['availability_context'] or bridge['positive_review']['sha256']!=REVIEW_SHA
+            or completion.read_sealed_artifact(bridge['positive_review'],base)!=review(root)):
+        raise ValueError('Exact Console LoadedMedia composite bridge differs')
+    return console_availability(bridge['version'],root=root,base=base,archive=bridge['availability_archive'],category=bridge['availability_category'])
+
+
+def validate_console_evidence(record,binding,branch,category,base,root,edges=None):
+    _,profile,_=console_branch(branch,root)
+    if category=='program':
+        if binding.get('runtime_observation_attachment'):
+            proof=runtime._proof(binding,base)
+            if audit.digest(record['runtime_read_program'])!=audit.digest(completion.read_sealed_artifact(proof['program_capture'],base)):
+                raise ValueError('Console LoadedMedia attached current program differs')
+        return validate_console_program(record,binding,branch,root,edges)
+    if category!='native' or branch['id']!=profile['gate'] or not binding.get('runtime_observation_attachment'):
+        raise ValueError('Only exact Console LoadedMedia result root accepts composite native support')
+    proof=runtime._proof(binding,base);mapping=proof['mapping'];original=_console_bridge(proof,branch,root,base)
+    bridge=completion.read_sealed_artifact(proof['source_review'],base)
+    prefix='lm-console-'+branch['route'][:4]+'-'
+    positive=original_observation(base,root=root,copied_prefix=prefix)
+    captured=completion.read_sealed_artifact(proof['program_capture'],base)
+    available=completion.read_sealed_artifact(bridge['availability_program_capture'],base)
+    if (proof['branch_id']!=branch['id'] or proof['native_shape_sha256']!=branch['shape_sha256']
+            or proof['native_run']!=record['native_runs'][0] or len(record['native_runs'])!=1
+            or proof['archive']!=original['archive'] or bridge['positive_archive']!=positive['archive']
+            or proof['capture_original_path']!=profile['report']['path'] or (base/proof['capture']['artifact']).read_bytes()!=original['report_raw']
+            or (base/mapping['raw_observation']['artifact']).read_bytes()!=original['raw_bytes'] or mapping['raw_original_path']!=profile['raw']['path']
+            or proof['relevant_sources']!=original['sources'] or record['observation_artifacts']!={'capture':proof['capture'],'raw':mapping['raw_observation']}
+            or binding['reference_chain']!=[] or mapping['native_pointer']!='/observations/raw/result' or mapping['program_pointer']!='/native_call/result'
+            or binding['observation_pointer']!=mapping['native_pointer'] or binding['program_observation_pointer']!=mapping['program_pointer']
+            or record.get('representative_native_support')!=console_basis(profile)
+            or captured['native_call']!={'uri':URI,'args':positive['request']['args'],'options':{},'result':positive['raw']['result']}
+            or available['native_call']!={'uri':URI,'args':original['request']['args'],'options':{},'result':original['raw']['result']}):
+        raise ValueError('Console LoadedMedia exact primary availability and separate positive replay differ')
+    for cap in (captured,available):
+        temp={**binding,'input':{**binding['input'],'gateway_argv':cap['gateway']['argv']}}
+        validate_console_program({'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
+            'relevant_sources':cap['source_context']['packaged']},temp,branch,root,edges)
+
+
+def validate_console_source(proof,sources,branch,binding,root,base):
+    _,profile,_=console_branch(branch,root)
+    if branch['id']!=profile['gate'] or proof['from_candidate']!=CONSOLE_CANDIDATE or not binding.get('runtime_observation_attachment'):
+        raise ValueError('Console LoadedMedia source bridge requires exact original Console gate')
+    attached=runtime._proof(binding,base)
+    original=_console_bridge(attached,branch,root,base)
+    if proof['loaded_media_source_review']!=attached['source_review'] or sources!=original['sources'] or attached['relevant_sources']!=sources:
+        raise ValueError('Console LoadedMedia original full413 source bridge differs')
+
+
+def write_console_bundle(output,captures,*,inventory,version):
+    """The existing portable format, exactly31 Console IDs and one result gate."""
+    from tests.support import runtime_remaining_evidence as remaining
+    reviewed=console_review();original=console_availability(version);profile=original['profile']
+    positive=original_observation();name_prefix='lm-console-'+version[:4]+'-'
+    output=Path(output);output.mkdir(parents=True,exist_ok=False)
+    source=audit.ROOT/FIXTURE
+    for name in ('r124-originals.json.gz','r124-category.json','support-review.json','console-review.json',
+                 profile['archive']['artifact'],profile['category']['artifact']):
+        shutil.copyfile(source/name,output/(name_prefix+name))
+    def write(name,value):return runtime.write_json(output/(name_prefix+name),value)
+    def desc(name):return {'artifact':name_prefix+name,'sha256':runtime.sha((output/(name_prefix+name)).read_bytes())}
+    (output/(name_prefix+'original-capture.json')).write_bytes(original['report_raw'])
+    (output/(name_prefix+'original-raw.json')).write_bytes(original['raw_bytes'])
+    route,=[r for r in inventory['native_coverage']['routes']if r['id']==profile['route']]
+    public,=[r for r in inventory['routes']if r['id']==route['public_route']]
+    candidate=inventory['native_coverage']['candidate_sha256'];sources=original['sources']
+    loaded=[json.loads(Path(path).read_bytes())for path in captures]
+    availability,=[c for c in loaded if c['native_call']=={'uri':URI,'args':original['request']['args'],'options':{},'result':{'return':[]}}]
+    availability_capture=write('availability-program-capture.json',availability)
+    index={'contract':'waapi-skill.branch-evidence-index/v1','base':'.','entries':[]}
+    requirements={'contract':'waapi-skill.branch-evidence-requirements/v1','branches':{}}
+    selected=set();attachment=None
+    edges={b['id']:b for b in inventory['native_coverage']['obligations']if b['kind']=='reference'}
+    for number,captured in enumerate(loaded):
+        mapped=[m for m in _mappings(inventory,captured,route)if m['branch']['id']not in selected]
+        if not mapped:continue
+        prefix='flow-'+str(number)+'-';cp=write(prefix+'capture.json',captured)
+        program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':captured['source_context']['packaged'],
+            'gateway':captured['gateway'],'native_call':captured['native_call'],'runtime_read_program':captured,
+            'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':captured['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
+        document={'contract':'waapi-skill.branch-bindings/v1','bindings':{}};policies={'contract':requirements['contract'],'branches':{}}
+        for mapping in mapped:
+            branch=mapping['branch'];identity=branch['id'];_,_,entry=console_branch(branch);pointer=mapping['program_pointer']
+            pp=fixed.public_pointer(branch,pointer,program)
+            check=({'pointer':pointer,'cardinality':branch['value']}if branch['kind']=='collection_cardinality'else
+                {'pointer':pointer,'equals':completion.pointer_value(program,pointer)})
+            assertion={'native_shape_sha256':branch['shape_sha256'],'native_route':profile['route']}
+            program['branch_assertions'][identity]={**assertion,'checks':[check,{'pointer':pp,'equals':completion.pointer_value(program,pp)}]}
+            binding={'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'public_route':public['id'],
+                'public_route_sha256':audit.digest(public),'input':{'gateway_argv':captured['gateway']['argv'],'selector':pointer},
+                'dispatch_pointer':'/native_call','observation_pointer':pointer,'gateway_observation_pointer':pp,'reference_chain':mapping['reference_chain'],
+                'relevant_sources':sorted(sources),'evidence':{},**{key:{'source':symbol,'selector':branch['pointer']}for key,symbol in (
+                    ('construction','skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#materialize_runtime_inspection_business_request'),
+                    ('validation','skills/waapi-skill/wwise_waapi/builders/schema.py#validate_resolved_semantic_result'),
+                    ('verifier','skills/waapi-skill/wwise_waapi/runtime_inspection_business.py#normalize_runtime_inspection_result'))}}
+            validate_console_program(program,binding,branch,audit.ROOT,edges)
+            document['bindings'][identity]=binding;policies['branches'][identity]=remaining.policy(entry);selected.add(identity)
+            if identity==profile['gate']:
+                if captured['native_call']!={'uri':URI,'args':positive['request']['args'],'options':{},'result':positive['raw']['result']}:
+                    raise ValueError('Console LoadedMedia gate requires complete original9262 public replay')
+                native_run={**desc(profile['category']['artifact']),'nodeid':profile['category']['nodeid'],
+                    'observation_sha256':[desc('original-capture.json')['sha256'],desc('original-raw.json')['sha256']]}
+                native_check={'pointer':'/observations/raw/result','equals':original['raw']['result']}
+                native={'candidate_sha256':candidate,'scope_kind':'product','evidence_kind':'native_execution','relevant_sources':sources,
+                    'invocation':original['context']['record']['invocation'],'native_runs':[native_run],
+                    'observation_artifacts':{'capture':desc('original-capture.json'),'raw':desc('original-raw.json')},
+                    'representative_native_support':console_basis(profile),'branch_assertions':{identity:{**assertion,'checks':[native_check]}}}
+                nd={**write('native.json',native),'nodeid':profile['category']['nodeid']}
+                mapping={k:v for k,v in mapping.items()if k!='branch'}
+                mapping.update(categories=['program','native'],branch_id=identity,native_shape_sha256=branch['shape_sha256'],
+                    category='console-additional-runtime-read-batch',native_pointer='/observations/raw/result',native_result_parent='/observations/raw',
+                    native_checks=[native_check],raw_observation=desc('original-raw.json'),raw_original_path=profile['raw']['path'])
+                bridge=write('console-source-review.json',{'contract':'waapi-skill.console-loaded-media-source/v1','version':version,
+                    'review':desc('console-review.json'),'availability_archive':desc(profile['archive']['artifact']),
+                    'availability_category':desc(profile['category']['artifact']),'availability_context':profile['availability_context'],
+                    'positive_review':desc('support-review.json'),'positive_archive':desc('r124-originals.json.gz'),
+                    'availability_program_capture':availability_capture})
+                proof=write('proof.json',{'contract':'waapi-skill.runtime-observation-proof/v1','branch_id':identity,
+                    'native_shape_sha256':branch['shape_sha256'],'mapping':mapping,'native_run':native_run,
+                    'archive':desc(profile['archive']['artifact']),'capture':desc('original-capture.json'),'capture_original_path':profile['report']['path'],
+                    'program_capture':cp,
+                    'relevant_sources':sources,'source_review':bridge})
+                attached=deepcopy(binding);attached.update(runtime_observation_attachment=proof,program_observation_pointer=pointer,
+                    observation_pointer=mapping['native_pointer'],native_observations_sha256={k:v['sha256']for k,v in native['observation_artifacts'].items()})
+                eq=write('native-equivalence.json',{'contract':'waapi-skill.branch-evidence-equivalence/v1','from_candidate':CONSOLE_CANDIDATE,
+                    'to_candidate':candidate,'branch_id':identity,'native_shape_sha256':branch['shape_sha256'],'native_route':profile['route'],
+                    'evidence_sha256':native_run['sha256'],'binding_semantics_sha256':audit.digest(completion.binding_semantics(attached)),
+                    'reviewed_reason':'Exact actualConsole empty availability plus separately mandatory9262 prepared-media semantic support and both full current Console replays; no Console nonempty native execution',
+                    'sources':sources,'loaded_media_source_review':bridge})
+                attachment=write('attachment.json',{'contract':'waapi-skill.runtime-observation-attachment/v1','branch_id':identity,
+                    'proof':proof,'evidence':nd,'native_equivalence':eq})
+        pd={**write(prefix+'program.json',program),'nodeid':captured['nodeid']}
+        for binding in document['bindings'].values():binding['evidence']['program']=deepcopy(pd)
+        bd=write(prefix+'bindings.json',document);rd=write(prefix+'requirements.json',policies)
+        index['entries'].append({'id':name_prefix+'loaded-media-'+str(number),'bindings':bd,'origin':{'bindings':bd,'program':desc(prefix+'program.json'),'requirements':rd,'capture':cp}})
+        requirements['branches'].update(policies['branches'])
+    if selected!={i for i,e in reviewed['entries'].items()if e['route']==profile['route']}or attachment is None:
+        raise ValueError('Console LoadedMedia bundle requires exact31 branches and complete composite gate')
+    index['runtime_observation_attachments']=[attachment]
+    write('requirements.json',requirements);write('index.json',index)
+    return output/(name_prefix+'index.json')

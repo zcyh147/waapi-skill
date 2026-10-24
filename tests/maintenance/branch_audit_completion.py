@@ -172,6 +172,8 @@ def candidate_identity(root, inventory, catalogs, *, digest):
                  'tests/support/runtime_observation_evidence.py',
                  'tests/fixtures/runtime/runtime-risk-policy-r124.json',
                  'tests/fixtures/runtime/runtime-opaque-policy-r126.json',
+                 'tests/fixtures/runtime-loaded-media/console-review.json',
+                 'tests/unit/test_console_loaded_media_evidence.py',
                  'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
                  'tests/support/runtime_remaining_evidence.py', 'tests/support/runtime_log_retained_evidence.py',
                  'tests/fixtures/runtime-log/retained-log-support.json',
@@ -1864,11 +1866,16 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             branch['representative_native_support'] = dict(BASIS)
         elif (branch['evidence_results'].get('native', {}).get('outcome') == 'passed'
                 and bindings.get(branch['id'], {}).get('runtime_observation_attachment')):
-            from tests.support.loaded_media_runtime_evidence import COMPOSITE_ROUTES, composite_branch, composite_basis
+            from tests.support.loaded_media_runtime_evidence import (COMPOSITE_ROUTES, composite_branch, composite_basis,
+                CONSOLE_ROUTES, console_branch, console_basis)
             if branch['route'] in COMPOSITE_ROUTES.values():
                 _, profile, _ = composite_branch(branch,root)
                 if branch['id'] == profile['anchor']:
                     branch['representative_native_support'] = composite_basis(profile)
+            elif branch['route'] in CONSOLE_ROUTES.values():
+                _, profile, _ = console_branch(branch,root)
+                if branch['id'] == profile['gate']:
+                    branch['representative_native_support'] = console_basis(profile)
     complete_states = {'verified', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:
