@@ -5,6 +5,67 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-24 R128 bounded Console log observations
+
+Frozen `d72e935c` ran three sequential owned Console sessions through the
+existing destructive lifecycle. Four independently recorded cases passed:
+
+| Console build | Selected cases | Test seconds | Established result |
+| --- | --- | ---: | --- |
+| 2023.1.19.8928 | Clear general log | 14.62 | Successful native ACK; result-schema-only verification |
+| 2024.1.13.9056 | Clear general log | 10.58 | Successful native ACK; result-schema-only verification |
+| 2025.1.7.9143 | Empty message; message with surrounding space, tab and newline | 11.30 | Exact matching addition event and durable verification for each message |
+
+The old-version results explicitly retain `business_state_verified=false` and
+`console_log_unobservable`; they prove command availability, not observed log
+removal. Each 2025 case observed one exact matching event and successful
+unsubscribe, with the same observation preserved in the transaction journal.
+Neither case claims exclusive causation or continuing channel state.
+
+All selected category and final invocation records passed. Source hashes and
+project mtimes stayed unchanged; all owned process groups exited and all three
+sandboxes were deleted. Total pytest time was 36.50s. Roots are
+`.waapi-skill-state/full-coverage/r128-console-log-native-{2023,2024,2025}-r1`.
+There was no retry, extra runtime-reader sweep, GUI, SDK setup or Fresh run.
+This is Mac Console evidence; original failed roots remain unchanged.
+
+The collector was independently reviewed after ten distinct focused fake-client
+cases passed. Cleanup controls corrected a test-only assumption about repeated
+unsubscribe attempts after failure; only those two failed cases were rerun.
+Existing native test bodies, the shared lifecycle and packaged source were
+unchanged by the collector. Exact branch admission and current global publication
+remain separate work; these four cases do not complete #186.
+
+## 2026-10-24 R128 exact log messages and empty-candidate accounting
+
+Reviewed integration `9ba83f9a` combines the log-message repair and the shared
+empty-candidate accounting repair. Log addition now preserves native-valid empty
+and surrounding-whitespace messages. Its existing 16 KiB input limit remains;
+the bounded terminal allowance handles JSON escaping while preserving exact
+`agent_result` and full verification journals. Only resolved, valid log requests
+receive the exceptional allowance; the ordinary global limit is unchanged.
+Four maximum-message transactions passed in 4.21s. The final referenced-choice
+guard repair passed its three affected version cases in 0.58s; earlier complete
+transactions were not rerun for that isolated guard correction.
+
+The accounting tool now checks generated empty candidates against their resolved
+parent schemas, preserving IDs, owners and historical outcomes. Its ordinary
+consumer accepts exact-field public counterexamples only with causal successful
+counterparts. The initial three focused cases passed in 7.31s; independent review
+then found a missing CLI-flag-to-native-field relation. The repaired argument
+case passed in 1.45s, including a coherent wrong-flag control. Result evidence and
+the classification sweep were unchanged and were not recaptured.
+
+The static sweep classified 29,413 empty occurrences across all 14 owners:
+29,079 accepted, 179 rejected and 155 unknown. These are schema classifications,
+not completed business branches. Unsupported semantics remain unresolved, and
+native business requirements remain independent. The new test module is in the
+350-entry fixed Program roster; its manifest contract passed in 0.31s.
+
+Both review findings are resolved. This slice ran no native Wwise, Fresh or
+full gate and grants no new global coverage credit. Log native observations,
+current source reconciliation and the broader runtime admission remain pending.
+
 ## 2026-10-24 R127 additional Console runtime observations
 
 Frozen `2dc0ee57` ran one owned Console test on each pinned 2023.1–2025.1

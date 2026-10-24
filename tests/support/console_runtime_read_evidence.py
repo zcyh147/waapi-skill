@@ -43,7 +43,7 @@ def reviewed_source_context(sources, root=audit.ROOT):
     changes = {name:{'before':sources.get(name),'after':current.get(name)}
         for name in sources.keys() | current.keys() if sources.get(name) != current.get(name)}
     if (len(sources) != 413 or len(current) != 413
-            or changes != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE}):
+            or changes != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE, **runtime.LOG_MESSAGE_SOURCE_CHANGES}):
         raise ValueError('R125 exact reviewed source delta differs')
     return current
 
@@ -187,8 +187,8 @@ def write_bundle(output, program_path, *, inventory, version, key, name_prefix="
     source_review = emit('r127-source-review.json', {
         'contract':'waapi-skill.runtime-read-source-review/v1', 'historical_candidate':CANDIDATE,
         'historical_sources':original['sources'], 'current_sources':captured['source_context']['packaged'],
-        'changed_files':{runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE},
-        'changed_symbols':{runtime.METER_SOURCE:runtime.METER_SOURCE_SYMBOLS},
+        'changed_files':{runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE, **runtime.LOG_MESSAGE_SOURCE_CHANGES},
+        'changed_symbols':{runtime.METER_SOURCE:runtime.METER_SOURCE_SYMBOLS, **runtime.LOG_MESSAGE_SOURCE_SYMBOLS},
         'scope':{'version':version,'key':key,'route':route['id']},
         'archive':original['archive'],'original_capture':capture_descriptor,
         'program_replay':index_doc['entries'][0]['origin']['capture']})
@@ -266,7 +266,7 @@ def validate_evidence(record,binding,branch,category,base,root,edges):
 
 
 def validate_source_review(descriptor, sources, branch, root, base):
-    """Only exact106 R125 identities may bridge the one reviewed meter delta."""
+    """Only exact106 R125 identities may bridge the reviewed meter and log-message deltas."""
     version,key,profile,reader = profile_for_branch(branch,root)
     runtime._portable_descriptor(descriptor,base)
     review = completion.read_sealed_artifact(descriptor,base)
@@ -276,8 +276,8 @@ def validate_source_review(descriptor, sources, branch, root, base):
     if (set(review) != expected or review['contract'] != 'waapi-skill.runtime-read-source-review/v1'
             or review['historical_candidate'] != CANDIDATE or review['historical_sources'] != sources
             or review['current_sources'] != current
-            or review['changed_files'] != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE}
-            or review['changed_symbols'] != {runtime.METER_SOURCE:runtime.METER_SOURCE_SYMBOLS}
+            or review['changed_files'] != {runtime.METER_SOURCE:runtime.METER_SOURCE_CHANGE, **runtime.LOG_MESSAGE_SOURCE_CHANGES}
+            or review['changed_symbols'] != {runtime.METER_SOURCE:runtime.METER_SOURCE_SYMBOLS, **runtime.LOG_MESSAGE_SOURCE_SYMBOLS}
             or review['scope'] != {'version':version,'key':key,'route':branch['route']}):
         raise ValueError('R125 exact reviewed source/branch closure differs')
     original = original_observation(version,key,base,root)
