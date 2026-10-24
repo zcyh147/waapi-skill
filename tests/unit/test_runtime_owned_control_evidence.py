@@ -320,3 +320,26 @@ def test_cursor_controls_teardown_portable_consumer(request,tmp_path,host):
             policies_changed=deepcopy(policies);policies_changed['branches'][identity]['reason']='caller downgrade'
             assert next(r for r in evaluate(bindings,policies_changed)['obligations']if r['id']==identity)['state']!='verified'
     register_exact_evidence_finalizer(request.node,finalize)
+
+
+def test_owned_controls_shared_namespace_uses_actual_host(request,tmp_path):
+    from tests.support.runtime_owned_control_evidence import write_owned_control_bundle
+    uri=PREFIX+'setCursorTime';contexts=('wwise-authoring','wwise-console');routes=[f'2025.1|{h}|{BUILDS["2025.1"]}|function|{uri}'for h in contexts]
+    inventory=log_inventory(routes,{'/resultSchema'})
+    captures=[cursor_control_flow(tmp_path/h,h,uri,38549,38549)for h in contexts]
+    def finalize(phases):
+        components=[]
+        for i,(receipt,native,context,trace,calls,_)in enumerate(captures):
+            path=tmp_path/f'namespace-{i}.json';runtime.write_program_receipt(path,receipt,native,nodeid=request.node.nodeid,phase_reports=phases,source_context=context,native_reads=trace,public_calls=calls)
+            index=write_owned_control_bundle(tmp_path/('namespace-'+contexts[i]),[path],inventory=log_inventory([routes[i]],{'/resultSchema'}),name_prefix='owned-controls-2025.1-cursor-')
+            components.append((index,json.loads((index.parent/'requirements.json').read_bytes())))
+        index,policies=runtime.write_runtime_composition(tmp_path/'combined',components)
+        bindings,base,_=audit.portable_binding_inputs(index,policies)
+        result=completion.evaluate_coverage(audit.ROOT,inventory,bindings,digest=audit.digest,evidence_base=base,requirements_document=policies)
+        assert {r['route']:r['state']for r in result['obligations']}=={routes[0]:'verified',routes[1]:'implemented_unverified'}
+        for bad in ('owned-controls-2024.1-cursor-','owned-controls-2025.1-save-','../escape-'):
+            out=tmp_path/('bad-namespace-'+str(len(bad)))
+            with pytest.raises(ValueError,match='prefix'):write_owned_control_bundle(out,[path],inventory=log_inventory([routes[1]],{'/resultSchema'}),name_prefix=bad)
+            assert not out.exists()
+        with pytest.raises(ValueError,match='duplicates an exact branch'):runtime.write_runtime_composition(tmp_path/'duplicate',components+components[:1])
+    register_exact_evidence_finalizer(request.node,finalize)

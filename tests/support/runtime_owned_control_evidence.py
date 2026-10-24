@@ -223,7 +223,7 @@ def write_owned_control_bundle(output,captures,*,inventory,name_prefix='',file_b
                     if fixed.predicate(branch,fixed.schema_node(branch),v)),None)
                 if hit:mappings.append((branch,chain,hit[0],None));break
         if not mappings:continue
-        prefix=(name_prefix or'owned-controls-')+str(number)+'-';cp=write(prefix+'capture.json',cap)
+        prefix=(name_prefix or'owned-controls-')+context['host']+'-'+str(number)+'-';cp=write(prefix+'capture.json',cap)
         program={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':cap['source_context']['packaged'],
             'gateway':cap['gateway'],'native_call':cap['native_call'],'runtime_read_program':cap,
             'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':cap['nodeid'],'outcome':'PASS'}]},'branch_assertions':{}}
@@ -400,7 +400,7 @@ def _write_file_boundaries(output,index,requirements,inventory,paths,seen,name_p
         route,=[r for r in inventory['native_coverage']['routes']if r['uri']==PREFIX+'saveCapture'and all(r[k]==v for k,v in context.items())]
         identity=route['id']+'|/argsSchema/properties/file/@empty/string';branch,=[b for b in inventory['native_coverage']['obligations']if b['id']==identity];entry=exact_entry(branch)
         if identity in seen:raise ValueError('Duplicate file destination boundary')
-        public,=[r for r in inventory['routes']if r['id']==route['public_route']];prefix=(name_prefix or'owned-controls-')+'boundary-'+str(number)+'-'
+        public,=[r for r in inventory['routes']if r['id']==route['public_route']];prefix=(name_prefix or'owned-controls-')+context['host']+'-boundary-'+str(number)+'-'
         cp=runtime.write_json(output/(prefix+'capture.json'),proof);rejected=proof['rejections'][0];g=rejected['gateway'];check={'pointer':'/gateway/payload/error_code','equals':g['payload']['error_code']}
         record={'candidate_sha256':candidate,'scope_kind':'product','relevant_sources':cap['source_context']['packaged'],**rejected,'file_destination_boundary':proof,
             'invocation':{'phase':'final','outcome':'PASS','node_outcomes':[{'nodeid':proof['nodeid'],'outcome':'PASS'}]},'branch_assertions':{
