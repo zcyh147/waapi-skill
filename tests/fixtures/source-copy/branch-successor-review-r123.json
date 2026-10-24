@@ -2575,7 +2575,7 @@
     "tests/destructive/support/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tests/destructive/support/api_coverage.py": "02f172a8e0608734f85fe93321cd9a2225e7e22a2805994ede477919aaf92be6",
     "tests/destructive/support/api_coverage_audit.py": "d0269ef9e280ce251b51bb5f33212f43cddc1c12be57c3b0ba8dc998b4f90d99",
-    "tests/destructive/support/authoring_batch.py": "1d46faa0decd2d63948defafb979eaf0036c3ddb7b04d330b226bd81a2257493",
+    "tests/destructive/support/authoring_batch.py": "c6845c80a38146aa1a68dbc5c1ce5d1197c9ff40c640ddb766c79bad378a5880",
     "tests/destructive/support/category_evidence.py": "cd5ca301cf6439fdd82e6b7775ba5b16c152643694f79b4be02fde7618f676d7",
     "tests/destructive/support/condition_finalization.py": "4c423624d658311d19a065ff6a65a6858476c41ea6d97e9c9405618e3de9e8bb",
     "tests/destructive/support/console_file_observation.py": "880f37d09e9ec6333cf74172665bd83200b5d513ba1b2612bb75c5b42141a968",
@@ -2589,7 +2589,7 @@
     "tests/destructive/support/phase21_uri_policy.py": "ef664551b80dd766183a23e909872883c94a96795c4e9bcd78e44ea8e39ec32b",
     "tests/destructive/support/phase2_coverage_summary.py": "cd17906403118817883ce994a8c8ba4b0b198e92cfcdcf6ba73b3af209ee0bbd",
     "tests/destructive/support/profiler_capability.py": "4a342bfc4b17fad0ab1d19b9a7c127c7ccbb8f678b9373e8e648080f4f6c4d79",
-    "tests/destructive/support/sandbox_fixture.py": "739dde747fbf5119d78198bc25794772e76d4f3b70304729ae42d82172676a97",
+    "tests/destructive/support/sandbox_fixture.py": "743097c4e072724029e0ba2bb5fb1929395c1c555ba9f446966ec2395aa71bb5",
     "tests/destructive/support/source_copy_fixture.py": "f9c8ba22f8b69e01bd9e5cf2424699efad4bafce71b1d10a712caf2b3d80177d",
     "tests/destructive/support/windows_gate.py": "1eff2589433c25870068950a47aa2f5fc7be392919676374e3449527309a17c5",
     "tests/destructive/support/workflow_evidence.py": "0f5fc6990b938dfab34e90e26065a9864b02dc61d2e9da15eac76db08338aabb",
@@ -2609,7 +2609,7 @@
     "tests/destructive/test_2025_1_soundbank_audio_sandbox.py": "7561239a91c2f3ff1004d370fcc23d3f349d48f0d6bfaaeaf704da64fa63fc24",
     "tests/destructive/test_2025_1_switchcontainer_assignment_sandbox.py": "52e50f0b5a7df444e5d1ba75d8a485c39e8ee1dcb2f7b57d32eddf7837fe71f0",
     "tests/destructive/test_attenuation_activation_gateway.py": "52fbe6af28500f73d63205465df8f8d8ba31082ce8ab095d01503c1d581a9e8a",
-    "tests/destructive/test_authoring_ui_business_live.py": "116d825e8bf6b34a14792b32cd46ec6ea9261ce26fa5f5e89c3ea36f6af35da8",
+    "tests/destructive/test_authoring_ui_business_live.py": "87848c8cd11be0bff12b7c05a06b1454709bde4f49177e59f10542d74d6ff44a",
     "tests/destructive/test_condition_visibility_gateway.py": "a6ff1844657a51a71a67b953a642f9cac54ca20297c90d5488a094dcf5afa522",
     "tests/destructive/test_cross_family_derived_identity.py": "2b4c3c4731bb97d51a0f5098ae9a5fdc6c7cef030bb7da8bd17d28be4f1c36c9",
     "tests/destructive/test_cross_family_effects.py": "e90ddfbc5a61556cf10b787b497553b3f7f8258ffb7ae211bc2d43b17863e747",
@@ -2747,7 +2747,7 @@
     "tests/semantic/support/codex_repair_profile.py": "9147de94a92b940c58c9af0e678740021d4443d51dbc6b8a1ca1148678a746b6",
     "tests/semantic/support/codex_runtime_control_business_agent_runner.py": "19da1be637be4525c1a01674eb1614d85f5812d4286af3f691d03ec3db6510ac",
     "tests/semantic/support/codex_runtime_control_business_profile.py": "c557c19b05f32087442ba7a7ea3138421855e01e319e34c04ab34b374062bfb8",
-    "tests/semantic/support/codex_scenario_lifecycle_v3.py": "abf0eee777da0a7adea86784132cb2054f7057c6866c7a75e1e5ecb421978837",
+    "tests/semantic/support/codex_scenario_lifecycle_v3.py": "d92ada1ed73ba8b5766e9377ab4c7a8f2f34b035a87f1088ff95c03f0be8a1bc",
     "tests/semantic/support/codex_soundbank_business_plan_v3.py": "0de66ae0b98a6b85c1a2f8e0b24bc9b1868050cc97039e2588adec3fb53ca108",
     "tests/semantic/support/codex_soundbank_runtime_v3.py": "207d7e569e783f27069b6aa33c94b3d5e5cec38367319c9d940b2cd0abad95df",
     "tests/semantic/support/codex_soundengine_business_agent_runner.py": "8d4eda8c3dca1ac5bba4bb9dd7547d836629ca17c1374c234ad374684f27ead0",
@@ -3422,6 +3422,40 @@
         "source_relevance": "Removes the Authoring2024/25-only restriction, retaining native-catalog build/private-HOME/ownership checks. Selected Source Console lifecycle never enters that removed Authoring guard. No new native Source lifecycle evidence implied."
       }
     ],
+    "demo_successor_review": {
+      "changed_dependencies": [
+        {
+          "after_sha256": "c6845c80a38146aa1a68dbc5c1ce5d1197c9ff40c640ddb766c79bad378a5880",
+          "before_sha256": "1d46faa0decd2d63948defafb979eaf0036c3ddb7b04d330b226bd81a2257493",
+          "path": "tests/destructive/support/authoring_batch.py",
+          "source_relevance": "Only the exact single named 2025 IntegrationDemo Authoring node may bind the immutable private exact-build context. Added source/config revalidation, Demo outcome and attribution are node-specific. Selected Source Console collectors are not owned Authoring batch nodes; ordinary selections retain catalog pins and reject a nonmatching private context."
+        },
+        {
+          "after_sha256": "743097c4e072724029e0ba2bb5fb1929395c1c555ba9f446966ec2395aa71bb5",
+          "before_sha256": "739dde747fbf5119d78198bc25794772e76d4f3b70304729ae42d82172676a97",
+          "path": "tests/destructive/support/sandbox_fixture.py",
+          "source_relevance": "The optional developer_observation defaults to None. Its non-null branch requires the exact IntegrationDemoObservation type, matching Authoring host/build/console and AutomationMode. The existing Source Console launch/copy/isolation path omits it and retains prior strategy arguments."
+        },
+        {
+          "after_sha256": "87848c8cd11be0bff12b7c05a06b1454709bde4f49177e59f10542d74d6ff44a",
+          "before_sha256": "116d825e8bf6b34a14792b32cd46ec6ea9261ce26fa5f5e89c3ea36f6af35da8",
+          "path": "tests/destructive/test_authoring_ui_business_live.py",
+          "source_relevance": "Adds only the separate live/destructive test_runtime_owned_2025_integration_demo_loaded_media node; selected Source Console collector/node bodies and their copy/Save graph protocol are unchanged."
+        },
+        {
+          "after_sha256": "d92ada1ed73ba8b5766e9377ab4c7a8f2f34b035a87f1088ff95c03f0be8a1bc",
+          "before_sha256": "abf0eee777da0a7adea86784132cb2054f7057c6866c7a75e1e5ecb421978837",
+          "path": "tests/semantic/support/codex_scenario_lifecycle_v3.py",
+          "source_relevance": "The optional private exact-build context is validated before use and forwarded only in the Authoring keyword branch. Default Console lifecycle construction/launch and selected Source graph/Save/copy verification remain unchanged."
+        }
+      ],
+      "independent_review": "/tmp/waapi-r124-demo-startup-review.md",
+      "pending": "No final five-case capture or successor publication. Regenerate candidate/context and actual after-teardown captures once the coordinated batch is stable; no new Source native or global credit.",
+      "previous_source_basis": "36f890000c6520ed8ecfa44149acfba06da667e0",
+      "reviewed_demo_candidate": "03a3976960850d7dfab327c0296144e6f7a7a05f",
+      "scope": "Four exact previously reviewed Demo-only dependency transitions; same619 membership, five original predecessors and26 Source shapes. All four blobs equal ea9db027 and are unchanged by the startup repair. The separate prior17-path semantic assessment and historical R92 review remain retained.",
+      "source_basis": "51d3c4eadfc67fba978bf8aa38be6cc28b9457c1"
+    },
     "pending": "No five-case current capture or successor bridge publication in this preparation change.",
     "predecessor_review": {
       "path": "tests/fixtures/source-copy/branch-successor-review-r92.json",
@@ -3491,5 +3525,5 @@
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/id": "7dd81143cb4faa6d9acddc9824594b289a339db9ebbb98818dae736d2d1ba6be",
     "2025.1|wwise-console|2025.1.7.9143|function|ak.wwise.core.object.copy|/resultSchema/@definition/waapi_definitions.json/definitions/objectReturn/properties/name": "1ad2c9db3be7742ac25c695afa5eccd45deeb74488f5109192d2d82e566c2059"
   },
-  "source_basis": "36f890000c6520ed8ecfa44149acfba06da667e0"
+  "source_basis": "51d3c4eadfc67fba978bf8aa38be6cc28b9457c1"
 }
