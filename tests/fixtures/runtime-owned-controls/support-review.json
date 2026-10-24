@@ -6968,6 +6968,31 @@
       ],
       "receipt_sha256": "ae49a9b80c3fdada18330b1dcb60d5d8bc40b62a97b7dc643a9fcfa017c821e6",
       "witness_sha256": "56e3a9c8995a4113f7d65a6905425baacfc6b1e8b8972e4925c04d2f8220d812"
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.setCursorTime": {
+      "provider": "cursor-effect",
+      "cursor_route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getCursorTime",
+      "request": {
+        "api": "ak.wwise.core.profiler.setCursorTime",
+        "args": {
+          "time": 38549
+        },
+        "options": {}
+      },
+      "result": {
+        "return": 38549
+      },
+      "raw_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/r92-runtime-native-2025-r3/evidence/authoring-node-observations/f5b183948b1318c348e72a5f-native-evidence/1792757512210953000-e6c8b8e9d56749f59853c7f4dd26f324-ak_wwise_core_profiler_setCursorTime.json",
+      "raw_sha256": "ec2dab3df66595f9ba820c5faded3197bbc7876ac1875a25d30f7d15cf01e813",
+      "receipt_indices": [
+        74,
+        75,
+        76,
+        77,
+        78
+      ],
+      "receipt_sha256": "077c7e563c7ec258e0202d47b68a651a7b89a06e9c97754146102bc71987b67a",
+      "witness_sha256": "546124adfaed8cd5c8ec94b0ead26cd17bb1b09be55d94764b30b179b68d539e"
     }
   },
   "program_objects": {

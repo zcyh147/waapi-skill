@@ -215,24 +215,36 @@ def validate_counterexample(record, descriptor, branch, classification, candidat
         # field. Only this reviewed closed compiler mapping is admitted here;
         # generic empty classification does not authorize other input seams.
         from wwise_waapi.runtime_inspection_business_contracts import (
-            LOG_ADD_ITEM_URI, LOG_SEVERITY_MEANINGS, runtime_inspection_business_contract_data)
-        if uri != LOG_ADD_ITEM_URI or section != 'argsSchema':
-            raise ValueError('unsupported public flag to selected native field mapping')
+            LOG_ADD_ITEM_URI, LOG_SEVERITY_MEANINGS, PROFILER_MOVE_CURSOR_URI,
+            PROFILER_CURSOR_MOVE_MEANINGS, runtime_inspection_business_contract_data)
         declaration = runtime_inspection_business_contract_data(uri, version=version)['declaration']
-        expected_flag = declaration['input_forms']['severity']['flag']
-        source_edge = branch['route'] + '|/argsSchema/properties/severity/$ref'
+        if uri == LOG_ADD_ITEM_URI and section == 'argsSchema':
+            field, public_field, meanings = 'severity', 'severity', LOG_SEVERITY_MEANINGS
+            source_edge = branch['route'] + '|/argsSchema/properties/severity/$ref'
+            if (binding.get('reference_chain') != [source_edge]
+                    or reference_edges[source_edge]['reference']['target'] != branch['route'] + '|' + classification['parent_pointer']):
+                raise ValueError('public flag does not construct the selected native severity field')
+        elif (uri == PROFILER_MOVE_CURSOR_URI and version == '2025.1'
+                and section == 'argsSchema' and branch['pointer'] == '/argsSchema/properties/position/@empty/string'
+                and classification['parent_pointer'] == '/argsSchema/properties/position'
+                and binding.get('reference_chain') == []):
+            from tests.support.runtime_owned_control_evidence import exact_entry, review
+            exact_entry(branch, root)
+            if branch['id'] not in review(root)['cursor_counterexample_ids']:
+                raise ValueError('only exact two source-owned cursor counterexamples qualify')
+            field, public_field, meanings = 'position', 'cursor_move', PROFILER_CURSOR_MOVE_MEANINGS
+        else:
+            raise ValueError('unsupported public flag to selected native field mapping')
+        expected_flag = declaration['input_forms'][public_field]['flag']
         if (flag != expected_flag or gateway['argv'].count(expected_flag) != 1
-                or observation != expected_dispatch + '/args/severity'
-                or binding.get('reference_chain') != [source_edge]
-                or reference_edges[source_edge]['reference']['target'] != branch['route'] + '|' + classification['parent_pointer']):
-            raise ValueError('public flag does not construct the selected native severity field')
+                or observation != expected_dispatch + '/args/' + field):
+            raise ValueError('public flag does not construct the selected native field')
         public_value = good_argv[index]
-        if (public_value not in declaration['value_choices']['severity']
-                or public_value not in LOG_SEVERITY_MEANINGS):
-            raise ValueError('valid public severity counterpart is not a disclosed choice')
+        if public_value not in declaration['value_choices'][public_field] or public_value not in meanings:
+            raise ValueError('valid public counterpart is not a disclosed choice')
         good_value = pointer_value(record, observation)
-        if not _same(good_value, LOG_SEVERITY_MEANINGS[public_value]):
-            raise ValueError('compiled severity differs from its source-owned public meaning')
+        if not _same(good_value, meanings[public_value]):
+            raise ValueError('compiled field differs from its source-owned public meaning')
         expected_check = {'pointer': input_pointer, 'equals': classification['candidate']}
     parent = {**branch, 'pointer': classification['parent_pointer'], 'shape_sha256': classification['parent_schema_sha256']}
     validate_native_alternative(root, parent, good_value, require_known=True)
@@ -262,7 +274,10 @@ def counterexample_source_context(root):
         'tests/support/runtime_observation_evidence.py',
         'tests/fixtures/runtime/runtime-remaining-policy-r127.json',
         'tests/fixtures/runtime-log/r122-category.json', 'tests/fixtures/runtime-log/r122-original.json.gz',
-        'tests/fixtures/runtime-log/r122-support.json', 'tests/fixtures/runtime-log/retained-log-support.json') if (root / name).is_file()]
+        'tests/fixtures/runtime-log/r122-support.json', 'tests/fixtures/runtime-log/retained-log-support.json',
+        'tests/support/runtime_owned_control_evidence.py', 'tests/unit/test_runtime_owned_control_evidence.py',
+        'tests/fixtures/runtime-owned-controls/support-review.json', 'tests/support/runtime_cursor_evidence.py',
+        'tests/fixtures/runtime-cursor/support-review.json') if (root / name).is_file()]
     return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in sorted(set(paths))}
 
 

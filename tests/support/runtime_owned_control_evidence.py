@@ -15,7 +15,7 @@ PREFIX='ak.wwise.core.profiler.'
 METER_URIS=frozenset(PREFIX+n for n in ('registerMeter','unregisterMeter'))
 URIS=METER_URIS|{PREFIX+n for n in ('saveCapture','moveCursor','setCursorTime')}
 SUPPORT='tests/fixtures/runtime-owned-controls/support-review.json'
-SUPPORT_SHA='1d580e740482d4a09ba786941d94609a708a25d73e113f77457157d089be214a'
+SUPPORT_SHA='8fd6711d144a3bf2e30bee630adaaab2492ad8c376d29266e79168c1369f83f3'
 CONTRACT='waapi-skill.retained-owned-control-assessment/v1'
 
 
@@ -76,6 +76,7 @@ def _capture(encoded,root):
     if cap['source_context']!=remaining._current_context(root,uri,cap['source_context']):raise ValueError('Owned control capture sources changed')
     if uri in METER_URIS:return _meter_capture(encoded,root)
     if uri==PREFIX+'saveCapture':return _save_capture(encoded,root)
+    if uri in {PREFIX+'moveCursor',PREFIX+'setCursorTime'}:return _cursor_capture(encoded,root)
     raise ValueError('Owned control family mapper not implemented')
 
 
@@ -177,7 +178,7 @@ def validate_evidence(record,binding,branch,category,base,root,edges=None):
 def qualified_result(descriptor,assessment,branch,candidate,scope_kind,base,binding,root,edges):
     entry=exact_entry(branch,root)
     if branch['pointer']!='/resultSchema'or entry['role']!='native_business_anchor'or scope_kind!='product':raise ValueError('Only exact owned-control roots qualify')
-    original=(original_save if branch['route'].endswith('.saveCapture')else original_meter)(branch['route'],base,root=root);p=original['profile'];cp=cursor.review(root)['profiles'][p['cursor_route']]
+    original=original_control(branch['route'],base,root=root);p=original['profile'];cp=cursor.review(root)['profiles'][p['cursor_route']]
     cap=completion.read_sealed_artifact(assessment['program_capture'],base);record=completion.read_sealed_artifact(descriptor,base)
     expected={'contract':CONTRACT,'branch_id':branch['id'],'profile':p,'support_review':assessment['support_review'],'archive':original['archive'],'program_capture':assessment['program_capture'],'facts':original['facts']}
     if branch['route'].endswith('.saveCapture'):
@@ -240,7 +241,7 @@ def write_owned_control_bundle(output,captures,*,inventory,name_prefix='',file_b
             validate_evidence(program,binding,branch,'program',output,audit.ROOT,edges)
             bindings['bindings'][identity]=binding;policies['branches'][identity]=remaining.policy(entry);seen.add(identity)
             if entry['role']=='native_business_anchor'and route['id']in review()['profiles']:
-                original=(original_save if uri==PREFIX+'saveCapture'else original_meter)(route['id']);p=original['profile'];cp_profile=cursor.review()['profiles'][p['cursor_route']]
+                original=original_control(route['id']);p=original['profile'];cp_profile=cursor.review()['profiles'][p['cursor_route']]
                 expected_args=cap['native_call']['args']if uri==PREFIX+'saveCapture'else p['request']['args']
                 if cap['native_call']!={'uri':uri,'args':expected_args,'options':{},'result':p['result']}:
                     raise ValueError('Capture native root requires actual original complete request/result replay first')
@@ -416,3 +417,85 @@ def _write_file_boundaries(output,index,requirements,inventory,paths,seen,name_p
         policy={'contract':requirements['contract'],'branches':{identity:remaining.policy(entry)}};rd=runtime.write_json(output/(prefix+'requirements.json'),policy)
         index['entries'].append({'id':prefix,'bindings':bd,'origin':{'bindings':bd,'program':{'artifact':pd['artifact'],'sha256':pd['sha256']},'requirements':rd,'capture':cp}})
         requirements['branches'].update(policy['branches']);seen.add(identity)
+
+
+def original_control(route,base=None,*,root=audit.ROOT):
+    uri=route.split('|')[-1]
+    if uri in METER_URIS:return original_meter(route,base,root=root)
+    if uri==PREFIX+'saveCapture':return original_save(route,base,root=root)
+    p=review(root)['profiles'].get(route)
+    if p is None or p['provider']!='cursor-effect':raise ValueError('No exact retained cursor control effect for route')
+    original=cursor.original_cursor(p['cursor_route'],base,root=root);cp=original['profile'];read=original['read'];calls=json.loads(read(cp['node_path']))['receipts'];chain=[calls[i]for i in p['receipt_indices']]
+    preview,shown,confirmed,executed,verified=chain;raw=json.loads(read(p['raw_path']));payload=verified['payload'];witness=json.loads(read(cp['report_path']))['outcomes']['profiler-cursor-snap-readback'];e=witness['evidence'];time=p['result']['return']
+    if (audit.digest(chain)!=p['receipt_sha256']or runtime.sha(read(p['raw_path']))!=p['raw_sha256']or audit.digest(witness)!=p['witness_sha256']
+            or witness['outcome']!='PASS'or type(time)is not int or time<0 or e['snapped_time_ms']!=time or e['requested_time_ms']!=p['request']['args']['time']
+            or e['user_cursor']!={'profiler_cursor':'user-cursor','available':True,'position_ms':time}or e['transaction']!=payload
+            or raw['ok']is not True or raw['dry_run']is not False or raw['api']!=uri or raw['result']!=p['result']
+            or payload['agent_result']['request']['arguments']!=p['request']or payload['agent_result']['result']!=p['result']
+            or any(c['exit_code']!=0 or c['payload'].get('ok')is not True for c in chain)
+            or shown['argv']not in [preview['payload']['next_command']['gateway_argv'],['transaction-show',preview['payload']['transaction_id']]]
+            or confirmed['argv']!=shown['payload']['next_command']['gateway_argv']or executed['argv']!=['execute',preview['payload']['transaction_id']]
+            or verified['argv']!=executed['payload']['next_command']['gateway_argv']or any(c['payload']['artifact_hash']!=preview['payload']['artifact_hash']for c in chain)
+            or Path(executed['payload']['dispatch_result']['evidence_path']).name!=Path(p['raw_path']).name
+            or payload['verified']is not True or payload['verification']['business_state_verified']is not True
+            or payload['verification']['verification_strength']!='independent_profiler_user_cursor_observation'or payload['automatic_retry']is not False):
+        raise ValueError('Exact original cursor returned time/independent observation/authorization differs')
+    return {'profile':p,'archive':original['archive'],'read':read,'facts':{**original['facts'],'actual_control':uri,
+        'requested_time_ms':e['requested_time_ms'],'returned_time_ms':time,'independent_user_cursor':e['user_cursor'],
+        'continuing_cursor_position_verified':False,'capture_data_verified':False}}
+
+
+@lru_cache(maxsize=128)
+def _cursor_capture(encoded,root):
+    from wwise_waapi.runtime_inspection_business_contracts import PROFILER_CURSOR_MOVE_MEANINGS
+    from wwise_waapi.builders.schema import validate_resolved_semantic_result
+    cap=json.loads(encoded);native=cap['native_call'];uri=native['uri'];calls=cap['public_calls'];trace=cap['native_reads'];getter=PREFIX+'getCursorTime'
+    if (uri not in {PREFIX+'moveCursor',PREFIX+'setCursorTime'}or cap['contract']!='waapi-skill.runtime-read-program/v1'
+            or cap['phase_reports']!=dict.fromkeys(('setup','call','teardown'),'passed')or cap['source_unchanged']is not True or len(calls)!=9 or not 1<=len(trace)<=96):
+        raise ValueError('Complete actual cursor control/public observation/teardown required')
+    commands=['draft-start','draft-declare-runtime-control-plan','draft-check','preview-from-draft','transaction-show','confirm','execute','verify','transaction-show'];end=0
+    for command,item in zip(commands,calls,strict=True):
+        g=item['gateway'];start=item['native_start'];stop=item['native_end']
+        if (g['argv'][0]!=command or g['exit_code']!=0 or g['payload'].get('ok')is not True or type(start)is not int or start!=end
+                or type(stop)is not int or not start<=stop<=len(trace)or'agent_result'in g['payload']and list(g['payload'])[-1]!='agent_result'):
+            raise ValueError('Cursor exact public phase/native span differs')
+        end=stop
+    allowed={uri,getter,'ak.wwise.core.getInfo','ak.wwise.core.getProjectInfo','ak.wwise.core.remote.getConnectionStatus'}
+    if end!=len(trace)or any(set(x)!={'ordinal','uri','args','options','result'}or type(x['ordinal'])is not int or x['ordinal']!=i or x['uri']not in allowed for i,x in enumerate(trace)):
+        raise ValueError('Cursor finite once-only trace differs')
+    contexts=[completion.native_host_context(x['result'],'isCommandLine')for x in trace if x['uri']=='ak.wwise.core.getInfo']
+    if not contexts or any(x!=contexts[0]for x in contexts)or contexts[0]['version']!='2025.1':raise ValueError('Cursor actual host/version drift')
+    context=contexts[0];mutations=[{k:x[k]for k in ('uri','args','options','result')}for x in trace if x['uri']==uri];reads=[x for x in trace if x['uri']==getter]
+    if mutations!=[native]or len(reads)!=1 or reads[0]['args']!={'cursor':'user'}or reads[0]['options']!={}:raise ValueError('Cursor needs one dispatch and one independent user observation')
+    started,declared,checked,preview,shown,confirmed,executed,verified,full=[x['gateway']for x in calls];payload=verified['payload'];tx=preview['payload']['transaction_id'];seal=preview['payload']['artifact_hash'];draft=started['payload']['draft']['draft_id'];authority=started['payload']['task_authority']
+    if (started['argv']!=['draft-start',uri]or any(draft not in x['argv']or authority not in x['argv']for x in (declared,checked,preview))
+            or shown['argv']!=preview['payload']['next_command']['gateway_argv']or confirmed['argv']!=shown['payload']['next_command']['gateway_argv']
+            or executed['argv']!=['execute',tx]or verified['argv']!=executed['payload']['next_command']['gateway_argv']or full['argv']!=['transaction-show',tx]
+            or any(x['payload'].get('transaction_id')!=tx or x['payload'].get('artifact_hash')!=seal for x in (shown,confirmed,executed,verified,full))
+            or payload['agent_result']['request']['arguments']!={'api':uri,'args':native['args'],'options':{}}or payload['agent_result']['result']!=native['result']or cap['gateway']!=verified
+            or payload['verified']is not True or payload['state']!='verified'or payload['automatic_retry']is not False
+            or payload['verification']['business_state_verified']is not True or payload['verification']['verification_strength']!='independent_profiler_user_cursor_observation'
+            or payload['is_command_line']is not (context['host']=='wwise-console')):raise ValueError('Sealed cursor authorization/once execution/verification differs')
+    argv=declared['argv'];flag='--cursor-move'if uri.endswith('.moveCursor')else'--cursor-target-ms';value=argv[argv.index(flag)+1]
+    args={'position':PROFILER_CURSOR_MOVE_MEANINGS.get(value)}if uri.endswith('.moveCursor')else{'time':int(value)}
+    if native['args']!=args or native['options']!={}:raise ValueError('Exact public cursor meaning differs from compiled native request')
+    validate_resolved_semantic_result(uri,native['result'],version=context['version']);time=native['result']['return']
+    if type(time)is not int or time<0 or reads[0]['result']!={'return':time}:raise ValueError('Returned cursor time is unavailable or differs from independent observation')
+    if not calls[7]['native_start']<=reads[0]['ordinal']<calls[7]['native_end']:raise ValueError('Independent getter must occur in verification phase')
+    evidence=next(e['details']['verification']for e in reversed(full['payload']['events'])if e['event_type']=='verification_recorded');public=payload['verification']
+    matching=(audit.digest(evidence)==public['canonical_sha256']if 'summary_contract'in public else audit.digest(evidence)==audit.digest(public))
+    observed={'kind':'profiler-user-cursor-observation','returned_time_ms':time,'observed_time_ms':time,'capture_data_verified':False,'outcome':'matched'}
+    if (not matching or evidence['verification_scope']['cursor_observation']!=observed
+            or evidence['verification_scope']['continuing_cursor_position_verified']is not False
+            or {k:reads[0][k]for k in ('uri','args','options','result')}not in evidence['readbacks']):raise ValueError('Complete independent cursor verification evidence differs')
+    return context,None
+
+
+def cursor_counterexample_policy(branch,root=audit.ROOT):
+    exact_entry(branch,root)
+    if branch['id']not in review(root)['cursor_counterexample_ids']:raise ValueError('Only exact two cursor-position counterexamples qualify')
+    from tests.support.empty_candidate_evidence import classify_empty_candidate
+    classification=classify_empty_candidate(root,branch)
+    if classification is None or classification['status']!='rejected':raise ValueError('Exact invalid cursor-position candidate no longer rejects')
+    return {'native_shape_sha256':branch['shape_sha256'],'categories':['program'],'empty_candidate':classification,
+        'reason':'Resolved reflected schema rejects this concrete synthetic candidate; exact public counterexample program proof required. No native absence/effect or parent credit.'}
