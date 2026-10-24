@@ -1,0 +1,516 @@
+{
+  "contract": "waapi-skill.loaded-media-representative-support/v1",
+  "authority": "docs/plans/full-waapi-coverage/SPEC.md#5",
+  "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+  "anchor_id": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single",
+  "catalog_build": "2025.1.7.9143",
+  "observed_build": "2025.1.11.9262",
+  "basis": "exact_reviewed_representative_support",
+  "native_candidate": "7289081b552c5f428013ba0b6bacaf7d05843481",
+  "nodeid": "tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_2025_integration_demo_loaded_media",
+  "time": 99328,
+  "native_result": {
+    "return": [
+      {
+        "fileName": "Ambience_40.wav",
+        "format": "VORBIS",
+        "mediaId": 124871431,
+        "size": 160821,
+        "soundBank": "Prepared"
+      }
+    ]
+  },
+  "snapshot_sha256": "da8d3b80a7148634bbf429ae9f2874e26c7bd30ced9b30e18d7b043a99736979",
+  "selected_schema_sha256": "62d61a72646dba9851972cb3486f0b43c9511e0df365651dd0165cd1daa848e9",
+  "original_source_count": 620,
+  "original_sources_sha256": "ead6b2cdd8841581817b1e86361338c8e693eb3c2f78f7327ae409be58e895cf",
+  "node_sha256": "00ac08b59dbd44cdeeb37ee77f6871d39a48572f98b6ee50a5051e493d0021c3",
+  "archive_files": 110,
+  "archive_expanded_bytes": 2561685,
+  "files": {
+    "documented-api.html": "be7fdae15b2aa9cc852cd8955e48fba09bf3028c2adb180645b98f2f8e8583e0",
+    "r124-originals.json.gz": "c3f6002e9846db4f58397d201fdbb1987d3d5dfd37559eb7524fe9609f77f5e5",
+    "r124-category.json": "1e052ef14bf7c6fd2e7360795881bc3d7e3b579fafa8980cc2abc4d255848e9b",
+    "documented-result.html": "5f91c61ea16b8112abe20916804f6f410036ad17017864d85f329147058bbea2",
+    "selected-definitions.json": "b8ae9c539d28070b86595e8b5f893a518fb1ff5a3a33334b151a6bf3775de94c"
+  },
+  "documented_meaning": {
+    "source": "/Applications/Audiokinetic/Wwise_2025.1.11.9262/SDK/Help/WwiseSDK-Mac.chm",
+    "pages": [
+      "ak_wwise_core_profiler_getloadedmedia.html",
+      "ak_wwise_core_profiler_getloadedmedia_result_schema.html"
+    ],
+    "meaning": "Loaded media at a specific profiler capture time; media loaded into memory as a result of PrepareEvent() and PrepareGameSyncs(). This is the selected API data meaning, not proof of the control effect or arbitrary patch compatibility."
+  },
+  "entries": {
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema",
+      "kind": "schema",
+      "shape_sha256": "9a1a0e2d0262685cb4e8404bcc3aa0655ab415a4a04e8d07da2659f4a5361126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/properties/time",
+      "kind": "schema",
+      "shape_sha256": "9c42b1ac7f74c57043a39b63e9c5006f8d08f8d31137dd9c4b17c4d897b6b085",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/properties/time/$ref": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/properties/time/$ref",
+      "kind": "reference",
+      "shape_sha256": "1ac15471078d85eed39256583cb2dec2d6f8ee5054ad0ffee149fb9e163364db",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime",
+      "kind": "schema",
+      "shape_sha256": "b30c36884f7bff743ed80d53f8d4c2e3f47e199033168b30b44316b998cf4f35",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0",
+      "kind": "schema",
+      "shape_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/0/minimum",
+      "kind": "constraint",
+      "shape_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1",
+      "kind": "schema",
+      "shape_sha256": "46f0eca6e30e845752c8b1259e94732b76a84653341e434d65aa817126b2d228",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/cursorTime/oneOf/1/$ref",
+      "kind": "reference",
+      "shape_sha256": "f72676ff26630debef861148ffe4033c668fc9b24d84a20d7c754c1328aec72f",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor",
+      "kind": "schema",
+      "shape_sha256": "b6177e66ca25e1f83db5adcac350aff92816fc7c18a3b5202344c2de22bfb206",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/0": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/0",
+      "kind": "enum_value",
+      "shape_sha256": "3190d261d186aeead3a8deec202737c7775af5c8d455a9e5ba958c48b5fd3f59",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/@definition/waapi_definitions.json/definitions/profilerCursor/enum/1",
+      "kind": "enum_value",
+      "shape_sha256": "47ee4b87312f219001c8d947f53aa0bbd7c7bb7b88eea51cce7b10f28289b1f4",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/argsSchema/additionalProperties": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/argsSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema",
+      "kind": "schema",
+      "shape_sha256": "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/additionalProperties": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/optionsSchema/@empty/object": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/optionsSchema/@empty/object",
+      "kind": "empty_object",
+      "shape_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema",
+      "kind": "schema",
+      "shape_sha256": "f09178ae6a3b1b070f9ee2f50774be219489f105a94b1f8650d7f2deb0724e52",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return",
+      "kind": "schema",
+      "shape_sha256": "ac133006edea479122a4b7dc82090208567a90fbe43b61a77b3bf483ec263d10",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items",
+      "kind": "schema",
+      "shape_sha256": "557481127601716e3e4990d1cfeb3be26b6e2c8cb75b7616bff808e10e6b7e8b",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/fileName",
+      "kind": "schema",
+      "shape_sha256": "7e10cec76158c011979b1f70694fc7b86e7fd3b2f7d4054b01fcf4bab9803209",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/fileName/@empty/string": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/fileName/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/format",
+      "kind": "schema",
+      "shape_sha256": "262e1f10354f089dc483512b22a4cab1bd48ffe4cc8e752a952258841b29769e",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/format/@empty/string": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/format/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/mediaId": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/mediaId",
+      "kind": "schema",
+      "shape_sha256": "c7195823b0e4e8cce346830633ea77ea3d4e465b39ea81a4754bdb2dabdc1cc8",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/size": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/size",
+      "kind": "schema",
+      "shape_sha256": "655aabe5f9abe1a56b99c5cf4923acc922f4200a35c1d28bdddb8a0fc7021730",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/soundBank",
+      "kind": "schema",
+      "shape_sha256": "23580f8ceff789823c6ad27b6dc554cfa40b361a1a37635937d935ad6cd20c62",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/properties/soundBank/@empty/string": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/properties/soundBank/@empty/string",
+      "kind": "empty_string",
+      "shape_sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/items/additionalProperties": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/items/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/empty": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/empty",
+      "kind": "collection_cardinality",
+      "shape_sha256": "e6845188b1d2aebdf19d13c1613d7a49b5806a7fe336ec775fa182b36719bbc1",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/single",
+      "kind": "collection_cardinality",
+      "shape_sha256": "0fff5f85e4fa1de522cb860c8f414693642420ddf27f55e3f9975a17728b7469",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program",
+        "native"
+      ],
+      "required_native_anchor_ids": []
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/multiple": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/properties/return/@cardinality/multiple",
+      "kind": "collection_cardinality",
+      "shape_sha256": "106c572c7b5c17d9f9d57380703dedabf9ed54c0857fe9e02d752da03f0f12ea",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    },
+    "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/additionalProperties": {
+      "route": "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia",
+      "pointer": "/resultSchema/additionalProperties",
+      "kind": "schema",
+      "shape_sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195,
+      "categories": [
+        "program"
+      ],
+      "required_native_anchor_ids": [
+        "2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single"
+      ]
+    }
+  },
+  "prior_policy_absent": {
+    "path": "docs/branch-coverage-requirements.json",
+    "sha256": "99ad508b7fca40ea0db30542115ce90e421e46ed276200d5fbb63a8e39cada3a",
+    "candidate": "8b600cfaa45f6670da76187db2dd76e27b613ae3"
+  }
+}

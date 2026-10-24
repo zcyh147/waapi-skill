@@ -1407,6 +1407,10 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
             from tests.support.fixed_runtime_read_evidence import URIS, validate_program
             if (branch.get('route') or '').split('|')[-1] in URIS:
                 normalized_construction = validate_program(record, binding or {}, branch, root, reference_edges)
+        if (category == 'program' and branch.get('route') == '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia'
+                and not (binding or {}).get('runtime_observation_attachment')):
+            from tests.support.loaded_media_runtime_evidence import validate_program
+            normalized_construction = validate_program(record, binding or {}, branch, root, reference_edges)
         if (binding or {}).get('runtime_observation_attachment'):
             from tests.support.runtime_observation_evidence import validate_runtime_evidence
             validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges)
@@ -1581,7 +1585,11 @@ def evidence_result(descriptor, branch, candidate, category, scope_kind, base, b
                         raise ValueError('native exact node observation links missing')
             for context, item in contexts:
                 if context['version'] != expected_version or context['build'] != expected_build:
-                    raise ValueError('native version/build mismatch')
+                    if category == 'native' and (branch.get('route') or '').endswith('|function|ak.wwise.core.profiler.getLoadedMedia'):
+                        from tests.support.loaded_media_runtime_evidence import accepts_native_context
+                        accepts_native_context(context, branch, binding, record, base, root)
+                    else:
+                        raise ValueError('native version/build mismatch')
                 observed_hosts.add(context['host'])
                 if not metadata_replay:
                     validate_native_source(context, item, branch, candidate, binding, base, root, historical_sources)
@@ -1643,6 +1651,9 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
         raise ValueError('requirements must name exact in-scope branches')
     from tests.support.runtime_observation_evidence import runtime_preservation_gates, apply_runtime_preservation_gates
     preservation_gates = runtime_preservation_gates(root, policies, native['obligations']) if scope is None else {}
+    if scope is None:
+        from tests.support.loaded_media_runtime_evidence import preservation_gates as loaded_media_gates
+        preservation_gates.update(loaded_media_gates(root, policies, native['obligations']))
     public = {r['id']: r for r in inventory['routes']}
     routes = {r['id']: r for r in native['routes']}
     symbols = {}
@@ -1764,6 +1775,12 @@ def evaluate_coverage(root, inventory, bindings_document, *, digest, scope=None,
             branch['direct_recipient_instance_metadata'] = 'not_observed'
         branch['state'] = 'verified' if outcomes <= {'passed', 'reviewed_mechanism_reuse', 'reviewed_class_metadata_and_object_scope_mechanism'} else 'environment_blocked' if 'blocked' in outcomes else 'implemented_unverified'
     apply_runtime_preservation_gates(native['obligations'], policies, preservation_gates)
+    for branch in native['obligations']:
+        if (branch['evidence_results'].get('native', {}).get('outcome') == 'passed'
+                and bindings.get(branch['id'], {}).get('runtime_observation_attachment')
+                and branch['id'] == '2025.1|wwise-authoring|2025.1.7.9143|function|ak.wwise.core.profiler.getLoadedMedia|/resultSchema/properties/return/@cardinality/single'):
+            from tests.support.loaded_media_runtime_evidence import BASIS
+            branch['representative_native_support'] = dict(BASIS)
     complete_states = {'verified', 'source_definition_verified', 'proven_native_absence', 'approved_exclusion'}
     counts = dict(sorted(Counter(r['state'] for r in native['obligations']).items()))
     if condition_reuse_reviews:

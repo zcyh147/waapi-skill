@@ -40,6 +40,10 @@ def program_source_context(root=audit.ROOT, *, flow=None):
         'tests/maintenance/branch_coverage_audit.py', 'tests/maintenance/branch_audit_completion.py']
     if flow in {'ak.wwise.core.profiler.' + name for name in ('getVoices', 'getBusses', 'getAudioObjects', 'getGameObjects')}:
         dependencies.extend(('tests/support/fixed_runtime_read_evidence.py', 'tests/unit/test_fixed_runtime_read_branch_evidence.py'))
+    if flow == 'ak.wwise.core.profiler.getLoadedMedia':
+        dependencies.extend(('tests/support/loaded_media_runtime_evidence.py',
+            'tests/unit/test_loaded_media_runtime_evidence.py', 'tests/support/fixed_runtime_read_evidence.py',
+            'tests/fixtures/runtime-loaded-media/support-review.json'))
     if flow == 'ak.wwise.core.profiler.getVoiceContributions':
         dependencies.append('tests/unit/test_contribution_branch_evidence.py')
     return {group: {name: sha((root / name).read_bytes()) for name in sorted(paths)}
@@ -312,6 +316,9 @@ def _validate_rtpc_structure(record, binding, branch, root):
 
 
 def validate_runtime_evidence(record, binding, branch, category, base, root, reference_edges=None):
+    if branch['route'].endswith('|function|ak.wwise.core.profiler.getLoadedMedia'):
+        from tests.support.loaded_media_runtime_evidence import validate_evidence
+        return validate_evidence(record, binding, branch, category, base, root, reference_edges or {})
     from tests.support.fixed_runtime_read_evidence import URIS, validate_evidence
     if branch['route'].split('|')[4] in URIS:
         return validate_evidence(record, binding, branch, category, base, root, reference_edges or {})
@@ -416,7 +423,7 @@ def attach_runtime_observations(descriptors, bindings, read, base, requirements,
             raise ValueError('Runtime observation requires exact reviewed program/native policy')
         observation_hashes = {'capture': proof['capture']['sha256']}
         from tests.support.fixed_runtime_read_evidence import URIS
-        if identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions'}:
+        if identity.split('|')[4] in URIS | {'ak.wwise.core.profiler.getVoiceContributions', 'ak.wwise.core.profiler.getLoadedMedia'}:
             raw = proof['mapping']['raw_observation']
             _portable_descriptor(raw, base)
             observation_hashes['raw'] = raw['sha256']

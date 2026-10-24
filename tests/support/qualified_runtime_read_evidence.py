@@ -53,8 +53,162 @@ def fixture_path(version, root=audit.ROOT):
     return root / f'tests/fixtures/runtime-qualified-reads/{version}-original.json.gz'
 
 
+R104_CANDIDATE = 'a5884dcbb655d03a4537ed1e3553ac01e1d2fdb8'
+R104_NODE = 'd87a1375cafae330c7be7f7f'
+R104_SELECTORS = 'tests/fixtures/runtime-qualified-reads/r125-r104-native-anchor-selectors.json'
+R104_SELECTORS_SHA = '59826bc255917de26fdd9a70a228d724941b8c125756195d55045d5ae8f83c68'
+
+
+def r104_profile(version, category):
+    raw = (audit.ROOT / R104_SELECTORS).read_bytes()
+    if runtime.sha(raw) != R104_SELECTORS_SHA:
+        raise ValueError('Exact22 R104 retained native anchor scope differs')
+    profile = json.loads(raw)['profiles'].get(version + '|' + category)
+    if profile is None:
+        raise ValueError('Only exact22 assessed R104 read profiles are eligible')
+    return profile
+
+
+def r104_fixture_path(version, root=audit.ROOT):
+    return root / f'tests/fixtures/runtime-qualified-reads/r104-{version}-original.json.gz'
+
+
+def r104_source_review():
+    # R104 differs from the reviewed R105 packaged basis only at this alias repair.
+    changes = deepcopy(runtime.RTPC_REVIEWED_SOURCE_CHANGES)
+    changes['skills/waapi-skill/wwise_waapi/builders/stable_reads.py']['before'] = '74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d'
+    symbols = deepcopy(runtime.RTPC_REVIEWED_SOURCE_SYMBOLS)
+    symbols['skills/waapi-skill/wwise_waapi/builders/stable_reads.py'] = ['normalize_profiler_game_objects_result: accept actual registerTime/unregisterTime and reflected registrationTime/unregistrationTime; preserve ID/name/time values']
+    return changes, symbols
+
+
+def retained_r104_read(version, category, descriptor=None, base=None):
+    """Exact failed R104 roots, independently assessed read facts and actual cleanup."""
+    import base64
+    import gzip
+    profile = r104_profile(version, category)
+    if descriptor is None:
+        path = r104_fixture_path(version)
+        base, descriptor = path.parent, {'artifact': path.name, 'sha256': runtime.sha(path.read_bytes())}
+    if descriptor['sha256'] != profile['archive']:
+        raise ValueError('Exact R104 whole original closure differs')
+    read = runtime.archive_reader(descriptor, base)
+    encoded = json.loads(gzip.decompress((base / descriptor['artifact']).read_bytes()))['files']
+    if len(encoded) != profile['files'] or audit.digest(encoded) != profile['decoded_files_sha256']:
+        raise ValueError('Exact R104 decoded whole archive map differs')
+    root = profile['original_root']
+    def load(relative): return json.loads(read(root + '/' + relative))
+    node = load(f'evidence/authoring-node-observations/{R104_NODE}.json')
+    sources = node['source_context']['sources']
+    if (node['candidate'] != R104_CANDIDATE or node['source_context']['candidate'] != R104_CANDIDATE
+            or node['nodeid'] != 'tests/destructive/test_authoring_ui_business_live.py::test_runtime_owned_profiler_capture_reads'
+            or len(sources) != 616 or audit.digest(sources) != 'ea923adf89f880842b4fcaff20fc22ec7478fedd9b62c5e2128990a12e45e42b'):
+        raise ValueError('Exact R104 candidate/full source context differs')
+    manifest = {}
+    for name, group in node['artifacts'].items():
+        if group['path'] != root + f'/evidence/authoring-node-observations/{R104_NODE}-' + name:
+            raise ValueError('Exact R104 manifest group differs')
+        for item in group['files']:
+            path = group['path'] + '/' + item['path']
+            if Path(item['path']).is_absolute() or '..' in Path(item['path']).parts or path in manifest:
+                raise ValueError('Exact R104 manifest path differs')
+            raw = read(path)
+            if runtime.sha(raw) != item['sha256'] or len(raw) != item['bytes']:
+                raise ValueError('Exact R104 manifest artifact differs')
+            manifest[path] = raw
+    if len(manifest) != profile['manifest_count']:
+        raise ValueError('Complete R104 original native manifest required')
+    capture = json.loads(manifest[root + f'/evidence/authoring-node-observations/{R104_NODE}-native-evidence/profiler-capture.json'])
+    life, quarantine, start = (load('evidence/' + n + '.json') for n in ('lifecycle', 'quarantine', 'start'))
+    review = load('root-review.json')
+    if (life['final_status'] != 'BLOCKED' or life['requested_status'] != 'BLOCKED'
+            or life['errors'] != [] or life['sandbox_retained'] is not True
+            or life['source_hash_before'] != life['source_hash_after']
+            or life['source_mtime_before_ns'] != life['source_mtime_after_ns']
+            or quarantine['status'] != 'BLOCKED' or quarantine['never_reuse'] is not True or quarantine['errors'] != []
+            or review['candidate'] != R104_CANDIDATE or review['version'] != version
+            or review['exit_code'] != 1 or review['formal_outcome'] != 'BLOCKED'
+            or review['source_context_files_checked'] != 616 or review['archive_files_checked'] != len(manifest)
+            or review['integrity_errors'] != [] or review['lifecycle_errors'] != []
+            or any(review[k] is not True for k in ('source_unchanged', 'cleanup_complete', 'fixture_preserved', 'post_terminal_port_8080_bindable'))
+            or review['post_terminal_owned_processes'] != []):
+        raise ValueError('R104 original blocked workflow/completed physical cleanup facts differ')
+    if (capture['candidate'] != R104_CANDIDATE or capture['version'] != version
+            or capture['host']['isCommandLine'] is not False or start['get_info'] != capture['host']
+            or start['authoring_build'] != profile['build'] or start['version'] != version
+            or capture['complete'] is not False or capture['capture_read_batch'] is not True or capture['errors'] != []
+            or capture['fixture_before'] != capture['fixture_after']
+            or capture['capture_position']['position_ms'] != profile['time']
+            or capture['cleanup']['complete'] is not True or capture['cleanup']['errors'] != []
+            or capture['cleanup']['transport_stopped_observation']['state'] != 'stopped'):
+        raise ValueError('R104 actual host/time/preservation/collector cleanup differs')
+    receipt, = [r for r in node['receipts'] if r['argv'] == profile['public_argv']]
+    raw = json.loads(manifest[profile['raw_path']])
+    if (runtime.sha(manifest[profile['raw_path']]) != profile['raw_sha256'] or raw['api'] != profile['uri']
+            or raw['version'] != version or raw['ok'] is not True or raw['dry_run'] is not False or raw['error_code'] is not None
+            or receipt['exit_code'] != profile['public_exit_code']):
+        raise ValueError('Exact R104 native packet/original public outcome differs')
+    # Every selected read is tied to the independently observed Soundcaster at the same T.
+    game_id = capture['transport_association']['gameObject']
+    audio = capture['outcomes']['profiler-audio-objects-observation']
+    ae = audio['evidence']
+    if (game_id != 18446744073709551614 or audio['outcome'] != 'PASS'
+            or ae['owned_identity_observed'] is not True or ae['complete'] is not True or ae['nonempty'] is not True
+            or ae['identity_ties'] != {'sound_row_indexes': [], 'bus_row_indexes': [], 'transport_game_object_row_indexes': [0, 1]}
+            or any(row['gameObjectID'] != game_id or row['busGUID'] != '{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}' for row in ae['agent_result']['return'])):
+        raise ValueError('R104 actual owned Soundcaster/runtime Bus association differs')
+    from tests.support.fixed_runtime_read_evidence import row_data
+    rows = raw['result']['return']
+    facts = {'original_workflow_outcome': 'BLOCKED', 'original_finalization': 'BLOCKED',
+        'original_public_exit_code': receipt['exit_code'], 'physical_cleanup_complete': True,
+        'post_terminal_port_8080_bindable': True, 'post_terminal_owned_processes': [],
+        'cleanup_credit_transferred': False, 'original_read_outcome': 'PASS',
+        'qualified_scope': 'owned Soundcaster/runtime Bus association; no Cars mixing-Bus effect'}
+    if category == 'r104-object-rtpcs-observation':
+        outcome = capture['outcomes']['profiler-rtpcs-observation']; evidence = outcome['evidence']
+        if (outcome['outcome'] != 'BLOCKED' or evidence['observation_status'] != 'PASS'
+                or evidence['owned_identity_observed'] is not False or evidence['rpm_stimulus_row_indexes'] != []
+                or evidence['owned_game_object_row_indexes'] != [0, 1] or evidence['attribution_scope'] != 'controlled-global-rtpc'
+                or capture['fixture_before']['rpm']['id'] != rows[0]['id'] or capture['fixture_before']['rpm']['name'] != rows[0]['name']
+                or [(r['name'], r['gameObjectId'], r['value']) for r in rows] != [('RPM', game_id, 1000.0), ('Engine_Load', game_id, 1.0)]):
+            raise ValueError('R104 object-specific RTPC fact/global-effect failure boundary differs')
+        facts.update(original_read_outcome='BLOCKED', collector_owned_identity_observed=False,
+            qualified_scope='object-specific read facts only; global setter effect unverified')
+        if receipt['payload']['agent_result'] != evidence['agent_result']:
+            raise ValueError('Original R104 complete RTPC public result differs')
+    elif category == 'r104-game-objects-observation':
+        if len(rows) != 1 or rows[0]['id'] != game_id or rows[0]['name'] != 'Transport/Soundcaster':
+            raise ValueError('R104 GameObject raw identity differs')
+        facts['qualified_scope'] = 'actual owned Soundcaster GameObject ID; current timestamp-alias replay'
+        if version == '2022.1':
+            if receipt['payload'].get('error_code') != 'INVALID_STABLE_READ_RESULT' or receipt['payload'].get('ok') is not False:
+                raise ValueError('R104 original public alias-normalization failure must remain')
+            facts['original_read_outcome'] = 'FAIL'
+        elif receipt['payload']['ok'] is not True:
+            raise ValueError('Original R104 successful public GameObject read required')
+    elif audit.digest(row_data(ae['agent_result']['return'])) != audit.digest(rows) or len(rows) != 2:
+        raise ValueError('R104 complete original AudioObject native/public array differs')
+    if receipt['exit_code'] == 0 and profile['uri'] != 'ak.wwise.core.profiler.getGameObjects':
+        public = receipt['payload']['agent_result']
+        if public['complete'] is not True or public['truncated'] is not False or audit.digest(row_data(public['return'])) != audit.digest(rows):
+            raise ValueError('Complete nontruncated R104 original public result required')
+    request = {'args': {'time': profile['time']}, 'options': {}}
+    if category == 'r104-audio-objects-observation':
+        issuers = [json.loads(data) for name, data in manifest.items()
+            if '/runtime-inspection-observations-v1/rto1-' in name]
+        issuer, = [item for item in issuers if item['plan']['request']['api'] == profile['uri']
+            and item['plan']['request']['args'] == request['args']]
+        if audit.digest(row_data(issuer['plan']['result']['return'])) != audit.digest(rows):
+            raise ValueError('R104 exact original AudioObject request issuer/result differs')
+        request = issuer['plan']['request']
+    return {'node': node, 'capture': capture, 'receipt': receipt, 'raw': raw, 'manifest': manifest,
+            'sources': sources, 'profile': profile, 'request': request, 'facts': facts}
+
+
 def retained_read(version, category, descriptor=None, base=None):
     """Read exactly one immutable closure, resolving only archived manifest paths."""
+    if category.startswith('r104-'):
+        return retained_r104_read(version, category, descriptor, base)
     profile = PROFILES[version]
     selected_profile = anchor_profile(version, category)
     if category not in CATEGORIES or (version == '2021.1' and selected_profile is None):
@@ -187,6 +341,17 @@ def retained_contribution_inputs(version):
 
 
 def selected_mappings(inventory, captured, version, category):
+    if category.startswith('r104-'):
+        profile = r104_profile(version, category)
+        route = next(r for r in inventory['native_coverage']['routes'] if r['id'] == profile['route'])
+        allowed = {r['id'] for r in profile['selectors']}
+        if category == 'r104-object-rtpcs-observation':
+            mappings = [{'branch': b, 'program_pointer': '/native_call/result/return/0/' + b['pointer'].rsplit('/', 1)[1], 'reference_chain': []}
+                for b in inventory['native_coverage']['obligations'] if b['id'] in allowed]
+        else:
+            from tests.support.fixed_runtime_read_evidence import mappings as fixed_mappings
+            mappings = fixed_mappings(inventory, captured, route, selected=allowed)
+        return route, mappings
     if category.endswith('-seed'):
         from tests.support.fixed_runtime_read_evidence import mappings as fixed_mappings
         route = next(r for r in inventory['native_coverage']['routes'] if r['id'] == anchor_profile(version, category)['route'])
@@ -208,7 +373,10 @@ def selected_mappings(inventory, captured, version, category):
 
 def write_qualified_read_bundle(output, program_path, original, *, inventory, version, category, selected=None):
     """Add one retained observation to ordinary shared per-branch program output."""
-    if Path(original) != Path(original_root(version)) and Path(original) != fixture_path(version):
+    is_r104 = category.startswith('r104-')
+    original_fixture = r104_fixture_path(version) if is_r104 else fixture_path(version)
+    root_locator = r104_profile(version, category)['original_root'] if is_r104 else original_root(version)
+    if Path(original) != Path(root_locator) and Path(original) != original_fixture:
         raise ValueError('Exact retained original locator required')
     retained = retained_read(version, category)
     captured = json.loads(Path(program_path).read_bytes())
@@ -220,26 +388,29 @@ def write_qualified_read_bundle(output, program_path, original, *, inventory, ve
     if not mappings:
         raise ValueError('No qualified result mappings')
     output = Path(output)
-    if category.endswith('-seed'):
+    if category.endswith('-seed') or (is_r104 and category != 'r104-object-rtpcs-observation'):
         from tests.support.fixed_runtime_read_evidence import write_fixed_bundle
         index_path = write_fixed_bundle(output, program_path, None, inventory=inventory, selected={r['branch']['id'] for r in mappings})
-    elif category == 'profiler-rtpcs-observation':
+    elif category in {'profiler-rtpcs-observation', 'r104-object-rtpcs-observation'}:
         index_path = runtime.write_field_bundle(output, program_path, None, inventory=inventory,
             version=version, host='wwise-authoring', mode='data', mappings=mappings)
     else:
         index_path = runtime.write_read_bundle(output, program_path, None, inventory=inventory,
             version=version, host='wwise-authoring', mode='qualified-data', mappings=mappings)
     index = json.loads(index_path.read_bytes())
-    shutil.copyfile(fixture_path(version), output / 'qualified-original.json.gz')
+    shutil.copyfile(original_fixture, output / 'qualified-original.json.gz')
     assessment = {'contract': 'waapi-skill.qualified-retained-read-assessment/v1',
-        'version': version, 'category': category, 'original_candidate': CANDIDATE,
+        'version': version, 'category': category, 'original_candidate': R104_CANDIDATE if is_r104 else CANDIDATE,
         'original_workflow_outcome': 'BLOCKED', 'original_finalization': 'BLOCKED',
         'successful_finalization': False, 'qualified_read_fact': 'PASS',
-        'lifecycle_obligations': lifecycle_obligations(version),
+        'lifecycle_obligations': [] if is_r104 else lifecycle_obligations(version),
         'archive': {'artifact': 'qualified-original.json.gz', 'sha256': retained['profile']['archive']},
         'program_capture': index['entries'][0]['origin']['capture'],
         'source_changes': runtime.RTPC_REVIEWED_SOURCE_CHANGES,
         'changed_symbols': runtime.RTPC_REVIEWED_SOURCE_SYMBOLS}
+    if is_r104:
+        assessment['source_changes'], assessment['changed_symbols'] = r104_source_review()
+        assessment['retained_facts'] = retained['facts']
     assessment_descriptor = runtime.write_json(output / 'qualified-assessment.json', assessment)
     bindings = completion.read_sealed_artifact(index['entries'][0]['bindings'], output)['bindings']
     attachments = []
@@ -280,36 +451,43 @@ def attach_qualified_reads(descriptors, bindings, read, requirements, captures):
 
 def qualified_read_result(descriptor, branch, candidate, scope_kind, base, binding, root, edges, historical_sources):
     assessment = completion.read_sealed_artifact(binding['qualified_runtime_read_attachment'], base)
-    if assessment['lifecycle_obligations'] != lifecycle_obligations(assessment['version']):
+    is_r104 = assessment['category'].startswith('r104-')
+    profile = r104_profile(assessment['version'], assessment['category']) if is_r104 else PROFILES[assessment['version']]
+    original_candidate = R104_CANDIDATE if is_r104 else CANDIDATE
+    if assessment['lifecycle_obligations'] != ([] if is_r104 else lifecycle_obligations(assessment['version'])):
         raise ValueError('All exact lifecycle obligations remain BLOCKED on #186')
     version, host, build, kind, uri = branch['route'].split('|')
-    if (scope_kind != 'product' or version not in PROFILES or host != 'wwise-authoring'
-            or build != PROFILES[version]['build'] or kind != 'function'
-            or CATEGORIES.get(assessment['category']) != uri or assessment['version'] != version
+    if (scope_kind != 'product' or (not is_r104 and version not in PROFILES) or host != 'wwise-authoring'
+            or build != profile['build'] or kind != 'function'
+            or (profile['uri'] if is_r104 else CATEGORIES.get(assessment['category'])) != uri or assessment['version'] != version
             or not branch['pointer'].startswith('/resultSchema')):
         raise ValueError('Qualified retained read exact route/result scope differs')
-    selected_profile = anchor_profile(version, assessment['category'])
+    selected_profile = profile if is_r104 else anchor_profile(version, assessment['category'])
     if selected_profile is not None and not any(r['id'] == branch['id'] and r['shape_sha256'] == branch['shape_sha256'] for r in selected_profile['selectors']):
         raise ValueError('Only exact43 approved native anchor selectors are eligible')
     expected = {'contract', 'version', 'category', 'original_candidate', 'original_workflow_outcome',
         'original_finalization', 'successful_finalization', 'qualified_read_fact', 'lifecycle_obligations',
         'archive', 'program_capture', 'source_changes', 'changed_symbols'}
+    if is_r104:
+        expected.add('retained_facts')
     if (set(assessment) != expected or assessment['contract'] != 'waapi-skill.qualified-retained-read-assessment/v1'
-            or assessment['original_candidate'] != CANDIDATE or assessment['original_workflow_outcome'] != 'BLOCKED'
+            or assessment['original_candidate'] != original_candidate or assessment['original_workflow_outcome'] != 'BLOCKED'
             or assessment['original_finalization'] != 'BLOCKED' or assessment['successful_finalization'] is not False
             or assessment['qualified_read_fact'] != 'PASS'):
         raise ValueError('Qualified assessment must preserve original BLOCKED finalization')
     retained = retained_read(version, assessment['category'], assessment['archive'], base)
+    if is_r104 and assessment['retained_facts'] != retained['facts']:
+        raise ValueError('Exact R104 qualified scope/original failures/actual cleanup facts differ')
     sources = retained['sources']
-    if completion.historical_source_seals(root, CANDIDATE, sources, historical_sources) != sources:
+    if completion.historical_source_seals(root, original_candidate, sources, historical_sources) != sources:
         raise ValueError('Original full 616-file candidate source map differs')
     before = {key: value for key, value in sources.items() if key.startswith('skills/waapi-skill/')}
     current = runtime.program_source_context(root, flow=uri)['packaged']
     changes = {key: {'before': before.get(key), 'after': current.get(key)}
                for key in before.keys() | current.keys() if before.get(key) != current.get(key)}
-    if (len(before) != 413 or assessment['source_changes'] != runtime.RTPC_REVIEWED_SOURCE_CHANGES
-            or changes != runtime.RTPC_REVIEWED_SOURCE_CHANGES
-            or assessment['changed_symbols'] != runtime.RTPC_REVIEWED_SOURCE_SYMBOLS):
+    expected_changes, expected_symbols = r104_source_review() if is_r104 else (runtime.RTPC_REVIEWED_SOURCE_CHANGES, runtime.RTPC_REVIEWED_SOURCE_SYMBOLS)
+    if (len(before) != 413 or assessment['source_changes'] != expected_changes
+            or changes != expected_changes or assessment['changed_symbols'] != expected_symbols):
         raise ValueError('Exact reviewed five-file source transition differs')
     runtime._portable_descriptor(assessment['program_capture'], base)
     capture = completion.read_sealed_artifact(assessment['program_capture'], base)
@@ -340,7 +518,7 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
             raise ValueError('Complete original RTPC array must survive current public replay')
         if capture['gateway']['argv'] != retained['receipt']['argv']:
             raise ValueError('Original RTPC request/time differs')
-    elif assessment['category'].endswith('-seed'):
+    elif assessment['category'].endswith('-seed') or is_r104:
         from tests.support.fixed_runtime_read_evidence import validate_program
         validate_program(program, binding, branch, root, edges)
         expected = {'uri': uri, 'args': retained['request']['args'], 'options': retained['request']['options'], 'result': retained['raw']['result']}
@@ -355,7 +533,7 @@ def qualified_read_result(descriptor, branch, candidate, scope_kind, base, bindi
                 or audit.digest(capture['native_call']['args']) != audit.digest(retained['receipt']['payload']['semantic_preview']['args'])
                 or audit.digest(capture['gateway']['payload']['agent_result']) != audit.digest(retained['receipt']['payload']['agent_result'])):
             raise ValueError('Complete original contribution/path must survive current public replay')
-    if type(capture['native_call']['args']['time']) is not int or capture['native_call']['args']['time'] != PROFILES[version]['time']:
+    if type(capture['native_call']['args']['time']) is not int or capture['native_call']['args']['time'] != profile['time']:
         raise ValueError('Exact original read time differs')
     value = completion.pointer_value(capture, pointer)
     if audit.digest(value) != audit.digest(record['observed']):
